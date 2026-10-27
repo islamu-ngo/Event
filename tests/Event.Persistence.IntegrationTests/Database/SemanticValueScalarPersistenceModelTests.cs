@@ -23,6 +23,38 @@ public sealed class SemanticValueScalarPersistenceModelTests
     [Arguments(PrimaryDatabaseProvider.SqlServer)]
     [Arguments(PrimaryDatabaseProvider.MariaDb)]
     [Arguments(PrimaryDatabaseProvider.MySql)]
+    public async Task PrivateBirthDateProvenanceRemainsAnIsolatedPiiOwnedCascade(PrimaryDatabaseProvider provider)
+    {
+        using var context = CreateContext(provider);
+        IModel model = context.GetService<IDesignTimeModel>().Model;
+        IEntityType receipt = RequiredEntity<UserBirthDateCollectionReceipt>(model);
+        IEntityType pii = RequiredEntity<UserPii>(model);
+        IForeignKey ownership = receipt.GetForeignKeys().Single();
+
+        await Assert.That(ownership.PrincipalEntityType.ClrType).IsEqualTo(typeof(UserPii));
+        await Assert.That(ownership.Properties.Select(property => property.Name))
+            .IsEquivalentTo([nameof(UserBirthDateCollectionReceipt.UserId)]);
+        await Assert.That(ownership.PrincipalKey.Properties.Select(property => property.Name))
+            .IsEquivalentTo([nameof(UserPii.UserId)]);
+        await Assert.That(ownership.DeleteBehavior).IsEqualTo(DeleteBehavior.Cascade);
+        await Assert.That(receipt.GetIndexes().Any(index => index.IsUnique
+            && index.Properties.Select(property => property.Name).SequenceEqual([nameof(UserBirthDateCollectionReceipt.UserId)]))).IsTrue();
+        await Assert.That(receipt.GetReferencingForeignKeys()).IsEmpty();
+        await Assert.That(receipt.GetProperties().Any(property => property.ClrType == typeof(DateOnly)
+            || property.ClrType == typeof(DateOnly?))).IsFalse();
+        await Assert.That(pii.GetForeignKeys().Any(foreignKey => foreignKey.PrincipalEntityType == receipt)).IsFalse();
+
+        if (provider == PrimaryDatabaseProvider.SqlServer)
+            await Assert.That(pii.GetForeignKeys().Single(foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(User)).DeleteBehavior)
+                .IsEqualTo(DeleteBehavior.NoAction);
+    }
+
+    [Test]
+    [Arguments(PrimaryDatabaseProvider.PostgreSql)]
+    [Arguments(PrimaryDatabaseProvider.Sqlite)]
+    [Arguments(PrimaryDatabaseProvider.SqlServer)]
+    [Arguments(PrimaryDatabaseProvider.MariaDb)]
+    [Arguments(PrimaryDatabaseProvider.MySql)]
     public async Task ProviderModelsKeepSemanticValueOwnersOnDirectScalarLeaves(PrimaryDatabaseProvider provider)
     {
         using var context = CreateContext(provider);

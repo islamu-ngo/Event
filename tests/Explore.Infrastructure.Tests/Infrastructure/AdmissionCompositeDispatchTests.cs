@@ -411,8 +411,9 @@ public sealed class AdmissionCompositeDispatchTests
             NullLogger<CompositeOutboxMessageDispatcher>.Instance,
             Substitute.For<IConfigurationManifestEffectDispatcher>(),
             Substitute.For<IConfigurationImportEffectDelivery>(),
-            Substitute.For<INotificationOutboxExecutionAuthority>(),
-            Substitute.For<IGenericOutboxExecutionAuthority>());
+            moderationEffectDispatcher: Substitute.For<IModerationEffectDispatcher>(),
+            notificationOutboxExecutionAuthority: Substitute.For<INotificationOutboxExecutionAuthority>(),
+            genericOutboxExecutionAuthority: Substitute.For<IGenericOutboxExecutionAuthority>());
     }
 
     private static NotificationFanoutOccurrenceHandoffService CreateNotificationHandoff()

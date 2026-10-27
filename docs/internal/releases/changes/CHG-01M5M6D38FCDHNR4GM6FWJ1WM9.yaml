@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5M6D38FCDHNR4GM6FWJ1WM9
+Title: "Retain protected pre-finding and content response custody"
+Type: feat
+Scope: privacy
+Summary: "Bind pre-finding issuance and protected content responses to exact native generation and finite recipient custody; included tests are unrun and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Generation-bound pre-finding and content-response custody restrict private reads and notification cleanup; retained occurrences alone do not grant disclosure. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires separately owned pre-finding, response, custody and notification receipt models plus generated schema history; no migration or provider execution occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Pre-finding administration/issuance/recipient and content-response availability/index/statement endpoint sources ship here; generated artifacts are reserved once for final host composition."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Deploy with notice and correction custody owners and the schema/composition checkpoints; complete paired protected response guidance and provider assurance before PR."

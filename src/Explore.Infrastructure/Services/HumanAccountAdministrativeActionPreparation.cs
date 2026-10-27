@@ -36,7 +36,7 @@ public sealed partial class HumanAccountAdministrativeActionPreparation(
     Func<IHumanActionCommitFinalizer> resolveFinalizer) : IHumanAccountAdministrativeActionPreparation
 {
     private async Task<IPreparedHumanAccountAdministrativeAction> Prepare(
-        object operation, string? requester, string resource, string action, bool annotated,
+        object operation, Guid? requester, string resource, string action, bool annotated,
         CancellationToken cancellationToken)
     {
         if (machine.IsMachineCaller)
@@ -51,7 +51,7 @@ public sealed partial class HumanAccountAdministrativeActionPreparation(
             ?? throw new UnauthorizedAccessException("Authentic credential lifetime is required.");
         Guid tenant = tenantContext.TenantId;
         if (tenant == Guid.Empty || subject.AccountKey != lifetime.AccountKey
-            || requester is not null && (!Guid.TryParse(requester, out Guid actor) || actor != subject.PrincipalId))
+            || requester.HasValue && (requester == Guid.Empty || requester != subject.PrincipalId))
             throw new UnauthorizedAccessException("The requester is not the original resolved account.");
         if (operation is ISecureRequest secure && secure.AuthorizationFacts switch
         {

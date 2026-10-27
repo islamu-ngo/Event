@@ -83,7 +83,6 @@ public sealed class OrganizationMemberAuthorizationTests
         var command = (ISecureRequest)new AddOrganizationMemberCommand
         {
             TenantId = tenantId,
-            RequesterUserId = Guid.NewGuid().ToString("D"),
             AddOrganizationMemberDto = new AddOrganizationMemberDto
             {
                 OrganizationId = organizationId,

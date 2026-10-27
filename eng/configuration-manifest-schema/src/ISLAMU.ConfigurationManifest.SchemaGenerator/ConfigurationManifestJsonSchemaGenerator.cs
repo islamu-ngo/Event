@@ -13,7 +13,7 @@ using Explore.Domain.Settings;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
 
-public static class ConfigurationManifestJsonSchemaGenerator
+public static partial class ConfigurationManifestJsonSchemaGenerator
 {
     public const string SchemaDialect = "https://json-schema.org/draft/2020-12/schema";
 
@@ -249,6 +249,7 @@ public static class ConfigurationManifestJsonSchemaGenerator
             ["tenantSettings"] = SettingsSchema(tenantSettings)
         };
         var schemaDefinitions = new JsonObject();
+        AddModerationDefinitions(definitions);
         foreach ((string key, JsonNode? value) in definitions)
             schemaDefinitions[key] = value;
 
@@ -317,6 +318,7 @@ public static class ConfigurationManifestJsonSchemaGenerator
             ["tenantSpec"] = TenantSpecSchema()
         };
         var result = new JsonObject();
+        AddModerationDefinitions(definitions);
         foreach ((string key, JsonNode? value) in definitions)
             result[key] = value;
         return result;
@@ -369,6 +371,7 @@ public static class ConfigurationManifestJsonSchemaGenerator
                 ["displayName"] = BoundedString(maximumLength: 500),
                 ["documents"] = Ref("tenantDocuments"),
                 ["legalDocuments"] = Ref("tenantLegalDocuments"),
+                ["moderation"] = Ref("moderationDocument"),
                 ["settings"] = Ref("tenantSettings")
             },
             ["displayName", "documents", "legalDocuments", "settings"]);
@@ -447,6 +450,7 @@ public static class ConfigurationManifestJsonSchemaGenerator
             {
                 ["documents"] = Ref("instanceDocuments"),
                 ["legalDocuments"] = Ref("instanceLegalDocuments"),
+                ["moderation"] = Ref("moderationDocument"),
                 ["settings"] = Ref("instanceSettings")
             },
             ["documents", "legalDocuments", "settings"]);
@@ -494,6 +498,7 @@ public static class ConfigurationManifestJsonSchemaGenerator
                 ["displayName"] = BoundedString(maximumLength: 500),
                 ["documents"] = Ref("tenantDocuments"),
                 ["legalDocuments"] = Ref("tenantLegalDocuments"),
+                ["moderation"] = Ref("moderationDocument"),
                 ["settings"] = Ref("tenantSettings")
             },
             ["displayName", "documents", "legalDocuments", "settings"]);

@@ -1,9 +1,12 @@
 using System.Data.Common;
 using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
+using Event.Persistence.IntegrationTests.Moderation;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventResource;
 using Explore.Application.Features.EventResources.Handlers.Commands;
@@ -16,6 +19,7 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
+using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
@@ -26,6 +30,8 @@ using Explore.Persistence.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using TUnit.Core.Interfaces;
 
@@ -33,21 +39,91 @@ namespace Event.Persistence.IntegrationTests;
 
 [NotInParallel("EventResourcePersistence")]
 [ClassDataSource<EventResourceFileUploadTests.Database>(Shared = SharedType.PerClass)]
-public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Database database)
+public sealed partial class EventResourceFileUploadTests(EventResourceFileUploadTests.Database database)
 {
     private static readonly DateTime Now = new(2040, 1, 1, 12, 0, 0, DateTimeKind.Utc);
     private static readonly byte[] Pdf = "%PDF-1.7\nresource test\n%%EOF"u8.ToArray();
+
+    [Test]
+    [Arguments(0)]
+    [Arguments(1)]
+    [Arguments(2)]
+    [Arguments(3)]
+    [Arguments(4)]
+    [Arguments(5)]
+    public async Task EveryUploadResponseAliasWithholdsStoredFieldsAfterPrivatePreparationLosesReadAuthority(int operation)
+    {
+        var seed = await SeedAsync();
+        await using var context = database.CreateContext();
+        var consumer = Workflow(context, seed);
+        var workflow = consumer.Workflow;
+        var intent = Intent(seed.Version);
+        using var content = new MemoryStream(Pdf);
+        StorageUploadSessionResult result;
+        if (operation is 0 or 1)
+        {
+            if (operation == 1)
+                await consumer.ReserveAsync(seed.ResourceId, intent, default);
+            result = await workflow.ReserveAsync(seed.ResourceId, intent, default);
+        }
+        else
+        {
+            var reservation = await consumer.ReserveAsync(seed.ResourceId, intent, default);
+            var id = reservation.Id!.Id;
+            if (operation is 2 or 3)
+            {
+                if (operation == 3) await FinalizeAsync(consumer, id);
+                result = await workflow.FinalizeAsync(new FinalizeStorageUploadSessionCommand
+                {
+                    UploadSessionId = id,
+                    Content = content,
+                    ContentLength = Pdf.Length,
+                    ContentType = "application/pdf"
+                }, default);
+            }
+            else
+            {
+                if (operation == 5) await consumer.CancelAsync(id, default);
+                result = await workflow.CancelAsync(id, default);
+            }
+        }
+        await using var ownedResult = result;
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(result.Response).IsNull();
+        await Assert.That(result.Projection).IsNotNull();
+        var serialized = System.Text.Json.JsonSerializer.SerializeToElement(result);
+        await Assert.That(serialized.TryGetProperty("Id", out _)).IsFalse();
+        await Assert.That(serialized.TryGetProperty("Response", out _)).IsFalse();
+        bool delivered = false;
+        var outcome = await result.Projection!.DiscloseAsync(async (response, token) =>
+        {
+            await Assert.That(response.Id!.SafeDisplayName).IsEqualTo(intent.SafeDisplayName);
+            await using var revoked = database.CreateContext();
+            (await revoked.Events.SingleAsync(row => row.Id == seed.EventId, token)).OrganizerActorId = null;
+            await Assert.That(await revoked.SaveChangesAsync(token)).IsEqualTo(1);
+            return response;
+        }, (_, _) => { delivered = true; return Task.CompletedTask; });
+        await Assert.That(outcome).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
+        await Assert.That(delivered).IsFalse();
+        await Assert.That(await result.Projection.DiscloseAsync(
+            (response, _) => Task.FromResult(response),
+            (_, _) => { delivered = true; return Task.CompletedTask; }))
+            .IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(delivered).IsFalse();
+        await RecordUploadDatabaseObservationAsync(context);
+    }
 
     [Test]
     public async Task NativeReservationBindsVersionSubjectAndRequestIdentity()
     {
         var seed = await SeedAsync();
         await using var context = database.CreateTenantContext(seed.TenantId);
-        var handler = new CreateEventResourceUploadSessionCommandHandler(Workflow(context, seed));
+        var handler = new CreateEventResourceUploadSessionCommandHandler(Workflow(context, seed).Workflow);
         var dto = Intent(seed.Version);
-        var first = await handler.ExecuteAsync(new(seed.ResourceId, dto), default);
-        var replay = await handler.ExecuteAsync(new(seed.ResourceId, dto), default);
-        var mismatch = await handler.ExecuteAsync(new(seed.ResourceId, dto with { ExpectedSizeBytes = Pdf.Length + 1 }), default);
+        var first = await EventResourceUploadTestConsumer.ConsumeAsync(handler.ExecuteAsync(new(seed.ResourceId, dto), default));
+        var replay = await EventResourceUploadTestConsumer.ConsumeAsync(handler.ExecuteAsync(new(seed.ResourceId, dto), default));
+        var mismatch = await EventResourceUploadTestConsumer.ConsumeAsync(handler.ExecuteAsync(
+            new(seed.ResourceId, dto with { ExpectedSizeBytes = Pdf.Length + 1 }), default));
         await Assert.That(first.IsSuccess).IsTrue();
         await Assert.That(replay.Id!.Id).IsEqualTo(first.Id!.Id);
         await Assert.That(mismatch.IsSuccess).IsFalse();
@@ -86,8 +162,8 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         var handler = new FinalizeStorageUploadSessionCommandHandler(Substitute.For<IStorageProviderBindingService>(), policy,
             sessions, new StorageUsageCounterRepository(context), new StorageObjectRepository(context),
             new PrivacyErasureStateRepository(context), new EventResourceStorageLifecycleRepository(context),
-            tenant, user, new EfCoreUnitOfWork(context), metrics, workflow);
-        var result = await handler.ExecuteAsync(command, default);
+            tenant, user, new EfCoreUnitOfWork(context), metrics, workflow.Workflow);
+        var result = await EventResourceUploadTestConsumer.ConsumeAsync(handler.ExecuteAsync(command, default));
         await Assert.That(result.IsSuccess).IsTrue();
         await using var read = database.CreateTenantContext(seed.TenantId);
         var resource = await read.EventResources.SingleAsync(value => value.Id == seed.ResourceId);
@@ -98,8 +174,9 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             pending.Id.ToString("D"), new StorageObjectCollectionAuthorizationFacts(seed.TenantId), default);
         await Assert.That(bound.Facts is EventResourceUploadAuthorizationFacts).IsTrue();
         var cancel = new CancelStorageUploadSessionCommandHandler(policy, sessions, new StorageUsageCounterRepository(context),
-            new EventResourceStorageLifecycleRepository(context), tenant, user, new EfCoreUnitOfWork(context), metrics, workflow);
-        await Assert.That((await cancel.ExecuteAsync(cancelCommand, default)).Id!.Status).IsEqualTo(StorageUploadSessionStates.Canceled);
+            new EventResourceStorageLifecycleRepository(context), tenant, user, new EfCoreUnitOfWork(context), metrics, workflow.Workflow);
+        await Assert.That((await EventResourceUploadTestConsumer.ConsumeAsync(
+            cancel.ExecuteAsync(cancelCommand, default))).Id!.Status).IsEqualTo(StorageUploadSessionStates.Canceled);
     }
 
     [Test]
@@ -388,7 +465,10 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         parent.Publish(Now);
         parent.VisibilityTypeId = (int)VisibilityTypeEnum.Public;
         await context.SaveChangesAsync();
-        var management = Management(context, seed, allowUnscanned: true);
+        await using var managementRequest = Management(context, seed, allowUnscanned: true);
+        await managementRequest.InitializeAsync();
+        await managementRequest.PrepareAsync();
+        var management = managementRequest.Workflow;
         foreach (var action in new[] { EventResourceManagementAction.Publish, EventResourceManagementAction.Unpublish,
                      EventResourceManagementAction.Publish })
         {
@@ -427,9 +507,12 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         await context.SaveChangesAsync();
         var version = (await context.EventResources.AsNoTracking()
             .SingleAsync(value => value.Id == seed.ResourceId)).ConcurrencyStamp;
-        var manager = Management(context, seed, condition is "cross-owned" or "policy-disallowed",
+        await using var managementRequest = Management(context, seed, condition is "cross-owned" or "policy-disallowed",
             condition == "policy-disallowed"
                 ? ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"] : null);
+        await managementRequest.InitializeAsync();
+        await managementRequest.PrepareAsync();
+        var manager = managementRequest.Workflow;
         await Assert.That((await manager.ChangeStateAsync(seed.ResourceId, version,
             EventResourceManagementAction.Publish, default)).IsSuccess).IsFalse();
         await using var verify = database.CreateTenantContext(seed.TenantId);
@@ -457,9 +540,14 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
                 .SingleAsync(value => value.Id == seed.ResourceId)).ConcurrencyStamp;
         }
         await using (var failing = database.CreateTenantContext(seed.TenantId, new AuditFailure()))
-            await Assert.That(async () => await Management(failing, seed, allowUnscanned: true)
+        {
+            await using var request = Management(failing, seed, allowUnscanned: true);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            await Assert.That(async () => await request.Workflow
                 .ChangeStateAsync(seed.ResourceId, version, EventResourceManagementAction.Publish, default))
                 .Throws<DbUpdateException>();
+        }
         await using (var rolledBack = database.CreateTenantContext(seed.TenantId))
         {
             var resource = await rolledBack.EventResources.SingleAsync(value => value.Id == seed.ResourceId);
@@ -471,7 +559,10 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         }
         await using (var resumed = database.CreateTenantContext(seed.TenantId))
         {
-            var management = Management(resumed, seed, allowUnscanned: true);
+            await using var request = Management(resumed, seed, allowUnscanned: true);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            var management = request.Workflow;
             await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version,
                 EventResourceManagementAction.Publish, default)).IsSuccess).IsTrue();
             await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version,
@@ -497,8 +588,13 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             version = (await upload.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).ConcurrencyStamp;
         }
         await using (var failing = database.CreateTenantContext(seed.TenantId, new AuditFailure()))
-            await Assert.That(async () => await Management(failing, seed).ChangeStateAsync(seed.ResourceId, version,
+        {
+            await using var request = Management(failing, seed);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            await Assert.That(async () => await request.Workflow.ChangeStateAsync(seed.ResourceId, version,
                 EventResourceManagementAction.Delete, default)).Throws<DbUpdateException>();
+        }
         await using (var verify = database.CreateTenantContext(seed.TenantId))
         {
             await Assert.That((await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).StorageObjectId).IsEqualTo(objectId);
@@ -508,7 +604,10 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         }
         await using (var deleting = database.CreateTenantContext(seed.TenantId))
         {
-            var management = Management(deleting, seed);
+            await using var request = Management(deleting, seed);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            var management = request.Workflow;
             await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version, EventResourceManagementAction.Delete, default)).IsSuccess).IsTrue();
             await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version, EventResourceManagementAction.Delete, default)).IsSuccess).IsFalse();
         }
@@ -750,7 +849,10 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         var workflow = Workflow(context, seed, async () =>
         {
             await using var deleting = database.CreateTenantContext(seed.TenantId);
-            await Assert.That((await Management(deleting, seed).ChangeStateAsync(seed.ResourceId, seed.Version,
+            await using var request = Management(deleting, seed);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            await Assert.That((await request.Workflow.ChangeStateAsync(seed.ResourceId, seed.Version,
                 EventResourceManagementAction.Delete, default)).IsSuccess).IsTrue();
             var tombstone = await deleting.StorageObjectDeletionTombstones.SingleAsync(value => value.TenantId == seed.TenantId);
             await Assert.That(tombstone.State).IsEqualTo(StorageObjectDeletionState.AwaitingProducer);
@@ -1027,7 +1129,7 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         return new(scope.TenantAId, scope.EventAId, actor, resource.Id, resource.ConcurrencyStamp, scope.StorageBId);
     }
 
-    private EventResourceFileUploadWorkflow Workflow(ExploreDbContext context, Seed seed, Func<Task>? beforeWrite = null,
+    private EventResourceUploadTestConsumer Workflow(ExploreDbContext context, Seed seed, Func<Task>? beforeWrite = null,
         bool corruptChecksum = false, Func<EventResourceGovernancePolicy>? governancePolicy = null, long quotaBytes = 10_000_000,
         string? providerVersion = null)
     {
@@ -1072,15 +1174,24 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             return binding;
         });
         providers.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(provider);
+        var moderation = new EventResourceModerationSnapshotReader(context,
+            Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
+            ModerationRecognitionResourceFixture.Reader(context));
         var authority = new EventResourceAuthorityOrchestrator(unit,
-            new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance),
+            new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
+                new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
+                    Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
+                    global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),
             routes, authorityProvider, new Clock());
-        return new(repository, new StorageUploadSessionRepository(context), new StorageObjectRepository(context),
+        return new(new EventResourceFileUploadWorkflow(repository, new StorageUploadSessionRepository(context), new StorageObjectRepository(context),
             new StorageUsageCounterRepository(context), new PrivacyErasureStateRepository(context), policy, providers, unit,
-            Lifecycle(context), authority, tenant, user, Substitute.For<IMachinePrincipalAccessor>(), new Clock());
+            new EventResourceUploadMutationBoundary(context, database.Privacy.Authority(context, new Clock()), moderation, new Clock()),
+            Lifecycle(context), authority, tenant, user, Substitute.For<IMachinePrincipalAccessor>(), new Clock()));
     }
 
-    private static EventResourceManagementWorkflow Management(ExploreDbContext context, Seed seed, bool allowUnscanned = false,
+    private ManagementRequest Management(ExploreDbContext context, Seed seed, bool allowUnscanned = false,
         string[]? mediaTypes = null)
     {
         var repository = new EventResourceRepository(context);
@@ -1093,14 +1204,41 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         routes.ReadAsync(seed.TenantId, Arg.Any<CancellationToken>()).Returns(new EventResourceProviderSnapshot(EventResourceProviderMode.Local, "", "default"));
         var provider = Substitute.For<IEventResourceAuthorizationProvider>();
         provider.CheckAsync(Arg.Any<EventResourceProviderInput>(), Arg.Any<CancellationToken>()).Returns(EventResourceProviderDecision.Allow);
-        var tenant = Substitute.For<ITenantContext>();
-        tenant.TenantId.Returns(seed.TenantId);
-        var user = Substitute.For<ICurrentUserService>();
-        user.UserId.Returns(seed.UserId);
-        user.IsAuthenticated.Returns(true);
-        return new(repository, unit, Lifecycle(context), new EventResourceAuthorityOrchestrator(unit,
-            new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance),
-            routes, provider, new Clock()), tenant, user, Substitute.For<IMachinePrincipalAccessor>(), new Clock());
+        var tenant = context.TenantContext;
+        if (tenant is null)
+        {
+            tenant = Substitute.For<ITenantContext>();
+            tenant.TenantId.Returns(seed.TenantId);
+            context.TenantContext = tenant;
+        }
+        else if (tenant.TenantId != seed.TenantId)
+            throw new InvalidOperationException("The management request must retain its original tenant.");
+        var clock = new Clock();
+        var human = new CurrentHumanPrincipalFixture(seed.UserId, seed.TenantId, borrowedContext: context,
+            configureServices: collection => collection.AddSingleton<IPrivacyIdentityFenceAuthority>(
+                database.Privacy.Authority(context, clock)), timeProvider: clock);
+        var services = human.Services;
+        var workflow = new EventResourceManagementWorkflow(repository, unit, Lifecycle(context), new EventResourceAuthorityOrchestrator(unit,
+            new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
+                new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
+                    Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
+                    global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),
+            routes, provider, clock), tenant, services.GetRequiredService<ICurrentUserService>(), human.Machine, clock,
+            new EventPublicationMutationBoundary(context, services.GetRequiredService<IPrivacyIdentityFenceAuthority>(),
+                services.GetRequiredService<IUserContext>(), human.Admin, human.Machine, clock,
+                ModerationRecognitionResourceFixture.Reader(context), services.GetRequiredService<IHumanActionCommitFinalizer>()));
+        return new(human, workflow);
+    }
+
+    private sealed class ManagementRequest(CurrentHumanPrincipalFixture human, EventResourceManagementWorkflow workflow)
+        : IAsyncDisposable
+    {
+        public EventResourceManagementWorkflow Workflow => workflow;
+        public Task InitializeAsync() => human.InitializeAsync();
+        public Task PrepareAsync() => human.PrepareAsync();
+        public ValueTask DisposeAsync() => human.DisposeAsync();
     }
 
     private static EventResourceStorageLifecycleService Lifecycle(ExploreDbContext context) =>
@@ -1117,7 +1255,7 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
     };
 
     private static async Task<BaseCommandResponse<Explore.Application.DTOs.StorageObject.StorageUploadSessionDto>> FinalizeAsync(
-        EventResourceFileUploadWorkflow workflow, Guid id)
+        EventResourceUploadTestConsumer workflow, Guid id)
     {
         using var content = new MemoryStream(Pdf);
         return await workflow.FinalizeAsync(new FinalizeStorageUploadSessionCommand
@@ -1137,13 +1275,44 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         }
     }
 
-    /// <summary>Current-model SQLite schema until the parent generates forward migrations; existing seeds and context infrastructure.</summary>
+    /// <summary>
+    /// Owns isolated SQLite outside measurement; measurement borrows the launcher's selected
+    /// primary database without replacing or deleting it.
+    /// </summary>
     public sealed class Database : IAsyncInitializer, IAsyncDisposable
     {
-        private SqliteConnection _connection = null!;
+        private static readonly SemaphoreSlim MeasurementInitialization = new(1, 1);
+        private SqliteConnection? _connection;
         private DbContextOptions<ExploreDbContext> _options = null!;
+        internal ModerationNoticePrivacyFixture Privacy { get; private set; } = null!;
         public async Task InitializeAsync()
         {
+            Privacy = await ModerationNoticePrivacyFixture.CreateAsync();
+            if (Environment.GetEnvironmentVariable("ISLAMU_MODERATION_MEASUREMENT_JOURNAL") == "1")
+            {
+                if (Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") != "Testing"
+                    || Environment.GetEnvironmentVariable("SECRET_PROVIDER") != "Environment")
+                    throw new InvalidOperationException("Upload measurement requires the launcher-selected testing environment.");
+                var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+                using var configurationOwner = (IDisposable)configuration;
+                var selected = Explore.Secrets.Database.PrimaryDatabaseConfiguration.BindRuntime(configuration);
+                var measured = TestDbContextOptions.Create<ExploreDbContext>();
+                PrimaryDatabaseProviderComposition.ConfigureApplication(measured, selected);
+                _options = measured.Options;
+                if (!await MeasurementInitialization.WaitAsync(TimeSpan.FromMinutes(1)))
+                    throw new TimeoutException("Upload measurement database initialization did not acquire its owner.");
+                try
+                {
+                    await using var initializer = CreateContext();
+                    await initializer.Database.EnsureCreatedAsync();
+                    await LookupTableSeeder.SeedAsync(initializer);
+                }
+                finally
+                {
+                    MeasurementInitialization.Release();
+                }
+                return;
+            }
             _connection = await SqliteTestDatabaseFactory.CreateOpenIsolatedConnectionAsync();
             _options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(_connection.ConnectionString)
                 .UseSnakeCaseNamingConvention()
@@ -1171,6 +1340,11 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             context.EnableTenantFilterBypass("Resource upload invariant test.");
             return context;
         }
+        public async ValueTask DisposeAsync()
+        {
+            if (_connection is not null) await _connection.DisposeAsync();
+            if (Privacy is not null) await Privacy.DisposeAsync();
+        }
         public ExploreDbContext CreateTenantContext(Guid tenantId, params IInterceptor[] interceptors)
             => CreateSelectedContext(tenantId, interceptors);
 
@@ -1185,6 +1359,5 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             return context;
         }
         private sealed record TestTenantContext(Guid TenantId) : ITenantContext;
-        public ValueTask DisposeAsync() => _connection.DisposeAsync();
     }
 }

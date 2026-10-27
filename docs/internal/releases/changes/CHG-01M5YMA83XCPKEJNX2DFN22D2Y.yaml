@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5YMA83XCPKEJNX2DFN22D2Y
+Title: "Reserve moderation routes during tenant resolution"
+Type: fix
+Scope: access
+Summary: "Keep moderation application routes out of root tenant selection in both the shared catalog and the BFF resolver outage fallback, without renaming existing tenants or changing configured-prefix routing."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: mitigated
+    Detail: "Reserve the moderation application root in the shared tenant slug catalog and independent browser outage fallback. Existing tenant records, authorization, and nonempty-prefix routing are unchanged. Added regression tests remain unrun; remote execution is required."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/multi-tenancy.md
+    Disposition: documented
+    Detail: "Moderation routes remain application routes during resolver API outages. This change does not rename existing tenants or migrate data."

@@ -1,5 +1,4 @@
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.DTOs.ManagedProviderProvisioning;
 using Explore.Application.Exceptions;
 using Explore.Application.Responses;
 
@@ -13,7 +12,7 @@ public sealed class ManagedTenantWorkerCreationPort(
     IManagedTenantWorkerCreationAdmission admission, IManagedTenantWorkerCreationOwnerFactory creators)
     : IManagedTenantWorkerCreationPort
 {
-    public async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> CreateAsync(
+    public async Task<BaseCommandResponse<ManagedTenantWorkerCreationOutcome>> CreateAsync(
         Guid operationId, Guid outboxMessageId, CancellationToken cancellationToken = default)
     {
         bool settled = false;

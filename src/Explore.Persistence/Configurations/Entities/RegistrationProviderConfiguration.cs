@@ -1,6 +1,7 @@
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
+using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -55,10 +56,11 @@ public sealed class RegistrationProviderBindingConfiguration : IEntityTypeConfig
 {
     public void Configure(EntityTypeBuilder<RegistrationProviderBinding> builder)
     {
-        builder.ToTable(table => table.HasCheckConstraint("ck_registration_provider_bindings_publication", $"(state_id = {(int)RegistrationProviderBindingStateEnum.Published} AND published_mapping_revision_hash IS NOT NULL AND published_at IS NOT NULL) OR (state_id <> {(int)RegistrationProviderBindingStateEnum.Published})"));
+        builder.ToTable(table => table.HasCheckConstraint("ck_registration_provider_bindings_publication",
+            $"(state_id = {(int)RegistrationProviderBindingStateEnum.Published} AND published_mapping_revision_hash IS NOT NULL AND published_at IS NOT NULL AND published_mapping_revision_hash_key = published_mapping_revision_hash) OR (state_id <> {(int)RegistrationProviderBindingStateEnum.Published} AND published_mapping_revision_hash IS NULL AND published_at IS NULL AND published_mapping_revision_hash_key = '')"));
         builder.Property(binding => binding.Id).ValueGeneratedNever();
-        builder.Property(binding => binding.PublishedMappingRevisionHash).HasConversion(hash => hash == null ? null : hash.Value, value => value == null ? null : RegistrationEvidenceHash.Create(value)).HasMaxLength(44);
-        builder.Property(binding => binding.PublishedMappingRevisionHashKey).IsRequired().HasMaxLength(44).HasDefaultValue(string.Empty);
+        builder.Property(binding => binding.PublishedMappingRevisionHash).HasConversion(hash => hash == null ? null : hash.Value, value => value == null ? null : RegistrationEvidenceHash.Create(value)).HasMaxLength(44).UsePortableOrdinalAscii();
+        builder.Property(binding => binding.PublishedMappingRevisionHashKey).IsRequired().HasMaxLength(44).HasDefaultValue(string.Empty).UsePortableOrdinalAscii();
         builder.Property(binding => binding.ProviderSurveyId).HasMaxLength(200);
         builder.Property(binding => binding.ProviderSurveyRevisionId).HasMaxLength(200);
         builder.Property(binding => binding.ProviderWebhookId).HasMaxLength(200);
@@ -67,7 +69,12 @@ public sealed class RegistrationProviderBindingConfiguration : IEntityTypeConfig
         builder.Property(binding => binding.ConcurrencyStamp).IsConcurrencyToken();
         builder.HasOne<Tenant>().WithMany().HasForeignKey(binding => binding.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasAlternateKey(binding => new { binding.TenantId, binding.Id });
-        builder.HasAlternateKey(binding => new { binding.TenantId, binding.Id, binding.PublishedMappingRevisionHashKey });
+        // The final hash belongs to an immutable principal, not to the mutable Draft binding's key.
+        builder.HasOne(binding => binding.Publication).WithOne()
+            .HasForeignKey<RegistrationProviderBinding>(binding => new { binding.TenantId, binding.Id, binding.PublishedMappingRevisionHashKey, binding.PublishedAt })
+            .HasPrincipalKey<RegistrationProviderBindingPublication>(publication => new { publication.TenantId, publication.RegistrationProviderBindingId, publication.MappingRevisionHashKey, publication.PublishedAt })
+            .IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+        builder.Navigation(binding => binding.Publication).AutoInclude();
         builder.HasOne(binding => binding.Connection).WithMany().HasForeignKey(binding => new { binding.TenantId, binding.RegistrationProviderConnectionId }).HasPrincipalKey(connection => new { connection.TenantId, connection.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<SecretBinding>().WithMany().HasForeignKey(binding => binding.WebhookSecretBindingId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<RegistrationFormVersion>().WithMany().HasForeignKey(binding => new { binding.TenantId, binding.RegistrationFormId, binding.RegistrationFormVersionId }).HasPrincipalKey(version => new { version.TenantId, version.RegistrationFormId, version.Id }).OnDelete(DeleteBehavior.Restrict);
@@ -81,6 +88,22 @@ public sealed class RegistrationProviderBindingConfiguration : IEntityTypeConfig
         builder.HasMany(binding => binding.OptionMappings).WithOne(mapping => mapping.Binding).HasForeignKey(mapping => new { mapping.TenantId, mapping.RegistrationProviderBindingId }).HasPrincipalKey(binding => new { binding.TenantId, binding.Id }).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(binding => binding.Capabilities).WithOne(capability => capability.Binding).HasForeignKey(capability => new { capability.TenantId, capability.RegistrationProviderBindingId }).HasPrincipalKey(binding => new { binding.TenantId, binding.Id }).OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(binding => new { binding.TenantId, binding.RegistrationProviderConnectionId, binding.RegistrationFormVersionId }).IsUnique();
+    }
+}
+
+public sealed class RegistrationProviderBindingPublicationConfiguration : IEntityTypeConfiguration<RegistrationProviderBindingPublication>
+{
+    public void Configure(EntityTypeBuilder<RegistrationProviderBindingPublication> builder)
+    {
+        builder.Property(publication => publication.Id).ValueGeneratedNever();
+        builder.Property(publication => publication.TenantId).IsRequired();
+        builder.Property(publication => publication.RegistrationProviderBindingId).IsRequired();
+        builder.Property(publication => publication.MappingRevisionHashKey).IsRequired().HasMaxLength(44).UsePortableOrdinalAscii();
+        builder.Property(publication => publication.PublishedAt).IsRequired();
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(publication => publication.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(publication => new { publication.TenantId, publication.RegistrationProviderBindingId }).IsUnique();
+        builder.HasAlternateKey(publication => new { publication.TenantId, publication.RegistrationProviderBindingId, publication.MappingRevisionHashKey });
+        builder.HasAlternateKey(publication => new { publication.TenantId, publication.RegistrationProviderBindingId, publication.MappingRevisionHashKey, publication.PublishedAt });
     }
 }
 

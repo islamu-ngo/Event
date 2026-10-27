@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M644ACAZ50Y7FS7RRBPHCQ
+Title: "Retain immutable registration provider publication evidence"
+Type: feat
+Scope: registration
+Summary: "Checkpoint immutable binding publication contracts, attempt relationships and provider-aware evidence transfer without claiming provider execution or rollback verification."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Publication evidence is immutable and exact tenant/binding/hash/time relationships constrain attempts. The transfer generator includes guards and ordering logic; no live provider behavior or host authorization is certified."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Publication tables/FKs/hash comparisons and existing-row evidence transfer require the cumulative migration history. Upgrade, downgrade and provider-specific transfer execution are unverified."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Published evidence cannot be replaced or removed; pair the source checkpoint with native management callers and upgrade guidance before deployment. No SQL Server rollback resolution is asserted."

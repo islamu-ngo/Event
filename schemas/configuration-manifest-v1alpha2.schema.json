@@ -1546,6 +1546,9 @@
         "legalDocuments": {
           "$ref": "#/$defs/instanceLegalDocuments"
         },
+        "moderation": {
+          "$ref": "#/$defs/moderationDocument"
+        },
         "settings": {
           "$ref": "#/$defs/instanceSettings"
         }
@@ -1603,6 +1606,685 @@
         },
         "spec": {
           "$ref": "#/$defs/tenantSpec"
+        }
+      }
+    },
+    "moderationClass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "basis",
+        "ground",
+        "meaning",
+        "reference"
+      ],
+      "properties": {
+        "reference": {
+          "$ref": "#/$defs/moderationReference"
+        },
+        "meaning": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "pattern": "\\S"
+        },
+        "ground": {
+          "type": "string",
+          "enum": [
+            "BroadSolutionMisconduct",
+            "BroadTenantMisconduct",
+            "ClassificationMismatchOrHonestError",
+            "CompatibleConfirmedConduct",
+            "ConfidentialityOrAccessAbuse",
+            "ConfirmedDeceptiveOrProhibitedPublication",
+            "CredibleCredentialCompromise",
+            "CredibleDeceptivePublicationRisk",
+            "CredibleImminentPhysicalRisk",
+            "CurrentAdultAudienceEligibility",
+            "EventManagementMisuse",
+            "FirstFinalClassificationViolation",
+            "FourthOrJustifiedPersistentClassificationEvasion",
+            "IndependentlyConfirmedPhysicalMisconduct",
+            "IndependentlyEstablishedCrossSolutionHarm",
+            "IndependentlyResolvedRecurrentPhysicalRisk",
+            "KnownProhibitedSecretSolicitation",
+            "PrivilegedTenantMisuse",
+            "ProvedRegistrationOrTicketAbuse",
+            "ProvenAbusiveAutomation",
+            "PublicationAbuse",
+            "PublicationMisuse",
+            "SecondFinalClassificationViolation",
+            "SeriousContinuedPhysicalRisk",
+            "ThirdFinalClassificationViolation",
+            "UploadMisuse",
+            "VerifiedUnsafeResource"
+          ]
+        },
+        "basis": {
+          "type": "string",
+          "enum": [
+            "ClassificationCorrection",
+            "ConfirmedWarning",
+            "CurrentEligibility",
+            "FinalConductFinding",
+            "KnownProhibitedDefinition",
+            "QualifiedUrgentProtection",
+            "VerifiedUnsafeObject"
+          ]
+        }
+      }
+    },
+    "moderationDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "catalogueRevision",
+        "classes",
+        "modes",
+        "profiles",
+        "reasons",
+        "schemaVersion",
+        "supportedProfiles"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "catalogueRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "modes": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "Embedded",
+              "RemoteStrict"
+            ]
+          }
+        },
+        "classes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": false,
+          "items": {
+            "$ref": "#/$defs/moderationClass"
+          }
+        },
+        "reasons": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": false,
+          "items": {
+            "$ref": "#/$defs/moderationReason"
+          }
+        },
+        "profiles": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": false,
+          "items": {
+            "$ref": "#/$defs/moderationProfile"
+          }
+        },
+        "supportedProfiles": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/moderationReference"
+          }
+        }
+      },
+      "$comment": "The wire parser also rejects duplicate JSON members and duplicate class/reason/profile semantic code+revision keys. Recipe strategy (including the base null strategy) must be unique. Native Application owns complete catalogue/compiler and thirteen-dimension recipe parity; schema acceptance is not draft eligibility or activation authority."
+    },
+    "moderationEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability",
+        "execution",
+        "kind",
+        "mode",
+        "target"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "ActualParticipantAgeEligibility",
+            "AudienceDisclosureAndDerivatives",
+            "ClassificationAndMaterialApproval",
+            "CollectedSecretIncidentAccess",
+            "DigitalJoinAndNewOnlineRegistration",
+            "ImplicatedCollection",
+            "ImplicatedPublication",
+            "ImplicatedRegistration",
+            "ImplicatedResourceAndRedirect",
+            "NamedAutomationCreation",
+            "NewAndMaterialPublication",
+            "NewUploadAndResourcePublication",
+            "ParticipantAdmission",
+            "PrivateVenueAndDerivedDisclosure",
+            "ProductEnrollment",
+            "ProvedEntitlementInvalidation",
+            "ReasonedNotice",
+            "RiskyCredentialMutationAndDelegation",
+            "SelectedEventManagement",
+            "SelectedPhysicalRegistration",
+            "SelectedResourceMetadataPayloadRedirect",
+            "SelectedTenantAdministration",
+            "UnsafeFormDefinitionAndSubmission",
+            "UnsafeResourceVersion",
+            "VenueSensitiveManagement",
+            "VenueSensitiveResourceReads"
+          ]
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "Correct",
+            "Deny",
+            "Guard",
+            "Hold",
+            "Notice",
+            "Quarantine",
+            "RequireReview",
+            "Revoke"
+          ]
+        },
+        "target": {
+          "type": "string",
+          "enum": [
+            "ActualViewerAndParticipant",
+            "ClassifiedContentVersions",
+            "CompromisedCredentialOperations",
+            "EnrolledTrustDomain",
+            "ImplicatedEventFormDestinationVersions",
+            "ProvedBadEntitlements",
+            "SelectedCommunityParticipants",
+            "SelectedOperations",
+            "SelectedParticipantEventWindow",
+            "SelectedResourceVersion",
+            "SelectedSolution",
+            "SelectedTenant"
+          ]
+        },
+        "capability": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "Admission",
+            "Contestation",
+            "Enrollment",
+            "Manage",
+            "Participate",
+            "PrivacyErasure",
+            "PrivateLogistics",
+            "ProtectedStatus",
+            "Publish",
+            "ReadResource",
+            "Support",
+            "Upload",
+            null
+          ]
+        },
+        "execution": {
+          "type": "string",
+          "enum": [
+            "NativeOwner",
+            "OverlayDenial"
+          ]
+        }
+      }
+    },
+    "moderationProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundle",
+        "contestationCalendarMonths",
+        "effects",
+        "grade",
+        "protectionPurpose",
+        "reason",
+        "recipes",
+        "recognition",
+        "referenceProfile",
+        "referenceRevision",
+        "requiredApprovals",
+        "rule",
+        "scopeKinds",
+        "strategies",
+        "subjectKinds",
+        "timing"
+      ],
+      "properties": {
+        "rule": {
+          "$ref": "#/$defs/moderationReference"
+        },
+        "reason": {
+          "$ref": "#/$defs/moderationReference"
+        },
+        "referenceProfile": {
+          "type": "string",
+          "enum": [
+            "CFG01",
+            "CFG05",
+            "CFG06",
+            "CFG07",
+            "CFG08",
+            "CFG09",
+            "CFG10",
+            "CFG11",
+            "CFG12",
+            "CFG13",
+            "CFG14",
+            "CFG15",
+            "CFG16",
+            "CFG17",
+            "CFG18",
+            "CFG19",
+            "CFG20",
+            "CFG23",
+            "CFG24",
+            "CFG25",
+            "CFG26",
+            "CFG28",
+            "CFG29",
+            "CFG30",
+            "CFG31",
+            "CFG32",
+            "CFG33"
+          ]
+        },
+        "referenceRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "grade": {
+          "type": "string",
+          "enum": [
+            "Control",
+            "G0",
+            "G1",
+            "G2",
+            "G3",
+            "G4"
+          ]
+        },
+        "scopeKinds": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "Community",
+              "Event",
+              "Instance",
+              "Resource",
+              "Solution",
+              "Tenant",
+              "TrustDomain"
+            ]
+          }
+        },
+        "subjectKinds": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "Content",
+              "Human",
+              "Organization",
+              "Service"
+            ]
+          }
+        },
+        "effects": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/moderationEffect"
+          }
+        },
+        "bundle": {
+          "type": "string",
+          "enum": [
+            "CommunitySafety",
+            "DigitalParticipation",
+            "EventSafety",
+            "ManagementContinuity",
+            "ObjectQuarantine",
+            "Protection",
+            "PublicationPause",
+            "PublicationReview",
+            "SelectedReadProtection",
+            "Unaffected"
+          ]
+        },
+        "protectionPurpose": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "CredentialRecovery",
+            "EntitlementIntegrity",
+            null
+          ]
+        },
+        "strategies": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "AgeAudienceEligibility",
+              "ClassificationIntegrity",
+              "PublicationIntegrity"
+            ]
+          }
+        },
+        "timing": {
+          "$ref": "#/$defs/moderationTiming"
+        },
+        "requiredApprovals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "contestationCalendarMonths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "recognition": {
+          "type": "string",
+          "enum": [
+            "Never",
+            "SeparatelyQualifiedFinalAction",
+            "SeparatelyQualifiedFinalEnrollment"
+          ]
+        },
+        "recipes": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 256,
+          "uniqueItems": false,
+          "items": {
+            "$ref": "#/$defs/moderationRecipe"
+          }
+        }
+      }
+    },
+    "moderationReason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "meaning",
+        "reference"
+      ],
+      "properties": {
+        "reference": {
+          "$ref": "#/$defs/moderationReference"
+        },
+        "meaning": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "pattern": "\\S"
+        },
+        "class": {
+          "$ref": "#/$defs/moderationReference"
+        }
+      }
+    },
+    "moderationRecipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capacity",
+        "content",
+        "credentials",
+        "existingAdmission",
+        "management",
+        "newAdmission",
+        "notifications",
+        "pendingWork",
+        "privateDisclosure",
+        "recognition",
+        "resources",
+        "restoration",
+        "settlement",
+        "strategy"
+      ],
+      "properties": {
+        "strategy": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "AgeAudienceEligibility",
+            "ClassificationIntegrity",
+            "PublicationIntegrity",
+            null
+          ]
+        },
+        "content": {
+          "type": "string",
+          "enum": [
+            "CorrectClassificationAndRevalidateVersions",
+            "CurrentQualifiedAudienceProjection",
+            "HoldOrQuarantineImplicatedVersions",
+            "PendingPublicationReview",
+            "PreserveSafePublished",
+            "QuarantineNamedVersion",
+            "StopSelectedPublication"
+          ]
+        },
+        "management": {
+          "type": "string",
+          "enum": [
+            "CurrentAuthority",
+            "DeniedEssentialOperationsContinuity",
+            "OnlyVenueSensitiveOperationsContinuity",
+            "PauseRiskyCredentialMutations",
+            "QualifiedAdultStewardWhenRequired"
+          ]
+        },
+        "resources": {
+          "type": "string",
+          "enum": [
+            "CurrentAudience",
+            "CurrentQualifiedAudience",
+            "DenyBadEntitlementDerivedAccess",
+            "DenySelectedMetadataPayloadAndRedirect",
+            "GuardImplicatedVersionAndDestination",
+            "QualifiedSafeObligationAndSessionOnly",
+            "QuarantineNamedVersionSafeStatusOnly",
+            "SafeSeparatePurposeOrOwnedDerivative"
+          ]
+        },
+        "newAdmission": {
+          "type": "string",
+          "enum": [
+            "CurrentEligibility",
+            "CurrentQualifiedParticipantAge",
+            "DenySelectedCommunity",
+            "DenySelectedEventWindow",
+            "DenySelectedIntegrityRegistration",
+            "DenySelectedOnlineJoinAndRegistration",
+            "HoldImplicatedIntake",
+            "PauseOnlyUnresolvedEssentialStewardship"
+          ]
+        },
+        "existingAdmission": {
+          "type": "string",
+          "enum": [
+            "CurrentEligibility",
+            "InvalidateProvedBadEntitlement",
+            "NonDisciplinaryEligibilityHoldAndSupport",
+            "SelectedCommunityParticipantRevocation",
+            "SelectedParticipantHoldOrRevocation"
+          ]
+        },
+        "privateDisclosure": {
+          "type": "string",
+          "enum": [
+            "CurrentAudience",
+            "DenyExactSelectedInformation",
+            "DenyProvedBadEntitlementDerivatives",
+            "FenceCommunityVenueAndAllDerivatives",
+            "FenceSelectedVenueAndAllDerivatives",
+            "GuardImplicatedResponsesExportsAndDestinations",
+            "MaskQuarantinedEmbeddedDetails",
+            "PreserveValidBookingLogistics",
+            "QualifiedAudienceAtViewAndFinalDispatch"
+          ]
+        },
+        "settlement": {
+          "type": "string",
+          "enum": [
+            "AffectedParticipantNativeRights",
+            "EligibilityHoldNativeRights",
+            "ImplicatedRightsAndOwnedIncident",
+            "NoBookingChange"
+          ]
+        },
+        "capacity": {
+          "type": "string",
+          "enum": [
+            "NoSeatChange",
+            "OwningParticipantTransitionExactlyOnce"
+          ]
+        },
+        "credentials": {
+          "type": "string",
+          "enum": [
+            "CurrentCredentialLifecycle",
+            "FenceSelectedParticipantAndRoster",
+            "InvalidateProvedBadEntitlementsOnly",
+            "RecheckActualParticipantEligibility",
+            "VerifyRecoveryBeforeRelease"
+          ]
+        },
+        "notifications": {
+          "type": "string",
+          "enum": [
+            "DurableSafeSubjectAndAdmin",
+            "SafeAffectedParticipantAndIncident",
+            "SafeEligibilityAndCorrection"
+          ]
+        },
+        "recognition": {
+          "type": "string",
+          "enum": [
+            "NoCaptureFromThisControl",
+            "SeparatelyQualifiedFinalSanctionOnly"
+          ]
+        },
+        "pendingWork": {
+          "type": "string",
+          "enum": [
+            "ClassificationReviewAndProjectionInvalidation",
+            "CurrentAgeAssuranceAndCorrection",
+            "CurrentPublicationApprovalRequired",
+            "ExplicitRecoveryReviewAndRenewal",
+            "FencePromotionClaimTransferAndFinalization",
+            "FreshAuthorityBeforeBlockedWorkResumes",
+            "MaterialVersionReviewAndIncidentOwner",
+            "OwnedContinuityDeadlineAndEscalation",
+            "OwnedObjectReviewNeverAutomaticRelease",
+            "RecheckCurrentEffectAtUseAndDispatch"
+          ]
+        },
+        "restoration": {
+          "type": "string",
+          "enum": [
+            "AuthorizedObjectDecision",
+            "CurrentAudienceAndAvailableResource",
+            "CurrentClassificationApproval",
+            "CurrentRightsNeverReissueCancelledTickets",
+            "FreshConsentAndAuthorityForHandoff",
+            "QualifiedAgeCorrectionNoHistoryPenalty",
+            "RecomputeCurrentRightsOnly",
+            "VerifiedCredentialAndRoleRecovery"
+          ]
+        }
+      }
+    },
+    "moderationReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "revision"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "pattern": "\\S"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        }
+      }
+    },
+    "moderationTiming": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "duration",
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "CurrentControlUntilQualifiedResolution",
+            "EarlierOfDayOrEventEnd",
+            "Finite",
+            "FixedEventEnd",
+            "NoEnforcementInterval",
+            "ObjectReviewWithinDay",
+            "ProtectiveDayWithReview",
+            "RecoveryOrDayReviewBoundary",
+            "ReviewedIndefinite"
+          ]
+        },
+        "duration": {
+          "type": "string",
+          "maxLength": 25,
+          "pattern": "^(?:[0-9]{1,8}\\.)?(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,7})?$",
+          "description": "Nonnegative .NET TimeSpan constant format, bounded by 10675199.02:48:05.4775807; the wire parser enforces the tick range."
         }
       }
     },
@@ -2887,6 +3569,9 @@
         },
         "legalDocuments": {
           "$ref": "#/$defs/tenantLegalDocuments"
+        },
+        "moderation": {
+          "$ref": "#/$defs/moderationDocument"
         },
         "settings": {
           "$ref": "#/$defs/tenantSettings"

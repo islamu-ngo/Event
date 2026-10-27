@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5Q6NNVHJGV8SKKWYPNTXNFP
+Title: "Align moderation enum contracts with JSON responses"
+Type: fix
+Scope: access
+Summary: "Register existing safety and recognition string enums, preserve optional nulls in HAL schemas, and regenerate the API inventory and typed client without changing runtime disclosure or authorization."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Six existing string enums are explicitly cataloged; nullable response enums are nullable and optional. Native schema, client and contract inventory generation accompany the correction. Runtime serialization, operation IDs and authorization are unchanged."
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented
+    Detail: "Regenerate consumers from the corrected API description rather than treating absent attestations or grounds as default decisions. New regression sources are locally unbuilt/unrun; fresh remote CI is required. No migration or configuration change is introduced."

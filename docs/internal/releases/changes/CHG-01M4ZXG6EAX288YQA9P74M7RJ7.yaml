@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZXG6EAX288YQA9P74M7RJ7
+Title: "Bind native Resource material identity to owned quarantine and review lifecycle"
+Type: feat
+Scope: access
+Summary: "Give actual Resource delivery material its own identity, retain independent effect-ordinal quarantine causes behind a persisted fail-closed guard, and bind exact fresh review chains and terminal cause release without republishing, recreating or restoring removed material."
+Group: moderation-resource-quarantine-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

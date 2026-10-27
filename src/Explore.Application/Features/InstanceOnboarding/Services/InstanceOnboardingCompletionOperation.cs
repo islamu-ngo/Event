@@ -107,16 +107,20 @@ public sealed class InstanceOnboardingCompletionOperation(
         try
         {
             outcome = await identityFence.ExecuteEnrollmentAsync(input.AccountKey,
-                async token =>
-                {
-                    if (input.AccountKey.ProviderKind != AuthenticationProviderKind.Local)
-                        await identityFence.EnsureSubjectMayEnrollAsync(input.UserId, token);
-                    return input.LocalCredential is null
-                        ? await unitOfWork.ExecuteSerializableAsync(inner => PersistAsync(input, inner), token)
-                        : await unitOfWork.ExecuteBootstrapConvergenceAsync(inner => PersistAsync(input, inner), token);
-                },
+                token => unitOfWork.ExecuteRecognitionEnrollmentAsync(
+                    async inner =>
+                    {
+                        PersistenceOutcome result = await PersistAsync(input, inner);
+                        if (!result.Response.IsSuccess)
+                            throw new EnrollmentRejected(result.Response);
+                        return result;
+                    }, identityFence.EnsureCurrentAsync, token),
                 cancellationToken);
             enrollmentGate.RequireCurrent();
+        }
+        catch (EnrollmentRejected rejected)
+        {
+            return rejected.Response;
         }
         catch (TenantDirectoryOperatorIdentityReadinessException exception)
         {
@@ -146,10 +150,20 @@ public sealed class InstanceOnboardingCompletionOperation(
         return outcome.Response;
     }
 
+    private sealed class EnrollmentRejected(BaseCommandResponse<Guid> response) : Exception
+    {
+        public BaseCommandResponse<Guid> Response { get; } = response;
+    }
+
     private async Task<PersistenceOutcome> PersistAsync(
         CompletionInput input,
         CancellationToken cancellationToken)
     {
+        UserExternalLogin? recognitionLogin = await externalLoginRepository.GetByProviderAndKey(input.AccountKey);
+        await identityFence.MatchAndBindAsync(input.AccountKey, input.UserId,
+            recognitionLogin?.Id ?? input.LocalCredential?.Receipt.ExternalLoginId ?? input.ExternalLoginId, null,
+            replacementProvisioning: recognitionLogin?.UserId != input.UserId, cancellationToken);
+
         InstanceBootstrapState? bootstrap = input.IsConfigured
             ? await bootstrapRepository.GetCurrentForUpdate(cancellationToken)
             : await AdmitInteractiveGenerationAsync(input.Settings!, cancellationToken);

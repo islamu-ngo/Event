@@ -17,9 +17,11 @@ public sealed class ConfigurationPortabilityRegistryTests
         "instance.settings",
         "instance.documents",
         "instance.legal_documents",
+        "instance.moderation",
         "tenant.settings",
         "tenant.documents",
         "tenant.legal_documents",
+        "tenant.moderation",
         "tenant.footer",
         "tenant.navigation",
         "tenant.templates",
@@ -140,6 +142,27 @@ public sealed class ConfigurationPortabilityRegistryTests
             await Assert.That(ReadString(descriptor, "Authority"))
                 .IsNotEqualTo("InstanceAdministrator");
         }
+    }
+
+    [Test]
+    [Arguments("instance.moderation", "Instance", "InstanceAdministrator")]
+    [Arguments("tenant.moderation", "Tenant", "TenantAdministrator")]
+    public async Task Moderation_DeclaresNativeDraftPortabilityWithoutDeletionOrUnconditionalRollback(
+        string key, string scope, string authority)
+    {
+        object descriptor = ReadSections()[key];
+        await Assert.That(ReadString(descriptor, "Scope")).IsEqualTo(scope);
+        await Assert.That(ReadString(descriptor, "Authority")).IsEqualTo(authority);
+        foreach (string capability in new[]
+            { "SupportsExport", "SupportsPreview", "SupportsDiff", "SupportsApply", "SupportsVerify" })
+            await Assert.That(ReadBool(descriptor, capability)).IsTrue();
+        await Assert.That(ReadBool(descriptor, "SupportsRollback")).IsFalse();
+        await Assert.That(ReadBool(descriptor, "SupportsDeletion")).IsFalse();
+        var artifacts = ReadEnumerable(descriptor, "ArtifactKinds")
+            .Cast<object>().Select(value => value.ToString()!).ToArray();
+        await Assert.That(artifacts).IsEquivalentTo(scope == "Instance"
+            ? new[] { "ConfigurationManifest" }
+            : new[] { "ConfigurationManifest", "TenantConfigurationPackage" });
     }
 
     [Test]

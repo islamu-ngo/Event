@@ -12,5 +12,7 @@ public enum SmtpDeliveryOutcome
     /// <summary>Authentication, configuration, or permanent rejection requires correction.</summary>
     ConfigurationFailure,
     /// <summary>The included contact expired before SMTP send began; no acceptance is possible.</summary>
-    RetentionExpired
+    RetentionExpired,
+    /// <summary>The original moderation purpose was rejected before SMTP send; terminal, never retryable.</summary>
+    AuthorityRejected
 }

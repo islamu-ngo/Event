@@ -88,7 +88,8 @@ public enum EmailDispatchKind
     ReportReceipt = 12,
     ReportOutcome = 13,
     ReportNeedsMoreInformation = 14,
-    ModerationAvailabilityRequired = 15
+    ModerationAvailabilityRequired = 15,
+    AccountModerationOriginalNotice = 16
 }
 
 public enum EmailDispatchStatus

@@ -13,7 +13,6 @@ public sealed record CreateOrganizationCommand : ICommand<BaseCommandResponse<Gu
     public const string PreCreateAuthorizationPhase = AuthorizationPhases.PreCreate;
 
     public required CreateOrganizationDto OrganizationDto { get; init; }
-    public required Guid CreatorUserId { get; init; }
 
     string? ISecureRequest.ResourceId => PreCreateResourceId;
 

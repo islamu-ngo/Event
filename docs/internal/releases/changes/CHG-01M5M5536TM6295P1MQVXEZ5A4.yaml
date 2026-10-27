@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5M5536TM6295P1MQVXEZ5A4
+Title: "Require retained independent findings before adjudication"
+Type: fix
+Scope: access
+Summary: "Qualify response or urgency findings against the exact attributed case and requested action scope without inventing a subject response."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+    Details: "Implement IModerationSession.FindFindingAsync and supply explicit action scope, attribution coordinates and adopted reason when finalizing findings. Native host integration is committed separately; no compatibility adapter is retained."
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Details: "Decision acceptance requires the exact independent final response or qualified urgency finding. Authored invariant regressions remain unrun and unbuilt."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.GroupMembers.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;
@@ -18,50 +19,52 @@ public class UpdateGroupMemberRoleCommandHandler : ICommandHandler<UpdateGroupMe
     private readonly IGroupMemberRepository _groupMemberRepository;
     private readonly IUserContext _userContext;
     private readonly ITenantContext _tenantContext;
+    private readonly IGroupMemberMutationBoundary _boundary;
     private readonly IHumanAccountAdministrativeActionPreparation _preparation;
-    private readonly ISerializableAttemptOwner _owner;
 
     public UpdateGroupMemberRoleCommandHandler(
         IGroupMemberRepository groupMemberRepository,
         IUserContext userContext,
         ITenantContext tenantContext,
-        IHumanAccountAdministrativeActionPreparation preparation,
-        ISerializableAttemptOwner owner)
+        IGroupMemberMutationBoundary boundary,
+        IHumanAccountAdministrativeActionPreparation preparation)
     {
         _groupMemberRepository = groupMemberRepository;
         _userContext = userContext;
         _tenantContext = tenantContext;
+        _boundary = boundary;
         _preparation = preparation;
-        _owner = owner;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateGroupMemberRoleCommand request, CancellationToken cancellationToken)
     {
-        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
-        return await _owner.ExecuteAsync(async token =>
-        {
-            await prepared.AcquireAsync(request, token);
-            var result = await ExecuteBodyAsync(request, token);
-            if (result.IsSuccess) prepared.Complete(result.Id);
-            return result;
-        }, cancellationToken);
-    }
-
-    private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(UpdateGroupMemberRoleCommand request, CancellationToken cancellationToken)
-    {
-        var dto = request.UpdateGroupMemberRoleDto;
-
-        var memberToUpdate = await _groupMemberRepository.GetGroupMemberWithDetails(dto.Id);
-        if (memberToUpdate == null)
-        {
-            return BaseCommandResponse.Validation<Guid>(["Member not found"], "Member not found");
-        }
-
-        if (!Guid.TryParse(request.RequesterUserId, out Guid requesterGuid))
+        if (!_userContext.IsAuthenticated || _userContext.UserId is not Guid requesterGuid || requesterGuid == Guid.Empty)
         {
             return BaseCommandResponse.Validation<Guid>(
                 ["Invalid requester User ID."],
                 "Invalid requester User ID.");
+        }
+
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
+        return await _boundary.ExecuteRoleChangeAsync(request.UpdateGroupMemberRoleDto.Id,
+            (int)request.UpdateGroupMemberRoleDto.Role, async (actor, token) =>
+            {
+                await prepared.AcquireAsync(request, token);
+                var result = await UpdateAsync(request, actor, token);
+                if (result.IsSuccess) prepared.Complete(result.Id);
+                return result;
+            }, cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> UpdateAsync(UpdateGroupMemberRoleCommand request,
+        Guid requesterGuid, CancellationToken cancellationToken)
+    {
+        var dto = request.UpdateGroupMemberRoleDto;
+
+        var memberToUpdate = await _groupMemberRepository.GetGroupMemberWithDetails(dto.Id);
+        if (memberToUpdate == null || memberToUpdate.TenantId != _tenantContext.TenantId)
+        {
+            return BaseCommandResponse.Validation<Guid>(["Member not found"], "Member not found");
         }
 
         var hasPermission = await _groupMemberRepository.HasPermissionInGroup(
@@ -93,6 +96,9 @@ public class UpdateGroupMemberRoleCommandHandler : ICommandHandler<UpdateGroupMe
                 ["Cannot demote the last admin of the group."],
                 "Cannot demote the last admin of the group.");
         }
+
+        if (memberToUpdate.RoleId == (int)dto.Role)
+            return BaseCommandResponse.Success(memberToUpdate.Id, "Member role updated successfully");
 
         memberToUpdate.RoleId = (int)dto.Role;
         await _groupMemberRepository.Update(memberToUpdate);

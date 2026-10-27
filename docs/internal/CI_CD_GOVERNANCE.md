@@ -503,6 +503,34 @@ It runs `SetupLiveAuthoritySecurityTests` with
 Cobertura arguments. Coverage validation observes that step's `started` output.
 There is no legacy tool-test loop or coverage owner.
 
+The reusable fast lane runs selected Architecture tests after the Release build
+and before this SetupLive gate. Structural failures therefore surface before
+long-running security checks; the Architecture command, selection condition,
+step ID and TRX evidence are unchanged. A passing Architecture step does not
+replace SetupLive or any later selected suite: all retained gates must pass.
+An early Architecture failure still fails `Build & Test` and retains its TRX;
+runtime suites skipped by fail-fast ordering are not passing evidence.
+
+`Focused Grant Settlement` (`grant-settlement-tests.yml`) is a supplementary PR
+and manual workflow, independent of the required `Build & Test` job. It builds
+the Persistence test project and executes only the ordinary and adjudicated
+grant-settlement methods, with minimum counts of 8 and 14 respectively and one
+test at a time. Both selections are attempted after a successful build even if
+the first fails; either failure still fails the job. Each test process has a
+five-minute TERM deadline followed by a fifteen-second forced-stop grace period;
+a process timeout fails its step without cancelling the other selection or
+turning incomplete execution into passing evidence. Thirty-day TRX artifacts
+and the summary identify the tested Git object and actual step outcomes.
+Temporary fixed-label fixture progress files are also retained and printed on
+process exit, preserving diagnostics when test-runner output is buffered or a
+deadline interrupts TRX generation. These probes contain no test input data and
+must be removed after diagnosis; neither printing nor artifact retention changes
+the original process exit status.
+The fixtures use SQLite, including separate and colocated privacy authorities;
+this lane does not attest the full provider matrix. It uses read-only checkout
+permissions without repository secrets. No existing workflow, required check,
+Architecture assertion or runtime/security gate is replaced or weakened.
+
 These read-only checks retain nonpersistent checkout credentials and no signing,
 publication or deployment authority. Bundled CI jobs, fourteen product/test
 solution registrations, two generator registrations, eight exclusive package
@@ -728,7 +756,7 @@ This is now a missing-evidence gate for breaking OpenAPI changes, not full autom
 
 ### Generated Migration Duplication
 
-The repository-root `.sonarcloud.properties` lists twenty EF-generated migration
+The repository-root `.sonarcloud.properties` lists fifty-two EF-generated migration
 files under `sonar.cpd.exclusions`. They repeat provider schema operations by
 design. This exception applies only to copy-paste detection: handwritten code,
 security analysis, migration execution and provider-parity checks remain included.
@@ -741,6 +769,16 @@ uses the MySQL catalog. Their provider round-trip and pending-model evidence is
 retained with the discovery workstream. The migration files are not hand-edited
 to avoid duplication detection. Discovery source, cancellation semantics,
 security checks and tests remain analyzed.
+
+The thirty-two moderation entries cover eight migration families across those
+same four catalogs: qualified ledger, native authority sources, qualification
+sources, qualification evidence/receipts, machine-subject bindings, native source
+owners, registration-provider publication and adjudicated case-read grants.
+Each entry retains its native paired Designer metadata and migration identifier;
+the original generated history is unchanged. These exact entries were approved
+for duplication-only classification during moderation PR review. No Designer,
+snapshot, handwritten generator or directory wildcard was added to the list.
+This classification supplies no migration execution or rollback assurance.
 
 Sonar automatic analysis supports this separate configuration file, not the
 CI scanner's `sonar-project.properties`. Its application to a pending PR must be
@@ -824,7 +862,7 @@ gate.
 
 | Evidence | Workflow(s) | Retention |
 |---|---|---:|
-| Fast/integration TRX, build/analyzer warning logs, and NuGet vulnerability summaries | `Build & Test (Reusable)` | 14 days |
+| Fast/integration TRX, build/analyzer warning logs, NuGet vulnerability summaries, and value-free setup-fixture progress | `Build & Test (Reusable)` | 14 days |
 | OpenAPI drift, `oasdiff`, and advisory Spectral artifacts | `OpenAPI Contract Guard` | 30 days |
 | Workflow security evidence | `Workflow Security` | 30 days |
 | OpenSSF Scorecard SARIF | `OpenSSF Scorecard` | 30 days |
@@ -836,6 +874,27 @@ gate.
 | Deployment summaries/logs | Coolify deploy workflows | 90 days minimum |
 
 Release notes must copy or link long-lived evidence that GitHub artifact retention will eventually delete.
+
+The fast-test artifact also retains `artifacts/test-progress/setup-security.log`
+when the setup security fixture reaches its progress checkpoints. Each record
+contains only a compile-time test method name, a fixed phase label and monotonic
+elapsed milliseconds; it contains no request values, credentials, identifiers or
+exception messages. The file distinguishes fixture startup/reset progress from
+test-runner output capture. Its absence does not prove where execution stopped.
+This evidence path does not change test selection, assertions, permissions or
+job time limits.
+
+### Native security job execution budgets
+
+`Build & Test` and `Security Integration Tests` have a maintainer-approved
+120-minute job limit. Retained setup-fixture checkpoints showed repeated native
+reset and seed work taking 138–141 seconds per case, so the previous 45-minute
+limit cancelled execution before the complete security cohort could finish.
+The larger budget changes neither test selection nor minimum counts, assertions,
+required-check names, permissions or native database guards. A timeout still fails
+the check; a longer limit is not evidence that tests passed. Use the retained
+progress file and completed test results to evaluate fixture improvements rather
+than treating cancellation as a successful security run.
 
 For manual releases, generate the durable release evidence manifest after downloading retained CI/CD artifacts:
 

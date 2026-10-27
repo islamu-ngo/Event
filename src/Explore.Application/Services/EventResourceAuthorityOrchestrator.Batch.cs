@@ -34,9 +34,11 @@ public sealed partial class EventResourceAuthorityOrchestrator
             return requests.Select(_ => EventResourceAuthorityOutcome.Forbidden).ToArray();
         var targets = requests.ToArray();
         var first = targets[0];
-        if (first.TenantId == Guid.Empty || first.SubjectUserId == Guid.Empty
+        if (first.TenantId == Guid.Empty || first.SubjectUserId == Guid.Empty || !first.HasConsistentPrincipal
             || targets.Any(request => request.TenantId != first.TenantId
+                || !request.HasConsistentPrincipal
                 || request.SubjectUserId != first.SubjectUserId || request.IsMachineCaller != first.IsMachineCaller
+                || request.MachinePrincipal != first.MachinePrincipal
                 || request.ResourceId == Guid.Empty)
             || targets.Select(request => request.ResourceId).Distinct().Count()
                 > EventResourceAuthorityRequest.MaximumBatchResources)

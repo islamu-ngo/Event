@@ -15,4 +15,3 @@ public interface IPreparedHumanAiModerationProposal
     Task AcquireAsync(ProposeAiToolActionCommand originalRequest, CancellationToken cancellationToken);
     void RetainProposal(AiConversation conversation, AiProposedAction proposedAction);
 }
-

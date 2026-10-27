@@ -15,7 +15,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace Event.Persistence.IntegrationTests;
 
-public sealed class RegistrationProviderFoundationPersistenceTests
+public sealed partial class RegistrationProviderFoundationPersistenceTests
 {
     private static readonly DateTime Now = new(2026, 8, 9, 12, 0, 0, DateTimeKind.Utc);
 
@@ -210,12 +210,12 @@ public sealed class RegistrationProviderFoundationPersistenceTests
     {
         await using ExploreDbContext context = CreateModelContext();
         IForeignKey? foreignKey = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(RegistrationAttempt))!
-            .GetForeignKeys().SingleOrDefault(candidate => candidate.PrincipalEntityType.ClrType == typeof(RegistrationProviderBinding) &&
+            .GetForeignKeys().SingleOrDefault(candidate => candidate.PrincipalEntityType.ClrType == typeof(RegistrationProviderBindingPublication) &&
                 candidate.Properties.Select(property => property.Name).SequenceEqual([nameof(RegistrationAttempt.TenantId), nameof(RegistrationAttempt.RegistrationProviderBindingId), "ProviderMappingRevisionHashKey"]));
 
         await Assert.That(foreignKey).IsNotNull();
         await Assert.That(foreignKey!.PrincipalKey.Properties.Select(property => property.Name)).IsEquivalentTo([
-            nameof(RegistrationProviderBinding.TenantId), nameof(RegistrationProviderBinding.Id), nameof(RegistrationProviderBinding.PublishedMappingRevisionHashKey)]);
+            nameof(RegistrationProviderBindingPublication.TenantId), nameof(RegistrationProviderBindingPublication.RegistrationProviderBindingId), nameof(RegistrationProviderBindingPublication.MappingRevisionHashKey)]);
     }
 
     [Test]

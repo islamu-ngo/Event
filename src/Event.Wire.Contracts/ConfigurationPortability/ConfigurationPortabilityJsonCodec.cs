@@ -48,18 +48,29 @@ public static class ConfigurationPortabilityJsonCodec
             {
                 if (value.Spec.Tenants.Count > ConfigurationPortabilityContentLimits.MaximumTenantCount)
                     Fail(ConfigurationPortabilityDiagnosticCodes.CountExceeded, "$.spec.tenants");
+                ConfigurationModerationShape.Validate(value.Spec.Instance.Moderation, "$.spec.instance.moderation");
+                for (int i = 0; i < value.Spec.Tenants.Count; i++)
+                    ConfigurationModerationShape.Validate(value.Spec.Tenants[i].Spec.Moderation, $"$.spec.tenants[{i}].spec.moderation");
             });
 
     public static TenantConfigurationPackageV1Alpha2 ParseTenantConfigurationPackage(ReadOnlyMemory<byte> artifact) =>
         Parse(artifact, ConfigurationPortabilityJsonContext.Default.TenantConfigurationPackageV1Alpha2,
             TenantConfigurationPackageContractMetadata.SchemaId, TenantConfigurationPackageContractMetadata.Kind,
-            static _ => { });
+            static value => ConfigurationModerationShape.Validate(value.Spec.Moderation, "$.spec.moderation"));
 
-    public static byte[] SerializeConfigurationManifest(ConfigurationManifestV1Alpha2 manifest) =>
-        Serialize(manifest, ConfigurationPortabilityJsonContext.Default.ConfigurationManifestV1Alpha2);
+    public static byte[] SerializeConfigurationManifest(ConfigurationManifestV1Alpha2 manifest)
+    {
+        byte[] artifact = Serialize(manifest, ConfigurationPortabilityJsonContext.Default.ConfigurationManifestV1Alpha2);
+        _ = ParseConfigurationManifest(artifact);
+        return artifact;
+    }
 
-    public static byte[] SerializeTenantConfigurationPackage(TenantConfigurationPackageV1Alpha2 package) =>
-        Serialize(package, ConfigurationPortabilityJsonContext.Default.TenantConfigurationPackageV1Alpha2);
+    public static byte[] SerializeTenantConfigurationPackage(TenantConfigurationPackageV1Alpha2 package)
+    {
+        byte[] artifact = Serialize(package, ConfigurationPortabilityJsonContext.Default.TenantConfigurationPackageV1Alpha2);
+        _ = ParseTenantConfigurationPackage(artifact);
+        return artifact;
+    }
 
     private static T Parse<T>(ReadOnlyMemory<byte> artifact, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo,
         string schema, string kind, Action<T> validate) where T : class
@@ -101,7 +112,16 @@ public static class ConfigurationPortabilityJsonCodec
     private static byte[] Serialize<T>(T value, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
     {
         ArgumentNullException.ThrowIfNull(value);
-        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(value, typeInfo);
+        byte[] bytes;
+        try
+        {
+            bytes = JsonSerializer.SerializeToUtf8Bytes(value, typeInfo);
+        }
+        catch (JsonException exception)
+        {
+            throw new ConfigurationPortabilityContractException(
+                ConfigurationPortabilityDiagnosticCodes.ContractInvalid, exception.Path ?? "$");
+        }
         if (bytes.Length > ConfigurationPortabilityContentLimits.MaximumArtifactUtf8Bytes)
             Fail(ConfigurationPortabilityDiagnosticCodes.TooLarge, "$");
         return bytes;
@@ -119,6 +139,11 @@ public static class ConfigurationPortabilityJsonCodec
                     Fail(ConfigurationPortabilityDiagnosticCodes.ContractInvalid, childPath);
                 if (ForbiddenMembers.Contains(property.Name))
                     Fail(ConfigurationPortabilityDiagnosticCodes.SensitiveMemberForbidden, childPath);
+                if (property.Name == "moderation" && property.Value.ValueKind == JsonValueKind.Null
+                    && (path == "$.spec" || path == "$.spec.instance"
+                        || path.StartsWith("$.spec.tenants[", StringComparison.Ordinal)
+                            && path.EndsWith("].spec", StringComparison.Ordinal)))
+                    Fail(ConfigurationPortabilityDiagnosticCodes.ContractInvalid, childPath);
                 if (string.Equals(path, "$.spec.instance.documents", StringComparison.Ordinal)
                     && property.Name.StartsWith("tenant.", StringComparison.Ordinal))
                     Fail(ConfigurationPortabilityDiagnosticCodes.ScopeInvalid, childPath);

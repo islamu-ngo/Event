@@ -1165,6 +1165,8 @@
           "Event.Wire.Contracts": "[1.0.0, )",
           "Explore.Domain": "[1.0.0, )",
           "FluentValidation.DependencyInjectionExtensions": "[12.1.1, )",
+          "ISLAMU.Moderation.Application": "[1.0.0, )",
+          "ISLAMU.Moderation.Domain": "[1.0.0, )",
           "Microsoft.Extensions.Caching.Hybrid": "[10.8.0, )",
           "Microsoft.Extensions.Configuration.Abstractions": "[10.0.13, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.13, )",
@@ -1179,6 +1181,7 @@
         "type": "Project",
         "dependencies": {
           "Event.Wire.Contracts": "[1.0.0, )",
+          "ISLAMU.Moderation.Domain": "[1.0.0, )",
           "Microsoft.Extensions.Compliance.Abstractions": "[10.8.0, )"
         }
       },
@@ -1229,6 +1232,15 @@
           "SQLitePCLRaw.bundle_e_sqlite3": "[2.1.12, )",
           "System.Security.Cryptography.Pkcs": "[10.0.13, )"
         }
+      },
+      "islamu.moderation.application": {
+        "type": "Project",
+        "dependencies": {
+          "ISLAMU.Moderation.Domain": "[1.0.0, )"
+        }
+      },
+      "islamu.moderation.domain": {
+        "type": "Project"
       },
       "AWSSDK.S3": {
         "type": "CentralTransitive",

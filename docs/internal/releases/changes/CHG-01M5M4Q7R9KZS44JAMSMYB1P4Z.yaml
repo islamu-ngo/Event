@@ -1,0 +1,25 @@
+Change-Id: CHG-01M5M4Q7R9KZS44JAMSMYB1P4Z
+Title: "Count distinct accepted findings for classification recurrence"
+Type: feat
+Scope: access
+Summary: "Calculate classification recurrence from distinct final findings with retained acceptance and reversal boundaries; native progression remains separate."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

@@ -1,18 +1,26 @@
 using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Net.Security;
 using System.Text;
 using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Testing.DataProtection;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Services;
+using Explore.Application.DTOs.Tenant;
 using Explore.Application.Models;
+using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Modules;
 using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Seed;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -130,6 +138,56 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
 
         await Assert.That(new[] { HttpStatusCode.OK, HttpStatusCode.BadRequest }).Contains(response.StatusCode).Because("instance admin should be allowed to create tenants via local RBAC " +
         "(actual status depends on request body validation, not authorization)");
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task TenantCreationUsesThePersistedProviderBindingRatherThanTheGuidTokenSubject(bool instanceAdministration)
+    {
+        await using var administrationFactory = instanceAdministration
+            ? new LocalRbacWebApplicationFactory(_keycloak.Authority, _keycloak.MetadataAddress,
+                _keycloak.TokenClient, _tenantContext, _cerbosConfigResolver, deploymentMode: "MultiTenant")
+            : null;
+        using var administrationClient = administrationFactory?.CreateClient();
+        var factory = administrationFactory ?? _instanceAdminFactory;
+        var client = administrationClient ?? _instanceAdminClient;
+        if (instanceAdministration)
+            await Assert.That(await factory.Services.GetRequiredService<IDeploymentModeProvider>().GetCurrentModeAsync())
+                .IsEqualTo(DeploymentMode.MultiTenant);
+        var token = await _keycloak.TokenClient.GetAdminTokenAsync();
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+        var accountKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(jwt.Issuer, jwt.Subject);
+        await using var observer = await factory.Services
+            .GetRequiredService<IGlobalExploreDbContextFactory>().CreateDbContextAsync();
+        var login = await observer.UserExternalLogins.AsNoTracking()
+            .SingleAsync(value => value.ProviderKey == accountKey.Value);
+        await Assert.That(Guid.Parse(jwt.Subject)).IsNotEqualTo(login.UserId);
+
+        var suffix = Guid.NewGuid().ToString("N");
+        var request = new CreateTenantDto
+        {
+            FullName = $"Provider bound tenant {suffix}",
+            Slug = $"provider-bound-{suffix}",
+            IsActive = false,
+            AssignCurrentUserAsTenantAdmin = true
+        };
+        using var message = CreateAuthorizedRequest(HttpMethod.Post,
+            instanceAdministration ? "/api/admin/instance/tenants" : "/api/tenant", token);
+        message.Content = JsonContent.Create(request);
+        using var response = await client.SendAsync(message);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(factory.RequestFailureSummary);
+        var result = await response.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
+        await Assert.That(result).IsNotNull();
+        await Assert.That(result!.IsSuccess).IsTrue();
+        var tenant = await observer.Tenants.AsNoTracking().SingleAsync(value => value.Id == result.Id);
+        await Assert.That(tenant.CreatedBy).IsEqualTo(login.UserId);
+        var membership = await observer.TenantUsers
+            .IgnoreTenantFilter("Observe the tenant creator's persisted membership after its HTTP request completed.")
+            .AsNoTracking().SingleAsync(value => value.TenantId == result.Id);
+        await Assert.That(membership.UserId).IsEqualTo(login.UserId);
+        await Assert.That(membership.CreatedBy).IsEqualTo(login.UserId);
     }
 
     #endregion
@@ -293,7 +351,7 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
     private static string CreateTenantJson()
     {
         var suffix = Guid.NewGuid().ToString("N");
-        return $"{{\"fullName\":\"Security Test Tenant {suffix}\",\"slug\":\"security-test-tenant-{suffix}\",\"isActive\":true}}";
+        return $"{{\"fullName\":\"Security Test Tenant {suffix}\",\"slug\":\"security-test-tenant-{suffix}\",\"isActive\":false}}";
     }
 
     private static HttpRequestMessage CreateAuthorizedRequest(HttpMethod method, string url, string token, string? jsonBody = null)
@@ -341,6 +399,7 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
         private readonly string _keycloakMetadataAddress;
         private readonly ITenantContext _tenantContext;
         private readonly ICerbosConfigResolver _cerbosConfigResolver;
+        private readonly string _deploymentMode;
 
         internal string RequestFailureSummary => _requestFailures.Summary;
 
@@ -349,13 +408,15 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
             string keycloakMetadataAddress,
             KeycloakTokenClient keycloakTokens,
             ITenantContext tenantContext,
-            ICerbosConfigResolver cerbosConfigResolver)
+            ICerbosConfigResolver cerbosConfigResolver,
+            string deploymentMode = "SingleTenant")
         {
             _keycloakTokens = keycloakTokens;
             _keycloakAuthority = keycloakAuthority;
             _keycloakMetadataAddress = keycloakMetadataAddress;
             _tenantContext = tenantContext;
             _cerbosConfigResolver = cerbosConfigResolver;
+            _deploymentMode = deploymentMode;
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -380,7 +441,7 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
                     ["S3Settings:Region"] = "us-east-1",
                     ["S3Settings:BucketName"] = "test-bucket",
                     ["S3Settings:Endpoint"] = "https://s3.example.com",
-                    ["Deployment:Mode"] = "SingleTenant",
+                    ["Deployment:Mode"] = _deploymentMode,
                     ["Deployment:DefaultTenantId"] = DefaultTenantId.ToString(),
                     ["Testing:HostProfile"] = TestHostProfile.Security,
                     ["Cerbos:GrpcEndpoint"] = "http://localhost:19999",
@@ -515,6 +576,19 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
                 dbContext.Tenants.Add(new TenantBuilder().WithId(DefaultTenantId).Build());
             else
                 tenant.TenantStatusId = (int)TenantStatusEnum.Active;
+
+            if (scope.ServiceProvider.GetRequiredService<IConfiguration>()
+                    .GetValue<DeploymentMode>("Deployment:Mode") == DeploymentMode.MultiTenant)
+            {
+                var administratorId = await dbContext.PlatformUserRoles
+                    .Where(role => role.RoleId == (int)RoleEnum.Admin)
+                    .Select(role => role.UserId).SingleAsync(cancellationToken);
+                var completedAt = DateTime.UtcNow;
+                var bootstrap = InstanceBootstrapState.CreateInteractivePending(
+                    Guid.CreateVersion7(), DeploymentMode.MultiTenant, completedAt);
+                bootstrap.CompleteInteractive(administratorId, completedAt);
+                dbContext.InstanceBootstrapStates.Add(bootstrap);
+            }
 
             dbContext.SystemSettings.Add(new SystemSetting
             {

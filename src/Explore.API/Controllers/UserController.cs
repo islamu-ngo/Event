@@ -252,6 +252,10 @@ public class UserController : EventControllerBase
 
     [HttpPatch("{id:guid}", Name = RouteNames.UpdateCurrentUser)]
     [Authorize]
+    [ProfileCollectionAdmission]
+    [SuppressIdempotencyResponseStorage]
+    [RequestSizeLimit(64 * 1024)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
@@ -262,6 +266,7 @@ public class UserController : EventControllerBase
         Guid id,
         [FromBody] UpdateUserDto userDto,
         [FromHeader(Name = "If-Match")] string? ifMatch,
+        [FromHeader(Name = ProfileCollectionAdmissionAttribute.HeaderName)] string? profileCollection,
         CancellationToken cancellationToken = default)
     {
         var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);

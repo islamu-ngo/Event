@@ -13,7 +13,8 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository(
     IOptions<PrivacyErasureOptions> options,
     EmbeddedPrivacyErasureAuthorityStorage? storage = null,
     ExploreDbContext? applicationContext = null)
-    : IPrivacyErasureAuthority, IPrivacyErasureAuthorityMaintenance, IPrivacyIdentityFenceAuthority
+    : IPrivacyErasureAuthority, IPrivacyErasureAuthorityMaintenance, IPrivacyIdentityFenceAuthority,
+        IPrivacyErasureRecoveryAuthority
 {
     public const int MaximumReadBatchSize = 500;
     private static readonly SemaphoreSlim WriterLock = new(1, 1);
@@ -97,12 +98,23 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository(
             throw new ArgumentOutOfRangeException(nameof(limit));
         }
 
+        // Recognition requalification rereads the committed fact while retaining the original
+        // identity writer gate. A second SQLite connection would block on that gate's counter.
+        if (_identityGate.Value is { } active)
+            return await ReadAfterInContextAsync(active, authoritySequence, limit, cancellationToken);
+
         if (storage is not null)
         {
             await storage.EnsureReadyAsync(cancellationToken);
         }
         await using EmbeddedPrivacyErasureAuthorityDbContext db =
             await contextFactory.CreateDbContextAsync(cancellationToken);
+        return await ReadAfterInContextAsync(db, authoritySequence, limit, cancellationToken);
+    }
+
+    private static async Task<IReadOnlyList<PrivacyErasureIntent>> ReadAfterInContextAsync(
+        EmbeddedPrivacyErasureAuthorityDbContext db, long authoritySequence, int limit, CancellationToken cancellationToken)
+    {
         PrivacyErasureCounter? counter = await db.AuthorityCounters
             .AsNoTracking()
             .SingleOrDefaultAsync(cancellationToken);
@@ -195,6 +207,7 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository(
             var deleted = 0;
             var pseudonymized = 0;
             long expectedSequence = counter.RetainedFloorSequence;
+            long retainedFloor = counter.RetainedFloorSequence;
             foreach (PrivacyErasureIntent candidate in candidates)
             {
                 EnsureContiguous(candidate, ref expectedSequence);
@@ -213,20 +226,14 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository(
                         pseudonymized++;
                     }
 
-                    if (candidate.AuthoritySequence > counter.RetainedFloorSequence)
-                    {
-                        counter.AdvanceRetainedFloorTo(candidate.AuthoritySequence);
-                    }
+                    retainedFloor = Math.Max(retainedFloor, candidate.AuthoritySequence);
 
                     break;
                 }
 
                 db.ErasureIntents.Remove(candidate);
                 deleted++;
-                if (candidate.AuthoritySequence > counter.RetainedFloorSequence)
-                {
-                    counter.AdvanceRetainedFloorTo(candidate.AuthoritySequence);
-                }
+                retainedFloor = Math.Max(retainedFloor, candidate.AuthoritySequence);
             }
 
             await EnsureNextSequenceExistsAsync(
@@ -235,6 +242,8 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository(
                 counter.LastSequence,
                 cancellationToken);
 
+            if (deleted != 0 || pseudonymized != 0)
+                counter.RecordCompaction(retainedFloor);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             storage?.HardenCompanionFiles();

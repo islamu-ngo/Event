@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Event.Wire.Contracts\Event.Wire.Contracts.csproj" />
+    <ProjectReference Include="..\ISLAMU.Moderation.Domain\ISLAMU.Moderation.Domain.csproj" />
   </ItemGroup>
 
 </Project>

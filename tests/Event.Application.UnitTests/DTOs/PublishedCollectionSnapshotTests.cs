@@ -4,6 +4,11 @@ using System.Reflection;
 using Explore.Application.DTOs.CustomPropertyDefinition;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.DTOs.Event;
+using Explore.Application.DTOs.EventAgendaItem;
+using Explore.Application.DTOs.EventDay;
+using Explore.Application.DTOs.EventProgram;
+using Explore.Application.DTOs.EventSession;
+using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.DTOs.EventSessionCustomProperty;
 using Explore.Application.DTOs.EventSessionTemplate;
@@ -204,6 +209,40 @@ public sealed class PublishedCollectionSnapshotTests
 
 public sealed class EventFamilyPublishedCollectionSnapshotTests
 {
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ManagedProgramCopiesEveryConstructorAndWithInput(bool replaceWith)
+    {
+        var sessions = new List<EventSessionListDto> { new() { EventTitle = "Event" } };
+        var groups = new List<EventSessionGroupListDto> { new() { Name = "Group" } };
+        var days = new List<EventDayListDto> { new() };
+        var items = new List<EventAgendaItemListDto> { new() { Title = "Item" } };
+        var program = replaceWith
+            ? new ManagedEventProgramDto([], [], [], []) with
+            {
+                Sessions = sessions,
+                SessionGroups = groups,
+                Days = days,
+                AgendaItems = items
+            }
+            : new ManagedEventProgramDto(sessions, groups, days, items);
+
+        sessions.Clear();
+        groups.Clear();
+        days.Clear();
+        items.Clear();
+
+        await Assert.That(program.Sessions.Count).IsEqualTo(1);
+        await Assert.That(program.SessionGroups.Count).IsEqualTo(1);
+        await Assert.That(program.Days.Count).IsEqualTo(1);
+        await Assert.That(program.AgendaItems.Count).IsEqualTo(1);
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(program,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        foreach (string name in new[] { "sessions", "sessionGroups", "days", "agendaItems" })
+            await Assert.That(json.RootElement.GetProperty(name).GetArrayLength()).IsEqualTo(1);
+    }
+
     private static readonly HashSet<string> OwnedNamespaces = new(StringComparer.Ordinal)
     {
         "Explore.Application.DTOs.Agenda",
@@ -230,7 +269,9 @@ public sealed class EventFamilyPublishedCollectionSnapshotTests
 
         foreach (PropertyInfo property in properties)
         {
-            object owner = Activator.CreateInstance(property.DeclaringType!)!;
+            object owner = property.DeclaringType == typeof(ManagedEventProgramDto)
+                ? new ManagedEventProgramDto([], [], [], [])
+                : Activator.CreateInstance(property.DeclaringType!)!;
             ICollection source = CreateMutableSource(property.PropertyType);
             AddValue(source, property.PropertyType, 1);
             property.SetValue(owner, source);

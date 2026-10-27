@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
@@ -29,20 +30,21 @@ public sealed partial class HumanEventTeamCustodyTests
         await request.Authenticate(await fixture.SignInAsync());
         var context = request.Services.GetRequiredService<ExploreDbContext>();
         Guid created = Guid.Empty;
-        var owner = new AfterBody((ISerializableAttemptOwner)new EfCoreUnitOfWork(context), async token =>
+        request.Admission.AfterNativeSources = async token =>
         {
             created = await context.EventRoleAssignments.AsNoTracking().Where(row =>
                 row.EventId == target.Event && row.RoleId == (int)RoleEnum.CheckInStaff).Select(row => row.Id).SingleAsync(token);
             await Assert.That(await context.AuditLogs.AsNoTracking().AnyAsync(row =>
                 row.EntityId == created.ToString() && row.Action == "EventRoleAssignmentCreated", token)).IsTrue();
             if (rejectAfterBody) throw new InvalidOperationException("Rejected before owner settlement.");
-        });
-        var handler = ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(request.Services, owner);
+        };
+        var handler = ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(request.Services);
         var command = Assignment(fixture, target.Event);
         if (rejectAfterBody)
             await Assert.ThrowsAsync<InvalidOperationException>(() => handler.ExecuteAsync(command));
         else
             await Assert.That((await handler.ExecuteAsync(command)).IsSuccess).IsTrue();
+        await Assert.That(request.Admission.NativeSourcesReached).IsTrue();
         await using var observer = fixture.Native.CreateDatabase();
         await Assert.That(await observer.EventRoleAssignments.AsNoTracking().AnyAsync(row => row.Id == created))
             .IsEqualTo(!rejectAfterBody);
@@ -51,14 +53,20 @@ public sealed partial class HumanEventTeamCustodyTests
     }
 
     private static Task<LocalIdentityLifecycleHttpFixture> CreateFixture() =>
-        LocalIdentityLifecycleHttpFixture.CreateAsync();
+        LocalIdentityLifecycleHttpFixture.CreateAsync(configureServices: services =>
+        {
+            var registration = services.Single(service => service.ServiceType == typeof(IHumanActionCommitFinalizer));
+            services.Remove(registration);
+            services.AddScoped(provider => new CommitAdmissionProbe(
+                (IHumanActionCommitFinalizer)ActivatorUtilities.CreateInstance(provider, registration.ImplementationType!)));
+            services.AddScoped<IHumanActionCommitFinalizer>(provider => provider.GetRequiredService<CommitAdmissionProbe>());
+        });
 
     private static AssignEventRoleCommand Assignment(LocalIdentityLifecycleHttpFixture fixture, Guid eventId) => new()
     {
         TenantId = PlatformDefaults.DefaultTenantId,
         EventId = eventId,
         TargetUserId = fixture.Binding.LocalSubjectId,
-        ActorUserId = fixture.Binding.LocalSubjectId,
         RoleId = (int)RoleEnum.CheckInStaff,
         StartsAtUtc = fixture.Clock.GetUtcNow().AddMinutes(-1).UtcDateTime
     };
@@ -122,16 +130,29 @@ public sealed partial class HumanEventTeamCustodyTests
         return (parent.Id, assignment.Id);
     }
 
-    private sealed class AfterBody(ISerializableAttemptOwner inner, Func<CancellationToken, Task> afterBody)
-        : ISerializableAttemptOwner
+    private sealed class CommitAdmissionProbe(IHumanActionCommitFinalizer inner) : IHumanActionCommitFinalizer
     {
-        public Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation,
-            CancellationToken cancellationToken = default) => inner.ExecuteAsync(async token =>
+        private int registrations;
+        internal Func<CancellationToken, Task>? AfterNativeSources { get; set; }
+        internal Func<CancellationToken, Task>? AfterAllSources { get; set; }
+        internal bool NativeSourcesReached { get; private set; }
+
+        public void Register(Func<CancellationToken, Task> validateSources, Action<DateTimeOffset> validateAssignments)
         {
-            T result = await operation(token);
-            await afterBody(token);
-            return result;
-        }, cancellationToken);
+            int position = ++registrations;
+            inner.Register(async token =>
+            {
+                await validateSources(token);
+                // Native admission registers first; inject only after its receipt read,
+                // before retained human sources validate the same physical transaction.
+                if (position == 1 && AfterNativeSources is { } afterNative)
+                {
+                    NativeSourcesReached = true;
+                    await afterNative(token);
+                }
+                if (position == registrations && AfterAllSources is { } afterAll) await afterAll(token);
+            }, validateAssignments);
+        }
     }
 
     private sealed class Request : IAsyncDisposable
@@ -139,6 +160,7 @@ public sealed partial class HumanEventTeamCustodyTests
         private readonly AsyncServiceScope scope;
         private readonly IHttpContextAccessor accessor;
         internal IServiceProvider Services => scope.ServiceProvider;
+        internal CommitAdmissionProbe Admission => Services.GetRequiredService<CommitAdmissionProbe>();
         internal DefaultHttpContext Context { get; }
 
         internal Request(IServiceProvider services)
@@ -149,14 +171,28 @@ public sealed partial class HumanEventTeamCustodyTests
             Services.GetRequiredService<ITenantContextAccessor>().BindExecutionTenant(PlatformDefaults.DefaultTenantId);
         }
 
-        internal async Task Authenticate(string token)
+        internal Task Authenticate(string token)
         {
             accessor.HttpContext = Context;
             Context.Request.Headers.Authorization = "Bearer " + token;
+            return AuthenticateOriginalRequest();
+        }
+
+        private async Task AuthenticateOriginalRequest()
+        {
             var result = await Context.AuthenticateAsync();
             await Assert.That(result.Succeeded).IsTrue();
             Context.User = result.Principal!;
             await Services.GetRequiredService<IHumanCommitScopePreparation>().PrepareAsync(default);
+        }
+
+        internal void SubstituteSubject(string subject)
+        {
+            var identity = (ClaimsIdentity)Context.User.Identity!;
+            foreach (var claim in identity.FindAll("sub").Concat(identity.FindAll(ClaimTypes.NameIdentifier)).ToArray())
+                identity.RemoveClaim(claim);
+            identity.AddClaim(new Claim("sub", subject));
+            identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, subject));
         }
 
         public async ValueTask DisposeAsync()

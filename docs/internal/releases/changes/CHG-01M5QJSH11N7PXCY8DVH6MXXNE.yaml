@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5QJSH11N7PXCY8DVH6MXXNE
+Title: "Select native tenant creation authority before authorization"
+Type: fix
+Scope: access
+Summary: "Let the existing human tenant-creation owner select its Global purpose before principal projection; retain the same provider decision, original credential and commit fences."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: mitigated
+    Detail: "The exact human CreateTenant command delegates the unchanged provider question to its existing native creator after dedicated owner selection. Original credential, immutable purpose, native sources, transaction and commit-time checks remain enforced; machine authority is not delegated. API regressions are authored but locally unbuilt/unrun."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: "No new permission, credential, setting or migration is required. This fixes ordering before native tenant creation; it does not certify provider execution, resolve the separate Setup GET/PATCH failures, or replace required CI."

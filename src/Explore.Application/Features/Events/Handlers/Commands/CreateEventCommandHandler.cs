@@ -70,14 +70,13 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
     private readonly ITenantContext _tenantContext;
     private readonly HybridCache _cache;
     private readonly BusinessMetrics _metrics;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IEventInitialCreationMutationBoundary _creationBoundary;
     private readonly IOutboxRepository _outboxRepository;
     private readonly IEventLifecyclePolicyProvider _lifecyclePolicyProvider;
     private readonly IEventLifecycleReadinessEvaluator _lifecycleReadinessEvaluator;
     private readonly EventLocationAttachmentService _eventLocationAttachmentService;
     private readonly AtprotoEventPublicationPlanner _atprotoPublicationPlanner;
     private readonly TimeProvider _timeProvider;
-    private readonly ISettingMutationLock _mutationLock;
     private readonly IVisitorAccessCapabilityResolver _visitorCapabilities;
     private readonly IAiEventDraftRecoveryRepository _aiDraftRecovery;
 
@@ -127,14 +126,13 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         ITenantContext tenantContext,
         HybridCache cache,
         BusinessMetrics metrics,
-        IUnitOfWork unitOfWork,
+        IEventInitialCreationMutationBoundary creationBoundary,
         IOutboxRepository outboxRepository,
         IEventLifecyclePolicyProvider lifecyclePolicyProvider,
         IEventLifecycleReadinessEvaluator lifecycleReadinessEvaluator,
         EventLocationAttachmentService eventLocationAttachmentService,
         AtprotoEventPublicationPlanner atprotoPublicationPlanner,
         TimeProvider timeProvider,
-        ISettingMutationLock mutationLock,
         IVisitorAccessCapabilityResolver visitorCapabilities,
         IAiEventDraftRecoveryRepository aiDraftRecovery)
     {
@@ -183,14 +181,13 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         _tenantContext = tenantContext;
         _cache = cache;
         _metrics = metrics;
-        _unitOfWork = unitOfWork;
+        _creationBoundary = creationBoundary;
         _outboxRepository = outboxRepository;
         _lifecyclePolicyProvider = lifecyclePolicyProvider;
         _lifecycleReadinessEvaluator = lifecycleReadinessEvaluator;
         _eventLocationAttachmentService = eventLocationAttachmentService;
         _atprotoPublicationPlanner = atprotoPublicationPlanner;
         _timeProvider = timeProvider;
-        _mutationLock = mutationLock;
         _visitorCapabilities = visitorCapabilities;
         _aiDraftRecovery = aiDraftRecovery;
     }
@@ -291,8 +288,14 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         var createdAt = now;
         DateTime occurredAt = now.UtcDateTime;
         bool publishOnCreate = requestedStatusId == (int)EventStatusEnum.Published;
-        var eventEntity = BuildEventEntity(dto, actorResult, timezoneId, currentUserId, createdAt, publishOnCreate,
-            aiOrigin?.ReservedEventId ?? Guid.CreateVersion7());
+        var newEventId = aiOrigin?.ReservedEventId ?? Guid.CreateVersion7();
+        var initialOwnerId = Guid.CreateVersion7();
+        var publicCode = GeneratePublicCode();
+        var creation = new EventInitialCreation(_tenantContext.TenantId, newEventId, initialOwnerId,
+            currentUserId, actorResult.ActorId, dto.OrganizationId, dto.GroupId,
+            actorResult.IsCommunitySubmission, createdAt.UtcDateTime,
+            imageIds.Where(id => id.HasValue).Select(id => id!.Value).Distinct().Order().ToArray(),
+            (EventStatusEnum)requestedStatusId);
         var federationOutboxId = Guid.CreateVersion7();
         var notificationFanoutOutboxId = Guid.CreateVersion7();
         var federationCreatedAt = occurredAt;
@@ -300,10 +303,15 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            var response = await _mutationLock.ExecuteOrderedGroupsAsync(
-                [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
-                token => _unitOfWork.ExecuteSerializableAsync(async ct =>
+            var response = await _creationBoundary.ExecuteCreationAsync(creation, async (creator, token) =>
             {
+                var current = await ResolvePublisherActorAsync(dto, creator, token);
+                return current.Succeeded && current.ActorId == creation.PublisherActorId
+                    && current.IsCommunitySubmission == creation.CommunitySubmission;
+            }, async (creator, ct) =>
+            {
+                var eventEntity = BuildEventEntity(dto, actorResult, timezoneId, creator, createdAt,
+                    publishOnCreate, newEventId, publicCode);
                 if (aiOrigin is not null)
                 {
                     var execution = await _aiDraftRecovery.ReadForPrimaryCreationAsync(
@@ -352,7 +360,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
                 eventEntity = await _eventRepository.Create(eventEntity);
                 await AssignFeaturedImageActorAsync(dto, actorResult.ActorId);
                 await CreateEventIslamicAspectAsync(dto, eventEntity, ct);
-                await AssignInitialEventOwnerAsync(eventEntity, currentUserId, createdAt.UtcDateTime, ct);
+                await AssignInitialEventOwnerAsync(eventEntity, creator, initialOwnerId, createdAt.UtcDateTime, ct);
 
                 var locationMap = await CreateLocationsAsync(
                     dto,
@@ -389,7 +397,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
                 if (aiOrigin is not null)
                     await _aiDraftRecovery.LinkPrimaryAsync(aiOrigin.Identity, aiOrigin.ExecutionId, eventEntity, ct);
                 return BaseCommandResponse.Success(eventEntity.Id, "Event created successfully.");
-            }, token), cancellationToken);
+            }, cancellationToken);
             if (!response.IsSuccess)
             {
                 return response;
@@ -460,7 +468,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         Guid currentUserId,
         DateTimeOffset createdAt,
         bool includePublicScheduleRollup,
-        Guid eventId)
+        Guid eventId,
+        string publicCode)
     {
         IReadOnlyList<CreateEventGraphSessionDto> publicSessionRequests = includePublicScheduleRollup
             ? dto.Sessions.Where(session => session.StartTime.HasValue).ToArray()
@@ -484,7 +493,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
             Description = dto.Description,
             Content = dto.Content,
             Slug = string.IsNullOrWhiteSpace(dto.Slug) ? SlugGenerator.FromTitle(dto.Title, "event") : dto.Slug,
-            PublicCode = GeneratePublicCode(),
+            PublicCode = publicCode,
             EventTypeId = dto.EventTypeId,
             AudienceGenderId = dto.AudienceGenderId,
             AudienceAgeId = dto.AudienceAgeId,
@@ -579,6 +588,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
     private async Task AssignInitialEventOwnerAsync(
         Explore.Domain.Event eventEntity,
         Guid creatorUserId,
+        Guid ownerAssignmentId,
         DateTime createdAtUtc,
         CancellationToken ct)
     {
@@ -596,6 +606,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
             createdAtUtc,
             expiresAtUtc: null,
             createdByUserId: creatorUserId);
+        assignment.Id = ownerAssignmentId;
+        assignment.CreatedAt = createdAtUtc;
 
         await _eventRoleAssignmentRepository.Create(assignment);
     }

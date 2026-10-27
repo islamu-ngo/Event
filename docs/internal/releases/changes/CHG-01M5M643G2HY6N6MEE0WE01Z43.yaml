@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5M643G2HY6N6MEE0WE01Z43
+Title: "Declare optional moderation deployment inputs without enabling them"
+Type: feat
+Scope: self-hosting
+Summary: "Catalogue maintenance and isolated-measurement environment inputs with explicit sensitivity and startup ownership, regenerate metadata, and leave all private deployment coordinates blank."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: "Catalogue metadata identifies private inputs as secret and launcher-only inputs as non-startup-owned. Blank deployment coordinates contain no credentials and confer no native authority; setup witnesses are unrun."
+  Migration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+    Detail: "Environment catalogue metadata and blank deployment inputs require no database migration."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: "Optional reconciliation and isolated-measurement variables are declared in the source environment catalogue and blank example. The generated catalogue travels with its source metadata; declaring inputs does not enable a service, select an authority or enroll a signer."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: "The environment catalogue and its generated metadata do not alter an HTTP API contract."
+  Operator:
+    Reference: docs/internal/SECRETS.md
+    Disposition: planned
+    Detail: "The paired environment guide lists reconciliation variables. Complete measurement-field table parity and programme deployment guidance remain outstanding; catalogue publication alone does not certify startup or measurement readiness."

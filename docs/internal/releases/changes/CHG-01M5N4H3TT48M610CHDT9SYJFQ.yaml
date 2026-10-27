@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5N4H3TT48M610CHDT9SYJFQ
+Title: "Restore native account creation with private PII model fields"
+Type: fix
+Scope: access
+Summary: "Reconcile the worker and Local identity INSERT manifests with the merged UserPii model while retaining birth-date read/update restrictions and strict model-shape rejection."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: mitigated
+    Detail: "Declare the existing private PII fields for INSERT without adding worker PII reads/updates or Local birth-date reads/updates. Strict model-shape rejection and native postimage custody remain active; authored regression sources are unrun and unbuilt locally."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Detail: "No new setting or secret is introduced. Existing account-creation manifests are reconciled with the already mapped model."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: planned
+    Detail: "Remote CI must verify startup, native permission attestation and account creation. No database was executed or updated locally, and product compilation alone does not certify provider behavior."

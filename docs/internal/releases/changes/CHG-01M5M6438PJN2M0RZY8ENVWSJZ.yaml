@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M6438PJN2M0RZY8ENVWSJZ
+Title: "Retain native dispatch provenance for provider advice"
+Type: feat
+Scope: events
+Summary: "Checkpoint case-generation, dispatch, callback identity and digest metadata for advisory signals without treating provider advice as native findings."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Structural signal factories bind advice to exact dispatch generation, authenticated inbox identity and material digest. Callback authentication and native authorization remain host-owned; tests are unrun."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Signal/link columns and indexes require the separate generated history and shared MySQL uniqueness policy. No migration or provider execution was performed."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/MODERATION.md
+    Disposition: planned
+    Detail: "Deploy only with the host callback/dispatch integration and schema checkpoint; retained provider advice is not a finding or decision."

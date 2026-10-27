@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4FK6MMM7JT6YTHQ8HK64Z4J
+Title: "Bind machine credentials to explicit canonical service identities"
+Type: feat
+Scope: access
+Summary: "Add native administrator-qualified credential-to-service bindings so replacement keys can retain the same canonical moderation subject. Bindings pin the installed host, credential source, key ID and owner coordinates without borrowing a human identity or inferring service IDs. Fresh reads reject revoked bindings, changed credentials and unavailable services. Add generated schemas for every primary provider. Current owner qualification, protected consumer conformance and profile activation remain separate open gates."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

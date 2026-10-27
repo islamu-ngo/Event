@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5M6D4AHX0YCFZNDKDBTKATZ
+Title: "Retain external moderation callbacks as advisory evidence only"
+Type: fix
+Scope: events
+Summary: "Bind authenticated provider advice to native dispatch and webhook receipt without creating findings, approval or executable discipline; included tests are unrun and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Coop/Osprey callback advice no longer approves or executes local discipline. Retain authenticated recommendations against native dispatch evidence and use the independent native finding/adjudication workflow for any action."
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Authenticated callback/webhook receipts bind advice to exact report/case dispatch generation; provider recommendations cannot become native findings, approvals or executable sanctions. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires separately owned provider link/signal provenance columns and uniqueness indexes in generated schema history; no migration or provider execution occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Callback endpoint source descriptions now state advisory-only semantics; the cumulative OpenAPI/client snapshot ships once in final host composition."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Update integrations expecting callback-triggered local execution and complete paired advisory-only dispatch/adjudication guidance; authenticated callback and provider assurance remain pending."

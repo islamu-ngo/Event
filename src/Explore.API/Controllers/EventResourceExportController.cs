@@ -4,6 +4,7 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.API.Models;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventResource;
 using Explore.Application.Features.EventResources;
@@ -38,22 +39,27 @@ public sealed class EventResourceExportController(
         Guid eventId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
     {
         var result = await export.QueryAsync(new(eventId, page, pageSize), cancellationToken);
-        if (result.Value is { } value)
+        if (result.Projection is { } projection)
         {
-            var items = value.Items.Select(item => item.DownloadAuthorized
-                && Url.RouteUrl(RouteNames.GetEventResourceContent, new { id = item.Id }) is { } href
-                    ? item with { Download = new(href) }
-                    : item with { Download = null }).ToImmutableArray();
-            return Ok(value with { Items = items });
+            return new EventResourceProjectionResult<EventResourceMetadataExportPageDto>(projection, (value, _) =>
+            {
+                var items = value.Items.Select(item => item.DownloadAuthorized
+                    && Url.RouteUrl(RouteNames.GetEventResourceContent, new { id = item.Id }) is { } href
+                        ? item with { Download = new(href) }
+                        : item with { Download = null }).ToImmutableArray();
+                return Task.FromResult<ActionResult>(Ok(value with { Items = items }));
+            }, ReadFailure);
         }
-        return result.Outcome switch
-        {
-            EventResourceAuthorityOutcome.NotFound => this.ToNotFoundProblem(
-                new("Resource not found", "The requested resource was not found.")),
-            EventResourceAuthorityOutcome.AuthenticationRequired => this.ToAuthenticationRequiredProblem(),
-            EventResourceAuthorityOutcome.Forbidden => this.ToForbiddenProblem(),
-            _ => this.ToServiceUnavailableProblem("Resource authority unavailable",
-                "Current resource authority could not be established.", EventResourceManagementFailureCodes.Unavailable)
-        };
+        return ReadFailure(result.Outcome);
     }
+
+    private ActionResult ReadFailure(EventResourceAuthorityOutcome outcome) => outcome switch
+    {
+        EventResourceAuthorityOutcome.NotFound => this.ToNotFoundProblem(
+            new("Resource not found", "The requested resource was not found.")),
+        EventResourceAuthorityOutcome.AuthenticationRequired => this.ToAuthenticationRequiredProblem(),
+        EventResourceAuthorityOutcome.Forbidden => this.ToForbiddenProblem(),
+        _ => this.ToServiceUnavailableProblem("Resource authority unavailable",
+            "Current resource authority could not be established.", EventResourceManagementFailureCodes.Unavailable)
+    };
 }

@@ -1,5 +1,6 @@
 namespace Event.Persistence.IntegrationTests.SetupLive;
 
+using System.Data;
 using System.Data.Common;
 using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
@@ -14,9 +15,11 @@ using Explore.Domain.Secrets;
 using Explore.Domain.SetupLive;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using ISLAMU.Wire.Contracts.SetupLive;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 
@@ -35,6 +38,143 @@ public sealed class SetupLivePersistenceInvariantTests(
         "fk_setup_secret_binding_operations_setup_target_en_ff0a38ad8625";
     private static readonly DateTime Now =
         new(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc);
+
+    [Test]
+    public async Task SetupBindingCatalogReadsOnlyTheExactInstanceIdWithoutProviderCoordinates()
+    {
+        await fixture.ResetAsync();
+        (Guid tenantId, _) = await SeedApplicationActorAsync();
+        SecretBinding signing = SetupBinding("setup.signing", "SETUP_SIGNING_TEST");
+        SecretBinding qualified = SetupBinding("setup.encryption", "SETUP_QUALIFIED_TEST");
+        qualified.Qualifier = "other";
+        SecretBinding tenantOnly = SetupBinding("setup.encryption", "SETUP_TENANT_TEST");
+        tenantOnly.Scope = SecretScope.Tenant;
+        tenantOnly.ScopeId = tenantId;
+        await using (ExploreDbContext seed = fixture.CreateDbContext())
+        {
+            seed.SecretBindings.AddRange(signing, qualified, tenantOnly);
+            await seed.SaveChangesAsync();
+        }
+
+        await using ExploreDbContext context = CreateApplicationContext(tenantId);
+        var catalog = new SetupSecretBindingCatalog(context, fixture.NativeQueueEnrollment);
+        await Assert.That(await catalog.FindInstanceIdAsync("setup.signing", CancellationToken.None))
+            .IsEqualTo((Guid?)signing.Id);
+        await Assert.That(await catalog.FindInstanceIdAsync("setup.encryption", CancellationToken.None))
+            .IsNull();
+        await Assert.That(await catalog.FindInstanceIdAsync("other.key", CancellationToken.None))
+            .IsNull();
+        await Assert.That(await catalog.FindInstanceIdAsync("SETUP.SIGNING", CancellationToken.None))
+            .IsNull();
+        PostgresException denied = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.SecretBindings.AsNoTracking()
+                .Where(binding => binding.Id == signing.Id)
+                .Select(binding => binding.InfisicalPath).SingleAsync());
+        await Assert.That(denied.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+        await Assert.That(context.TenantFilterTenantId).IsEqualTo(tenantId);
+        await Assert.That(context.IsTenantFilterBypassed).IsFalse();
+        await Assert.That(context.Database.CurrentTransaction).IsNull();
+    }
+
+    [Test]
+    public async Task SetupBindingCatalogLeavesReplacementTransactionAndConnectionOpenOnOwnershipFailure()
+    {
+        CancellationToken token = TestContext.Current!.Execution.CancellationToken;
+        await fixture.ResetAsync();
+        (Guid tenantId, _) = await SeedApplicationActorAsync();
+        await using (ExploreDbContext seed = fixture.CreateDbContext())
+        {
+            seed.SecretBindings.Add(SetupBinding("setup.signing", "SETUP_SIGNING_TEST"));
+            await seed.SaveChangesAsync(token);
+        }
+
+        IDbContextTransaction? replacement = null;
+        int backend = 0;
+        using var interceptor = new SetupBindingOwnerChangeInterceptor(async owner =>
+        {
+            backend = ((NpgsqlConnection)owner.Database.GetDbConnection()).ProcessID;
+            replacement = await owner.Database.BeginTransactionAsync(token);
+            // Transfer the existing open reference, not BeginTransaction's additional reference.
+            await owner.Database.CloseConnectionAsync();
+        });
+        await using ExploreDbContext context = CreateApplicationContext(tenantId, interceptor);
+        DbConnection connection = context.Database.GetDbConnection();
+        await Assert.That(connection.State).IsEqualTo(ConnectionState.Closed);
+        var catalog = new SetupSecretBindingCatalog(context, fixture.NativeQueueEnrollment);
+        try
+        {
+            var failure = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                catalog.FindInstanceIdAsync("setup.signing", token));
+            await Assert.That(failure!.Message).IsEqualTo("setup_binding_original_owner_changed");
+            await Assert.That(replacement).IsNotNull();
+            await Assert.That(context.Database.CurrentTransaction).IsSameReferenceAs(replacement);
+            await Assert.That(context.Database.GetDbConnection()).IsSameReferenceAs(connection);
+            await Assert.That(connection.State).IsEqualTo(ConnectionState.Open);
+            await Assert.That(((NpgsqlConnection)connection).ProcessID).IsEqualTo(backend);
+            DbTransaction physical = replacement!.GetDbTransaction();
+            await Assert.That(physical.Connection).IsSameReferenceAs(connection);
+            await using var command = connection.CreateCommand();
+            command.Transaction = physical;
+            command.CommandText = "SELECT 1";
+            await Assert.That(await command.ExecuteScalarAsync(token)).IsEqualTo(1);
+        }
+        finally
+        {
+            if (replacement is not null)
+                await replacement.DisposeAsync();
+        }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task SetupBindingCatalogDoesNotCloseChangedExecutionOwnerOrMaskLeaseFailure(bool invalidateLease)
+    {
+        CancellationToken token = TestContext.Current!.Execution.CancellationToken;
+        await fixture.ResetAsync();
+        (Guid tenantId, _) = await SeedApplicationActorAsync();
+        var tenant = new MutableSetupTenantContext(tenantId);
+        int backend = 0;
+        using var interceptor = new SetupBindingOwnerChangeInterceptor(owner =>
+        {
+            backend = ((NpgsqlConnection)owner.Database.GetDbConnection()).ProcessID;
+            if (invalidateLease)
+                tenant.TenantId = Guid.CreateVersion7();
+            else
+                owner.EnableTenantFilterBypass("setup catalog ownership regression");
+            return Task.CompletedTask;
+        });
+        await using ExploreDbContext context = fixture.CreateEnrolledTenantDbContext(tenant, interceptor);
+        context.BindTenantLease();
+        DbConnection connection = context.Database.GetDbConnection();
+        await Assert.That(connection.State).IsEqualTo(ConnectionState.Closed);
+        var catalog = new SetupSecretBindingCatalog(context, fixture.NativeQueueEnrollment);
+        try
+        {
+            if (invalidateLease)
+            {
+                var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    catalog.FindInstanceIdAsync("setup.signing", token));
+                await Assert.That(failure!.Message).IsEqualTo("tenant_lease_identity_changed");
+            }
+            else
+            {
+                var failure = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                    catalog.FindInstanceIdAsync("setup.signing", token));
+                await Assert.That(failure!.Message).IsEqualTo("setup_binding_original_owner_changed");
+            }
+            await Assert.That(context.Database.GetDbConnection()).IsSameReferenceAs(connection);
+            await Assert.That(connection.State).IsEqualTo(ConnectionState.Open);
+            await Assert.That(((NpgsqlConnection)connection).ProcessID).IsEqualTo(backend);
+            await Assert.That(context.Database.CurrentTransaction).IsNull();
+        }
+        finally
+        {
+            tenant.TenantId = tenantId;
+            context.ClearTenantFilterBypass();
+            await context.Database.CloseConnectionAsync();
+        }
+    }
 
     [Test]
     public async Task TenantFilterFailsClosedForEverySetupLiveEntity()
@@ -1047,7 +1187,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         IUnitOfWork? unitOfWork = null,
         ISetupSecretBindingOperationCoordinator? coordinator = null) => new(
         new SetupLiveRepository(context),
-        new SecretBindingRepository(context),
+        new SetupSecretBindingCatalog(context, fixture.NativeQueueEnrollment),
         unitOfWork ?? new EfCoreUnitOfWork(context),
         new ActorOwnershipReader(context, fixture.NativeQueueEnrollment),
         new AllowAuthorizationProvider(),
@@ -1308,6 +1448,33 @@ public sealed class SetupLivePersistenceInvariantTests(
             Task.FromResult<IReadOnlyList<AuthorizationDecision>>(
                 requests.Select(_ => AuthorizationDecision.Allow(
                     AuthorizationProviderMetadata.Local)).ToArray());
+    }
+
+    private sealed class SetupBindingOwnerChangeInterceptor(Func<ExploreDbContext, Task> changeOwner)
+        : DbCommandInterceptor, IDisposable
+    {
+        private readonly DataTable _buffer = new();
+        private bool _changed;
+
+        public override async ValueTask<DbDataReader> ReaderExecutedAsync(
+            DbCommand command, CommandExecutedEventData eventData, DbDataReader result,
+            CancellationToken cancellationToken = default)
+        {
+            if (_changed || !command.CommandText.Contains("secret_bindings", StringComparison.Ordinal))
+                return result;
+            _changed = true;
+            _buffer.Load(result);
+            await result.DisposeAsync();
+            await changeOwner((ExploreDbContext)eventData.Context!);
+            return _buffer.CreateDataReader();
+        }
+
+        public void Dispose() => _buffer.Dispose();
+    }
+
+    private sealed class MutableSetupTenantContext(Guid tenantId) : ITenantContext
+    {
+        public Guid TenantId { get; set; } = tenantId;
     }
 
     private sealed class ClaimReadRendezvousInterceptor : DbCommandInterceptor

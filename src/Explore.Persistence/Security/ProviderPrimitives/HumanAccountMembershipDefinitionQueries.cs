@@ -53,7 +53,12 @@ internal sealed class HumanAccountMembershipDefinitionQueries
             .Select(mapping => new HumanPrincipalPermissionFact(mapping.RoleId, mapping.PermissionId,
                 mapping.Permission.MasterCode, mapping.Permission.IsActive,
                 mapping.Permission.MasterCode == PermissionCodes.EventCreate,
-                mapping.Permission.MasterCode == PermissionCodes.EventManageFinance)).ToListAsync(token);
+                mapping.Permission.MasterCode == PermissionCodes.EventManageFinance)
+            {
+                MatchesGroupMemberCreateCode = mapping.Permission.MasterCode == PermissionCodes.GroupMemberCreate,
+                MatchesGroupMemberUpdateCode = mapping.Permission.MasterCode == PermissionCodes.GroupMemberUpdate,
+                MatchesGroupMemberDeleteCode = mapping.Permission.MasterCode == PermissionCodes.GroupMemberDelete
+            }).ToListAsync(token);
         return (roles.ToImmutableArray(), permissions.ToImmutableArray());
     }
 }

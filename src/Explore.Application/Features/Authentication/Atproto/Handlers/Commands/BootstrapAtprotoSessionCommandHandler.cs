@@ -34,7 +34,8 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
     ITenantContext tenantContext,
     IConfiguration configuration,
     TimeProvider timeProvider,
-    PrivacyIdentityFenceOperation identityFence)
+    PrivacyIdentityFenceOperation identityFence,
+    IAtprotoParticipationMutationFactory participationMutations)
     : ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>
 {
     public async Task<AtprotoSessionBootstrapResult> ExecuteAsync(
@@ -69,12 +70,21 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
         ProviderAccountKey accountKey =
             PlatformIdentityPrincipalExtensions.CreateAtprotoAccountKey(
                 verified.Did);
-        return await settingMutationLock.ExecuteOrderedGroupsAsync(
-            [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
-            leaseToken => identityFence.ExecuteEnrollmentAsync(accountKey,
-                token => CompleteVerifiedAsync(request, verified, accountKey, tenantId, token),
-                leaseToken),
-            cancellationToken).ConfigureAwait(false);
+        var attempt = new ParticipationAttempt();
+        try
+        {
+            return await settingMutationLock.ExecuteOrderedGroupsAsync(
+                [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+                leaseToken => identityFence.ExecuteEnrollmentAsync(accountKey,
+                    token => CompleteVerifiedAsync(request, verified, accountKey, tenantId, attempt, token),
+                    token => attempt.Current?.EnsureCurrentAsync(token) ?? Task.CompletedTask,
+                    leaseToken),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (OnboardingRollbackException exception)
+        {
+            return AtprotoSessionBootstrapResult.Failed(exception.FailureCode);
+        }
     }
 
     private async Task<AtprotoSessionBootstrapResult> CompleteVerifiedAsync(
@@ -82,6 +92,7 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
         AtprotoVerifiedOAuthSession verified,
         ProviderAccountKey accountKey,
         Guid tenantId,
+        ParticipationAttempt attempt,
         CancellationToken cancellationToken)
     {
         AuthenticationProviderKind primaryProvider =
@@ -101,8 +112,6 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
 
         var login = await externalLoginRepository
             .GetByProviderAndKey(accountKey).ConfigureAwait(false);
-        if (login is not null)
-            await identityFence.EnsureSubjectMayEnrollAsync(login.UserId, cancellationToken);
         InstanceBootstrapState? bootstrap = await bootstrapRepository
             .GetCurrent(cancellationToken).ConfigureAwait(false);
         // Pending configured setup admits only its verified claimant. After completion,
@@ -151,9 +160,10 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
             Guid.CreateVersion7(),
             Guid.CreateVersion7());
         BootstrapPersistenceOutcome persistence =
-            await unitOfWork.ExecuteBootstrapConvergenceAsync(
+            await unitOfWork.ExecuteRecognitionEnrollmentAsync(
                 async transactionToken =>
         {
+            attempt.Current = null;
             // Recheck after acquiring authority and starting the convergence snapshot.
             // An exact existing DID binding has login authority independently of signup.
             UserExternalLogin? currentLogin = await externalLoginRepository
@@ -175,6 +185,16 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
                 }
             }
 
+            if (request.Classification is AtprotoSubjectClassification.Organization or AtprotoSubjectClassification.Group)
+                attempt.Current = await participationMutations.AcquireAsync(accountKey,
+                    currentLogin?.UserId ?? jitIds.UserId, currentLogin?.Id ?? jitIds.ExternalLoginId,
+                    tenantId, transactionToken).ConfigureAwait(false);
+
+            await identityFence.MatchAndBindAsync(accountKey, currentLogin?.UserId ?? jitIds.UserId,
+                currentLogin?.Id ?? jitIds.ExternalLoginId,
+                tenantId, replacementProvisioning: !IsExactLinkedLogin(currentLogin, accountKey),
+                transactionToken).ConfigureAwait(false);
+
             AtprotoPlatformAccount? account =
                 await jitAccountProvisioning.EnsureAsync(
                     accountKey,
@@ -183,8 +203,7 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
                     transactionToken).ConfigureAwait(false);
             if (account is null)
             {
-                return BootstrapPersistenceOutcome.Failed(
-                    "linked_identity_incomplete");
+                throw new OnboardingRollbackException("linked_identity_incomplete");
             }
 
             AtprotoSubjectOnboardingResult onboarding =
@@ -195,11 +214,11 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
                 account.PersonalActor,
                 tenantId,
                 indexedAt,
+                attempt.Current,
                 transactionToken).ConfigureAwait(false);
             if (!onboarding.Success)
             {
-                return BootstrapPersistenceOutcome.Failed(
-                    onboarding.FailureCode);
+                throw new OnboardingRollbackException(onboarding.FailureCode);
             }
 
             if (onboarding.ParticipationId is not null)
@@ -220,7 +239,11 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
                 onboarding.ActorId!.Value,
                 onboarding.ParticipationId);
         },
-                cancellationToken).ConfigureAwait(false);
+                async token =>
+                {
+                    await identityFence.EnsureCurrentAsync(token).ConfigureAwait(false);
+                    if (attempt.Current is { } participant) await participant.EnsureCurrentAsync(token).ConfigureAwait(false);
+                }, cancellationToken).ConfigureAwait(false);
         if (!persistence.Success)
         {
             return AtprotoSessionBootstrapResult.Failed(
@@ -247,6 +270,16 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
         login is not null
         && login.AuthenticationProviderId == (int)AuthenticationProviderKind.Atproto
         && string.Equals(login.ProviderKey, accountKey.Value, StringComparison.Ordinal);
+
+    private sealed class ParticipationAttempt
+    {
+        public IAtprotoParticipationMutation? Current { get; set; }
+    }
+
+    private sealed class OnboardingRollbackException(string failureCode) : Exception("AT Protocol onboarding was rolled back.")
+    {
+        public string FailureCode { get; } = failureCode;
+    }
 
     private sealed record BootstrapPersistenceOutcome(
         bool Success,

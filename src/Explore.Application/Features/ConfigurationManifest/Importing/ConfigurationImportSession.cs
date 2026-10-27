@@ -2,7 +2,8 @@ namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using System.Security.Cryptography;
 using System.Text;
-using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.ConfigurationManifest.Moderation;
+using System.Text.Json.Serialization;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 
 public static class ConfigurationImportSessionLimits
@@ -217,6 +218,8 @@ public sealed class ConfigurationImportSession
     public string? PreviewRequiredApprovalDigest { get; private set; }
     public ConfigurationImportApplyMode? PreviewApplyMode { get; private set; }
     public DateTime? PreviewExpiresAt { get; private set; }
+    [JsonIgnore]
+    public ModerationConfigurationImportReservationSet? ModerationReservation { get; private set; }
     public long Revision { get; private set; }
 
     public ConfigurationImportTarget Target =>
@@ -255,7 +258,8 @@ public sealed class ConfigurationImportSession
                         "Preview approval digest is missing."),
                 PreviewExpiresAt
                     ?? throw new InvalidOperationException(
-                        "Preview expiry is missing."));
+                        "Preview expiry is missing."),
+                ModerationReservation?.Digest);
 
     public static ConfigurationImportSession Create(
         Guid sessionId,
@@ -324,10 +328,20 @@ public sealed class ConfigurationImportSession
 
     public void MarkPreviewReady(
         ConfigurationImportPreviewBinding binding,
-        DateTime occurredAt)
+        DateTime occurredAt,
+        ModerationConfigurationImportReservationSet? moderationReservation = null)
     {
         ArgumentNullException.ThrowIfNull(binding);
         EnsureActiveTime(occurredAt);
+        if (binding.ModerationReservationDigest != moderationReservation?.Digest)
+            throw new ConfigurationImportSessionException(ConfigurationImportFailureCodes.StalePreview);
+        if (ModerationReservation is not null && ModerationReservation.Digest != moderationReservation?.Digest)
+            throw new ConfigurationImportSessionException(ConfigurationImportFailureCodes.StalePreview);
+        if (moderationReservation is not null && (moderationReservation.TargetAuthorityKey != Target.AuthorityKey
+            || moderationReservation.ArtifactDigest != binding.ArtifactDigest
+            || moderationReservation.SelectionDigest != binding.SelectedSectionsDigest
+            || moderationReservation.MappingDigest != binding.MappingDigest))
+            throw new ConfigurationImportSessionException(ConfigurationImportFailureCodes.StalePreview);
         if (!MatchesTarget(binding.Target)
             || !string.Equals(
                 ArtifactDigest,
@@ -345,6 +359,7 @@ public sealed class ConfigurationImportSession
         PreviewApplyMode = binding.ApplyMode;
         PreviewRequiredApprovalDigest = binding.RequiredApprovalDigest;
         PreviewExpiresAt = binding.ExpiresAt;
+        ModerationReservation = moderationReservation;
         State = ConfigurationImportSessionState.PreviewReady;
         UpdatedAt = occurredAt;
         Revision = checked(Revision + 1);

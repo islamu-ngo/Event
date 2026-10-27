@@ -41,6 +41,7 @@ using Explore.ServiceDefaults.Configuration;
 using Explore.ServiceDefaults.DataProtection;
 using Explore.ServiceDefaults.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -338,6 +339,16 @@ public static class ApiHostServiceCollectionExtensions
                 options.JsonSerializerOptions.Converters.Add(
                     new Explore.API.Serialization.OptionalUpdateJsonConverterFactory());
                 options.JsonSerializerOptions.Converters.Add(
+                    new Explore.API.Serialization.ModerationAuthorityScopeJsonConverter());
+                options.JsonSerializerOptions.Converters.Add(
+                    new Explore.API.Serialization.ModerationSubjectReferenceJsonConverter());
+                options.JsonSerializerOptions.Converters.Add(
+                    new Explore.API.Serialization.ModerationRuleReferenceJsonConverter());
+                options.JsonSerializerOptions.Converters.Add(
+                    new Explore.API.Serialization.ModerationProposalJsonConverter());
+                options.JsonSerializerOptions.Converters.Add(
+                    new Explore.API.Serialization.ModerationClassificationMaterialJsonConverter());
+                options.JsonSerializerOptions.Converters.Add(
                     new System.Text.Json.Serialization.JsonStringEnumConverter());
             });
         builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
@@ -372,6 +383,8 @@ public static class ApiHostServiceCollectionExtensions
         builder.Services.AddSwaggerGenWithAuth(builder.Configuration);
         builder.Services.AddOpenApi("islamu-event", options =>
         {
+            options.CreateSchemaReferenceId = type => ModerationIntentSchemaTransformer.IsIntent(type.Type)
+                ? type.Type.Name : OpenApiOptions.CreateDefaultSchemaReferenceId(type);
             options.ShouldInclude = description => true;
             options.AddDocumentTransformer((document, _, _) =>
             {
@@ -382,13 +395,16 @@ public static class ApiHostServiceCollectionExtensions
             options.AddDocumentTransformer<KeycloakOpenApiSecurityTransformer>();
             options.AddDocumentTransformer<ManagedControlPlaneOpenApiSecurityTransformer>();
             options.AddDocumentTransformer<PrivacyErasureReceiptOpenApiSecurityTransformer>();
+            options.AddDocumentTransformer<ModerationRecognitionCorrectionOpenApiSecurityTransformer>();
             options.AddDocumentTransformer<LocalCredentialReplacementOpenApiSecurityTransformer>();
             options.AddDocumentTransformer<AdmissionScannerOpenApiSecurityTransformer>();
             options.AddDocumentTransformer<HalDtoSchemaTransformer>();
             options.AddSchemaTransformer<ExternalApiKeyIssuanceSchemaTransformer>();
+            options.AddSchemaTransformer<ModerationIntentSchemaTransformer>();
             options.AddSchemaTransformer<LocalizationImportSchemaTransformer>();
             options.AddDocumentTransformer<QuotaExceededDetailsOpenApiTransformer>();
             options.AddDocumentTransformer<OpenApiStringEnumDocumentTransformer>();
+            options.AddDocumentTransformer<ModerationIntentSchemaTransformer>();
             options.AddDocumentTransformer<OperatorIdentityManifestSchemaTransformer>();
             options.AddDocumentTransformer<SetupLiveRequestBodyTransformer>();
             options.AddDocumentTransformer<OperationIdInvariantTransformer>();
@@ -396,6 +412,8 @@ public static class ApiHostServiceCollectionExtensions
             options.AddOperationTransformer<KeycloakOpenApiSecurityTransformer>();
             options.AddOperationTransformer<ManagedControlPlaneOpenApiSecurityTransformer>();
             options.AddOperationTransformer<PrivacyErasureReceiptOpenApiSecurityTransformer>();
+            options.AddOperationTransformer<ModerationRecognitionCorrectionOpenApiSecurityTransformer>();
+            options.AddOperationTransformer<ModerationNoticeOpenApiSecurityTransformer>();
             options.AddOperationTransformer<LocalCredentialReplacementOpenApiSecurityTransformer>();
             options.AddOperationTransformer<AdmissionScannerOpenApiSecurityTransformer>();
             options.AddOperationTransformer<StorageUploadRequestBodyTransformer>();

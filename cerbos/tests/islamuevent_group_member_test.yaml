@@ -1,0 +1,85 @@
+name: GroupMemberAuthorityTests
+description: "Membership mutations require an exact tenant/group/action scope, not organization administration or public join authority."
+principals:
+  group_admin:
+    id: "group-admin"
+    roles: ["islamuevent_authenticated_user"]
+    attr:
+      isInstanceAdmin: false
+      tenantMemberships: {}
+      orgMemberships: {}
+      groupMemberships: {"group-1": "admin"}
+      groupMemberCreateScopes: ["tenant-1/group-1"]
+      groupMemberUpdateScopes: ["tenant-1/group-1"]
+      groupMemberDeleteScopes: ["tenant-1/group-1"]
+  delegated_editor:
+    id: "delegated-editor"
+    roles: ["islamuevent_authenticated_user"]
+    attr:
+      isInstanceAdmin: false
+      tenantMemberships: {}
+      orgMemberships: {}
+      groupMemberships: {}
+      groupMemberCreateScopes: []
+      groupMemberUpdateScopes: ["tenant-1/group-1"]
+      groupMemberDeleteScopes: []
+  organization_admin:
+    id: "organization-admin"
+    roles: ["islamuevent_authenticated_user"]
+    attr:
+      isInstanceAdmin: false
+      tenantMemberships: {}
+      orgMemberships: {"org-1": "admin"}
+resources:
+  own:
+    kind: "islamuevent_group_member"
+    id: "membership-1"
+    attr: {tenantId: "tenant-1", groupId: "group-1", userId: "member-1", organizationId: "org-1"}
+  other_group:
+    kind: "islamuevent_group_member"
+    id: "membership-2"
+    attr: {tenantId: "tenant-1", groupId: "group-2", userId: "member-1"}
+  other_tenant:
+    kind: "islamuevent_group_member"
+    id: "membership-3"
+    attr: {tenantId: "tenant-2", groupId: "group-1", userId: "member-1"}
+tests:
+  - name: "Administrator scopes authorize the selected group only"
+    input:
+      principals: ["group_admin"]
+      resources: ["own", "other_group", "other_tenant"]
+      actions: ["create", "update", "delete"]
+    expected:
+      - principal: "group_admin"
+        resource: "own"
+        actions: {create: EFFECT_ALLOW, update: EFFECT_ALLOW, delete: EFFECT_ALLOW}
+      - principal: "group_admin"
+        resource: "other_group"
+        actions: {create: EFFECT_DENY, update: EFFECT_DENY, delete: EFFECT_DENY}
+      - principal: "group_admin"
+        resource: "other_tenant"
+        actions: {create: EFFECT_DENY, update: EFFECT_DENY, delete: EFFECT_DENY}
+  - name: "Delegation does not become a different action or jurisdiction"
+    input:
+      principals: ["delegated_editor"]
+      resources: ["own", "other_group", "other_tenant"]
+      actions: ["create", "update", "delete"]
+    expected:
+      - principal: "delegated_editor"
+        resource: "own"
+        actions: {create: EFFECT_DENY, update: EFFECT_ALLOW, delete: EFFECT_DENY}
+      - principal: "delegated_editor"
+        resource: "other_group"
+        actions: {create: EFFECT_DENY, update: EFFECT_DENY, delete: EFFECT_DENY}
+      - principal: "delegated_editor"
+        resource: "other_tenant"
+        actions: {create: EFFECT_DENY, update: EFFECT_DENY, delete: EFFECT_DENY}
+  - name: "Organization administration does not grant group membership management"
+    input:
+      principals: ["organization_admin"]
+      resources: ["own"]
+      actions: ["view", "create", "update", "delete"]
+    expected:
+      - principal: "organization_admin"
+        resource: "own"
+        actions: {view: EFFECT_ALLOW, create: EFFECT_DENY, update: EFFECT_DENY, delete: EFFECT_DENY}

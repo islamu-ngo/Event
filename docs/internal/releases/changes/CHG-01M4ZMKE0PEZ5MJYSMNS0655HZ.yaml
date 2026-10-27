@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZMKE0PEZ5MJYSMNS0655HZ
+Title: "Separate allegation material ownership from responsible subjects"
+Type: feat
+Scope: access
+Summary: "Retain target-owned allegation evidence without inferred responsibility, permit only unresolved intake assignment, and reject final findings until a subject is attributed."
+Group: moderation-allegation-ownership-contract
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

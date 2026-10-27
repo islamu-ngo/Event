@@ -23,5 +23,13 @@ public class UserPiiConfiguration : IEntityTypeConfiguration<UserPii>
             .IsRequired();
 
         builder.HasIndex(e => e.Email);
+
+        builder.Property<DateOnly?>("_dateOfBirth")
+            .HasColumnName("date_of_birth");
+        builder.Property<Guid?>("_birthDateCollectionReceiptId")
+            .HasColumnName("birth_date_collection_receipt_id");
+        builder.Property<long>("_birthDateRevision")
+            .HasColumnName("birth_date_revision")
+            .IsConcurrencyToken();
     }
 }

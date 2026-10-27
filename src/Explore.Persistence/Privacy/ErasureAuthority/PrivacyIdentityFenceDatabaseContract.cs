@@ -45,7 +45,8 @@ public static class PrivacyIdentityFenceDatabaseContract
                 RAISE EXCEPTION 'privacy_identity_fence_key_mismatch' USING ERRCODE = '22023';
             END IF;
             UPDATE {Schema}.authority_counter SET identity_key_id = p_key_id,
-                identity_key_verification_tag = p_verification_tag WHERE singleton;
+                identity_key_verification_tag = p_verification_tag, revision = revision + 1
+                WHERE singleton AND identity_key_id IS NULL;
         END;
         $function$;
 
@@ -143,5 +144,6 @@ public static class PrivacyIdentityFenceDatabaseContract
         GRANT EXECUTE ON FUNCTION {Schema}.read_identity_fences(bigint) TO {Runtime};
         GRANT EXECUTE ON FUNCTION {Schema}.read_identity_fenced_intents_after(bigint, integer) TO {Runtime};
         REVOKE EXECUTE ON FUNCTION {Schema}.{PrivacyErasureAuthorityDatabaseContract.AppendFunction}(uuid, smallint, uuid, smallint, integer, interval) FROM {Runtime};
+        {PrivacyErasureRecoveryDatabaseContract.MigrationSql}
         """;
 }

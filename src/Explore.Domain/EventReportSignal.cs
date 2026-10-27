@@ -30,10 +30,108 @@ public class EventReportSignal : ITenantEntity, IAuditableEntity
     public string? SafeSummary { get; private set; }
     public string? ExternalSignalId { get; private set; }
     public string CorrelationId { get; private set; } = null!;
+    public Guid? CaseId { get; private set; }
+    public Guid? SourceCaseConcurrencyStamp { get; private set; }
+    public Guid? ProviderLinkId { get; private set; }
+    public Guid? IncomingWebhookMessageId { get; private set; }
+    public string? AdvisoryIdentity { get; private set; }
+    public int? AdvisoryOrdinal { get; private set; }
+    public string? AdvisoryMaterialSha256 { get; private set; }
     public DateTime CreatedAt { get; set; }
     public Guid? CreatedBy { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public Guid? UpdatedBy { get; set; }
+
+    /// <summary>
+    /// Records advice against an existing native dispatch binding, not a finding or decision.
+    /// The material digest owns the complete callback, including omitted evidence fields.
+    /// </summary>
+    public static EventReportSignal CreateProviderAdvice(
+        EventReport report,
+        EventReportCase reportCase,
+        EventReportExternalLink providerLink,
+        string advisoryIdentity,
+        int ordinal,
+        string materialSha256,
+        string signalType,
+        string policyCode,
+        decimal? score,
+        EventReportSignalVerdict verdict,
+        EventReportRecommendedAction? recommendedAction,
+        string? safeSummary,
+        string? externalSignalId,
+        string correlationId,
+        DateTime createdAt,
+        IncomingWebhookMessage? incomingMessage = null)
+    {
+        if (reportCase.TenantId != report.TenantId || reportCase.ReportId != report.Id ||
+            providerLink.TenantId != report.TenantId || providerLink.ReportId != report.Id ||
+            providerLink.CaseId != reportCase.Id || providerLink.SyncState != EventReportSyncState.Synced ||
+            providerLink.CaseConcurrencyStamp != reportCase.ConcurrencyStamp)
+        {
+            throw new ArgumentException("Provider advice requires the exact native report, case and synced dispatch binding.");
+        }
+
+        ArgumentOutOfRangeException.ThrowIfNegative(ordinal);
+
+        if (materialSha256.Length != 71 || !materialSha256.StartsWith("sha256:", StringComparison.Ordinal) ||
+            materialSha256.Skip(7).Any(character => !char.IsAsciiHexDigitLower(character)))
+        {
+            throw new ArgumentException("Provider advice requires a SHA-256 material digest.", nameof(materialSha256));
+        }
+
+        var provider = providerLink.Provider switch
+        {
+            EventReportExternalProvider.Coop => EventReportSignalProvider.Coop,
+            EventReportExternalProvider.Osprey => EventReportSignalProvider.Osprey,
+            _ => throw new ArgumentOutOfRangeException(nameof(providerLink))
+        };
+
+        if (provider == EventReportSignalProvider.Coop &&
+            (incomingMessage is null || incomingMessage.TenantId != report.TenantId ||
+             incomingMessage.Provider != "coop" ||
+             !string.Equals(incomingMessage.ProviderMessageId, advisoryIdentity, StringComparison.Ordinal) ||
+             !string.Equals(incomingMessage.PayloadHash, materialSha256, StringComparison.Ordinal) ||
+             incomingMessage.Status == IncomingWebhookMessageStatus.PayloadConflict))
+        {
+            throw new ArgumentException("Coop advice requires its authenticated native inbox identity.", nameof(incomingMessage));
+        }
+
+        if (provider == EventReportSignalProvider.Osprey && incomingMessage is not null)
+        {
+            throw new ArgumentException("Osprey HTTP advice does not have a native inbox envelope.", nameof(incomingMessage));
+        }
+
+        var signal = Create(
+            report.TenantId, report.Id, report.EventId, provider, signalType, policyCode,
+            score, verdict, recommendedAction, safeSummary, externalSignalId, correlationId,
+            createdAt, providerLink.ProviderTargetScope, providerLink.ProviderTargetId);
+        signal.CaseId = reportCase.Id;
+        signal.SourceCaseConcurrencyStamp = providerLink.CaseConcurrencyStamp;
+        signal.ProviderLinkId = providerLink.Id;
+        signal.IncomingWebhookMessageId = incomingMessage?.Id;
+        signal.AdvisoryIdentity = EventReportGuards.NormalizeRequired(
+            advisoryIdentity, MaxExternalSignalIdLength, nameof(advisoryIdentity));
+        signal.AdvisoryOrdinal = ordinal;
+        signal.AdvisoryMaterialSha256 = materialSha256;
+        return signal;
+    }
+
+    public bool MatchesAdvisorySource(
+        Guid reportId,
+        Guid caseId,
+        Guid providerLinkId,
+        string materialSha256,
+        Guid? incomingWebhookMessageId,
+        EventReportProviderTargetScope providerTargetScope,
+        string providerTargetId,
+        Guid? caseConcurrencyStamp) =>
+        ReportId == reportId && CaseId == caseId && ProviderLinkId == providerLinkId &&
+        caseConcurrencyStamp is not null && SourceCaseConcurrencyStamp == caseConcurrencyStamp &&
+        IncomingWebhookMessageId == incomingWebhookMessageId &&
+        ProviderTargetScope == providerTargetScope &&
+        string.Equals(ProviderTargetId, providerTargetId, StringComparison.Ordinal) &&
+        string.Equals(AdvisoryMaterialSha256, materialSha256, StringComparison.Ordinal);
 
     public static EventReportSignal Create(
         Guid tenantId,

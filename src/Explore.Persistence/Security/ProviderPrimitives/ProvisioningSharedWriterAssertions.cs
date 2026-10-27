@@ -179,4 +179,3 @@ public static partial class PostgresOrdinarySettingsContract
             [(typeof(Tenant), truncate ? 32 : 29)],
             Privileges(context, enrollment), TenantMembershipBody(context, enrollment, truncate));
 }
-

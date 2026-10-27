@@ -41,7 +41,7 @@
     <PackageVersion Include="Ical.Net" Version="5.2.3" />
     <PackageVersion Include="Infisical.Sdk" Version="3.0.4" />
     <PackageVersion Include="MailKit" Version="4.17.0" />
-    <!-- AppHost MessagePack security floor for GHSA-qhrr-8q5h-9q3h. -->
+    <!-- AppHost and KubernetesClient MessagePack security floor for GHSA-qhrr-8q5h-9q3h. -->
     <PackageVersion Include="MessagePack" Version="3.1.9" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.10" />

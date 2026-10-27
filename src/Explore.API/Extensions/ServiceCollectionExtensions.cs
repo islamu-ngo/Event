@@ -23,6 +23,7 @@ internal static class ServiceCollectionExtensions
             // Add schema filter for HAL wrapper types to properly expose inner DTOs
             options.SchemaFilter<HalSchemaFilter>();
             options.SchemaFilter<OpenApiStringEnumSchemaFilter>();
+            options.SchemaFilter<ModerationIntentSchemaTransformer>();
             options.DocumentFilter<HalSchemaDocumentFilter>();
 
             // Swashbuckle remains as a transition baseline until native OpenAPI parity is proven.
@@ -31,6 +32,8 @@ internal static class ServiceCollectionExtensions
             options.OperationFilter<OpenApiVersionedContentTypesOperationFilter>();
             options.OperationFilter<ManagedControlPlaneOpenApiSecurityTransformer>();
             options.OperationFilter<PrivacyErasureReceiptOpenApiSecurityTransformer>();
+            options.OperationFilter<ModerationRecognitionCorrectionOpenApiSecurityTransformer>();
+            options.OperationFilter<ModerationNoticeOpenApiSecurityTransformer>();
             options.OperationFilter<LocalCredentialReplacementOpenApiSecurityTransformer>();
             options.OperationFilter<AdmissionScannerOpenApiSecurityTransformer>();
             options.OperationFilter<KeycloakSwaggerOpenApiSecurityFilter>();
@@ -40,6 +43,9 @@ internal static class ServiceCollectionExtensions
             options.AddSecurityDefinition(
                 PrivacyErasureReceiptOpenApiSecurityTransformer.SecuritySchemeName,
                 PrivacyErasureReceiptOpenApiSecurityTransformer.CreateSecurityScheme());
+            options.AddSecurityDefinition(
+                ModerationRecognitionCorrectionOpenApiSecurityTransformer.SecuritySchemeName,
+                ModerationRecognitionCorrectionOpenApiSecurityTransformer.CreateSecurityScheme());
             options.AddSecurityDefinition(
                 LocalCredentialReplacementOpenApiSecurityTransformer.SecuritySchemeName,
                 LocalCredentialReplacementOpenApiSecurityTransformer.CreateSecurityScheme());

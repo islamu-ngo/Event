@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M7ZHPC2CBKP2CVVNSD5QQ7
+Title: "report retryable promotion publication authority failures"
+Type: fix
+Scope: ticketing
+Summary: "Separate promotion publication denial from unavailable authority with HTTP 403 and 503 ProblemDetails instead of collapsing both into validation failures. Included controller tests are unrun."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Promotion publication restrictions map to denial and unavailable authority maps to a retryable failure without treating either as successful publication. Included controller tests are UNRUN and runtime assurance remains pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Promotion publication declares HTTP 503 alongside its existing denied response and uses promotion-specific ProblemDetails for HTTP 403 and 503. Matching cumulative OpenAPI and client artifacts remain in the final checkpoint."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Coordinate the endpoint with its already introduced publication handler and final generated contract. Main owns paired guidance and runtime verification; no intermediate deployment or provider conformance is asserted."

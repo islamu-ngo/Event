@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZXE07K82SQ64HQY3GZHPET
+Title: "Retain exact measured operations evidence and independent acceptance"
+Type: feat
+Scope: access
+Summary: "Retain immutable native operations reports with explicit evidence gaps, canonical UUIDv7 proof references and original finite custody, then independently accept exact report contents without converting signatures, report persistence or acceptance into readiness or enforcement permission."
+Group: moderation-measured-operations-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

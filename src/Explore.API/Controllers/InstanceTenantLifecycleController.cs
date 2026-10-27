@@ -17,6 +17,7 @@ using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Tenants.Requests.Commands;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
@@ -46,19 +47,22 @@ public sealed class InstanceTenantLifecycleController : EventControllerBase
     private readonly ICommandHandler<TransitionInstanceTenantLifecycleCommand, BaseCommandResponse<InstanceTenantLifecycleTransitionDto>> _transitionTenant;
     private readonly IResourceAssembler<InstanceTenantDetailDto, InstanceTenantListItemDto> _tenantAssembler;
     private readonly IDeploymentModeProvider _deploymentMode;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
 
     public InstanceTenantLifecycleController(
         ICommandHandler<CreateTenantCommand, BaseCommandResponse<Guid>> createTenant,
         IQueryHandler<GetInstanceTenantDetailsQuery, InstanceTenantDetailDto?> tenantQuery,
         ICommandHandler<TransitionInstanceTenantLifecycleCommand, BaseCommandResponse<InstanceTenantLifecycleTransitionDto>> transitionTenant,
         IResourceAssembler<InstanceTenantDetailDto, InstanceTenantListItemDto> tenantAssembler,
-        IDeploymentModeProvider deploymentMode)
+        IDeploymentModeProvider deploymentMode,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery)
     {
         _createTenant = createTenant;
         _tenantQuery = tenantQuery;
         _transitionTenant = transitionTenant;
         _tenantAssembler = tenantAssembler;
         _deploymentMode = deploymentMode;
+        _identityQuery = identityQuery;
     }
 
     [HttpGet("tenants/{tenantId:guid}", Name = RouteNames.GetInstanceAdminTenantById)]
@@ -108,10 +112,14 @@ public sealed class InstanceTenantLifecycleController : EventControllerBase
         [FromBody] CreateTenantDto dto,
         CancellationToken cancellationToken = default)
     {
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
+        if (!userId.HasValue)
+            return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
+
         var response = await _createTenant.ExecuteAsync(new CreateTenantCommand
         {
             TenantDto = dto,
-            RequestingUserId = CurrentUserId
+            RequestingUserId = userId.Value
         }, cancellationToken);
 
         return this.MapCommandResponse(response);

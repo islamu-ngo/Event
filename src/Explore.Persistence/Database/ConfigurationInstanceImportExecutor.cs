@@ -40,9 +40,17 @@ internal sealed class ConfigurationInstanceImportExecutor(
     {
         await using var scope = await CreateOwnerAsync(cancellationToken);
         var reader = scope.ServiceProvider.GetRequiredService<ConfigurationManifestCurrentStateReader>();
-        return await scope.ServiceProvider.GetRequiredService<IUnitOfWork>()
+        var lease = scope.ServiceProvider.GetRequiredService<ExploreDbContextExecutionLease>();
+        var lifetime = lease.HumanLifetime
+            ?? throw new UnauthorizedAccessException("Instance snapshots require the original authenticated credential lifetime.");
+        var result = await scope.ServiceProvider.GetRequiredService<IUnitOfWork>()
             .ExecuteSerializableAsync(
                 token => reader.ReadImportSnapshotAsync(view, null, token), cancellationToken);
+        lease.RequireOriginalCredential(scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext
+            ?? throw new UnauthorizedAccessException("The original authenticated request is missing."), lifetime);
+        if (!lifetime.IsValidAt(scope.ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow()))
+            throw new UnauthorizedAccessException("The original authenticated credential expired before snapshot disclosure.");
+        return result;
     }
 
     public async Task<ConfigurationImportPreviewResult> PreviewAsync(

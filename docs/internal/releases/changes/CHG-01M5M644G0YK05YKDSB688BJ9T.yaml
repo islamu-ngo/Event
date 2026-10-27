@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M644G0YK05YKDSB688BJ9T
+Title: "Checkpoint cumulative native authority model schemas"
+Type: feat
+Scope: database
+Summary: "Retain four generated migration histories and cumulative snapshots with their shared model entrypoints; migrations remain unapplied and provider upgrade and rollback behavior unverified."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Generated constraints and shared model filters/save hooks retain native authority and private-custody structure. This source integration supplies no verified provider, migration, authorization or recovery guarantee."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Four generated histories retain thirteen complete migration/Designer pairs and four cumulative snapshots. Migrations remain unapplied; all upgrade, downgrade and SQL Server rollback behavior is unverified."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "This checkpoint closes source history only. Do not deploy intermediate source commits or infer an upgrade/rollback procedure, provider support or restoration verdict from unexecuted generated code."

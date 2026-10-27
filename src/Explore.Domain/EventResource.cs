@@ -8,6 +8,7 @@ namespace Explore.Domain;
 public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeletable, IConcurrencyAware
 {
     private readonly List<EventResourceAudienceRule> _audienceRules = [];
+    private readonly List<EventResourceModerationQuarantine> _moderationQuarantines = [];
     private Guid _tenantId;
 
     public Guid Id { get; private set; }
@@ -37,6 +38,20 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
     public int SortOrder { get; private set; }
     public Guid? AccessibleAlternativeEventResourceId { get; private set; }
     public Guid? StorageObjectId { get; private set; }
+    /// <summary>Native delivery identity, independent of metadata and the mutable concurrency stamp.</summary>
+    public Guid? MaterialVersionId { get; private set; }
+    /// <summary>
+    /// Persisted fail-closed guard; delivery must remain blocked even when causes were not loaded.
+    /// A separately authorized native release owner is required before any cause can be removed.
+    /// </summary>
+    public int ModerationQuarantineCount { get; private set; }
+    public bool HasModerationQuarantine => ModerationQuarantineCount != 0;
+    /// <summary>
+    /// Active causes for native enforcement. EF uses the backing field, preserving retired
+    /// receipts and their original unique effect/ordinal custody across material replacement.
+    /// </summary>
+    public IReadOnlyCollection<EventResourceModerationQuarantine> ModerationQuarantines =>
+        _moderationQuarantines.Where(cause => cause.ReleaseId is null).ToArray();
     public string? ExternalDestinationCiphertext { get; private set; }
     public int? ExternalDestinationProtectionVersion { get; private set; }
     public string? ExternalDestinationSafeOrigin { get; private set; }
@@ -132,11 +147,14 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
     public Guid? SetStoredFile(Guid storageObjectId, Guid expectedStamp, Guid actorId, DateTime occurredAtUtc)
     {
         RequireWritable(expectedStamp, actorId, occurredAtUtc);
+        RequireUnquarantinedMaterial();
         if (storageObjectId == Guid.Empty)
         {
             throw new ArgumentException("A stored object identity is required.", nameof(storageObjectId));
         }
         var detached = StorageObjectId == storageObjectId ? null : StorageObjectId;
+        if (StorageObjectId != storageObjectId || EventResourceDeliveryTypeId != (int)EventResourceDeliveryTypeEnum.StoredFile)
+            MaterialVersionId = Guid.CreateVersion7();
         StorageObjectId = storageObjectId;
         ExternalDestinationCiphertext = null;
         ExternalDestinationProtectionVersion = null;
@@ -150,6 +168,7 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
         Guid expectedStamp, Guid actorId, DateTime occurredAtUtc)
     {
         RequireWritable(expectedStamp, actorId, occurredAtUtc);
+        RequireUnquarantinedMaterial();
         if (string.IsNullOrWhiteSpace(ciphertext) || protectionVersion < 1
             || !Uri.TryCreate(safeOrigin, UriKind.Absolute, out var origin)
             || origin.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(origin.UserInfo)
@@ -158,10 +177,15 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
             throw new ArgumentException("A protected destination and safe HTTPS origin are required.");
         }
         var detached = StorageObjectId;
+        var normalizedOrigin = origin.GetLeftPart(UriPartial.Authority);
+        if (EventResourceDeliveryTypeId != (int)EventResourceDeliveryTypeEnum.ExternalLink
+            || ExternalDestinationCiphertext != ciphertext || ExternalDestinationProtectionVersion != protectionVersion
+            || ExternalDestinationSafeOrigin != normalizedOrigin)
+            MaterialVersionId = Guid.CreateVersion7();
         StorageObjectId = null;
         ExternalDestinationCiphertext = ciphertext;
         ExternalDestinationProtectionVersion = protectionVersion;
-        ExternalDestinationSafeOrigin = origin.GetLeftPart(UriPartial.Authority);
+        ExternalDestinationSafeOrigin = normalizedOrigin;
         EventResourceDeliveryTypeId = (int)EventResourceDeliveryTypeEnum.ExternalLink;
         Touch(actorId, occurredAtUtc);
         return detached;
@@ -259,7 +283,71 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
         UpdatedBy = moderatorUserId;
     }
 
-    public bool HasPublishablePayload() => (EventResourceDeliveryTypeEnum)EventResourceDeliveryTypeId switch
+    /// <summary>
+    /// Applies only native operational state. The caller must already own the serializable native
+    /// authority, original capture, exact selection/adoption and live effect-lease fences.
+    /// This method does not acquire those permissions or complete the originating effect.
+    /// Include the complete cause collection before adding a contribution.
+    /// </summary>
+    public EventResourceModerationQuarantine ApplyModerationQuarantine(
+        Guid receiptId, Guid effectId, int bindingOrdinal, Guid expectedMaterialVersionId,
+        Guid expectedStamp, DateTimeOffset appliedAt)
+    {
+        if (expectedMaterialVersionId == Guid.Empty || MaterialVersionId != expectedMaterialVersionId
+            || ModerationQuarantines.Count != ModerationQuarantineCount
+            || ModerationQuarantines.Any(row => row.TenantId != TenantId || row.EventId != EventId
+                || row.EventResourceId != Id || row.MaterialVersionId != expectedMaterialVersionId))
+            throw new InvalidOperationException("Quarantine requires the exact material and complete native cause set.");
+        foreach (var cause in _moderationQuarantines) cause.ValidatePersistedState();
+        var receipt = EventResourceModerationQuarantine.Create(receiptId, this, effectId, bindingOrdinal, appliedAt);
+        var existing = _moderationQuarantines.SingleOrDefault(
+            row => row.EffectId == effectId && row.BindingOrdinal == bindingOrdinal);
+        if (existing is not null)
+        {
+            if (existing.Id != receiptId || existing.TenantId != TenantId || existing.EventId != EventId
+                || existing.EventResourceId != Id || existing.MaterialVersionId != expectedMaterialVersionId
+                || appliedAt < existing.AppliedAt)
+                throw new InvalidOperationException("A quarantine cause cannot be rebound to another transition.");
+            return existing;
+        }
+        if (IsDeleted || ConcurrencyStamp != expectedStamp
+            || _moderationQuarantines.Any(row => row.Id == receiptId) || !HasDeliveryPayload())
+            throw new InvalidOperationException("The selected resource material is unavailable or changed.");
+        var count = checked(ModerationQuarantineCount + 1);
+        _moderationQuarantines.Add(receipt);
+        ModerationQuarantineCount = count;
+        return receipt;
+    }
+
+    /// <summary>
+    /// The native owner must qualify the complete fresh review under transaction-owned fences.
+    /// This transition retires exactly one cause, never republishes or recreates any material.
+    /// Load the complete backing collection; the active count remains the persisted guard.
+    /// </summary>
+    public void ReleaseModerationQuarantine(EventResourceModerationQuarantineRelease receipt, Guid expectedStamp)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        receipt.ValidatePersistedState();
+        var cause = _moderationQuarantines.SingleOrDefault(row => row.Id == receipt.QuarantineId);
+        if (cause is null || !receipt.Owns(cause) || cause.TenantId != TenantId
+            || cause.EventId != EventId || cause.EventResourceId != Id
+            || ModerationQuarantines.Count != ModerationQuarantineCount)
+            throw new InvalidOperationException("Release requires exact cause custody and the complete active cause set.");
+        foreach (var retained in _moderationQuarantines) retained.ValidatePersistedState();
+        if (cause.ReleaseId == receipt.Id) return;
+        if (cause.ReleaseId is not null || IsDeleted || !HasDeliveryPayload()
+            || MaterialVersionId != receipt.MaterialVersionId || ConcurrencyStamp != expectedStamp
+            || ModerationQuarantineCount <= 0
+            || ModerationQuarantines.Any(row => row.TenantId != TenantId || row.EventId != EventId
+                || row.EventResourceId != Id || row.MaterialVersionId != MaterialVersionId))
+            throw new InvalidOperationException("Unavailable or changed material cannot be released or restored.");
+        cause.Release(receipt);
+        ModerationQuarantineCount = checked(ModerationQuarantineCount - 1);
+    }
+
+    public bool HasPublishablePayload() => !HasModerationQuarantine && HasDeliveryPayload();
+
+    private bool HasDeliveryPayload() => (EventResourceDeliveryTypeEnum)EventResourceDeliveryTypeId switch
     {
         EventResourceDeliveryTypeEnum.StoredFile => StorageObjectId.HasValue && StorageObjectId != Guid.Empty
             && ExternalDestinationCiphertext is null && ExternalDestinationProtectionVersion is null
@@ -272,6 +360,7 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
 
     private void RequirePublishable(EventResourceParentFacts parent, bool payloadSafetySatisfied)
     {
+        RequireUnquarantinedMaterial();
         if (!payloadSafetySatisfied || !HasPublishablePayload()
             || !EventResourceAccessRules.IsParentEligible(this, parent)
             || !Availability.TryResolve(parent.Schedule, out _, out _))
@@ -346,6 +435,12 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
         {
             throw new InvalidOperationException("The resource was changed or is no longer editable.");
         }
+    }
+
+    private void RequireUnquarantinedMaterial()
+    {
+        if (HasModerationQuarantine)
+            throw new InvalidOperationException("Material remains under an independently owned quarantine.");
     }
 
     private static void RequireActorAndTime(Guid actorId, DateTime occurredAtUtc)

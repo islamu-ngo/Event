@@ -7,4 +7,5 @@ namespace Explore.Application.Features.EventReporting.Requests.Commands;
 public sealed record ProcessCoopDecisionCallbackCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public required CoopDecisionCallbackRequestDto Request { get; init; }
+    public Guid IncomingWebhookMessageId { get; init; }
 }

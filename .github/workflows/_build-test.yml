@@ -58,7 +58,7 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     outputs:
       coverage-ready: ${{ steps.coverage_reports.outputs.ready }}
     env:
@@ -135,6 +135,11 @@ jobs:
         if: ${{ inputs.run-fast-tests && inputs.collect-coverage }}
         run: mkdir -p artifacts/coverage
 
+      - name: Architecture Tests
+        if: ${{ inputs.run-fast-tests && inputs.run-architecture-tests }}
+        id: test_architecture
+        run: dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Architecture.Tests.trx
+
       - name: Event SetupLive authority security gate
         if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
         id: test_setup
@@ -171,11 +176,6 @@ jobs:
             coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-Event.Domain.UnitTests.cobertura.xml" --coverage-output-format cobertura)
           fi
           dotnet test --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Domain.UnitTests.trx "${coverage_args[@]}"
-
-      - name: Architecture Tests
-        if: ${{ inputs.run-fast-tests && inputs.run-architecture-tests }}
-        id: test_architecture
-        run: dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Architecture.Tests.trx
 
       - name: Unit Tests — Secrets
         if: ${{ inputs.run-fast-tests && inputs.run-secrets-tests }}
@@ -296,6 +296,7 @@ jobs:
             '**/TestResults/**/*.trx'
             artifacts/build/fast-build.log
             artifacts/dependencies/**
+            artifacts/test-progress/setup-security.log
           if-no-files-found: warn
           retention-days: 14
 

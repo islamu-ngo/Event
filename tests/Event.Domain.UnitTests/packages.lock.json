@@ -118,8 +118,12 @@
         "type": "Project",
         "dependencies": {
           "Event.Wire.Contracts": "[1.0.0, )",
+          "ISLAMU.Moderation.Domain": "[1.0.0, )",
           "Microsoft.Extensions.Compliance.Abstractions": "[10.8.0, )"
         }
+      },
+      "islamu.moderation.domain": {
+        "type": "Project"
       },
       "Microsoft.Extensions.Compliance.Abstractions": {
         "type": "CentralTransitive",

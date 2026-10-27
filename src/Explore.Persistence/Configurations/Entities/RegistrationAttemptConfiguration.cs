@@ -1,6 +1,7 @@
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
+using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -41,9 +42,10 @@ public sealed class RegistrationAttemptConfiguration : IEntityTypeConfiguration<
             .HasConversion(hash => hash.Value, value => CapabilityTokenHash.Create(value)).HasMaxLength(44).IsRequired();
         builder.Property(attempt => attempt.ProviderMappingRevisionHash)
             .HasConversion(hash => hash == null ? null : hash.Value,
-                value => value == null ? null : RegistrationEvidenceHash.Create(value)).HasMaxLength(44);
+                value => value == null ? null : RegistrationEvidenceHash.Create(value)).HasMaxLength(44).UsePortableOrdinalAscii();
         var providerMappingRevisionHashKey = builder.Property<string>("ProviderMappingRevisionHashKey");
         providerMappingRevisionHashKey
+            .UsePortableOrdinalAscii()
             .HasComputedColumnSql("COALESCE(provider_mapping_revision_hash, '')", stored: true)
             .HasMaxLength(44)
             .ValueGeneratedOnAdd()
@@ -92,9 +94,9 @@ public sealed class RegistrationAttemptConfiguration : IEntityTypeConfiguration<
             .HasPrincipalKey(version => new { version.TenantId, version.EventId, version.RegistrationFormId, version.Id })
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(attempt => attempt.Status).WithMany().HasForeignKey(attempt => attempt.StatusId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<RegistrationProviderBinding>().WithMany()
+        builder.HasOne<RegistrationProviderBindingPublication>().WithMany()
             .HasForeignKey(nameof(RegistrationAttempt.TenantId), nameof(RegistrationAttempt.RegistrationProviderBindingId), "ProviderMappingRevisionHashKey")
-            .HasPrincipalKey(nameof(RegistrationProviderBinding.TenantId), nameof(RegistrationProviderBinding.Id), nameof(RegistrationProviderBinding.PublishedMappingRevisionHashKey))
+            .HasPrincipalKey(nameof(RegistrationProviderBindingPublication.TenantId), nameof(RegistrationProviderBindingPublication.RegistrationProviderBindingId), nameof(RegistrationProviderBindingPublication.MappingRevisionHashKey))
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<RegistrationAttempt>().WithMany()
             .HasForeignKey(attempt => new

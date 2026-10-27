@@ -67,5 +67,6 @@ public sealed partial class EventResourceAuthoritySnapshotReader
         parent.TenantId, parent.Id, parent.ActorId, parent.Actor?.UserId, parent.Actor?.OrganizationId,
         parent.Actor?.GroupId, parent.OrganizerActorId, parent.OrganizerActor?.UserId,
         parent.OrganizerActor?.OrganizationId, parent.OrganizerActor?.GroupId,
-        parent.EventProvenanceType?.MasterCode ?? parent.EventProvenanceTypeId.ToString(), parent.SubmittedByUserId);
+        parent.EventProvenanceType?.MasterCode ?? parent.EventProvenanceTypeId.ToString(
+            System.Globalization.CultureInfo.InvariantCulture), parent.SubmittedByUserId);
 }

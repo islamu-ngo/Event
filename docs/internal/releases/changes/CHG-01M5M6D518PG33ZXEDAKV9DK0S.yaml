@@ -1,0 +1,31 @@
+Change-Id: CHG-01M5M6D518PG33ZXEDAKV9DK0S
+Title: "Compose native authority owners and checkpoint their API contracts"
+Type: feat
+Scope: access
+Summary: "Compose reviewed native acquisition and dispatch owners with cumulative API and generated client snapshots after their introducing sources; included tests are unrun and no intermediate build or deployment assurance is claimed."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Consume the cumulative generated client/OpenAPI snapshot only with all introducing source owners. Move generic profile-image writes to the dedicated endpoint, handle nullable/status-only quarantined resource results, and replace callback-triggered discipline with independent native adjudication. No intermediate contract compatibility is asserted."
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Compose reviewed native dispatch, acquisition, source-session and dependency-injection owners with terminal HAL/OpenAPI/authentication contracts after all capability sources. Included tests are UNRUN; runtime/provider assurance is pending and intermediate commits are not certified."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "The separately owned cumulative model/schema histories are required; no migration is generated or applied here, and provider execution/upgrade/rollback assurance remains pending."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: planned
+    Detail: "Compose selected secret, runtime public database identity, scheduler and native registration wiring only after their reviewed owners; completion of deployment guidance and runtime assurance remains pending."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Include the existing cumulative OpenAPI JSON, API markdown and generated tag client exactly once after all introducing endpoints, converters and DTOs. Splitting this snapshot requires regenerating intermediate histories; no regeneration or contract execution occurred."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "This is the approved review-first composition checkpoint for exactly 49 reviewed source/API/generated artifacts, not a deployable intermediate release or passing verification. Complete paired guides and full provider/runtime assurance before PR."

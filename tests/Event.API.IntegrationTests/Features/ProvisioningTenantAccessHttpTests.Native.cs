@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.Events.Handlers.Queries;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.Onboarding;
@@ -122,7 +124,7 @@ public sealed partial class ProvisioningTenantAccessHttpTests
     [Arguments("legal")]
     [Arguments("discovery")]
     [Arguments("home")]
-    public async Task ResidualNativePublicReadsRecheckLifecycleAfterActiveResult(string path)
+    public async Task ResidualNativePublicReadsRecheckLifecycleWithoutInventingCalendarApproval(string path)
     {
         await using var factory = await CreateReadyAsync();
         var fixture = await SeedPublicContentAsync(factory, enableFederation: path == "discovery");
@@ -149,7 +151,10 @@ public sealed partial class ProvisioningTenantAccessHttpTests
         // Keep the same handler scope and real HybridCache across the persisted lifecycle change.
         await using var scope = host.Services.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(TenantId);
-        await Assert.That(await ReadPublicAsync(scope.ServiceProvider, path, fixture.EventId, fixture.ImageId)).IsTrue();
+        // This fixture has public content but no accepted classification/control sources.
+        // Active tenant lifecycle alone cannot qualify the anonymous calendar.
+        await Assert.That(await ReadPublicAsync(scope.ServiceProvider, path, fixture.EventId, fixture.ImageId))
+            .IsEqualTo(path != "calendar");
         await SetLifecycleAsync(factory, TenantStatusEnum.Provisioning);
         await Assert.That(await ReadPublicAsync(scope.ServiceProvider, path, fixture.EventId, fixture.ImageId)).IsFalse();
     }
@@ -175,7 +180,12 @@ public sealed partial class ProvisioningTenantAccessHttpTests
             case "public-detail":
                 return await QueryAsync<GetPublicEventDetailsRequest, EventDto?>(services, new() { SlugCode = "lifecycle-ABCDEFGH" }) is not null;
             case "calendar":
-                return await QueryAsync<GetEventCalendarExportRequest, EventCalendarExportDto?>(services, new(eventId)) is not null;
+                await using (var calendar = await QueryAsync<GetEventCalendarExportRequest, PublicEventCalendarProjection?>(
+                    services, new(eventId)))
+                {
+                    return calendar is not null && await calendar.DiscloseAsync((_, _) => Task.FromResult(true),
+                        (_, _) => Task.CompletedTask, Token) == ModerationPublicEventCalendarOutcome.Allowed;
+                }
             case "open-graph":
                 return await QueryAsync<GetPublicEventOpenGraphImageRequest, EventOpenGraphImageRenderResult?>(services, new() { SlugCode = "lifecycle-ABCDEFGH" }) is not null;
             case "media":

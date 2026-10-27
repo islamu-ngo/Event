@@ -24,6 +24,11 @@ public sealed class ManagedTenantWorkerGraphPlanTests
         await Assert.That(graph.Result.UserId).IsEqualTo(Subject);
         await Assert.That(graph.Result.UserActorId).IsEqualTo(Actor);
         await Assert.That(graph.Result.UserExternalLoginId).IsEqualTo(Login);
+        await Assert.That(graph.Result.TenantId).IsEqualTo(graph.Creation.Tenant.Id);
+        await Assert.That(graph.Result.TenantUserId).IsEqualTo(graph.Effects.OfType<TenantUser>().Single().Id);
+        await Assert.That(graph.Result.TenantUserProfileId).IsEqualTo(graph.Effects.OfType<TenantUserProfile>().Single().Id);
+        await Assert.That(graph.Result.TenantUserRoleGrantId).IsEqualTo(graph.Effects.OfType<TenantUserRoleGrant>().Single().Id);
+        await Assert.That(graph.Result.TenantPlanAssignmentId).IsEqualTo(graph.Effects.OfType<TenantPlanAssignment>().Single().Id);
         await Assert.That(graph.Effects.OfType<ITenantEntity>().All(row => row.TenantId == graph.Creation.Tenant.Id)).IsTrue();
         await Assert.That(graph.Effects.OfType<TenantUser>().Single().UserId).IsEqualTo(Subject);
         await Assert.That(graph.Effects.OfType<TenantUserRoleGrant>().Single().TenantUserId)
@@ -105,6 +110,9 @@ public sealed class ManagedTenantWorkerGraphPlanTests
         await Assert.That(graph.CreatedActor.Pii.DisplayName).IsEqualTo(original.DisplayName);
         await Assert.That(graph.CreatedUser.Pii.UserId).IsEqualTo(graph.CreatedUser.Id);
         await Assert.That(graph.CreatedUser.Pii.Email).IsEqualTo(original.Email);
+        await Assert.That(graph.CreatedUser.Pii.ReadDeclaredBirthDate()).IsNull();
+        await Assert.That(graph.CreatedUser.Pii.ReadBirthDateCollectionReceiptId()).IsNull();
+        await Assert.That(graph.CreatedUser.Pii.ReadBirthDateRevision()).IsEqualTo(0L);
         await Assert.That(graph.CreatedLogin!.UserId).IsEqualTo(graph.CreatedUser.Id);
         await Assert.That(graph.CreatedLogin.ProviderKey).IsEqualTo(ManagedTenantWorkerGraphPlan.Account(snapshot).Value);
         await Assert.That(graph.CreatedLogin.AuthenticationProviderId)

@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5S7ZD5XQ6XPVCVNE57R1J99
+Title: "Retain human custody before tenant discovery enrollment"
+Type: fix
+Scope: access
+Summary: "Acquire the tenant creator's original human-source gate before discovery enrollment and retain both through native transaction settlement without changing authorization or permissions."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: mitigated
+    Detail: "Retain original Human custody before Discovery and through native transaction settlement, preserving primary outcome and cleanup-failure evidence together. Existing identity, authorization, custody and finalizer checks remain enforced. Native HTTP regressions are authored but locally unbuilt/unrun."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "No new permissions, credentials, settings or schema migration. Failed enrollment acquisition releases Human custody; this source correction does not certify remote security gates or resolve the separately investigated setup-gate stall."

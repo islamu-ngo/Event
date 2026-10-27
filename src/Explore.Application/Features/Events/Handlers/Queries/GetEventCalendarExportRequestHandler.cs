@@ -1,112 +1,23 @@
-using Explore.Application.Contracts.LocationPrivacy;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.Event;
-using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Events.Requests.Queries;
-using Explore.Domain;
-using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
 public sealed class GetEventCalendarExportRequestHandler(
-    IEventRepository eventRepository,
-    IEventSessionRepository eventSessionRepository,
-    IEventLocationDisclosureService eventLocationDisclosureService,
-    ITenantLifecycleAccessService lifecycle)
-    : IQueryHandler<GetEventCalendarExportRequest, EventCalendarExportDto?>
+    IModerationPublicEventCalendarRepository repository, ITenantContext tenant,
+    IEventLocationDisclosureService locations, TimeProvider clock)
+    : IQueryHandler<GetEventCalendarExportRequest, PublicEventCalendarProjection?>
 {
-    public async Task<EventCalendarExportDto?> QueryAsync(
-        GetEventCalendarExportRequest request,
-        CancellationToken cancellationToken)
+    public Task<PublicEventCalendarProjection?> QueryAsync(
+        GetEventCalendarExportRequest request, CancellationToken cancellationToken)
     {
-        Event? entity = await eventRepository.GetEventWithDetails(request.EventId);
-        if (entity is null || !IsPublicCalendarEligible(entity) ||
-            !await lifecycle.IsPublicAsync(entity.TenantId, cancellationToken))
-        {
-            return null;
-        }
-
-        List<EventSession> sessions = await eventSessionRepository.GetPublicSessionsByEventAsync(
-            request.EventId,
-            cancellationToken);
-        EventSession? primarySession = sessions
-            .OrderBy(session => session.StartTime)
-            .FirstOrDefault();
-
-        if (primarySession is null)
-        {
-            return null;
-        }
-
-        if (primarySession.StartTime is null || primarySession.EndTime is null)
-        {
-            return null;
-        }
-
-        string? location = await ResolvePublicLocationAsync(primarySession, cancellationToken);
-
-        return new EventCalendarExportDto(
-            entity.Id,
-            entity.Title,
-            entity.Content ?? entity.Description,
-            entity.Slug,
-            primarySession.StartTime.Value.ToUniversalTime(),
-            primarySession.EndTime.Value.ToUniversalTime(),
-            location);
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        PublicEventCalendarProjection? projection = request.EventId == Guid.Empty || tenant.TenantId == Guid.Empty
+            ? null : new(repository, new(tenant.TenantId, request.EventId), locations, clock, cancellationToken);
+        return Task.FromResult(projection);
     }
-
-    private async Task<string?> ResolvePublicLocationAsync(
-        EventSession session,
-        CancellationToken cancellationToken)
-    {
-        if (session.EventLocationId is not { } eventLocationId)
-        {
-            return null;
-        }
-
-        IReadOnlyDictionary<Guid, EventLocationDisclosureResult> results =
-            await eventLocationDisclosureService.ResolveManyAsync(
-                [new EventLocationDisclosureRequest(
-                    session.TenantId,
-                    session.EventId,
-                    eventLocationId,
-                    session.RoomId,
-                    RequesterUserId: null,
-                    EventLocationDisclosurePurpose.Public)],
-                cancellationToken);
-
-        return results.TryGetValue(eventLocationId, out EventLocationDisclosureResult? result)
-            && result.Purpose == EventLocationDisclosurePurpose.Public
-            && result.State != EventLocationDisclosureState.Hidden
-                ? FormatPublicLocation(result.Values)
-                : null;
-    }
-
-    private static string? FormatPublicLocation(EventLocationDisclosureValues? values)
-    {
-        if (values is null)
-        {
-            return null;
-        }
-
-        string[] parts =
-        [
-            values.VenueName,
-            values.RoomName,
-            values.StreetAddress,
-            values.Postcode,
-            values.City,
-            values.Country
-        ];
-        string location = string.Join(", ", parts.Where(value => !string.IsNullOrWhiteSpace(value))!);
-        return string.IsNullOrWhiteSpace(location) ? null : location;
-    }
-
-    private static bool IsPublicCalendarEligible(Event entity)
-    {
-        return entity.EventStatusId == (int)EventStatusEnum.Published &&
-            entity.VisibilityTypeId == (int)VisibilityTypeEnum.Public;
-    }
-
 }

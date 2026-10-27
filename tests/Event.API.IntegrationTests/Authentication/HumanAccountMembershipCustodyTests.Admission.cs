@@ -98,22 +98,20 @@ public sealed partial class HumanAccountMembershipCustodyTests
         var context = request.Services.GetRequiredService<ExploreDbContext>();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var released = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var owner = new AfterBody((ISerializableAttemptOwner)new EfCoreUnitOfWork(context), async token =>
+        request.Admission.AfterNativeSources = async token =>
         {
             if (extend)
                 await context.SupportAccessSessions.Where(row => row.Id == sessionId)
                     .ExecuteUpdateAsync(update => update.SetProperty(row => row.ExpiresAtUtc, expiry.AddMinutes(5)), token);
-            request.Services.GetRequiredService<IHumanActionCommitFinalizer>().Register(async finalToken =>
-            {
-                // This reader is registered after account admission. Its completion,
-                // rather than a sleep, determines the terminal time sample.
-                entered.TrySetResult();
-                await released.Task.WaitAsync(TimeSpan.FromSeconds(30), finalToken);
-                await context.SupportAccessSessions.AsNoTracking().SingleAsync(row => row.Id == sessionId, finalToken);
-                if (extend) fixture.Clock.Advance(expiry.AddTicks(1) - fixture.Clock.GetUtcNow());
-            }, _ => { });
-        });
-        Task<bool> operation = ActivatorUtilities.CreateInstance<RevokeTenantUserRoleGrantCommandHandler>(request.Services, owner)
+        };
+        request.Admission.AfterAllSources = async token =>
+        {
+            entered.TrySetResult();
+            await released.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
+            await context.SupportAccessSessions.AsNoTracking().SingleAsync(row => row.Id == sessionId, token);
+            if (extend) fixture.Clock.Advance(expiry.AddTicks(1) - fixture.Clock.GetUtcNow());
+        };
+        Task<bool> operation = ActivatorUtilities.CreateInstance<RevokeTenantUserRoleGrantCommandHandler>(request.Services)
             .ExecuteAsync(new() { Id = target, TenantId = PlatformDefaults.DefaultTenantId }, default);
         try
         {
@@ -143,26 +141,22 @@ public sealed partial class HumanAccountMembershipCustodyTests
         var context = request.Services.GetRequiredService<ExploreDbContext>();
         var readEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var owner = new AfterBody((ISerializableAttemptOwner)new EfCoreUnitOfWork(context), _ =>
+        request.Admission.AfterAllSources = async token =>
         {
-            request.Services.GetRequiredService<IHumanActionCommitFinalizer>().Register(async token =>
-            {
-                readEntered.TrySetResult();
-                await releaseRead.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
-                await context.TenantUserRoleGrants.AsNoTracking().SingleAsync(row => row.Id == target, token);
-                var lifetime = (await request.Services.GetRequiredService<IHumanAuthenticationLifetimeObserver>()
-                    .ObserveAsync(request.Context.User, token))!;
-                fixture.Clock.Advance(lifetime.ExpiresAt.Add(lifetime.ClockSkew).AddTicks(1) - fixture.Clock.GetUtcNow());
-            }, _ => { });
-            return Task.CompletedTask;
-        });
+            readEntered.TrySetResult();
+            await releaseRead.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
+            await context.TenantUserRoleGrants.AsNoTracking().SingleAsync(row => row.Id == target, token);
+            var lifetime = (await request.Services.GetRequiredService<IHumanAuthenticationLifetimeObserver>()
+                .ObserveAsync(request.Context.User, token))!;
+            fixture.Clock.Advance(lifetime.ExpiresAt.Add(lifetime.ClockSkew).AddTicks(1) - fixture.Clock.GetUtcNow());
+        };
         async Task Query()
         {
             if (details)
-                await ActivatorUtilities.CreateInstance<GetTenantUserRoleGrantDetailsRequestHandler>(request.Services, owner)
+                await ActivatorUtilities.CreateInstance<GetTenantUserRoleGrantDetailsRequestHandler>(request.Services)
                     .QueryAsync(new() { Id = target, TenantId = PlatformDefaults.DefaultTenantId }, default);
             else
-                await ActivatorUtilities.CreateInstance<GetTenantUserRoleGrantListRequestHandler>(request.Services, owner)
+                await ActivatorUtilities.CreateInstance<GetTenantUserRoleGrantListRequestHandler>(request.Services)
                     .QueryAsync(new() { TenantId = PlatformDefaults.DefaultTenantId }, default);
         }
         Task operation = Query();
@@ -245,7 +239,6 @@ public sealed partial class HumanAccountMembershipCustodyTests
             request.Services);
         var command = new Explore.Application.Features.GroupMembers.Requests.Commands.AddGroupMemberCommand
         {
-            RequesterUserId = fixture.Binding.LocalSubjectId.ToString("D"),
             AddGroupMemberDto = new() { GroupId = target.Owner, Email = target.OtherEmail, Role = RoleEnum.GroupMember }
         };
         if (write)

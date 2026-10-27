@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5M7ZJFRFDD93EZDR1J8E2NF
+Title: "let recipients answer protected pre-finding notices deliberately"
+Type: feat
+Scope: privacy
+Summary: "Open protected notices from validated notification identities, expose only native recipient actions and clear private content on expiry or route changes without automatic acknowledgement or write retries. Included tests are unrun."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Protected notices require native recipient actions, exact revisions and finite retention; opening never acknowledges, writes are not automatically retried and expiry or obsolete navigation clears private content. Included tests are UNRUN; browser and provider assurance remain pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Complete authenticated noncached route and service wiring with the existing protected-notice API and matched generated client. Main owns public/internal guidance and final verification; no intermediate deployment readiness is asserted."

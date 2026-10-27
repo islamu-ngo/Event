@@ -47,6 +47,7 @@ public sealed class CompositeOutboxMessageDispatcher(
     ILogger<CompositeOutboxMessageDispatcher> logger,
     IConfigurationManifestEffectDispatcher configurationManifestEffectDispatcher,
     IConfigurationImportEffectDelivery configurationImportEffectDelivery,
+    IModerationEffectDispatcher moderationEffectDispatcher,
     INotificationOutboxExecutionAuthority notificationOutboxExecutionAuthority,
     IGenericOutboxExecutionAuthority genericOutboxExecutionAuthority) : IOutboxMessageDispatcher
 {
@@ -63,6 +64,10 @@ public sealed class CompositeOutboxMessageDispatcher(
         }
         switch (message.EventType)
         {
+            case ModerationEffectOutboxMessageFactory.EventType:
+                await moderationEffectDispatcher.DispatchAsync(message, ct);
+                return;
+
             case NotificationFanoutOccurrenceOutboxMessageFactory.EventType:
                 await notificationFanoutOccurrenceHandoffService.HandoffAsync(message, ct);
                 return;
@@ -280,6 +285,10 @@ public sealed class CompositeOutboxMessageDispatcher(
             await genericOutboxExecutionAuthority.RequireDeadLetterAsync(message, ct);
         switch (message.EventType)
         {
+            case ModerationEffectOutboxMessageFactory.EventType:
+                await moderationEffectDispatcher.DispatchAsync(message, ct);
+                return;
+
             case OperatorIdentityImportAudit.EventType:
                 await DispatchAsync(message, ct);
                 return;

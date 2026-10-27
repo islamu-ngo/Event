@@ -87,21 +87,23 @@ public sealed class AtprotoEventPublicationRepositoryTests(PostgreSqlContainerFi
         await Assert.That(context.ChangeTracker.Entries()).IsEmpty();
         await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(MaximumPublicationQueryCount);
 
-        ITenantLifecycleAccessService lifecycle = Substitute.For<ITenantLifecycleAccessService>();
-        lifecycle.IsPublicAsync(tenantId, Arg.Any<CancellationToken>()).Returns(true);
         IEventLocationDisclosureService disclosure = Substitute.For<IEventLocationDisclosureService>();
         disclosure.ResolveManyAsync(Arg.Any<IReadOnlyCollection<EventLocationDisclosureRequest>>(),
             Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyDictionary<Guid, EventLocationDisclosureResult>>(
             new Dictionary<Guid, EventLocationDisclosureResult>()));
         ITenantContext tenant = Substitute.For<ITenantContext>();
         tenant.TenantId.Returns(tenantId);
-        await using var tenantContext = fixture.CreateTenantFilteredDbContext(tenant);
+        var calendarOwner = Substitute.For<IModerationPublicEventCalendarRepository>();
+        calendarOwner.AcquireAsync(Arg.Any<ModerationPublicEventCalendarRequest>(), Arg.Any<CancellationToken>())
+            .Returns<ModerationPublicEventCalendarAcquisition>(
+                _ => throw new InvalidOperationException("Pending calendar construction cannot acquire or expose payload."));
         var calendar = await new GetEventCalendarExportRequestHandler(
-            new EventRepository(tenantContext), new EventSessionRepository(tenantContext, new Microsoft.AspNetCore.Http.HttpContextAccessor()), disclosure, lifecycle)
+            calendarOwner, tenant, disclosure, TimeProvider.System)
             .QueryAsync(new GetEventCalendarExportRequest(eventId), CancellationToken.None);
+        await using var pendingCalendar = calendar;
         await Assert.That(calendar).IsNotNull();
         string calendarJson = JsonSerializer.Serialize(calendar);
-        await Assert.That(calendarJson).Contains("Bounded publication graph");
+        await Assert.That(calendarJson).DoesNotContain("Bounded publication graph");
         await Assert.That(calendarJson).DoesNotContain("PRIVATE_RESOURCE_TITLE_CANARY");
         await Assert.That(calendarJson).DoesNotContain("https://resource-only.example.test");
     }

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.ManagedProviderProvisioning;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -24,7 +24,7 @@ public sealed class ManagedTenantWorkerGraphPlan
 {
     private ManagedTenantWorkerGraphPlan(TenantCreationOutcome creation, User? user, Actor? actor,
         UserExternalLogin? login, bool upgradeEmail, List<object> effects,
-        ManagedProviderClientProvisioningResultDto result)
+        ManagedTenantWorkerCreationOutcome result)
     {
         Creation = creation;
         CreatedUser = user;
@@ -41,7 +41,7 @@ public sealed class ManagedTenantWorkerGraphPlan
     public UserExternalLogin? CreatedLogin { get; }
     public bool UpgradeExistingEmailVerified { get; }
     public IReadOnlyList<object> Effects { get; }
-    public ManagedProviderClientProvisioningResultDto Result { get; }
+    public ManagedTenantWorkerCreationOutcome Result { get; }
 
     public static ManagedTenantWorkerGraphPlan Build(ManagedTenantWorkerCreationSnapshot original,
         ManagedTenantProvisioningResolvedBootstrap bootstrap, ManagedTenantWorkerAdministratorSource administrator,
@@ -267,17 +267,7 @@ public sealed class ManagedTenantWorkerGraphPlan
         });
         return new(creation, user, actor, login,
             !local && administrator.UserId.HasValue && external!.EmailVerified && administrator.EmailVerified != true,
-            effects, new()
-            {
-                TenantId = tenantId,
-                UserId = userId,
-                UserActorId = actorId,
-                UserExternalLoginId = loginId,
-                TenantUserId = member.Id,
-                TenantUserProfileId = profile.Id,
-                TenantUserRoleGrantId = grant.Id,
-                TenantPlanAssignmentId = assignment.Id
-            });
+            effects, new(tenantId, userId, actorId, loginId, member.Id, profile.Id, grant.Id, assignment.Id));
     }
 
     public static ProviderAccountKey Account(ManagedTenantWorkerCreationSnapshot original)

@@ -11,6 +11,7 @@ using Explore.Application.DTOs.EventAddOns;
 using Explore.Application.Features.EventAddOns.Requests.Commands;
 using Explore.Application.Features.EventAddOns.Requests.Queries;
 using Explore.Application.Hateoas;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -24,7 +25,7 @@ public sealed class EventAddOnManagementController(
     IQueryHandler<GetEventAddOnCatalogQuery, EventAddOnCatalogDto?> getCatalogHandler,
     ICommandHandler<CreateEventAddOnCatalogDraftCommand, EventAddOnCatalogDto?> createDraftHandler,
     ICommandHandler<AddEventAddOnCatalogItemCommand, EventAddOnCatalogDto?> addItemHandler,
-    ICommandHandler<PublishEventAddOnCatalogCommand, EventAddOnCatalogDto?> publishHandler,
+    ICommandHandler<PublishEventAddOnCatalogCommand, EventAddOnPublicationResponse> publishHandler,
     ICommandHandler<RetireEventAddOnCatalogCommand, EventAddOnCatalogDto?> retireHandler,
     IResourceAssembler<EventAddOnCatalogDto, EventAddOnCatalogDto> assembler,
     TimeProvider timeProvider) : ControllerBase
@@ -33,6 +34,14 @@ public sealed class EventAddOnManagementController(
         "Add-on management unavailable",
         "The add-on configuration was not found or is unavailable.",
         "event_add_on_management_unavailable");
+
+    private static readonly CommandFailurePolicy PublicationFailures = CommandFailurePolicy
+        .ValidatedBy(new ApiValidationProblemDescriptor("event_add_on", "Add-on publication failed", "Add-on publication failed."))
+        .Forbidden("Add-on publication restricted", "Current publication restrictions prevent publishing this add-on catalog.",
+            "event_add_on_publish_restricted")
+        .Unavailable("Add-on publication authority unavailable", "Current publication authority could not be established.",
+            "event_add_on_publish_authority_unavailable")
+        .NotFound(Unavailable, "event_add_on_management_unavailable");
 
     [HttpGet("", Name = RouteNames.GetEventAddOnManagement)]
     [AllowAnonymous]
@@ -109,18 +118,20 @@ public sealed class EventAddOnManagementController(
     [ProducesResponseType<HalResource<EventAddOnCatalogDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
-    public Task<ActionResult<HalResource<EventAddOnCatalogDto>>> Publish(
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<HalResource<EventAddOnCatalogDto>>> Publish(
         Guid eventId,
-        CancellationToken cancellationToken) =>
-        ResourceAsync(
-            publishHandler.ExecuteAsync(
-                new PublishEventAddOnCatalogCommand(
-                    eventId,
-                    timeProvider.GetUtcNow().UtcDateTime),
-                cancellationToken));
+        CancellationToken cancellationToken)
+    {
+        EventAddOnPublicationResponse response = await publishHandler.ExecuteAsync(
+            new PublishEventAddOnCatalogCommand(eventId, timeProvider.GetUtcNow().UtcDateTime), cancellationToken);
+        if (!response.IsSuccess) return PublicationFailures.Map(this, response);
+        return Ok(await assembler.ToResource(response.Catalog!, HttpContext));
+    }
 
     [HttpPost("retire", Name = RouteNames.RetireEventAddOnCatalog)]
     [Authorize]

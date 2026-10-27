@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4EXEQTSB4CBRF3AW5ZGTWRG
+Title: "Keep audience metadata private until final delivery"
+Type: fix
+Scope: access
+Summary: "Prevent audience detail and collection metadata from surviving revocation after response preparation. Native queries return private single-use projections; fresh authority gates final HTTP or native delivery after representation assembly. Native consumers must use Projection.DiscloseAsync instead of Value. HTTP response shapes remain unchanged and incomplete moderation profiles remain inactive."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

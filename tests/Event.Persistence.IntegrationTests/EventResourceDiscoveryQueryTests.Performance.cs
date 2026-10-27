@@ -63,10 +63,11 @@ public sealed partial class EventResourceDiscoveryQueryTests
             var workflow = Workflow(context, scope.TenantAId, subject, provider);
             long started = Stopwatch.GetTimestamp();
             var result = await workflow.ListAsync(scope.EventAId, 20, null, default);
+            var page = await DiscloseAsync(result.Projection);
             milliseconds.Add(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
             selects.Add(recorder.Commands.Count);
             await Assert.That(result.Failure).IsEqualTo(EventResourceAudienceFailure.None);
-            await Assert.That(result.Value!.Items.Select(item => item.Id).SequenceEqual([resources[^1].Id])).IsTrue();
+            await Assert.That(page.Items.Select(item => item.Id).SequenceEqual([resources[^1].Id])).IsTrue();
             await Assert.That(recorder.Commands.Count).IsLessThanOrEqualTo(150);
             await Assert.That(provider.Sizes.Count).IsLessThanOrEqualTo(4);
             await Assert.That(context.ChangeTracker.Entries<RegistrationParticipant>().Any()).IsFalse();

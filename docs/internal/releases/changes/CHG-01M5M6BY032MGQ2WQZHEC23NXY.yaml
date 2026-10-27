@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5M6BY032MGQ2WQZHEC23NXY
+Title: "Bind confidential case intake and reads to committed receipts"
+Type: feat
+Scope: access
+Summary: "Bind submission, attribution and private case reads to exact committed account receipts and current native custody; included tests are unrun and runtime/provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Account-bound committed submission and read receipts, separate grants and current attribution/custody prevent submit authority becoming private read authority. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires the separately owned native case-source, attribution, receipt and custody model plus generated schema checkpoint; no migration or provider execution occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Introducing case-intake, attribution, grant and private narrative endpoints travel in this source packet; their cumulative schema/client snapshot is deferred once to host composition."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Deploy only with the reviewed native owners, schema and final composition; complete paired operator guidance and provider assurance before PR. No intermediate deployment readiness is claimed."

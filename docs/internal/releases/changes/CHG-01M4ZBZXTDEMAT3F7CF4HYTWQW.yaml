@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4ZBZXTDEMAT3F7CF4HYTWQW
+Title: "Model exact effect ownership and original completion custody"
+Type: feat
+Scope: access
+Summary: "Define finite native effect leases, original capture binding and payload-free completion acknowledgement without enabling native completion or extending private retention."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

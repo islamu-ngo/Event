@@ -35,16 +35,16 @@ public sealed class EventRoleAuthorityCeilingService : IEventRoleAuthorityCeilin
 
     private readonly IEventAuthoritySnapshotService _authoritySnapshotService;
     private readonly IRoleRepository _roleRepository;
-    private readonly IPermissionRegistryService _permissionRegistry;
+    private readonly IPermissionRepository _permissionRepository;
 
     public EventRoleAuthorityCeilingService(
         IEventAuthoritySnapshotService authoritySnapshotService,
         IRoleRepository roleRepository,
-        IPermissionRegistryService permissionRegistry)
+        IPermissionRepository permissionRepository)
     {
         _authoritySnapshotService = authoritySnapshotService;
         _roleRepository = roleRepository;
-        _permissionRegistry = permissionRegistry;
+        _permissionRepository = permissionRepository;
     }
 
     public async Task<IReadOnlyList<EventRolePreset>> GetAssignableRolePresetsAsync(
@@ -161,7 +161,7 @@ public sealed class EventRoleAuthorityCeilingService : IEventRoleAuthorityCeilin
             return new HashSet<string>(StringComparer.Ordinal);
         }
 
-        var activePermissionByCode = (await _permissionRegistry.GetAllPermissionsAsync())
+        var activePermissionByCode = (await _permissionRepository.GetAll())
             .Where(permission => permission.IsActive)
             .ToDictionary(permission => permission.MasterCode, StringComparer.Ordinal);
 

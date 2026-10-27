@@ -210,11 +210,34 @@ public sealed class EventResourceRepository : IEventResourceRepository
             .ToListAsync(cancellationToken);
     }
 
+    public Task<Tenant?> GetAuthorityTenantAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken) =>
+        _dbContext.Tenants.AsNoTracking().Include(tenant => tenant.TenantStatus)
+            .SingleOrDefaultAsync(tenant => tenant.Id == tenantId, cancellationToken);
+
+    public Task<OrganizationTenant?> GetAuthorityOrganizationTenantAsync(
+        Guid tenantId,
+        Guid organizationId,
+        CancellationToken cancellationToken) =>
+        _dbContext.OrganizationTenants.AsNoTracking().Include(placement => placement.Organization)
+            .SingleOrDefaultAsync(placement => placement.TenantId == tenantId
+                && placement.OrganizationId == organizationId, cancellationToken);
+
+    public Task<GroupTenant?> GetAuthorityGroupTenantAsync(
+        Guid tenantId,
+        Guid groupId,
+        CancellationToken cancellationToken) =>
+        _dbContext.GroupTenants.AsNoTracking().Include(placement => placement.Group)
+            .SingleOrDefaultAsync(placement => placement.TenantId == tenantId
+                && placement.GroupId == groupId, cancellationToken);
+
     public Task<TenantUser?> GetTenantUserAsync(
         Guid tenantId,
         Guid subjectUserId,
         CancellationToken cancellationToken) =>
         _dbContext.TenantUsers.AsNoTracking()
+            .Include(user => user.User)
             .SingleOrDefaultAsync(user => user.TenantId == tenantId
                 && user.UserId == subjectUserId, cancellationToken);
 
@@ -618,7 +641,8 @@ public sealed class EventResourceRepository : IEventResourceRepository
         Guid subjectUserId, int limit, CancellationToken cancellationToken)
     {
         int bound = RequireLimit(limit, MaximumFactCount);
-        var values = await _dbContext.PlatformUserRoles.AsNoTracking().Include(value => value.Role)
+        var values = await _dbContext.PlatformUserRoles.AsNoTracking()
+            .Include(value => value.Role).Include(value => value.User)
             .Where(value => value.UserId == subjectUserId)
             .OrderBy(value => value.Id).Take(bound + 1).ToListAsync(cancellationToken);
         return RequireCompleteFacts(values, bound, nameof(PlatformUserRole));

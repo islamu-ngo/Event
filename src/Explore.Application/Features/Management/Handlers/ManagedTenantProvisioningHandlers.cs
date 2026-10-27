@@ -16,9 +16,18 @@ public sealed class ScheduleManagedTenantProvisioningCommandHandler(
     IManagedTenantProvisioningSchedulingPort scheduling)
     : ICommandHandler<ScheduleManagedTenantProvisioningCommand, BaseCommandResponse<ManagementTenantProvisioningOperationDto>>
 {
-    public Task<BaseCommandResponse<ManagementTenantProvisioningOperationDto>> ExecuteAsync(
-        ScheduleManagedTenantProvisioningCommand request, CancellationToken cancellationToken = default) =>
-        scheduling.ScheduleAsync(request, cancellationToken);
+    public async Task<BaseCommandResponse<ManagementTenantProvisioningOperationDto>> ExecuteAsync(
+        ScheduleManagedTenantProvisioningCommand request, CancellationToken cancellationToken = default)
+    {
+        var response = await scheduling.ScheduleAsync(request, cancellationToken);
+        return BaseCommandResponse.Restore(
+            response.Id is { } operation ? ManagedTenantProvisioningRequestCodec.ToDto(operation) : null,
+            response.IsSuccess,
+            response.Message,
+            response.Errors,
+            response.FailureCode,
+            response.QuotaExceeded);
+    }
 }
 
 public sealed class CancelManagedTenantProvisioningOperationCommandHandler(

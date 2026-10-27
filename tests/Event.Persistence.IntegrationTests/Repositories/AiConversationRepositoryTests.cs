@@ -475,6 +475,72 @@ public sealed class AiConversationRepositoryTests(PostgreSqlContainerFixture fix
     }
 
     [Test]
+    [Arguments(0, false)]
+    [Arguments(1, false)]
+    [Arguments(2, false)]
+    [Arguments(0, true)]
+    [Arguments(1, true)]
+    [Arguments(2, true)]
+    public async Task Proposed_action_state_is_owned_by_explicit_persistence_not_nested_tool_saves(int outcome, bool rollback)
+    {
+        await fixture.ResetAsync();
+        var scope = await SeedTenantAndUserAsync("ai-action-isolation");
+        var graph = await SeedConversationGraphAsync(scope, "Original proposal", DateTime.UtcNow.AddHours(-1));
+        Guid resourceId = Guid.CreateVersion7();
+        await using (var context = fixture.CreateTenantFilteredDbContext(new TestTenantContext(scope.TenantId)))
+        {
+            var repository = new AiConversationRepository(context);
+            var action = (await repository.GetProposedActionForUpdateAsync(graph.ProposedActionId, default))!;
+            var conversation = action.Conversation!;
+            await Assert.That(ReferenceEquals(action.Message,
+                conversation.Messages.Single(message => message.Id == action.MessageId))).IsTrue();
+            conversation.Title = "Unsaved tool-local title";
+            if (outcome == 2) action.Reject(scope.UserId, DateTime.UtcNow);
+            else action.Confirm(scope.UserId, DateTime.UtcNow);
+
+            // The real confirmation handler's tool save must not persist its pending proposal decision.
+            await repository.CreateToolExecutionAsync(new AiToolExecution
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantId,
+                ProposedActionId = action.Id,
+                ToolName = "CreateEventDraft",
+                StartedAt = DateTime.UtcNow
+            }, default);
+            var before = await context.AiProposedActions.AsNoTracking().SingleAsync(row => row.Id == action.Id);
+            await Assert.That(before.Status).IsEqualTo(AiProposedActionStatus.Proposed);
+            await Assert.That(before.ConfirmedAt).IsNull();
+            await Assert.That(before.RejectedAt).IsNull();
+            await Assert.That(await context.AiConversations.AsNoTracking()
+                .Where(row => row.Id == graph.ConversationId).Select(row => row.Title).SingleAsync())
+                .IsEqualTo("Original proposal");
+
+            if (outcome == 0) action.MarkExecuted(resourceId);
+            if (outcome == 1) action.MarkFailed("event_creation_denied", "Native Event authority changed.");
+            await using var transaction = await context.Database.BeginTransactionAsync();
+            await repository.UpdateProposedActionAsync(action, default);
+            if (rollback) await transaction.RollbackAsync();
+            else await transaction.CommitAsync();
+        }
+        await using var inspect = fixture.CreateTenantFilteredDbContext(new TestTenantContext(scope.TenantId));
+        var saved = await inspect.AiProposedActions.AsNoTracking().SingleAsync(row => row.Id == graph.ProposedActionId);
+        var expected = rollback ? AiProposedActionStatus.Proposed : outcome switch
+        {
+            0 => AiProposedActionStatus.Executed,
+            1 => AiProposedActionStatus.Failed,
+            _ => AiProposedActionStatus.Rejected
+        };
+        await Assert.That(saved.Status).IsEqualTo(expected);
+        await Assert.That(saved.ResultResourceId).IsEqualTo(!rollback && outcome == 0 ? (Guid?)resourceId : null);
+        await Assert.That(saved.FailureCode).IsEqualTo(!rollback && outcome == 1 ? "event_creation_denied" : null);
+        await Assert.That(saved.ConfirmedBy).IsEqualTo(!rollback && outcome != 2 ? (Guid?)scope.UserId : null);
+        await Assert.That(saved.RejectedBy).IsEqualTo(!rollback && outcome == 2 ? (Guid?)scope.UserId : null);
+        await Assert.That(await inspect.AiConversations.AsNoTracking()
+            .Where(row => row.Id == graph.ConversationId).Select(row => row.Title).SingleAsync())
+            .IsEqualTo("Original proposal");
+    }
+
+    [Test]
     public async Task HardDeleteUserConversationGraphAsync_DeletesTargetGraphsAcrossTenants_AndLeavesUnrelatedGraphByteEquivalent()
     {
         await fixture.ResetAsync();

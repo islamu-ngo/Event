@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4EKSX2VS6B1Q1M5VP96J67B
+Title: "Persist bounded moderation qualification sources"
+Type: feat
+Scope: access
+Summary: "Persist checked finding, reviewer and policy sources with actual case ownership, direct tenant boundaries, one current policy head per jurisdiction and restrictive rule parents. Generate the four owning provider schemas without adopting live evidence or activating enforcement."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

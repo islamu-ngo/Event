@@ -298,6 +298,43 @@ public class EventReportTests
     }
 
     [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task EventReportExternalLink_RequiresPairedNativeCaseAndGeneration(bool omitCase)
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+        {
+            _ = EventReportExternalLink.CreatePending(Guid.CreateVersion7(), Guid.CreateVersion7(),
+                omitCase ? null : Guid.CreateVersion7(), omitCase ? Guid.CreateVersion7() : null,
+                EventReportExternalProvider.Osprey, "dispatch-generation");
+            return Task.CompletedTask;
+        });
+    }
+
+    [Test]
+    public async Task ProviderAdvice_RejectsNativeGenerationSubstitutionWithoutChangingCase()
+    {
+        var report = CreateReport();
+        var reportCase = EventReportCase.Create(report.TenantId, report.Id, "default", EventReportPriority.Normal, null);
+        var observedAt = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        var link = EventReportExternalLink.CreatePending(report.TenantId, report.Id, reportCase.Id,
+            Guid.CreateVersion7(), EventReportExternalProvider.Osprey, "dispatch-generation", observedAt);
+        link.MarkSynced(null, "provider-signal", null, observedAt);
+        var stamp = reportCase.ConcurrencyStamp;
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+        {
+            _ = EventReportSignal.CreateProviderAdvice(report, reportCase, link, "provider-signal", 0,
+                "sha256:" + new string('a', 64), "policy_match", "spam", null,
+                EventReportSignalVerdict.NeedsReview, null, null, null, "dispatch-generation", observedAt);
+            return Task.CompletedTask;
+        });
+        await Assert.That(reportCase.ConcurrencyStamp).IsEqualTo(stamp);
+        await Assert.That(reportCase.CurrentDecisionId).IsNull();
+        await Assert.That(report.Signals.Count).IsEqualTo(0);
+        await Assert.That(report.Decisions.Count).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task EventReportExternalLink_CreatePending_StoresProviderTargetIdentity()
     {
         var tenantId = Guid.CreateVersion7();
@@ -307,6 +344,7 @@ public class EventReportTests
             tenantId,
             Guid.CreateVersion7(),
             caseId: null,
+            caseConcurrencyStamp: null,
             EventReportExternalProvider.Osprey,
             "sync-1",
             providerTargetScope: EventReportProviderTargetScope.Tenant,
@@ -325,6 +363,7 @@ public class EventReportTests
                 Guid.CreateVersion7(),
                 Guid.CreateVersion7(),
                 caseId: null,
+                caseConcurrencyStamp: null,
                 EventReportExternalProvider.Coop,
                 "sync-2",
                 providerTargetScope: EventReportProviderTargetScope.Tenant,
@@ -401,6 +440,94 @@ public class EventReportTests
             reporterLocale: null,
             reporterIpHash: null,
             reporterUserAgentHash: null);
+    }
+
+    [Test]
+    public async Task ProviderAdvice_BindsNativeCaseAndSource_WithoutSelectingDecision()
+    {
+        var report = CreateReport();
+        var reportCase = EventReportCase.Create(report.TenantId, report.Id, "default", EventReportPriority.Normal, null);
+        var observedAt = new DateTime(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc);
+        var link = EventReportExternalLink.CreatePending(report.TenantId, report.Id, reportCase.Id,
+            reportCase.ConcurrencyStamp, EventReportExternalProvider.Osprey, "native-dispatch", observedAt,
+            EventReportProviderTargetScope.Tenant, report.TenantId.ToString("N"));
+        link.MarkSynced(null, "provider-signal", null, observedAt);
+        var material = "sha256:" + new string('a', 64);
+        var stamp = reportCase.ConcurrencyStamp;
+
+        var advice = EventReportSignal.CreateProviderAdvice(
+            report, reportCase, link, "provider-signal", 0, material, "policy_match", "spam",
+            0.9m, EventReportSignalVerdict.Urgent, EventReportRecommendedAction.HeavyRedact,
+            "Human review required.", "provider-signal", "native-dispatch", observedAt);
+
+        await Assert.That(advice.CaseId).IsEqualTo(reportCase.Id);
+        await Assert.That(advice.SourceCaseConcurrencyStamp).IsEqualTo(stamp);
+        await Assert.That(advice.ProviderTargetId).IsEqualTo(report.TenantId.ToString("N"));
+        await Assert.That(advice.MatchesAdvisorySource(report.Id, reportCase.Id, link.Id, material, null,
+            link.ProviderTargetScope, link.ProviderTargetId, stamp)).IsTrue();
+        await Assert.That(advice.MatchesAdvisorySource(report.Id, Guid.CreateVersion7(), link.Id, material, null,
+            link.ProviderTargetScope, link.ProviderTargetId, stamp)).IsFalse();
+        await Assert.That(advice.MatchesAdvisorySource(report.Id, reportCase.Id, Guid.CreateVersion7(), material, null,
+            link.ProviderTargetScope, link.ProviderTargetId, stamp)).IsFalse();
+        await Assert.That(advice.MatchesAdvisorySource(report.Id, reportCase.Id, link.Id, "sha256:" + new string('b', 64), null,
+            link.ProviderTargetScope, link.ProviderTargetId, stamp)).IsFalse();
+        await Assert.That(advice.MatchesAdvisorySource(report.Id, reportCase.Id, link.Id, material, null,
+            EventReportProviderTargetScope.Instance, link.ProviderTargetId, stamp)).IsFalse();
+        await Assert.That(advice.MatchesAdvisorySource(report.Id, reportCase.Id, link.Id, material, null,
+            link.ProviderTargetScope, Guid.CreateVersion7().ToString("N"), stamp)).IsFalse();
+        await Assert.That(advice.MatchesAdvisorySource(report.Id, reportCase.Id, link.Id, material, null,
+            link.ProviderTargetScope, link.ProviderTargetId, Guid.CreateVersion7())).IsFalse();
+        await Assert.That(reportCase.CurrentDecisionId).IsNull();
+        await Assert.That(reportCase.Status).IsEqualTo(EventReportCaseStatus.Open);
+        await Assert.That(reportCase.ConcurrencyStamp).IsEqualTo(stamp);
+        await Assert.That(report.Decisions.Count).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task ProviderAdvice_RejectsForeignTenantOrCaseBinding(bool foreignTenant)
+    {
+        var report = CreateReport();
+        var reportCase = EventReportCase.Create(report.TenantId, report.Id, "default", EventReportPriority.Normal, null);
+        var observedAt = new DateTime(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc);
+        var link = EventReportExternalLink.CreatePending(
+            foreignTenant ? Guid.CreateVersion7() : report.TenantId, report.Id,
+            foreignTenant ? reportCase.Id : Guid.CreateVersion7(), reportCase.ConcurrencyStamp, EventReportExternalProvider.Osprey,
+            "native-dispatch", observedAt);
+        link.MarkSynced(null, "provider-signal", null, observedAt);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+        {
+            _ = EventReportSignal.CreateProviderAdvice(report, reportCase, link, "provider-signal", 0,
+                "sha256:" + new string('a', 64), "policy_match", "spam", null,
+                EventReportSignalVerdict.NeedsReview, null, null, null, "native-dispatch", observedAt);
+            return Task.CompletedTask;
+        });
+        await Assert.That(reportCase.CurrentDecisionId).IsNull();
+        await Assert.That(report.Decisions.Count).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task CoopAdvice_RequiresRealNativeInboxEnvelope()
+    {
+        var report = CreateReport();
+        var reportCase = EventReportCase.Create(report.TenantId, report.Id, "default", EventReportPriority.Normal, null);
+        var observedAt = new DateTime(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc);
+        var link = EventReportExternalLink.CreatePending(report.TenantId, report.Id, reportCase.Id,
+            reportCase.ConcurrencyStamp, EventReportExternalProvider.Coop, "native-dispatch", observedAt);
+        link.MarkSynced("provider-case", null, null, observedAt);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+        {
+            _ = EventReportSignal.CreateProviderAdvice(report, reportCase, link, "provider-advice", 0,
+                "sha256:" + new string('a', 64), "global_ban", "spam", null,
+                EventReportSignalVerdict.NeedsReview, EventReportRecommendedAction.Escalate,
+                null, null, "native-dispatch", observedAt);
+            return Task.CompletedTask;
+        });
+        await Assert.That(reportCase.CurrentDecisionId).IsNull();
+        await Assert.That(report.Decisions.Count).IsEqualTo(0);
     }
 
     private static bool Implements<T>(params Type[] expectedInterfaces)

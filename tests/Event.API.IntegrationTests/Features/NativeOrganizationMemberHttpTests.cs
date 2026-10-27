@@ -1,16 +1,19 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
+using Explore.Application.DTOs.OrganizationMember;
 using Explore.Application.Features.OrganizationMembers.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -105,22 +108,41 @@ public sealed class NativeOrganizationMemberHttpTests
         await Assert.That(invitations.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That((await JsonAsync(invitations)).EnumerateArray()
             .Select(item => item.GetProperty("id").GetGuid())).IsEquivalentTo(new[] { id });
+        using var claimedRecipientEmail = factory.CreateClient();
+        claimedRecipientEmail.DefaultRequestHeaders.Add(TestAuthHandler.AuthHeaderName,
+            TestAuthHandler.CreateAuthHeaderValue(data.Outsider.Id, "Member", ("email", data.Invitee.Email)));
+        using var unrelatedInvitations = await claimedRecipientEmail.GetAsync("/api/organizationmember/invitations");
+        await Assert.That(unrelatedInvitations.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That((await JsonAsync(unrelatedInvitations)).EnumerateArray().ToArray()).IsEmpty();
         using (var scope = factory.Services.CreateScope())
         {
             scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>()
                 .SetTenant(PlatformDefaults.DefaultTenantId);
             var query = scope.ServiceProvider.GetRequiredService<
                 IQueryHandler<ValidateOrganizationInvitationQuery, BaseCommandResponse<Guid>>>();
-            foreach (var userId in new[] { Guid.Empty, data.Outsider.Id })
+            var invitationList = scope.ServiceProvider.GetRequiredService<
+                IQueryHandler<GetMyInvitationsRequest, List<OrganizationInvitationDto>>>();
+            var http = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+            var previous = http.HttpContext;
+            try
             {
-                var rejected = await query.QueryAsync(
-                    new ValidateOrganizationInvitationQuery { InvitationId = id, UserId = userId }, default);
-                await Assert.That(rejected.IsSuccess).IsFalse();
+                var command = new ValidateOrganizationInvitationQuery { InvitationId = id };
+                foreach (var userId in new[] { Guid.Empty, data.Outsider.Id, data.Invitee.Id })
+                {
+                    http.HttpContext = new DefaultHttpContext
+                    {
+                        User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [new Claim(ClaimTypes.NameIdentifier, userId.ToString())], "native-invitation-caller"))
+                    };
+                    var result = await query.QueryAsync(command, default);
+                    await Assert.That(result.IsSuccess).IsEqualTo(userId == data.Invitee.Id);
+                    if (result.IsSuccess) await Assert.That(result.Id).IsEqualTo(id);
+                    var currentInvitations = await invitationList.QueryAsync(new(), default);
+                    await Assert.That(currentInvitations.Select(item => item.Id)).IsEquivalentTo(
+                        userId == data.Invitee.Id ? new[] { id } : Array.Empty<Guid>());
+                }
             }
-            var valid = await query.QueryAsync(
-                new ValidateOrganizationInvitationQuery { InvitationId = id, UserId = data.Invitee.Id }, default);
-            await Assert.That(valid.IsSuccess).IsTrue();
-            await Assert.That(valid.Id).IsEqualTo(id);
+            finally { http.HttpContext = previous; }
         }
         using (var accepted = await recipient.PostAsync($"/api/organizationmember/invitations/{id}/accept", null))
         {

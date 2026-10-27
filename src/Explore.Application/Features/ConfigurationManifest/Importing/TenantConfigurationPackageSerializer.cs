@@ -1,6 +1,5 @@
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
-using System.Text.Json;
 using Explore.Application.DTOs.PaidEventPolicies;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 
@@ -11,6 +10,14 @@ public static class TenantConfigurationPackageSerializer
         ConfigurationManifestTenantV1Alpha2 tenant)
     {
         ArgumentNullException.ThrowIfNull(manifest);
+        return Create(manifest.Metadata, tenant);
+    }
+
+    public static TenantConfigurationPackageV1Alpha2 Create(
+        ConfigurationManifestMetadataV1Alpha2 metadata,
+        ConfigurationManifestTenantV1Alpha2 tenant)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
         ArgumentNullException.ThrowIfNull(tenant);
         return new TenantConfigurationPackageV1Alpha2
         {
@@ -23,13 +30,13 @@ public static class TenantConfigurationPackageSerializer
                 Source = new TenantConfigurationPackageSourceV1Alpha2
                 {
                     TenantName = tenant.Metadata.Name,
-                    InstanceName = manifest.Metadata.Name
+                    InstanceName = metadata.Name
                 },
                 Export = new ConfigurationManifestExportMetadataV1Alpha2
                 {
-                    View = manifest.Metadata.Export?.View
+                    View = metadata.Export?.View
                         ?? ConfigurationManifestExportMetadataValues.OverridesView,
-                    EffectiveValuesFlattened = manifest.Metadata.Export?
+                    EffectiveValuesFlattened = metadata.Export?
                         .EffectiveValuesFlattened ?? false,
                     SensitiveValuesOmitted = true,
                     AuthorityScope = ConfigurationManifestExportMetadataValues
@@ -44,7 +51,8 @@ public static class TenantConfigurationPackageSerializer
                 DisplayName = tenant.Spec.DisplayName,
                 Settings = tenant.Spec.Settings,
                 Documents = tenant.Spec.Documents,
-                LegalDocuments = tenant.Spec.LegalDocuments
+                LegalDocuments = tenant.Spec.LegalDocuments,
+                Moderation = tenant.Spec.Moderation
             }
         };
     }
@@ -53,9 +61,6 @@ public static class TenantConfigurationPackageSerializer
         TenantConfigurationPackageV1Alpha2 package)
     {
         ArgumentNullException.ThrowIfNull(package);
-        return JsonSerializer.SerializeToUtf8Bytes(
-            package,
-            ConfigurationPortabilityJsonContext.Default
-                .TenantConfigurationPackageV1Alpha2);
+        return ConfigurationPortabilityJsonCodec.SerializeTenantConfigurationPackage(package);
     }
 }

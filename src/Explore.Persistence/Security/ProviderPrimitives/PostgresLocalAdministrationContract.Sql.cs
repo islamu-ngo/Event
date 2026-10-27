@@ -107,6 +107,8 @@ public static partial class PostgresLocalAdministrationContract
         var sql = new HumanPrincipalSourceSql(context);
         string T<T>() => sql.Table(typeof(T));
         string C<T>(string property) => sql.Column(typeof(T), property);
+        string piiColumns = string.Join(",", Inventory.Single(source => source.Type == typeof(UserPii))
+            .Properties.Select(property => "r." + C<UserPii>(property)));
         string tokenKey = $"t.{C<IdentityUserToken<Guid>>("LoginProvider")} = {Text(LocalCredentialStateMetadata.TokenLoginProvider)}"
             + $" AND t.{C<IdentityUserToken<Guid>>("Name")} = {Text(LocalCredentialStateMetadata.TokenName)}";
         string Data(Type type, string source) => Text(Label(type)) + ",(SELECT COALESCE(pg_catalog.jsonb_agg("
@@ -152,7 +154,7 @@ public static partial class PostgresLocalAdministrationContract
                 selected_graph_users AS (
                     SELECT r.* FROM {T<User>()} r WHERE r.{C<User>("Id")} IN (SELECT id FROM subjects)),
                 selected_user_pii AS (
-                    SELECT r.* FROM {T<UserPii>()} r WHERE r.{C<UserPii>("UserId")} IN (SELECT id FROM subjects)),
+                    SELECT {piiColumns} FROM {T<UserPii>()} r WHERE r.{C<UserPii>("UserId")} IN (SELECT id FROM subjects)),
                 selected_actors AS (
                     SELECT r.* FROM {T<Actor>()} r WHERE r.{C<Actor>("UserId")} IN (SELECT id FROM subjects)
                         OR r.{C<Actor>("Id")} IN (SELECT {C<LocalIdentityCredentialOperation>("PersonalActorId")} FROM selected_operations)),

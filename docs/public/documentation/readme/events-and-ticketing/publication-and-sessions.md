@@ -9,6 +9,11 @@ add them later through the saved event's available actions. A session can be a
 meeting, a stop on a tour, or another scheduled part of that program. Adding a
 date or city does not require another event listing.
 
+Managed program responses retain independent snapshots of their sessions, groups,
+days and agenda collections. Changing the lists used to construct or replace a
+response does not change that response afterwards. The JSON arrays and available
+event actions are unchanged; this does not grant permission to edit a saved event.
+
 ## Preparing a program during event creation
 
 Add program items in the event's program section. Edit, duplicate, move and

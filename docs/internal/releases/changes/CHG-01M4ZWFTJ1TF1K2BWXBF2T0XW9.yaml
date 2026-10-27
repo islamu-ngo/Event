@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZWFTJ1TF1K2BWXBF2T0XW9
+Title: "Retain independently adopted profile collection procedure vocabulary"
+Type: feat
+Scope: privacy
+Summary: "Snapshot explicit preliminary and optional profile fields against exact adopted child-age policy and collection ownership, require independent finite procedure acceptance, and preserve terminal withdrawal without converting declarations or reference fields into applicability, consent or permission to ingest sensitive data."
+Group: moderation-profile-collection-procedure-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

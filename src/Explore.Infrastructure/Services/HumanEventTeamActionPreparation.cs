@@ -26,6 +26,7 @@ public sealed partial class HumanEventTeamActionPreparation(
     IHumanAuthenticationLifetimeObserver lifetimeObserver,
     IMachinePrincipalAccessor machine,
     ITenantContext tenantContext,
+    IAdminContext identity,
     TimeProvider clock,
     CerbosAuthorizationService cerbos,
     IOptions<AuthorizationProviderDeploymentOptions> authorizationOptions,
@@ -58,11 +59,11 @@ public sealed partial class HumanEventTeamActionPreparation(
 
     private async Task<IPreparedHumanEventTeamAction> Prepare(object operation, CancellationToken token)
     {
-        var (tenant, eventId, actor) = operation switch
+        var (tenant, eventId, requestedActor) = operation switch
         {
-            AssignEventRoleByEmailCommand x => (x.TenantId, x.EventId, (Guid?)x.ActorUserId),
-            AssignEventRoleCommand x => (x.TenantId, x.EventId, (Guid?)x.ActorUserId),
-            RevokeEventRoleAssignmentCommand x => (x.TenantId, x.EventId, (Guid?)x.ActorUserId),
+            AssignEventRoleByEmailCommand x => (x.TenantId, x.EventId, (Guid?)null),
+            AssignEventRoleCommand x => (x.TenantId, x.EventId, (Guid?)null),
+            RevokeEventRoleAssignmentCommand x => (x.TenantId, x.EventId, (Guid?)null),
             GetEventTeamListRequest x => (x.TenantId, x.EventId, null),
             GetAssignableEventRolePresetsRequest x => (x.TenantId, x.EventId, (Guid?)x.AssignerUserId),
             _ => throw new InvalidOperationException("Unknown original Event team operation.")
@@ -75,10 +76,12 @@ public sealed partial class HumanEventTeamActionPreparation(
         var context = httpContext.HttpContext
             ?? throw new UnauthorizedAccessException("The original authenticated request is required.");
         var authenticated = context.User;
+        var actor = await identity.ResolveUserIdAsync(token);
         var lifetime = await lifetimeObserver.ObserveAsync(authenticated, token)
             ?? throw new UnauthorizedAccessException("Authentic original credential lifetime is required.");
         if (tenant == Guid.Empty || eventId == Guid.Empty || tenantContext.TenantId != tenant
-            || subject.AccountKey != lifetime.AccountKey || actor.HasValue && actor != subject.PrincipalId)
+            || subject.AccountKey != lifetime.AccountKey || actor is null || actor == Guid.Empty
+            || actor != subject.PrincipalId || requestedActor.HasValue && requestedActor != actor)
             throw new UnauthorizedAccessException("Event team target or actor differs from original custody.");
 
         var principalSource = resolvePrincipal();

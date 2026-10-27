@@ -295,7 +295,7 @@ namespace Event.Architecture.Tests
             await Assert.That(classBaseline.Failures).IsEmpty();
             await Assert.That(bodyBaseline.Failures).IsEmpty();
             await Assert.That(classBaseline.Entries).IsEmpty();
-            await Assert.That(bodyBaseline.Entries).Count().IsEqualTo(10);
+            await Assert.That(bodyBaseline.Entries).Count().IsEqualTo(12);
             await Assert.That(bodyBaseline.Entries.All(entry => entry.Category == "legitimate-target")).IsTrue();
             await Assert.That(DiscoverConcreteApplicationClassRequests()).IsEmpty();
         }

@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Explore.Secrets.UnitTests.Services;
+namespace Explore.Infrastructure.Tests.Secrets;
 
 public sealed class ExternalDataProtectionRingTests
 {

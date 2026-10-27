@@ -544,6 +544,22 @@ Only bounded state, enabled intent, and ownership scope enter `EmailDeliveryCapa
 No extra SMTP credential cache sits above the selected secret authority. The shared
 resolver's documented freshness and coordinated-restart requirements below still apply.
 
+### Setup storage rights
+
+`PostgresSetupLiveStoragePermissions` installs ordinary SELECT/INSERT/UPDATE
+rights on the three EF-mapped enrollment, issuance-claim and operation tables
+for the declared Runtime login, plus SELECT-only access to the secret-binding
+reference metadata used by readiness and runtime resolution. No secret value is
+stored in that relation. Binding mutation rights are not granted. Both the production migrator and native test
+fixture install these rights after tenant RLS. The installer requires the
+declared Migrator session and never grants DELETE, bypass-RLS, an elevated role
+or a database workflow function. Application authorization, transaction ownership
+and effect settlement remain in C#; database permission is not enrollment authority.
+Compromise of the Runtime database credential can expose binding coordinates;
+it cannot by itself authenticate to the selected secret authority. Tenant and
+consumer admission remain application responsibilities, not claims of database
+workflow isolation.
+
 ### Runtime resolution outcomes and bounded freshness
 
 Runtime bindings return one of five value-free outcomes. `Resolved` is the only

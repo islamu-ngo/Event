@@ -61,6 +61,18 @@ First-run setup secrets generated in volumes must be retrieved securely and purg
 
 ---
 
+## Setup database permissions
+
+The PostgreSQL migrator installs fixed permissions for the configured Runtime
+account: SELECT, INSERT and UPDATE on setup enrollment, issuance-claim and
+operation storage, and SELECT-only access to secret-binding reference metadata.
+That metadata contains coordinates, not secret values; the selected provider
+supplies the values. Installation is idempotent and requires the declared
+Migrator session. It does not add DELETE, grant delegation or bypass-RLS rights.
+Run the normal migrator before serving setup enrollment; do not substitute
+administrator database credentials in the API to repair a permission failure.
+Retain separate Migrator and Runtime accounts.
+
 ## SMTP Credential Ownership
 
 Email is disabled until explicitly enabled through `email.delivery_enabled`. Credentials

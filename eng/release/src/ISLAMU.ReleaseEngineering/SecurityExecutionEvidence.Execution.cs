@@ -2,11 +2,13 @@ using System.Security.Cryptography;
 using System.Diagnostics;
 using System.ComponentModel;
 using System.Globalization;
+using System.IO.MemoryMappedFiles;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Text.Json;
 using System.Xml;
+using System.Xml.Linq;
 
 namespace ISLAMU.ReleaseEngineering;
 
@@ -16,6 +18,542 @@ public static partial class SecurityExecutionEvidence
         IReadOnlyList<ConfiguredMountDeclaration> Mounts);
     internal sealed record ConfiguredMountDeclaration(string Type, string Source, string Target, bool ReadOnly);
     internal sealed record ConfiguredProjectDeclaration(string Name, string ProjectPath);
+    internal sealed record OwnManagedBuild(string ProjectPath, string TargetPath, string TargetName,
+        string? RuntimeManifestFileName, string? EndpointManifestFileName);
+    internal sealed record OwningManagedTarget(OwnManagedBuild Build, string AssemblyPath,
+        string FileListPath, string FileListSha256, CompiledInputSnapshot Inputs)
+    {
+        internal IReadOnlyList<string> GeneratedRoots { get; init; } = [];
+        internal IReadOnlyList<string> LockedPackageRoots { get; init; } = [];
+        internal LocalServedAssetSnapshot? ServedInputs { get; init; }
+        internal string? RestoreInputsSha256 { get; init; }
+    }
+    internal sealed record LiveNativeTool(int Pid, ulong Start, string Executable, ulong Device, ulong Inode,
+        long Bytes, string Sha256, string? Script, string? ScriptSha256, IReadOnlyList<int> Ancestors,
+        bool WorkloadRun = false, string? ConfigPath = null, string? ConfigSha256 = null, string? LoadOrigin = null);
+    internal sealed record NativeContainerAssociation(string Resource, string InstanceSha256, string ContainerId, string ImageId, bool Present);
+    internal sealed record NativeToolLead(string Role, int CreatorPid, int? Pid, ulong? Start, string? ExpectedExecutable);
+    internal sealed record QualifiedManagedInterval(string RunId, string Resource, int Pid, ulong Start,
+        string ExecutableSha256, long FirstTimestamp, long LastTimestamp, long TimestampFrequency);
+    internal sealed record RuntimePressureIdentity(int Pid, ulong Start, string ExecutableSha256,
+        long StartedTimestamp, long CompletedTimestamp, double CpuUserSeconds, double CpuSystemSeconds, long WorkingSetBytes);
+    internal sealed record RuntimeExporterValues(double CpuUserSeconds, double CpuSystemSeconds, long WorkingSetBytes);
+    internal sealed record OwnedApiListener(int Pid, ulong Start, int Port, ulong SocketInode, string NetworkNamespace, string Endpoint);
+    internal sealed record ParentPressureSample(RuntimePressureIdentity Api, OwnedApiListener Listener,
+        int K6Pid, ulong K6Start, string K6Sha256, long TimestampFrequency)
+    {
+        public OwnedApiListener? HttpListener { get; init; }
+    }
+    internal sealed record ParentPressureDelta(double MinimumElapsedSeconds, double MaximumElapsedSeconds,
+        double CpuUserSeconds, double CpuSystemSeconds, double MinimumCpuCoreUse, double MaximumCpuCoreUse);
+    internal sealed record PressureSchedule(bool Final, bool Completed, IReadOnlyList<string> RowDigests);
+    private sealed record LivePrivateObservation(string Path, LiveFileIdentity Identity, byte[] Bytes, string Sha256);
+
+    internal static bool TryReadOwnedK6RunArguments(IReadOnlyList<string> arguments, out string? config, out string? script)
+    {
+        config = null; script = null;
+        if (arguments.Count != 9 || !HintAbsolutePath(arguments[0]) || arguments[1] != "run" || arguments[2] != "--config"
+            || !HintAbsolutePath(arguments[3]) || arguments[4] != "--quiet" || arguments[5] != "--no-color"
+            || arguments[6] != "--no-usage-report" || arguments[7] != "--include-system-env-vars=true"
+            || !HintAbsolutePath(arguments[8]) || !arguments[8].EndsWith(".js", StringComparison.Ordinal)) return false;
+        config = arguments[3]; script = arguments[8]; return true;
+    }
+
+    internal static bool TryReadPressureSchedule(byte[] bytes, out PressureSchedule? schedule)
+    {
+        schedule = null;
+        try
+        {
+            if (bytes.Length is < 1 or > 4_194_304) return false;
+            using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
+            JsonElement root = document.RootElement;
+            if (!UniqueProperties(root) || root.GetProperty("Schema").GetInt32() != 1
+                || root.GetProperty("CapacityEvidenceEligible").ValueKind != JsonValueKind.False) return false;
+            JsonElement observations = root.GetProperty("Observations");
+            if (observations.ValueKind != JsonValueKind.Array || observations.GetArrayLength() is < 1 or > 900) return false;
+            if (root.GetProperty("Final").ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+                || root.GetProperty("Completed").ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
+            var rows = new List<string>();
+            foreach (JsonElement observation in observations.EnumerateArray())
+            {
+                JsonElement runtime = observation.GetProperty("Runtime");
+                if (!ExactFields(runtime, "Status", "CpuUserSeconds", "CpuSystemSeconds", "WorkingSetBytes", "CaptureStatus",
+                    "StartedTimestamp", "CompletedTimestamp", "TimestampFrequency", "ProcessId", "KernelStart", "CounterUnit",
+                    "MemoryUnit", "ExportContractQualified", "ResetIdentityQualified", "ScrapeEndpoint", "MetricDefinitions", "NumericSamples")
+                    || runtime.GetProperty("Status").GetInt32() != 3 || runtime.GetProperty("CaptureStatus").GetInt32() is < 0 or > 4
+                    || runtime.GetProperty("ProcessId").ValueKind != JsonValueKind.Null
+                    || runtime.GetProperty("KernelStart").ValueKind != JsonValueKind.Null
+                    || Text(runtime, "CounterUnit") != "seconds" || Text(runtime, "MemoryUnit") != "bytes"
+                    || runtime.GetProperty("ExportContractQualified").ValueKind != JsonValueKind.False
+                    || runtime.GetProperty("ResetIdentityQualified").ValueKind != JsonValueKind.False) return false;
+                long first = runtime.GetProperty("StartedTimestamp").GetInt64(), last = runtime.GetProperty("CompletedTimestamp").GetInt64();
+                long frequency = runtime.GetProperty("TimestampFrequency").GetInt64();
+                if (first <= 0 || last < first || frequency != Stopwatch.Frequency) return false;
+                JsonElement definitions = runtime.GetProperty("MetricDefinitions"), samples = runtime.GetProperty("NumericSamples");
+                if (definitions.ValueKind != JsonValueKind.Array || definitions.GetArrayLength() > 2
+                    || samples.ValueKind != JsonValueKind.Array || samples.GetArrayLength() > 3) return false;
+                foreach (JsonElement definition in definitions.EnumerateArray())
+                    if (!ExactFields(definition, "Name", "Kind", "Unit")) return false;
+                foreach (JsonElement sample in samples.EnumerateArray())
+                    if (!ExactFields(sample, "Name", "Kind", "Unit", "CpuMode", "CpuSeconds", "Bytes")) return false;
+                rows.Add(DigestBytes(Encoding.UTF8.GetBytes(observation.GetRawText())));
+            }
+            schedule = new(root.GetProperty("Final").GetBoolean(), root.GetProperty("Completed").GetBoolean(), rows.AsReadOnly());
+            return true;
+        }
+        catch (Exception failure) when (failure is JsonException or InvalidDataException or InvalidOperationException
+            or ArgumentException or FormatException or OverflowException or KeyNotFoundException or NotSupportedException)
+        { return false; }
+    }
+
+    internal static bool TryReadRuntimeExporter(byte[] bytes, out RuntimeExporterValues? values)
+    {
+        values = null;
+        try
+        {
+            if (bytes.Length is < 1 or > 4_194_304) return false;
+            const string cpu = "dotnet_process_cpu_time_seconds", total = cpu + "_total", memory = "dotnet_process_memory_working_set_bytes";
+            var types = new Dictionary<string, string>(StringComparer.Ordinal);
+            var units = new Dictionary<string, string>(StringComparer.Ordinal);
+            double? user = null, system = null; long? working = null;
+            string[] lines = new UTF8Encoding(false, true).GetString(bytes).Split('\n');
+            if (lines.Length > 65_536 || lines.Count(line => line.Trim() == "# EOF") != 1
+                || lines.LastOrDefault(line => !string.IsNullOrWhiteSpace(line))?.Trim() != "# EOF") return false;
+            foreach (string raw in lines)
+            {
+                string line = raw.Trim();
+                if (line.Length > 16_384) return false;
+                string[] parts = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 0) continue;
+                if (line.StartsWith("# TYPE ", StringComparison.Ordinal) || line.StartsWith("# UNIT ", StringComparison.Ordinal))
+                {
+                    if (parts.Length < 3 || parts[2] is not (cpu or memory)) continue;
+                    if (parts.Length != 4 || !(parts[1] == "TYPE" ? types : units).TryAdd(parts[2], parts[3])) return false;
+                    continue;
+                }
+                if (line.StartsWith('#')) continue;
+                int label = parts[0].IndexOf('{', StringComparison.Ordinal);
+                string name = label < 0 ? parts[0] : parts[0][..label];
+                if (name is not (total or memory)) continue;
+                if (parts.Length != 2) return false;
+                if (name == memory)
+                {
+                    if (parts[0] != memory || working.HasValue
+                        || !long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out long number) || number < 0) return false;
+                    working = number;
+                }
+                else
+                {
+                    if (!double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double number)
+                        || !double.IsFinite(number) || number < 0) return false;
+                    if (parts[0] == total + "{cpu_mode=\"user\"}" && !user.HasValue) user = number;
+                    else if (parts[0] == total + "{cpu_mode=\"system\"}" && !system.HasValue) system = number;
+                    else return false;
+                }
+            }
+            if (!user.HasValue || !system.HasValue || !working.HasValue || types.Count != 2 || units.Count != 2
+                || types[cpu] != "counter" || units[cpu] != "seconds" || types[memory] != "gauge" || units[memory] != "bytes") return false;
+            values = new(user.Value, system.Value, working.Value); return true;
+        }
+        catch (Exception failure) when (failure is ArgumentException or InvalidOperationException or OverflowException or KeyNotFoundException)
+        { return false; }
+    }
+
+    internal static bool TryCreateParentPressureDelta(ParentPressureSample previous, ParentPressureSample current,
+        out ParentPressureDelta? delta)
+    {
+        delta = null;
+        if (previous.Api.Pid <= 0 || previous.Api.Start == 0 || previous.K6Pid <= 0 || previous.K6Start == 0
+            || previous.Api.Pid != current.Api.Pid || previous.Api.Start != current.Api.Start
+            || previous.Api.ExecutableSha256 != current.Api.ExecutableSha256 || previous.Listener != current.Listener
+            || previous.HttpListener is null || previous.HttpListener != current.HttpListener
+            || previous.Listener.Pid != previous.Api.Pid || previous.Listener.Start != previous.Api.Start
+            || previous.HttpListener.Pid != previous.Api.Pid || previous.HttpListener.Start != previous.Api.Start
+            || previous.HttpListener.NetworkNamespace != previous.Listener.NetworkNamespace
+            || previous.HttpListener.Port == previous.Listener.Port || previous.HttpListener.SocketInode == previous.Listener.SocketInode
+            || previous.K6Pid != current.K6Pid || previous.K6Start != current.K6Start || previous.K6Sha256 != current.K6Sha256
+            || previous.TimestampFrequency <= 0 || previous.TimestampFrequency != current.TimestampFrequency
+            || previous.Api.StartedTimestamp <= 0 || current.Api.StartedTimestamp <= 0
+            || previous.Api.CompletedTimestamp < previous.Api.StartedTimestamp || current.Api.CompletedTimestamp < current.Api.StartedTimestamp
+            || current.Api.StartedTimestamp <= previous.Api.CompletedTimestamp
+            || !double.IsFinite(previous.Api.CpuUserSeconds) || !double.IsFinite(previous.Api.CpuSystemSeconds)
+            || !double.IsFinite(current.Api.CpuUserSeconds) || !double.IsFinite(current.Api.CpuSystemSeconds)
+            || previous.Api.CpuUserSeconds < 0 || previous.Api.CpuSystemSeconds < 0
+            || previous.Api.WorkingSetBytes < 0 || current.Api.WorkingSetBytes < 0
+            || current.Api.CpuUserSeconds < previous.Api.CpuUserSeconds || current.Api.CpuSystemSeconds < previous.Api.CpuSystemSeconds) return false;
+        double lower = ((double)current.Api.StartedTimestamp - previous.Api.CompletedTimestamp) / current.TimestampFrequency;
+        double upper = ((double)current.Api.CompletedTimestamp - previous.Api.StartedTimestamp) / current.TimestampFrequency;
+        double user = current.Api.CpuUserSeconds - previous.Api.CpuUserSeconds, system = current.Api.CpuSystemSeconds - previous.Api.CpuSystemSeconds;
+        if (!double.IsFinite(user + system) || lower <= 0 || upper < lower || !double.IsFinite((user + system) / lower)) return false;
+        delta = new(lower, upper, user, system, (user + system) / upper, (user + system) / lower); return true;
+    }
+
+    internal static bool TrySelectOwnedApiListener(IReadOnlySet<ulong> sockets, byte[] tcp, byte[] tcp6,
+        uint user, int port, out ulong inode, out string? endpoint)
+    {
+        inode = 0; endpoint = null;
+        if (port is < 1 or > 65535 || sockets.Count is < 1 or > 4096) return false;
+        var selected = new List<(ulong Inode, bool V6)>();
+        foreach (var table in new[] { (Bytes: tcp, V6: false), (Bytes: tcp6, V6: true) })
+        {
+            if (table.Bytes.Length is < 1 or > 1_048_576) return false;
+            string[] lines;
+            try { lines = new UTF8Encoding(false, true).GetString(table.Bytes).Split('\n'); }
+            catch (ArgumentException) { return false; }
+            if (lines.Length > 16_384) return false;
+            foreach (string line in lines.Skip(1).Where(line => !string.IsNullOrWhiteSpace(line)))
+            {
+                string[] fields = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+                if (fields.Length is < 10 or > 64 || !ulong.TryParse(fields[9], NumberStyles.None, CultureInfo.InvariantCulture, out ulong socket)) return false;
+                if (fields[3] != "0A") continue;
+                string[] local = fields[1].Split(':');
+                if (local.Length != 2 || !int.TryParse(local[1], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out int actualPort)
+                    || !uint.TryParse(fields[7], NumberStyles.None, CultureInfo.InvariantCulture, out uint actualUser)) return false;
+                if (actualPort != port) continue;
+                bool loopback = table.V6
+                    ? local[0] is "00000000000000000000000000000000" or "00000000000000000000000001000000"
+                    : local[0] is "00000000" or "0100007F";
+                if (!loopback)
+                {
+                    if (sockets.Contains(socket)) return false;
+                    continue;
+                }
+                if (!sockets.Contains(socket) || actualUser != user || selected.Any(item => item.V6 == table.V6)) return false;
+                selected.Add((socket, table.V6));
+            }
+        }
+        if (selected.Count == 0) return false;
+        var choice = selected.OrderBy(item => item.V6).First();
+        inode = choice.Inode;
+        endpoint = "http://" + (choice.V6 ? "[::1]" : "127.0.0.1") + ":" + port.ToString(CultureInfo.InvariantCulture) + "/metrics";
+        return true;
+    }
+
+    private static HashSet<ulong> ReadProcessSocketInodes(int pid)
+    {
+        string[] paths = Directory.EnumerateFileSystemEntries("/proc/" + pid.ToString(CultureInfo.InvariantCulture) + "/fd")
+            .Take(4097).ToArray();
+        if (paths.Length > 4096) throw new InvalidDataException("api_descriptor_inventory_limit");
+        var sockets = new HashSet<ulong>();
+        foreach (string path in paths)
+        {
+            string? target = new FileInfo(path).LinkTarget;
+            if (target is null || !target.StartsWith("socket:[", StringComparison.Ordinal)) continue;
+            if (!target.EndsWith(']') || !ulong.TryParse(target.AsSpan(8, target.Length - 9), NumberStyles.None,
+                CultureInfo.InvariantCulture, out ulong inode) || inode == 0) throw new InvalidDataException("api_descriptor_invalid");
+            sockets.Add(inode);
+        }
+        return sockets;
+    }
+
+    internal static bool TryMatchMappedCandidate(byte[] maps, string path, ulong deviceMajor, ulong deviceMinor, ulong inode, long bytes,
+        out string? mappingSha256)
+    {
+        mappingSha256 = null;
+        if (maps.Length is < 1 or > 4_194_304 || !HintAbsolutePath(path) || path.Contains('\\', StringComparison.Ordinal)
+            || path.EndsWith(" (deleted)", StringComparison.Ordinal) || inode == 0 || bytes <= 0) return false;
+        string[] lines;
+        try { lines = new UTF8Encoding(false, true).GetString(maps).Split('\n'); }
+        catch (ArgumentException) { return false; }
+        if (lines.Length > 65_536) return false;
+        var ranges = new List<(ulong First, ulong Last)>();
+        var selectedLines = new List<string>();
+        foreach (string line in lines.Where(line => !string.IsNullOrWhiteSpace(line)))
+        {
+            string[] fields = line.Split((char[]?)null, 6, StringSplitOptions.RemoveEmptyEntries);
+            if (fields.Length == 6 && fields[5] == path + " (deleted)") return false;
+            if (fields.Length != 6 || fields[5] != path) continue;
+            string[] range = fields[0].Split('-'), device = fields[3].Split(':');
+            if (range.Length != 2 || device.Length != 2 || fields[1].Length != 4 || fields[1][0] != 'r' || fields[1][1] == 'w'
+                || !ulong.TryParse(range[0], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out ulong first)
+                || !ulong.TryParse(range[1], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out ulong last) || last <= first
+                || !ulong.TryParse(fields[2], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out ulong offset) || offset >= (ulong)bytes
+                || !ulong.TryParse(device[0], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out ulong major) || major != deviceMajor
+                || !ulong.TryParse(device[1], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out ulong minor) || minor != deviceMinor
+                || !ulong.TryParse(fields[4], NumberStyles.None, CultureInfo.InvariantCulture, out ulong actualInode) || actualInode != inode
+                || ranges.Count >= 1024 || ranges.Any(item => first < item.Last && item.First < last)) return false;
+            ranges.Add((first, last));
+            selectedLines.Add(line);
+        }
+        if (ranges.Count == 0) return false;
+        mappingSha256 = DigestBytes(Encoding.UTF8.GetBytes(string.Join('\n', selectedLines.Order(StringComparer.Ordinal))));
+        return true;
+    }
+
+    private static bool TryReadHeldMappingDevice(byte[] maps, string path, ulong address, ulong inode, long bytes,
+        out ulong deviceMajor, out ulong deviceMinor)
+    {
+        deviceMajor = 0; deviceMinor = 0;
+        if (maps.Length is < 1 or > 4_194_304 || address == 0) return false;
+        string[] lines;
+        try { lines = new UTF8Encoding(false, true).GetString(maps).Split('\n'); }
+        catch (ArgumentException) { return false; }
+        foreach (string line in lines)
+        {
+            string[] fields = line.Split((char[]?)null, 6, StringSplitOptions.RemoveEmptyEntries);
+            if (fields.Length != 6 || fields[5] != path) continue;
+            string[] range = fields[0].Split('-'), device = fields[3].Split(':');
+            if (range.Length != 2 || !ulong.TryParse(range[0], NumberStyles.AllowHexSpecifier,
+                CultureInfo.InvariantCulture, out ulong first) || first != address) continue;
+            if (device.Length != 2 || !ulong.TryParse(device[0], NumberStyles.AllowHexSpecifier,
+                    CultureInfo.InvariantCulture, out ulong major)
+                || !ulong.TryParse(device[1], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out ulong minor)
+                || !TryMatchMappedCandidate(maps, path, major, minor, inode, bytes, out _)) return false;
+            deviceMajor = major; deviceMinor = minor;
+            return true;
+        }
+        return false;
+    }
+
+    internal static async Task<OwnedApiListener?> CaptureOwnedApiListenerAsync(OwnedNativeProcessContext invocation,
+        int pid, ulong start, int port, CancellationToken token)
+    {
+        try
+        {
+            ManagedProcessIdentity? owner = ReadManagedProcessIdentity(invocation.Pid), host = ReadManagedProcessIdentity(pid);
+            if (!OperatingSystem.IsLinux() || invocation.Group != invocation.Pid || invocation.Session != invocation.Pid
+                || owner is null || host is null || owner.Start != invocation.Start || owner.State is 'Z' or 'X'
+                || owner.Group != invocation.Group || owner.Session != invocation.Session || host.Start != start
+                || host.Start < invocation.Start || host.User != owner.User || host.State is 'Z' or 'X') return null;
+            string parentNamespace = new FileInfo("/proc/" + Environment.ProcessId.ToString(CultureInfo.InvariantCulture) + "/ns/net").LinkTarget ?? string.Empty;
+            string namespacePath = "/proc/" + pid.ToString(CultureInfo.InvariantCulture) + "/ns/net";
+            string network = new FileInfo(namespacePath).LinkTarget ?? string.Empty;
+            if (!network.StartsWith("net:[", StringComparison.Ordinal) || !network.EndsWith(']') || network != parentNamespace) return null;
+            token.ThrowIfCancellationRequested();
+            HashSet<ulong> sockets = ReadProcessSocketInodes(pid);
+            string prefix = "/proc/" + pid.ToString(CultureInfo.InvariantCulture) + "/net/";
+            if (!TrySelectOwnedApiListener(sockets, ReadLiveProcBytes(prefix + "tcp", 1_048_576),
+                ReadLiveProcBytes(prefix + "tcp6", 1_048_576), host.User, port, out ulong inode, out string? endpoint)) return null;
+            string executedPath = "/proc/" + pid.ToString(CultureInfo.InvariantCulture) + "/exe";
+            LiveFileIdentity executed = await ReadLiveMetadataAsync(executedPath, true, token).ConfigureAwait(false);
+            if ((executed.Bits & 0xf000) != 0x8000 || executed.Bytes is < 1 or > 1_073_741_824) return null;
+            string executedHash = HashLiveExecutable(executedPath, executed.Bytes);
+            if (await ReadLiveMetadataAsync(executedPath, true, token).ConfigureAwait(false) != executed
+                || HashLiveExecutable(executedPath, executed.Bytes) != executedHash || !ReadProcessSocketInodes(pid).Contains(inode)
+                || new FileInfo(namespacePath).LinkTarget != network
+                || new FileInfo("/proc/" + Environment.ProcessId.ToString(CultureInfo.InvariantCulture) + "/ns/net").LinkTarget != network
+                || !SameLiveProcess(ReadManagedProcessIdentity(pid), host)
+                || !SameLiveProcess(ReadManagedProcessIdentity(invocation.Pid), owner)) return null;
+            return new(pid, start, port, inode, network, endpoint!);
+        }
+        catch (Exception failure) when (failure is IOException or UnauthorizedAccessException or InvalidDataException
+            or InvalidOperationException or ArgumentException or FormatException or OverflowException or NotSupportedException)
+        { return null; }
+    }
+
+    private static async Task<RuntimeExporterValues?> ReadOwnedRuntimeExporterAsync(string endpoint, CancellationToken token)
+    {
+        using var handler = new SocketsHttpHandler { UseProxy = false, AllowAutoRedirect = false };
+        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(3) };
+        using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+        request.Headers.Accept.ParseAdd("application/openmetrics-text;version=1.0.0");
+        using HttpResponseMessage response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
+        string? media = response.Content.Headers.ContentType?.MediaType;
+        var contentType = response.Content.Headers.ContentType;
+        if (response.StatusCode != System.Net.HttpStatusCode.OK || media is null
+            || !media.Equals("application/openmetrics-text", StringComparison.OrdinalIgnoreCase)
+            || contentType!.Parameters.Count(parameter => parameter.Name.Equals("version", StringComparison.OrdinalIgnoreCase)) != 1
+            || contentType.Parameters.Single(parameter => parameter.Name.Equals("version", StringComparison.OrdinalIgnoreCase)).Value?.Trim('"') != "1.0.0"
+            || contentType.CharSet is string charset && !charset.Trim('"').Equals("utf-8", StringComparison.OrdinalIgnoreCase)) return null;
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+        deadline.CancelAfter(TimeSpan.FromSeconds(3));
+        await using Stream stream = await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
+        using var body = new MemoryStream();
+        byte[] buffer = new byte[8192];
+        int count;
+        while ((count = await stream.ReadAsync(buffer, deadline.Token).ConfigureAwait(false)) != 0)
+        {
+            if (body.Length + count > 4_194_304) return null;
+            body.Write(buffer, 0, count);
+        }
+        return TryReadRuntimeExporter(body.ToArray(), out var values) ? values : null;
+    }
+
+    internal static bool TryReadNativeObservationLead(byte[] bytes, string runId,
+        out NativeContainerAssociation? container, out NativeToolLead? tool)
+    {
+        container = null;
+        tool = null;
+        try
+        {
+            if (bytes.Length is < 1 or > 65_536 || runId.Length != 32 || !LowerHex(runId)) return false;
+            using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
+            JsonElement root = document.RootElement;
+            if (!UniqueProperties(root) || root.GetProperty("Schema").GetInt32() != 1 || Text(root, "RunId") != runId) return false;
+            if (ExactFields(root, "Schema", "RunId", "Container"))
+            {
+                JsonElement value = root.GetProperty("Container");
+                if (!ExactFields(value, "Resource", "InstanceSha256", "ContainerId", "ImageId", "Present")) return false;
+                string resource = Text(value, "Resource"), instance = Text(value, "InstanceSha256"), id = Text(value, "ContainerId"), image = Text(value, "ImageId");
+                if (resource.Length is < 1 or > 128 || resource.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not ('-' or '_'))
+                    || instance.Length != 64 || !LowerHex(instance) || id.Length != 64 || !LowerHex(id) || !FullLocalImageId(image)
+                    || value.GetProperty("Present").ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
+                container = new(resource, instance, id, image, value.GetProperty("Present").GetBoolean());
+                return true;
+            }
+            if (!ExactFields(root, "Schema", "RunId", "Tool")) return false;
+            JsonElement lead = root.GetProperty("Tool");
+            if (!ExactFields(lead, "Role", "CreatorPid", "Pid", "Start", "ExpectedExecutable")) return false;
+            string role = Text(lead, "Role");
+            int creator = lead.GetProperty("CreatorPid").GetInt32();
+            JsonElement pidValue = lead.GetProperty("Pid"), startValue = lead.GetProperty("Start"), pathValue = lead.GetProperty("ExpectedExecutable");
+            int? pid = pidValue.ValueKind == JsonValueKind.Null ? null : pidValue.GetInt32();
+            ulong? start = startValue.ValueKind == JsonValueKind.Null ? null : startValue.GetUInt64();
+            string? path = pathValue.ValueKind == JsonValueKind.Null ? null : pathValue.GetString();
+            if (creator <= 0 || (role == "browser" ? pid.HasValue || start.HasValue || path is not null
+                    : role != "docker" || pid is null or <= 0 || start is null or 0 || path is not null)) return false;
+            tool = new(role, creator, pid, start, path);
+            return true;
+        }
+        catch (Exception failure) when (failure is JsonException or InvalidDataException or InvalidOperationException
+            or ArgumentException or FormatException or OverflowException or KeyNotFoundException or NotSupportedException)
+        { return false; }
+    }
+
+    private static async Task<LivePrivateObservation?> CaptureLivePrivateObservationAsync(OwnedNativeProcessContext invocation,
+        string root, string runId, string path, CancellationToken token)
+    {
+        try
+        {
+            ManagedProcessIdentity? owner = ReadManagedProcessIdentity(invocation.Pid);
+            if (!OperatingSystem.IsLinux() || owner is null || owner.Start != invocation.Start || owner.Group != invocation.Group
+                || owner.Session != invocation.Session || owner.State is 'Z' or 'X' || runId.Length != 32 || !LowerHex(runId)
+                || Path.GetDirectoryName(path) != root || !NoInputLinks(root) || !NoInputLinks(path)) return null;
+            string marker = Path.Combine(root, ".islamu-test-owner");
+            LiveFileIdentity directory = await ReadLiveMetadataAsync(root, false, token).ConfigureAwait(false);
+            LiveFileIdentity identity = await ReadLiveMetadataAsync(path, false, token).ConfigureAwait(false);
+            LiveFileIdentity marked = await ReadLiveMetadataAsync(marker, false, token).ConfigureAwait(false);
+            if ((directory.Bits & 0xf000) != 0x4000 || (directory.Bits & 0xfff) != 0x1c0 || directory.User != owner.User
+                || !PrivateLiveFile(marked, owner.User, 32) || Encoding.ASCII.GetString(ReadBoundedFile(marker, 32)) != runId
+                || !PrivateLiveFile(identity, owner.User, identity.Bytes) || identity.Bytes is < 1 or > 65_536
+                || !await ProcessHoldsLiveFileAsync(owner.Pid, path, identity, token).ConfigureAwait(false)) return null;
+            byte[] bytes = ReadBoundedFile(path, 65_536);
+            LiveFileIdentity directoryAfter = await ReadLiveMetadataAsync(root, false, token).ConfigureAwait(false);
+            if (await ReadLiveMetadataAsync(path, false, token).ConfigureAwait(false) != identity
+                || directoryAfter.Device != directory.Device || directoryAfter.Inode != directory.Inode
+                || directoryAfter.Bits != directory.Bits || directoryAfter.User != directory.User
+                || await ReadLiveMetadataAsync(marker, false, token).ConfigureAwait(false) != marked
+                || Encoding.ASCII.GetString(ReadBoundedFile(marker, 32)) != runId
+                || !ReadBoundedFile(path, 65_536).AsSpan().SequenceEqual(bytes)
+                || !await ProcessHoldsLiveFileAsync(owner.Pid, path, identity, token).ConfigureAwait(false)
+                || !SameLiveProcess(ReadManagedProcessIdentity(owner.Pid), owner)) return null;
+            return new(path, identity, bytes, DigestBytes(bytes));
+        }
+        catch (Exception failure) when (failure is IOException or UnauthorizedAccessException or InvalidDataException
+            or ArgumentException or InvalidOperationException or FormatException or OverflowException or NotSupportedException)
+        { return null; }
+    }
+
+    internal static async Task<LiveNativeTool?> CaptureLiveNativeToolAsync(OwnedNativeProcessContext invocation,
+        int pid, CancellationToken token)
+    {
+        try
+        {
+            if (!OperatingSystem.IsLinux() || invocation.Pid <= 0 || invocation.Start == 0
+                || invocation.Group != invocation.Pid || invocation.Session != invocation.Pid) return null;
+            ManagedProcessIdentity? owner = ReadManagedProcessIdentity(invocation.Pid), process = ReadManagedProcessIdentity(pid);
+            if (owner is null || process is null || owner.Start != invocation.Start || owner.Group != invocation.Group
+                || owner.Session != invocation.Session || owner.State is 'Z' or 'X') return null;
+            List<ManagedProcessIdentity>? chain = ReadLiveHostAncestorChain(process, owner, token);
+            if (chain is null) return null;
+            string executable = "/proc/" + pid.ToString(CultureInfo.InvariantCulture) + "/exe";
+            string path = new FileInfo(executable).LinkTarget ?? throw new InvalidDataException("native_tool_unavailable");
+            LiveFileIdentity identity = await ReadLiveMetadataAsync(executable, true, token).ConfigureAwait(false);
+            if (!Path.IsPathFullyQualified(path) || path.Length > 8192 || path.Any(char.IsControl)
+                || (identity.Bits & 0xf000) != 0x8000 || identity.Bytes is < 1 or > 1_073_741_824) return null;
+            string hash = HashLiveExecutable(executable, identity.Bytes);
+            byte[] command = ReadLiveProcBytes("/proc/" + pid.ToString(CultureInfo.InvariantCulture) + "/cmdline", 65536);
+            string? script = null, scriptHash = null, config = null, configHash = null, loadOrigin = null;
+            byte[]? loadEnvironment = null;
+            if (command.Length < 2 || command[^1] != 0) return null;
+            string[] arguments = new UTF8Encoding(false, true).GetString(command).Split('\0');
+            bool workloadRun = TryReadOwnedK6RunArguments(arguments[..^1], out config, out string? workloadScript);
+            if (workloadRun)
+            {
+                script = workloadScript;
+                loadEnvironment = ReadLiveProcBytes("/proc/" + pid.ToString(CultureInfo.InvariantCulture) + "/environ", 262_144);
+                string[] environment = new UTF8Encoding(false, true).GetString(loadEnvironment).Split('\0', StringSplitOptions.RemoveEmptyEntries);
+                string[] origins = environment.Where(value => value.StartsWith("LOAD_ORIGIN=", StringComparison.Ordinal)).ToArray();
+                string[] targets = environment.Where(value => value.StartsWith("LOAD_TARGET=", StringComparison.Ordinal)).ToArray();
+                if (origins.Length != 1 || targets.Length != 1 || origins[0].Length > 4096 || targets[0].Length > 8192
+                    || !Uri.TryCreate(origins[0][12..], UriKind.Absolute, out var origin)
+                    || origin.Scheme != "http" || origin.Host is not ("127.0.0.1" or "[::1]")
+                    || origin.UserInfo.Length != 0 || origin.AbsolutePath != "/" || origin.Query.Length != 0 || origin.Fragment.Length != 0
+                    || !Uri.TryCreate(targets[0][12..], UriKind.Absolute, out var target) || target.UserInfo.Length != 0
+                    || target.GetLeftPart(UriPartial.Authority) != origin.GetLeftPart(UriPartial.Authority)) return null;
+                loadOrigin = origin.GetLeftPart(UriPartial.Authority);
+            }
+            if (arguments.Length > 2 && HintAbsolutePath(arguments[1])
+                && Path.GetExtension(arguments[1]) is ".js" or ".mjs" or ".cjs")
+                script = arguments[1];
+            if (script is not null)
+            {
+                if (!NoInputLinks(script)) return null;
+                LiveFileIdentity source = await ReadLiveMetadataAsync(script, false, token).ConfigureAwait(false);
+                if ((source.Bits & 0xf000) != 0x8000 || source.Bytes is < 1 or > 134_217_728) return null;
+                scriptHash = HashLiveExecutable(script, source.Bytes);
+                if (await ReadLiveMetadataAsync(script, false, token).ConfigureAwait(false) != source
+                    || HashLiveExecutable(script, source.Bytes) != scriptHash) return null;
+            }
+            if (config is not null)
+            {
+                if (!NoInputLinks(config)) return null;
+                LiveFileIdentity source = await ReadLiveMetadataAsync(config, false, token).ConfigureAwait(false);
+                if ((source.Bits & 0xf000) != 0x8000 || source.User != owner.User || source.Links != 1
+                    || source.Bytes is < 1 or > 1_048_576) return null;
+                configHash = HashLiveExecutable(config, source.Bytes);
+                if (await ReadLiveMetadataAsync(config, false, token).ConfigureAwait(false) != source
+                    || HashLiveExecutable(config, source.Bytes) != configHash) return null;
+            }
+            if (await ReadLiveMetadataAsync(executable, true, token).ConfigureAwait(false) != identity
+                || HashLiveExecutable(executable, identity.Bytes) != hash || new FileInfo(executable).LinkTarget != path
+                || !ReadLiveProcBytes("/proc/" + pid.ToString(CultureInfo.InvariantCulture) + "/cmdline", 65536).AsSpan().SequenceEqual(command)
+                || loadEnvironment is not null && !ReadLiveProcBytes("/proc/" + pid.ToString(CultureInfo.InvariantCulture) + "/environ", 262_144).AsSpan().SequenceEqual(loadEnvironment)
+                || chain.Any(item => !SameLiveProcess(ReadManagedProcessIdentity(item.Pid), item))) return null;
+            return new(pid, process.Start, path, identity.Device, identity.Inode, identity.Bytes, hash,
+                script, scriptHash, chain.Select(item => item.Pid).ToArray(), workloadRun, config, configHash, loadOrigin);
+        }
+        catch (Exception failure) when (failure is IOException or UnauthorizedAccessException or InvalidDataException
+            or InvalidOperationException or ArgumentException or OverflowException or FormatException or NotSupportedException)
+        { return null; }
+    }
+
+    private static IReadOnlyList<int> ReadOwnedChildCandidates(OwnedNativeProcessContext invocation)
+    {
+        ManagedProcessIdentity? owner = ReadManagedProcessIdentity(invocation.Pid);
+        if (owner is null || owner.Start != invocation.Start || owner.Group != invocation.Group || owner.Session != invocation.Session)
+            throw new InvalidDataException("native_tool_owner_changed");
+        var found = new HashSet<int>();
+        var pending = new Stack<int>();
+        pending.Push(invocation.Pid);
+        int tasks = 0;
+        while (pending.TryPop(out int parent))
+        {
+            if (!found.Add(parent)) continue;
+            if (found.Count > 1024) throw new InvalidDataException("native_tool_inventory_limit");
+            ManagedProcessIdentity? identity = ReadManagedProcessIdentity(parent);
+            if (identity is null || ReadLiveHostAncestorChain(identity, owner, CancellationToken.None) is null) continue;
+            string directory = "/proc/" + parent.ToString(CultureInfo.InvariantCulture) + "/task";
+            if (!Directory.Exists(directory)) continue;
+            foreach (string task in Directory.EnumerateDirectories(directory))
+            {
+                if (++tasks > 4096) throw new InvalidDataException("native_tool_inventory_limit");
+                string children = Path.Combine(task, "children");
+                if (!File.Exists(children)) continue;
+                string[] values = new UTF8Encoding(false, true).GetString(ReadLiveProcBytes(children, 65_536))
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (string value in values)
+                {
+                    if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int child) || child <= 0)
+                        throw new InvalidDataException("native_tool_child_invalid");
+                    ManagedProcessIdentity? actual = ReadManagedProcessIdentity(child);
+                    if (actual is not null && actual.Parent == parent && actual.User == owner.User && actual.Start >= owner.Start)
+                        pending.Push(child);
+                }
+            }
+        }
+        return found.Order().ToArray();
+    }
 
     internal static bool TryReadConfiguredContainerDeclarations(byte[] bytes, string runId,
         out IReadOnlyList<ConfiguredContainerDeclaration>? declarations) =>
@@ -106,6 +644,22 @@ public static partial class SecurityExecutionEvidence
         string Resource, string ImageReference, string ContainerId, string DeclarationSha256);
     internal sealed record NativeContainerCreationSnapshot(IReadOnlyList<NativeCreatedContainer> Created,
         IReadOnlySet<string> PendingCreationIds, byte[] PrivateManifest);
+
+    internal static bool IncludeForeignRowInSdkInventory(string containerId, string? foreignOwner,
+        IReadOnlySet<string> initialContainerIds, IReadOnlySet<string> qualifiedDirectContainerIds, bool previouslyObservedPendingDeclaration) =>
+        initialContainerIds.Contains(containerId) || !qualifiedDirectContainerIds.Contains(containerId)
+            && !(previouslyObservedPendingDeclaration && foreignOwner == "foreign");
+
+    internal static void UpdatePendingDirectHints(ISet<string> hints, string creationId, bool heldPendingObserved, bool completedQualified)
+    {
+        if (completedQualified) hints.Remove(creationId);
+        else if (heldPendingObserved) hints.Add(creationId);
+    }
+
+    internal static bool DirectCreationObservationComplete(IReadOnlySet<string> seenCreationIds,
+        IReadOnlyDictionary<string, NativeCreatedContainer> qualifiedCreations, IReadOnlySet<string> observedContainerIds) =>
+        seenCreationIds.SetEquals(qualifiedCreations.Keys)
+        && qualifiedCreations.Values.All(creation => observedContainerIds.Contains(creation.ContainerId));
 
     internal static async Task<NativeContainerCreationSnapshot?> CaptureLiveNativeContainerCreationsAsync(
         OwnedNativeProcessContext invocation, string invocationTemporary, string runId, string kind,
@@ -204,11 +758,23 @@ public static partial class SecurityExecutionEvidence
                 return null;
             byte[] manifest = JsonSerializer.SerializeToUtf8Bytes(new
             {
-                schemaVersion = 1, runId, kind, creator, invocation, created,
+                schemaVersion = 1,
+                runId,
+                kind,
+                creator,
+                invocation,
+                created,
                 pendingCreationIds = pending.Order(StringComparer.Ordinal),
-                records = brackets.Select(item => new { path = item.Path, sha256 = DigestBytes(item.Bytes),
-                    item.Identity.Device, item.Identity.Inode, liveDescriptorMatched = true }),
-                creatorAuthentication = "not-attested", assertionAuthority = "reviewed-native-source-and-operator"
+                records = brackets.Select(item => new
+                {
+                    path = item.Path,
+                    sha256 = DigestBytes(item.Bytes),
+                    item.Identity.Device,
+                    item.Identity.Inode,
+                    liveDescriptorMatched = true
+                }),
+                creatorAuthentication = "not-attested",
+                assertionAuthority = "reviewed-native-source-and-operator"
             });
             return new(created, pending, manifest);
         }
@@ -226,6 +792,106 @@ public static partial class SecurityExecutionEvidence
         IReadOnlyDictionary<string, string> VolumeMountpoints);
     internal sealed record ObservedContainerMount(string Type, string Name, string Source, string Destination, bool ReadWrite);
     internal sealed record ConfiguredOwnedResource(ObservedOwnedResource Container, IReadOnlyList<ObservedContainerMount> Mounts);
+
+    internal static bool TrySelectDirectImageVolumeMountpoints(JsonElement row, NativeCreatedContainer pair,
+        string expectedImage, IReadOnlySet<string> inherited, IReadOnlyDictionary<string, string> current,
+        InitialNativeResources initial, out IReadOnlyDictionary<string, string>? selected)
+    {
+        selected = null;
+        try
+        {
+            if (!FullLocalImageId(expectedImage) || !initial.ImageIds.Contains(expectedImage)
+                || initial.ContainerIds.Contains(pair.ContainerId) || inherited.Count > 64
+                || inherited.Any(path => !CanonicalObservedMountPath(path)) || current.Count > 65_536
+                || Text(row, "Id") != pair.ContainerId || Text(row, "Image") != pair.ImageReference
+                || Text(row, "ImageID") != expectedImage || !TryReadRuntimeMounts(row, out var mounts)) return false;
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (ObservedContainerMount mount in mounts)
+            {
+                if (mount.Type != "volume" || !inherited.Contains(mount.Destination)
+                    || pair.Resource != "docker-wait" && mount.Destination == "/sentinel") continue;
+                if (initial.VolumeNames.Contains(mount.Name) || !current.TryGetValue(mount.Name, out string? path)
+                    || path != mount.Source || !result.TryAdd(mount.Name, path)) return false;
+            }
+            selected = result;
+            return true;
+        }
+        catch (Exception failure) when (failure is JsonException or InvalidDataException or InvalidOperationException
+            or ArgumentException or FormatException or OverflowException or KeyNotFoundException or NotSupportedException)
+        { return false; }
+    }
+
+    internal static bool TryReadDirectCreatedResources(byte[] bytes, string owner, NativeContainerCreationSnapshot creations,
+        IReadOnlyDictionary<string, string> images, InitialNativeResources initial,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> imageVolumeTargets, IReadOnlyDictionary<string, string> volumeMountpoints,
+        out IReadOnlyList<ConfiguredOwnedResource>? resources)
+    {
+        resources = null;
+        try
+        {
+            if (bytes.Length is < 1 or > MaximumReportBytes || owner.Length != 32 || !LowerHex(owner)
+                || creations.Created.Count > 64 || creations.PendingCreationIds.Count > 64 || images.Count > 65_536
+                || initial.ContainerIds.Count > 65_536 || initial.ImageIds.Count > 65_536 || initial.VolumeNames.Count > 65_536
+                || volumeMountpoints.Count > 65_536 || volumeMountpoints.Any(item => !RuntimeVolumeName(item.Key)
+                    || !CanonicalObservedMountPath(item.Value))) return false;
+            var pairs = new Dictionary<string, NativeCreatedContainer>(StringComparer.Ordinal);
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (NativeCreatedContainer pair in creations.Created)
+            {
+                if (pair.RunId != owner || pair.CreatorPid <= 0 || pair.CreationId.Length != 32 || !LowerHex(pair.CreationId)
+                    || pair.CreationId[12] != '7' || pair.CreationId[16] is not ('8' or '9' or 'a' or 'b')
+                    || !ids.Add(pair.CreationId) || creations.PendingCreationIds.Contains(pair.CreationId)
+                    || pair.Resource is not ("docker-wait" or "foreign-volume-named" or "foreign-volume-bind")
+                    || pair.ContainerId.Length != 64 || !LowerHex(pair.ContainerId) || initial.ContainerIds.Contains(pair.ContainerId)
+                    || pair.DeclarationSha256.Length != 64 || !LowerHex(pair.DeclarationSha256)
+                    || !images.TryGetValue(pair.ImageReference, out string? image) || !FullLocalImageId(image)
+                    || !initial.ImageIds.Contains(image) || !pairs.TryAdd(pair.ContainerId, pair)) return false;
+            }
+            using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
+            JsonElement inventory = document.RootElement;
+            if (!UniqueProperties(inventory) || inventory.ValueKind != JsonValueKind.Array || inventory.GetArrayLength() > 65_536) return false;
+            var result = new List<ConfiguredOwnedResource>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (JsonElement row in inventory.EnumerateArray())
+            {
+                string id = Text(row, "Id");
+                if (id.Length != 64 || !LowerHex(id) || !seen.Add(id)) return false;
+                if (!pairs.TryGetValue(id, out NativeCreatedContainer? pair)) continue;
+                if (!row.TryGetProperty("Labels", out JsonElement labels)
+                    || labels.ValueKind is not (JsonValueKind.Null or JsonValueKind.Object)) return false;
+                bool hasOwner = labels.ValueKind == JsonValueKind.Object && labels.TryGetProperty("islamu.assurance.owner", out _);
+                if (pair.Resource == "docker-wait" ? hasOwner : !hasOwner || Text(labels, "islamu.assurance.owner") != "foreign") return false;
+                if (labels.ValueKind == JsonValueKind.Object && labels.TryGetProperty("islamu.assurance.resource", out _)
+                    || Text(row, "Image") != pair.ImageReference || Text(row, "ImageID") != images[pair.ImageReference]
+                    || !TryReadRuntimeMounts(row, out var mounts)
+                    || !imageVolumeTargets.TryGetValue(images[pair.ImageReference], out var inherited)) return false;
+                string state = Text(row, "State");
+                if (state is not ("created" or "running" or "paused" or "restarting" or "exited" or "dead" or "removing")) return false;
+                var expected = new HashSet<string>(inherited, StringComparer.Ordinal);
+                if (pair.Resource != "docker-wait") expected.Add("/sentinel");
+                if (!mounts!.Select(mount => mount.Destination).ToHashSet(StringComparer.Ordinal).SetEquals(expected)) return false;
+                foreach (ObservedContainerMount mount in mounts)
+                {
+                    if (!mount.ReadWrite) return false;
+                    if (pair.Resource == "foreign-volume-bind" && mount.Destination == "/sentinel")
+                    {
+                        if (mount.Type != "bind" || mount.Name.Length != 0
+                            || volumeMountpoints.Any(volume => volume.Value == mount.Source && initial.VolumeNames.Contains(volume.Key))
+                            || volumeMountpoints.Count(volume => volume.Value == mount.Source && !initial.VolumeNames.Contains(volume.Key)) != 1)
+                            return false;
+                    }
+                    else if (mount.Type != "volume" || initial.VolumeNames.Contains(mount.Name)
+                        || !volumeMountpoints.TryGetValue(mount.Name, out string? mountpoint) || mountpoint != mount.Source) return false;
+                }
+                result.Add(new(new(id, images[pair.ImageReference], pair.Resource, state == "running"), mounts));
+            }
+            resources = result.AsReadOnly();
+            return true;
+        }
+        catch (Exception failure) when (failure is JsonException or InvalidDataException or InvalidOperationException
+            or ArgumentException or OverflowException or FormatException or KeyNotFoundException or NotSupportedException)
+        { return false; }
+    }
 
     internal static bool TryReadApiCreatedResources(byte[] bytes, string owner, NativeContainerCreationSnapshot creations,
         IReadOnlyDictionary<string, string> imageIds, InitialNativeResources initial,
@@ -548,9 +1214,14 @@ public static partial class SecurityExecutionEvidence
             manifest["process"]!["resourceAssociation"] = "fixture-sdk-lead-and-live-host-ancestry";
             manifest["sdkLead"] = JsonSerializer.SerializeToNode(new
             {
-                pid = lead.Pid, start = lead.Start, lead.Parent, lead.User, lead.Group, lead.Session,
+                pid = lead.Pid,
+                start = lead.Start,
+                lead.Parent,
+                lead.User,
+                lead.Group,
+                lead.Session,
                 hostAncestry = selectedChain.Select(identity => new
-                    { identity.Pid, identity.Start, identity.Parent, identity.User, identity.Group, identity.Session })
+                { identity.Pid, identity.Start, identity.Parent, identity.User, identity.Group, identity.Session })
             });
             byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest);
             return bytes.Length > MaximumReportBytes ? null : new(bytes, DigestBytes(bytes), after.FileCount);
@@ -561,6 +1232,51 @@ public static partial class SecurityExecutionEvidence
         {
             return null;
         }
+    }
+
+    private static async Task<CompiledInputSnapshot?> CaptureQualifiedManagedResourceAsync(OwnedNativeProcessContext invocation,
+        string invocationTemporary, string fixtureRoot, NativeManagedLaunchHint hint, string repository, string candidate,
+        IReadOnlyDictionary<string, OwningManagedTarget> targets, CancellationToken token)
+    {
+        NativeFixtureModelSnapshot? model = await CaptureLiveFixtureModelAsync(invocation, invocationTemporary,
+            fixtureRoot, hint.RunId, token).ConfigureAwait(false);
+        ConfiguredProjectDeclaration? selected = model?.Projects.SingleOrDefault(project => project.Name == hint.Resource);
+        if (model is null || selected is null) return null;
+        string relative = Path.GetRelativePath(repository, selected.ProjectPath);
+        if (!SafeInputRelativePath(relative) || !targets.TryGetValue(relative, out OwningManagedTarget? target)
+            || target.AssemblyPath != Path.Combine(repository, target.Build.TargetPath)) return null;
+        CompiledInputSnapshot? live = await CaptureLiveManagedInputsAsync(invocation, invocationTemporary,
+            fixtureRoot, hint, target.AssemblyPath, candidate, token).ConfigureAwait(false);
+        if (live is null) return null;
+        using JsonDocument observed = JsonDocument.Parse(live.PrivateManifest, DocumentOptions);
+        using JsonDocument expected = JsonDocument.Parse(target.Inputs.PrivateManifest, DocumentOptions);
+        JsonElement value = observed.RootElement, host = value.GetProperty("hostRoot");
+        if (!JsonElement.DeepEquals(value.GetProperty("managed"), expected.RootElement)) return null;
+        if (target.Build.RuntimeManifestFileName is null)
+        {
+            if (host.GetProperty("servedAssets").ValueKind != JsonValueKind.Null) return null;
+        }
+        else
+        {
+            JsonElement served = host.GetProperty("servedAssets");
+            string runtime = Path.Combine(Path.GetDirectoryName(target.AssemblyPath)!, target.Build.RuntimeManifestFileName);
+            string endpoints = Path.Combine(Path.GetDirectoryName(target.AssemblyPath)!, target.Build.EndpointManifestFileName!);
+            if (served.ValueKind != JsonValueKind.Object || target.ServedInputs is null
+                || Text(served, "RuntimeManifestPath") != runtime || Text(served, "EndpointManifestPath") != endpoints
+                || !TryCaptureLocalServedAssets(repository, candidate, [runtime], target.GeneratedRoots,
+                    target.LockedPackageRoots, out var current, out _,
+                    new Dictionary<string, string>(StringComparer.Ordinal) { [runtime] = endpoints })
+                || current!.PrivateManifestSha256 != target.ServedInputs.PrivateManifestSha256) return null;
+        }
+        NativeFixtureModelSnapshot? after = await CaptureLiveFixtureModelAsync(invocation, invocationTemporary,
+            fixtureRoot, hint.RunId, token).ConfigureAwait(false);
+        if (after?.ModelSha256 != model.ModelSha256) return null;
+        var manifest = System.Text.Json.Nodes.JsonNode.Parse(live.PrivateManifest)!.AsObject();
+        manifest["owningBuild"] = JsonSerializer.SerializeToNode(target.Build);
+        manifest["owningFileListSha256"] = target.FileListSha256;
+        manifest["servedInputClosureSha256"] = target.ServedInputs?.PrivateManifestSha256;
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest);
+        return bytes.Length > MaximumReportBytes ? null : new(bytes, DigestBytes(bytes), live.FileCount);
     }
 
     private static List<ManagedProcessIdentity>? ReadLiveHostAncestorChain(ManagedProcessIdentity host,
@@ -638,13 +1354,18 @@ public static partial class SecurityExecutionEvidence
             using JsonDocument host = JsonDocument.Parse(record, DocumentOptions);
             JsonElement value = host.RootElement;
             if (!UniqueProperties(value) || !ExactFields(value, "Schema", "RunId", "Pid", "Start", "ContentRoot",
-                    "ApplicationName", "EntryAssembly", "IsWebHost", "WebRoot", "ServedAssets")
+                    "ApplicationName", "EntryAssembly", "IsWebHost", "WebRoot", "ServedAssets", "OperationsTargetPort", "HttpTargetPort")
                 || value.GetProperty("Schema").GetInt32() != 1 || Text(value, "RunId") != hint.RunId
                 || value.GetProperty("Pid").GetInt32() != hint.Pid || value.GetProperty("Start").GetUInt64() != process.Start)
                 return null;
             string contentRoot = InputDirectory(Text(value, "ContentRoot"));
             string applicationName = Text(value, "ApplicationName"), recordedEntry = Text(value, "EntryAssembly");
             JsonElement webRootValue = value.GetProperty("WebRoot"), servedAssets = value.GetProperty("ServedAssets");
+            JsonElement operationsPortValue = value.GetProperty("OperationsTargetPort");
+            int? operationsPort = operationsPortValue.ValueKind == JsonValueKind.Null ? null : operationsPortValue.GetInt32();
+            JsonElement httpPortValue = value.GetProperty("HttpTargetPort");
+            int? httpPort = httpPortValue.ValueKind == JsonValueKind.Null ? null : httpPortValue.GetInt32();
+            if (operationsPort is <= 0 or > 65535 || httpPort is <= 0 or > 65535 || httpPort.HasValue && httpPort == operationsPort) return null;
             if (string.IsNullOrWhiteSpace(applicationName) || applicationName.Length > 512 || applicationName.Any(char.IsControl)
                 || !HintAbsolutePath(recordedEntry) || recordedEntry.Length > 4096 || recordedEntry != expectedEntry
                 || value.GetProperty("IsWebHost").ValueKind is not (JsonValueKind.True or JsonValueKind.False)
@@ -658,7 +1379,7 @@ public static partial class SecurityExecutionEvidence
                     if (component.LinkTarget is not null || component.Exists
                         && (component.Attributes & FileAttributes.ReparsePoint) != 0) return null;
             }
-            if (!isWebHost && (webRoot is not null || servedAssets.ValueKind != JsonValueKind.Null)) return null;
+            if (!isWebHost && (webRoot is not null || servedAssets.ValueKind != JsonValueKind.Null || httpPort.HasValue)) return null;
             if (servedAssets.ValueKind != JsonValueKind.Null)
             {
                 if (!isWebHost || !ExactFields(servedAssets, "RuntimeManifestPath", "RuntimeManifestSha256",
@@ -708,6 +1429,21 @@ public static partial class SecurityExecutionEvidence
                 if ((identity.Bits & 0xf000) != 0x8000 || identity.Bytes is < 1 or > 1_073_741_824) return null;
                 primaryIdentities.Add(identity);
             }
+            await using var entryHandle = new FileStream(expectedEntry, FileMode.Open, FileAccess.Read, FileShare.Read);
+            string heldEntryPath = "/proc/" + Environment.ProcessId.ToString(CultureInfo.InvariantCulture) + "/fd/"
+                + entryHandle.SafeFileHandle.DangerousGetHandle().ToInt64().ToString(CultureInfo.InvariantCulture);
+            LiveFileIdentity heldEntry = await ReadLiveMetadataAsync(heldEntryPath, true, cancellationToken).ConfigureAwait(false);
+            if (heldEntry != primaryIdentities[0]) return null;
+            using var entryMapping = MemoryMappedFile.CreateFromFile(entryHandle, null, 0,
+                MemoryMappedFileAccess.Read, HandleInheritability.None, leaveOpen: true);
+            using var entryView = entryMapping.CreateViewAccessor(0, heldEntry.Bytes, MemoryMappedFileAccess.Read);
+            // Btrfs subvolume stat devices can differ from the kernel mapping device; bind through this held descriptor's view.
+            if (!TryReadHeldMappingDevice(ReadLiveProcBytes("/proc/self/maps", 4_194_304), expectedEntry,
+                    unchecked((ulong)entryView.SafeMemoryMappedViewHandle.DangerousGetHandle().ToInt64()), heldEntry.Inode,
+                    heldEntry.Bytes, out ulong entryMappingDeviceMajor, out ulong entryMappingDeviceMinor)
+                || !TryMatchMappedCandidate(ReadLiveProcBytes("/proc/" + hint.Pid + "/maps", 4_194_304), expectedEntry,
+                    entryMappingDeviceMajor, entryMappingDeviceMinor, heldEntry.Inode, heldEntry.Bytes, out string? entryMappingSha256)) return null;
+            string heldEntrySha256 = HashLiveExecutable(heldEntryPath, heldEntry.Bytes);
             if (!TryCaptureProjectManagedInputs(Path.GetDirectoryName(expectedEntry)!, candidate,
                 [Path.GetFileName(expectedEntry)], out var managed, out _)) return null;
             LiveFileIdentity executableIdentity = await ReadLiveMetadataAsync(executable, false, cancellationToken).ConfigureAwait(false);
@@ -739,6 +1475,11 @@ public static partial class SecurityExecutionEvidence
                     || await ReadLiveMetadataAsync(primaryPaths[ordinal], false, cancellationToken).ConfigureAwait(false)
                         != primaryIdentities[ordinal]) return null;
             if (await ReadLiveMetadataAsync(executable, false, cancellationToken).ConfigureAwait(false) != executableIdentity
+                || await ReadLiveMetadataAsync(heldEntryPath, true, cancellationToken).ConfigureAwait(false) != heldEntry
+                || HashLiveExecutable(heldEntryPath, heldEntry.Bytes) != heldEntrySha256
+                || !TryMatchMappedCandidate(ReadLiveProcBytes("/proc/" + hint.Pid + "/maps", 4_194_304), expectedEntry,
+                    entryMappingDeviceMajor, entryMappingDeviceMinor, heldEntry.Inode, heldEntry.Bytes, out string? afterEntryMapping)
+                || afterEntryMapping != entryMappingSha256
                 || await ReadLiveMetadataAsync(root, false, cancellationToken).ConfigureAwait(false) != rootIdentity
                 || !ReadBoundedFile(modelPath, 262144).AsSpan().SequenceEqual(model)
                 || !ReadBoundedFile(recordPath, 16384).AsSpan().SequenceEqual(record)
@@ -751,17 +1492,48 @@ public static partial class SecurityExecutionEvidence
                     && !VerifyLiveSuppliedInputs(suppliedAfter, process, executable, directory, actualEntry, cancellationToken)) return null;
             byte[] manifest = JsonSerializer.SerializeToUtf8Bytes(new
             {
-                schemaVersion = 1, candidateOid = candidate,
-                process = new { pid = process.Pid, start = process.Start, user = process.User, group = process.Group,
-                    session = process.Session, resource = hint.Resource, instanceSha256 = hint.InstanceSha256,
-                    resourceAssociation = "fixture-sdk-lead-metadata", executable,
-                    executableSha256 = executableDigest, entry = actualEntry, workingDirectory = directory },
-                hostRoot = new { contentRoot, applicationName, entryAssembly = recordedEntry, isWebHost, webRoot,
-                    servedAssets = servedAssets.Clone(), recordSha256 = DigestBytes(record), device = recordIdentity.Device,
-                    inode = recordIdentity.Inode, liveDescriptorMatched = true,
-                    assertionAuthority = "reviewed-child-source-and-operator" },
-                invocation, fixture = new { runId = hint.RunId, root, claimIdentity.Device, claimIdentity.Inode },
-                containerDeclarationSha256 = DigestBytes(model), containerDeclarationKind = "typed-prestart-declaration",
+                schemaVersion = 1,
+                candidateOid = candidate,
+                process = new
+                {
+                    pid = process.Pid,
+                    start = process.Start,
+                    user = process.User,
+                    group = process.Group,
+                    session = process.Session,
+                    resource = hint.Resource,
+                    instanceSha256 = hint.InstanceSha256,
+                    resourceAssociation = "fixture-sdk-lead-metadata",
+                    executable,
+                    executableSha256 = executableDigest,
+                    entry = actualEntry,
+                    entryMappingSha256,
+                    entryMappingDeviceMajor,
+                    entryMappingDeviceMinor,
+                    entryDevice = heldEntry.Device,
+                    entryInode = heldEntry.Inode,
+                    workingDirectory = directory
+                },
+                hostRoot = new
+                {
+                    contentRoot,
+                    applicationName,
+                    entryAssembly = recordedEntry,
+                    isWebHost,
+                    webRoot,
+                    operationsTargetPort = operationsPort,
+                    httpTargetPort = httpPort,
+                    servedAssets = servedAssets.Clone(),
+                    recordSha256 = DigestBytes(record),
+                    device = recordIdentity.Device,
+                    inode = recordIdentity.Inode,
+                    liveDescriptorMatched = true,
+                    assertionAuthority = "reviewed-child-source-and-operator"
+                },
+                invocation,
+                fixture = new { runId = hint.RunId, root, claimIdentity.Device, claimIdentity.Inode },
+                containerDeclarationSha256 = DigestBytes(model),
+                containerDeclarationKind = "typed-prestart-declaration",
                 managed = JsonSerializer.Deserialize<JsonElement>(managed!.PrivateManifest)
             });
             if (manifest.Length > MaximumReportBytes) return null;
@@ -777,7 +1549,11 @@ public static partial class SecurityExecutionEvidence
 
     private sealed record ManagedProcessIdentity(int Pid, int Parent, uint User, int Group, int Session, ulong Start, char State);
     private sealed record LiveFileIdentity(uint Bits, uint User, ulong Links, ulong Device, ulong Inode,
-        long Bytes, string Modified, string Created);
+        long Bytes, string Modified, string Created)
+    {
+        public ulong DeviceMajor { get; init; }
+        public ulong DeviceMinor { get; init; }
+    }
 
     private static bool SameLiveProcess(ManagedProcessIdentity? current, ManagedProcessIdentity expected) =>
         current is not null && current.State is not ('Z' or 'X') && current.Pid == expected.Pid
@@ -926,15 +1702,21 @@ public static partial class SecurityExecutionEvidence
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(5));
-        using var process = new Process { StartInfo = new ProcessStartInfo("/usr/bin/stat")
+        using var process = new Process
         {
-            UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true
-        } };
+            StartInfo = new ProcessStartInfo("/usr/bin/stat")
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            }
+        };
         process.StartInfo.Environment.Clear();
         process.StartInfo.Environment["LC_ALL"] = "C";
         process.StartInfo.Environment["TZ"] = "UTC";
         if (follow) process.StartInfo.ArgumentList.Add("--dereference");
-        foreach (string argument in new[] { "--format=%f|%u|%h|%d|%i|%s|%y|%w", "--", path }) process.StartInfo.ArgumentList.Add(argument);
+        foreach (string argument in new[] { "--format=%f|%u|%h|%d|%i|%s|%y|%w|%Hd|%Ld", "--", path }) process.StartInfo.ArgumentList.Add(argument);
         if (!process.Start()) throw new InvalidDataException("managed_metadata_unavailable");
         Task<string> output = ReadLiveMetadataPipeAsync(process.StandardOutput, deadline.Token);
         Task<string> error = ReadLiveMetadataPipeAsync(process.StandardError, deadline.Token);
@@ -965,16 +1747,18 @@ public static partial class SecurityExecutionEvidence
         }
         if (failures.Count != 0) throw new AggregateException(failures);
         string[] fields = value!.TrimEnd('\n').Split('|');
-        if (fields.Length != 8 || !uint.TryParse(fields[0], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out uint bits)
+        if (fields.Length != 10 || !uint.TryParse(fields[0], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out uint bits)
             || !uint.TryParse(fields[1], NumberStyles.None, CultureInfo.InvariantCulture, out uint user)
             || !ulong.TryParse(fields[2], NumberStyles.None, CultureInfo.InvariantCulture, out ulong links)
             || !ulong.TryParse(fields[3], NumberStyles.None, CultureInfo.InvariantCulture, out ulong device)
             || !ulong.TryParse(fields[4], NumberStyles.None, CultureInfo.InvariantCulture, out ulong inode)
             || !long.TryParse(fields[5], NumberStyles.None, CultureInfo.InvariantCulture, out long bytes) || bytes < 0
             || fields[6].Length is < 1 or > 64 || fields[7].Length is < 1 or > 64
-            || fields.Skip(6).Any(field => field.Any(char.IsControl)))
+            || fields.Skip(6).Any(field => field.Any(char.IsControl))
+            || !ulong.TryParse(fields[8], NumberStyles.None, CultureInfo.InvariantCulture, out ulong major)
+            || !ulong.TryParse(fields[9], NumberStyles.None, CultureInfo.InvariantCulture, out ulong minor))
             throw new InvalidDataException("managed_metadata_invalid");
-        return new(bits, user, links, device, inode, bytes, fields[6], fields[7]);
+        return new(bits, user, links, device, inode, bytes, fields[6], fields[7]) { DeviceMajor = major, DeviceMinor = minor };
     }
 
     private static async Task<string> ReadLiveMetadataPipeAsync(StreamReader reader, CancellationToken cancellationToken)
@@ -1323,12 +2107,16 @@ public static partial class SecurityExecutionEvidence
                     privateTrxSha256 = Convert.ToHexString(SHA256.HashData(invocation.ReportBytes)).ToLowerInvariant(),
                     counts = new
                     {
-                        selected = report.Counts.Selected, executed = report.Counts.Executed, passed = report.Counts.Passed,
-                        failed = report.Counts.Failed, skipped = report.Counts.Skipped
+                        selected = report.Counts.Selected,
+                        executed = report.Counts.Executed,
+                        passed = report.Counts.Passed,
+                        failed = report.Counts.Failed,
+                        skipped = report.Counts.Skipped
                     },
                     nodes = nodes.Select((node, ordinal) => new
                     {
-                        node = ordinal, requiredTest = registered.TryGetValue(node.Identity, out int index) ? (int?)index : null,
+                        node = ordinal,
+                        requiredTest = registered.TryGetValue(node.Identity, out int index) ? (int?)index : null,
                         outcome = "passed"
                     })
                 });
@@ -1414,7 +2202,8 @@ public static partial class SecurityExecutionEvidence
 
     internal static bool TryCaptureLocalServedAssets(string repositoryRoot, string candidate,
         IReadOnlyList<string> runtimeManifests, IReadOnlyList<string> generatedRoots,
-        IReadOnlyList<string> lockedPackageRoots, out LocalServedAssetSnapshot? snapshot, out string diagnostic)
+        IReadOnlyList<string> lockedPackageRoots, out LocalServedAssetSnapshot? snapshot, out string diagnostic,
+        IReadOnlyDictionary<string, string>? explicitEndpointManifests = null)
     {
         snapshot = null;
         diagnostic = "local_served_assets_invalid";
@@ -1422,6 +2211,8 @@ public static partial class SecurityExecutionEvidence
         {
             if (!OperatingSystem.IsLinux() || runtimeManifests.Count is < 1 or > 64 ||
                 generatedRoots.Count is < 1 or > 128 || lockedPackageRoots.Count > 128) return false;
+            if (explicitEndpointManifests is not null && (explicitEndpointManifests.Count != runtimeManifests.Count
+                || !explicitEndpointManifests.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(runtimeManifests))) return false;
             string repository = InputDirectory(repositoryRoot);
             string[] generated = generatedRoots.Select(InputDirectory).Distinct(StringComparer.Ordinal).ToArray();
             string[] packages = lockedPackageRoots.Select(InputDirectory).Order(StringComparer.Ordinal).ToArray();
@@ -1479,8 +2270,18 @@ public static partial class SecurityExecutionEvidence
                 if (!Path.IsPathFullyQualified(declared)) return false;
                 string path = Path.GetFullPath(declared);
                 const string runtimeSuffix = ".staticwebassets.runtime.json";
-                if (!path.EndsWith(runtimeSuffix, StringComparison.Ordinal) || !manifests.Add(path)) return false;
-                string endpointsPath = path[..^runtimeSuffix.Length] + ".staticwebassets.endpoints.json";
+                if (!manifests.Add(path)) return false;
+                string endpointsPath;
+                if (explicitEndpointManifests is not null)
+                {
+                    endpointsPath = explicitEndpointManifests[declared];
+                    if (!HintAbsolutePath(endpointsPath) || endpointsPath == path) return false;
+                }
+                else
+                {
+                    if (!path.EndsWith(runtimeSuffix, StringComparison.Ordinal)) return false;
+                    endpointsPath = path[..^runtimeSuffix.Length] + ".staticwebassets.endpoints.json";
+                }
                 using var runtime = JsonDocument.Parse(ReadManifest(path), new JsonDocumentOptions { MaxDepth = 64 });
                 using var endpoints = JsonDocument.Parse(ReadManifest(endpointsPath), new JsonDocumentOptions { MaxDepth = 64 });
                 JsonElement runtimeRoot = runtime.RootElement;
@@ -1522,7 +2323,8 @@ public static partial class SecurityExecutionEvidence
             if (!TryReadCandidateSource(repository, candidate, out _, out _)) return false;
             byte[] manifest = JsonSerializer.SerializeToUtf8Bytes(new
             {
-                schemaVersion = 1, candidateOid = candidate,
+                schemaVersion = 1,
+                candidateOid = candidate,
                 roots = new[] { new { kind = "candidate", path = repository } }
                     .Concat(packages.Select(path => new { kind = "locked-package", path })),
                 files
@@ -1761,12 +2563,14 @@ public static partial class SecurityExecutionEvidence
                 string version = ReadManagedInformationalVersion(path);
                 if (!version.EndsWith("+" + candidate, StringComparison.Ordinal) ||
                     !CapturedRegularFileStillMatches(path, files[relative])) return false;
-                managed.Add(new { path = relative, informationalVersion = version });
+                managed.Add(new { path = relative, informationalVersion = version, ownBuild = ReadOwnManagedBuild(path) });
             }
             byte[] manifest = JsonSerializer.SerializeToUtf8Bytes(new
             {
-                schemaVersion = 1, candidateOid = candidate,
-                files = inventory.RootElement.GetProperty("files"), managedEntries = managed
+                schemaVersion = 1,
+                candidateOid = candidate,
+                files = inventory.RootElement.GetProperty("files"),
+                managedEntries = managed
             });
             if (manifest.Length > MaximumReportBytes) return false;
             snapshot = new(manifest, Convert.ToHexString(SHA256.HashData(manifest)).ToLowerInvariant(), captured.FileCount);
@@ -1873,7 +2677,8 @@ public static partial class SecurityExecutionEvidence
             }
             byte[] manifest = JsonSerializer.SerializeToUtf8Bytes(new
             {
-                schemaVersion = 1, candidateOid = candidate,
+                schemaVersion = 1,
+                candidateOid = candidate,
                 files = files.Values.OrderBy(file => file.Path, StringComparer.Ordinal)
                     .Select(file => new { path = file.Path, bytes = file.Bytes, sha256 = file.Sha256 }),
                 managedEntries = managed
@@ -1894,6 +2699,258 @@ public static partial class SecurityExecutionEvidence
     internal sealed record CompiledInputSnapshot(byte[] PrivateManifest, string PrivateManifestSha256, int FileCount);
     private sealed record CompiledInputFile(string Path, long Bytes, string Sha256);
 
+    internal static OwnManagedBuild? ReadOwnManagedBuild(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using var image = new PEReader(stream);
+        if (!image.HasMetadata) return null;
+        if (image.PEHeaders.CorHeader?.MetadataDirectory.Size is not (>= 1 and <= 8_388_608))
+            throw new InvalidDataException("own_build_metadata_limit");
+        MetadataReader reader = image.GetMetadataReader();
+        if (!reader.IsAssembly) return null;
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        int count = 0;
+        foreach (CustomAttributeHandle handle in reader.GetAssemblyDefinition().GetCustomAttributes())
+        {
+            if (++count > 4096) throw new InvalidDataException("own_build_metadata_limit");
+            CustomAttribute attribute = reader.GetCustomAttribute(handle);
+            if (!AssemblyAttributeHasType(reader, attribute, "AssemblyMetadataAttribute")) continue;
+            BlobReader blob = reader.GetBlobReader(attribute.Value);
+            if (blob.ReadUInt16() != 1) throw new InvalidDataException("own_build_metadata_invalid");
+            string? key = blob.ReadSerializedString(), value = blob.ReadSerializedString();
+            if (blob.ReadUInt16() != 0 || blob.RemainingBytes != 0)
+                throw new InvalidDataException("own_build_metadata_invalid");
+            if (key is null || !key.StartsWith("ISLAMU.Assurance.", StringComparison.Ordinal)) continue;
+            if (value is null) throw new InvalidDataException("own_build_metadata_invalid");
+            if (key is not ("ISLAMU.Assurance.ProjectPath" or "ISLAMU.Assurance.TargetPath" or "ISLAMU.Assurance.TargetName"
+                    or "ISLAMU.Assurance.RuntimeManifestFileName" or "ISLAMU.Assurance.EndpointManifestFileName")
+                || !values.TryAdd(key, value)) throw new InvalidDataException("own_build_metadata_invalid");
+        }
+        if (values.Count == 0) return null;
+        if (values.Count is not (3 or 5)
+            || !values.TryGetValue("ISLAMU.Assurance.ProjectPath", out string? project)
+            || !values.TryGetValue("ISLAMU.Assurance.TargetPath", out string? target)
+            || !values.TryGetValue("ISLAMU.Assurance.TargetName", out string? name)
+            || !SafeInputRelativePath(project) || project.Any(char.IsControl) || !project.EndsWith(".csproj", StringComparison.Ordinal)
+            || !SafeInputRelativePath(target) || target.Any(char.IsControl) || !target.EndsWith(".dll", StringComparison.Ordinal)
+            || name.Length is < 1 or > 512 || name.Contains('/', StringComparison.Ordinal) || name.Contains('\\', StringComparison.Ordinal) || name.Any(char.IsControl)
+            || Path.GetFileName(target) != name + ".dll") throw new InvalidDataException("own_build_metadata_invalid");
+        values.TryGetValue("ISLAMU.Assurance.RuntimeManifestFileName", out string? runtime);
+        values.TryGetValue("ISLAMU.Assurance.EndpointManifestFileName", out string? endpoints);
+        if (values.Count == 5 && (runtime is null || endpoints is null || runtime == endpoints
+            || !SafeInputRelativePath(runtime) || runtime.Contains('/', StringComparison.Ordinal) || runtime.Any(char.IsControl)
+            || !SafeInputRelativePath(endpoints) || endpoints.Contains('/', StringComparison.Ordinal) || endpoints.Any(char.IsControl)))
+            throw new InvalidDataException("own_build_metadata_invalid");
+        return new(project, target, name, runtime, endpoints);
+    }
+
+    private static bool AssemblyAttributeHasType(MetadataReader reader, CustomAttribute attribute, string expectedName)
+    {
+        EntityHandle declaringType;
+        string constructor;
+        if (attribute.Constructor.Kind == HandleKind.MemberReference)
+        {
+            MemberReference member = reader.GetMemberReference((MemberReferenceHandle)attribute.Constructor);
+            declaringType = member.Parent;
+            constructor = reader.GetString(member.Name);
+        }
+        else if (attribute.Constructor.Kind == HandleKind.MethodDefinition)
+        {
+            MethodDefinition method = reader.GetMethodDefinition((MethodDefinitionHandle)attribute.Constructor);
+            declaringType = method.GetDeclaringType();
+            constructor = reader.GetString(method.Name);
+        }
+        else return false;
+        if (constructor != ".ctor") return false;
+        if (declaringType.Kind == HandleKind.TypeReference)
+        {
+            TypeReference type = reader.GetTypeReference((TypeReferenceHandle)declaringType);
+            return reader.GetString(type.Namespace) == "System.Reflection" && reader.GetString(type.Name) == expectedName;
+        }
+        if (declaringType.Kind == HandleKind.TypeDefinition)
+        {
+            TypeDefinition type = reader.GetTypeDefinition((TypeDefinitionHandle)declaringType);
+            return reader.GetString(type.Namespace) == "System.Reflection" && reader.GetString(type.Name) == expectedName;
+        }
+        return false;
+    }
+
+    private static Dictionary<string, OwningManagedTarget> CaptureOwningManagedTargets(string repositoryRoot,
+        string candidate, IEnumerable<string> selectedProjects)
+    {
+        string repository = InputDirectory(repositoryRoot);
+        Dictionary<string, string> tracked = ReadTrackedInputBlobs(repository, candidate);
+        var projects = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Stack<string>(selectedProjects);
+        var targets = new Dictionary<string, OwningManagedTarget>(StringComparer.Ordinal);
+        var generatedRoots = new HashSet<string>(StringComparer.Ordinal);
+        var restoreIndexes = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        int visitedEntries = 0;
+        while (pending.TryPop(out string? project))
+        {
+            if (!projects.Add(project)) continue;
+            if (projects.Count > 128 || !SafeInputRelativePath(project) || !tracked.ContainsKey(project)
+                || !project.EndsWith(".csproj", StringComparison.Ordinal)) throw new InvalidDataException("own_project_graph_invalid");
+            string projectPath = Path.Combine(repository, project);
+            if (!NoInputLinks(projectPath)) throw new InvalidDataException("own_project_graph_invalid");
+            byte[] projectBytes = ReadBoundedFile(projectPath, 1_048_576);
+            using (var input = new MemoryStream(projectBytes, writable: false))
+            using (XmlReader xml = XmlReader.Create(input, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null }))
+            {
+                XDocument document = XDocument.Load(xml);
+                var edges = new HashSet<string>(StringComparer.Ordinal);
+                foreach (XElement reference in document.Descendants().Where(item => item.Name.LocalName == "ProjectReference"))
+                {
+                    string? include = reference.Attribute("Include")?.Value;
+                    if (reference.AncestorsAndSelf().Any(item => item.Attribute("Condition") is not null)
+                        || string.IsNullOrEmpty(include) || include.Any(character => character is '$' or '%' or '*' or '?' or ';')
+                        || Path.IsPathRooted(include)) throw new InvalidDataException("own_project_graph_dynamic");
+                    string full = Path.GetFullPath(include.Replace('\\', '/'), Path.GetDirectoryName(projectPath)!);
+                    string relative = Path.GetRelativePath(repository, full);
+                    if (!SafeInputRelativePath(relative) || !tracked.ContainsKey(relative) || !edges.Add(relative))
+                        throw new InvalidDataException("own_project_graph_invalid");
+                    pending.Push(relative);
+                }
+            }
+            string intermediate = Path.Combine(Path.GetDirectoryName(projectPath)!, "obj");
+            if (!Directory.Exists(intermediate)) continue;
+            generatedRoots.Add(InputDirectory(intermediate));
+            string binaryRoot = Path.Combine(Path.GetDirectoryName(projectPath)!, "bin");
+            if (Directory.Exists(binaryRoot)) generatedRoots.Add(InputDirectory(binaryRoot));
+            restoreIndexes.Add(project, []);
+            var directories = new Stack<(string Path, int Depth)>();
+            directories.Push((intermediate, 0));
+            int indexes = 0;
+            while (directories.TryPop(out var directory))
+            {
+                if (!NoInputLinks(directory.Path) || directory.Depth > 12) throw new InvalidDataException("own_output_index_invalid");
+                foreach (string entry in Directory.EnumerateFileSystemEntries(directory.Path))
+                {
+                    if (++visitedEntries > 65_536 || !NoInputLinks(entry)) throw new InvalidDataException("own_output_index_limit");
+                    if ((File.GetAttributes(entry) & FileAttributes.Directory) != 0)
+                    {
+                        directories.Push((entry, directory.Depth + 1));
+                        continue;
+                    }
+                    if (Path.GetFileName(entry) == "project.assets.json")
+                    {
+                        if (restoreIndexes[project].Count >= 64) throw new InvalidDataException("own_restore_index_limit");
+                        restoreIndexes[project].Add(entry);
+                    }
+                    if (!entry.EndsWith(".FileListAbsolute.txt", StringComparison.Ordinal)) continue;
+                    if (++indexes > 64) throw new InvalidDataException("own_output_index_limit");
+                    byte[] indexBytes = ReadBoundedFile(entry, 1_048_576);
+                    string[] lines = new UTF8Encoding(false, true).GetString(indexBytes).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    if (lines.Length > 65_536) throw new InvalidDataException("own_output_index_limit");
+                    var matches = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (string line in lines)
+                    {
+                        string path = line.TrimEnd('\r');
+                        if (!path.EndsWith(".dll", StringComparison.Ordinal) || !File.Exists(path)) continue;
+                        if (!HintAbsolutePath(path) || !InputWithin(path, repository) || !NoInputLinks(path))
+                            throw new InvalidDataException("own_output_index_invalid");
+                        OwnManagedBuild? build = ReadOwnManagedBuild(path);
+                        if (build is null || build.ProjectPath != project || Path.Combine(repository, build.TargetPath) != path) continue;
+                        if (!matches.Add(path) || targets.ContainsKey(project)
+                            || !TryCaptureProjectManagedInputs(Path.GetDirectoryName(path)!, candidate, [Path.GetFileName(path)], out var capture, out _))
+                            throw new InvalidDataException("own_output_index_ambiguous");
+                        targets.Add(project, new(build, path, entry, DigestBytes(indexBytes), capture!));
+                    }
+                    if (!ReadBoundedFile(entry, 1_048_576).AsSpan().SequenceEqual(indexBytes))
+                        throw new InvalidDataException("own_output_index_changed");
+                }
+            }
+            if (!ReadBoundedFile(projectPath, 1_048_576).AsSpan().SequenceEqual(projectBytes))
+                throw new InvalidDataException("own_project_graph_changed");
+        }
+        if (generatedRoots.Count > 128) throw new InvalidDataException("own_generated_root_limit");
+        foreach (string project in targets.Keys.ToArray())
+        {
+            OwningManagedTarget target = targets[project];
+            if (target.Build.RuntimeManifestFileName is null) continue;
+            string runtime = Path.Combine(Path.GetDirectoryName(target.AssemblyPath)!, target.Build.RuntimeManifestFileName);
+            string endpoints = Path.Combine(Path.GetDirectoryName(target.AssemblyPath)!, target.Build.EndpointManifestFileName!);
+            var packages = ReadServedLockedPackageRoots(repository, project, runtime,
+                restoreIndexes[project], tracked, out string restoreDigest);
+            string[] generated = generatedRoots.Order(StringComparer.Ordinal).ToArray();
+            if (!TryCaptureLocalServedAssets(repository, candidate, [runtime], generated, packages,
+                out var served, out _, new Dictionary<string, string>(StringComparer.Ordinal) { [runtime] = endpoints }))
+                throw new InvalidDataException("own_served_inputs_invalid");
+            targets[project] = target with
+            {
+                GeneratedRoots = generated,
+                LockedPackageRoots = packages,
+                ServedInputs = served,
+                RestoreInputsSha256 = restoreDigest
+            };
+        }
+        return targets;
+    }
+
+    private static IReadOnlyList<string> ReadServedLockedPackageRoots(string repository, string project,
+        string runtimeManifest, IReadOnlyList<string> restoreIndexes, IReadOnlyDictionary<string, string> tracked,
+        out string restoreDigest)
+    {
+        string projectPath = Path.Combine(repository, project);
+        string lockRelative = Path.Combine(Path.GetDirectoryName(project)!, "packages.lock.json");
+        if (!tracked.ContainsKey(lockRelative)) throw new InvalidDataException("own_restore_lock_missing");
+        byte[] lockedBytes = ReadBoundedFile(Path.Combine(repository, lockRelative), MaximumReportBytes);
+        using JsonDocument locked = JsonDocument.Parse(lockedBytes, DocumentOptions);
+        var packages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (JsonProperty framework in locked.RootElement.GetProperty("dependencies").EnumerateObject())
+            foreach (JsonProperty package in framework.Value.EnumerateObject())
+            {
+                if (!package.Value.TryGetProperty("resolved", out JsonElement resolved)) continue;
+                string key = package.Name + "/" + resolved.GetString(), hash = Text(package.Value, "contentHash");
+                if (hash.Length is < 1 or > 1024 || packages.Count >= 16_384
+                    || packages.TryGetValue(key, out string? previous) && previous != hash)
+                    throw new InvalidDataException("own_restore_lock_invalid");
+                packages[key] = hash;
+            }
+        byte[]? selected = null;
+        foreach (string index in restoreIndexes)
+        {
+            byte[] bytes = ReadBoundedFile(index, MaximumReportBytes);
+            using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
+            if (Text(document.RootElement.GetProperty("project").GetProperty("restore"), "projectPath") != projectPath) continue;
+            if (selected is not null) throw new InvalidDataException("own_restore_index_ambiguous");
+            selected = bytes;
+        }
+        if (selected is null) throw new InvalidDataException("own_restore_index_missing");
+        using JsonDocument assets = JsonDocument.Parse(selected, DocumentOptions);
+        using JsonDocument runtime = JsonDocument.Parse(ReadBoundedFile(runtimeManifest, MaximumReportBytes), DocumentOptions);
+        var roots = new HashSet<string>(StringComparer.Ordinal);
+        string[] packageFolders = assets.RootElement.GetProperty("packageFolders").EnumerateObject()
+            .Select(folder => InputDirectory(folder.Name)).Take(9).ToArray();
+        if (packageFolders.Length is < 1 or > 8) throw new InvalidDataException("own_restore_index_invalid");
+        JsonProperty[] libraries = assets.RootElement.GetProperty("libraries").EnumerateObject().Take(16_385).ToArray();
+        if (libraries.Length > 16_384) throw new InvalidDataException("own_restore_index_limit");
+        foreach (JsonElement element in runtime.RootElement.GetProperty("ContentRoots").EnumerateArray())
+        {
+            string root = InputDirectory(element.GetString()!);
+            if (root == repository || InputWithin(root, repository)) continue;
+            var matches = new HashSet<string>(StringComparer.Ordinal);
+            foreach (JsonProperty library in libraries)
+            {
+                if (Text(library.Value, "type") != "package") continue;
+                string relative = Text(library.Value, "path");
+                if (!SafeInputRelativePath(relative) || !packages.TryGetValue(library.Name, out string? hash)
+                    || Text(library.Value, "sha512") != hash) continue;
+                foreach (string folder in packageFolders)
+                {
+                    string candidateRoot = Path.Combine(folder, relative);
+                    if ((root == candidateRoot || InputWithin(root, candidateRoot)) && Directory.Exists(candidateRoot))
+                        matches.Add(InputDirectory(candidateRoot));
+                }
+            }
+            if (matches.Count != 1 || roots.Count >= 128) throw new InvalidDataException("own_served_package_unlocked");
+            roots.Add(matches.Single());
+        }
+        restoreDigest = DigestBytes(JsonSerializer.SerializeToUtf8Bytes(new
+        { lockSha256 = DigestBytes(lockedBytes), assetsSha256 = DigestBytes(selected) }));
+        return roots.Order(StringComparer.Ordinal).ToArray();
+    }
+
     private static bool SafeInputRelativePath(string path) => path.Length is > 0 and <= 4096 &&
         !Path.IsPathRooted(path) && !path.Contains('\\', StringComparison.Ordinal) &&
         path.Split('/').All(part => part.Length > 0 && part is not ("." or ".."));
@@ -1904,7 +2961,9 @@ public static partial class SecurityExecutionEvidence
         {
             var info = new ProcessStartInfo("/usr/bin/stat")
             {
-                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
                 CreateNoWindow = true
             };
             info.Environment.Clear();
@@ -2043,8 +3102,11 @@ public static partial class SecurityExecutionEvidence
     {
         var info = new ProcessStartInfo(ReleaseToolPaths.Git)
         {
-            UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
-            CreateNoWindow = true, WorkingDirectory = root
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            WorkingDirectory = root
         };
         info.Environment.Clear();
         foreach (var (name, value) in new[]
@@ -2097,8 +3159,11 @@ public static partial class SecurityExecutionEvidence
             timeout > TimeSpan.FromDays(1)) throw new InvalidDataException("native_process_invalid");
         var isolated = new ProcessStartInfo("/usr/bin/setsid")
         {
-            UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
-            CreateNoWindow = true, WorkingDirectory = command.WorkingDirectory
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            WorkingDirectory = command.WorkingDirectory
         };
         isolated.Environment.Clear();
         foreach (var (name, value) in command.Environment) isolated.Environment[name] = value;
@@ -2335,10 +3400,16 @@ public static partial class SecurityExecutionEvidence
     private static async Task SignalNativeGroupAsync(int group, NativeProcessIdentity leader, string signal)
     {
         if (!NativeGroupHasLiveMembers(group, leader)) return;
-        using var process = new Process { StartInfo = new ProcessStartInfo("/usr/bin/kill")
+        using var process = new Process
         {
-            UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true
-        } };
+            StartInfo = new ProcessStartInfo("/usr/bin/kill")
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            }
+        };
         process.StartInfo.ArgumentList.Add(signal);
         process.StartInfo.ArgumentList.Add("--");
         process.StartInfo.ArgumentList.Add("-" + group.ToString(CultureInfo.InvariantCulture));
@@ -2390,8 +3461,11 @@ public static partial class SecurityExecutionEvidence
 
         var info = new ProcessStartInfo(ReleaseToolPaths.Dotnet)
         {
-            UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
-            CreateNoWindow = true, WorkingDirectory = temporaryDirectory
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            WorkingDirectory = temporaryDirectory
         };
         info.Environment["TMPDIR"] = temporaryDirectory;
         info.ArgumentList.Add(assemblyPath);
@@ -2493,8 +3567,11 @@ public static partial class SecurityExecutionEvidence
                 privateTrxSha256 = Convert.ToHexString(SHA256.HashData(reportBytes)).ToLowerInvariant(),
                 counts = new
                 {
-                    selected = report.Counts.Selected, executed = report.Counts.Executed,
-                    passed = report.Counts.Passed, failed = report.Counts.Failed, skipped = report.Counts.Skipped
+                    selected = report.Counts.Selected,
+                    executed = report.Counts.Executed,
+                    passed = report.Counts.Passed,
+                    failed = report.Counts.Failed,
+                    skipped = report.Counts.Skipped
                 },
                 nodes = discovered.Select((node, ordinal) => new
                 {

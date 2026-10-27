@@ -43,9 +43,14 @@ internal static class SecurityExecutionEvidenceFixture
                     };
                     if (id == "owned-runtime") test["lifecycle"] = new JsonObject
                     {
-                        ["stage"] = "none", ["completion"] = "success", ["directContainers"] = false,
-                        ["resource"] = null, ["signals"] = new JsonArray(), ["rootDisposition"] = "not-applicable"
+                        ["stage"] = "none",
+                        ["completion"] = "success",
+                        ["directContainers"] = false,
+                        ["resource"] = null,
+                        ["signals"] = new JsonArray(),
+                        ["rootDisposition"] = "not-applicable"
                     };
+                    if (id == "owned-load-correctness") test["loadPurpose"] = variant == "alpha" ? "foundation" : "programme";
                     return (JsonNode)test;
                 }).ToArray())
             });
@@ -125,7 +130,8 @@ internal static class SecurityExecutionEvidenceFixture
                     type = new
                     {
                         @namespace = test.ClassName[..test.ClassName.LastIndexOf('.')],
-                        typeName = test.ClassName[(test.ClassName.LastIndexOf('.') + 1)..], methodName = test.MethodName
+                        typeName = test.ClassName[(test.ClassName.LastIndexOf('.') + 1)..],
+                        methodName = test.MethodName
                     }
                 })
             });
@@ -161,7 +167,9 @@ internal static class SecurityExecutionEvidenceFixture
                     counts = new { selected, executed = selected, passed = selected, failed = 0, skipped = 0 },
                     nodes = Enumerable.Range(0, selected).Select(ordinal => new
                     {
-                        node = ordinal, requiredTest = separate ? invocation : ordinal, outcome = "passed"
+                        node = ordinal,
+                        requiredTest = separate ? invocation : ordinal,
+                        outcome = "passed"
                     })
                 });
                 string relative = "proofs/" + id + "/" + invocation + ".json";
@@ -170,13 +178,22 @@ internal static class SecurityExecutionEvidenceFixture
                 File.WriteAllBytes(destination, proof);
                 byte[] invocationRecord = JsonSerializer.SerializeToUtf8Bytes(new
                 {
-                    schemaVersion = 1, synthetic = true, candidateOid, runId = "42", runAttempt = 1,
-                    lane = id, invocation, privateDiscoverySha256 = discoveryDigest, privateTrxSha256 = reportDigest
+                    schemaVersion = 1,
+                    synthetic = true,
+                    candidateOid,
+                    runId = "42",
+                    runAttempt = 1,
+                    lane = id,
+                    invocation,
+                    privateDiscoverySha256 = discoveryDigest,
+                    privateTrxSha256 = reportDigest
                 });
                 File.WriteAllBytes(Path.Combine(reportDirectory, id + "." + invocation + ".invocation.json"), invocationRecord);
                 artifacts.Add(new
                 {
-                    kind = "native-proof", invocation, path = relative,
+                    kind = "native-proof",
+                    invocation,
+                    path = relative,
                     sha256 = Convert.ToHexString(SHA256.HashData(proof)).ToLowerInvariant(),
                     privateInvocationSha256 = Convert.ToHexString(SHA256.HashData(invocationRecord)).ToLowerInvariant()
                 });

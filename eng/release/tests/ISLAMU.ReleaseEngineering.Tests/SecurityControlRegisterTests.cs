@@ -75,6 +75,26 @@ public sealed class SecurityControlRegisterTests
                 }
                 await Assert.That(parsed.Where(lane => lane.Key != "owned-runtime")
                     .All(lane => lane.Value.Lifecycles.Count == 0)).IsTrue();
+                var load = parsed["owned-load-correctness"];
+                await Assert.That(load.LoadPurposes.Keys.ToHashSet().SetEquals(load.Tests)).IsTrue();
+                await Assert.That(load.LoadPurposes.Values.ToHashSet().SetEquals(new[]
+                    { SecurityControlRegister.LoadPurpose.Foundation, SecurityControlRegister.LoadPurpose.Programme })).IsTrue();
+                await Assert.That(parsed.Where(lane => lane.Key != "owned-load-correctness").All(lane => lane.Value.LoadPurposes.Count == 0)).IsTrue();
+                foreach (string invalidPurpose in new[] { "missing", "null", "unknown", "other-lane" })
+                {
+                    JsonObject malformed = register.DeepClone().AsObject();
+                    JsonArray lanes = malformed["executionRequirements"]!.AsArray();
+                    JsonObject loadRow = lanes.Single(lane => lane!["laneId"]!.GetValue<string>() == "owned-load-correctness")!["requiredTests"]![0]!.AsObject();
+                    switch (invalidPurpose)
+                    {
+                        case "missing": loadRow.Remove("loadPurpose"); break;
+                        case "null": loadRow["loadPurpose"] = null; break;
+                        case "unknown": loadRow["loadPurpose"] = "future-purpose"; break;
+                        case "other-lane": lanes[0]!["requiredTests"]![0]!["loadPurpose"] = "foundation"; break;
+                    }
+                    await File.WriteAllTextAsync(path, malformed.ToJsonString());
+                    await Assert.That(SecurityControlRegister.TryValidate(path, out _)).IsFalse();
+                }
                 foreach (string invalid in new[] { "missing", "null", "unknown-field", "unknown-stage",
                     "unknown-completion", "contradictory-stage", "direct-without-resource-operation",
                     "unexpected-resource", "duplicate-signal", "unknown-root-disposition", "other-lane" })

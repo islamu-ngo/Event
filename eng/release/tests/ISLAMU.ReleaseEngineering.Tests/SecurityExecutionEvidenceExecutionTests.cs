@@ -1,11 +1,15 @@
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Xml.Linq;
 using System.Text.Json;
 using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
+using System.Reflection.PortableExecutable;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
 
@@ -51,6 +55,16 @@ public sealed class SecurityExecutionEvidenceIntegrationTests
         await Assert.That(launch.Deadline.TotalSeconds).IsEqualTo((double)expectedDeadlineSeconds);
         if (lane == "owned-runtime")
         {
+            foreach (var lifecycle in requirement.Lifecycles.Values)
+            {
+                bool hosted = lifecycle.Stage == SecurityControlRegister.RuntimeStage.Hosted;
+                var typed = SecurityExecutionEvidence.NativeExecutionStartInfo("/owned/tests.dll", uids,
+                    "/owned/tmp/results", "/owned/tmp", "execution.trx", requirement.HostProfile, lane, lifecycle);
+                string[] typedArguments = typed.Command.ArgumentList.ToArray();
+                await Assert.That(typedArguments[Array.IndexOf(typedArguments, "--timeout") + 1])
+                    .IsEqualTo(hosted ? "1200s" : "720s");
+                await Assert.That(typed.Deadline.TotalSeconds).IsEqualTo(hosted ? 1260d : 735d);
+            }
             bool rejected = false;
             try
             {
@@ -133,24 +147,37 @@ public sealed class SecurityExecutionEvidenceManagedHintTests
             Path.ChangeExtension(entry, ".runtimeconfig.json")];
         JsonObject document = new()
         {
-            ["Schema"] = 1, ["RunId"] = owner,
+            ["Schema"] = 1,
+            ["RunId"] = owner,
             ["Hint"] = new JsonObject
             {
-                ["Resource"] = "event-migrationservice", ["InstanceSha256"] = instance, ["Pid"] = 123, ["Start"] = 42,
+                ["Resource"] = "event-migrationservice",
+                ["InstanceSha256"] = instance,
+                ["Pid"] = 123,
+                ["Start"] = 42,
                 ["Diagnostic"] = "managed_launch_os_inputs_observed",
                 ["Inputs"] = new JsonObject
                 {
                     ["Ancestry"] = new JsonArray(new JsonObject
                     {
-                        ["Pid"] = 123, ["Parent"] = 122, ["User"] = 1000, ["Group"] = 123,
-                        ["Session"] = 123, ["Start"] = 42, ["State"] = "S"
+                        ["Pid"] = 123,
+                        ["Parent"] = 122,
+                        ["User"] = 1000,
+                        ["Group"] = 123,
+                        ["Session"] = 123,
+                        ["Start"] = 42,
+                        ["State"] = "S"
                     }),
-                    ["Executable"] = files[0], ["WorkingDirectory"] = "/candidate/src/Explore.MigrationService",
+                    ["Executable"] = files[0],
+                    ["WorkingDirectory"] = "/candidate/src/Explore.MigrationService",
                     ["Entry"] = entry,
                     ["Files"] = new JsonArray(files.Select(path => (JsonNode)new JsonObject
                     {
-                        ["Path"] = path, ["Bytes"] = 16, ["Sha256"] = new string('B', 64),
-                        ["LastWriteUtcTicks"] = 638000000000000000L, ["CreationUtcTicks"] = 638000000000000000L
+                        ["Path"] = path,
+                        ["Bytes"] = 16,
+                        ["Sha256"] = new string('B', 64),
+                        ["LastWriteUtcTicks"] = 638000000000000000L,
+                        ["CreationUtcTicks"] = 638000000000000000L
                     }).ToArray())
                 }
             }
@@ -242,6 +269,74 @@ public sealed class SecurityExecutionEvidenceManagedHintTests
 public sealed class SecurityExecutionEvidenceParentModelTests
 {
     [Test]
+    public async Task ReplacedEntryPathCannotQualifyWhileTheOriginalAssemblyRemainsMapped()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = new SecurityExecutionEvidenceProcessTests.ProcessFixture();
+        string source = Path.GetDirectoryName(typeof(SecurityExecutionEvidenceParentModelTests).Assembly.Location)!;
+        string copied = Path.Combine(fixture.Root, "candidate");
+        foreach (string path in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            string destination = Path.Combine(copied, Path.GetRelativePath(source, path));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(path, destination);
+        }
+        string entry = Path.Combine(copied, Path.GetFileName(typeof(SecurityExecutionEvidenceParentModelTests).Assembly.Location));
+        ProcessStartInfo command = await fixture.CommandAsync("managed-witness", entry);
+        string temporary = command.WorkingDirectory;
+        command.Environment["TMPDIR"] = temporary;
+        File.SetUnixFileMode(temporary, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        string owner = Path.GetFileName(temporary)[^32..];
+        string root = Path.Combine(temporary, "islamu-assurance", owner);
+        string lead = Path.Combine(root, "managed-control-lead.json");
+        string version = typeof(SecurityExecutionEvidence).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+        string candidate = version[(version.LastIndexOf('+') + 1)..];
+        using var caller = new CancellationTokenSource(TimeSpan.FromSeconds(50));
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command,
+            TimeSpan.FromSeconds(55), caller.Token, async (context, stop) =>
+            {
+                using var ready = CancellationTokenSource.CreateLinkedTokenSource(stop);
+                ready.CancelAfter(TimeSpan.FromSeconds(10));
+                while (!File.Exists(lead)) await Task.Delay(10, ready.Token);
+                await Assert.That(SecurityExecutionEvidence.TryReadManagedLaunchHint(File.ReadAllBytes(lead), owner,
+                    out var parsed, out _)).IsTrue();
+                var hint = parsed ?? throw new InvalidDataException("mapped_child_lead_missing");
+                await Assert.That(await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(context,
+                    temporary, root, hint, entry, candidate, stop)).IsNotNull();
+                string maps = "/proc/" + context.Pid.ToString(CultureInfo.InvariantCulture) + "/maps";
+                await Assert.That(File.ReadAllText(maps).Contains(" " + entry + "\n", StringComparison.Ordinal)).IsTrue();
+                string original = Path.Combine(temporary, "original-mapped-entry.dll");
+                File.Move(entry, original);
+                try
+                {
+                    File.Copy(original, entry);
+                    await Assert.That(File.ReadAllBytes(entry).AsSpan().SequenceEqual(File.ReadAllBytes(original))).IsTrue();
+                    await Assert.That(SecurityExecutionEvidence.TryCaptureProjectManagedInputs(copied, candidate,
+                        [Path.GetFileName(entry)], out _, out _)).IsTrue();
+                    await Assert.That(File.ReadAllText(maps).Contains(" " + original + "\n", StringComparison.Ordinal)).IsTrue();
+                    using Process child = Process.GetProcessById(context.Pid);
+                    await Assert.That(child.HasExited).IsFalse();
+                    await Assert.That(await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(context,
+                        temporary, root, hint, entry, candidate, stop)).IsNull();
+                }
+                finally
+                {
+                    File.Delete(entry);
+                    File.Move(original, entry);
+                }
+                await Assert.That(await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(context,
+                    temporary, root, hint, entry, candidate, stop)).IsNotNull();
+                await caller.CancelAsync();
+            });
+        if (result.ObserverFailures.Count != 0)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(result.ObserverFailures[0]).Throw();
+        await Assert.That(result.Cancelled).IsTrue();
+        await Assert.That(result.CleanupSucceeded && result.ObserverSettled).IsTrue();
+        await Assert.That(fixture.OwnedChildrenRemain()).IsFalse();
+    }
+
+    [Test]
     public async Task LiveChildPossessionCannotBeReplacedByCopiedBytesOrDifferentProcessInputs()
     {
         if (!OperatingSystem.IsLinux()) return;
@@ -293,6 +388,15 @@ public sealed class SecurityExecutionEvidenceParentModelTests
                 await Assert.That(process.GetProperty("resource").GetString()).IsEqualTo("event-migrationservice");
                 await Assert.That(process.GetProperty("instanceSha256").GetString()).IsEqualTo(new string('c', 64));
                 await Assert.That(manifest.RootElement.GetProperty("candidateOid").GetString()).IsEqualTo(candidate);
+                var nativeTool = await SecurityExecutionEvidence.CaptureLiveNativeToolAsync(context, context.Pid, stop);
+                await Assert.That(nativeTool is not null).IsTrue();
+                await Assert.That(nativeTool!.Pid).IsEqualTo(context.Pid);
+                await Assert.That(nativeTool.Start).IsEqualTo(context.Start);
+                await Assert.That(nativeTool.Executable).IsEqualTo(process.GetProperty("executable").GetString());
+                await Assert.That(nativeTool.Sha256).IsEqualTo(process.GetProperty("executableSha256").GetString());
+                await Assert.That(nativeTool.Ancestors[^1]).IsEqualTo(context.Pid);
+                await Assert.That(await SecurityExecutionEvidence.CaptureLiveNativeToolAsync(context,
+                    Environment.ProcessId, stop)).IsNull();
                 var declared = await SecurityExecutionEvidence.CaptureLiveFixtureModelAsync(context,
                     temporary, root, owner, stop);
                 await Assert.That(declared is not null).IsTrue();
@@ -332,7 +436,9 @@ public sealed class SecurityExecutionEvidenceParentModelTests
                     {
                         using (var copied = new FileStream(pairPath, new FileStreamOptions
                         {
-                            Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read,
+                            Mode = FileMode.CreateNew,
+                            Access = FileAccess.Write,
+                            Share = FileShare.Read,
                             UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
                         }))
                         {
@@ -353,7 +459,9 @@ public sealed class SecurityExecutionEvidenceParentModelTests
                 using (var nextCreatorSignal = new FileStream(Path.Combine(root, "managed-control-next-creation"),
                     new FileStreamOptions
                     {
-                        Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read,
+                        Mode = FileMode.CreateNew,
+                        Access = FileAccess.Write,
+                        Share = FileShare.Read,
                         UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
                     }))
                     nextCreatorSignal.Flush(true);
@@ -398,27 +506,44 @@ public sealed class SecurityExecutionEvidenceParentModelTests
                 {
                     ["Ancestry"] = new JsonArray(new JsonObject
                     {
-                        ["Pid"] = context.Pid, ["Parent"] = int.Parse(liveFields[1], System.Globalization.CultureInfo.InvariantCulture),
-                        ["User"] = process.GetProperty("user").GetUInt32(), ["Group"] = context.Group,
-                        ["Session"] = context.Session, ["Start"] = context.Start, ["State"] = liveFields[0]
+                        ["Pid"] = context.Pid,
+                        ["Parent"] = int.Parse(liveFields[1], System.Globalization.CultureInfo.InvariantCulture),
+                        ["User"] = process.GetProperty("user").GetUInt32(),
+                        ["Group"] = context.Group,
+                        ["Session"] = context.Session,
+                        ["Start"] = context.Start,
+                        ["State"] = liveFields[0]
                     }),
-                    ["Executable"] = executable, ["WorkingDirectory"] = process.GetProperty("workingDirectory").GetString(),
-                    ["Entry"] = entry, ["Files"] = new JsonArray(inputPaths.Select(path =>
+                    ["Executable"] = executable,
+                    ["WorkingDirectory"] = process.GetProperty("workingDirectory").GetString(),
+                    ["Entry"] = entry,
+                    ["Files"] = new JsonArray(inputPaths.Select(path =>
                     {
                         var file = new FileInfo(path);
                         using var bytes = File.OpenRead(path);
                         return (JsonNode)new JsonObject
                         {
-                            ["Path"] = path, ["Bytes"] = file.Length,
+                            ["Path"] = path,
+                            ["Bytes"] = file.Length,
                             ["Sha256"] = Convert.ToHexStringLower(SHA256.HashData(bytes)),
-                            ["LastWriteUtcTicks"] = file.LastWriteTimeUtc.Ticks, ["CreationUtcTicks"] = file.CreationTimeUtc.Ticks
+                            ["LastWriteUtcTicks"] = file.LastWriteTimeUtc.Ticks,
+                            ["CreationUtcTicks"] = file.CreationTimeUtc.Ticks
                         };
                     }).ToArray())
                 };
                 byte[] HintBytes(JsonObject inputs) => JsonSerializer.SerializeToUtf8Bytes(new
                 {
-                    Schema = 1, RunId = owner, Hint = new { selectedHint.Resource, selectedHint.InstanceSha256,
-                        selectedHint.Pid, selectedHint.Start, Diagnostic = "managed_launch_os_inputs_observed", Inputs = inputs }
+                    Schema = 1,
+                    RunId = owner,
+                    Hint = new
+                    {
+                        selectedHint.Resource,
+                        selectedHint.InstanceSha256,
+                        selectedHint.Pid,
+                        selectedHint.Start,
+                        Diagnostic = "managed_launch_os_inputs_observed",
+                        Inputs = inputs
+                    }
                 });
                 await Assert.That(SecurityExecutionEvidence.TryReadManagedLaunchHint(HintBytes(supplied), owner,
                     out var parsedInputs, out _)).IsTrue();
@@ -505,7 +630,9 @@ public sealed class SecurityExecutionEvidenceParentModelTests
                 {
                     using (var replacement = new FileStream(record, new FileStreamOptions
                     {
-                        Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read,
+                        Mode = FileMode.CreateNew,
+                        Access = FileAccess.Write,
+                        Share = FileShare.Read,
                         UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
                     }))
                         await replacement.WriteAsync(File.ReadAllBytes(original), stop);
@@ -613,7 +740,9 @@ public sealed class SecurityExecutionEvidenceParentModelTests
                         using (var signal = new FileStream(Path.Combine(launcherRoot, "managed-control-start-host"),
                             new FileStreamOptions
                             {
-                                Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read,
+                                Mode = FileMode.CreateNew,
+                                Access = FileAccess.Write,
+                                Share = FileShare.Read,
                                 UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
                             }))
                             await signal.FlushAsync(unrelatedStop);
@@ -687,7 +816,9 @@ public sealed class SecurityExecutionEvidenceParentModelTests
                         using (var signal = new FileStream(Path.Combine(launcherRoot, "managed-control-start-second-host"),
                             new FileStreamOptions
                             {
-                                Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read,
+                                Mode = FileMode.CreateNew,
+                                Access = FileAccess.Write,
+                                Share = FileShare.Read,
                                 UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
                             }))
                             await signal.FlushAsync(unrelatedStop);
@@ -742,7 +873,8 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         string source = "islamu-test-" + owner + "-data";
         JsonObject Model() => new()
         {
-            ["Schema"] = 1, ["RunId"] = owner,
+            ["Schema"] = 1,
+            ["RunId"] = owner,
             ["Projects"] = new JsonArray(new JsonObject
             {
                 ["Name"] = "event-migrationservice",
@@ -750,10 +882,15 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             }),
             ["Containers"] = new JsonArray(new JsonObject
             {
-                ["Name"] = "native-model-control", ["Image"] = "registry.example.test/native/model:control",
-                ["PullPolicy"] = "Never", ["Mounts"] = new JsonArray(new JsonObject
+                ["Name"] = "native-model-control",
+                ["Image"] = "registry.example.test/native/model:control",
+                ["PullPolicy"] = "Never",
+                ["Mounts"] = new JsonArray(new JsonObject
                 {
-                    ["Type"] = "Volume", ["Source"] = source, ["Target"] = "/native-data", ["ReadOnly"] = false
+                    ["Type"] = "Volume",
+                    ["Source"] = source,
+                    ["Target"] = "/native-data",
+                    ["ReadOnly"] = false
                 })
             })
         };
@@ -872,12 +1009,18 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             new Dictionary<string, string>(StringComparer.Ordinal) { [source] = mountpoint });
         JsonObject RuntimeContainer() => new()
         {
-            ["Id"] = containerId, ["ImageID"] = imageId, ["Image"] = expectedModel[0].Image, ["State"] = "running",
+            ["Id"] = containerId,
+            ["ImageID"] = imageId,
+            ["Image"] = expectedModel[0].Image,
+            ["State"] = "running",
             ["Labels"] = new JsonObject { ["islamu.assurance.owner"] = owner, ["islamu.assurance.resource"] = "native-model-control" },
             ["Mounts"] = new JsonArray(new JsonObject
             {
-                ["Type"] = "volume", ["Name"] = source, ["Source"] = mountpoint,
-                ["Destination"] = "/native-data", ["RW"] = true
+                ["Type"] = "volume",
+                ["Name"] = source,
+                ["Source"] = mountpoint,
+                ["Destination"] = "/native-data",
+                ["RW"] = true
             })
         };
         byte[] RuntimeBytes(JsonObject container) => JsonSerializer.SerializeToUtf8Bytes(new JsonArray(container));
@@ -888,6 +1031,45 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             new SecurityExecutionEvidence.ObservedOwnedResource(containerId, imageId, "native-model-control", true));
         await Assert.That(exactObserved.Single().Mounts.Single()).IsEqualTo(
             new SecurityExecutionEvidence.ObservedContainerMount("volume", source, mountpoint, "/native-data", true));
+        string pendingForeignId = new('6', 64), pendingCreationId = "01929b87c1d070009a01f3b20d6e0a11";
+        JsonObject pendingForeign = RuntimeContainer();
+        pendingForeign["Id"] = pendingForeignId;
+        pendingForeign["Labels"]!["islamu.assurance.owner"] = "foreign";
+        byte[] PendingSdkRows(bool held, IReadOnlySet<string> initial, IReadOnlySet<string> qualified)
+        {
+            var rows = new JsonArray(RuntimeContainer());
+            if (SecurityExecutionEvidence.IncludeForeignRowInSdkInventory(pendingForeignId, "foreign", initial, qualified, held))
+                rows.Add(pendingForeign.DeepClone());
+            return JsonSerializer.SerializeToUtf8Bytes(rows);
+        }
+        var noDirectIds = new HashSet<string>(StringComparer.Ordinal);
+        var pendingDirectHints = new HashSet<string>(StringComparer.Ordinal);
+        SecurityExecutionEvidence.UpdatePendingDirectHints(pendingDirectHints, pendingCreationId, heldPendingObserved: false, completedQualified: false);
+        await Assert.That(pendingDirectHints.Count).IsEqualTo(0);
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(PendingSdkRows(false, noDirectIds, noDirectIds), expected, out _)).IsFalse();
+        SecurityExecutionEvidence.UpdatePendingDirectHints(pendingDirectHints, pendingCreationId, heldPendingObserved: true, completedQualified: false);
+        SecurityExecutionEvidence.UpdatePendingDirectHints(pendingDirectHints, pendingCreationId, heldPendingObserved: false, completedQualified: false);
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(PendingSdkRows(pendingDirectHints.Contains(pendingCreationId), noDirectIds, noDirectIds), expected, out var pendingSdk)).IsTrue();
+        var actualPendingSdk = pendingSdk ?? throw new InvalidDataException("native_control_pending_sdk_missing");
+        await Assert.That(actualPendingSdk.Single().Container).IsEqualTo(exactObserved.Single().Container);
+        await Assert.That(actualPendingSdk.Single().Mounts.SequenceEqual(exactObserved.Single().Mounts)).IsTrue();
+        var initialForeign = new HashSet<string>(StringComparer.Ordinal) { pendingForeignId };
+        var initialForeignInputs = expected with { Initial = expected.Initial with { ContainerIds = initialForeign } };
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(PendingSdkRows(true, initialForeign, noDirectIds), initialForeignInputs, out _)).IsFalse();
+        var seenDirect = new HashSet<string>(StringComparer.Ordinal) { pendingCreationId };
+        var qualifiedCreations = new Dictionary<string, SecurityExecutionEvidence.NativeCreatedContainer>(StringComparer.Ordinal);
+        await Assert.That(SecurityExecutionEvidence.DirectCreationObservationComplete(seenDirect, qualifiedCreations, noDirectIds)).IsFalse();
+        SecurityExecutionEvidence.UpdatePendingDirectHints(pendingDirectHints, pendingCreationId, heldPendingObserved: false, completedQualified: false);
+        await Assert.That(SecurityExecutionEvidence.DirectCreationObservationComplete(seenDirect, qualifiedCreations, noDirectIds)).IsFalse();
+        qualifiedCreations.Add(pendingCreationId, new(owner, pendingCreationId, 123, "foreign-volume-named", expectedModel[0].Image,
+            pendingForeignId, new string('b', 64)));
+        await Assert.That(SecurityExecutionEvidence.DirectCreationObservationComplete(seenDirect, qualifiedCreations, noDirectIds)).IsFalse();
+        var qualifiedDirectIds = new HashSet<string>(StringComparer.Ordinal) { pendingForeignId };
+        SecurityExecutionEvidence.UpdatePendingDirectHints(pendingDirectHints, pendingCreationId, heldPendingObserved: false, completedQualified: true);
+        await Assert.That(pendingDirectHints.Count).IsEqualTo(0);
+        await Assert.That(SecurityExecutionEvidence.DirectCreationObservationComplete(seenDirect, qualifiedCreations, qualifiedDirectIds)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(PendingSdkRows(false, noDirectIds, qualifiedDirectIds), expected, out _)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(PendingSdkRows(true, initialForeign, qualifiedDirectIds), initialForeignInputs, out _)).IsFalse();
         foreach (string invalid in new[] { "initial-container", "initial-volume", "image-not-in-initial-cache", "unknown-resource", "wrong-image-id",
             "wrong-image-ref", "wrong-volume-name", "wrong-source-mountpoint", "wrong-target", "missing-rw", "duplicate-target" })
         {
@@ -903,14 +1085,20 @@ public sealed class SecurityExecutionEvidenceParentModelTests
                 case "wrong-image-ref":
                     const string foreignReference = "registry.example.test/native/foreign:control";
                     runtime["Image"] = foreignReference;
-                    selected = expected with { Images = new Dictionary<string, string>
-                        { [expectedModel[0].Image] = imageId, [foreignReference] = imageId } };
+                    selected = expected with
+                    {
+                        Images = new Dictionary<string, string>
+                        { [expectedModel[0].Image] = imageId, [foreignReference] = imageId }
+                    };
                     break;
                 case "wrong-volume-name":
                     mount["Name"] = source + "-foreign";
                     mount["Source"] = "/foreign-volume-data";
-                    selected = expected with { VolumeMountpoints = new Dictionary<string, string>
-                        { [source] = mountpoint, [source + "-foreign"] = "/foreign-volume-data" } };
+                    selected = expected with
+                    {
+                        VolumeMountpoints = new Dictionary<string, string>
+                        { [source] = mountpoint, [source + "-foreign"] = "/foreign-volume-data" }
+                    };
                     break;
                 case "wrong-source-mountpoint": mount["Source"] = "/foreign-volume-data"; break;
                 case "wrong-target": mount["Destination"] = "/foreign-target"; break;
@@ -932,15 +1120,18 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         JsonObject withImplicit = RuntimeContainer();
         withImplicit["Mounts"]!.AsArray().Add(new JsonObject
         {
-            ["Type"] = "volume", ["Name"] = anonymous, ["Source"] = anonymousMountpoint,
-            ["Destination"] = "/image-declared-data", ["RW"] = true
+            ["Type"] = "volume",
+            ["Name"] = anonymous,
+            ["Source"] = anonymousMountpoint,
+            ["Destination"] = "/image-declared-data",
+            ["RW"] = true
         });
         var implicitExpected = expected with
         {
             ImageVolumeTargets = new Dictionary<string, IReadOnlySet<string>>
-                { [imageId] = new HashSet<string> { "/image-declared-data" } },
+            { [imageId] = new HashSet<string> { "/image-declared-data" } },
             VolumeMountpoints = new Dictionary<string, string>
-                { [source] = mountpoint, [anonymous] = anonymousMountpoint }
+            { [source] = mountpoint, [anonymous] = anonymousMountpoint }
         };
         await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(withImplicit.DeepClone().AsObject()),
             implicitExpected, out var implicitObserved)).IsTrue();
@@ -954,8 +1145,11 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(withImplicit.DeepClone().AsObject()),
             implicitExpected with { ImageVolumeTargets = new Dictionary<string, IReadOnlySet<string>>() }, out _)).IsFalse();
         await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(withImplicit.DeepClone().AsObject()),
-            implicitExpected with { ImageVolumeTargets = new Dictionary<string, IReadOnlySet<string>>
-                { ["sha256:" + new string('8', 64)] = new HashSet<string> { "/image-declared-data" } } }, out _)).IsFalse();
+            implicitExpected with
+            {
+                ImageVolumeTargets = new Dictionary<string, IReadOnlySet<string>>
+                { ["sha256:" + new string('8', 64)] = new HashSet<string> { "/image-declared-data" } }
+            }, out _)).IsFalse();
         await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(withImplicit.DeepClone().AsObject()),
             implicitExpected with { Initial = expected.Initial with { VolumeNames = new HashSet<string> { anonymous } } }, out _)).IsFalse();
         JsonObject foreignConsumer = RuntimeContainer();
@@ -969,8 +1163,11 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         readonlyRuntimeMount.Remove("Name");
         readonlyRuntimeMount["Source"] = "/native-readonly-source";
         readonlyRuntimeMount["RW"] = false;
-        var readonlyExpected = expected with { Containers = readonlyBind ?? throw new InvalidDataException("native_control_bind_missing"),
-            VolumeMountpoints = new Dictionary<string, string>() };
+        var readonlyExpected = expected with
+        {
+            Containers = readonlyBind ?? throw new InvalidDataException("native_control_bind_missing"),
+            VolumeMountpoints = new Dictionary<string, string>()
+        };
         await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(readonlyRuntime.DeepClone().AsObject()),
             readonlyExpected, out var readonlyObserved)).IsTrue();
         await Assert.That(readonlyObserved!.Single().Mounts.Single()).IsEqualTo(
@@ -995,7 +1192,10 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             boundConsumer["Labels"]!["islamu.assurance.owner"] = new string('b', 32);
             boundConsumer["Mounts"] = new JsonArray(new JsonObject
             {
-                ["Type"] = "bind", ["Source"] = binding.Source, ["Destination"] = "/foreign-use", ["RW"] = true
+                ["Type"] = "bind",
+                ["Source"] = binding.Source,
+                ["Destination"] = "/foreign-use",
+                ["RW"] = true
             });
             if (SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(boundConsumer), expected, out _))
                 throw new InvalidDataException("native_volume_bind_consumer_accepted_" + binding.Reason);
@@ -1005,7 +1205,10 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         unrelatedBind["Labels"]!["islamu.assurance.owner"] = new string('b', 32);
         unrelatedBind["Mounts"] = new JsonArray(new JsonObject
         {
-            ["Type"] = "bind", ["Source"] = mountpoint + "-foreign", ["Destination"] = "/foreign-use", ["RW"] = true
+            ["Type"] = "bind",
+            ["Source"] = mountpoint + "-foreign",
+            ["Destination"] = "/foreign-use",
+            ["RW"] = true
         });
         await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(unrelatedBind), expected,
             out var unrelatedBinding)).IsTrue();
@@ -1021,7 +1224,10 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         retainedImplicitBind["Labels"]!["islamu.assurance.owner"] = new string('b', 32);
         retainedImplicitBind["Mounts"] = new JsonArray(new JsonObject
         {
-            ["Type"] = "bind", ["Source"] = anonymousMountpoint, ["Destination"] = "/foreign-use", ["RW"] = false
+            ["Type"] = "bind",
+            ["Source"] = anonymousMountpoint,
+            ["Destination"] = "/foreign-use",
+            ["RW"] = false
         });
         if (SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(retainedImplicitBind), implicitExpected, out _))
             throw new InvalidDataException("native_retained_implicit_bind_consumer_accepted");
@@ -1029,8 +1235,12 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             out var pendingResources)).IsTrue();
         await Assert.That(pendingResources!.Count).IsEqualTo(0);
         await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(Encoding.UTF8.GetBytes("[]"),
-            expected with { Containers = zero ?? throw new InvalidDataException("native_control_empty_missing"),
-                Images = new Dictionary<string, string>(), VolumeMountpoints = new Dictionary<string, string>() },
+            expected with
+            {
+                Containers = zero ?? throw new InvalidDataException("native_control_empty_missing"),
+                Images = new Dictionary<string, string>(),
+                VolumeMountpoints = new Dictionary<string, string>()
+            },
             out var emptyResources)).IsTrue();
         await Assert.That(emptyResources!.Count).IsEqualTo(0);
 
@@ -1043,17 +1253,20 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         var apiCreatedSnapshot = new SecurityExecutionEvidence.NativeContainerCreationSnapshot([apiCreatedPair],
             new HashSet<string>(StringComparer.Ordinal), []);
         var apiCreatedImages = new Dictionary<string, string>(StringComparer.Ordinal)
-            { [apiCreatedReference] = apiCreatedImageId, [apiAliasReference] = apiCreatedImageId };
+        { [apiCreatedReference] = apiCreatedImageId, [apiAliasReference] = apiCreatedImageId };
         var apiCreatedInitial = new SecurityExecutionEvidence.InitialNativeResources(
             new HashSet<string>(StringComparer.Ordinal), new HashSet<string>(StringComparer.Ordinal),
             new HashSet<string>(StringComparer.Ordinal) { apiCreatedImageId, "sha256:" + new string('e', 64) });
         JsonObject ApiCreatedRow() => new()
         {
-            ["Id"] = apiCreatedId, ["Image"] = apiCreatedReference, ["ImageID"] = apiCreatedImageId,
-            ["State"] = "running", ["Mounts"] = new JsonArray(),
+            ["Id"] = apiCreatedId,
+            ["Image"] = apiCreatedReference,
+            ["ImageID"] = apiCreatedImageId,
+            ["State"] = "running",
+            ["Mounts"] = new JsonArray(),
             ["Labels"] = new JsonObject { ["islamu.assurance.owner"] = owner, ["islamu.assurance.resource"] = "keycloak" }
         };
-        byte[] ApiCreatedBytes(JsonObject row) => JsonSerializer.SerializeToUtf8Bytes(new JsonArray(row));
+        byte[] ApiCreatedBytes(JsonObject row) => JsonSerializer.SerializeToUtf8Bytes(new JsonArray(row.DeepClone()));
         if (!SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(ApiCreatedRow()), owner,
             apiCreatedSnapshot, apiCreatedImages, apiCreatedInitial, out var apiCreatedObserved))
             throw new InvalidDataException("native_api_creator_resource_join_missing");
@@ -1079,19 +1292,30 @@ public sealed class SecurityExecutionEvidenceParentModelTests
                 case "image-id": apiConflictingRow["ImageID"] = "sha256:" + new string('e', 64); break;
                 case "container-id": apiConflictingRow["Id"] = new string('f', 64); break;
                 case "missing-pair": apiConflictingSnapshot = apiCreatedSnapshot with { Created = [] }; break;
-                case "pending-pair": apiConflictingSnapshot = apiCreatedSnapshot with
+                case "pending-pair":
+                    apiConflictingSnapshot = apiCreatedSnapshot with
                     { Created = [], PendingCreationIds = new HashSet<string>(StringComparer.Ordinal) { apiCreatedPair.CreationId } }; break;
-                case "pair-image": apiConflictingSnapshot = apiCreatedSnapshot with
+                case "pair-image":
+                    apiConflictingSnapshot = apiCreatedSnapshot with
                     { Created = [apiCreatedPair with { ImageReference = apiAliasReference }] }; break;
-                case "pair-id": apiConflictingSnapshot = apiCreatedSnapshot with
+                case "pair-id":
+                    apiConflictingSnapshot = apiCreatedSnapshot with
                     { Created = [apiCreatedPair with { ContainerId = new string('f', 64) }] }; break;
-                case "initial-container": apiConflictingInitial = apiCreatedInitial with
+                case "initial-container":
+                    apiConflictingInitial = apiCreatedInitial with
                     { ContainerIds = new HashSet<string>(StringComparer.Ordinal) { apiCreatedId } }; break;
-                case "uncached-image": apiConflictingInitial = apiCreatedInitial with
+                case "uncached-image":
+                    apiConflictingInitial = apiCreatedInitial with
                     { ImageIds = new HashSet<string>(StringComparer.Ordinal) }; break;
-                case "mount": apiConflictingRow["Mounts"] = new JsonArray(new JsonObject
-                    { ["Type"] = "volume", ["Name"] = "unqualified-volume", ["Source"] = "/unqualified",
-                        ["Destination"] = "/data", ["RW"] = true }); break;
+                case "mount":
+                    apiConflictingRow["Mounts"] = new JsonArray(new JsonObject
+                    {
+                        ["Type"] = "volume",
+                        ["Name"] = "unqualified-volume",
+                        ["Source"] = "/unqualified",
+                        ["Destination"] = "/data",
+                        ["RW"] = true
+                    }); break;
             }
             if (SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(apiConflictingRow), owner,
                 apiConflictingSnapshot, apiCreatedImages, apiConflictingInitial, out _))
@@ -1101,9 +1325,494 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             apiCreatedSnapshot, apiCreatedImages, apiCreatedInitial, out var apiCreatedGone)).IsTrue();
         await Assert.That(apiCreatedGone!.Count).IsEqualTo(0);
         await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(Encoding.UTF8.GetBytes("[]"), owner,
-            apiCreatedSnapshot with { Created = [], PendingCreationIds = new HashSet<string>(StringComparer.Ordinal)
-                { apiCreatedPair.CreationId } }, apiCreatedImages, apiCreatedInitial, out var apiCreationNotYetVisible)).IsTrue();
+            apiCreatedSnapshot with
+            {
+                Created = [],
+                PendingCreationIds = new HashSet<string>(StringComparer.Ordinal)
+                { apiCreatedPair.CreationId }
+            }, apiCreatedImages, apiCreatedInitial, out var apiCreationNotYetVisible)).IsTrue();
         await Assert.That(apiCreationNotYetVisible!.Count).IsEqualTo(0);
+
+        var directPair = apiCreatedPair with { Resource = "docker-wait" };
+        var directSnapshot = apiCreatedSnapshot with { Created = [directPair] };
+        var directImageTargets = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+        { [apiCreatedImageId] = new HashSet<string>(StringComparer.Ordinal) };
+        var directVolumePaths = new Dictionary<string, string>(StringComparer.Ordinal) { [source] = "/native/direct-volume" };
+        JsonObject directRow = ApiCreatedRow();
+        directRow["Labels"] = null;
+        await Assert.That(SecurityExecutionEvidence.TryReadDirectCreatedResources(ApiCreatedBytes(directRow), owner,
+            directSnapshot, apiCreatedImages, apiCreatedInitial, directImageTargets, directVolumePaths, out var directObserved)).IsTrue();
+        var actualDirect = directObserved ?? throw new InvalidDataException("native_direct_output_missing");
+        await Assert.That(actualDirect.Single().Container).IsEqualTo(
+            new SecurityExecutionEvidence.ObservedOwnedResource(apiCreatedId, apiCreatedImageId, "docker-wait", true));
+        await Assert.That(actualDirect.Single().Mounts.Count).IsEqualTo(0);
+        foreach (bool bind in new[] { false, true })
+        {
+            string operation = bind ? "foreign-volume-bind" : "foreign-volume-named";
+            var expectedMount = new SecurityExecutionEvidence.ObservedContainerMount(bind ? "bind" : "volume",
+                bind ? "" : source, "/native/direct-volume", "/sentinel", true);
+            directRow["Labels"] = new JsonObject { ["islamu.assurance.owner"] = "foreign" };
+            directRow["Mounts"] = new JsonArray(new JsonObject
+            {
+                ["Type"] = expectedMount.Type,
+                ["Name"] = expectedMount.Name,
+                ["Source"] = expectedMount.Source,
+                ["Destination"] = expectedMount.Destination,
+                ["RW"] = expectedMount.ReadWrite
+            });
+            var sentinelSnapshot = directSnapshot with { Created = [directPair with { Resource = operation }] };
+            await Assert.That(SecurityExecutionEvidence.TryReadDirectCreatedResources(ApiCreatedBytes(directRow), owner,
+                sentinelSnapshot, apiCreatedImages, apiCreatedInitial, directImageTargets, directVolumePaths, out var sentinelObserved)).IsTrue();
+            var actualSentinel = sentinelObserved ?? throw new InvalidDataException("native_sentinel_output_missing");
+            await Assert.That(actualSentinel.Single().Container.Resource).IsEqualTo(operation);
+            await Assert.That(actualSentinel.Single().Mounts.Single()).IsEqualTo(expectedMount);
+            await Assert.That(SecurityExecutionEvidence.TryReadDirectCreatedResources(ApiCreatedBytes(directRow), owner,
+                sentinelSnapshot, apiCreatedImages, apiCreatedInitial with { VolumeNames = new HashSet<string>(StringComparer.Ordinal) { source } },
+                directImageTargets, directVolumePaths, out _)).IsFalse();
+            await Assert.That(SecurityExecutionEvidence.TryReadDirectCreatedResources(ApiCreatedBytes(directRow), owner,
+                sentinelSnapshot, apiCreatedImages, apiCreatedInitial, directImageTargets,
+                new Dictionary<string, string>(StringComparer.Ordinal), out _)).IsFalse();
+            if (bind)
+                await Assert.That(SecurityExecutionEvidence.TryReadDirectCreatedResources(ApiCreatedBytes(directRow), owner,
+                    sentinelSnapshot, apiCreatedImages, apiCreatedInitial, directImageTargets,
+                    new Dictionary<string, string>(directVolumePaths, StringComparer.Ordinal) { [source + "-ambiguous"] = expectedMount.Source }, out _)).IsFalse();
+            directRow["Labels"]!["islamu.assurance.owner"] = owner;
+            await Assert.That(SecurityExecutionEvidence.TryReadDirectCreatedResources(ApiCreatedBytes(directRow), owner,
+                sentinelSnapshot, apiCreatedImages, apiCreatedInitial, directImageTargets, directVolumePaths, out _)).IsFalse();
+            directRow["Labels"]!["islamu.assurance.owner"] = "foreign";
+            directRow["Mounts"]![0]!["Source"] = "/native/direct-volume-sibling";
+            await Assert.That(SecurityExecutionEvidence.TryReadDirectCreatedResources(ApiCreatedBytes(directRow), owner,
+                sentinelSnapshot, apiCreatedImages, apiCreatedInitial, directImageTargets, directVolumePaths, out _)).IsFalse();
+        }
+
+        JsonObject imageVolumeRow = ApiCreatedRow();
+        imageVolumeRow["Labels"] = new JsonObject { ["islamu.assurance.owner"] = "foreign" };
+        imageVolumeRow["Mounts"] = new JsonArray(new JsonObject
+        {
+            ["Type"] = "volume",
+            ["Name"] = source,
+            ["Source"] = "/native/direct-volume",
+            ["Destination"] = "/sentinel",
+            ["RW"] = true
+        }, new JsonObject
+        {
+            ["Type"] = "volume",
+            ["Name"] = source + "-image",
+            ["Source"] = "/native/image-volume",
+            ["Destination"] = "/image-data",
+            ["RW"] = true
+        });
+        var imageVolumePair = directPair with { Resource = "foreign-volume-named" };
+        var imageVolumePaths = new Dictionary<string, string>(directVolumePaths, StringComparer.Ordinal)
+        { [source + "-image"] = "/native/image-volume" };
+        using (JsonDocument imageVolumeDocument = JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(imageVolumeRow)))
+        {
+            await Assert.That(SecurityExecutionEvidence.TrySelectDirectImageVolumeMountpoints(imageVolumeDocument.RootElement,
+                imageVolumePair, apiCreatedImageId, new HashSet<string>(StringComparer.Ordinal) { "/image-data", "/sentinel" },
+                imageVolumePaths, apiCreatedInitial, out var selectedImageVolumes)).IsTrue();
+            var actualImageVolumes = selectedImageVolumes ?? throw new InvalidDataException("native_direct_image_volume_missing");
+            await Assert.That(actualImageVolumes.Count).IsEqualTo(1);
+            await Assert.That(actualImageVolumes[source + "-image"]).IsEqualTo("/native/image-volume");
+            await Assert.That(actualImageVolumes.ContainsKey(source)).IsFalse();
+            var inheritedTargets = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+            { [apiCreatedImageId] = new HashSet<string>(StringComparer.Ordinal) { "/image-data" } };
+            var imageVolumeSnapshot = directSnapshot with { Created = [imageVolumePair] };
+            await Assert.That(SecurityExecutionEvidence.TryReadDirectCreatedResources(ApiCreatedBytes(imageVolumeRow), owner,
+                imageVolumeSnapshot, apiCreatedImages, apiCreatedInitial, inheritedTargets, actualImageVolumes, out _)).IsFalse();
+            await Assert.That(SecurityExecutionEvidence.TryReadDirectCreatedResources(ApiCreatedBytes(imageVolumeRow), owner,
+                imageVolumeSnapshot, apiCreatedImages, apiCreatedInitial, inheritedTargets, imageVolumePaths, out var selectedImageResources)).IsTrue();
+            var selectedImageResource = selectedImageResources ?? throw new InvalidDataException("native_direct_full_output_missing");
+            await Assert.That(selectedImageResource.Single().Mounts.Count).IsEqualTo(2);
+            await Assert.That(selectedImageResource.Single().Mounts.ToHashSet().SetEquals(new[]
+            {
+                new SecurityExecutionEvidence.ObservedContainerMount("volume", source, "/native/direct-volume", "/sentinel", true),
+                new SecurityExecutionEvidence.ObservedContainerMount("volume", source + "-image", "/native/image-volume", "/image-data", true)
+            })).IsTrue();
+            await Assert.That(SecurityExecutionEvidence.TrySelectDirectImageVolumeMountpoints(imageVolumeDocument.RootElement,
+                imageVolumePair, "sha256:" + new string('e', 64), new HashSet<string>(StringComparer.Ordinal) { "/image-data" },
+                imageVolumePaths, apiCreatedInitial, out _)).IsFalse();
+        }
+
+        string[] benchmarkNames = ["event-list-minimal", "event-list-hal", "lookup-category-types", "system-onboarding-status",
+            "my-events-minimal", "event-creation-context"];
+        JsonObject BenchmarkResults() => new()
+        {
+            ["Benchmarks"] = new JsonArray(benchmarkNames.Select((name, index) => (JsonNode)new JsonObject
+            {
+                ["Method"] = "Get_Endpoint_PostgreSql",
+                ["Namespace"] = "Event.Benchmarks.Benchmarks",
+                ["Type"] = "ApiEndpointPostgreSqlBenchmarks",
+                ["Parameters"] = "Scenario=" + name,
+                ["FullName"] = "Event.Benchmarks.Benchmarks.ApiEndpointPostgreSqlBenchmarks.Get_Endpoint_PostgreSql[" + name + "]",
+                ["Statistics"] = new JsonObject { ["N"] = 1, ["Mean"] = 20 + index },
+                ["Measurements"] = new JsonArray(new JsonObject
+                {
+                    ["IterationMode"] = "Workload",
+                    ["IterationStage"] = "Actual",
+                    ["Operations"] = index + 2,
+                    ["Nanoseconds"] = index + 100
+                })
+            }).ToArray())
+        };
+        await Assert.That(SecurityExecutionEvidence.TryReadApiBenchmarkMeasurements(
+            JsonSerializer.SerializeToUtf8Bytes(BenchmarkResults()), out var benchmarkMeasured)).IsTrue();
+        await Assert.That(benchmarkMeasured!.Count).IsEqualTo(6);
+        foreach (var item in benchmarkNames.Select((name, index) => (Name: name, Index: index)))
+            await Assert.That(benchmarkMeasured.Single(row => row.Scenario == item.Name)).IsEqualTo(
+                new SecurityExecutionEvidence.ApiBenchmarkMeasurement(item.Name, 1, 20 + item.Index, item.Index + 2, item.Index + 100,
+                    "Event.Benchmarks.Benchmarks.ApiEndpointPostgreSqlBenchmarks.Get_Endpoint_PostgreSql[" + item.Name + "]"));
+        foreach (string fault in new[] { "missing", "duplicate", "method", "statistics", "count", "mean", "warmup", "operations" })
+        {
+            JsonObject report = BenchmarkResults();
+            JsonArray rows = report["Benchmarks"]!.AsArray();
+            switch (fault)
+            {
+                case "missing": rows.RemoveAt(5); break;
+                case "duplicate": rows[5]!["Parameters"] = "Scenario=" + benchmarkNames[0]; break;
+                case "method": rows[0]!["Method"] = "UnreviewedMethod"; break;
+                case "statistics": rows[0]!["Statistics"] = null; break;
+                case "count": rows[0]!["Statistics"]!["N"] = 0; break;
+                case "mean": rows[0]!["Statistics"]!["Mean"] = 0; break;
+                case "warmup": rows[0]!["Measurements"]![0]!["IterationStage"] = "Warmup"; break;
+                case "operations": rows[0]!["Measurements"]![0]!["Operations"] = 0; break;
+            }
+            await Assert.That(SecurityExecutionEvidence.TryReadApiBenchmarkMeasurements(JsonSerializer.SerializeToUtf8Bytes(report), out _)).IsFalse();
+        }
+        JsonObject queryReport = BenchmarkResults();
+        JsonArray queryRows = queryReport["Benchmarks"]!.AsArray();
+        while (queryRows.Count > 3) queryRows.RemoveAt(queryRows.Count - 1);
+        string[] queryMethods = ["QueryConstruction_WithTracking", "QueryConstruction_WithNoTracking", "CompiledQuery_Invocation"];
+        for (int index = 0; index < queryRows.Count; index++)
+        {
+            queryRows[index]!["Type"] = "EfCoreQueryBenchmarks";
+            queryRows[index]!["Method"] = queryMethods[index];
+            queryRows[index]!["Parameters"] = "";
+            queryRows[index]!["FullName"] = "Event.Benchmarks.Benchmarks.EfCoreQueryBenchmarks." + queryMethods[index];
+        }
+        await Assert.That(SecurityExecutionEvidence.TryReadApiBenchmarkMeasurements(JsonSerializer.SerializeToUtf8Bytes(queryReport),
+            out var queryMeasured, queryConstruction: true)).IsTrue();
+        await Assert.That(queryMeasured!.Select(item => item.Scenario).ToHashSet(StringComparer.Ordinal).SetEquals(queryMethods)).IsTrue();
+        var nineResults = benchmarkMeasured!.Concat(queryMeasured!).ToArray();
+        string[] qualifiedWorkerNames = nineResults.Select(item => item.FullName).ToArray();
+        await Assert.That(SecurityExecutionEvidence.BenchmarkWorkersCoverResults(qualifiedWorkerNames, nineResults)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.BenchmarkWorkersCoverResults(qualifiedWorkerNames.Concat([qualifiedWorkerNames[0]]).ToArray(), nineResults)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.BenchmarkWorkersCoverResults(qualifiedWorkerNames[..^1], nineResults)).IsFalse();
+        await Assert.That(SecurityExecutionEvidence.BenchmarkWorkersCoverResults(qualifiedWorkerNames.Append("Event.Benchmarks.Benchmarks.EfCoreQueryBenchmarks.Unselected").ToArray(), nineResults)).IsFalse();
+        queryRows[2]!["Method"] = queryMethods[0];
+        await Assert.That(SecurityExecutionEvidence.TryReadApiBenchmarkMeasurements(JsonSerializer.SerializeToUtf8Bytes(queryReport),
+            out _, queryConstruction: true)).IsFalse();
+        queryRows[2]!["Method"] = queryMethods[2];
+        queryRows[2]!["Parameters"] = "Scenario=unselected";
+        await Assert.That(SecurityExecutionEvidence.TryReadApiBenchmarkMeasurements(JsonSerializer.SerializeToUtf8Bytes(queryReport),
+            out _, queryConstruction: true)).IsFalse();
+
+        string leadRun = new('a', 32);
+        byte[] browserIntent = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            Schema = 1,
+            RunId = leadRun,
+            Tool = new { Role = "browser", CreatorPid = 123, Pid = (int?)null, Start = (ulong?)null, ExpectedExecutable = (string?)null }
+        });
+        await Assert.That(SecurityExecutionEvidence.TryReadNativeObservationLead(browserIntent, leadRun,
+            out var absentContainer, out var browserLead)).IsTrue();
+        await Assert.That(absentContainer).IsNull();
+        await Assert.That(browserLead).IsEqualTo(new SecurityExecutionEvidence.NativeToolLead("browser", 123, null, null, null));
+        foreach (string field in new[] { "Role", "CreatorPid", "Pid", "Start", "ExpectedExecutable", "Extra" })
+        {
+            JsonObject changedIntent = JsonNode.Parse(browserIntent)!.AsObject();
+            changedIntent["Tool"]![field] = field switch
+            {
+                "Role" => JsonValue.Create("unselected"),
+                "CreatorPid" => JsonValue.Create(0),
+                "Pid" => JsonValue.Create(123),
+                "Start" => JsonValue.Create(1UL),
+                _ => JsonValue.Create("/unobserved/browser")
+            };
+            await Assert.That(SecurityExecutionEvidence.TryReadNativeObservationLead(JsonSerializer.SerializeToUtf8Bytes(changedIntent),
+                leadRun, out _, out _)).IsFalse();
+        }
+        byte[] dockerLeadBytes = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            Schema = 1,
+            RunId = leadRun,
+            Tool = new { Role = "docker", CreatorPid = 123, Pid = 456, Start = 789UL, ExpectedExecutable = (string?)null }
+        });
+        await Assert.That(SecurityExecutionEvidence.TryReadNativeObservationLead(dockerLeadBytes, leadRun, out _, out var dockerLead)).IsTrue();
+        await Assert.That(dockerLead).IsEqualTo(new SecurityExecutionEvidence.NativeToolLead("docker", 123, 456, 789, null));
+        byte[] containerLeadBytes = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            Schema = 1,
+            RunId = leadRun,
+            Container = new
+            {
+                Resource = "postgres",
+                InstanceSha256 = new string('b', 64),
+                ContainerId = new string('c', 64),
+                ImageId = "sha256:" + new string('d', 64),
+                Present = true
+            }
+        });
+        await Assert.That(SecurityExecutionEvidence.TryReadNativeObservationLead(containerLeadBytes, leadRun, out var containerLead, out _)).IsTrue();
+        await Assert.That(containerLead).IsEqualTo(new SecurityExecutionEvidence.NativeContainerAssociation("postgres",
+            new string('b', 64), new string('c', 64), "sha256:" + new string('d', 64), true));
+        await Assert.That(SecurityExecutionEvidence.TryReadNativeObservationLead(containerLeadBytes, new string('e', 32), out _, out _)).IsFalse();
+
+        JsonObject PressureSamples() => new()
+        {
+            ["Schema"] = 1,
+            ["CapacityEvidenceEligible"] = false,
+            ["Final"] = false,
+            ["Completed"] = false,
+            ["Observations"] = new JsonArray(new JsonObject
+            {
+                ["Runtime"] = new JsonObject
+                {
+                    ["Status"] = 3,
+                    ["CpuUserSeconds"] = 1.25,
+                    ["CpuSystemSeconds"] = 0.5,
+                    ["WorkingSetBytes"] = 4096,
+                    ["CaptureStatus"] = 0,
+                    ["StartedTimestamp"] = 120L,
+                    ["CompletedTimestamp"] = 180L,
+                    ["TimestampFrequency"] = Stopwatch.Frequency,
+                    ["ProcessId"] = null,
+                    ["KernelStart"] = null,
+                    ["CounterUnit"] = "seconds",
+                    ["MemoryUnit"] = "bytes",
+                    ["ExportContractQualified"] = false,
+                    ["ResetIdentityQualified"] = false,
+                    ["ScrapeEndpoint"] = null,
+                    ["MetricDefinitions"] = new JsonArray(),
+                    ["NumericSamples"] = new JsonArray()
+                }
+            })
+        };
+        await Assert.That(SecurityExecutionEvidence.TryReadPressureSchedule(JsonSerializer.SerializeToUtf8Bytes(PressureSamples()),
+            out var pressureSchedule)).IsTrue();
+        await Assert.That(pressureSchedule!.RowDigests.Count).IsEqualTo(1);
+        await Assert.That(pressureSchedule.Final).IsFalse();
+        await Assert.That(SecurityExecutionEvidence.LoadPurposeObservationsMatch(SecurityControlRegister.LoadPurpose.Foundation, true, false, false)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.LoadPurposeObservationsMatch(SecurityControlRegister.LoadPurpose.Programme, true, true, true)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.LoadPurposeObservationsMatch(SecurityControlRegister.LoadPurpose.Programme, true, false, false)).IsFalse();
+        await Assert.That(SecurityExecutionEvidence.LoadPurposeObservationsMatch(SecurityControlRegister.LoadPurpose.Programme, true, true, false)).IsFalse();
+        await Assert.That(SecurityExecutionEvidence.LoadPurposeObservationsMatch(SecurityControlRegister.LoadPurpose.Foundation, false, false, false)).IsFalse();
+        await Assert.That(SecurityExecutionEvidence.LoadPurposeObservationsMatch(SecurityControlRegister.LoadPurpose.Foundation, true, false, true)).IsFalse();
+        foreach (string fault in new[] { "clock", "claimed-pid", "claimed-start", "unit", "exporter" })
+        {
+            JsonObject pressure = PressureSamples();
+            JsonNode runtime = pressure["Observations"]![0]!["Runtime"]!;
+            switch (fault)
+            {
+                case "clock": runtime["TimestampFrequency"] = Stopwatch.Frequency + 1; break;
+                case "claimed-pid": runtime["ProcessId"] = 123; break;
+                case "claimed-start": runtime["KernelStart"] = 456; break;
+                case "unit": runtime["MemoryUnit"] = "kilobytes"; break;
+                case "exporter": runtime["ExportContractQualified"] = true; break;
+            }
+            await Assert.That(SecurityExecutionEvidence.TryReadPressureSchedule(JsonSerializer.SerializeToUtf8Bytes(pressure), out _)).IsFalse();
+        }
+        const string exporter = "# TYPE dotnet_process_cpu_time_seconds counter\n# UNIT dotnet_process_cpu_time_seconds seconds\n"
+            + "dotnet_process_cpu_time_seconds_total{cpu_mode=\"user\"} 1.25\n"
+            + "dotnet_process_cpu_time_seconds_total{cpu_mode=\"system\"} 0.5\n"
+            + "# TYPE dotnet_process_memory_working_set_bytes gauge\n# UNIT dotnet_process_memory_working_set_bytes bytes\n"
+            + "dotnet_process_memory_working_set_bytes 4096\n# EOF\n";
+        await Assert.That(SecurityExecutionEvidence.TryReadRuntimeExporter(Encoding.UTF8.GetBytes(exporter), out var exporterValues)).IsTrue();
+        await Assert.That(exporterValues).IsEqualTo(new SecurityExecutionEvidence.RuntimeExporterValues(1.25, 0.5, 4096));
+        await Assert.That(SecurityExecutionEvidence.TryReadRuntimeExporter(Encoding.UTF8.GetBytes(
+            exporter.Replace(" 4096\n", " 9007199254740993\n", StringComparison.Ordinal)), out var exactLargeRss)).IsTrue();
+        await Assert.That(exactLargeRss!.WorkingSetBytes).IsEqualTo(9007199254740993L);
+        foreach (string malformed in new[]
+        {
+            exporter.Replace("# UNIT dotnet_process_cpu_time_seconds seconds\n", "", StringComparison.Ordinal),
+            exporter.Replace("cpu_time_seconds counter", "cpu_time_seconds_total counter", StringComparison.Ordinal),
+            exporter.Replace("cpu_mode=\"user\"", "cpu_mode=\"user\",other=\"value\"", StringComparison.Ordinal),
+            exporter.Replace(" 1.25\n", " NaN\n", StringComparison.Ordinal),
+            exporter.Replace(" 0.5\n", " -1\n", StringComparison.Ordinal),
+            exporter.Replace(" 4096\n", " 4096.5\n", StringComparison.Ordinal),
+            exporter.Replace("# EOF\n", "", StringComparison.Ordinal), exporter + "unexpected 1\n",
+            exporter.Replace("# EOF", "dotnet_process_memory_working_set_bytes 4096\n# EOF", StringComparison.Ordinal)
+        })
+            await Assert.That(SecurityExecutionEvidence.TryReadRuntimeExporter(Encoding.UTF8.GetBytes(malformed), out _)).IsFalse();
+        byte[] tcp = Encoding.ASCII.GetBytes("header\n0: 0100007F:1F90 00000000:0000 0A 0:0 00:0 0 1000 0 12345\n");
+        await Assert.That(SecurityExecutionEvidence.TrySelectOwnedApiListener(new HashSet<ulong> { 12345 }, tcp, "header\n"u8.ToArray(),
+            1000, 8080, out ulong listenerInode, out string? listenerEndpoint)).IsTrue();
+        await Assert.That(listenerInode).IsEqualTo(12345UL);
+        await Assert.That(listenerEndpoint).IsEqualTo("http://127.0.0.1:8080/metrics");
+        byte[] competingTcp = Encoding.ASCII.GetBytes(Encoding.ASCII.GetString(tcp)
+            + "1: 00000000:1F90 00000000:0000 0A 0:0 00:0 0 1000 0 67890\n");
+        await Assert.That(SecurityExecutionEvidence.TrySelectOwnedApiListener(new HashSet<ulong> { 12345 }, competingTcp, "header\n"u8.ToArray(),
+            1000, 8080, out _, out _)).IsFalse();
+        await Assert.That(SecurityExecutionEvidence.TrySelectOwnedApiListener(new HashSet<ulong> { 12345 },
+            Encoding.ASCII.GetBytes(Encoding.ASCII.GetString(competingTcp).Replace("00000000:1F90", "00000000:1F91", StringComparison.Ordinal)),
+            "header\n"u8.ToArray(), 1000, 8080, out _, out _)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.TrySelectOwnedApiListener(new HashSet<ulong> { 999 }, tcp, "header\n"u8.ToArray(),
+            1000, 8080, out _, out _)).IsFalse();
+        await Assert.That(SecurityExecutionEvidence.TrySelectOwnedApiListener(new HashSet<ulong> { 12345 }, tcp, "header\n"u8.ToArray(),
+            1001, 8080, out _, out _)).IsFalse();
+        var listener = new SecurityExecutionEvidence.OwnedApiListener(123, 456, 8080, 12345, "net:[123]", listenerEndpoint!);
+        var firstPressure = new SecurityExecutionEvidence.ParentPressureSample(new(123, 456, new string('f', 64), 100, 200, 1, 2, 4096),
+            listener, 789, 1000, new string('e', 64), 1000)
+        { HttpListener = listener with { Port = 8081, SocketInode = 12346, Endpoint = "http://127.0.0.1:8081" } };
+        var nextPressure = firstPressure with
+        {
+            Api = firstPressure.Api with
+            {
+                StartedTimestamp = 1100,
+                CompletedTimestamp = 1200,
+                CpuUserSeconds = 2,
+                CpuSystemSeconds = 3
+            }
+        };
+        await Assert.That(SecurityExecutionEvidence.TryCreateParentPressureDelta(firstPressure, nextPressure, out var pressureDelta)).IsTrue();
+        await Assert.That(pressureDelta).IsEqualTo(new SecurityExecutionEvidence.ParentPressureDelta(0.9, 1.1, 1, 1, 2 / 1.1, 2 / 0.9));
+        foreach (var replaced in new[] { nextPressure with { K6Start = 1001 },
+            nextPressure with { HttpListener = listener },
+            nextPressure with { Api = nextPressure.Api with { Start = 457 } },
+            nextPressure with { Api = nextPressure.Api with { CpuUserSeconds = 0.5 } },
+            nextPressure with { Api = nextPressure.Api with { StartedTimestamp = 199 } } })
+            await Assert.That(SecurityExecutionEvidence.TryCreateParentPressureDelta(firstPressure, replaced, out _)).IsFalse();
+        string[] k6Arguments = ["/owned/k6", "run", "--config", "/owned/config.json", "--quiet", "--no-color",
+            "--no-usage-report", "--include-system-env-vars=true", "/owned/workload.js"];
+        await Assert.That(SecurityExecutionEvidence.TryReadOwnedK6RunArguments(k6Arguments, out var k6Config, out var k6Script)).IsTrue();
+        await Assert.That(k6Config).IsEqualTo("/owned/config.json");
+        await Assert.That(k6Script).IsEqualTo("/owned/workload.js");
+        await Assert.That(SecurityExecutionEvidence.TryReadOwnedK6RunArguments(["/owned/k6", "version"], out _, out _)).IsFalse();
+        await Assert.That(SecurityExecutionEvidence.TryReadOwnedK6RunArguments(k6Arguments.Concat(["--extra"]).ToArray(), out _, out _)).IsFalse();
+        const string mappedCandidate = "1000-2000 r--p 00000000 08:02 123 /owned/Event.Benchmarks.dll\n";
+        await Assert.That(SecurityExecutionEvidence.TryMatchMappedCandidate(Encoding.ASCII.GetBytes(mappedCandidate),
+            "/owned/Event.Benchmarks.dll", 8, 2, 123, 4096, out var mappedDigest)).IsTrue();
+        await Assert.That(mappedDigest!.Length).IsEqualTo(64);
+        foreach (string invalidMapping in new[]
+        {
+            mappedCandidate.Replace("08:02", "08:03", StringComparison.Ordinal),
+            mappedCandidate.Replace(" 123 ", " 124 ", StringComparison.Ordinal),
+            mappedCandidate.Replace(".dll\n", ".dll (deleted)\n", StringComparison.Ordinal),
+            mappedCandidate.Replace("00000000", "00001000", StringComparison.Ordinal),
+            mappedCandidate + mappedCandidate
+        })
+            await Assert.That(SecurityExecutionEvidence.TryMatchMappedCandidate(Encoding.ASCII.GetBytes(invalidMapping),
+                "/owned/Event.Benchmarks.dll", 8, 2, 123, 4096, out _)).IsFalse();
+
+        using var metadataFixture = new SecurityExecutionEvidenceCandidateTests.SourceFixture();
+        string benchmarkTemporary = Path.Combine(metadataFixture.Root, "private 'quoted'");
+        string benchmarkArtifacts = Path.Combine(benchmarkTemporary, "bdn");
+        string benchmarkEntry = Path.Combine(metadataFixture.Root, "Event.Benchmarks.dll");
+        ProcessStartInfo benchmarkCommand = SecurityExecutionEvidence.ApiBenchmarkStartInfo(benchmarkEntry, benchmarkTemporary, benchmarkArtifacts, "smoke");
+        await Assert.That(benchmarkCommand.UseShellExecute).IsFalse();
+        await Assert.That(benchmarkCommand.WorkingDirectory).IsEqualTo(benchmarkTemporary);
+        await Assert.That(benchmarkCommand.ArgumentList.SequenceEqual(new[] { benchmarkEntry, "--filter", "*ApiEndpointPostgreSqlBenchmarks*",
+            "--job", "Dry", "--inProcess", "--stopOnFirstError", "--artifacts", benchmarkArtifacts })).IsTrue();
+        bool outsideBenchmarkArtifacts = false;
+        try { _ = SecurityExecutionEvidence.ApiBenchmarkStartInfo(benchmarkEntry, benchmarkTemporary, metadataFixture.Root, "smoke"); }
+        catch (InvalidDataException) { outsideBenchmarkArtifacts = true; }
+        await Assert.That(outsideBenchmarkArtifacts).IsTrue();
+        ProcessStartInfo baselineCommand = SecurityExecutionEvidence.ApiBenchmarkStartInfo(benchmarkEntry, benchmarkTemporary, benchmarkArtifacts, "baseline");
+        await Assert.That(baselineCommand.ArgumentList.SequenceEqual(new[] { benchmarkEntry, "--filter", "*ApiEndpointPostgreSqlBenchmarks*",
+            "*EfCoreQueryBenchmarks*", "--stopOnFirstError", "--artifacts", benchmarkArtifacts })).IsTrue();
+        if (OperatingSystem.IsLinux())
+        {
+            File.SetUnixFileMode(metadataFixture.Root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            string dockerConfiguration = SecurityExecutionEvidence.CreateOwnedDockerConfiguration(metadataFixture.Root);
+            await SecurityExecutionEvidence.ValidateOwnedDockerConfigurationAsync(dockerConfiguration, CancellationToken.None);
+            string dockerConfigurationFile = Path.Combine(dockerConfiguration, "config.json");
+            await File.WriteAllTextAsync(dockerConfigurationFile, "{\"currentContext\":\"foreign\"}");
+            bool changedDockerConfigurationRejected = false;
+            try { await SecurityExecutionEvidence.ValidateOwnedDockerConfigurationAsync(dockerConfiguration, CancellationToken.None); }
+            catch (Exception) { changedDockerConfigurationRejected = true; }
+            await Assert.That(changedDockerConfigurationRejected).IsTrue();
+            await File.WriteAllTextAsync(dockerConfigurationFile, "{}\n");
+            await SecurityExecutionEvidence.ValidateOwnedDockerConfigurationAsync(dockerConfiguration, CancellationToken.None);
+        }
+        SecurityExecutionEvidence.RequireOwnedLaunchEnvironment(_ => null);
+        SecurityExecutionEvidence.RequireOwnedLaunchEnvironment(name => name == "DOCKER_HOST" ? "unix:///owned/docker.sock" : null);
+        foreach (string loader in new[] { "DOTNET_STARTUP_HOOKS", "LD_PRELOAD", "CORECLR_PROFILER_PATH" })
+        {
+            bool forbiddenLoader = false;
+            try { SecurityExecutionEvidence.RequireOwnedLaunchEnvironment(name => name == loader ? "/untracked/input" : null); }
+            catch (Exception) { forbiddenLoader = true; }
+            await Assert.That(forbiddenLoader).IsTrue();
+        }
+        string ownAssembly = Path.Combine(metadataFixture.Root, "own-metadata.dll");
+        var ownFields = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["ISLAMU.Assurance.ProjectPath"] = "src/Own/Own.csproj",
+            ["ISLAMU.Assurance.TargetPath"] = "src/Own/bin/Release/net10.0/Own.dll",
+            ["ISLAMU.Assurance.TargetName"] = "Own",
+            ["ISLAMU.Assurance.RuntimeManifestFileName"] = "chosen-runtime.json",
+            ["ISLAMU.Assurance.EndpointManifestFileName"] = "chosen-endpoints.json"
+        };
+        WriteOwnMetadataAssembly(ownAssembly, ownFields);
+        await Assert.That(SecurityExecutionEvidence.ReadOwnManagedBuild(ownAssembly)).IsEqualTo(
+            new SecurityExecutionEvidence.OwnManagedBuild("src/Own/Own.csproj",
+                "src/Own/bin/Release/net10.0/Own.dll", "Own", "chosen-runtime.json", "chosen-endpoints.json"));
+        foreach (string conflict in new[] { "duplicate", "missing", "outside-project", "target-name", "unpaired-manifest", "unknown" })
+        {
+            var changed = ownFields.ToList();
+            switch (conflict)
+            {
+                case "duplicate": changed.Add(changed[0]); break;
+                case "missing": changed.RemoveAll(item => item.Key == "ISLAMU.Assurance.ProjectPath"); break;
+                case "outside-project": changed[0] = new(changed[0].Key, "../outside.csproj"); break;
+                case "target-name": changed[2] = new(changed[2].Key, "Different"); break;
+                case "unpaired-manifest": changed.RemoveAll(item => item.Key == "ISLAMU.Assurance.EndpointManifestFileName"); break;
+                case "unknown": changed.Add(new("ISLAMU.Assurance.Unreviewed", "value")); break;
+            }
+            WriteOwnMetadataAssembly(ownAssembly, changed);
+            bool refused = false;
+            try { _ = SecurityExecutionEvidence.ReadOwnManagedBuild(ownAssembly); }
+            catch (InvalidDataException) { refused = true; }
+            await Assert.That(refused).IsTrue();
+        }
+        byte[] actualBindingInputs;
+        try { actualBindingInputs = SecurityExecutionEvidence.CaptureExecutionTools(); }
+        catch (Exception failure)
+        {
+            string deps = AppContext.GetData("APP_CONTEXT_DEPS_FILES") as string ?? string.Empty;
+            throw new InvalidDataException("native_binding_capture_failed:deps_semicolon_files="
+                + deps.Split(';').Count(File.Exists).ToString(CultureInfo.InvariantCulture)
+                + ":deps_platform_separator_files=" + deps.Split(Path.PathSeparator).Count(File.Exists).ToString(CultureInfo.InvariantCulture), failure);
+        }
+        await Assert.That(SecurityExecutionEvidence.CaptureExecutionTools().AsSpan().SequenceEqual(actualBindingInputs)).IsTrue();
+        using JsonDocument actualBindings = JsonDocument.Parse(actualBindingInputs);
+        JsonElement bindingFiles = actualBindings.RootElement.GetProperty("files");
+        await Assert.That(bindingFiles.EnumerateArray().Any(file => file.GetProperty("path").GetString()
+            == typeof(SecurityExecutionEvidence).Assembly.Location)).IsTrue();
+        await Assert.That(bindingFiles.EnumerateArray().Any(file => file.GetProperty("path").GetString()!
+            .EndsWith(".deps.json", StringComparison.Ordinal))).IsTrue();
+    }
+
+    private static void WriteOwnMetadataAssembly(string path, IEnumerable<KeyValuePair<string, string>> fields)
+    {
+        var metadata = new MetadataBuilder();
+        metadata.AddModule(0, metadata.GetOrAddString("Own.dll"), metadata.GetOrAddGuid(Guid.CreateVersion7()), default, default);
+        AssemblyDefinitionHandle assembly = metadata.AddAssembly(metadata.GetOrAddString("Own"), new Version(1, 0, 0, 0),
+            default, default, default, default);
+        metadata.AddTypeDefinition(TypeAttributes.NotPublic, default, metadata.GetOrAddString("<Module>"), default,
+            MetadataTokens.FieldDefinitionHandle(1), MetadataTokens.MethodDefinitionHandle(1));
+        AssemblyReferenceHandle framework = metadata.AddAssemblyReference(metadata.GetOrAddString("System.Runtime"),
+            new Version(10, 0, 0, 0), default, default, default, default);
+        TypeReferenceHandle attribute = metadata.AddTypeReference(framework, metadata.GetOrAddString("System.Reflection"),
+            metadata.GetOrAddString("AssemblyMetadataAttribute"));
+        var signature = new BlobBuilder();
+        new BlobEncoder(signature).MethodSignature(isInstanceMethod: true).Parameters(2, result => result.Void(), parameters =>
+        {
+            parameters.AddParameter().Type().String();
+            parameters.AddParameter().Type().String();
+        });
+        MemberReferenceHandle constructor = metadata.AddMemberReference(attribute, metadata.GetOrAddString(".ctor"), metadata.GetOrAddBlob(signature));
+        foreach (var field in fields)
+        {
+            var value = new BlobBuilder();
+            value.WriteUInt16(1);
+            value.WriteSerializedString(field.Key);
+            value.WriteSerializedString(field.Value);
+            value.WriteUInt16(0);
+            metadata.AddCustomAttribute(assembly, constructor, metadata.GetOrAddBlob(value));
+        }
+        var image = new BlobBuilder();
+        new ManagedPEBuilder(new PEHeaderBuilder(imageCharacteristics: Characteristics.ExecutableImage | Characteristics.Dll),
+            new MetadataRootBuilder(metadata), new BlobBuilder()).Serialize(image);
+        File.WriteAllBytes(path, image.ToArray());
     }
 }
 
@@ -1120,8 +1829,11 @@ public sealed class SecurityExecutionEvidenceNativeUidChildTests
             string assembly = typeof(SecurityExecutionEvidenceNativeUidChildTests).Assembly.Location;
             var discovery = new ProcessStartInfo(ReleaseToolPaths.Dotnet)
             {
-                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
-                CreateNoWindow = true, WorkingDirectory = root
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                WorkingDirectory = root
             };
             discovery.Environment["TMPDIR"] = root;
             foreach (string argument in new[] { assembly, "--list-tests", "json", "--treenode-filter",
@@ -1254,7 +1966,10 @@ public sealed class SecurityExecutionEvidenceResourceSnapshotTests
         var initialContainerIds = new HashSet<string>(StringComparer.Ordinal) { new string('f', 64) };
         JsonObject Resource(char id, string kind) => new()
         {
-            ["Id"] = new string(id, 64), ["ImageID"] = image, ["Image"] = "cached:test", ["State"] = "running",
+            ["Id"] = new string(id, 64),
+            ["ImageID"] = image,
+            ["Image"] = "cached:test",
+            ["State"] = "running",
             ["Labels"] = new JsonObject { ["islamu.assurance.owner"] = owner, ["islamu.assurance.resource"] = kind }
         };
         var snapshot = new JsonArray(Resource('c', "keycloak"), Resource('d', "cerbos"));
@@ -1697,10 +2412,12 @@ public sealed class SecurityExecutionEvidenceExecutionTests
             int split = identity.ClassName.LastIndexOf('.');
             Discovery["tests"]!.AsArray().Add(new JsonObject
             {
-                ["uid"] = uid, ["displayName"] = identity.TestName,
+                ["uid"] = uid,
+                ["displayName"] = identity.TestName,
                 ["type"] = new JsonObject
                 {
-                    ["namespace"] = identity.ClassName[..split], ["typeName"] = identity.ClassName[(split + 1)..],
+                    ["namespace"] = identity.ClassName[..split],
+                    ["typeName"] = identity.ClassName[(split + 1)..],
                     ["methodName"] = identity.MethodName
                 }
             });
@@ -2014,10 +2731,17 @@ public sealed class SecurityExecutionEvidenceTransportTests
     {
         string uid = variant switch
         {
-            "empty" => "", "spaces" => "   ", "leading-space" => " native",
-            "trailing-space" => "native ", "newline" => "native\nuid", "return" => "native\ruid",
-            "tab" => "native\tuid", "nul" => "native\0uid", "delete" => "native\u007fuid",
-            "oversized" => new string('x', 4097), _ => variant
+            "empty" => "",
+            "spaces" => "   ",
+            "leading-space" => " native",
+            "trailing-space" => "native ",
+            "newline" => "native\nuid",
+            "return" => "native\ruid",
+            "tab" => "native\tuid",
+            "nul" => "native\0uid",
+            "delete" => "native\u007fuid",
+            "oversized" => new string('x', 4097),
+            _ => variant
         };
         string root = Path.Combine(Path.GetTempPath(), "native-transport-" + Guid.NewGuid().ToString("N"));
         bool rejected = false;
@@ -2257,7 +2981,9 @@ public sealed class SecurityExecutionEvidenceProcessTests
             using (var ready = new FileStream(pending,
                 new FileStreamOptions
                 {
-                    Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read,
+                    Mode = FileMode.CreateNew,
+                    Access = FileAccess.Write,
+                    Share = FileShare.Read,
                     UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
                 }))
             {
@@ -2282,7 +3008,9 @@ public sealed class SecurityExecutionEvidenceProcessTests
             }
             var options = new FileStreamOptions
             {
-                Mode = FileMode.CreateNew, Access = FileAccess.ReadWrite, Share = FileShare.Read,
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.ReadWrite,
+                Share = FileShare.Read,
                 UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
             };
             if (mode != "managed-host")
@@ -2291,11 +3019,13 @@ public sealed class SecurityExecutionEvidenceProcessTests
                     marker.Write(Encoding.ASCII.GetBytes(owner));
                 using (var model = new FileStream(Path.Combine(context, "container-model.json"), options))
                     model.Write(JsonSerializer.SerializeToUtf8Bytes(new
-                        { Schema = 1, RunId = owner, Containers = Array.Empty<object>(), Projects = Array.Empty<object>() }));
+                    { Schema = 1, RunId = owner, Containers = Array.Empty<object>(), Projects = Array.Empty<object>() }));
             }
             using var claim = mode == "managed-host" ? null : new FileStream(Path.Combine(context, ".apphost-claim"), new FileStreamOptions
             {
-                Mode = FileMode.CreateNew, Access = FileAccess.ReadWrite, Share = FileShare.ReadWrite,
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.ReadWrite,
+                Share = FileShare.ReadWrite,
                 UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
             });
             string stat = File.ReadAllText("/proc/" + Environment.ProcessId + "/stat");
@@ -2307,11 +3037,18 @@ public sealed class SecurityExecutionEvidenceProcessTests
             {
                 await record.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(new
                 {
-                    Schema = 1, RunId = owner, Pid = Environment.ProcessId, Start = start,
+                    Schema = 1,
+                    RunId = owner,
+                    Pid = Environment.ProcessId,
+                    Start = start,
                     ContentRoot = Path.GetDirectoryName(typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location),
                     ApplicationName = typeof(SecurityExecutionEvidenceProcessTests).Assembly.GetName().Name,
                     EntryAssembly = typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location,
-                    IsWebHost = false, WebRoot = (string?)null, ServedAssets = (object?)null
+                    IsWebHost = false,
+                    WebRoot = (string?)null,
+                    ServedAssets = (object?)null,
+                    OperationsTargetPort = (int?)null,
+                    HttpTargetPort = (int?)null
                 }));
                 await record.FlushAsync();
                 File.Move(unpublished, Path.Combine(context, $"managed-host-root-{Environment.ProcessId}-{start}.json"));
@@ -2331,16 +3068,24 @@ public sealed class SecurityExecutionEvidenceProcessTests
             {
                 byte[] declarationBytes = JsonSerializer.SerializeToUtf8Bytes(new
                 {
-                    Schema = 1, RunId = owner, CreationId = creationId, CreatorPid = Environment.ProcessId,
-                    Resource = "keycloak", ImageReference = "example.invalid/creator-control:local"
+                    Schema = 1,
+                    RunId = owner,
+                    CreationId = creationId,
+                    CreatorPid = Environment.ProcessId,
+                    Resource = "keycloak",
+                    ImageReference = "example.invalid/creator-control:local"
                 });
                 await creationDeclaration.WriteAsync(declarationBytes);
                 creationDeclaration.Flush(true);
                 File.Move(creationStem + ".declaration-pending", creationStem + "-declaration.json");
                 await creationReceipt.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(new
                 {
-                    Schema = 1, RunId = owner, CreationId = creationId, CreatorPid = Environment.ProcessId,
-                    Resource = "keycloak", ImageReference = "example.invalid/creator-control:local",
+                    Schema = 1,
+                    RunId = owner,
+                    CreationId = creationId,
+                    CreatorPid = Environment.ProcessId,
+                    Resource = "keycloak",
+                    ImageReference = "example.invalid/creator-control:local",
                     ContainerId = new string('a', 64),
                     DeclarationSha256 = Convert.ToHexStringLower(SHA256.HashData(declarationBytes))
                 }));
@@ -2369,9 +3114,14 @@ public sealed class SecurityExecutionEvidenceProcessTests
             {
                 await lead.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(new
                 {
-                    Schema = 1, RunId = owner, Hint = new
+                    Schema = 1,
+                    RunId = owner,
+                    Hint = new
                     {
-                        Resource = "event-migrationservice", InstanceSha256 = new string('c', 64), Pid = Environment.ProcessId, Start = start,
+                        Resource = "event-migrationservice",
+                        InstanceSha256 = new string('c', 64),
+                        Pid = Environment.ProcessId,
+                        Start = start,
                         Diagnostic = "managed_launch_inputs_unavailable:process_not_owned"
                     }
                 }));
@@ -2425,16 +3175,24 @@ public sealed class SecurityExecutionEvidenceProcessTests
                 using var nextReceipt = new FileStream(nextCreationStem + ".created-pending", options);
                 byte[] nextDeclarationBytes = JsonSerializer.SerializeToUtf8Bytes(new
                 {
-                    Schema = 1, RunId = owner, CreationId = nextCreationId, CreatorPid = Environment.ProcessId,
-                    Resource = "cerbos", ImageReference = "example.invalid/creator-control:next"
+                    Schema = 1,
+                    RunId = owner,
+                    CreationId = nextCreationId,
+                    CreatorPid = Environment.ProcessId,
+                    Resource = "cerbos",
+                    ImageReference = "example.invalid/creator-control:next"
                 });
                 await nextDeclaration.WriteAsync(nextDeclarationBytes);
                 nextDeclaration.Flush(true);
                 File.Move(nextCreationStem + ".declaration-pending", nextCreationStem + "-declaration.json");
                 await nextReceipt.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(new
                 {
-                    Schema = 1, RunId = owner, CreationId = nextCreationId, CreatorPid = Environment.ProcessId,
-                    Resource = "cerbos", ImageReference = "example.invalid/creator-control:next",
+                    Schema = 1,
+                    RunId = owner,
+                    CreationId = nextCreationId,
+                    CreatorPid = Environment.ProcessId,
+                    Resource = "cerbos",
+                    ImageReference = "example.invalid/creator-control:next",
                     ContainerId = new string('d', 64),
                     DeclarationSha256 = Convert.ToHexStringLower(SHA256.HashData(nextDeclarationBytes))
                 }));
@@ -2496,18 +3254,23 @@ public sealed class SecurityExecutionEvidenceProcessTests
     internal sealed class ProcessFixture : IDisposable
     {
         private readonly string root = Path.Combine(Path.GetTempPath(), "native-owned-process-" + Guid.NewGuid().ToString("N"));
+        internal string Root => root;
         internal string Canary { get; } = "private-stream-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
 
         internal ProcessFixture() => Directory.CreateDirectory(root);
 
-        internal async Task<ProcessStartInfo> CommandAsync(string mode)
+        internal async Task<ProcessStartInfo> CommandAsync(string mode, string? assemblyPath = null)
         {
+            string assembly = assemblyPath ?? typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location;
             var discovery = new ProcessStartInfo(ReleaseToolPaths.Dotnet)
             {
-                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
-                WorkingDirectory = root, CreateNoWindow = true
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                WorkingDirectory = root,
+                CreateNoWindow = true
             };
-            foreach (string argument in new[] { typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location,
+            foreach (string argument in new[] { assembly,
                 "--list-tests", "json", "--treenode-filter", "/*/*/SecurityExecutionEvidenceProcessTests/OwnedNativeChild", "--no-ansi" })
                 discovery.ArgumentList.Add(argument);
             using var process = new Process { StartInfo = discovery };
@@ -2526,7 +3289,7 @@ public sealed class SecurityExecutionEvidenceProcessTests
             if (document.RootElement.GetProperty("schemaVersion").GetInt32() != 1 || tests.GetArrayLength() != 1)
                 throw new InvalidDataException("native_child_discovery_failed");
             string uid = tests[0].GetProperty("uid").GetString()!;
-            var command = SecurityExecutionEvidence.NativeTestStartInfo(typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location,
+            var command = SecurityExecutionEvidence.NativeTestStartInfo(assembly,
                 [uid], Path.Combine(root, "results"), root, "owned-child.trx", 60);
             command.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CONTROL"] = mode;
             command.Environment["ISLAMU_RELEASE_NATIVE_CHILD_ROOT"] = root;
@@ -2654,8 +3417,11 @@ public sealed class SecurityExecutionEvidenceCandidateTests
         {
             var info = new ProcessStartInfo(ReleaseToolPaths.Git)
             {
-                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
-                WorkingDirectory = Root, CreateNoWindow = true
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                WorkingDirectory = Root,
+                CreateNoWindow = true
             };
             info.Environment.Clear();
             info.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
@@ -2721,6 +3487,24 @@ public sealed class SecurityExecutionEvidenceServedAssetTests
         JsonNode tracked = files.Single(file => file!["path"]!.GetValue<string>() == "src/Fixture/wwwroot/tracked.bin")!;
         await Assert.That(tracked["gitBlobOid"]!.GetValue<string>())
             .IsEqualTo(fixture.Source.Git("rev-parse", fixture.Candidate + ":src/Fixture/wwwroot/tracked.bin").Trim());
+        string selectedRuntime = Path.Combine(fixture.OutputRoot, "explicit-runtime-manifest.json");
+        string selectedEndpoints = Path.Combine(fixture.OutputRoot, "explicit-endpoints-manifest.json");
+        File.Move(fixture.RuntimePath, selectedRuntime);
+        File.Move(fixture.EndpointsPath, selectedEndpoints);
+        File.WriteAllText(fixture.EndpointsPath, "{}");
+        bool explicitAccepted = SecurityExecutionEvidence.TryCaptureLocalServedAssets(fixture.CandidateRoot, fixture.Candidate,
+            [selectedRuntime], [fixture.GeneratedRoot, fixture.OutputRoot], [fixture.PackageRoot], out var explicitSnapshot, out _,
+            new Dictionary<string, string>(StringComparer.Ordinal) { [selectedRuntime] = selectedEndpoints });
+        await Assert.That(explicitAccepted).IsTrue();
+        JsonArray explicitFiles = JsonNode.Parse(explicitSnapshot!.PrivateManifest)!["files"]!.AsArray();
+        await Assert.That(explicitFiles.Count).IsEqualTo(5);
+        await Assert.That(explicitFiles.Any(file => file!["path"]!.GetValue<string>() ==
+            Path.GetRelativePath(fixture.CandidateRoot, selectedEndpoints))).IsTrue();
+        await Assert.That(explicitFiles.Any(file => file!["path"]!.GetValue<string>() ==
+            Path.GetRelativePath(fixture.CandidateRoot, fixture.EndpointsPath))).IsFalse();
+        await Assert.That(SecurityExecutionEvidence.TryCaptureLocalServedAssets(fixture.CandidateRoot, fixture.Candidate,
+            [selectedRuntime], [fixture.GeneratedRoot, fixture.OutputRoot], [fixture.PackageRoot], out _, out _,
+            new Dictionary<string, string>(StringComparer.Ordinal) { [selectedRuntime] = fixture.EndpointsPath })).IsFalse();
     }
 
     [Test]
@@ -2840,19 +3624,23 @@ public sealed class SecurityExecutionEvidenceServedAssetTests
                         ["generated.bin"] = Asset(1, "generated.bin"),
                         ["_content"] = new JsonObject
                         {
-                            ["Asset"] = null, ["Patterns"] = null,
+                            ["Asset"] = null,
+                            ["Patterns"] = null,
                             ["Children"] = new JsonObject { ["locked.bin"] = Asset(2, "locked.bin") }
                         }
                     },
                     ["Patterns"] = new JsonArray(new JsonObject
                     {
-                        ["ContentRootIndex"] = 0, ["Pattern"] = "**", ["Depth"] = 0
+                        ["ContentRootIndex"] = 0,
+                        ["Pattern"] = "**",
+                        ["Depth"] = 0
                     })
                 }
             };
             EndpointManifest = new JsonObject
             {
-                ["Version"] = 1, ["ManifestType"] = "Build",
+                ["Version"] = 1,
+                ["ManifestType"] = "Build",
                 ["Endpoints"] = new JsonArray(Endpoint("tracked.bin"), Endpoint("generated.bin"), Endpoint("_content/locked.bin"))
             };
             SaveRuntime();
@@ -2862,13 +3650,17 @@ public sealed class SecurityExecutionEvidenceServedAssetTests
         private static JsonObject Asset(int root, string path) => new()
         {
             ["Asset"] = new JsonObject { ["ContentRootIndex"] = root, ["SubPath"] = path },
-            ["Children"] = null, ["Patterns"] = null
+            ["Children"] = null,
+            ["Patterns"] = null
         };
 
         private static JsonObject Endpoint(string file) => new()
         {
-            ["AssetFile"] = file, ["Route"] = file, ["EndpointProperties"] = new JsonArray(),
-            ["ResponseHeaders"] = new JsonArray(), ["Selectors"] = new JsonArray()
+            ["AssetFile"] = file,
+            ["Route"] = file,
+            ["EndpointProperties"] = new JsonArray(),
+            ["ResponseHeaders"] = new JsonArray(),
+            ["Selectors"] = new JsonArray()
         };
 
         internal bool Capture(out SecurityExecutionEvidence.LocalServedAssetSnapshot? snapshot, out string diagnostic) =>
@@ -2904,7 +3696,9 @@ public sealed class SecurityExecutionEvidenceProjectClosureTests
         using var fixture = new ProjectClosureFixture();
         fixture.Libraries["System.Runtime.Reference/10.0.0.0"] = new JsonObject
         {
-            ["type"] = "referenceassembly", ["serviceable"] = false, ["sha512"] = string.Empty
+            ["type"] = "referenceassembly",
+            ["serviceable"] = false,
+            ["sha512"] = string.Empty
         };
         fixture.Target["System.Runtime.Reference/10.0.0.0"] = new JsonObject
         {
@@ -2992,7 +3786,9 @@ public sealed class SecurityExecutionEvidenceProjectClosureTests
             case "ambiguous-project-owner":
                 fixture.Libraries["Ambiguous.Owned.Project/1.0.0"] = new JsonObject
                 {
-                    ["type"] = "project", ["serviceable"] = false, ["sha512"] = string.Empty
+                    ["type"] = "project",
+                    ["serviceable"] = false,
+                    ["sha512"] = string.Empty
                 };
                 fixture.Target["Ambiguous.Owned.Project/1.0.0"] = new JsonObject
                 {
@@ -3181,7 +3977,10 @@ public sealed class SecurityExecutionEvidenceCompiledInputTests
         {
             var info = new ProcessStartInfo("/usr/bin/mkfifo")
             {
-                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
             };
             info.ArgumentList.Add("--");
             info.ArgumentList.Add(Path.Combine(Root, "input.pipe"));

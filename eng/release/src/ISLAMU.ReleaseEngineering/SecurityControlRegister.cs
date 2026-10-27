@@ -424,10 +424,12 @@ public static class SecurityControlRegister
 
             var tests = new HashSet<RequiredTest>();
             var lifecycles = new Dictionary<RequiredTest, RuntimeLifecycle>();
+            var loadPurposes = new Dictionary<RequiredTest, LoadPurpose>();
             foreach (JsonElement test in requirement.GetProperty("requiredTests").EnumerateArray())
             {
                 string[] fields = lane == "owned-runtime"
                     ? ["className", "methodName", "testName", "lifecycle"]
+                    : lane == "owned-load-correctness" ? ["className", "methodName", "testName", "loadPurpose"]
                     : ["className", "methodName", "testName"];
                 if (!ClosedFields(test, fields)) throw new InvalidDataException();
                 string className = test.GetProperty("className").GetString() ?? string.Empty;
@@ -439,6 +441,13 @@ public static class SecurityControlRegister
                 if (lane == "owned-runtime")
                     lifecycles.Add(new RequiredTest(className, methodName, testName),
                         ReadRuntimeLifecycle(test.GetProperty("lifecycle")));
+                if (lane == "owned-load-correctness")
+                    loadPurposes.Add(new RequiredTest(className, methodName, testName), test.GetProperty("loadPurpose").GetString() switch
+                    {
+                        "foundation" => LoadPurpose.Foundation,
+                        "programme" => LoadPurpose.Programme,
+                        _ => throw new InvalidDataException()
+                    });
             }
 
             if (tests.Count is < 1 or > 1024 || !requirements.TryAdd(lane, new ExecutionRequirement(project, profile, tests)
@@ -446,7 +455,8 @@ public static class SecurityControlRegister
                 Environment = project == apiProject ? "Testing" : "Assurance",
                 Selector = selector,
                 ReportFileName = lane + "-tests.trx",
-                Lifecycles = lifecycles
+                Lifecycles = lifecycles,
+                LoadPurposes = loadPurposes
             }))
                 throw new InvalidDataException();
         }
@@ -463,8 +473,11 @@ public static class SecurityControlRegister
         internal string ReportFileName { get; init; } = string.Empty;
         internal IReadOnlyDictionary<RequiredTest, RuntimeLifecycle> Lifecycles { get; init; } =
             new Dictionary<RequiredTest, RuntimeLifecycle>();
+        internal IReadOnlyDictionary<RequiredTest, LoadPurpose> LoadPurposes { get; init; } =
+            new Dictionary<RequiredTest, LoadPurpose>();
     }
     internal readonly record struct RequiredTest(string ClassName, string MethodName, string TestName);
+    internal enum LoadPurpose { Foundation, Programme }
 
     internal enum RuntimeStage { None, Build, Startup, Hosted }
     internal enum RuntimeCompletion { Success, Cancelled, BuilderFault, ExecutionFault, ControlledFault, Refused, StopFault }
@@ -478,16 +491,22 @@ public static class SecurityControlRegister
             throw new InvalidDataException();
         RuntimeStage stage = value.GetProperty("stage").GetString() switch
         {
-            "none" => RuntimeStage.None, "build" => RuntimeStage.Build,
-            "startup" => RuntimeStage.Startup, "hosted" => RuntimeStage.Hosted,
+            "none" => RuntimeStage.None,
+            "build" => RuntimeStage.Build,
+            "startup" => RuntimeStage.Startup,
+            "hosted" => RuntimeStage.Hosted,
             _ => throw new InvalidDataException()
         };
         RuntimeCompletion completion = value.GetProperty("completion").GetString() switch
         {
-            "success" => RuntimeCompletion.Success, "cancelled" => RuntimeCompletion.Cancelled,
-            "builder-fault" => RuntimeCompletion.BuilderFault, "execution-fault" => RuntimeCompletion.ExecutionFault,
-            "controlled-fault" => RuntimeCompletion.ControlledFault, "refused" => RuntimeCompletion.Refused,
-            "stop-fault" => RuntimeCompletion.StopFault, _ => throw new InvalidDataException()
+            "success" => RuntimeCompletion.Success,
+            "cancelled" => RuntimeCompletion.Cancelled,
+            "builder-fault" => RuntimeCompletion.BuilderFault,
+            "execution-fault" => RuntimeCompletion.ExecutionFault,
+            "controlled-fault" => RuntimeCompletion.ControlledFault,
+            "refused" => RuntimeCompletion.Refused,
+            "stop-fault" => RuntimeCompletion.StopFault,
+            _ => throw new InvalidDataException()
         };
         RuntimeRootDisposition root = value.GetProperty("rootDisposition").GetString() switch
         {

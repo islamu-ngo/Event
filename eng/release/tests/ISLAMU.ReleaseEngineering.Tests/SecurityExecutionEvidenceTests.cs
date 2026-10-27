@@ -149,6 +149,98 @@ public sealed class SecurityExecutionEvidenceOwnedCommandTests
     }
 }
 
+public sealed class SecurityExecutionEvidenceBenchmarkRetentionTests
+{
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task PrivateBenchmarkOriginalsSurviveSuccessfulChildCleanupWithTheirExactDigests(bool baseline)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string root = Directory.CreateTempSubdirectory("benchmark-retention-").FullName;
+        try
+        {
+            string temporary = Path.Combine(root, "child");
+            string retained = Path.Combine(root, "private-evidence");
+            Directory.CreateDirectory(temporary);
+            Directory.CreateDirectory(retained, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            var originals = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+            {
+                ["inputs-before.json"] = "before-input-manifest"u8.ToArray(),
+                ["inputs-after.json"] = "after-input-manifest"u8.ToArray(),
+                ["api-report-full.json"] = "private-api-report"u8.ToArray(),
+                ["stdout.bin"] = "native-standard-output"u8.ToArray(),
+                ["stderr.bin"] = "native-standard-error"u8.ToArray(),
+                ["resource-observation.json"] = "private-resource-observation"u8.ToArray()
+            };
+            if (baseline) originals.Add("query-report-full.json", "private-query-report"u8.ToArray());
+            foreach (var item in originals) File.WriteAllBytes(Path.Combine(temporary, item.Key), item.Value);
+            var digests = originals.ToDictionary(item => item.Key, item => Convert.ToHexStringLower(SHA256.HashData(item.Value)),
+                StringComparer.Ordinal);
+            var process = new SecurityExecutionEvidence.OwnedNativeProcessResult(0, false, false, false, false, true,
+                File.ReadAllBytes(Path.Combine(temporary, "stdout.bin")), File.ReadAllBytes(Path.Combine(temporary, "stderr.bin")));
+
+            SecurityExecutionEvidence.RetainApiBenchmarkEvidence(retained,
+                File.ReadAllBytes(Path.Combine(temporary, "inputs-before.json")),
+                File.ReadAllBytes(Path.Combine(temporary, "inputs-after.json")),
+                File.ReadAllBytes(Path.Combine(temporary, "api-report-full.json")),
+                baseline ? File.ReadAllBytes(Path.Combine(temporary, "query-report-full.json")) : null,
+                process, File.ReadAllBytes(Path.Combine(temporary, "resource-observation.json")));
+
+            await Assert.That(SecurityExecutionEvidence.TryRemoveOwnedChildTemporary(temporary, process, true)).IsTrue();
+            await Assert.That(Directory.Exists(temporary)).IsFalse();
+            await Assert.That(File.GetUnixFileMode(retained)).IsEqualTo(
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            await Assert.That(new DirectoryInfo(retained).LinkTarget).IsNull();
+            await Assert.That(Directory.GetFiles(retained).Length).IsEqualTo(originals.Count);
+            foreach (var item in digests)
+            {
+                string path = Path.Combine(retained, item.Key);
+                await Assert.That(Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)))).IsEqualTo(item.Value);
+                await Assert.That(File.GetUnixFileMode(path)).IsEqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                await Assert.That(new FileInfo(path).LinkTarget).IsNull();
+            }
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Test]
+    [Arguments("directory-link")]
+    [Arguments("file-link")]
+    [Arguments("public-mode")]
+    public async Task BenchmarkRetentionRejectsLinkedOrNonprivateDestinationsWithoutChangingTheirTargets(string variant)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string root = Directory.CreateTempSubdirectory("benchmark-retention-boundary-").FullName;
+        try
+        {
+            string target = Path.Combine(root, "target");
+            string retained = Path.Combine(root, "private-evidence");
+            Directory.CreateDirectory(target, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            string sentinel = Path.Combine(target, "sentinel.bin");
+            byte[] original = RandomNumberGenerator.GetBytes(32);
+            File.WriteAllBytes(sentinel, original);
+            if (variant == "directory-link") Directory.CreateSymbolicLink(retained, target);
+            else
+            {
+                Directory.CreateDirectory(retained, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+                if (variant == "file-link") File.CreateSymbolicLink(Path.Combine(retained, "inputs-before.json"), sentinel);
+                else File.SetUnixFileMode(retained, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                    | UnixFileMode.GroupRead);
+            }
+            var process = new SecurityExecutionEvidence.OwnedNativeProcessResult(0, false, false, false, false, true, [], []);
+            bool rejected = false;
+            try { SecurityExecutionEvidence.RetainApiBenchmarkEvidence(retained, [1], [2], [3], null, process, [4]); }
+            catch (Exception) { rejected = true; }
+
+            await Assert.That(rejected).IsTrue();
+            await Assert.That(File.ReadAllBytes(sentinel).AsSpan().SequenceEqual(original)).IsTrue();
+            await Assert.That(Directory.GetFiles(target).Length).IsEqualTo(1);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+}
+
 public sealed class SecurityExecutionEvidenceTests
 {
     [Test]
@@ -682,8 +774,12 @@ public sealed class SecurityExecutionEvidenceTests
                     {
                         uid = "synthetic private uid " + ordinal,
                         displayName = definition.Attribute("name")!.Value,
-                        type = new { @namespace = className[..split], typeName = className[(split + 1)..],
-                            methodName = method.Attribute("name")!.Value }
+                        type = new
+                        {
+                            @namespace = className[..split],
+                            typeName = className[(split + 1)..],
+                            methodName = method.Attribute("name")!.Value
+                        }
                     };
                 })
             });

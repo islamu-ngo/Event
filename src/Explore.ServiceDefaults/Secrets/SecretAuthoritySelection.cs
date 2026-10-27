@@ -12,6 +12,8 @@ public sealed record SecretAuthoritySelection(
     string EnvironmentName,
     SecretConsumerRole Consumer)
 {
+    public Guid? AuthenticationProfileRevision { get; init; }
+
     public static SecretAuthoritySelection Select(
         IConfiguration bootstrap,
         string environmentName,
@@ -30,7 +32,12 @@ public sealed record SecretAuthoritySelection(
             || !Enum.TryParse(selected, true, out SecretAuthorityKind provider)
             || !Enum.IsDefined(consumer))
             throw new InvalidOperationException("secret_authority_selection_invalid");
-        var selection = new SecretAuthoritySelection(provider, environmentName, consumer);
+        var selection = new SecretAuthoritySelection(provider, environmentName, consumer)
+        {
+            AuthenticationProfileRevision = Guid.TryParse(
+                bootstrap["AUTHENTICATION_CREDENTIAL_PROFILE_REVISION"], out Guid revision)
+                && revision != Guid.Empty ? revision : null
+        };
         selection.Validate();
         return selection;
     }

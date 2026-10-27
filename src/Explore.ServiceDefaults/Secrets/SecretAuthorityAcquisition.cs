@@ -1,11 +1,14 @@
 using SecretKit.Core;
 using SecretKit.Extensions.Configuration;
 using SecretKit.Infisical;
+using SecretKit.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
+using Explore.ServiceDefaults.DataProtection;
+using System.Collections.Frozen;
 
 namespace Explore.ServiceDefaults.Secrets;
 
-public sealed class SecretAuthorityAcquisition : IAsyncDisposable
+public sealed partial class SecretAuthorityAcquisition : IAsyncDisposable
 {
     private readonly SecretAuthoritySelection _selection;
     private readonly ISecretReader _reader;
@@ -13,6 +16,7 @@ public sealed class SecretAuthorityAcquisition : IAsyncDisposable
     private readonly InfisicalAuthorityOptions? _options;
     private readonly InfisicalClient? _client;
     private readonly InfisicalPeriodicTokenSession? _session;
+    private InfisicalAuthenticationMaintenance? _maintenance;
     private readonly SocketsHttpHandler? _ownedTransport;
     private readonly LocalAuthorityReader? _local;
     private readonly CancellationTokenSource _lifetime = new();
@@ -41,6 +45,69 @@ public sealed class SecretAuthorityAcquisition : IAsyncDisposable
     /// <summary>The host may explicitly maintain this session; construction starts no maintenance loop.</summary>
     public InfisicalPeriodicTokenSession? AuthenticationSession => _session;
 
+    public SecretAuthorityKind Provider => _selection.Provider;
+    public SecretAuthoritySelection Selection => _selection;
+    public Guid GenerationId { get; } = Guid.CreateVersion7();
+    public TimeSpan ReadTimeout => _options?.RequestTimeout ?? TimeSpan.FromSeconds(15);
+    public InfisicalAuthorityOptions? InfisicalOptions => _options;
+
+    /// <summary>Borrowed native client for admitted outer-layer operations; the process owner alone disposes it.</summary>
+    public InfisicalClient? NativeClient
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            return _client;
+        }
+    }
+
+    public InfisicalAuthenticationMaintenance? AuthenticationMaintenance => Volatile.Read(ref _maintenance);
+
+    /// <summary>Starts only the selected session's renewal helper, before lengthy serving-host admission.</summary>
+    public async Task StartAuthenticationMaintenanceAsync(CancellationToken cancellationToken = default)
+    {
+        InfisicalAuthenticationMaintenance maintenance;
+        CancellationToken lifetime;
+        lock (_operationGate)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            if (_session is null)
+                return;
+            if (_maintenance is not null)
+                throw new InvalidOperationException("secret_authentication_maintenance_already_started");
+            maintenance = new InfisicalAuthenticationMaintenance(_session, TimeSpan.FromSeconds(10));
+            _maintenance = maintenance;
+            lifetime = _lifetime.Token;
+            _activePreparations++;
+        }
+        try
+        {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime);
+            try
+            {
+                await maintenance.StartAsync(linked.Token).ConfigureAwait(false);
+                linked.Token.ThrowIfCancellationRequested();
+            }
+            catch
+            {
+                await maintenance.DisposeAsync().ConfigureAwait(false);
+                throw;
+            }
+        }
+        finally
+        {
+            TaskCompletionSource? drained = null;
+            lock (_operationGate)
+            {
+                _activePreparations--;
+                if (_activePreparations == 0 && _disposed != 0)
+                    drained = _preparationsDrained;
+            }
+            drained?.TrySetResult();
+        }
+    }
+
     public static async ValueTask<SecretOutcome<SecretAuthorityAcquisition>> OpenInfisicalAsync(
         SecretAuthoritySelection selection,
         IEnumerable<SecretAcquisitionEntry> entries,
@@ -66,7 +133,7 @@ public sealed class SecretAuthorityAcquisition : IAsyncDisposable
             || options.Origin.Query.Length != 0 || options.Origin.Fragment.Length != 0
             || string.IsNullOrWhiteSpace(options.ProjectId) || string.IsNullOrWhiteSpace(options.VaultEnvironment)
             || string.IsNullOrWhiteSpace(options.ClientId)
-            || options.RequestTimeout <= TimeSpan.Zero || options.RequestTimeout > TimeSpan.FromMinutes(5)
+            || options.RequestTimeout <= TimeSpan.Zero || options.RequestTimeout > TimeSpan.FromMinutes(1)
             || options.RenewBefore <= TimeSpan.Zero
             || options.Lifetime is not (InfisicalTokenLifetime.Finite or InfisicalTokenLifetime.Periodic)
             || options.Lifetime == InfisicalTokenLifetime.Finite && options.Period is not null
@@ -80,17 +147,20 @@ public sealed class SecretAuthorityAcquisition : IAsyncDisposable
             AllowLoopbackDevelopmentHttp = development && options.Origin.IsLoopback,
             MaximumResponseBytes = 1024 * 1024
         };
-        SocketsHttpHandler transport = hostTransport ?? new SocketsHttpHandler
-        {
-            AllowAutoRedirect = false,
-            UseCookies = false,
-            ActivityHeadersPropagator = null
-        };
+        SocketsHttpHandler? ownedTransport = null;
         InfisicalPeriodicTokenSession? session = null;
         InfisicalClient? client = null;
-        bool transferred = false;
+        SecretAuthorityAcquisition? owner = null;
         try
         {
+            if (hostTransport is null)
+                ownedTransport = new SocketsHttpHandler
+                {
+                    AllowAutoRedirect = false,
+                    UseCookies = false,
+                    ActivityHeadersPropagator = null
+                };
+            SocketsHttpHandler transport = hostTransport ?? ownedTransport!;
             using var timeout = new CancellationTokenSource(options.RequestTimeout, clock);
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
             using var authentication = new InfisicalUniversalAuthentication(options.Origin, transport, network, clock);
@@ -123,10 +193,13 @@ public sealed class SecretAuthorityAcquisition : IAsyncDisposable
             session = new InfisicalPeriodicTokenSession(login, evidence,
                 options.RenewBefore, options.RequestTimeout, transport, network, clock);
             client = new InfisicalClient(options.Origin, transport, session, network, clock);
-            var owner = new SecretAuthorityAcquisition(selection, client, clock, options, client, session,
-                hostTransport is null ? transport : null);
-            transferred = true;
-            return SecretOutcome<SecretAuthorityAcquisition>.Success(owner);
+            owner = new SecretAuthorityAcquisition(selection, client, clock, options, client, session, ownedTransport);
+            client = null;
+            session = null;
+            ownedTransport = null;
+            var outcome = SecretOutcome<SecretAuthorityAcquisition>.Success(owner);
+            owner = null;
+            return outcome;
         }
         catch (ArgumentException)
         {
@@ -134,15 +207,12 @@ public sealed class SecretAuthorityAcquisition : IAsyncDisposable
         }
         finally
         {
-            if (!transferred)
-            {
-                if (client is not null)
-                    await client.DisposeAsync().ConfigureAwait(false);
-                if (session is not null)
-                    await session.DisposeAsync().ConfigureAwait(false);
-                if (hostTransport is null)
-                    transport.Dispose();
-            }
+            await using var unpublishedOwner = owner;
+            if (client is not null)
+                await client.DisposeAsync().ConfigureAwait(false);
+            if (session is not null)
+                await session.DisposeAsync().ConfigureAwait(false);
+            ownedTransport?.Dispose();
         }
     }
 
@@ -164,9 +234,20 @@ public sealed class SecretAuthorityAcquisition : IAsyncDisposable
         return new SecretAuthorityAcquisition(selection, reader, TimeProvider.System, local: reader);
     }
 
-    public async ValueTask<SecretOutcome<SecretAuthorityLease>> PrepareGroupAsync(
+    public ValueTask<SecretOutcome<SecretAuthorityLease>> PrepareGroupAsync(
         IEnumerable<SecretAcquisitionEntry> entries,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        PrepareGroupCoreAsync(entries, allowAbsent: false, cancellationToken);
+
+    /// <summary>Collects declared optional fields without treating authority failures as absence.</summary>
+    public ValueTask<SecretOutcome<SecretAuthorityLease>> PrepareAvailableGroupAsync(
+        IEnumerable<SecretAcquisitionEntry> entries,
+        CancellationToken cancellationToken = default) =>
+        PrepareGroupCoreAsync(entries, allowAbsent: true, cancellationToken);
+
+    private async ValueTask<SecretOutcome<SecretAuthorityLease>> PrepareGroupCoreAsync(
+        IEnumerable<SecretAcquisitionEntry> entries, bool allowAbsent,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entries);
         CancellationToken lifetime;
@@ -186,8 +267,13 @@ public sealed class SecretAuthorityAcquisition : IAsyncDisposable
             {
                 using var timeout = new CancellationTokenSource(_options.RequestTimeout, _clock);
                 using var bounded = CancellationTokenSource.CreateLinkedTokenSource(linked.Token, timeout.Token);
-                var result = await PrepareAsync(_selection, _reader, _options.ProjectId,
-                    _options.VaultEnvironment, requested, _clock, bounded.Token).ConfigureAwait(false);
+                var nativeSelections = requested.Select(entry => new SecretSelection(entry.ConfigurationKey, _reader,
+                    new SecretReference(_reader.Authority, new InfisicalSecretAddress(
+                        _options.ProjectId, _options.VaultEnvironment, entry.Folder, entry.Key,
+                        null, InfisicalResolution.Raw, false))));
+                var result = allowAbsent
+                    ? await PrepareAvailableSelectionsAsync(requested, nativeSelections, bounded.Token).ConfigureAwait(false)
+                    : await PrepareSelectionsAsync(requested, nativeSelections, _clock, bounded.Token).ConfigureAwait(false);
                 if (result.IsSuccess)
                 {
                     try
@@ -210,8 +296,157 @@ public sealed class SecretAuthorityAcquisition : IAsyncDisposable
             }
             var selections = requested.Select(entry => new SecretSelection(entry.ConfigurationKey, _reader,
                 new SecretReference(_reader.Authority, new LocalSecretAddress(entry.Key))));
-            var local = await PrepareSelectionsAsync(requested, selections, _clock, linked.Token).ConfigureAwait(false);
+            var local = allowAbsent
+                ? await PrepareAvailableSelectionsAsync(requested, selections, linked.Token).ConfigureAwait(false)
+                : await PrepareSelectionsAsync(requested, selections, _clock, linked.Token).ConfigureAwait(false);
             return AdmitPrepared(local, linked.Token);
+        }
+        finally
+        {
+            TaskCompletionSource? drained = null;
+            lock (_operationGate)
+            {
+                _activePreparations--;
+                if (_activePreparations == 0 && _disposed != 0)
+                    drained = _preparationsDrained;
+            }
+            drained?.TrySetResult();
+        }
+    }
+
+    private async ValueTask<SecretOutcome<SecretAuthorityLease>> PrepareAvailableSelectionsAsync(
+        SecretAcquisitionEntry[] requested, IEnumerable<SecretSelection> selections,
+        CancellationToken cancellationToken)
+    {
+        using var retained = new RetainedAuthorityReader(_reader.Authority);
+        var presentEntries = new List<SecretAcquisitionEntry>();
+        var presentSelections = new List<SecretSelection>();
+        int index = 0;
+        foreach (SecretSelection selection in selections)
+        {
+            var result = await _reader.ReadAsync(selection.Reference, cancellationToken).ConfigureAwait(false);
+            if (result.IsSuccess)
+            {
+                retained.Reads.Add(selection.Reference, result.Value);
+                presentEntries.Add(requested[index]);
+                presentSelections.Add(new(selection.ConsumerKey, retained, selection.Reference));
+            }
+            else if (result.Status != SecretStatus.Absent)
+            {
+                return SecretOutcome<SecretAuthorityLease>.Failure(result.Status, result.RetryAfter);
+            }
+            index++;
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        if (presentEntries.Count == 0)
+            return SecretOutcome<SecretAuthorityLease>.Failure(SecretStatus.Absent);
+        // Export the retained observations, not a second provider read that can race
+        // deletion, recreation or a changed credential between collection and publication.
+        return await PrepareSelectionsAsync(
+            presentEntries.ToArray(), presentSelections, _clock, cancellationToken).ConfigureAwait(false);
+    }
+
+    private sealed class RetainedAuthorityReader(SecretAuthority authority) : ISecretReader, IDisposable
+    {
+        public SecretAuthority Authority { get; } = authority;
+        internal Dictionary<SecretReference, SecretRead> Reads { get; } = new();
+
+        public ValueTask<SecretOutcome<SecretRead>> ReadAsync(
+            SecretReference reference, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!reference.BelongsTo(Authority) || !Reads.TryGetValue(reference, out var read))
+                return ValueTask.FromResult(SecretOutcome<SecretRead>.Failure(SecretStatus.Invalid));
+            SecretRead? copy = null;
+            try
+            {
+                copy = new SecretRead(read.Material.Copy(), read.Observation);
+                var outcome = SecretOutcome<SecretRead>.Success(copy);
+                copy = null;
+                return ValueTask.FromResult(outcome);
+            }
+            finally
+            {
+                copy?.Dispose();
+            }
+        }
+
+        public void Dispose()
+        {
+            foreach (SecretRead read in Reads.Values)
+                read.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Acquires only the selected serving consumer's ring and admission, without configuration export.
+    /// The returned owner pins a complete native generation; it cannot read arbitrary authority keys.
+    /// </summary>
+    public async ValueTask<SecretDataProtectionMaterial> PrepareDataProtectionAsync(
+        string partition, CancellationToken cancellationToken = default)
+    {
+        CancellationToken lifetime;
+        lock (_operationGate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            lifetime = _lifetime.Token;
+            _activePreparations++;
+        }
+        try
+        {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime);
+            linked.Token.ThrowIfCancellationRequested();
+            string selectedPartition = _selection.Consumer switch
+            {
+                SecretConsumerRole.Api => "api",
+                SecretConsumerRole.Bff => "bff",
+                SecretConsumerRole.Combined => "combined",
+                _ => throw new InvalidOperationException("secret_data_protection_scope_invalid")
+            };
+            if (!string.Equals(partition, selectedPartition, StringComparison.Ordinal))
+                throw new InvalidOperationException("secret_data_protection_scope_invalid");
+            string prefix = ExternalDataProtectionRegistration.EnvironmentPrefix(partition);
+            using var timeout = new CancellationTokenSource(
+                _options?.RequestTimeout ?? TimeSpan.FromSeconds(15), _clock);
+            using var bounded = CancellationTokenSource.CreateLinkedTokenSource(linked.Token, timeout.Token);
+            _local?.Refresh();
+            ISecretReader dataProtectionReader = _local?.FreshReader ?? _reader;
+            SecretSelection Select(string name, string folder, string key) => new(name, dataProtectionReader,
+                new SecretReference(dataProtectionReader.Authority, _options is null
+                    ? new LocalSecretAddress(key)
+                    : new InfisicalSecretAddress(_options.ProjectId, _options.VaultEnvironment,
+                        folder, key, null, InfisicalResolution.Raw, false)));
+            using var loader = new SecretSnapshotLoader(
+                [Select("Ring", $"/runtime/{partition}/data-protection", prefix + "_RING"),
+                 Select("Admission", $"/admission/{partition}/data-protection", prefix + "_ADMISSION")], _clock);
+            var result = await loader.RefreshAsync(bounded.Token).ConfigureAwait(false);
+            if (!result.IsSuccess)
+                throw new InvalidOperationException("secret_data_protection_unavailable");
+            if (_session is not null)
+            {
+                var token = await _session.GetTokenAsync(bounded.Token).ConfigureAwait(false);
+                if (!token.IsSuccess)
+                    throw new InvalidOperationException("secret_data_protection_unavailable");
+                token.Value.Dispose();
+            }
+            SecretDataProtectionMaterial? material = null;
+            try
+            {
+                material = new SecretDataProtectionMaterial(loader.Acquire());
+                lock (_operationGate)
+                {
+                    bounded.Token.ThrowIfCancellationRequested();
+                    if (_disposed != 0)
+                        throw new OperationCanceledException("secret_authority_retired", bounded.Token);
+                    var resultMaterial = material;
+                    material = null;
+                    return resultMaterial;
+                }
+            }
+            finally
+            {
+                material?.Dispose();
+            }
         }
         finally
         {
@@ -289,13 +524,21 @@ public sealed class SecretAuthorityAcquisition : IAsyncDisposable
                 {
                     try
                     {
-                        if (_client is not null)
-                            await _client.DisposeAsync().ConfigureAwait(false);
+                        if (_maintenance is not null)
+                            await _maintenance.DisposeAsync().ConfigureAwait(false);
                     }
                     finally
                     {
-                        if (_session is not null)
-                            await _session.DisposeAsync().ConfigureAwait(false);
+                        try
+                        {
+                            if (_client is not null)
+                                await _client.DisposeAsync().ConfigureAwait(false);
+                        }
+                        finally
+                        {
+                            if (_session is not null)
+                                await _session.DisposeAsync().ConfigureAwait(false);
+                        }
                     }
                 }
             }
@@ -338,13 +581,14 @@ public sealed class SecretAuthorityAcquisition : IAsyncDisposable
         SecretAcquisitionEntry[] requested, IEnumerable<SecretSelection> selections,
         TimeProvider timeProvider, CancellationToken cancellationToken)
     {
-        var loader = new SecretSnapshotLoader(selections, timeProvider);
+        SecretSnapshotLoader? loader = null;
         SecretSnapshotHandle? handle = null;
         SecretConfigurationExport? export = null;
         IConfigurationRoot? configuration = null;
-        bool transferred = false;
+        SecretAuthorityLease? lease = null;
         try
         {
+            loader = new SecretSnapshotLoader(selections, timeProvider);
             var prepared = await loader.RefreshAsync(cancellationToken).ConfigureAwait(false);
             if (!prepared.IsSuccess)
                 return SecretOutcome<SecretAuthorityLease>.Failure(prepared.Status, prepared.RetryAfter);
@@ -353,19 +597,22 @@ public sealed class SecretAuthorityAcquisition : IAsyncDisposable
             export = SecretConfigurationExport.CreateAcknowledgingManagedStrings(handle,
                 requested.Select(entry => new SecretConfigurationMapping(entry.ConfigurationKey, entry.ConfigurationKey)));
             configuration = new ConfigurationBuilder().Add(export).Build();
-            var lease = new SecretAuthorityLease(loader, handle, export, configuration);
-            transferred = true;
-            return SecretOutcome<SecretAuthorityLease>.Success(lease);
+            lease = new SecretAuthorityLease(loader, handle, export, configuration);
+            loader = null;
+            handle = null;
+            export = null;
+            configuration = null;
+            var outcome = SecretOutcome<SecretAuthorityLease>.Success(lease);
+            lease = null;
+            return outcome;
         }
         finally
         {
-            if (!transferred)
-            {
-                (configuration as IDisposable)?.Dispose();
-                export?.Dispose();
-                handle?.Dispose();
-                loader.Dispose();
-            }
+            lease?.Dispose();
+            (configuration as IDisposable)?.Dispose();
+            export?.Dispose();
+            handle?.Dispose();
+            loader?.Dispose();
         }
     }
 
@@ -379,21 +626,64 @@ public sealed class SecretAuthorityAcquisition : IAsyncDisposable
     {
         public SecretAuthority Authority { get; } = new();
 
+        internal IReadOnlyDictionary<string, string?> RuntimeValues { get; } =
+            configuration.AsEnumerable().ToFrozenDictionary(pair => pair.Key, pair => pair.Value,
+                StringComparer.OrdinalIgnoreCase);
+        internal ISecretReader FreshReader => new FreshLocalReader(this);
+
+        internal void Refresh() => (configuration as IConfigurationRoot)?.Reload();
+
         public ValueTask<SecretOutcome<SecretRead>> ReadAsync(
-            SecretReference reference, CancellationToken cancellationToken = default)
+            SecretReference reference, CancellationToken cancellationToken = default) =>
+            Read(reference, fresh: false, cancellationToken);
+
+        private ValueTask<SecretOutcome<SecretRead>> Read(
+            SecretReference reference, bool fresh, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!reference.BelongsTo(Authority) || reference.Address is not LocalSecretAddress address)
                 return ValueTask.FromResult(SecretOutcome<SecretRead>.Failure(SecretStatus.Invalid));
-            string? value = configuration[address.Key];
-            return ValueTask.FromResult(string.IsNullOrEmpty(value)
-                ? SecretOutcome<SecretRead>.Failure(SecretStatus.Absent)
-                : SecretOutcome<SecretRead>.Success(new SecretRead(SecretMaterial.FromText(value),
-                    new SecretObservation(reference, null, clock.GetUtcNow(), SecretValidity.Valid, null))));
+            string? value = fresh ? configuration[address.Key] : RuntimeValues.GetValueOrDefault(address.Key);
+            if (value is null)
+                return ValueTask.FromResult(SecretOutcome<SecretRead>.Failure(SecretStatus.Absent));
+            if (value.Length == 0)
+                return ValueTask.FromResult(SecretOutcome<SecretRead>.Failure(SecretStatus.Invalid));
+            SecretRead? read = null;
+            try
+            {
+                read = new SecretRead(SecretMaterial.FromText(value),
+                    new SecretObservation(reference, null, clock.GetUtcNow(), SecretValidity.Valid, null));
+                var outcome = SecretOutcome<SecretRead>.Success(read);
+                read = null;
+                return ValueTask.FromResult(outcome);
+            }
+            finally
+            {
+                read?.Dispose();
+            }
         }
 
         public void Dispose() => ownedConfiguration?.Dispose();
+
+        private sealed class FreshLocalReader(LocalAuthorityReader owner) : ISecretReader
+        {
+            public SecretAuthority Authority => owner.Authority;
+            public ValueTask<SecretOutcome<SecretRead>> ReadAsync(
+                SecretReference reference, CancellationToken cancellationToken = default) =>
+                owner.Read(reference, fresh: true, cancellationToken);
+        }
     }
+}
+
+/// <summary>Owns exactly two protected values from one complete acquired generation.</summary>
+public sealed class SecretDataProtectionMaterial : IDisposable
+{
+    private readonly SecretSnapshotHandle _handle;
+    internal SecretDataProtectionMaterial(SecretSnapshotHandle handle) => _handle = handle;
+    public SecretRead ReadRing() => _handle.Read("Ring");
+    public SecretRead ReadAdmission() => _handle.Read("Admission");
+    public void Dispose() => _handle.Dispose();
+    public override string ToString() => "secret_data_protection_material";
 }
 
 /// <summary>Retains native dispatch evidence even when the opening waiter is canceled.</summary>

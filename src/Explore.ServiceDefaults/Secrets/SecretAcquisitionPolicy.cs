@@ -20,6 +20,23 @@ public static class SecretAcquisitionPolicy
     private static readonly string[] MigrationRoots =
         ["/database", "/database/erasure", "/database/identity", "/postgresql"];
 
+    public static IReadOnlyList<string> Roots(SecretConsumerRole consumer) => consumer switch
+    {
+        SecretConsumerRole.Api => Array.AsReadOnly(ApiRoots),
+        SecretConsumerRole.Bff => Array.AsReadOnly(BffRoots),
+        SecretConsumerRole.Combined => Array.AsReadOnly<string>([.. ApiRoots, .. BffRoots]),
+        SecretConsumerRole.Migration => Array.AsReadOnly(MigrationRoots),
+        _ => throw new InvalidOperationException("secret_consumer_scope_invalid")
+    };
+
+    public static void AdmitRoots(SecretAuthoritySelection selection, IReadOnlyList<string> roots)
+    {
+        selection.Validate();
+        if (roots.Count == 0 || roots.Distinct(StringComparer.Ordinal).Count() != roots.Count
+            || roots.Any(root => !AllowsRoot(selection.Consumer, root)))
+            throw new InvalidOperationException("secret_consumer_scope_invalid");
+    }
+
     public static bool AllowsRoot(SecretConsumerRole consumer, string folder) => consumer switch
     {
         SecretConsumerRole.Api => ApiRoots.Contains(folder, StringComparer.Ordinal),
@@ -52,8 +69,9 @@ public static class SecretAcquisitionPolicy
             throw new InvalidOperationException("secret_consumer_scope_invalid");
     }
 
-    private static bool IsAuthorityInput(string name) =>
+    internal static bool IsAuthorityInput(string name) =>
         string.Equals(name, "SECRET_PROVIDER", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(name, "AUTHENTICATION_CREDENTIAL_PROFILE_REVISION", StringComparison.OrdinalIgnoreCase)
         || string.Equals(name, "DOTNET_ENVIRONMENT", StringComparison.OrdinalIgnoreCase)
         || string.Equals(name, "ASPNETCORE_ENVIRONMENT", StringComparison.OrdinalIgnoreCase)
         || name.StartsWith("SecretProvider", StringComparison.OrdinalIgnoreCase)

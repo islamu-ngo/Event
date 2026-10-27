@@ -39,6 +39,17 @@ Not every hosted service is a periodic sweep, and forcing one into the scheduler
 | `OutboxProcessor` | Durable side-effect authority; its fencing and retry are coupled to its own loop |
 | `ManagedControlPlaneRegistrationWorker` | Retry-until-registered bootstrap that returns on success — a recurring trigger would never stop |
 | Queue/event-driven drains, startup gates | Not interval-driven at all |
+| Selected Infisical session authentication maintenance | One SecretKit helper may schedule renewal of its own process-local token; token lifetime belongs to that session, not a durable or clustered business job |
+
+The authentication exception is limited to one
+`InfisicalAuthenticationMaintenance` per selected Infisical session. It may
+renew that session's token only: no application-secret polling, business work,
+automatic login, identity switching or mutation replay. Event owns explicit
+startup before lengthy admission, failure cleanup, work drain and disposal.
+Environment/User Secrets authorities and short-lived migration/tooling
+invocations start no helper. This exception adds no general-purpose timer loop
+or additional business scheduler; Quartz remains the scheduling authority for
+application jobs.
 
 These are semantic categories, not a source allowlist. `QuartzSchedulerCompositionTests`
 proves the registered recurring-job manifest and queue-drain boundaries through

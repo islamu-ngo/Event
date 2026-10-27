@@ -373,6 +373,11 @@
           "Polly.RateLimiting": "8.4.2"
         }
       },
+      "Microsoft.Extensions.ServiceDiscovery.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.8.0",
+        "contentHash": "FR1eyZTR6W6Ura43aQ+Kpcogb7aS4EAsMh8sMfOyZHx0PUBzmooIni/GvJBpXjgBUboWCgoDrdbLwCmN7DxHCA=="
+      },
       "Microsoft.Identity.Client": {
         "type": "Transitive",
         "resolved": "4.83.1",
@@ -654,6 +659,26 @@
           "System.Security.Cryptography.Pkcs": "[10.0.13, )"
         }
       },
+      "explore.servicedefaults": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Extensions.Compliance.Abstractions": "[10.8.0, )",
+          "Microsoft.Extensions.Compliance.Redaction": "[10.8.0, )",
+          "Microsoft.Extensions.Http.Resilience": "[10.8.0, )",
+          "Microsoft.Extensions.ServiceDiscovery": "[10.8.0, )",
+          "Microsoft.Extensions.Telemetry": "[10.8.0, )",
+          "OpenTelemetry.Exporter.OpenTelemetryProtocol": "[1.17.0, )",
+          "OpenTelemetry.Exporter.Prometheus.AspNetCore": "[1.17.0-beta.1, )",
+          "OpenTelemetry.Extensions.Hosting": "[1.17.0, )",
+          "OpenTelemetry.Instrumentation.AspNetCore": "[1.17.0, )",
+          "OpenTelemetry.Instrumentation.Http": "[1.17.0, )",
+          "OpenTelemetry.Instrumentation.Runtime": "[1.17.0, )",
+          "SecretKit.Core": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+          "SecretKit.Extensions.Configuration": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+          "SecretKit.Extensions.Hosting": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+          "SecretKit.Infisical": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]"
+        }
+      },
       "EntityFramework": {
         "type": "CentralTransitive",
         "requested": "[6.5.2, )",
@@ -748,6 +773,24 @@
         "resolved": "10.8.0",
         "contentHash": "7I0DXMTCqpXpXg+SLLDlfedtv6DN5Lgiv+PR3MclzqKPOHNB17YP42KMNI61ckSrffh0xsuIqQyCIjvWc6vUuw=="
       },
+      "Microsoft.Extensions.Compliance.Redaction": {
+        "type": "CentralTransitive",
+        "requested": "[10.8.0, )",
+        "resolved": "10.8.0",
+        "contentHash": "5S2z7mIiLNkaL4E/EVB666hHLNOZVLUxLQmz4S4Zb0OfXd57kAf9zB6EHwteADyywdwD2Kmd2R3mzC0eCjv8jg==",
+        "dependencies": {
+          "Microsoft.Extensions.Compliance.Abstractions": "10.8.0"
+        }
+      },
+      "Microsoft.Extensions.ServiceDiscovery": {
+        "type": "CentralTransitive",
+        "requested": "[10.8.0, )",
+        "resolved": "10.8.0",
+        "contentHash": "OflwReySDxjF/zVe2mo0ZqmZjVVPCJ68CoT91CG+j+gjeK4nByslvr8LFd7DcOs2VKHZZsKxfIejcysjEMG3Ng==",
+        "dependencies": {
+          "Microsoft.Extensions.ServiceDiscovery.Abstractions": "10.8.0"
+        }
+      },
       "Microsoft.Extensions.Telemetry": {
         "type": "CentralTransitive",
         "requested": "[10.8.0, )",
@@ -801,6 +844,60 @@
           "Npgsql": "10.0.3"
         }
       },
+      "OpenTelemetry.Exporter.OpenTelemetryProtocol": {
+        "type": "CentralTransitive",
+        "requested": "[1.17.0, )",
+        "resolved": "1.17.0",
+        "contentHash": "R1omQOrQpGlS0Cp5UIr/TAiuEA48JrPlgr1NPV5gESiTU7HhWU+ILe2EBSYb1fKdsSavZ7nZkHcUxAzofPqr2A==",
+        "dependencies": {
+          "OpenTelemetry": "1.17.0"
+        }
+      },
+      "OpenTelemetry.Exporter.Prometheus.AspNetCore": {
+        "type": "CentralTransitive",
+        "requested": "[1.17.0-beta.1, )",
+        "resolved": "1.17.0-beta.1",
+        "contentHash": "eecXu43HkY7LFJDutrQ6kpwvUOMDeqLMtU+UeN225ckXw33qN/StTcdW6mTHH1jDSYdFM29vvDXB3jnFwPHkXg==",
+        "dependencies": {
+          "OpenTelemetry": "[1.17.0, 2.0.0)"
+        }
+      },
+      "OpenTelemetry.Extensions.Hosting": {
+        "type": "CentralTransitive",
+        "requested": "[1.17.0, )",
+        "resolved": "1.17.0",
+        "contentHash": "t1OwL/4qgboGMobYVT+UV5zgWnFqCp4Pw8lcsmzh8m2K8PQsTKkyxrC32tqYTMYny3GOW4q5cltE3dTVzLmRew==",
+        "dependencies": {
+          "OpenTelemetry": "1.17.0"
+        }
+      },
+      "OpenTelemetry.Instrumentation.AspNetCore": {
+        "type": "CentralTransitive",
+        "requested": "[1.17.0, )",
+        "resolved": "1.17.0",
+        "contentHash": "rGbmk1vuy1kvgZmE0ps7Vb99YZvDap6AalrrF60FwnNit1uW/PbeFZj1cpb0T8MPkYmjhBrRJ1/JB6QqXkRjHA==",
+        "dependencies": {
+          "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.17.0, 2.0.0)"
+        }
+      },
+      "OpenTelemetry.Instrumentation.Http": {
+        "type": "CentralTransitive",
+        "requested": "[1.17.0, )",
+        "resolved": "1.17.0",
+        "contentHash": "uTwVtxIJ/xB96wGYTaDsbkJVeCFdUxTwvrlDUn2YJixy0UuKc8DvQMzwKNJMTzNFiiyYO9c40id6tUHTmWs33A==",
+        "dependencies": {
+          "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.17.0, 2.0.0)"
+        }
+      },
+      "OpenTelemetry.Instrumentation.Runtime": {
+        "type": "CentralTransitive",
+        "requested": "[1.17.0, )",
+        "resolved": "1.17.0",
+        "contentHash": "HyYenisDn/xdtyVXdjImsCl+RNC2gq01N0rvSR7tsYAylXR2sxX/YgMsyTajMXA27+r1vB7lNU8cWRhV0fwL+Q==",
+        "dependencies": {
+          "OpenTelemetry.Api": "[1.17.0, 2.0.0)"
+        }
+      },
       "Refit": {
         "type": "CentralTransitive",
         "requested": "[16.3.0, )",
@@ -808,6 +905,41 @@
         "contentHash": "tQS8KnCqSrQPFIjYNglhU1heHSo0NOR82fLSqa4btzrtsvNs3JR8/VETFil2wFB+vncJ/vUpULhR4T0YxfZzTQ==",
         "dependencies": {
           "ReactiveUI.Primitives": "8.2.0"
+        }
+      },
+      "SecretKit.Core": {
+        "type": "CentralTransitive",
+        "requested": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+        "resolved": "0.1.0-local.20261024.1",
+        "contentHash": "OmWuzSqaRzIveyzqq0KZyXJhBWGIhfe5gSsatGjTAC0PwyWa2Xnqvjzlz3dzVZ/dNzHw5UkCdZzXhCD2NKnqgw=="
+      },
+      "SecretKit.Extensions.Configuration": {
+        "type": "CentralTransitive",
+        "requested": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+        "resolved": "0.1.0-local.20261024.1",
+        "contentHash": "nrZrduL2eCDTrlWfBeN502VK2gwMb5tuUveU2urqOPLgim69W0EjLabQQF1Cl1dve5D1CJt5uNajdVFvNRZwsQ==",
+        "dependencies": {
+          "SecretKit.Core": "0.1.0-local.20261024.1"
+        }
+      },
+      "SecretKit.Extensions.Hosting": {
+        "type": "CentralTransitive",
+        "requested": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+        "resolved": "0.1.0-local.20261024.1",
+        "contentHash": "V6MhXUgOvK/xhvO6C5Z/doLV/kNSTjXsRuSpr/yzp7jpLlm/3Xw8HYKkDrKGLKPW+rfSJYkJJVzeUXzC4LpaBw==",
+        "dependencies": {
+          "SecretKit.Core": "0.1.0-local.20261024.1",
+          "SecretKit.Infisical": "0.1.0-local.20261024.1"
+        }
+      },
+      "SecretKit.Infisical": {
+        "type": "CentralTransitive",
+        "requested": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+        "resolved": "0.1.0-local.20261024.1",
+        "contentHash": "2JKcVrs+yVSsSip2e7Vfln8qHNeoa9H5DG3DFSnwA6Cq9Av4m7XI0mnjKgy6f5qvYcAVLhRwureDywcKsnWkjg==",
+        "dependencies": {
+          "Refit": "16.3.0",
+          "SecretKit.Core": "0.1.0-local.20261024.1"
         }
       },
       "SQLitePCLRaw.bundle_e_sqlite3": {

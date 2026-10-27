@@ -1349,6 +1349,7 @@
           "Explore.Application": "[1.0.0, )",
           "Explore.Atproto.Transport": "[1.0.0, )",
           "Explore.Secrets": "[1.0.0, )",
+          "Explore.ServiceDefaults": "[1.0.0, )",
           "Google.Protobuf": "[3.35.1, )",
           "Grpc.Net.Client": "[2.80.0, )",
           "MailKit": "[4.17.0, )",

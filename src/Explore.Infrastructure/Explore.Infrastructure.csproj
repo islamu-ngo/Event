@@ -52,6 +52,7 @@
     <ProjectReference Include="..\Explore.Atproto.Transport\Explore.Atproto.Transport.csproj" />
     <ProjectReference Include="..\Explore.Application\Explore.Application.csproj" />
     <ProjectReference Include="..\Explore.Secrets\Explore.Secrets.csproj" />
+    <ProjectReference Include="..\Explore.ServiceDefaults\Explore.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>

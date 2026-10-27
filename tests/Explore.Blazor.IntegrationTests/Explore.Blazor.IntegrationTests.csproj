@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <Compile Include="../Shared/ExternalDataProtectionTestAuthority.cs" Link="Fixtures/ExternalDataProtectionTestAuthority.cs" />
+    <Compile Include="../Shared/SecretKitHttpAuthority.cs" Link="Fixtures/SecretKitHttpAuthority.cs" />
+    <Using Include="Event.Testing.Secrets" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Explore.Atproto.Transport\Explore.Atproto.Transport.csproj" />

@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventAddOns;
+using Explore.Application.Responses;
 
 namespace Explore.Application.Features.EventAddOns.Requests.Commands;
 

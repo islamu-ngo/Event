@@ -11,6 +11,7 @@ using Explore.Application.DTOs.EventAddOns;
 using Explore.Application.Features.EventAddOns.Requests.Commands;
 using Explore.Application.Features.EventAddOns.Requests.Queries;
 using Explore.Application.Hateoas;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;

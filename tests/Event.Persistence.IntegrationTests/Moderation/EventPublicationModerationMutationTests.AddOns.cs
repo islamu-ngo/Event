@@ -4,6 +4,7 @@ using Explore.Application.DTOs.EventAddOns;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventAddOns.Handlers.Commands;
 using Explore.Application.Features.EventAddOns.Requests.Commands;
+using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;

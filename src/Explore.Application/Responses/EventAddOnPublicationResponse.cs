@@ -1,6 +1,6 @@
-using Explore.Application.Responses;
+using Explore.Application.DTOs.EventAddOns;
 
-namespace Explore.Application.DTOs.EventAddOns;
+namespace Explore.Application.Responses;
 
 public sealed record EventAddOnPublicationResponse : BaseCommandResponse<Guid>
 {

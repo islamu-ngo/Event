@@ -1037,8 +1037,11 @@ public sealed partial class ModerationCaseNativeProofTests
 
         public static async Task<NativeDatabase> CreateAsync(ModerationCaseTargetKind kind, bool standalone = false)
         {
+            using var progress = new StreamWriter(Console.OpenStandardError()) { AutoFlush = true };
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] native-template:start");
             var path = Path.Combine(Path.GetTempPath(), $"native-case-proof-{Guid.CreateVersion7():N}.db");
             await LocalIdentitySqliteTemplate.CopyAsync(path, null, true, default);
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] native-template:complete");
             var database = new NativeDatabase(path, kind, standalone);
             await using (var context = database.Context())
             {
@@ -1158,9 +1161,13 @@ public sealed partial class ModerationCaseNativeProofTests
                     database.FormId = version.Id;
                     context.AddRange(parent, role, catalog, order, resource, form, provider, schema, version);
                 }
+                progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] native-seed-save:start");
                 await context.SaveChangesAsync();
+                progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] native-seed-save:complete");
             }
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] native-qualification:start");
             await QualifyNarrativeCustodyAsync(database, kind);
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] native-qualification:complete");
             await using (var context = database.Context())
             {
                 await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
@@ -1171,6 +1178,7 @@ public sealed partial class ModerationCaseNativeProofTests
                 await Assert.That(await owner.RecheckIssuanceAsync(default)).IsTrue();
                 await transaction.CommitAsync();
             }
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] native-fixture:ready");
             return database;
         }
 

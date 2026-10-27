@@ -300,6 +300,8 @@ public sealed partial class ModerationCaseNativeProofTests
 
     private static async Task<(Guid CaseId, Guid GrantId)> GrantedReadAsync(NativeDatabase database)
     {
+        using var progress = new StreamWriter(Console.OpenStandardError()) { AutoFlush = true };
+        progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] ordinary-intake:start");
         Guid caseId;
         Guid sourceId;
         await using (var context = database.Context())
@@ -314,6 +316,7 @@ public sealed partial class ModerationCaseNativeProofTests
             await Assert.That(accepted.Outcome).IsEqualTo(ModerationCaseIntakeCommitOutcome.Accepted);
             caseId = accepted.Acknowledgement!.CaseId;
         }
+        progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] ordinary-intake:complete");
         await using var setup = database.Context();
         await using var transaction = await setup.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var owner = database.Owner(setup);
@@ -323,6 +326,7 @@ public sealed partial class ModerationCaseNativeProofTests
         await setup.SaveChangesAsync();
         await Assert.That(await owner.RecheckIssuanceAsync(default)).IsTrue();
         await transaction.CommitAsync();
+        progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] ordinary-initial-grant:complete");
         return (caseId, grant!.Id);
     }
 }

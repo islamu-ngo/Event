@@ -41,7 +41,7 @@ jobs:
       - name: Ordinary Grant Settlement
         id: ordinary
         run: |
-          dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
+          timeout --signal=TERM --kill-after=15s 5m dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
             --configuration Release --no-build --verbosity minimal -- \
             --treenode-filter "/*/*/ModerationCaseNativeProofTests/ReadGrantSettlement*" \
             --minimum-expected-tests 8 --maximum-parallel-tests 1 --no-progress \
@@ -51,7 +51,7 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         id: adjudicated
         run: |
-          dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
+          timeout --signal=TERM --kill-after=15s 5m dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
             --configuration Release --no-build --verbosity minimal -- \
             --treenode-filter "/*/*/ModerationNoticeReadTests/Adjudicated_grant_settlement*" \
             --minimum-expected-tests 10 --maximum-parallel-tests 1 --no-progress \

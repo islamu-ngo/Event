@@ -516,7 +516,10 @@ and manual workflow, independent of the required `Build & Test` job. It builds
 the Persistence test project and executes only the ordinary and adjudicated
 grant-settlement methods, with minimum counts of 8 and 10 respectively and one
 test at a time. Both selections are attempted after a successful build even if
-the first fails; either failure still fails the job. Thirty-day TRX artifacts
+the first fails; either failure still fails the job. Each test process has a
+five-minute TERM deadline followed by a fifteen-second forced-stop grace period;
+a process timeout fails its step without cancelling the other selection or
+turning incomplete execution into passing evidence. Thirty-day TRX artifacts
 and the summary identify the tested Git object and actual step outcomes.
 The fixtures use SQLite, including separate and colocated privacy authorities;
 this lane does not attest the full provider matrix. It uses read-only checkout

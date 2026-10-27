@@ -92,10 +92,15 @@ public sealed partial class ModerationQualificationWriterTests
 
         public static async Task<SourceDatabase> CreateAsync()
         {
+            using var progress = new StreamWriter(Console.OpenStandardError()) { AutoFlush = true };
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] source-template:start");
             var connection = await SqliteTestDatabaseFactory.CreateOpenIsolatedConnectionAsync();
             await LocalIdentitySqliteTemplate.CopySeededApplicationToAsync(connection, CancellationToken.None);
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] source-template:complete");
             var database = new SourceDatabase(connection);
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] source-privacy:start");
             database.Privacy = await ModerationNoticePrivacyFixture.CreateAsync();
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] source-privacy:complete");
             await using var context = database.Context();
             var status = await context.TenantStatuses.SingleAsync(row => row.IsActiveState);
             context.Tenants.Add(new Tenant
@@ -148,7 +153,9 @@ public sealed partial class ModerationQualificationWriterTests
                 DisplayName = "Source maintenance"
             };
             context.ServicePrincipals.Add(principal);
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] source-seed-save:start");
             await context.SaveChangesAsync();
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] source-seed-save:complete");
             context.ChangeTracker.Clear();
             var identity = Identity(context, database.AdministratorId, false);
             var setup = await new EstablishModerationAuthoritySourcesCommandHandler(
@@ -165,6 +172,7 @@ public sealed partial class ModerationQualificationWriterTests
                 });
             if (!setup.IsSuccess)
                 throw new InvalidOperationException("The real native authority fixture did not install.");
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] source-fixture:ready");
             return database;
         }
 

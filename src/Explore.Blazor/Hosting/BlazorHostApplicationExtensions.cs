@@ -45,6 +45,15 @@ public static class BlazorHostApplicationExtensions
             }
 
             await app.InitializeDynamicAuthSchemesAsync();
+            var lifecycleLogger = app.Services.GetRequiredService<ILoggerFactory>()
+                .CreateLogger("Explore.Blazor.Hosting.Lifecycle");
+            app.Lifetime.ApplicationStarted.Register(() =>
+            {
+                foreach (string address in app.Urls)
+                    if (Uri.TryCreate(address, UriKind.Absolute, out var listener))
+                        lifecycleLogger.LogInformation(
+                            "BFF lifecycle {Phase} on listener port {ListenerPort}", "started", listener.Port);
+            });
         }
 
         return app;

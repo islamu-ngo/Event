@@ -764,7 +764,7 @@ The standard CI pipeline runs the fast test projects on every PR; integration-en
 3. Runs each fast test project sequentially (not solution-level). `Explore.Infrastructure.Tests` uses `Category!=Runtime` in the fast lane so Docker-backed provider tests do not become an implicit required gate.
 4. Publishes TRX evidence for CI troubleshooting
 5. Fails the PR if any test project reports failures
-6. Architecture tests run alongside unit tests (no infrastructure needed)
+6. Selected Architecture tests run immediately after the build and coverage-directory preparation, before the retained SetupLive security gate and unit suites (no infrastructure needed). Early structural failure blocks the job; skipped runtime suites are not passing evidence, and a successful Architecture run does not replace any later selected gate.
 
 Integration-enabled callers additionally run focused infrastructure runtime categories as evidence. The `Email` lane starts Mailpit through Testcontainers and publishes `Explore.Infrastructure.Tests.Email.trx`; the `RabbitMQ` lane starts the RabbitMQ management image, may also start Mailpit for consumer delivery assertions, and should publish `Explore.Infrastructure.Tests.RabbitMQ.trx` with container diagnostics.
 

@@ -503,6 +503,14 @@ It runs `SetupLiveAuthoritySecurityTests` with
 Cobertura arguments. Coverage validation observes that step's `started` output.
 There is no legacy tool-test loop or coverage owner.
 
+The reusable fast lane runs selected Architecture tests after the Release build
+and before this SetupLive gate. Structural failures therefore surface before
+long-running security checks; the Architecture command, selection condition,
+step ID and TRX evidence are unchanged. A passing Architecture step does not
+replace SetupLive or any later selected suite: all retained gates must pass.
+An early Architecture failure still fails `Build & Test` and retains its TRX;
+runtime suites skipped by fail-fast ordering are not passing evidence.
+
 These read-only checks retain nonpersistent checkout credentials and no signing,
 publication or deployment authority. Bundled CI jobs, fourteen product/test
 solution registrations, two generator registrations, eight exclusive package

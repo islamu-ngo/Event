@@ -315,17 +315,20 @@ public sealed partial class ModerationCaseNativeProofTests
             await using var context = database.Context();
             context.CurrentUserService = caller;
             var sources = NativeNarrativePolicyWriter(context, database, caller, privacy.Authority(context, database.Clock));
+            using var deadline = new CancellationTokenSource();
+            if (Environment.GetEnvironmentVariable("GRANT_TEST_PROGRESS_PATH") is { Length: > 0 })
+                deadline.CancelAfter(TimeSpan.FromSeconds(30));
             progress.WriteLine($"[DEBUG-GRANT-SETTLEMENT] native-qualification-command:{command.GetType().Name}:start");
             var response = command switch
             {
                 RecordModerationCaseNarrativePolicyCommand recording =>
-                    await new RecordModerationCaseNarrativePolicyCommandHandler(sources).ExecuteAsync(recording),
+                    await new RecordModerationCaseNarrativePolicyCommandHandler(sources).ExecuteAsync(recording, deadline.Token),
                 AdoptModerationCaseNarrativePolicyCommand adopting =>
-                    await new AdoptModerationCaseNarrativePolicyCommandHandler(sources).ExecuteAsync(adopting),
+                    await new AdoptModerationCaseNarrativePolicyCommandHandler(sources).ExecuteAsync(adopting, deadline.Token),
                 RecordModerationOperationalBudgetCommand recording =>
-                    await new RecordModerationOperationalBudgetCommandHandler(sources).ExecuteAsync(recording),
+                    await new RecordModerationOperationalBudgetCommandHandler(sources).ExecuteAsync(recording, deadline.Token),
                 AdoptModerationOperationalBudgetCommand adopting =>
-                    await new AdoptModerationOperationalBudgetCommandHandler(sources).ExecuteAsync(adopting),
+                    await new AdoptModerationOperationalBudgetCommandHandler(sources).ExecuteAsync(adopting, deadline.Token),
                 _ => throw new ArgumentOutOfRangeException(nameof(command))
             };
             progress.WriteLine($"[DEBUG-GRANT-SETTLEMENT] native-qualification-command:{command.GetType().Name}:complete");

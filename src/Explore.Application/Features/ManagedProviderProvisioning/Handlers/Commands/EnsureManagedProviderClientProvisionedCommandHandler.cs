@@ -57,6 +57,23 @@ public sealed class EnsureManagedProviderClientProvisionedCommandHandler(
                 "tenant_provisioning_operation_missing", "Durable operation and outbox-generation identifiers are required.");
 
         // The port reloads the full persisted request under its original delivery authority.
-        return await workerCreation.CreateAsync(operation, message, cancellationToken);
+        var response = await workerCreation.CreateAsync(operation, message, cancellationToken);
+        return BaseCommandResponse.Restore(
+            response.Id is { } outcome ? new ManagedProviderClientProvisioningResultDto
+            {
+                TenantId = outcome.TenantId,
+                UserId = outcome.UserId,
+                UserActorId = outcome.UserActorId,
+                UserExternalLoginId = outcome.UserExternalLoginId,
+                TenantUserId = outcome.TenantUserId,
+                TenantUserProfileId = outcome.TenantUserProfileId,
+                TenantUserRoleGrantId = outcome.TenantUserRoleGrantId,
+                TenantPlanAssignmentId = outcome.TenantPlanAssignmentId
+            } : null,
+            response.IsSuccess,
+            response.Message,
+            response.Errors,
+            response.FailureCode,
+            response.QuotaExceeded);
     }
 }

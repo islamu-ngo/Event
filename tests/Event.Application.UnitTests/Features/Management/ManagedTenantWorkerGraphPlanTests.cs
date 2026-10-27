@@ -24,6 +24,11 @@ public sealed class ManagedTenantWorkerGraphPlanTests
         await Assert.That(graph.Result.UserId).IsEqualTo(Subject);
         await Assert.That(graph.Result.UserActorId).IsEqualTo(Actor);
         await Assert.That(graph.Result.UserExternalLoginId).IsEqualTo(Login);
+        await Assert.That(graph.Result.TenantId).IsEqualTo(graph.Creation.Tenant.Id);
+        await Assert.That(graph.Result.TenantUserId).IsEqualTo(graph.Effects.OfType<TenantUser>().Single().Id);
+        await Assert.That(graph.Result.TenantUserProfileId).IsEqualTo(graph.Effects.OfType<TenantUserProfile>().Single().Id);
+        await Assert.That(graph.Result.TenantUserRoleGrantId).IsEqualTo(graph.Effects.OfType<TenantUserRoleGrant>().Single().Id);
+        await Assert.That(graph.Result.TenantPlanAssignmentId).IsEqualTo(graph.Effects.OfType<TenantPlanAssignment>().Single().Id);
         await Assert.That(graph.Effects.OfType<ITenantEntity>().All(row => row.TenantId == graph.Creation.Tenant.Id)).IsTrue();
         await Assert.That(graph.Effects.OfType<TenantUser>().Single().UserId).IsEqualTo(Subject);
         await Assert.That(graph.Effects.OfType<TenantUserRoleGrant>().Single().TenantUserId)

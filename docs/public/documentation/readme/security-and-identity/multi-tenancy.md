@@ -66,7 +66,7 @@ Root routing shares a namespace with application and infrastructure paths.
 Tenant creation and slug changes therefore reject reserved names
 case-insensitively. The protected catalog covers:
 
-* application roots such as `admin`, `events`, `login`, and `onboarding`;
+* application roots such as `admin`, `events`, `login`, `moderation`, and `onboarding`;
 * framework and API roots such as `_blazor`, `_framework`, `api`, and `mcp`;
 * authentication callbacks, health/metrics endpoints, and static-asset roots;
 * governed names such as `official`, `security`, `system`, and `islamu`.
@@ -74,6 +74,8 @@ case-insensitively. The protected catalog covers:
 Slugs must be at least three characters and use lowercase letters and numbers,
 with single hyphens only between segments. Choose a stable community identifier
 such as `al-nour` rather than a system path or an identity-implying name.
+The moderation root remains an application route if resolver configuration is
+temporarily unavailable. This reservation does not rename existing tenants.
 
 ---
 

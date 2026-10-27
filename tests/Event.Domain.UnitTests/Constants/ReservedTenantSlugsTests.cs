@@ -9,6 +9,9 @@ public class ReservedTenantSlugsTests
     [Arguments("vapid-public-key")]
     [Arguments("scalar")]
     [Arguments("quartz")]
+    [Arguments("moderation")]
+    [Arguments("Moderation")]
+    [Arguments("MODERATION")]
     [Arguments("Explore.Blazor.a1b2c3.styles.css")]
     [Arguments("client.09af.js")]
     [Arguments(".well-known")]
@@ -25,7 +28,7 @@ public class ReservedTenantSlugsTests
         [
             "about", "admin", "ai", "auth", "community-guidelines", "contact", "error", "errors",
             "actors", "events", "event-created", "forbidden", "group", "home", "login", "logout",
-            "my", "notifications", "onboarding", "organization", "organizations", "payments",
+            "moderation", "my", "notifications", "onboarding", "organization", "organizations", "payments",
             "privacy", "registration", "settings", "setup", "startup", "status", "studio",
             "terms", "tickets", "users"
         ];
@@ -71,7 +74,7 @@ public class ReservedTenantSlugsTests
     [Test]
     public async Task IsReserved_WithValidTenantSlugs_ReturnsFalse()
     {
-        string[] tenantSlugs = ["al-nour", "my-community", "masjid-al-iman"];
+        string[] tenantSlugs = ["al-nour", "my-community", "masjid-al-iman", "moderation-community"];
 
         await Assert.That(tenantSlugs.All(slug => !ReservedTenantSlugs.IsReserved(slug))).IsTrue();
     }

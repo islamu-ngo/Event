@@ -8,7 +8,7 @@ public static class ReservedTenantSlugs
     {
         "about", "admin", "ai", "auth", "community-guidelines", "contact", "error", "errors",
         "actors", "events", "event-created", "forbidden", "group", "home", "login", "logout",
-        "my", "notifications", "onboarding", "organization", "organizations", "payments", "privacy",
+        "moderation", "my", "notifications", "onboarding", "organization", "organizations", "payments", "privacy",
         "registration", "settings", "setup", "startup", "status", "studio", "terms", "tickets",
         "users", "oauth", "test-endpoint",
         "_blazor", "_framework", "_content", "_host",

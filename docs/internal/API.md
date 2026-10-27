@@ -795,6 +795,9 @@ The dotted-root rule covers generated asset fingerprints and metadata filenames
 without enumerating each build output. Tenant create/update validators consume
 this predicate; the finite `All` set is not an exhaustive list of rejected values.
 This validation does not rename existing tenants or change endpoint authorization.
+The `moderation` application root is reserved in both this catalog and the BFF's
+resolver-configuration outage fallback, so `/moderation` and its child routes do
+not select a tenant when the resolver API is unavailable.
 
 ## Structured Legal-Identity Contracts
 

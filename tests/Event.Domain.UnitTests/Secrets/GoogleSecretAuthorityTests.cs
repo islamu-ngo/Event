@@ -2,7 +2,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 
-namespace Explore.Secrets.UnitTests.Services;
+namespace Event.Domain.UnitTests.Secrets;
 
 public sealed class GoogleSecretAuthorityTests
 {

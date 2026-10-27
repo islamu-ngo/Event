@@ -1553,6 +1553,8 @@
           "Polly": "[8.7.0, )",
           "RabbitMQ.Client": "[7.2.1, )",
           "Refit.HttpClientFactory": "[16.3.0, )",
+          "SecretKit.Core": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+          "SecretKit.Infisical": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
           "Stripe.net": "[52.3.0, )",
           "Svix": "[1.99.1, )",
           "System.IdentityModel.Tokens.Jwt": "[8.22.0, )",

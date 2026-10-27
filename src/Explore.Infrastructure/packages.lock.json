@@ -187,6 +187,22 @@
           "Refit": "16.3.0"
         }
       },
+      "SecretKit.Core": {
+        "type": "Direct",
+        "requested": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+        "resolved": "0.1.0-local.20261024.1",
+        "contentHash": "OmWuzSqaRzIveyzqq0KZyXJhBWGIhfe5gSsatGjTAC0PwyWa2Xnqvjzlz3dzVZ/dNzHw5UkCdZzXhCD2NKnqgw=="
+      },
+      "SecretKit.Infisical": {
+        "type": "Direct",
+        "requested": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+        "resolved": "0.1.0-local.20261024.1",
+        "contentHash": "2JKcVrs+yVSsSip2e7Vfln8qHNeoa9H5DG3DFSnwA6Cq9Av4m7XI0mnjKgy6f5qvYcAVLhRwureDywcKsnWkjg==",
+        "dependencies": {
+          "Refit": "16.3.0",
+          "SecretKit.Core": "0.1.0-local.20261024.1"
+        }
+      },
       "Stripe.net": {
         "type": "Direct",
         "requested": "[52.3.0, )",
@@ -907,12 +923,6 @@
           "ReactiveUI.Primitives": "8.2.0"
         }
       },
-      "SecretKit.Core": {
-        "type": "CentralTransitive",
-        "requested": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
-        "resolved": "0.1.0-local.20261024.1",
-        "contentHash": "OmWuzSqaRzIveyzqq0KZyXJhBWGIhfe5gSsatGjTAC0PwyWa2Xnqvjzlz3dzVZ/dNzHw5UkCdZzXhCD2NKnqgw=="
-      },
       "SecretKit.Extensions.Configuration": {
         "type": "CentralTransitive",
         "requested": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
@@ -930,16 +940,6 @@
         "dependencies": {
           "SecretKit.Core": "0.1.0-local.20261024.1",
           "SecretKit.Infisical": "0.1.0-local.20261024.1"
-        }
-      },
-      "SecretKit.Infisical": {
-        "type": "CentralTransitive",
-        "requested": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
-        "resolved": "0.1.0-local.20261024.1",
-        "contentHash": "2JKcVrs+yVSsSip2e7Vfln8qHNeoa9H5DG3DFSnwA6Cq9Av4m7XI0mnjKgy6f5qvYcAVLhRwureDywcKsnWkjg==",
-        "dependencies": {
-          "Refit": "16.3.0",
-          "SecretKit.Core": "0.1.0-local.20261024.1"
         }
       },
       "SQLitePCLRaw.bundle_e_sqlite3": {

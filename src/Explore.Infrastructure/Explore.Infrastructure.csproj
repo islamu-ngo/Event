@@ -42,6 +42,8 @@
     <PackageReference Include="OpenTelemetry" />
     <PackageReference Include="RabbitMQ.Client" />
     <PackageReference Include="Refit.HttpClientFactory" />
+    <PackageReference Include="SecretKit.Core" />
+    <PackageReference Include="SecretKit.Infisical" />
     <PackageReference Include="Svix" />
     <PackageReference Include="Stripe.net" />
     <PackageReference Include="WebPush" />

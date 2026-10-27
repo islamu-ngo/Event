@@ -105,6 +105,27 @@ Reject expired or uncertain preparation; no persisted token, automatic relogin
 or renewal replay. One caller's cancellation must not cancel another owner's
 accepted shared work.
 
+## Native runtime read ownership
+
+Native sources and `SecretResolverCacheState` are shared across scopes, while
+binding repositories and `ISecretResolver` remain scoped. Resolve
+`IRetainedSecretResolver` through that same scoped resolver instance. Registration
+does not create or take ownership of the selected authority supplied by the
+composition root.
+
+Admit binding coordinates and consumer roots before provider access. Keep native
+revision comparison inside its selected owner; exported comparison tokens are
+not portable provider versions. Fence publication by read-start order and reject
+superseded responses or evidence lost through compaction. Binding changes, owner
+replacement and inventory eviction invalidate comparison evidence even when
+secret material has not changed.
+
+Environment and User Secrets validation uses the selected frozen generation,
+not a promise to reread ambient configuration. Provider access and cache
+publication tests qualify these local boundaries, not remote actor permissions
+or convergence across replicas. Native read registration alone does not activate
+a serving entrypoint.
+
 ## Foundation versus successor execution
 
 All four immutable packages at `[0.1.0-local.20261024.1]` support this foundation;

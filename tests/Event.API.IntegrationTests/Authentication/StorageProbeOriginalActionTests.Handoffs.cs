@@ -236,7 +236,7 @@ public sealed partial class StorageProbeOriginalActionTests
             services.AddStorageProbeSourceOwner();
             services.RemoveAll<ISecretSource>();
             services.AddSingleton<ISecretSource>(this);
-            services.AddScoped<IRetainedSecretResolver, Explore.Secrets.Services.SecretResolver>();
+            services.AddScoped<IRetainedSecretResolver, Explore.Infrastructure.Secrets.SecretResolver>();
             var factory = Substitute.For<IStorageProbeClientFactory>();
             factory.Create(Arg.Any<S3Configuration>()).Returns(call =>
                 CreateClient(call.Arg<S3Configuration>() ?? throw new InvalidOperationException("Missing probe configuration.")));

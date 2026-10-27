@@ -39,7 +39,7 @@ internal sealed class StorageProbeNativeRemote(PostgreSqlContainerFixture postgr
         services.RemoveAll<ISecretSource>();
         services.AddSingleton<ISecretSource>(this);
         services.RemoveAll<IRetainedSecretResolver>();
-        services.AddScoped<IRetainedSecretResolver, Explore.Secrets.Services.SecretResolver>();
+        services.AddScoped<IRetainedSecretResolver, Explore.Infrastructure.Secrets.SecretResolver>();
         services.RemoveAll<IStorageProbeClientFactory>();
         var factory = Substitute.For<IStorageProbeClientFactory>();
         factory.Create(Arg.Any<S3Configuration>()).Returns(call =>

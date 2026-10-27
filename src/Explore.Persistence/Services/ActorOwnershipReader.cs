@@ -5,7 +5,7 @@ using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 
-namespace Explore.Persistence.Repositories;
+namespace Explore.Persistence.Services;
 
 /// <summary>Projects ownership identifiers on the caller's original selected tenant context.</summary>
 public sealed class ActorOwnershipReader(

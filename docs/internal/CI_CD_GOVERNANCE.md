@@ -521,6 +521,11 @@ five-minute TERM deadline followed by a fifteen-second forced-stop grace period;
 a process timeout fails its step without cancelling the other selection or
 turning incomplete execution into passing evidence. Thirty-day TRX artifacts
 and the summary identify the tested Git object and actual step outcomes.
+Temporary fixed-label fixture progress files are also retained and printed on
+process exit, preserving diagnostics when test-runner output is buffered or a
+deadline interrupts TRX generation. These probes contain no test input data and
+must be removed after diagnosis; neither printing nor artifact retention changes
+the original process exit status.
 The fixtures use SQLite, including separate and colocated privacy authorities;
 this lane does not attest the full provider matrix. It uses read-only checkout
 permissions without repository secrets. No existing workflow, required check,

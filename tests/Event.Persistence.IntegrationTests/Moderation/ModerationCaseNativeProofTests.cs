@@ -1037,7 +1037,10 @@ public sealed partial class ModerationCaseNativeProofTests
 
         public static async Task<NativeDatabase> CreateAsync(ModerationCaseTargetKind kind, bool standalone = false)
         {
-            using var progress = new StreamWriter(Console.OpenStandardError()) { AutoFlush = true };
+            using var progress = new StreamWriter(Environment.GetEnvironmentVariable("GRANT_TEST_PROGRESS_PATH") is { Length: > 0 } progressFile
+                ? new FileStream(progressFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)
+                : Console.OpenStandardError())
+            { AutoFlush = true };
             progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] native-template:start");
             var path = Path.Combine(Path.GetTempPath(), $"native-case-proof-{Guid.CreateVersion7():N}.db");
             await LocalIdentitySqliteTemplate.CopyAsync(path, null, true, default);

@@ -300,7 +300,10 @@ public sealed partial class ModerationCaseNativeProofTests
 
     private static async Task<(Guid CaseId, Guid GrantId)> GrantedReadAsync(NativeDatabase database)
     {
-        using var progress = new StreamWriter(Console.OpenStandardError()) { AutoFlush = true };
+        using var progress = new StreamWriter(Environment.GetEnvironmentVariable("GRANT_TEST_PROGRESS_PATH") is { Length: > 0 } progressFile
+            ? new FileStream(progressFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)
+            : Console.OpenStandardError())
+        { AutoFlush = true };
         progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] ordinary-intake:start");
         Guid caseId;
         Guid sourceId;

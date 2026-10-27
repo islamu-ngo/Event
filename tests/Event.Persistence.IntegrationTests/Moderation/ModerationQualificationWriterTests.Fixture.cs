@@ -92,7 +92,10 @@ public sealed partial class ModerationQualificationWriterTests
 
         public static async Task<SourceDatabase> CreateAsync()
         {
-            using var progress = new StreamWriter(Console.OpenStandardError()) { AutoFlush = true };
+            using var progress = new StreamWriter(Environment.GetEnvironmentVariable("GRANT_TEST_PROGRESS_PATH") is { Length: > 0 } progressFile
+                ? new FileStream(progressFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)
+                : Console.OpenStandardError())
+            { AutoFlush = true };
             progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] source-template:start");
             var connection = await SqliteTestDatabaseFactory.CreateOpenIsolatedConnectionAsync();
             await LocalIdentitySqliteTemplate.CopySeededApplicationToAsync(connection, CancellationToken.None);

@@ -203,7 +203,7 @@ public sealed partial class ModerationAdjudicatedCaseReadGrantRepository(
                                     result = current;
                                 }
                                 saved = Snapshot(result);
-                                settlement = context.BindModerationReadGrantSettlement(result!);
+                                settlement = context.BindModerationReadGrantSettlement(result!, authority.Epoch);
                                 await context.SaveChangesAsync(token);
                                 await Recheck(token);
                                 return result;

@@ -13,8 +13,13 @@ public partial class ExploreDbContext
         ModerationCaseReadGrantRevocationReceipt? receipt) => BindModerationReadGrantSettlement(
             receipt is null ? [Entry(grant)] : [Entry(grant), Entry(receipt)]);
 
-    internal IDisposable BindModerationReadGrantSettlement(ModerationAdjudicatedCaseReadGrant grant) =>
-        BindModerationReadGrantSettlement([Entry(grant)]);
+    internal IDisposable BindModerationReadGrantSettlement(ModerationAdjudicatedCaseReadGrant grant,
+        ModerationQualificationEpoch qualification)
+    {
+        if (Entry(qualification).State != EntityState.Unchanged)
+            throw new ModerationReadGrantSettlementException();
+        return BindModerationReadGrantSettlement([Entry(grant), Entry(qualification)]);
+    }
 
     private IDisposable BindModerationReadGrantSettlement(EntityEntry[] entries)
     {

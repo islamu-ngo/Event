@@ -1943,8 +1943,15 @@ checks ownership before preparation, after native recovery preparation and after
 the save interceptors return. A substituted recipient, expiry or additional
 tracked grant aborts the transaction instead of becoming the accepted snapshot.
 The lease remains active through the co-located privacy owner's final check.
-The new substitution and additional-write regressions are source-only and
-UNRUN/unbuilt; this mechanism still requires remote provider verification.
+The adjudicated owner also binds its exact, already qualified
+`ModerationQualificationEpoch` as an unchanged observation, with all mapped values
+frozen. Only that object is admitted: changing its revision, replacing it or
+detaching it aborts settlement. This does not authorize qualification writes or
+admit arbitrary unchanged tracked rows.
+The prior substitution and additional-write regressions compiled remotely but
+failed before their settlement probes were reached. The new qualification
+mutation/replacement cases remain unbuilt and unrun; this mechanism still
+requires successful remote provider verification.
 
 Two supplementary native source cases exercise issuance by an actual custody
 TenantAdmin rather than a platform administrator, then loss of that exact role

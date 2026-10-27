@@ -16,7 +16,7 @@ public sealed partial class ModerationNoticeReadTests
         var original = await SeedCreatingNoticeLedgerAsync(fixture);
         var request = AdjudicatedGrantRequest(fixture, original);
         await using var primary = fixture.Database.Context();
-        await using var colocated = colocatedPrivacy ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(primary) : null;
+        await using var colocated = colocatedPrivacy ? ModerationNoticePrivacyFixture.ReuseColocated(primary) : null;
         await using var writer = fixture.Database.Context();
         var repository = AdjudicatedGrants(writer, fixture, fixture.Database.AdministratorId, colocated);
         var before = await RecoveryAsync();
@@ -50,6 +50,10 @@ public sealed partial class ModerationNoticeReadTests
     [Arguments(true, "extra-first-save")]
     [Arguments(false, "extra-second-save")]
     [Arguments(true, "extra-second-save")]
+    [Arguments(false, "qualification-revision")]
+    [Arguments(true, "qualification-revision")]
+    [Arguments(false, "qualification-replacement")]
+    [Arguments(true, "qualification-replacement")]
     public async Task Adjudicated_grant_settlement_rejects_substitution_and_unowned_grants(
         bool colocatedPrivacy, string defect)
     {
@@ -57,7 +61,8 @@ public sealed partial class ModerationNoticeReadTests
         var original = await SeedCreatingNoticeLedgerAsync(fixture);
         var request = AdjudicatedGrantRequest(fixture, original);
         await using var primary = fixture.Database.Context();
-        await using var colocated = colocatedPrivacy ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(primary) : null;
+        var qualificationBefore = await primary.ModerationQualificationEpochs.AsNoTracking().SingleAsync();
+        await using var colocated = colocatedPrivacy ? ModerationNoticePrivacyFixture.ReuseColocated(primary) : null;
         var extraId = Guid.CreateVersion7();
         var probe = new SubstituteAdjudicatedGrantAtSave(request.OperationId, extraId, fixture.Database.SubjectId, defect);
         await using (var writer = fixture.Database.Context(probe))
@@ -72,6 +77,9 @@ public sealed partial class ModerationNoticeReadTests
         inspect.ModerationTrustDomainId = fixture.Database.Scope.TrustDomainId;
         await Assert.That(await inspect.Set<ModerationAdjudicatedCaseReadGrant>()
             .AnyAsync(row => row.Id == request.OperationId || row.Id == extraId)).IsFalse();
+        var qualificationAfter = await inspect.ModerationQualificationEpochs.AsNoTracking().SingleAsync();
+        await Assert.That((qualificationAfter.Id, qualificationAfter.HostBindingId, qualificationAfter.TenantId, qualificationAfter.Revision))
+            .IsEqualTo((qualificationBefore.Id, qualificationBefore.HostBindingId, qualificationBefore.TenantId, qualificationBefore.Revision));
         await AssertOriginalAdjudicatedLedgerUnchangedAsync(fixture, original);
     }
 
@@ -97,6 +105,19 @@ public sealed partial class ModerationNoticeReadTests
             }
             else if (!Observed && defect == "extra-second-save" && _saves == 2)
                 AddExtra(context, entry.Entity);
+            else if (!Observed && (defect is "qualification-revision" or "qualification-replacement")
+                && entry.State == EntityState.Added)
+            {
+                Observed = true;
+                var epoch = context.ChangeTracker.Entries<ModerationQualificationEpoch>().Single();
+                if (defect == "qualification-revision") epoch.Entity.Advance(epoch.Entity.Revision);
+                else
+                {
+                    var replacement = (ModerationQualificationEpoch)epoch.CurrentValues.ToObject();
+                    epoch.State = EntityState.Detached;
+                    context.Attach(replacement);
+                }
+            }
             return ValueTask.FromResult(result);
         }
 

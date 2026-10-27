@@ -1095,8 +1095,12 @@ The grant/revoke routes return identifiers only, not case bodies or delivery
 tokens. Independently approved correction text and delivery still need their
 own qualification. The settlement repair keeps the originally qualified recipient
 and deadline fixed before saving and rejects additional tracked grants, including
-changes introduced between the enrollment owner's saves. The added regression
-cases remain **UNRUN/unbuilt**; this is not provider/runtime certification.
+changes introduced between the enrollment owner's saves. The original
+qualification record must also remain unchanged; the grant operation cannot
+advance or replace it. Earlier regression cases compiled remotely but failed
+before the settlement probes were reached. The new qualification mutation and
+replacement cases remain **UNRUN/unbuilt**; this is not provider/runtime
+certification.
 Source integration is in progress: Domain and Application
 compiled, and the custody-scope correction compiled in Persistence with 62 warnings
 and no errors. The subsequent construction-time expiry correction also compiled

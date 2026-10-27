@@ -35,6 +35,16 @@ internal sealed class ModerationNoticePrivacyFixture(
         return new(connection, options, ownsConnection: false);
     }
 
+    internal static ModerationNoticePrivacyFixture ReuseColocated(
+        ExploreDbContext primary, params IInterceptor[] interceptors)
+    {
+        var connection = (SqliteConnection)primary.Database.GetDbConnection();
+        var options = TestDbContextOptions.Create<EmbeddedPrivacyErasureAuthorityDbContext>()
+            .UseSqlite(connection).UseSnakeCaseNamingConvention().AddInterceptors(interceptors).Options;
+        // LocalIdentitySqliteTemplate already includes the co-located privacy authority schema.
+        return new(connection, options, ownsConnection: false);
+    }
+
     internal EmbeddedPrivacyErasureAuthorityRepository Authority(ExploreDbContext primary, TimeProvider clock) =>
         new(new AuthorityFactory(options), clock, Options.Create(new PrivacyErasureOptions()), applicationContext: primary);
 

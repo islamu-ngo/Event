@@ -5,21 +5,7 @@ using Explore.Application.Responses;
 
 namespace Explore.Application.Features.Users.Handlers.Commands;
 
-public sealed class ReadProfileCollectionOptionsHandler(IModerationProfileCollectionAdmissionOwner owner)
-    : IQueryHandler<ReadProfileCollectionOptionsRequest, IReadOnlyList<ModerationProfileCollectionOption>>
-{
-    public Task<IReadOnlyList<ModerationProfileCollectionOption>> QueryAsync(ReadProfileCollectionOptionsRequest request,
-        CancellationToken cancellationToken = default) => owner.ReadOptionsAsync(request.UserId, cancellationToken);
-}
-
-public sealed class ReadPrivateBirthDateStatusHandler(IModerationProfileCollectionAdmissionOwner owner)
-    : IQueryHandler<ReadPrivateBirthDateStatusRequest, PrivateBirthDateStatus>
-{
-    public Task<PrivateBirthDateStatus> QueryAsync(ReadPrivateBirthDateStatusRequest request,
-        CancellationToken cancellationToken = default) => owner.ReadBirthDateStatusAsync(request.UserId, cancellationToken);
-}
-
-public sealed class RecordPrivateBirthDateHandler(IModerationProfileCollectionAdmissionOwner owner)
+public sealed class RecordPrivateBirthDateCommandHandler(IModerationProfileCollectionAdmissionOwner owner)
     : ICommandHandler<RecordPrivateBirthDateCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(RecordPrivateBirthDateCommand request,
@@ -30,7 +16,7 @@ public sealed class RecordPrivateBirthDateHandler(IModerationProfileCollectionAd
     }
 }
 
-public sealed class ClearPrivateBirthDateHandler(IModerationProfileCollectionAdmissionOwner owner)
+public sealed class ClearPrivateBirthDateCommandHandler(IModerationProfileCollectionAdmissionOwner owner)
     : ICommandHandler<ClearPrivateBirthDateCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ClearPrivateBirthDateCommand request,

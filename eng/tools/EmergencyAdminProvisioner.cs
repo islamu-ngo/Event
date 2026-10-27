@@ -2,7 +2,7 @@
 #:project ../../src/Explore.Persistence.Migrations.Sqlite/Explore.Persistence.Migrations.Sqlite.csproj
 #:project ../../src/Explore.Persistence.Migrations.SqlServer/Explore.Persistence.Migrations.SqlServer.csproj
 #:project ../../src/Explore.Persistence.Migrations.MySql/Explore.Persistence.Migrations.MySql.csproj
-#:property RestorePackagesWithLockFile=false
+#:property NuGetLockFilePath=obj/EmergencyAdminProvisioner/packages.lock.json
 #:property PublishAot=false
 
 using Explore.Domain.ValueObjects;

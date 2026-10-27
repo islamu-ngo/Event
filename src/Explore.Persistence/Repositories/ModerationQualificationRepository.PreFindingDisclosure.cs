@@ -198,13 +198,7 @@ public sealed partial class ModerationQualificationRepository
                     throw new InvalidOperationException("Native pre-finding cleanup authority is unavailable.");
                 context.ModerationTrustDomainId = host.TrustDomainId;
                 var now = PreFindingTime();
-                var sqlite = context.Database.ProviderName == RelationalNamedLock.SqliteProvider;
-                var candidates = sqlite
-                    ? context.Set<ModerationPreFindingNotice>().FromSqlInterpolated($"""
-                        SELECT n.* FROM moderation_pre_finding_notices AS n
-                        WHERE n.purged_at IS NULL AND julianday(n.retain_until) <= julianday({now})
-                        """)
-                    : context.Set<ModerationPreFindingNotice>().Where(row => row.PurgedAt == null && row.RetainUntil <= now);
+                var candidates = ModerationPreFindingTemporalQueries.UnpurgedRetainedThrough(context, now);
                 var metadata = await candidates.AsNoTracking()
                     .Where(row => row.HostBindingId == host.Id && row.TenantId == tenant && row.TrustDomainId == host.TrustDomainId)
                     .OrderBy(row => row.Id).Take(batchSize).Select(row => new { row.Id, row.Revision, row.RetainUntil })

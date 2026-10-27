@@ -65,11 +65,14 @@ internal sealed class OwnedBrowserContext : IAsyncDisposable
 {
     private readonly IPlaywright playwright;
     private readonly IBrowser browser;
+    private readonly FileStream? toolObservation;
 
-    private OwnedBrowserContext(IPlaywright playwright, IBrowser browser, IBrowserContext context, IPage page)
+    private OwnedBrowserContext(IPlaywright playwright, IBrowser browser, IBrowserContext context, IPage page,
+        FileStream? toolObservation)
     {
         this.playwright = playwright;
         this.browser = browser;
+        this.toolObservation = toolObservation;
         Context = context;
         Page = page;
     }
@@ -86,8 +89,12 @@ internal sealed class OwnedBrowserContext : IAsyncDisposable
 
         IPlaywright playwright = await Playwright.CreateAsync();
         IBrowser? browser = null;
+        FileStream? toolObservation = null;
         try
         {
+            using var observationDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            toolObservation = await AppHostRuntimeTests.DirectContainerCreationObservation.RecordBrowserToolAsync(
+                observationDeadline.Token);
             browser = await playwright.Chromium.LaunchAsync(new() { Headless = true });
             IBrowserContext context = await browser.NewContextAsync(new()
             {
@@ -99,39 +106,34 @@ internal sealed class OwnedBrowserContext : IAsyncDisposable
             context.SetDefaultTimeout(15_000);
             context.SetDefaultNavigationTimeout(30_000);
             IPage page = await context.NewPageAsync();
-            return new(playwright, browser, context, page);
+            return new(playwright, browser, context, page, toolObservation);
         }
-        catch
+        catch (Exception primary)
         {
-            try
-            {
-                if (browser is not null)
-                    await browser.CloseAsync();
-            }
-            finally
-            {
-                playwright.Dispose();
-            }
-            throw;
+            var failures = new List<Exception> { primary };
+            try { if (browser is not null) await browser.CloseAsync(); }
+            catch (Exception failure) { failures.Add(failure); }
+            try { playwright.Dispose(); }
+            catch (Exception failure) { failures.Add(failure); }
+            try { if (toolObservation is not null) await toolObservation.DisposeAsync(); }
+            catch (Exception failure) { failures.Add(failure); }
+            if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(primary).Throw();
+            throw new AggregateException(failures);
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        try
-        {
-            await Context.CloseAsync();
-        }
-        finally
-        {
-            try
-            {
-                await browser.CloseAsync();
-            }
-            finally
-            {
-                playwright.Dispose();
-            }
-        }
+        var failures = new List<Exception>();
+        try { await Context.CloseAsync(); }
+        catch (Exception failure) { failures.Add(failure); }
+        try { await browser.CloseAsync(); }
+        catch (Exception failure) { failures.Add(failure); }
+        try { playwright.Dispose(); }
+        catch (Exception failure) { failures.Add(failure); }
+        try { if (toolObservation is not null) await toolObservation.DisposeAsync(); }
+        catch (Exception failure) { failures.Add(failure); }
+        if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException(failures);
     }
 }

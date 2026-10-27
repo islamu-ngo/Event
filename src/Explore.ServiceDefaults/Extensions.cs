@@ -76,7 +76,9 @@ public static class Extensions
                 throw new InvalidDataException();
             await using (var markerStream = new FileStream(marker, new FileStreamOptions
             {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read,
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
                 Options = FileOptions.Asynchronous | FileOptions.SequentialScan
             }))
             {
@@ -176,7 +178,9 @@ public static class Extensions
             string[] identity = await PrivateManagedHostRootObserver.FileIdentityAsync(path, false, cancellationToken);
             await using var stream = new FileStream(path, new FileStreamOptions
             {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read,
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
                 Options = FileOptions.Asynchronous | FileOptions.SequentialScan
             });
             string descriptor = $"/proc/{Environment.ProcessId}/fd/{stream.SafeFileHandle.DangerousGetHandle()}";
@@ -234,8 +238,10 @@ public static class Extensions
             await VerifyFilesAsync(cancellationToken);
             return new
             {
-                RuntimeManifestPath = Runtime!.Path, RuntimeManifestSha256 = Runtime.Sha256,
-                EndpointManifestPath = Endpoint!.Path, EndpointManifestSha256 = Endpoint.Sha256
+                RuntimeManifestPath = Runtime!.Path,
+                RuntimeManifestSha256 = Runtime.Sha256,
+                EndpointManifestPath = Endpoint!.Path,
+                EndpointManifestSha256 = Endpoint.Sha256
             };
         }
 
@@ -495,6 +501,11 @@ public static class Extensions
                     throw new InvalidDataException();
                 NoLinks(entryAssembly);
                 var webEnvironment = services.GetService<IWebHostEnvironment>();
+                int? operationsTargetPort = webEnvironment is null ? null
+                    : configuration.GetValue<int?>("OperationalEndpoints:Port");
+                if (operationsTargetPort is < 1 or > 65535) throw new InvalidDataException();
+                int? httpTargetPort = webEnvironment is null ? null
+                    : ReadHttpTargetPort(configuration[WebHostDefaults.ServerUrlsKey], operationsTargetPort);
                 string? webRoot = webEnvironment?.WebRootPath;
                 if (!string.IsNullOrEmpty(webRoot))
                 {
@@ -504,9 +515,17 @@ public static class Extensions
                 ulong start = ProcessStart();
                 byte[] record = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
                 {
-                    Schema = 1, RunId = owner, Pid = Environment.ProcessId, Start = start, ContentRoot = contentRoot,
-                    ApplicationName = applicationName, EntryAssembly = entryAssembly,
-                    IsWebHost = webEnvironment is not null, WebRoot = webRoot,
+                    Schema = 1,
+                    RunId = owner,
+                    Pid = Environment.ProcessId,
+                    Start = start,
+                    ContentRoot = contentRoot,
+                    ApplicationName = applicationName,
+                    EntryAssembly = entryAssembly,
+                    IsWebHost = webEnvironment is not null,
+                    WebRoot = webRoot,
+                    OperationsTargetPort = operationsTargetPort,
+                    HttpTargetPort = httpTargetPort,
                     ServedAssets = services.GetService<AssuranceStaticAssetSelection>() is { } selection
                         ? await selection.ObserveAsync(cancellationToken) : null
                 });
@@ -515,7 +534,9 @@ public static class Extensions
                 string published = Path.Combine(root, $"managed-host-root-{Environment.ProcessId}-{start}.json");
                 pending = new FileStream(temporary, new FileStreamOptions
                 {
-                    Mode = FileMode.CreateNew, Access = FileAccess.ReadWrite, Share = FileShare.Read,
+                    Mode = FileMode.CreateNew,
+                    Access = FileAccess.ReadWrite,
+                    Share = FileShare.Read,
                     UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
                 });
                 await pending.WriteAsync(record, cancellationToken);
@@ -569,6 +590,28 @@ public static class Extensions
             return Task.CompletedTask;
         }
 
+        private static int? ReadHttpTargetPort(string? bindings, int? operationsPort)
+        {
+            if (string.IsNullOrWhiteSpace(bindings) || bindings.Length > 8192) return null;
+            string[] values = bindings.Split(';');
+            if (values.Length > 16) return null;
+            var ports = new HashSet<int>();
+            foreach (string binding in values)
+            {
+                // Wildcard authorities are binding selectors; only their explicitly configured port is retained.
+                string value = binding.Trim();
+                if (value.StartsWith("http://*:", StringComparison.OrdinalIgnoreCase)
+                    || value.StartsWith("http://+:", StringComparison.OrdinalIgnoreCase))
+                    value = "http://localhost:" + value[9..];
+                if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                    || uri.Scheme is not ("http" or "https") || uri.UserInfo.Length != 0
+                    || uri.AbsolutePath != "/" || uri.Query.Length != 0 || uri.Fragment.Length != 0
+                    || uri.Port is < 1 or > 65535) return null;
+                if (uri.Scheme == "http" && uri.Port != operationsPort) ports.Add(uri.Port);
+            }
+            return ports.Count == 1 ? ports.Single() : null;
+        }
+
         public void Dispose()
         {
             Interlocked.Exchange(ref stopped, 1);
@@ -611,7 +654,9 @@ public static class Extensions
             using var process = new System.Diagnostics.Process();
             process.StartInfo = new System.Diagnostics.ProcessStartInfo("stat")
             {
-                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
             };
             process.StartInfo.Environment["LC_ALL"] = "C";
             if (follow) process.StartInfo.ArgumentList.Add("--dereference");

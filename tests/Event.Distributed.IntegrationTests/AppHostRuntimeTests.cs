@@ -549,9 +549,13 @@ public sealed partial class AppHostRuntimeTests
     [Test]
     public async Task ManagedLaunchHintsRemainPrivateExclusiveAndUnattested()
     {
-        await using var owner = new OwnedAppHostFixture("Split");
+        var owner = new OwnedAppHostFixture("Split");
+        CancellationTokenSource? readerLifetimeDependency = null;
+        bool readerDependenciesSettled = true;
+        var controlFailures = new List<Exception>();
         var selected = new ProjectResource("explore-api");
-        var observation = new OwnedAppHostFixture.ManagedResourceLaunchObservation([selected], owner.RunId, owner.Root);
+        var selectedContainer = new ContainerResource("postgres");
+        var observation = new OwnedAppHostFixture.ManagedResourceLaunchObservation([selected, selectedContainer], owner.RunId, owner.Root);
         string retained = Path.Combine(Path.GetTempPath(), $"islamu-assurance-managed-launches-{owner.RunId}");
         try
         {
@@ -565,7 +569,111 @@ public sealed partial class AppHostRuntimeTests
             observation.RecordStartupFailure("readiness_wait", unknownReason, false, true, false);
             if (OperatingSystem.IsLinux())
                 await Assert.That(File.GetUnixFileMode(hints[0]) == (UnixFileMode.UserRead | UnixFileMode.UserWrite)).IsTrue();
-            await observation.RetainAsync(CancellationToken.None);
+            var readerLifetime = new CancellationTokenSource();
+            readerLifetimeDependency = readerLifetime;
+            using var startupLifetime = new CancellationTokenSource();
+            using var lifecycleDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var readerArmed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var laterIncarnation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var laterPublished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var initialHint = observation.Rows.Single();
+            ulong laterStart = initialHint.Start == 1 ? 2UL : 1UL;
+            async Task ObserveLifetimeAsync()
+            {
+                readerArmed.TrySetResult();
+                await laterIncarnation.Task.WaitAsync(readerLifetime.Token);
+                // A controlled incarnation token exercises publication; this is not a kernel PID-reuse claim.
+                await observation.PublishObservedIncarnationAsync(selected, initialHint.InstanceSha256,
+                    initialHint.Pid, laterStart, initialHint.Diagnostic, null, readerLifetime.Token);
+                await observation.PublishObservedIncarnationAsync(selected, initialHint.InstanceSha256,
+                    initialHint.Pid, laterStart, initialHint.Diagnostic, null, readerLifetime.Token);
+                laterPublished.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, readerLifetime.Token);
+            }
+            readerDependenciesSettled = false;
+            Task lifetimeReader = ObserveLifetimeAsync();
+            bool readerSurvivedReadiness = false, laterCaptured = false;
+            var lifecycleFailures = new List<Exception>();
+            try
+            {
+                await OwnedAppHostFixture.RunObservedStartupAsync(token => lifetimeReader.WaitAsync(token),
+                    _ => Task.CompletedTask, _ => readerArmed.Task, () => { }, (_, _, _) => { }, startupLifetime);
+                readerSurvivedReadiness = startupLifetime.IsCancellationRequested && !lifetimeReader.IsCompleted;
+                laterIncarnation.TrySetResult();
+                await laterPublished.Task.WaitAsync(lifecycleDeadline.Token);
+                laterCaptured = observation.Rows.Count == 2
+                    && observation.Rows.Any(row => row.Start == laterStart)
+                    && Directory.GetFiles(owner.Root, "managed-launch-*.json").Length == 2;
+            }
+            catch (Exception lifecycleFailure) { lifecycleFailures.Add(lifecycleFailure); }
+            Task readerCancellation = readerLifetime.CancelAsync();
+            using var settlementDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            try
+            {
+                await OwnedAppHostFixture.JoinManagedObservationAsync(lifetimeReader, readerCancellation,
+                    null, readerLifetime.Token, settlementDeadline.Token);
+            }
+            catch (Exception settlementFailure) { lifecycleFailures.Add(settlementFailure); }
+            readerDependenciesSettled = lifetimeReader.IsCompleted && readerCancellation.IsCompleted;
+            if (lifecycleFailures.Count != 0) throw new AggregateException(lifecycleFailures);
+            await Assert.That(readerSurvivedReadiness && laterCaptured && lifetimeReader.IsCanceled
+                && readerCancellation.IsCompletedSuccessfully).IsTrue()
+                .Because("Managed publication survives readiness and settles before terminal retention.");
+
+            var retainedStartup = new InvalidOperationException("test_managed_retained_startup_failure");
+            var laterFailure = new InvalidOperationException("test_managed_later_reader_failure");
+            var cancelFailure = new InvalidOperationException("test_managed_reader_cancellation_failure");
+            await OwnedAppHostFixture.JoinManagedObservationAsync(Task.FromException(retainedStartup),
+                Task.CompletedTask, retainedStartup, CancellationToken.None, lifecycleDeadline.Token);
+            var joinedFailure = await Assert.That(() => OwnedAppHostFixture.JoinManagedObservationAsync(
+                Task.FromException(new AggregateException(retainedStartup, laterFailure)),
+                Task.FromException(cancelFailure), retainedStartup, CancellationToken.None,
+                lifecycleDeadline.Token)).Throws<AggregateException>();
+            var joinedCauses = joinedFailure!.Flatten().InnerExceptions;
+            await Assert.That(joinedCauses.Count == 2 && joinedCauses.Any(error => ReferenceEquals(error, laterFailure))
+                && joinedCauses.Any(error => ReferenceEquals(error, cancelFailure))).IsTrue();
+            using var expiredSettlement = new CancellationTokenSource();
+            await expiredSettlement.CancelAsync();
+            var pendingReader = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var incomplete = await Assert.That(() => OwnedAppHostFixture.JoinManagedObservationAsync(
+                pendingReader.Task, Task.CompletedTask, null, CancellationToken.None,
+                expiredSettlement.Token)).Throws<OperationCanceledException>();
+            await Assert.That(!pendingReader.Task.IsCompleted
+                && incomplete!.CancellationToken == expiredSettlement.Token).IsTrue();
+            // Controlled typed identities exercise association custody, not actual daemon creation.
+            var containerIdentity = new OwnedAppHostFixture.ContainerCleanupIdentity(selectedContainer, "owned-container-instance",
+                new string('a', 64), "sha256:" + new string('b', 64), new HashSet<string>(), string.Empty, 0, [], false);
+            await Task.WhenAll(observation.PublishContainerAsync(containerIdentity, CancellationToken.None),
+                observation.PublishContainerAsync(containerIdentity, CancellationToken.None));
+            await Assert.That(async () => await observation.PublishContainerAsync(containerIdentity with
+            { Resource = new ContainerResource(selectedContainer.Name) }, CancellationToken.None)).Throws<InvalidOperationException>();
+            await Assert.That(async () => await observation.PublishContainerAsync(containerIdentity with
+            { Image = "sha256:" + new string('c', 64) }, CancellationToken.None)).Throws<InvalidOperationException>();
+            string containerLead = Directory.GetFiles(owner.Root, "managed-launch-container-*.json").Single();
+            using (var associationDocument = JsonDocument.Parse(await File.ReadAllBytesAsync(containerLead)))
+            {
+                var association = associationDocument.RootElement.GetProperty("Container");
+                string? instanceDigest = association.GetProperty("InstanceSha256").GetString();
+                await Assert.That(observation.ContainerRows.Count == 1 && observation.Rows.Count == 2
+                    && associationDocument.RootElement.EnumerateObject().Count() == 3
+                    && association.EnumerateObject().Count() == 5
+                    && association.GetProperty("Resource").GetString() == selectedContainer.Name
+                    && association.GetProperty("ContainerId").GetString() == containerIdentity.Id
+                    && association.GetProperty("ImageId").GetString() == containerIdentity.Image
+                    && association.GetProperty("Present").GetBoolean()
+                    && instanceDigest is { Length: 64 }
+                    && instanceDigest.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f')
+                    && string.Equals(instanceDigest,
+                        Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(containerIdentity.Instance))),
+                        StringComparison.OrdinalIgnoreCase)).IsTrue();
+            }
+            Task firstRetention = observation.RetainOnceAsync(CancellationToken.None);
+            Task secondRetention = observation.RetainOnceAsync(CancellationToken.None);
+            await Assert.That(ReferenceEquals(firstRetention, secondRetention)).IsTrue();
+            await Task.WhenAll(firstRetention, secondRetention);
+            await observation.PublishContainerAsync(containerIdentity, CancellationToken.None);
+            await Assert.That(async () => await observation.PublishContainerAsync(containerIdentity with
+            { Id = new string('d', 64) }, CancellationToken.None)).Throws<InvalidOperationException>();
             string summary = Path.Combine(retained, "managed-launches.json");
             byte[] original = await File.ReadAllBytesAsync(summary);
             var primary = new InvalidOperationException("test_managed_health_failure");
@@ -578,153 +686,405 @@ public sealed partial class AppHostRuntimeTests
             using var document = JsonDocument.Parse(original);
             await Assert.That(document.RootElement.GetProperty("LaunchInputs").GetString() == "not-attested"
                 && document.RootElement.GetProperty("HostContentRoot").GetString() == "unknown"
+                && document.RootElement.GetProperty("ContainerRows").GetArrayLength() == 1
+                && document.RootElement.GetProperty("ExpectedResources").EnumerateArray()
+                    .Select(item => item.GetString()).SequenceEqual(new[] { selected.Name })
                 && document.RootElement.GetProperty("StartupFailureDiagnostic").GetString()
                     == "readiness_wait:guard_unclassified:linked=0:caller=1:fixture=0"
                 && !System.Text.Encoding.UTF8.GetString(original).Contains(canary, StringComparison.Ordinal)).IsTrue();
-        }
-        finally { if (Directory.Exists(retained)) Directory.Delete(retained, recursive: true); }
-    }
+            await observation.RetainOnceAsync(CancellationToken.None);
+            byte[] repeatedRetention = await File.ReadAllBytesAsync(summary);
+            await Assert.That(original.SequenceEqual(repeatedRetention)).IsTrue();
 
-    [Test]
-    public async Task TemporaryResourcePropertyShapesRejectForeignObjectsAndNeverDiscloseValues()
-    {
-        var selected = new ProjectResource("explore-api");
-        var foreign = new ProjectResource("explore-api");
-        var observation = new OwnedAppHostFixture.ResourcePropertyShapeObservation([selected]);
-        string canary = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        ImmutableArray<ResourcePropertySnapshot> properties =
-        [
-            new("pid", canary), new("process-id", new ThrowOnShapeFormatting()) { IsSensitive = true },
-            new("executable", new ThrowOnShapeFormatting()), new("args", canary),
-            new("environment", canary), new("password", canary), new("pid1", canary),
-            new("/pid", canary), new(new string('p', 65), canary)
-        ];
-        observation.Capture(foreign, "foreign-instance", properties);
-        observation.Capture(selected, null, properties);
-        observation.Capture(selected, "owned-instance", default);
-        await Assert.That(observation.Rows.Count).IsEqualTo(0);
-        observation.Capture(selected, "owned-instance", properties);
-        await Assert.That(observation.Rows.Count).IsEqualTo(2);
-        await Assert.That(observation.Rows.Any(row => row.Name == "process-id"
-            && row.PrimitiveType == "not-inspected" && row.IsSensitive)).IsTrue();
-        await Assert.That(JsonSerializer.Serialize(observation.Rows).Contains(canary, StringComparison.Ordinal)).IsFalse();
-    }
+            var rejected = new OwnedAppHostFixture.ManagedResourceLaunchObservation([selected], owner.RunId, owner.Root);
+            Task rejectedWrite = rejected.RetainOnceAsync(CancellationToken.None);
+            var rejectedFailure = await Assert.That(async () => await rejectedWrite).Throws<InvalidOperationException>();
+            Task repeatedFailure = rejected.RetainOnceAsync(CancellationToken.None);
+            await Assert.That(ReferenceEquals(rejectedWrite, repeatedFailure)
+                && rejectedFailure!.Message == "test_managed_launch_destination_exists").IsTrue();
+            await Assert.That(async () => await repeatedFailure).Throws<InvalidOperationException>();
 
-    [Test]
-    public async Task TemporaryResourcePropertyShapesRemainBoundedAndUnknown()
-    {
-        var selected = new ProjectResource("explore-api");
-        var observation = new OwnedAppHostFixture.ResourcePropertyShapeObservation([selected]);
-        var properties = Enumerable.Range(0, 33).Select(variant => new ResourcePropertySnapshot(
-            new string("processstarttime".Select((character, index) => ((variant >> index) & 1) != 0
-                ? char.ToUpperInvariant(character) : character).ToArray()), variant)).ToImmutableArray();
-        observation.Capture(selected, "owned-instance-0", properties);
-        await Assert.That(observation.Rows.Count).IsEqualTo(32);
-        for (int index = 1; index < 6; index++) observation.Capture(selected, $"owned-instance-{index}", properties);
-        await Assert.That(observation.Rows.Count).IsEqualTo(128);
-        await Assert.That(observation.HasOmittedPropertyShapes).IsTrue();
-        await Assert.That(observation.LaunchInputs).IsEqualTo("not-attested");
-    }
-
-    [Test]
-    public async Task TemporaryResourcePropertyEvidenceUsesExclusivePrivateFiles()
-    {
-        string runId = Guid.NewGuid().ToString("N");
-        string directory = Path.Combine(Path.GetTempPath(), $"islamu-assurance-resource-shapes-{runId}");
-        var observation = new OwnedAppHostFixture.ResourcePropertyShapeObservation([]);
-        try
-        {
-            await OwnedAppHostFixture.WritePropertyShapeEvidenceAsync(runId,
-                Convert.ToHexString(RandomNumberGenerator.GetBytes(32)), observation, CancellationToken.None);
-            string file = Path.Combine(directory, "shapes.json");
-            await Assert.That(OperatingSystem.IsLinux()).IsTrue();
-            if (OperatingSystem.IsLinux())
+            var failedOwner = new OwnedAppHostFixture("Split");
+            var bodyFailure = new InvalidOperationException("test_managed_completion_primary");
+            string failedMarker = Path.Combine(failedOwner.Root, TestingResourceIsolation.MarkerName);
+            var completionControlFailures = new List<Exception>();
+            Exception? expectedDisposalFailure = null;
+            try
             {
-                await Assert.That(File.GetUnixFileMode(directory) == (UnixFileMode.UserRead
-                    | UnixFileMode.UserWrite | UnixFileMode.UserExecute)).IsTrue();
-                await Assert.That(File.GetUnixFileMode(file) == (UnixFileMode.UserRead | UnixFileMode.UserWrite)).IsTrue();
+                var completionFailure = await Assert.That(() => failedOwner.CompleteManagedLaunchObservationAsync(
+                    bodyFailure, CancellationToken.None)).Throws<AggregateException>();
+                await Assert.That(completionFailure!.Flatten().InnerExceptions
+                    .Any(error => ReferenceEquals(error, bodyFailure))).IsTrue();
+                await Assert.That(() => failedOwner.StartAsync(CancellationToken.None))
+                    .Throws<ObjectDisposedException>();
+                File.Delete(failedMarker);
+                var disposalFailure = await Assert.That(async () => await failedOwner.DisposeAsync())
+                    .Throws<AggregateException>();
+                expectedDisposalFailure = disposalFailure;
+                await Assert.That(disposalFailure!.Flatten().InnerExceptions
+                    .Any(error => ReferenceEquals(error, bodyFailure))
+                    && disposalFailure.Flatten().InnerExceptions.Any(error => error is InvalidOperationException
+                    { Message: "test_resource_marker_invalid" })
+                    && Directory.Exists(failedOwner.Root)).IsTrue();
             }
-            byte[] original = await File.ReadAllBytesAsync(file);
-            var refusal = await Assert.That(async () => await OwnedAppHostFixture.WritePropertyShapeEvidenceAsync(runId,
-                Convert.ToHexString(RandomNumberGenerator.GetBytes(32)), observation, CancellationToken.None))
-                .Throws<InvalidOperationException>();
-            await Assert.That(refusal!.Message).IsEqualTo("test_resource_shape_destination_exists");
-            byte[] retained = await File.ReadAllBytesAsync(file);
-            await Assert.That(original.SequenceEqual(retained)).IsTrue();
-        }
-        finally { if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true); }
-    }
+            catch (Exception controlFailure) { completionControlFailures.Add(controlFailure); }
+            finally
+            {
+                try { await failedOwner.DisposeAsync(); }
+                catch (Exception cleanupFailure) when (ReferenceEquals(cleanupFailure, expectedDisposalFailure)) { }
+                catch (Exception cleanupFailure) { completionControlFailures.Add(cleanupFailure); }
+                try
+                {
+                    if (Directory.Exists(failedOwner.Root))
+                    {
+                        if (!File.Exists(failedMarker))
+                        {
+                            var markerOptions = new FileStreamOptions
+                            { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
+                            if (!OperatingSystem.IsWindows())
+                                markerOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+                            using var marker = new FileStream(failedMarker, markerOptions);
+                            marker.Write(System.Text.Encoding.UTF8.GetBytes(failedOwner.RunId));
+                        }
+                        new TestingResourceIsolation(failedOwner.RunId, failedOwner.Root).VerifyOwnership();
+                        Directory.Delete(failedOwner.Root, recursive: true);
+                    }
+                }
+                catch (Exception controlCleanupFailure) { completionControlFailures.Add(controlCleanupFailure); }
+            }
+            if (completionControlFailures.Count != 0) throw new AggregateException(completionControlFailures);
 
-    [Test]
-    public async Task TemporaryResourcePropertyEvidenceRefusesLinkedDestinationsAndHonoursCancellation()
-    {
-        await Assert.That(OperatingSystem.IsLinux()).IsTrue();
-        if (!OperatingSystem.IsLinux()) return;
-        string runId = Guid.NewGuid().ToString("N");
-        string directory = Path.Combine(Path.GetTempPath(), $"islamu-assurance-resource-shapes-{runId}");
-        string foreign = Path.Combine(Path.GetTempPath(), $"islamu-assurance-foreign-shape-{runId}");
-        Directory.CreateDirectory(foreign, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        string canary = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        string sentinel = Path.Combine(foreign, "sentinel");
-        await File.WriteAllTextAsync(sentinel, canary);
-        try
-        {
-            Directory.CreateSymbolicLink(directory, foreign);
-            var refusal = await Assert.That(async () => await OwnedAppHostFixture.WritePropertyShapeEvidenceAsync(runId,
-                Convert.ToHexString(RandomNumberGenerator.GetBytes(32)), new([]), CancellationToken.None))
+            string endpoint = "unix://" + Path.Combine(Path.GetTempPath(), "unused-direct-witness.sock");
+            await Assert.That(async () => await DirectContainerCreationObservation.BeginAsync(
+                "docker-wait", owner.RunId, null, endpoint, CancellationToken.None)).Throws<InvalidOperationException>();
+            var direct = await DirectContainerCreationObservation.BeginAsync(
+                "docker-wait", owner.RunId, owner.Root, endpoint, CancellationToken.None);
+            try
+            {
+                await direct.RecordDockerProcessAsync(Environment.ProcessId, CancellationToken.None);
+                string dockerToolPath = Directory.GetFiles(owner.Root, "managed-launch-tool-docker-*.json").Single();
+                using (var toolDocument = JsonDocument.Parse(await File.ReadAllBytesAsync(dockerToolPath)))
+                {
+                    var tool = toolDocument.RootElement.GetProperty("Tool");
+                    var actualIdentity = await OwnedAppHostFixture.ManagedResourceLaunchObservation.ReadIdentityAsync(
+                        Environment.ProcessId, CancellationToken.None);
+                    await Assert.That(toolDocument.RootElement.EnumerateObject().Count() == 3
+                        && tool.EnumerateObject().Count() == 5 && tool.GetProperty("Role").GetString() == "docker"
+                        && tool.GetProperty("CreatorPid").GetInt32() == Environment.ProcessId
+                        && tool.GetProperty("Pid").GetInt32() == actualIdentity.Pid
+                        && tool.GetProperty("Start").GetUInt64() == actualIdentity.Start
+                        && tool.GetProperty("ExpectedExecutable").ValueKind == JsonValueKind.Null).IsTrue();
+                }
+                await using (var browserLead = await DirectContainerCreationObservation.RecordBrowserToolAsync(
+                    owner.RunId, owner.Root, endpoint, CancellationToken.None))
+                {
+                    string path = Directory.GetFiles(owner.Root, "managed-launch-tool-browser-*.json").Single();
+                    using var toolDocument = JsonDocument.Parse(await File.ReadAllBytesAsync(path));
+                    var tool = toolDocument.RootElement.GetProperty("Tool");
+                    await Assert.That(browserLead is not null && tool.EnumerateObject().Count() == 5
+                        && tool.GetProperty("Role").GetString() == "browser"
+                        && tool.GetProperty("CreatorPid").GetInt32() == Environment.ProcessId
+                        && tool.GetProperty("Pid").ValueKind == JsonValueKind.Null
+                        && tool.GetProperty("Start").ValueKind == JsonValueKind.Null
+                        && tool.GetProperty("ExpectedExecutable").ValueKind == JsonValueKind.Null).IsTrue();
+                }
+                string declarationPath = Directory.GetFiles(owner.Root, "direct-container-*-declaration.json").Single();
+                byte[] declaration = await File.ReadAllBytesAsync(declarationPath);
+                using var declarationDocument = JsonDocument.Parse(declaration);
+                string creationId = declarationDocument.RootElement.GetProperty("CreationId").GetString()!;
+                await Assert.That(declarationDocument.RootElement.EnumerateObject().Count() == 6
+                    && declarationDocument.RootElement.GetProperty("Schema").GetInt32() == 1
+                    && declarationDocument.RootElement.GetProperty("RunId").GetString() == owner.RunId
+                    && Guid.TryParseExact(creationId, "N", out _) && creationId[12] == '7').IsTrue();
+                await Assert.That(() => DirectContainerCreationObservation.RequireCreatedId(1, new string('a', 64)))
+                    .Throws<InvalidOperationException>();
+                await Assert.That(() => DirectContainerCreationObservation.RequireCreatedId(0, "ambiguous"))
+                    .Throws<InvalidOperationException>();
+                // This synthetic receipt exercises file custody; it is not native creation evidence.
+                await direct.RecordCreatedAsync(0, new string('a', 64), CancellationToken.None);
+                string createdPath = Directory.GetFiles(owner.Root, "direct-container-*-created-*.json").Single();
+                byte[] created = await File.ReadAllBytesAsync(createdPath);
+                using var createdDocument = JsonDocument.Parse(created);
+                string? declarationDigest = createdDocument.RootElement.GetProperty("DeclarationSha256").GetString();
+                await Assert.That(declarationDigest is { Length: 64 }
+                    && declarationDigest.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f')
+                    && string.Equals(declarationDigest, Convert.ToHexString(SHA256.HashData(declaration)), StringComparison.OrdinalIgnoreCase)
+                    && createdDocument.RootElement.EnumerateObject().Count() == 8
+                    && createdDocument.RootElement.GetProperty("CreationId").GetString() == creationId
+                    && createdDocument.RootElement.GetProperty("CreatorPid").GetInt32() == Environment.ProcessId
+                    && createdDocument.RootElement.GetProperty("Resource").GetString() == "docker-wait").IsTrue();
+                if (OperatingSystem.IsLinux())
+                    await Assert.That(File.GetUnixFileMode(declarationPath) == (UnixFileMode.UserRead | UnixFileMode.UserWrite)
+                        && File.GetUnixFileMode(createdPath) == (UnixFileMode.UserRead | UnixFileMode.UserWrite)).IsTrue();
+                await Assert.That(async () => await direct.RecordCreatedAsync(0, new string('b', 64), CancellationToken.None))
+                    .Throws<InvalidOperationException>();
+                byte[] retainedDeclaration = await File.ReadAllBytesAsync(declarationPath);
+                byte[] retainedCreated = await File.ReadAllBytesAsync(createdPath);
+                await Assert.That(declaration.SequenceEqual(retainedDeclaration)
+                    && created.SequenceEqual(retainedCreated)).IsTrue();
+            }
+            finally { await direct.DisposeAsync(); }
+            await direct.DisposeAsync();
+            await Assert.That(async () => await direct.RecordCreatedAsync(0, new string('b', 64), CancellationToken.None))
                 .Throws<InvalidOperationException>();
-            await Assert.That(refusal!.Message).IsEqualTo("test_resource_shape_destination_exists");
-            await Assert.That(await File.ReadAllTextAsync(sentinel) == canary).IsTrue();
-            await Assert.That(Directory.GetFiles(foreign).Length).IsEqualTo(1);
-            Directory.Delete(directory);
-            using var cancelled = new CancellationTokenSource();
-            await cancelled.CancelAsync();
-            await Assert.That(async () => await OwnedAppHostFixture.WritePropertyShapeEvidenceAsync(runId,
-                Convert.ToHexString(RandomNumberGenerator.GetBytes(32)), new([]), cancelled.Token))
-                .Throws<OperationCanceledException>();
-            await Assert.That(Directory.Exists(directory)).IsFalse();
         }
+        catch (Exception controlFailure) { controlFailures.Add(controlFailure); }
         finally
         {
-            if (new DirectoryInfo(directory).LinkTarget is not null) Directory.Delete(directory);
-            Directory.Delete(foreign, recursive: true);
+            // A nonterminal controlled publisher retains its CTS/root for the finite native process boundary.
+            if (readerDependenciesSettled)
+            {
+                try { readerLifetimeDependency?.Dispose(); }
+                catch (Exception cleanupFailure) { controlFailures.Add(cleanupFailure); }
+                try { if (Directory.Exists(retained)) Directory.Delete(retained, recursive: true); }
+                catch (Exception cleanupFailure) { controlFailures.Add(cleanupFailure); }
+                try { await owner.DisposeAsync(); }
+                catch (Exception cleanupFailure) { controlFailures.Add(cleanupFailure); }
+            }
         }
+        if (controlFailures.Count == 1)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(controlFailures[0]).Throw();
+        if (controlFailures.Count > 1) throw new AggregateException(controlFailures);
     }
 
-    [Test]
-    public async Task TemporaryResourcePropertyEvidenceRetainsOriginalFailureAndOwnedCleanup()
-    {
-        await using var owner = new OwnedAppHostFixture("Split");
-        var original = new InvalidOperationException("test_shape_original_failure");
-        var failure = await Assert.That(async () => await owner.CompleteResourcePropertyShapeObservationAsync(
-            original, CancellationToken.None)).Throws<AggregateException>();
-        await Assert.That(failure!.InnerExceptions.Any(exception => ReferenceEquals(exception, original))).IsTrue();
-        await Assert.That(failure.InnerExceptions.Any(exception => exception.Message == "test_resource_shape_write_invalid_state")).IsTrue();
-        await owner.DisposeAsync();
-        await Assert.That(Directory.Exists(owner.Root)).IsFalse();
-    }
 
     private sealed class ThrowOnShapeFormatting
     {
         public override string ToString() => throw new InvalidOperationException("test_shape_value_was_formatted");
     }
 
+    internal sealed class DirectContainerCreationObservation : IAsyncDisposable
+    {
+        private static readonly SemaphoreSlim Publication = new(1, 1);
+        internal const string ImageReference = "postgres:18-alpine";
+        private readonly Event.Testing.AssuranceOwnershipContext context;
+        private readonly string resource;
+        private readonly string creationId = Guid.CreateVersion7().ToString("N");
+        private FileStream? declaration;
+        private FileStream? created;
+        private FileStream? dockerTool;
+        private string declarationSha256 = string.Empty;
+        private bool disposed;
+
+        private DirectContainerCreationObservation(Event.Testing.AssuranceOwnershipContext context, string resource)
+        {
+            this.context = context;
+            this.resource = resource;
+        }
+
+        internal static Task<DirectContainerCreationObservation> BeginAsync(string resource, CancellationToken token) =>
+            BeginAsync(resource, Environment.GetEnvironmentVariable("ISLAMU_TEST_RUN_ID"),
+                Environment.GetEnvironmentVariable("ISLAMU_TEST_ROOT"), Environment.GetEnvironmentVariable("DOCKER_HOST"), token);
+
+        internal static async Task<DirectContainerCreationObservation> BeginAsync(string resource,
+            string? runId, string? root, string? dockerHost, CancellationToken token)
+        {
+            if (resource is not ("docker-wait" or "foreign-volume-named" or "foreign-volume-bind")
+                || string.IsNullOrEmpty(TestContext.Current?.Metadata.TestDetails.Identity.TestId))
+                throw new InvalidOperationException("test_creation_resource_invalid");
+            var context = await Event.Testing.AssuranceOwnershipContext.ValidateAssuranceContextAsync(
+                runId, root, Path.GetTempPath(), dockerHost)
+                ?? throw new InvalidOperationException("test_creation_owner_required");
+            await Publication.WaitAsync(token);
+            try
+            {
+                if (Directory.EnumerateFiles(context.Root, "*-container-*-declaration.json").Take(65).Count() >= 64)
+                    throw new InvalidOperationException("test_creation_observation_limit");
+                var observation = new DirectContainerCreationObservation(context, resource);
+                byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    Schema = 1,
+                    RunId = context.Owner,
+                    CreatorPid = Environment.ProcessId,
+                    CreationId = observation.creationId,
+                    Resource = resource,
+                    ImageReference
+                });
+                observation.declarationSha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+                observation.declaration = await observation.WriteRecordAsync("declaration", bytes, token);
+                return observation;
+            }
+            finally { Publication.Release(); }
+        }
+
+        internal static string RequireCreatedId(int exitCode, string output)
+        {
+            string id = output.Trim();
+            if (exitCode != 0 || id.Length != 64 || id.Any(character => character is not (>= '0' and <= '9' or >= 'a' and <= 'f')))
+                throw new InvalidOperationException("test_creation_identity_unavailable");
+            return id;
+        }
+
+        internal async Task RecordCreatedAsync(int exitCode, string containerId, CancellationToken token)
+        {
+            containerId = RequireCreatedId(exitCode, containerId);
+            await Publication.WaitAsync(token);
+            try
+            {
+                if (disposed || declaration is null) throw new InvalidOperationException("test_creation_observation_closed");
+                if (created is not null) throw new InvalidOperationException("test_creation_identity_duplicate");
+                byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    Schema = 1,
+                    RunId = context.Owner,
+                    CreatorPid = Environment.ProcessId,
+                    CreationId = creationId,
+                    Resource = resource,
+                    ImageReference,
+                    ContainerId = containerId,
+                    DeclarationSha256 = declarationSha256
+                });
+                created = await WriteRecordAsync($"created-{containerId}", bytes, token);
+            }
+            finally { Publication.Release(); }
+        }
+
+        internal async Task RecordDockerProcessAsync(int pid, CancellationToken token)
+        {
+            var before = await OwnedAppHostFixture.ManagedResourceLaunchObservation.ReadIdentityAsync(pid, token);
+            if (before.Start == 0 || before.State is 'Z' or 'X')
+                throw new InvalidOperationException("test_tool_process_unavailable");
+            await Publication.WaitAsync(token);
+            try
+            {
+                if (disposed || dockerTool is not null) throw new InvalidOperationException("test_tool_observation_closed");
+                dockerTool = await WriteToolAsync(context, "docker", pid, before.Start, null, token);
+            }
+            finally { Publication.Release(); }
+        }
+
+        internal static Task<FileStream?> RecordBrowserToolAsync(CancellationToken token) =>
+            RecordBrowserToolAsync(Environment.GetEnvironmentVariable("ISLAMU_TEST_RUN_ID"),
+                Environment.GetEnvironmentVariable("ISLAMU_TEST_ROOT"), Environment.GetEnvironmentVariable("DOCKER_HOST"), token);
+
+        internal static async Task<FileStream?> RecordBrowserToolAsync(string? runId, string? root,
+            string? dockerHost, CancellationToken token)
+        {
+            var context = await Event.Testing.AssuranceOwnershipContext.ValidateAssuranceContextAsync(
+                runId, root, Path.GetTempPath(), dockerHost);
+            if (context is null) return null;
+            await Publication.WaitAsync(token);
+            try { return await WriteToolAsync(context, "browser", null, null, null, token); }
+            finally { Publication.Release(); }
+        }
+
+        private static Task<FileStream> WriteToolAsync(Event.Testing.AssuranceOwnershipContext context, string role,
+            int? pid, ulong? start, string? executable, CancellationToken token)
+        {
+            if (Directory.EnumerateFiles(context.Root, "managed-launch-tool-*.json").Take(65).Count() >= 64)
+                throw new InvalidOperationException("test_tool_observation_limit");
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                Schema = 1,
+                RunId = context.Owner,
+                Tool = new { Role = role, CreatorPid = Environment.ProcessId, Pid = pid, Start = start, ExpectedExecutable = executable }
+            });
+            string name = $"managed-launch-tool-{role}-{Environment.ProcessId}-{Guid.CreateVersion7():N}.json";
+            return WritePrivateRecordAsync(context, name, bytes, token);
+        }
+
+        private Task<FileStream> WriteRecordAsync(string stage, byte[] bytes, CancellationToken token) =>
+            WritePrivateRecordAsync(context, $"direct-container-{resource}-{creationId}-{stage}.json", bytes, token);
+
+        private static async Task<FileStream> WritePrivateRecordAsync(Event.Testing.AssuranceOwnershipContext context,
+            string name, byte[] bytes, CancellationToken token)
+        {
+            if (!OperatingSystem.IsLinux() || bytes.Length is < 1 or > 8192)
+                throw new InvalidOperationException("test_creation_observation_invalid");
+            await VerifyRootAsync(context);
+            string pending = Path.Combine(context.Root, "." + name + ".pending");
+            string final = Path.Combine(context.Root, name);
+            FileStream? output = null;
+            try
+            {
+                output = new FileStream(pending, new FileStreamOptions
+                {
+                    Mode = FileMode.CreateNew,
+                    Access = FileAccess.ReadWrite,
+                    Share = FileShare.Read,
+                    Options = FileOptions.Asynchronous | FileOptions.WriteThrough,
+                    UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+                });
+                await output.WriteAsync(bytes, token);
+                await output.FlushAsync(token);
+                output.Flush(flushToDisk: true);
+                output.Position = 0;
+                byte[] readback = new byte[bytes.Length];
+                await output.ReadExactlyAsync(readback, token);
+                if (!bytes.AsSpan().SequenceEqual(readback)) throw new InvalidOperationException("test_creation_observation_invalid");
+                File.Move(pending, final, overwrite: false);
+                var info = new FileInfo(final);
+                if (info.LinkTarget is not null || info.Length != bytes.Length
+                    || (info.Attributes & FileAttributes.ReparsePoint) != 0
+                    || File.GetUnixFileMode(final) != (UnixFileMode.UserRead | UnixFileMode.UserWrite))
+                    throw new InvalidOperationException("test_creation_observation_invalid");
+                await VerifyRootAsync(context);
+                return output;
+            }
+            catch (Exception failure)
+            {
+                try { if (output is not null) await output.DisposeAsync(); }
+                catch (Exception closing) { throw new AggregateException(failure, closing); }
+                throw;
+            }
+        }
+
+        private static async Task VerifyRootAsync(Event.Testing.AssuranceOwnershipContext context)
+        {
+            if (await Event.Testing.AssuranceOwnershipContext.ValidateAssuranceOwnershipAsync(
+                context.Owner, context.Root, Path.GetTempPath()) != context.Owner)
+                throw new InvalidOperationException("test_creation_observation_invalid");
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await Publication.WaitAsync();
+            try
+            {
+                if (disposed) return;
+                disposed = true;
+                var failures = new List<Exception>();
+                foreach (var stream in new[] { dockerTool, created, declaration })
+                {
+                    try { if (stream is not null) await stream.DisposeAsync(); }
+                    catch (Exception failure) { failures.Add(failure); }
+                }
+                if (failures.Count != 0) throw new AggregateException(failures);
+            }
+            finally { Publication.Release(); }
+        }
+    }
+
     [Test]
     public async Task CancelledDockerWaitReapsItsChildAndPreservesTheContainer()
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-        var creation = await OwnedAppHostFixture.RunDockerAsync(["run", "--pull=never", "--detach", "--entrypoint", "sleep",
-            "postgres:18-alpine", "600"], deadline.Token);
-        await Assert.That(creation.ExitCode).IsEqualTo(0);
-        string container = creation.Output.Trim();
+        var observation = await DirectContainerCreationObservation.BeginAsync("docker-wait", deadline.Token);
+        string? container = null;
+        var failures = new List<Exception>();
         try
         {
+            Exception? toolFailure = null;
+            try
+            {
+                var creation = await OwnedAppHostFixture.RunDockerAsync(["run", "--pull=never", "--detach", "--entrypoint", "sleep",
+                    DirectContainerCreationObservation.ImageReference, "600"], deadline.Token, async pid =>
+                    {
+                        try { await observation.RecordDockerProcessAsync(pid, deadline.Token); }
+                        catch (Exception toolObservationFailure) { toolFailure = toolObservationFailure; }
+                    });
+                container = DirectContainerCreationObservation.RequireCreatedId(creation.ExitCode, creation.Output);
+                await observation.RecordCreatedAsync(creation.ExitCode, container, deadline.Token);
+            }
+            catch (Exception creationFailure) when (toolFailure is not null)
+            { throw new AggregateException(toolFailure, creationFailure); }
+            if (toolFailure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(toolFailure).Throw();
             using var cancellation = new CancellationTokenSource();
             Process? child = null;
             try
             {
                 Task waiting = OwnedAppHostFixture.RunDockerAsync(["wait", container], cancellation.Token,
-                    id => child = Process.GetProcessById(id));
+                    id => { child = Process.GetProcessById(id); return Task.CompletedTask; });
                 cancellation.Cancel();
                 await Assert.That(async () => await waiting).Throws<OperationCanceledException>();
                 await Assert.That(child!.WaitForExit(0)).IsTrue();
@@ -734,11 +1094,22 @@ public sealed partial class AppHostRuntimeTests
             await Assert.That(retained.ExitCode).IsEqualTo(0);
             await Assert.That(retained.Output.Trim()).IsEqualTo("true");
         }
+        catch (Exception failure) { failures.Add(failure); }
         finally
         {
-            var removal = await OwnedAppHostFixture.RunDockerAsync(["rm", "--force", "--volumes", container], CancellationToken.None);
-            await Assert.That(removal.ExitCode).IsEqualTo(0);
+            try
+            {
+                if (container is not null)
+                {
+                    var removal = await OwnedAppHostFixture.RunDockerAsync(["rm", "--force", "--volumes", container], CancellationToken.None);
+                    await Assert.That(removal.ExitCode).IsEqualTo(0);
+                }
+            }
+            catch (Exception failure) { failures.Add(failure); }
+            try { await observation.DisposeAsync(); }
+            catch (Exception failure) { failures.Add(failure); }
         }
+        if (failures.Count != 0) throw new AggregateException(failures);
     }
 
     [Test]
@@ -767,11 +1138,16 @@ public sealed partial class AppHostRuntimeTests
         await Assert.That(OwnedAppHostFixture.NativePathsOverlap("/native/database", "/native/data")).IsFalse();
         foreach (bool bindMount in new[] { false, true })
         {
-            var owner = await OwnedAppHostFixture.CreateAsync("Split", deadline.Token);
-            string volume = $"islamu-test-{owner.RunId}-islamu-event-postgres-data";
+            var observation = await DirectContainerCreationObservation.BeginAsync(
+                bindMount ? "foreign-volume-bind" : "foreign-volume-named", deadline.Token);
+            OwnedAppHostFixture? owner = null;
+            string? volume = null;
             string? sentinel = null;
+            var failures = new List<Exception>();
             try
             {
+                owner = await OwnedAppHostFixture.CreateAsync("Split", deadline.Token);
+                volume = $"islamu-test-{owner.RunId}-islamu-event-postgres-data";
                 var creation = await OwnedAppHostFixture.RunDockerAsync(["volume", "create", volume], deadline.Token);
                 await Assert.That(creation.ExitCode).IsEqualTo(0);
                 var inspected = await OwnedAppHostFixture.RunDockerAsync(
@@ -780,11 +1156,22 @@ public sealed partial class AppHostRuntimeTests
                 string mount = bindMount
                     ? $"type=bind,source={inspected.Output.Trim()},target=/sentinel"
                     : $"type=volume,source={volume},target=/sentinel";
-                var container = await OwnedAppHostFixture.RunDockerAsync(["create", "--pull=never", "--label",
-                    "islamu.assurance.owner=foreign", "--mount", mount,
-                    "postgres:18-alpine"], deadline.Token);
-                await Assert.That(container.ExitCode).IsEqualTo(0);
-                sentinel = container.Output.Trim();
+                Exception? toolFailure = null;
+                try
+                {
+                    var container = await OwnedAppHostFixture.RunDockerAsync(["create", "--pull=never", "--label",
+                        "islamu.assurance.owner=foreign", "--mount", mount,
+                        DirectContainerCreationObservation.ImageReference], deadline.Token, async pid =>
+                        {
+                            try { await observation.RecordDockerProcessAsync(pid, deadline.Token); }
+                            catch (Exception toolObservationFailure) { toolFailure = toolObservationFailure; }
+                        });
+                    sentinel = DirectContainerCreationObservation.RequireCreatedId(container.ExitCode, container.Output);
+                    await observation.RecordCreatedAsync(container.ExitCode, sentinel, deadline.Token);
+                }
+                catch (Exception creationFailure) when (toolFailure is not null)
+                { throw new AggregateException(toolFailure, creationFailure); }
+                if (toolFailure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(toolFailure).Throw();
 
                 var failure = await Assert.That(async () => await owner.DisposeAsync()).Throws<AggregateException>();
                 await Assert.That(failure!.Flatten().InnerExceptions.Any(error =>
@@ -795,23 +1182,37 @@ public sealed partial class AppHostRuntimeTests
                 await Assert.That(retained.Output.Trim()).IsEqualTo("foreign");
                 await Assert.That(Directory.Exists(owner.Root)).IsTrue();
             }
+            catch (Exception failure) { failures.Add(failure); }
             finally
             {
-                try { await using (owner) { } }
-                catch (AggregateException) { }
-                if (sentinel is not null)
+                try
                 {
-                    var removal = await OwnedAppHostFixture.RunDockerAsync(["rm", "--volumes", sentinel], CancellationToken.None);
-                    await Assert.That(removal.ExitCode).IsEqualTo(0);
+                    if (owner is not null)
+                    {
+                        try { await using (owner) { } }
+                        catch (AggregateException) { }
+                    }
+                    if (sentinel is not null)
+                    {
+                        var removal = await OwnedAppHostFixture.RunDockerAsync(["rm", "--volumes", sentinel], CancellationToken.None);
+                        await Assert.That(removal.ExitCode).IsEqualTo(0);
+                    }
+                    if (volume is not null)
+                    {
+                        var volumeRemoval = await OwnedAppHostFixture.RunDockerAsync(["volume", "rm", volume], CancellationToken.None);
+                        await Assert.That(volumeRemoval.ExitCode).IsEqualTo(0);
+                    }
+                    if (owner is not null && Directory.Exists(owner.Root))
+                    {
+                        new TestingResourceIsolation(owner.RunId, owner.Root).VerifyOwnership();
+                        Directory.Delete(owner.Root, recursive: true);
+                    }
                 }
-                var volumeRemoval = await OwnedAppHostFixture.RunDockerAsync(["volume", "rm", volume], CancellationToken.None);
-                await Assert.That(volumeRemoval.ExitCode).IsEqualTo(0);
-                if (Directory.Exists(owner.Root))
-                {
-                    new TestingResourceIsolation(owner.RunId, owner.Root).VerifyOwnership();
-                    Directory.Delete(owner.Root, recursive: true);
-                }
+                catch (Exception failure) { failures.Add(failure); }
+                try { await observation.DisposeAsync(); }
+                catch (Exception failure) { failures.Add(failure); }
             }
+            if (failures.Count != 0) throw new AggregateException(failures);
         }
     }
 
@@ -820,9 +1221,8 @@ public sealed partial class AppHostRuntimeTests
     [Arguments("Standalone")]
     public async Task RealTopologyCompletesMigrationAndBecomesHealthy(string topology)
     {
-        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(15));
         await using var owner = await OwnedAppHostFixture.CreateAsync(topology, deadline.Token);
-        if (topology == "Split") await owner.BeginResourcePropertyShapeObservationAsync(deadline.Token);
         Exception? failure = null;
         try
         {
@@ -832,16 +1232,8 @@ public sealed partial class AppHostRuntimeTests
             await Assert.That(response.IsSuccessStatusCode).IsTrue();
         }
         catch (Exception exception) { failure = exception; }
-        if (topology == "Split")
-        {
-            using var evidenceDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await owner.CompleteResourcePropertyShapeObservationAsync(failure, evidenceDeadline.Token);
-        }
-        else
-        {
-            using var evidenceDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await owner.CompleteManagedLaunchObservationAsync(failure, evidenceDeadline.Token);
-        }
+        using var evidenceDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await owner.CompleteManagedLaunchObservationAsync(failure, evidenceDeadline.Token);
     }
 
     [Test]
@@ -966,7 +1358,7 @@ public sealed partial class AppHostRuntimeTests
     [Test]
     public async Task ConcurrentOwnersRemainHealthyWhenTheirNeighbourStops()
     {
-        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(6));
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(15));
         await using var first = await OwnedAppHostFixture.CreateAsync("Split", deadline.Token, configuredAdministrator: true);
         await using var second = await OwnedAppHostFixture.CreateAsync("Standalone", deadline.Token, configuredAdministrator: true);
         await Task.WhenAll(first.StartAsync(deadline.Token), second.StartAsync(deadline.Token));

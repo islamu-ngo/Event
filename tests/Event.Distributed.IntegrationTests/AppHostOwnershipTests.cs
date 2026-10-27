@@ -27,7 +27,8 @@ public sealed class AppHostOwnershipTests
         string canary = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         var untrusted = new Dictionary<string, string?>
         {
-            ["PAYMENTS_STRIPE_MODE"] = "Live", ["STRIPE_PLATFORM_SECRET_KEY"] = canary,
+            ["PAYMENTS_STRIPE_MODE"] = "Live",
+            ["STRIPE_PLATFORM_SECRET_KEY"] = canary,
             ["TestingEnvironment:STRIPE_PLATFORM_SECRET_KEY"] = canary,
             ["Authentication:Local:Jwt:SigningKey"] = canary,
             ["Storage:Local:RootPath"] = "foreign-operator-storage"
@@ -83,14 +84,19 @@ public sealed class AppHostOwnershipTests
         var tokens = new JwtSecurityTokenHandler();
         string token = tokens.CreateEncodedJwt(new SecurityTokenDescriptor
         {
-            Issuer = "assurance", Audience = "assurance", Expires = DateTime.UtcNow.AddMinutes(5),
+            Issuer = "assurance",
+            Audience = "assurance",
+            Expires = DateTime.UtcNow.AddMinutes(5),
             Subject = new ClaimsIdentity([new Claim("sub", Guid.CreateVersion7().ToString())]),
             SigningCredentials = new(new SymmetricSecurityKey(Key(first)), SecurityAlgorithms.HmacSha256)
         });
         var validation = new TokenValidationParameters
         {
-            ValidIssuer = "assurance", ValidAudience = "assurance", ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Key(second)), ClockSkew = TimeSpan.Zero
+            ValidIssuer = "assurance",
+            ValidAudience = "assurance",
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Key(second)),
+            ClockSkew = TimeSpan.Zero
         };
         await Assert.That(() => tokens.ValidateToken(token, validation, out _)).Throws<SecurityTokenException>();
         validation.IssuerSigningKey = new SymmetricSecurityKey(Key(first));
@@ -135,7 +141,8 @@ public sealed class AppHostOwnershipTests
         var configuration = new ConfigurationManager();
         configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["PAYMENTS_STRIPE_MODE"] = "Live", ["STRIPE_PLATFORM_SECRET_KEY"] = canary,
+            ["PAYMENTS_STRIPE_MODE"] = "Live",
+            ["STRIPE_PLATFORM_SECRET_KEY"] = canary,
             ["Storage:Local:RootPath"] = root.Path + "-foreign",
             ["Authentication:Local:Jwt:SigningKey"] = canary,
             ["TestingEnvironment:STRIPE_PLATFORM_SECRET_KEY"] = canary
@@ -647,7 +654,28 @@ public sealed class AppHostOwnershipTests
     public async Task ActualHostRootHasOneLiveProcessDescriptorUntilStopped()
     {
         if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException("private_host_observation_requires_linux");
-        foreach (bool isWebHost in new[] { false, true })
+        int configuredTargetPort = RandomNumberGenerator.GetInt32(1024, 65536);
+        int publicTargetPort;
+        do { publicTargetPort = RandomNumberGenerator.GetInt32(1024, 65536); } while (publicTargetPort == configuredTargetPort);
+        int alternatePort;
+        do { alternatePort = RandomNumberGenerator.GetInt32(1024, 65536); }
+        while (alternatePort == configuredTargetPort || alternatePort == publicTargetPort);
+        string operations = $"http://127.0.0.1:{configuredTargetPort}";
+        string http = $"http://127.0.0.1:{publicTargetPort}";
+        string configured = configuredTargetPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        foreach ((bool isWebHost, string? configuredPort, int? expectedPort, bool rejected, string? bindings, int? expectedHttp) in
+            new (bool, string?, int?, bool, string?, int?)[]
+            {
+                (false, null, null, false, http, null), (false, configured, null, false, http, null),
+                (true, null, null, false, null, null),
+                (true, configured, configuredTargetPort, false, http + ";" + operations, publicTargetPort),
+                (true, "0", null, true, http, null), (true, "65536", null, true, http, null), (true, "invalid", null, true, http, null),
+                (true, configured, configuredTargetPort, false, null, null),
+                (true, configured, configuredTargetPort, false, http + $";http://127.0.0.1:{alternatePort}", null),
+                (true, configured, configuredTargetPort, false, "not-a-binding", null),
+                (true, configured, configuredTargetPort, false, operations, null),
+                (true, configured, configuredTargetPort, false, $"http://*:{publicTargetPort};" + operations, publicTargetPort)
+            })
         {
             using var owner = new PrivateHostRoot();
             string webRoot = Path.Combine(owner.Root, "actual-web-root");
@@ -655,15 +683,27 @@ public sealed class AppHostOwnershipTests
             await using var web = isWebHost ? Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(
                 new Microsoft.AspNetCore.Builder.WebApplicationOptions
                 {
-                    EnvironmentName = "Assurance", ContentRootPath = owner.ContentRoot, WebRootPath = webRoot,
+                    EnvironmentName = "Assurance",
+                    ContentRootPath = owner.ContentRoot,
+                    WebRootPath = webRoot,
                     ApplicationName = typeof(Microsoft.Extensions.Hosting.Extensions).Assembly.GetName().Name
                 }).Build() : null;
             var builder = owner.Builder();
+            builder.Configuration["OperationalEndpoints:Port"] = configuredPort;
+            builder.Configuration[Microsoft.AspNetCore.Hosting.WebHostDefaults.ServerUrlsKey] = bindings;
             if (web is not null)
                 builder.Services.AddSingleton<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>(web.Environment);
             builder.AddServiceDefaults();
             using var host = builder.Build();
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            if (rejected)
+            {
+                var failure = await Assert.That(() => host.StartAsync(deadline.Token)).Throws<InvalidOperationException>();
+                await Assert.That(failure!.Message == "managed_host_root_observation_rejected"
+                    && failure.InnerException is null
+                    && !Directory.EnumerateFiles(owner.Root, "managed-host-root-*").Any()).IsTrue();
+                continue;
+            }
             await host.StartAsync(deadline.Token);
             string record = AssertSinglePrivateRecord(owner);
             using (var document = System.Text.Json.JsonDocument.Parse(File.ReadAllBytes(record)))
@@ -686,7 +726,13 @@ public sealed class AppHostOwnershipTests
                     && value.TryGetProperty("IsWebHost", out var capability) && capability.GetBoolean() == isWebHost
                     && value.TryGetProperty("WebRoot", out var actualWebRoot)
                     && (isWebHost ? actualWebRoot.GetString() == web!.Environment.WebRootPath
-                        : actualWebRoot.ValueKind == System.Text.Json.JsonValueKind.Null)).IsTrue()
+                        : actualWebRoot.ValueKind == System.Text.Json.JsonValueKind.Null)
+                    && value.TryGetProperty("OperationsTargetPort", out var operationsPort)
+                    && (expectedPort is { } port ? operationsPort.GetInt32() == port
+                        : operationsPort.ValueKind == System.Text.Json.JsonValueKind.Null)
+                    && value.TryGetProperty("HttpTargetPort", out var httpPort)
+                    && (expectedHttp is { } target ? httpPort.GetInt32() == target
+                        : httpPort.ValueKind == System.Text.Json.JsonValueKind.Null)).IsTrue()
                     .Because("The private host record must carry actual entry and registered web-environment facts.");
                 if (web is not null)
                     await Assert.That(!ReferenceEquals(builder.Environment, web.Environment)
@@ -694,8 +740,41 @@ public sealed class AppHostOwnershipTests
             }
             OpenHostDescriptor[] descriptors = OpenRecordDescriptors(record);
             await Assert.That(descriptors.Length).IsEqualTo(1);
+            var selected = new ProjectResource("explore-api");
+            var observed = new OwnedAppHostFixture.ManagedResourceLaunchObservation([selected], owner.Id, owner.Root);
+            await observed.CaptureAsync(selected, "selected-instance", [new("executable.pid", Environment.ProcessId)], deadline.Token);
+            OwnedAppHostFixture.ManagedResourceLaunchObservation? afterStop = null;
+            if (expectedHttp is { } directPort && expectedPort is not null)
+            {
+                await Assert.That(async () => { await observed.ReadDirectHttpOriginAsync(selected, deadline.Token); })
+                    .Throws<InvalidOperationException>()
+                    .Because("A configured URL and a live host record do not prove that this process serves the port.");
+                web!.Urls.Clear();
+                web.Urls.Add($"http://127.0.0.1:{directPort}");
+                await web.StartAsync(deadline.Token);
+                Uri origin = await observed.ReadDirectHttpOriginAsync(selected, deadline.Token);
+                await Assert.That(origin.Scheme == "http" && origin.Host == "127.0.0.1" && origin.Port == directPort
+                    && origin.AbsolutePath == "/" && origin.Query.Length == 0 && origin.Fragment.Length == 0).IsTrue();
+                await Assert.That(async () => { await observed.ReadDirectHttpOriginAsync(new ProjectResource(selected.Name), deadline.Token); })
+                    .Throws<InvalidOperationException>();
+                afterStop = new([selected], owner.Id, owner.Root);
+                await afterStop.CaptureAsync(selected, "after-stop-instance", [new("executable.pid", Environment.ProcessId)], deadline.Token);
+                await Assert.That((await afterStop.ReadDirectHttpOriginAsync(selected, deadline.Token)).Port == directPort).IsTrue();
+                var hint = observed.Rows.Single();
+                await observed.PublishObservedIncarnationAsync(selected, new string('a', 64), hint.Pid, hint.Start,
+                    hint.Diagnostic, null, deadline.Token);
+                await Assert.That(async () => { await observed.ReadDirectHttpOriginAsync(selected, deadline.Token); }).Throws<InvalidOperationException>();
+            }
+            else
+            {
+                var refusal = await Assert.That(async () => { await observed.ReadDirectHttpOriginAsync(selected, deadline.Token); })
+                    .Throws<InvalidOperationException>();
+                await Assert.That(refusal!.Message == "test_direct_http_origin_unavailable" && refusal.InnerException is null).IsTrue();
+            }
             await host.StopAsync(deadline.Token);
             await Assert.That(OpenRecordDescriptors(record, descriptors[0]).Length).IsEqualTo(0);
+            if (afterStop is not null)
+                await Assert.That(async () => { await afterStop.ReadDirectHttpOriginAsync(selected, deadline.Token); }).Throws<InvalidOperationException>();
             await host.StopAsync(deadline.Token);
             await Assert.That(OpenRecordDescriptors(record, descriptors[0]).Length).IsEqualTo(0);
         }
@@ -718,26 +797,26 @@ public sealed class AppHostOwnershipTests
         if (variant == "wrong-environment")
         {
             foreach (string environment in new[] { "Testing", "Staging", "Development" })
-            foreach (string context in new[] { "complete", "partial", "malformed" })
-            {
-                var ordinary = owner.Builder(environment);
-                ordinary.Configuration["DOTNET_ENVIRONMENT"] = "Assurance";
-                ordinary.Configuration["ASPNETCORE_ENVIRONMENT"] = "Assurance";
-                if (context == "partial") ordinary.Configuration["ISLAMU_TEST_ROOT"] = null;
-                if (context == "malformed")
+                foreach (string context in new[] { "complete", "partial", "malformed" })
                 {
-                    ordinary.Configuration["ISLAMU_TEST_ROOT"] = "not-an-absolute-private-root";
-                    ordinary.Configuration["ISLAMU_TEST_RUN_ID"] = "not-an-owner";
+                    var ordinary = owner.Builder(environment);
+                    ordinary.Configuration["DOTNET_ENVIRONMENT"] = "Assurance";
+                    ordinary.Configuration["ASPNETCORE_ENVIRONMENT"] = "Assurance";
+                    if (context == "partial") ordinary.Configuration["ISLAMU_TEST_ROOT"] = null;
+                    if (context == "malformed")
+                    {
+                        ordinary.Configuration["ISLAMU_TEST_ROOT"] = "not-an-absolute-private-root";
+                        ordinary.Configuration["ISLAMU_TEST_RUN_ID"] = "not-an-owner";
+                    }
+                    ordinary.AddServiceDefaults();
+                    using var ordinaryHost = ordinary.Build();
+                    await Assert.That(ordinaryHost.Services.GetRequiredService<IHostEnvironment>().EnvironmentName)
+                        .IsEqualTo(environment);
+                    using var ordinaryDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    await ordinaryHost.StartAsync(ordinaryDeadline.Token);
+                    await ordinaryHost.StopAsync(ordinaryDeadline.Token);
+                    await Assert.That(Directory.EnumerateFiles(owner.Root, "managed-host-root-*").Any()).IsFalse();
                 }
-                ordinary.AddServiceDefaults();
-                using var ordinaryHost = ordinary.Build();
-                await Assert.That(ordinaryHost.Services.GetRequiredService<IHostEnvironment>().EnvironmentName)
-                    .IsEqualTo(environment);
-                using var ordinaryDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                await ordinaryHost.StartAsync(ordinaryDeadline.Token);
-                await ordinaryHost.StopAsync(ordinaryDeadline.Token);
-                await Assert.That(Directory.EnumerateFiles(owner.Root, "managed-host-root-*").Any()).IsFalse();
-            }
             return;
         }
         var builder = owner.Builder();
@@ -753,7 +832,8 @@ public sealed class AppHostOwnershipTests
                 File.Move(marker, marker + ".retained");
                 File.CreateSymbolicLink(marker, marker + ".retained");
                 break;
-            case "root-mode": File.SetUnixFileMode(owner.Root, UnixFileMode.UserRead | UnixFileMode.UserWrite |
+            case "root-mode":
+                File.SetUnixFileMode(owner.Root, UnixFileMode.UserRead | UnixFileMode.UserWrite |
                 UnixFileMode.UserExecute | UnixFileMode.GroupRead); break;
             case "marker-mode": File.SetUnixFileMode(marker, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead); break;
             case "outside-root": builder.Configuration["ISLAMU_TEST_ROOT"] = owner.ContentRoot; break;
@@ -937,7 +1017,9 @@ public sealed class AppHostOwnershipTests
         using var process = new System.Diagnostics.Process();
         process.StartInfo = new System.Diagnostics.ProcessStartInfo("stat")
         {
-            UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
         };
         process.StartInfo.Environment["LC_ALL"] = "C";
         foreach (string argument in new[] { "--format=%F|%a|%h|%d|%i|%s", "--", path })
@@ -1014,7 +1096,7 @@ public sealed class AppHostOwnershipTests
         {
             string? target = new FileInfo(path).LinkTarget;
             bool samePath = target == record || target == record + " (deleted)";
-            if (!samePath && original is null) continue;
+            if (!samePath && (original is null || target is null || !Path.IsPathFullyQualified(target))) continue;
             try
             {
                 string value = File.ReadAllText("/proc/self/fdinfo/" + Path.GetFileName(path));
@@ -1111,7 +1193,9 @@ public sealed class AppHostOwnershipTests
             Directory.CreateDirectory(ContentRoot);
             using var marker = new FileStream(Path.Combine(Root, TestingResourceIsolation.MarkerName), new FileStreamOptions
             {
-                Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None,
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
                 UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
             });
             marker.Write(Encoding.UTF8.GetBytes(Id));
@@ -1121,13 +1205,16 @@ public sealed class AppHostOwnershipTests
         {
             var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
             {
-                DisableDefaults = true, EnvironmentName = environment, ContentRootPath = ContentRoot,
+                DisableDefaults = true,
+                EnvironmentName = environment,
+                ContentRootPath = ContentRoot,
                 ApplicationName = typeof(AppHostOwnershipTests).Assembly.GetName().Name
             });
             builder.Configuration.Sources.Clear();
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ISLAMU_TEST_ROOT"] = Root, ["ISLAMU_TEST_RUN_ID"] = Id
+                ["ISLAMU_TEST_ROOT"] = Root,
+                ["ISLAMU_TEST_RUN_ID"] = Id
             });
             return builder;
         }

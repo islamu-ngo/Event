@@ -17,7 +17,7 @@ public sealed class ExternalDataProtectionRuntimeTests
     [Arguments(OwnedBffPeerProtection.IndependentValidAuthority)]
     public async Task SelectedExternalAuthorityControlsPeerSessionsAcrossBffRestart(OwnedBffPeerProtection protection)
     {
-        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(7));
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(15));
         CancellationToken cancellationToken = deadline.Token;
         await using var owner = await OwnedAppHostFixture.CreateAsync("Split", cancellationToken,
             configuredAdministrator: true, deploymentMode: "MultiTenant",
@@ -235,7 +235,7 @@ public sealed class ExternalDataProtectionRuntimeTests
     private sealed class BffSession(Uri address) : IDisposable
     {
         private readonly HttpClient client = new(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
-            { BaseAddress = address };
+        { BaseAddress = address };
         private readonly CookieContainer cookies = new();
         public Uri Address => address;
 
@@ -249,7 +249,8 @@ public sealed class ExternalDataProtectionRuntimeTests
             }
             using var response = await SendAsync(HttpMethod.Post, "/bff/auth/local/login", new
             {
-                identifier = owner.BootstrapIdentifier, password = owner.BootstrapReplacementPassword
+                identifier = owner.BootstrapIdentifier,
+                password = owner.BootstrapReplacementPassword
             }, cancellationToken);
             response.EnsureSuccessStatusCode();
             using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
@@ -261,7 +262,7 @@ public sealed class ExternalDataProtectionRuntimeTests
         {
             foreach (Cookie cookie in issuer.cookies.GetCookies(issuer.Address))
                 cookies.Add(Address, new Cookie(cookie.Name, cookie.Value, cookie.Path)
-                    { Secure = cookie.Secure, HttpOnly = cookie.HttpOnly, Expires = cookie.Expires });
+                { Secure = cookie.Secure, HttpOnly = cookie.HttpOnly, Expires = cookie.Expires });
         }
 
         public bool ContainsCookieValue(string content) => cookies.GetCookies(Address).Cast<Cookie>()

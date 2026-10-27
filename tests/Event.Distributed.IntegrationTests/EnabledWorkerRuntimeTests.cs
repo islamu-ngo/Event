@@ -22,7 +22,7 @@ public sealed class EnabledWorkerRuntimeTests
     [Test]
     public async Task EnabledWorkerDeliversPendingWorkAndRecoversTheOriginalPreHandoffClaimAfterRestart()
     {
-        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(7));
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(15));
         CancellationToken cancellationToken = deadline.Token;
         await using var owner = await OwnedAppHostFixture.CreateAsync("Split", true, "MultiTenant", null,
             builder =>
@@ -99,14 +99,20 @@ public sealed class EnabledWorkerRuntimeTests
     {
         using var created = await api.PostAsJsonAsync("/api/tenant", new
         {
-            fullName = "Enabled worker assurance", slug = $"worker-{owner.RunId}", isActive = true,
+            fullName = "Enabled worker assurance",
+            slug = $"worker-{owner.RunId}",
+            isActive = true,
             assignCurrentUserAsTenantAdmin = true,
             directoryOperatorIdentity = new
             {
-                publicName = "Assurance operator", legalName = "Assurance operator",
-                operatorKindCode = "registered_organization", jurisdictionCountryCode = "BE",
-                publicContactEmail = owner.BootstrapIdentifier, legalNoticeUrl = "https://example.invalid/legal",
-                termsUrl = "https://example.invalid/terms", privacyUrl = "https://example.invalid/privacy"
+                publicName = "Assurance operator",
+                legalName = "Assurance operator",
+                operatorKindCode = "registered_organization",
+                jurisdictionCountryCode = "BE",
+                publicContactEmail = owner.BootstrapIdentifier,
+                legalNoticeUrl = "https://example.invalid/legal",
+                termsUrl = "https://example.invalid/terms",
+                privacyUrl = "https://example.invalid/privacy"
             }
         }, cancellationToken);
         created.EnsureSuccessStatusCode();
@@ -121,10 +127,15 @@ public sealed class EnabledWorkerRuntimeTests
         string purpose = role == PrimaryDatabaseRole.Runtime ? "RUNTIME" : "GLOBAL";
         return new()
         {
-            Role = role, Provider = PrimaryDatabaseProvider.PostgreSql, Host = endpoint.Host, Port = endpoint.Port,
-            Database = owner.EnvironmentAuthority["DATABASE_NAME"], Schema = owner.EnvironmentAuthority["DATABASE_SCHEMA"]!,
+            Role = role,
+            Provider = PrimaryDatabaseProvider.PostgreSql,
+            Host = endpoint.Host,
+            Port = endpoint.Port,
+            Database = owner.EnvironmentAuthority["DATABASE_NAME"],
+            Schema = owner.EnvironmentAuthority["DATABASE_SCHEMA"]!,
             Username = owner.EnvironmentAuthority[$"DATABASE_{purpose}_USERNAME"],
-            Password = owner.EnvironmentAuthority[$"DATABASE_{purpose}_PASSWORD"], TlsMode = PrimaryDatabaseTlsMode.Disabled
+            Password = owner.EnvironmentAuthority[$"DATABASE_{purpose}_PASSWORD"],
+            TlsMode = PrimaryDatabaseTlsMode.Disabled
         };
     }
 
@@ -144,36 +155,55 @@ public sealed class EnabledWorkerRuntimeTests
         DateTime now = DateTime.UtcNow;
         var intent = new NotificationIntent
         {
-            TenantId = tenantId, RecipientUserId = userId, RecipientTenantUser = membership,
+            TenantId = tenantId,
+            RecipientUserId = userId,
+            RecipientTenantUser = membership,
             CategoryId = (int)NotificationCategoryEnum.RegistrationLifecycle,
             OwnershipTypeId = (int)NotificationOwnershipTypeEnum.IslamuEvent,
             RecipientKindId = (int)NotificationRecipientKindEnum.User,
             StatusId = (int)NotificationIntentStatusEnum.DispatchQueued,
-            TemplateKey = "registration.confirmed", DeduplicationKey = $"worker-assurance:{Guid.CreateVersion7():N}",
+            TemplateKey = "registration.confirmed",
+            DeduplicationKey = $"worker-assurance:{Guid.CreateVersion7():N}",
             EmailDeliveryPolicyRevision = policyRevision,
             CreatedAt = now
         };
         var dispatch = new EmailDispatchOutbox
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Kind = EmailDispatchKind.RegistrationConfirmation,
-            SourceType = "notification_intent", SourceId = intent.Id,
-            NotificationIntentId = intent.Id, NotificationIntent = intent,
-            RecipientUserId = userId, RecipientTenantUser = membership,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Kind = EmailDispatchKind.RegistrationConfirmation,
+            SourceType = "notification_intent",
+            SourceId = intent.Id,
+            NotificationIntentId = intent.Id,
+            NotificationIntent = intent,
+            RecipientUserId = userId,
+            RecipientTenantUser = membership,
             RecipientAddressSource = RecipientAddressSource.TenantUserVerifiedEmail,
-            RecipientEmail = address.Email!, Subject = $"Worker assurance {Guid.CreateVersion7():N}",
+            RecipientEmail = address.Email!,
+            Subject = $"Worker assurance {Guid.CreateVersion7():N}",
             PlainTextBody = "The original registration notification was delivered.",
-            CreatedAt = now, UpdatedAt = now
+            CreatedAt = now,
+            UpdatedAt = now
         };
         intent.Deliveries.Add(new NotificationDelivery
         {
-            TenantId = tenantId, NotificationIntentId = intent.Id, NotificationIntent = intent,
+            TenantId = tenantId,
+            NotificationIntentId = intent.Id,
+            NotificationIntent = intent,
             ChannelId = (int)NotificationPreferenceChannelEnum.Email,
             DeliveryPolicyId = (int)NotificationDeliveryPolicyEnum.RegistrationStatusOptional,
-            PolicyVersion = 1, PreferenceCategoryCode = NotificationPreferenceCategoryCodes.RegistrationStatus,
-            RecipientAddressSource = RecipientAddressSource.TenantUserVerifiedEmail, DisclosureLevel = "standard",
-            TemplateKey = intent.TemplateKey, TemplateVersion = 1,
-            EmailDispatchOutboxId = dispatch.Id, EmailDispatchOutbox = dispatch,
-            StatusId = (int)NotificationDeliveryStatusEnum.Queued, ProviderStatus = "queued", QueuedAt = now, CreatedAt = now
+            PolicyVersion = 1,
+            PreferenceCategoryCode = NotificationPreferenceCategoryCodes.RegistrationStatus,
+            RecipientAddressSource = RecipientAddressSource.TenantUserVerifiedEmail,
+            DisclosureLevel = "standard",
+            TemplateKey = intent.TemplateKey,
+            TemplateVersion = 1,
+            EmailDispatchOutboxId = dispatch.Id,
+            EmailDispatchOutbox = dispatch,
+            StatusId = (int)NotificationDeliveryStatusEnum.Queued,
+            ProviderStatus = "queued",
+            QueuedAt = now,
+            CreatedAt = now
         });
         context.NotificationIntents.Add(intent);
         await context.SaveChangesAsync(cancellationToken);

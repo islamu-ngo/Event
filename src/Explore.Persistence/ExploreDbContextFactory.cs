@@ -1,6 +1,4 @@
 using Explore.Persistence.Database;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -22,12 +20,8 @@ public class ExploreDbContextFactory : IDesignTimeDbContextFactory<ExploreDbCont
             .AddEnvironmentVariables()
             .AddCommandLine(args)
             .Build();
-        if (new ConfigurationBuilder().AddCommandLine(args).Build()
-            .GetValue<bool>("DesignTime:ModelOnly"))
+        if (DesignTimeModelConfiguration.IsRequested(args, bootstrap))
         {
-            if (!SecretAuthorityConfiguration.IsDevelopmentOrTesting(
-                    SecretAuthorityConfiguration.GetEnvironmentName(bootstrap)))
-                throw new InvalidOperationException("Model-only scaffolding requires Development or Testing.");
             string? selected = bootstrap["Database:Provider"] ?? bootstrap["DATABASE_PROVIDER"];
             if (!Enum.TryParse(selected, true, out PrimaryDatabaseProvider provider) || !Enum.IsDefined(provider))
                 throw new InvalidOperationException("Model-only scaffolding requires an explicit supported provider.");
@@ -48,14 +42,9 @@ public class ExploreDbContextFactory : IDesignTimeDbContextFactory<ExploreDbCont
             PrimaryDatabaseProviderComposition.ConfigureApplicationModel(modelBuilder, modelOptions);
             return new ExploreDbContext(modelBuilder.Options);
         }
-        var configurationBuilder = new ConfigurationBuilder().AddConfiguration(
-            SecretAuthorityConfiguration.Build(
-                bootstrap,
-                SecretAuthorityConfiguration.GetEnvironmentName(bootstrap),
-                "/database",
-                "/database/erasure"));
-
-        return CreateDbContext(configurationBuilder);
+        return MigrationDatabaseAcquisition.CreateDesignTimeContext(
+            bootstrap, ["/database"],
+            configuration => CreateDbContext(new ConfigurationBuilder().AddConfiguration(configuration)));
     }
 
     public ExploreDbContext CreateDbContext(IConfigurationBuilder configurationBuilder)

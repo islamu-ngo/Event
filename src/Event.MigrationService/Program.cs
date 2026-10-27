@@ -5,19 +5,20 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Schema;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace Event.MigrationService;
 
 public class Program
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         var builder = Host.CreateApplicationBuilder(args);
 
-        var databaseOptions = builder.Configuration.AddPrimaryDatabaseBootstrap(
-            builder.Environment.EnvironmentName);
+        await using var authority = await MigrationDatabaseAcquisition.OpenAsync(
+            builder.Configuration, builder.Environment.EnvironmentName,
+            ["/database", "/database/erasure", "/database/identity"]);
+        var databaseOptions = builder.Configuration.AddPrimaryDatabaseBootstrap(authority);
         ExploreDatabaseMigrator.EnsureAgentBrowserAdmission(builder.Configuration, builder.Environment);
 
         builder.AddServiceDefaults();
@@ -87,7 +88,7 @@ public class Program
                 EmbeddedPrivacyErasureAuthorityDbContextFactory.Configure(options, embedded));
         }
 
-        var host = builder.Build();
-        host.Run();
+        using var host = builder.Build();
+        await host.RunAsync();
     }
 }

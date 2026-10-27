@@ -1538,6 +1538,7 @@
           "Explore.Application": "[1.0.0, )",
           "Explore.Atproto.Transport": "[1.0.0, )",
           "Explore.Secrets": "[1.0.0, )",
+          "Explore.ServiceDefaults": "[1.0.0, )",
           "Google.Protobuf": "[3.35.1, )",
           "Grpc.Net.Client": "[2.80.0, )",
           "MailKit": "[4.17.0, )",
@@ -1564,7 +1565,7 @@
         "dependencies": {
           "EFCore.NamingConventions": "[10.0.1, )",
           "Explore.Application": "[1.0.0, )",
-          "Explore.Secrets": "[1.0.0, )",
+          "Explore.ServiceDefaults": "[1.0.0, )",
           "Microsoft.AspNetCore.DataProtection.EntityFrameworkCore": "[10.0.10, )",
           "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "[10.0.10, )",
           "Microsoft.EntityFrameworkCore": "[10.0.10, )",

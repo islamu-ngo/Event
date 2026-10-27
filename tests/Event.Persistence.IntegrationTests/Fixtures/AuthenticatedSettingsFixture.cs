@@ -28,7 +28,6 @@ using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Seed;
-using Explore.Secrets.Database;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Diagnostics;

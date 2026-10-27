@@ -31,7 +31,6 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Entities;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using Explore.Secrets.Extensions;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;

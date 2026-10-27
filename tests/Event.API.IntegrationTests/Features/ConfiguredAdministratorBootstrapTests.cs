@@ -18,7 +18,6 @@ using Explore.Persistence;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Persistence.Database;
-using Explore.Secrets.Database;
 using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;

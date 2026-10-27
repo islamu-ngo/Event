@@ -18,7 +18,6 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Services;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using Explore.Secrets.Extensions;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;

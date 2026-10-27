@@ -32,7 +32,6 @@ using Explore.Domain.Settings;
 using Explore.Infrastructure.Storage;
 using Explore.Persistence;
 using Explore.Persistence.Database;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;

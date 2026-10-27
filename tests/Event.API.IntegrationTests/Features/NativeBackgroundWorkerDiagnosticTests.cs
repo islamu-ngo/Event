@@ -9,7 +9,6 @@ using Explore.Domain.Constants;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;

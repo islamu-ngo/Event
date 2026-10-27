@@ -19,7 +19,6 @@ using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
 using Explore.Tests.Shared.Settings;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;

@@ -1,9 +1,9 @@
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Npgsql;
 
-namespace Explore.Secrets.UnitTests.Database;
+namespace Event.Persistence.IntegrationTests.Database;
 
 public sealed class PrivacyErasureAuthorityDatabaseConfigurationTests
 {

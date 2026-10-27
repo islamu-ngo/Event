@@ -1,5 +1,4 @@
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 
 namespace Event.MigrationService.Extensions;
 
@@ -14,20 +13,12 @@ public static class ConfigurationExtensions
     /// </remarks>
     public static PrimaryDatabaseConnectionOptions AddPrimaryDatabaseBootstrap(
         this IConfigurationBuilder configBuilder,
-        string environmentName)
+        MigrationDatabaseAcquisition authority)
     {
-        var bootstrapConfiguration = configBuilder.Build();
-        IConfiguration authority = SecretAuthorityConfiguration.Build(
-            bootstrapConfiguration,
-            environmentName,
-            SecretConsumer.Migration,
-            "/database",
-            "/database/erasure",
-            "/database/identity");
-        var databaseOptions = PrimaryDatabaseConfiguration.BindMigrator(authority);
+        var databaseOptions = PrimaryDatabaseConfiguration.BindMigrator(authority.Configuration);
         var database = PrimaryDatabaseConfiguration.BuildConnectionString(databaseOptions);
 
-        configBuilder.AddConfiguration(authority);
+        authority.ApplyTo(configBuilder);
 
         Console.WriteLine("===========================================");
         Console.WriteLine("Migration Service database bootstrap:");

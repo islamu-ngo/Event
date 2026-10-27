@@ -2,7 +2,6 @@ using Explore.Application.Contracts.Recovery;
 using Explore.Infrastructure.Recovery;
 using Explore.Persistence;
 using Explore.Persistence.Database;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

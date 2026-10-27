@@ -1,6 +1,4 @@
 using Explore.Persistence.Database;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -16,11 +14,19 @@ public sealed class CoLocatedPrivacyErasureAuthorityDbContextFactory
             .AddEnvironmentVariables()
             .AddCommandLine(args)
             .Build();
-        IConfiguration configuration = SecretAuthorityConfiguration.Build(
-            bootstrap,
-            SecretAuthorityConfiguration.GetEnvironmentName(bootstrap),
-            "/database",
-            "/database/erasure");
+        if (DesignTimeModelConfiguration.IsRequested(args, bootstrap))
+        {
+            var modelBuilder = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthorityModel(
+                modelBuilder, DesignTimeModelConfiguration.ReadPrimary(bootstrap));
+            return new CoLocatedPrivacyErasureAuthorityDbContext(modelBuilder.Options);
+        }
+        return MigrationDatabaseAcquisition.CreateDesignTimeContext(
+            bootstrap, ["/database"], CreateDbContext);
+    }
+
+    private static CoLocatedPrivacyErasureAuthorityDbContext CreateDbContext(IConfiguration configuration)
+    {
         PrimaryDatabaseConnectionOptions database =
             PrimaryDatabaseConfiguration.BindMigrator(configuration);
         var options = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>();

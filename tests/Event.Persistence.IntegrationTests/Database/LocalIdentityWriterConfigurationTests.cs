@@ -1,8 +1,8 @@
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
-namespace Explore.Secrets.UnitTests.Configuration;
+namespace Event.Persistence.IntegrationTests.Database;
 
 public sealed class LocalIdentityWriterConfigurationTests
 {

@@ -1,9 +1,9 @@
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
-namespace Explore.Secrets.UnitTests.Database;
+namespace Event.Persistence.IntegrationTests.Database;
 
 public sealed class EmbeddedPrivacyErasureAuthorityOptionsTests
 {

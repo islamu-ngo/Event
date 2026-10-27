@@ -28,7 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Explore.Application\Explore.Application.csproj" />
-    <ProjectReference Include="..\Explore.Secrets\Explore.Secrets.csproj" />
+    <ProjectReference Include="..\Explore.ServiceDefaults\Explore.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>

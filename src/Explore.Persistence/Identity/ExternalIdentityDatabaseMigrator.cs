@@ -1,4 +1,4 @@
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

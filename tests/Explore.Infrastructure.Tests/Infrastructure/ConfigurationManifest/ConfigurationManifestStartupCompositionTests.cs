@@ -12,7 +12,6 @@ using Explore.Infrastructure;
 using Explore.Infrastructure.ConfigurationManifest;
 using Explore.Persistence;
 using Explore.Persistence.Database;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

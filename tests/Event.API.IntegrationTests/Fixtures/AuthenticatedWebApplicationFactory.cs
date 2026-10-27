@@ -7,7 +7,6 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
 using Explore.ServiceDefaults.DataProtection;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

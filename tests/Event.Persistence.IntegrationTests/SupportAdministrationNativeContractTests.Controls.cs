@@ -2,7 +2,7 @@ using System.Data;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Explore.Domain.Enums;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Native = Explore.Persistence.Security.PostgresSupportAdministrationContract;

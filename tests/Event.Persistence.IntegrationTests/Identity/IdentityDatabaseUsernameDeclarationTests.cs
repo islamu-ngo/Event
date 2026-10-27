@@ -1,5 +1,5 @@
 using Explore.Persistence.Identity;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Extensions.Configuration;
 
 namespace Event.Persistence.IntegrationTests.Identity;

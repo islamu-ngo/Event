@@ -13,7 +13,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Privacy.ErasureAuthority;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;

@@ -15,7 +15,6 @@ using Explore.Persistence.Identity;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;

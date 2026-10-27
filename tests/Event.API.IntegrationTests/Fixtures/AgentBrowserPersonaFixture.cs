@@ -18,7 +18,7 @@ using Explore.Persistence.Identity;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Seed;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.TestHost;

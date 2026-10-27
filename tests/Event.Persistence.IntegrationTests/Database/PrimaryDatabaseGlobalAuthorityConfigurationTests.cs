@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Extensions.Configuration;
 using TUnit.Core;
 
-namespace Explore.Secrets.UnitTests.Configuration;
+namespace Event.Persistence.IntegrationTests.Database;
 
 public sealed class PrimaryDatabaseGlobalAuthorityConfigurationTests
 {

@@ -8,7 +8,6 @@ using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Domain;
 using Explore.Domain.Constants;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;

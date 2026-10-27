@@ -8,7 +8,7 @@ using Explore.Persistence.Identity;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

@@ -107,7 +107,7 @@ public sealed class ImportEventAmbiguousCommitPersistenceTests(PostgreSqlContain
                 new InstanceBootstrapStateRepository(context),
                 new Explore.Persistence.Services.TenantLookupSource(
                     new Explore.Persistence.Database.GlobalExploreDbContextFactory(
-                        fixture.GetNativeQueueOptions(Explore.Secrets.Database.PrimaryDatabaseRole.Global)))));
+                        fixture.GetNativeQueueOptions(Explore.Persistence.Database.PrimaryDatabaseRole.Global)))));
         var handler = new ImportEventCommandHandler(
             repository,
             Substitute.For<IStorageObjectRepository>(),

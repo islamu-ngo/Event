@@ -170,7 +170,7 @@ public sealed partial class OrdinarySettingsNativeContractTests
 
     private async Task<OrdinaryReadTargets> SeedOrdinaryReadTargetsAsync()
     {
-        await using var seed = Open(Explore.Secrets.Database.PrimaryDatabaseRole.Migrator);
+        await using var seed = Open(Explore.Persistence.Database.PrimaryDatabaseRole.Migrator);
         var tenants = await seed.Tenants.AsNoTracking()
             .Where(row => row.FullName == "Ordinary native fixture").ToListAsync();
         Guid own = tenants.Single(row => row.TenantStatusId == (int)TenantStatusEnum.Active).Id;
@@ -191,7 +191,7 @@ public sealed partial class OrdinarySettingsNativeContractTests
 
     private async Task<OrdinaryReadState> ReadOrdinaryReadStateAsync(OrdinaryReadTargets targets)
     {
-        await using var observer = Open(Explore.Secrets.Database.PrimaryDatabaseRole.Migrator);
+        await using var observer = Open(Explore.Persistence.Database.PrimaryDatabaseRole.Migrator);
         var system = await observer.SystemSettings.AsNoTracking().SingleAsync(row => row.SettingKey == TenantDisclosureKey);
         var tenants = await observer.Set<TenantSetting>().IgnoreTenantFilter(ReadIsolationProof).AsNoTracking()
             .Where(row => row.SettingKey == TenantDisclosureKey && (row.TenantId == targets.Own || row.TenantId == targets.Foreign))

@@ -16,7 +16,6 @@ using Explore.Persistence.Identity;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;

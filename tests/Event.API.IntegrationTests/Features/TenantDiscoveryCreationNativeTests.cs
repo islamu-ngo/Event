@@ -14,7 +14,6 @@ using Explore.Domain.Settings.Documents;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;

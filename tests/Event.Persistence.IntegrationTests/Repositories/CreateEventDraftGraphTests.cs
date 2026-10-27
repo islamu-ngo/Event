@@ -17,7 +17,6 @@ using Explore.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
-using Explore.Secrets.Database;
 using Explore.Secrets.Extensions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;

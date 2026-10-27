@@ -1,7 +1,7 @@
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Extensions.Configuration;
 
-namespace Explore.Secrets.UnitTests.Configuration;
+namespace Event.Persistence.IntegrationTests.Database;
 
 public sealed class DatabaseUsernameDeclarationTests
 {

@@ -1,6 +1,6 @@
 using Explore.API.Extensions;
 using Explore.Infrastructure.Services;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Extensions.Configuration;
 using System.Reflection;
 

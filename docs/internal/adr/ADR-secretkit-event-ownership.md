@@ -45,6 +45,14 @@ the ASP.NET-capable assembly dependency is acknowledged, but ordinary queries
 must not depend on HTTP hosting. Database construction and provider semantics
 remain Persistence responsibilities.
 
+`MigrationDatabaseAcquisition` opens the migration consumer through ServiceDefaults,
+prepares only declared database groups and overlays explicit null masks rather
+than reviving lower-priority credential aliases. MigrationService retains that
+owner through `RunAsync`; the synchronous EF contract bridges acquisition once
+with a two-minute deadline and disposes it after context construction.
+`DesignTimeModelConfiguration` selects the explicit Development/Testing model-only
+lane before acquisition, so offline scaffolding requires no secret authority.
+
 ## Async required-group preparation
 
 The approved composition contract awaits complete preparation before host

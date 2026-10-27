@@ -1061,7 +1061,7 @@
         "dependencies": {
           "EFCore.NamingConventions": "[10.0.1, )",
           "Explore.Application": "[1.0.0, )",
-          "Explore.Secrets": "[1.0.0, )",
+          "Explore.ServiceDefaults": "[1.0.0, )",
           "Microsoft.AspNetCore.DataProtection.EntityFrameworkCore": "[10.0.10, )",
           "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "[10.0.10, )",
           "Microsoft.EntityFrameworkCore": "[10.0.10, )",

@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Explore.Domain;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;

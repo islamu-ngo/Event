@@ -5,7 +5,6 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Models;
 using Explore.Persistence.Schema;
-using Explore.Secrets.Database;
 using Microsoft.Extensions.Configuration;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

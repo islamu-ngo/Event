@@ -5,7 +5,6 @@ using Explore.Domain.Constants;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;

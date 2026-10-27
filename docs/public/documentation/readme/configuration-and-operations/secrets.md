@@ -205,6 +205,23 @@ them protected and offline until a separately authorized retention decision.
 
 ## Secret Rotation Procedure
 
+### Migration and EF tooling
+
+Migration startup and credential-bearing EF factories select the migration
+consumer, not API or BFF authority. Inject that invocation's database fields and
+machine identity before starting it; an Aspire child process does not supply
+credentials to a separate terminal. These short-lived invocations do not start
+token maintenance. Missing selected fields cannot fall back to application JSON,
+command-line passwords or a raw connection string. An explicitly empty field is
+an error, not permission to choose another alias.
+
+For Development/Testing model scaffolding without credentials, pass
+`--DesignTime:ModelOnly=true` after the EF argument separator and explicitly
+select the model's provider. This path does not contact the secret authority.
+Identity models additionally require an explicit identity schema; MySQL/MariaDB
+models require their server version. Model construction does not verify that an
+existing database is reachable or matches the model.
+
 Plan secret rotations as rolling service restarts. The platform requires process reload to rebind database and encryption credentials:
 
 1. Generate the replacement secret in your selected authority (Environment or Infisical).

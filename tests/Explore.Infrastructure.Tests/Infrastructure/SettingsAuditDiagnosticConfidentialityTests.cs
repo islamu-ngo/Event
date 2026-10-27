@@ -16,7 +16,6 @@ using Explore.Infrastructure.Storage;
 using Explore.Infrastructure.Services;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Database;
-using Explore.Secrets.Database;
 using Explore.Tests.Shared.Settings;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Caching.Distributed;

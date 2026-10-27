@@ -5,7 +5,6 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Schema;
-using Explore.Secrets.Database;
 using Explore.Secrets.Configuration;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Event.Standalone.Hosting;

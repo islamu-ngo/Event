@@ -1,14 +1,14 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
-namespace Explore.Secrets.UnitTests.Database;
+namespace Event.Persistence.IntegrationTests.Database;
 
 public sealed class DeploymentCredentialConfigurationTests
 {

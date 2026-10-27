@@ -1,5 +1,8 @@
 using Explore.Domain;
 using Explore.Persistence;
+using System.Data.Common;
+using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -20,7 +23,7 @@ public sealed partial class ModerationNoticeReadTests
         await using var writer = fixture.Database.Context();
         var repository = AdjudicatedGrants(writer, fixture, fixture.Database.AdministratorId, colocated);
         var before = await RecoveryAsync();
-        await Assert.That(await repository.GrantAsync(request)).IsNotNull();
+        await Assert.That(await ObserveGrantSettlementAsync(() => repository.GrantAsync(request))).IsNotNull();
         var issued = await RecoveryAsync();
         await Assert.That(issued).IsEqualTo((before.Id, before.Revision + 1, before.Generation, before.Position + 1));
         await Assert.That(await repository.GrantAsync(request)).IsNotNull();
@@ -67,8 +70,9 @@ public sealed partial class ModerationNoticeReadTests
         var probe = new SubstituteAdjudicatedGrantAtSave(request.OperationId, extraId, fixture.Database.SubjectId, defect);
         await using (var writer = fixture.Database.Context(probe))
         {
-            await Assert.That(await AdjudicatedGrants(writer, fixture, fixture.Database.AdministratorId, colocated)
-                .GrantAsync(request)).IsNull();
+            await Assert.That(await ObserveGrantSettlementAsync(() =>
+                AdjudicatedGrants(writer, fixture, fixture.Database.AdministratorId, colocated)
+                    .GrantAsync(request))).IsNull();
             await Assert.That(probe.Observed).IsTrue();
             await Assert.That(writer.Database.CurrentTransaction).IsNull();
             await Assert.That(writer.ChangeTracker.HasChanges()).IsFalse();
@@ -81,6 +85,35 @@ public sealed partial class ModerationNoticeReadTests
         await Assert.That((qualificationAfter.Id, qualificationAfter.HostBindingId, qualificationAfter.TenantId, qualificationAfter.Revision))
             .IsEqualTo((qualificationBefore.Id, qualificationBefore.HostBindingId, qualificationBefore.TenantId, qualificationBefore.Revision));
         await AssertOriginalAdjudicatedLedgerUnchangedAsync(fixture, original);
+    }
+
+    private static async Task<ModerationAdjudicatedCaseReadGrant?> ObserveGrantSettlementAsync(
+        Func<Task<ModerationAdjudicatedCaseReadGrant?>> operation)
+    {
+        var path = Environment.GetEnvironmentVariable("GRANT_TEST_PROGRESS_PATH");
+        if (string.IsNullOrEmpty(path)) return await operation();
+        Exception? refusal = null;
+        EventHandler<FirstChanceExceptionEventArgs> trace = (_, arguments) =>
+        {
+            if (arguments.Exception is DbException || arguments.Exception.GetType().FullName is
+                "Explore.Persistence.Repositories.ModerationAdjudicatedCaseReadGrantRepository+Unavailable"
+                or "Explore.Persistence.ExploreDbContext+ModerationReadGrantSettlementException")
+                Interlocked.CompareExchange(ref refusal, arguments.Exception, null);
+        };
+        AppDomain.CurrentDomain.FirstChanceException += trace;
+        try
+        {
+            var result = await operation();
+            if (result is null && refusal is { } failure)
+            {
+                using var progress = new StreamWriter(new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite));
+                progress.WriteLine($"[DEBUG-GRANT-SETTLEMENT] adjudicated-refusal:{failure.GetType().Name}");
+                foreach (var frame in new StackTrace(failure, true).GetFrames().Take(8))
+                    progress.WriteLine($"[DEBUG-GRANT-SETTLEMENT] refusal-frame:{frame.GetMethod()?.DeclaringType?.Name}.{frame.GetMethod()?.Name}:{frame.GetFileLineNumber()}");
+            }
+            return result;
+        }
+        finally { AppDomain.CurrentDomain.FirstChanceException -= trace; }
     }
 
     private sealed class SubstituteAdjudicatedGrantAtSave(

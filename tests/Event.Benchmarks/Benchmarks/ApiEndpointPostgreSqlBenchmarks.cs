@@ -26,6 +26,8 @@ public class ApiEndpointPostgreSqlBenchmarks : IAsyncDisposable
     private readonly string _fixtureNonce = Guid.CreateVersion7().ToString("N");
     private AssuranceOwnershipContext? _assurance;
     private string? _intendedContainerName;
+    private string? _knownContainerId;
+    private readonly List<FileStream> _heldWitnesses = [];
     private int _stageSequence;
     private PostgreSqlContainer? _container;
     private BenchmarkPostgreSqlAuthority? _authority;
@@ -74,6 +76,10 @@ public class ApiEndpointPostgreSqlBenchmarks : IAsyncDisposable
                 .Build();
             Console.WriteLine($"benchmark_owned_container: run_id={_ownedRunId} profile=native_ten_purpose_roles");
             await _container.StartAsync(deadline.Token);
+            string actualId = _container.Id;
+            if (actualId.Length != 64 || !actualId.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f'))
+                throw new InvalidOperationException("benchmark_native_container_id_invalid");
+            _knownContainerId = actualId;
             RecordStage(AssuranceStage.ContainerStartReturned);
             Console.WriteLine($"benchmark_owned_container_started: run_id={_ownedRunId} container_id={_container.Id}");
             _authority = BenchmarkDatabaseConfiguration.BindOwnedPostgreSql(_container.GetConnectionString());
@@ -123,7 +129,7 @@ public class ApiEndpointPostgreSqlBenchmarks : IAsyncDisposable
         }
     }
 
-    [Benchmark(Description = "GET: native PostgreSQL 18 / TestServer / output cache disabled")]
+    [Benchmark(Description = "GET + JSON body validation: native PostgreSQL 18 / TestServer / output cache disabled")]
     public async Task<ApiBenchmarkResult> Get_Endpoint_PostgreSql()
     {
         try
@@ -144,12 +150,40 @@ public class ApiEndpointPostgreSqlBenchmarks : IAsyncDisposable
             if (response.StatusCode != HttpStatusCode.OK)
                 throw new InvalidOperationException("benchmark_native_measured_status_invalid");
             var content = await response.Content.ReadAsByteArrayAsync();
+            RequireMeasuredContract(response, content);
             return new ApiBenchmarkResult(Scenario.Name, (int)response.StatusCode, content.Length);
         }
         catch (Exception failure)
         {
             throw new NativeBenchmarkFailure(FailurePhase.Request, [failure]);
         }
+    }
+
+    private void RequireMeasuredContract(HttpResponseMessage response, byte[] content)
+    {
+        string? mediaType = response.Content.Headers.ContentType?.MediaType;
+        if (content.Length == 0 || content.Length > 4 * 1024 * 1024 ||
+            mediaType is null || !(mediaType == "application/json" || mediaType.EndsWith("+json", StringComparison.Ordinal)))
+            throw new InvalidOperationException("benchmark_native_measured_body_invalid");
+        using var body = JsonDocument.Parse(content);
+        JsonValueKind expected = Scenario.Name == "lookup-category-types" ? JsonValueKind.Array : JsonValueKind.Object;
+        if (body.RootElement.ValueKind != expected)
+            throw new InvalidOperationException("benchmark_native_measured_contract_invalid");
+        bool present = Scenario.Name switch
+        {
+            "lookup-category-types" => body.RootElement.GetArrayLength() > 0,
+            "event-list-minimal" or "event-list-hal" => body.RootElement.TryGetProperty("snapshotCount", out var count)
+                && count.ValueKind == JsonValueKind.Number,
+            "my-events-minimal" => body.RootElement.TryGetProperty("totalCount", out var count)
+                && count.ValueKind == JsonValueKind.Number,
+            "system-onboarding-status" => body.RootElement.TryGetProperty("requiresOnboarding", out var required)
+                && required.ValueKind is JsonValueKind.True or JsonValueKind.False,
+            "event-creation-context" => body.RootElement.TryGetProperty("canCreate", out var allowed)
+                && allowed.ValueKind is JsonValueKind.True or JsonValueKind.False,
+            _ => false
+        };
+        if (!present)
+            throw new InvalidOperationException("benchmark_native_measured_contract_invalid");
     }
 
     [GlobalCleanup]
@@ -169,9 +203,8 @@ public class ApiEndpointPostgreSqlBenchmarks : IAsyncDisposable
         catch (Exception failure) { failures.Add(failure); }
         var anonymous = Interlocked.Exchange(ref _anonymous, null);
         var authenticated = Interlocked.Exchange(ref _authenticated, null);
-        var factory = Interlocked.Exchange(ref _factory, null);
-        var authority = Interlocked.Exchange(ref _authority, null);
-        var container = Interlocked.Exchange(ref _container, null);
+        var factory = _factory;
+        var container = _container;
         _session = null;
         try { anonymous?.Dispose(); }
         catch (Exception failure) { failures.Add(failure); }
@@ -179,19 +212,41 @@ public class ApiEndpointPostgreSqlBenchmarks : IAsyncDisposable
         catch (Exception failure) { failures.Add(failure); }
         if (factory is not null)
         {
-            try { await factory.DisposeAsync(); }
+            try
+            {
+                await factory.DisposeAsync();
+                _factory = null;
+            }
             catch (Exception failure) { failures.Add(failure); }
         }
-        try { authority?.Dispose(); }
-        catch (Exception failure) { failures.Add(failure); }
         if (container is not null)
         {
             try
             {
                 await container.DisposeAsync();
+                _container = null;
                 RecordStage(AssuranceStage.ContainerDisposalReturned);
             }
             catch (Exception failure) { failures.Add(failure); }
+        }
+        if (_factory is null && _container is null)
+        {
+            try
+            {
+                _authority?.Dispose();
+                _authority = null;
+            }
+            catch (Exception failure) { failures.Add(failure); }
+            if (_authority is null)
+                for (int index = _heldWitnesses.Count - 1; index >= 0; index--)
+                {
+                    try
+                    {
+                        _heldWitnesses[index].Dispose();
+                        _heldWitnesses.RemoveAt(index);
+                    }
+                    catch (Exception failure) { failures.Add(failure); }
+                }
         }
         return failures;
     }
@@ -224,6 +279,7 @@ public class ApiEndpointPostgreSqlBenchmarks : IAsyncDisposable
             injectFailure = (bool?)null,
             resource = "postgres",
             intendedContainerName = _intendedContainerName,
+            containerId = _knownContainerId,
             imageReference = PostgreSqlImage,
             imagePullPolicy = "never",
             dockerEndpointSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(owner.DockerEndpoint.OriginalString))),
@@ -242,11 +298,16 @@ public class ApiEndpointPostgreSqlBenchmarks : IAsyncDisposable
         {
             stream = new FileStream(Path.Combine(owner.Root, file), new FileStreamOptions
             {
-                Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None,
-                UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite, Options = FileOptions.WriteThrough
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.Read,
+                UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite,
+                Options = FileOptions.WriteThrough
             });
             stream.Write(bytes);
             stream.Flush(flushToDisk: true);
+            _heldWitnesses.Add(stream);
+            stream = null;
         }
         catch (Exception failure) { failures.Add(failure); }
         finally

@@ -17,12 +17,32 @@ jobs:
     name: Performance Smoke
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      TMPDIR: ${{ runner.temp }}/islamu-performance-private
+      DOCKER_HOST: unix:///var/run/docker.sock
+      TESTCONTAINERS_RYUK_DISABLED: "true"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      - name: Prepare private execution parent
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$TMPDIR"
+          test "$(stat -c %u "$TMPDIR")" = "$(id -u)"
+          test ! -L "$TMPDIR"
+          chmod 700 "$TMPDIR"
+          test ! -e "$TMPDIR/public"
+          [[ "$DOCKER_HOST" == unix:///* ]]
+          socket="$(readlink --canonicalize-existing -- "${DOCKER_HOST#unix://}")"
+          test -S "$socket"
+          printf 'DOCKER_HOST=unix://%s\n' "$socket" >> "$GITHUB_ENV"
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -32,68 +52,58 @@ jobs:
           cache-dependency-path: "**/packages.lock.json"
 
       - name: Restore dependencies
-        run: dotnet restore --locked-mode
+        run: |
+          dotnet restore --locked-mode
+          dotnet restore eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --locked-mode
 
-      - name: Build benchmarks
+      - name: Build native admission and benchmarks
         shell: bash
         run: |
-          set -o pipefail
-          mkdir -p artifacts/performance
+          set -euo pipefail
+          dotnet build eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj \
+            --configuration Release --no-restore --verbosity quiet --nologo -m:1 \
+            -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
           dotnet build tests/Event.Benchmarks/Event.Benchmarks.csproj \
-            --configuration Release \
-            --no-restore \
-            --verbosity minimal \
-            2>&1 | tee artifacts/performance/performance-build.log
+            --configuration Release --no-restore --verbosity quiet --nologo -m:1 \
+            -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
 
-      - name: Run API endpoint performance smoke
+      - name: Cache the declared PostgreSQL image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker --host "$DOCKER_HOST" pull postgres:18-alpine > "$TMPDIR/postgres-provision.log" 2>&1
+
+      - name: Admit six native PostgreSQL functional cases
         id: performance_smoke
         shell: bash
         run: |
-          set -o pipefail
-          mkdir -p artifacts/performance/benchmarkdotnet
-          dotnet run --project tests/Event.Benchmarks/Event.Benchmarks.csproj \
-            --configuration Release \
-            --no-build \
-            -- \
-            --filter "*ApiEndpointBenchmarks*" \
-            --job ShortRun \
-            --warmupCount 1 \
-            --iterationCount 3 \
-            --artifacts artifacts/performance/benchmarkdotnet \
-            2>&1 | tee artifacts/performance/performance-smoke.log
+          set -euo pipefail
+          umask 077
+          dotnet eng/release/src/ISLAMU.ReleaseEngineering/bin/Release/net10.0/ISLAMU.ReleaseEngineering.dll \
+            execute-api-benchmarks "$TMPDIR/public" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_EVENT_NAME" smoke \
+            > "$TMPDIR/benchmark-parent.log" 2>&1
+          test -s "$TMPDIR/public/benchmark-summary.json"
 
       - name: Write Performance Smoke Summary
         if: always()
         shell: bash
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          REF_NAME: ${{ github.ref_name }}
-          COMMIT_SHA: ${{ github.sha }}
           PERFORMANCE_OUTCOME: ${{ steps.performance_smoke.outcome }}
         run: |
           {
             echo "## Performance Smoke Evidence"
             echo
-            echo "| Field | Value |"
-            echo "|---|---|"
-            echo "| Trigger | ${EVENT_NAME} |"
-            echo "| Ref | ${REF_NAME} |"
-            echo "| Commit | ${COMMIT_SHA} |"
-            echo "| Benchmark suite | Event.Benchmarks ApiEndpointBenchmarks ShortRun |"
-            echo "| Benchmark outcome | ${PERFORMANCE_OUTCOME} |"
-            echo "| Artifact | performance-smoke-evidence |"
-            echo "| Build log | artifacts/performance/performance-build.log |"
-            echo "| Benchmark log | artifacts/performance/performance-smoke.log |"
-            echo "| BenchmarkDotNet results | artifacts/performance/benchmarkdotnet/** |"
-            echo
-            echo "This lane remains scheduled/manual and advisory until enough retained runs prove stable signal."
+            echo "Native PostgreSQL whole-six Dry functional admission: ${PERFORMANCE_OUTCOME}."
+            echo "Only the shared native parent's admitted benchmark-summary.json is published."
+            echo "Private credentials, custody records, logs and full BenchmarkDotNet results are withheld."
+            echo "Dry is not a statistical baseline or production capacity claim."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Performance Smoke Evidence
-        if: always()
+      - name: Upload Admitted Performance Evidence
+        if: ${{ success() && steps.performance_smoke.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: performance-smoke-evidence
-          path: artifacts/performance/**
-          if-no-files-found: warn
+          path: ${{ env.TMPDIR }}/public/benchmark-summary.json
+          if-no-files-found: error
           retention-days: 30

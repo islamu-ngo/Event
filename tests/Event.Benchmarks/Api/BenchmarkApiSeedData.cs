@@ -28,7 +28,8 @@ internal static class BenchmarkApiSeedData
     {
         using (var initial = await ReadNativeAsync(client, HttpMethod.Post, "/api/auth/local/login", new
         {
-            identifier = factory.BootstrapIdentifier, password = factory.BootstrapPassword
+            identifier = factory.BootstrapIdentifier,
+            password = factory.BootstrapPassword
         }, null, cancellationToken))
         {
             if (initial.RootElement.GetProperty("success").GetBoolean())
@@ -43,13 +44,20 @@ internal static class BenchmarkApiSeedData
         Guid tenantId;
         using (var tenant = await ReadNativeAsync(client, HttpMethod.Post, "/api/Tenant", new
         {
-            fullName = "Benchmark native community", slug, isActive = true, assignCurrentUserAsTenantAdmin = true,
+            fullName = "Benchmark native community",
+            slug,
+            isActive = true,
+            assignCurrentUserAsTenantAdmin = true,
             directoryOperatorIdentity = new
             {
-                publicName = "Benchmark native community", legalName = "Benchmark native community",
-                operatorKindCode = "registered_organization", jurisdictionCountryCode = "BE",
-                registrationIdentifier = runId, publicContactEmail = "benchmark@example.invalid",
-                legalNoticeUrl = "https://example.invalid/legal", termsUrl = "https://example.invalid/terms",
+                publicName = "Benchmark native community",
+                legalName = "Benchmark native community",
+                operatorKindCode = "registered_organization",
+                jurisdictionCountryCode = "BE",
+                registrationIdentifier = runId,
+                publicContactEmail = "benchmark@example.invalid",
+                legalNoticeUrl = "https://example.invalid/legal",
+                termsUrl = "https://example.invalid/terms",
                 privacyUrl = "https://example.invalid/privacy"
             }
         }, session.Token, cancellationToken))
@@ -72,8 +80,11 @@ internal static class BenchmarkApiSeedData
             Guid id;
             using (var created = await ReadNativeAsync(client, HttpMethod.Post, "/api/Event", new
             {
-                title, slug = $"benchmark-api-event-{index:D2}", description = "Project-owned InformationOnly benchmark event.",
-                eventFormatId = (int)EventFormatEnum.Digital, eventTimeZoneId = "UTC",
+                title,
+                slug = $"benchmark-api-event-{index:D2}",
+                description = "Project-owned InformationOnly benchmark event.",
+                eventFormatId = (int)EventFormatEnum.Digital,
+                eventTimeZoneId = "UTC",
                 participationConfiguration = new
                 {
                     participationHandlingModeId = (int)ParticipationHandlingModeEnum.InformationOnly,
@@ -104,7 +115,8 @@ internal static class BenchmarkApiSeedData
     {
         using var response = await ReadNativeAsync(client, HttpMethod.Post, "/api/auth/local/login", new
         {
-            identifier = factory.BootstrapIdentifier, password = factory.ReplacementPassword
+            identifier = factory.BootstrapIdentifier,
+            password = factory.ReplacementPassword
         }, null, cancellationToken);
         var root = response.RootElement;
         if (!root.GetProperty("success").GetBoolean())

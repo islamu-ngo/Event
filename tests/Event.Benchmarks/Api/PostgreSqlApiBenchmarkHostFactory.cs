@@ -42,8 +42,10 @@ internal sealed class PostgreSqlApiBenchmarkHostFactory : WebApplicationFactory<
         _database = database;
         _blocklist = JsonSerializer.SerializeToUtf8Bytes(new
         {
-            Version = 1, Revision = Guid.CreateVersion7().ToString("N"),
-            Source = "Project-owned native benchmark password policy", License = "Project-owned generated test data",
+            Version = 1,
+            Revision = Guid.CreateVersion7().ToString("N"),
+            Source = "Project-owned native benchmark password policy",
+            License = "Project-owned generated test data",
             Passwords = new[] { Convert.ToHexString(RandomNumberGenerator.GetBytes(32)) }
         });
         string blocklistPath = Path.Combine(_root, "password-blocklist.json");

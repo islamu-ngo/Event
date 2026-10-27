@@ -68,5 +68,19 @@
     "reason": "The body explicitly selects the tenant-local user who will receive a role; the controller supplies trusted ITenantContext to TenantUserRoleGrant Create authorization, and the handler verifies the persisted target TenantUser belongs to that same current tenant and is active before creating audited authority.",
     "owner": "Application Tenant User Role Grants",
     "removalTrigger": "Remove this disposition if the target tenant user moves to an authoritative route or server selection; otherwise retain current-tenant authorization, persisted target membership/status checks, and duplicate-grant protection."
+  },
+  {
+    "fullyQualifiedMember": "Explore.Application.Features.Moderation.Requests.Commands.GrantModerationAdjudicatedCaseReadPurposeCommand.GranteeUserId",
+    "category": "legitimate-target",
+    "reason": "The body selects the finite adjudicated-case grant recipient, never the issuing administrator. The controller supplies the route case; ModerationAdjudicatedCaseReadGrantRepository resolves IAdminContext independently, acquires current native tenant/host/qualification and administrator authority, rejects deleted or erasing accounts, and binds the exact case revision and original creating-effect custody ceiling. Its enrollment and commit rechecks preserve issuer/recipient separation. ModerationNoticeReadTests covers a distinct reader, unknown recipients, changed-input replay, revocation and original-notice isolation.",
+    "owner": "Application/Persistence Moderation Adjudicated Case Read Grants",
+    "removalTrigger": "Remove this disposition if recipients become server-selected or self-only; otherwise retain independent current administrator resolution, recipient account fences, exact original-custody binding, finite expiry and commit-time rechecks."
+  },
+  {
+    "fullyQualifiedMember": "Explore.Application.Features.Moderation.Requests.Commands.GrantModerationCaseReadPurposeCommand.GranteeUserId",
+    "category": "legitimate-target",
+    "reason": "The body selects the person receiving a case/material-specific read purpose. The controller supplies the route case and the handler maps GranteeUserId to the internal request's CallerUserId target; this does not replace the authenticated issuer. ModerationCaseReadGrantRepository and ModerationCaseTargetProofOwner independently bind the current human, tenant, host and administrator, validate the recipient account and exact native source/case revision, cap expiry by current policy, and recheck issuance before commit. Read-receipt issuance separately binds the authenticated reader and withholds tokens after grant, account, policy, case or native-target changes.",
+    "owner": "Application/Persistence Moderation Case Read Grants",
+    "removalTrigger": "Remove this disposition if read-grant recipients become server-selected or self-only; otherwise retain issuer/recipient separation, current native administration, recipient account fences, exact case/source binding, finite expiry and final issuance rechecks."
   }
 ]

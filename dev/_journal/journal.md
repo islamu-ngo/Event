@@ -3389,3 +3389,31 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 - [x] Stays in journal only; concrete adversarial-fixture restoration lesson. No dependency or production authority change.
 
 ---
+
+[2026-10-27 Europe/Brussels] — Grant ownership includes recovery and first-save coordinates
+
+**Context**: While reviewing two exact moderation read-grant authorization classifications for PR80, independent source reviews disagreed about settlement safety. An anonymized cross-evaluation distinguished real native authorization checks from the additional guarantees needed across saving and final admission.
+
+**Symptom / Observation**: Ordinary grant creation and revocation restrict tracked entities to their requested grant and receipt, but the save boundary also tracks canonical recovery advancement. Adjudicated grant creation captures its accepted coordinate snapshot after saving, and subsequent unit-of-work saves are not paired with an exact grant-owned write inventory. These are source-confirmed findings, not executed runtime reproductions or demonstrated HTTP exploits.
+
+**Root Cause**: `ModerationCaseReadGrantRepository` checks its narrow entity predicate again after `SaveChangesAsync`, which can legitimately add or attach `ModerationRecoveryStoreState`. `ModerationAdjudicatedCaseReadGrantRepository` saves before `Snapshot(result)`, so a first-save change to recipient or expiry can become the accepted reference rather than being compared with the original request. Its final checks inspect the requested grant while the unit of work can perform another save; structurally valid additional grants need an independent owned-write check. Existing account, administrator, tenant and custody checks do not establish those missing ownership and coordinate guarantees.
+
+**Resolution**: Withdrew the two uncommitted classification entries; no runtime authorization, tracker guard or architecture assertion was relaxed. Required corrections remain: admit only the exact context-owned recovery advancement, freeze immutable coordinates before the first save, and retain an exact owned-write boundary through final settlement. Required regression seams are valid creation/revocation with atomic recovery advancement, first-save recipient/expiry substitution, and a second grant added after the requested grant's save, across separate and colocated enrollment. Local execution was prohibited; none of these scenarios has a claimed passing or failing runtime result. The standalone `Tenant.FullName` counterexample was refuted because discovery-enrollment custody rejects that write, so it must not be cited as proof of silent flushing.
+
+**Why This Matters for Future Work**: A positive-looking authority recheck is not a complete save boundary. Inventory save-generated rows explicitly without broadly allowing their type; compare persisted results against pre-save intent, not a snapshot that can already contain a substituted value. Keep source review, authored test expectations and executed provider evidence distinct.
+
+**References**:
+- `src/Explore.Persistence/Repositories/ModerationCaseReadGrantRepository.cs:28`
+- `src/Explore.Persistence/Repositories/ModerationCaseReadGrantRepository.cs:77`
+- `src/Explore.Persistence/ExploreDbContext.ModerationRecovery.cs:28`
+- `src/Explore.Persistence/Repositories/ModerationAdjudicatedCaseReadGrantRepository.cs:67`
+- `src/Explore.Persistence/Repositories/ModerationAdjudicatedCaseReadGrantRepository.cs:200`
+- `src/Explore.Persistence/EfCoreUnitOfWork.cs:242`
+- `tests/Event.Persistence.IntegrationTests/Moderation/ModerationCaseNativeProofTests.ReadGrantAdministration.cs`
+- `tests/Event.Persistence.IntegrationTests/Moderation/ModerationNoticeReadTests.AdjudicatedGrants.cs`
+- PR: https://github.com/islamu-ngo/Event/pull/80
+
+**Promotion Consideration**:
+- [x] Stays in journal only pending native corrections and executed provider evidence.
+
+---

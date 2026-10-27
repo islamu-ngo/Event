@@ -10,9 +10,10 @@ public sealed class ModerationContributionSelectionTests
     [Test]
     public async Task DraftSelection_SnapshotsEveryBindingWithoutApprovingNativeTargets()
     {
-        var (selection, bindings) = Selection();
+        var input = Selection();
+        var selection = input.Selection;
         selection.ValidatePersistedState();
-        bindings.Clear();
+        input.Bindings.Clear();
         await Assert.That(selection.Bindings.Count).IsEqualTo(2);
         await Assert.That(selection.Bindings.Single(row => row.Kind == ModerationContributionBindingKind.Effect).Effect)
             .IsEqualTo(ModerationReferenceCatalogue.GetProfile(ModerationReferenceProfileId.CFG06).Effects[0]);

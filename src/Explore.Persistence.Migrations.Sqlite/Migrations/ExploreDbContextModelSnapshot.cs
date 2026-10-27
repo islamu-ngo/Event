@@ -31020,6 +31020,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("enrollment_id");
 
+                    b.Property<int?>("MutationEvidence")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mutation_evidence");
+
                     b.Property<Guid>("OperationKey")
                         .HasColumnType("TEXT")
                         .HasColumnName("operation_key");

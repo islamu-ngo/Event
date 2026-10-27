@@ -648,6 +648,30 @@ it cannot by itself authenticate to the selected secret authority. Tenant and
 consumer admission remain application responsibilities, not claims of database
 workflow isolation.
 
+### Setup binding mutation evidence
+
+Native writers attach a target-bound receipt projection to the caller-owned
+`SetupSecretBindingWriteRequest.Attempt` before dispatch. Application retains
+that request across the await and settles after the actual native operation
+unwinds, including cancellation. `SetupSecretBindingOperation.MutationEvidence`
+persists only the value-free disposition. Null means unobserved;
+`NotDispatched` is an observed non-dispatch, not a default recovery assumption.
+`PossiblyDispatched`, `Applied`, `Pending`, `Rejected` and `Conflict` remain
+distinct from local delivery state.
+
+Success requires Applied evidence and completed cache invalidation. Interrupted
+work can become Cancelled only with proven NotDispatched evidence; other native
+states settle as Failed/Unavailable without erasing their effect. An Applied
+receipt survives later invalidation failure. Duplicate operation keys return
+the retained operation rather than dispatching again. A missing settlement after
+database failure remains uncertain; neither an Accepted row nor a fresh secret
+read establishes that the original request had no effect.
+
+The existing wire state/outcome stays bounded and does not expose SDK objects
+or native coordinates. Reconcile uncertain effects and pending approvals under
+explicit authority; do not replay to discover their result. A native receipt's
+local ID is not server idempotency or a durable provider recovery handle.
+
 ### Runtime resolution outcomes and bounded freshness
 
 Runtime bindings return one of five value-free outcomes. `Resolved` is the only

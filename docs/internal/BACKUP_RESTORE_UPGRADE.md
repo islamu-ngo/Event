@@ -27,6 +27,15 @@ readiness before returning traffic. A renewed process token is not credential
 activation or fleet convergence. The five-minute runtime cache is not a promise
 of immediate external credential revocation.
 
+Apply the generated `RetainSecretMutationEvidence` migration through the
+controlled migrator before running the new setup writer. Keep the nullable
+evidence on historical operations unknown rather than backfilling a fictitious
+non-dispatch result. Reconcile interrupted writes against their original
+external targets before any explicitly authorized retry; a lost response is
+not proof that no provider effect occurred. Restore operation/enrollment/binding
+metadata consistently, without placing external secret values in the database,
+manifest or recovery report. See [authority recovery](TROUBLESHOOTING.md#selected-secret-authority-recovery).
+
 ## Native PostgreSQL login identity
 
 Bootstrap, navigation and tenant-preference native contracts serialize declared login names

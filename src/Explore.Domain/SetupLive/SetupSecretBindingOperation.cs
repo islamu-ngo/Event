@@ -1,6 +1,7 @@
 namespace Explore.Domain.SetupLive;
 
 using Explore.Domain.Interfaces;
+using Explore.Domain.Secrets;
 
 public enum SetupSecretBindingOperationState
 {
@@ -42,6 +43,7 @@ public sealed class SetupSecretBindingOperation :
     public string SecretValueCommitment { get; private set; } = string.Empty;
     public SetupSecretBindingOperationState State { get; private set; }
     public SetupSecretBindingOperationOutcome Outcome { get; private set; }
+    public SecretMutationEvidence? MutationEvidence { get; private set; }
     public DateTime CreatedAt { get; set; }
     public Guid? CreatedBy { get; set; }
     public DateTime? UpdatedAt { get; set; }
@@ -151,9 +153,21 @@ public sealed class SetupSecretBindingOperation :
                 observedAt);
     }
 
+    public void RecordMutationEvidence(SecretMutationEvidence evidence)
+    {
+        if (!Enum.IsDefined(evidence))
+            throw new ArgumentOutOfRangeException(nameof(evidence));
+        EnsureAccepted();
+        if (MutationEvidence.HasValue && MutationEvidence != evidence)
+            throw new InvalidOperationException("Settled source evidence cannot be replaced.");
+        MutationEvidence = evidence;
+    }
+
     public bool Succeed(DateTime settledAt)
     {
         RequireTransitionTime(settledAt, nameof(settledAt));
+        if (MutationEvidence != SecretMutationEvidence.Applied)
+            throw new InvalidOperationException("Source application must be confirmed before success.");
         if (State == SetupSecretBindingOperationState.Succeeded)
             return false;
         EnsureAccepted();
@@ -188,6 +202,8 @@ public sealed class SetupSecretBindingOperation :
     public bool Cancel(DateTime settledAt)
     {
         RequireTransitionTime(settledAt, nameof(settledAt));
+        if (MutationEvidence != SecretMutationEvidence.NotDispatched)
+            throw new InvalidOperationException("Only proven undispatched work can be cancelled.");
         if (State == SetupSecretBindingOperationState.Cancelled)
             return false;
         EnsureAccepted();

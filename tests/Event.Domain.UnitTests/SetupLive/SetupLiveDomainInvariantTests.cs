@@ -101,6 +101,7 @@ public sealed class SetupLiveDomainInvariantTests
             Property("SecretValueCommitment", typeof(string)),
             Property("State", RequireType("SetupSecretBindingOperationState")),
             Property("Outcome", RequireType("SetupSecretBindingOperationOutcome")),
+            Property("MutationEvidence", typeof(Explore.Domain.Secrets.SecretMutationEvidence?)),
             Property("CreatedAt", typeof(DateTime), publicSetter: true),
             Property("CreatedBy", typeof(Guid?), publicSetter: true),
             Property("UpdatedAt", typeof(DateTime?), publicSetter: true),
@@ -117,6 +118,8 @@ public sealed class SetupLiveDomainInvariantTests
                 typeof(string), typeof(string), typeof(int), typeof(string)),
             InstanceMethod("CanDispatch", typeof(bool),
                 RequireType("SetupTargetEnrollment"), typeof(DateTime)),
+            InstanceMethod("RecordMutationEvidence", typeof(void),
+                typeof(Explore.Domain.Secrets.SecretMutationEvidence)),
             InstanceMethod("Succeed", typeof(bool), typeof(DateTime)),
             InstanceMethod("Fail", typeof(bool),
                 RequireType("SetupSecretBindingOperationOutcome"), typeof(DateTime)),
@@ -606,6 +609,8 @@ public sealed class SetupLiveDomainInvariantTests
                 typeof(ArgumentException));
         }
 
+        ((Explore.Domain.SetupLive.SetupSecretBindingOperation)operation).RecordMutationEvidence(
+            Explore.Domain.Secrets.SecretMutationEvidence.Applied);
         bool succeeded = Succeed(operation, CreatedAt.AddMinutes(1));
         await Assert.That(succeeded).IsTrue();
         await Assert.That(Read<object>(operation, "State").ToString())
@@ -632,6 +637,10 @@ public sealed class SetupLiveDomainInvariantTests
         foreach (string terminal in terminals)
         {
             object operation = CreateOperation();
+            if (terminal is "Succeeded" or "Cancelled")
+                ((Explore.Domain.SetupLive.SetupSecretBindingOperation)operation).RecordMutationEvidence(
+                    terminal == "Succeeded" ? Explore.Domain.Secrets.SecretMutationEvidence.Applied
+                        : Explore.Domain.Secrets.SecretMutationEvidence.NotDispatched);
             Set(operation, "ConcurrencyStamp", PersistenceStamp);
             DateTime settledAt = CreatedAt.AddMinutes(1);
             Dictionary<string, object?> expected = NamedSnapshot(operation);

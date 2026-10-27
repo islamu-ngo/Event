@@ -31039,6 +31039,10 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("enrollment_id");
 
+                    b.Property<int?>("MutationEvidence")
+                        .HasColumnType("int")
+                        .HasColumnName("mutation_evidence");
+
                     b.Property<Guid>("OperationKey")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("operation_key");

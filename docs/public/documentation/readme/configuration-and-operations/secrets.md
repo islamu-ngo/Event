@@ -136,6 +136,23 @@ Run the normal migrator before serving setup enrollment; do not substitute
 administrator database credentials in the API to repair a permission failure.
 Retain separate Migrator and Runtime accounts.
 
+## Interrupted secret updates
+
+Run the normal database migrator before serving this version to add the
+nullable retained-effect column as well as the fixed setup storage permissions.
+
+Cancelling an HTTP request does not roll back a secret update already sent to
+the provider. Failed/Unavailable can mean local delivery failed after the source
+changed, or that approval or completion is still uncertain. It does not prove
+that nothing happened.
+
+Keep the same operation key when retrieving or repeating the same request;
+Event returns its retained operation without automatically dispatching again.
+Reconcile the provider's current state and any approval request before choosing
+a new authorized operation. A fresh read alone does not attribute a change to
+the interrupted request. Do not use an SDK-local receipt ID as a provider
+recovery or idempotency key.
+
 ## SMTP Credential Ownership
 
 Email is disabled until explicitly enabled through `email.delivery_enabled`. Credentials

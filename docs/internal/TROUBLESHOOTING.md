@@ -20,6 +20,14 @@ provider, reuse another consumer's machine identity, or enable an automatic
 login loop. Successful token renewal does not refresh application credentials
 or prove another replica's readiness.
 
+An interrupted setup write may have reached the provider even when its HTTP
+waiter was canceled. Inspect the retained operation's bounded disposition and
+reconcile the exact external target before authorizing another write. Never
+interpret cancellation, an unavailable response, or cache-invalidation failure
+as proof of non-dispatch. Keep values, tokens and coordinates out of incident
+attachments; retain operation identifiers and value-free evidence instead.
+See [mutation evidence](SECRETS.md#setup-binding-mutation-evidence).
+
 ## Onboarding Journey Readiness
 
 Use the private `GET /api/instanceonboarding/journey` resource with active setup

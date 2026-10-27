@@ -73,6 +73,7 @@ public sealed class SetupSecretBindingWriteRequest
     public Guid BindingId { get; }
     public string BindingKey { get; }
     public ReadOnlyMemory<byte> SecretValue { get; }
+    public Explore.Application.Contracts.Secrets.SecretMutationAttempt Attempt { get; } = new();
 }
 
 public enum SetupSecretBindingWriteOutcome

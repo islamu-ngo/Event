@@ -159,6 +159,17 @@ live-provider assurance from offline checks.
 
 ## Admission and retirement verification
 
+Native mutation adapters retain a request-owned `SecretMutationAttempt` before
+provider dispatch. Its live projection preserves `NotDispatched`,
+`PossiblyDispatched`, `Applied`, `Pending`, `Rejected` and `Conflict` separately
+from local delivery. Authentication and setup adapters update only an existing
+canonical instance binding through the selected owner, never create missing
+material or replay uncertain work. Applied evidence requires exact-instance
+cache invalidation before delivery is reported; later invalidation failure does
+not erase the provider effect. These additive adapters and opt-in registration
+do not activate serving roots or strengthen persisted setup settlement by
+themselves; that cutover must replace selection and its handler/model together.
+
 Preparation reserves the owner before enumerating caller-supplied selections.
 Retirement closes admission, cancels, drains reservations, and disposes native
 resources outside the ownership gate. Publication checks the same gate.

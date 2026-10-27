@@ -42,6 +42,7 @@ namespace Event.Api.IntegrationTests.Fixtures;
 internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplicationFactory
 {
     private const string SigningKeyVariable = "AUTHENTICATION_LOCAL_JWT_KEY";
+    private readonly string _localJwtKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
     private const string ExternalAudience = "islamu-event-api";
     private readonly AuthenticationProviderKind _primaryProvider;
     private readonly TimeProvider? _timeProvider;
@@ -97,7 +98,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         SetEnvironment("Database__Database", _databasePath);
         SetEnvironment("Database__Runtime__Database", _databasePath);
         SetEnvironment("Authentication__Local__JwtKey", null);
-        SetEnvironment(SigningKeyVariable, Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)));
+        SetEnvironment(SigningKeyVariable, _localJwtKey);
         SetEnvironment("PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID", Guid.CreateVersion7().ToString("N"));
         SetEnvironment("PRIVACY_ERASURE_IDENTITY_FENCE_KEY", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
     }
@@ -167,6 +168,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             builder.ConfigureLogging(logging => logging.AddProvider(_logCapture));
         string primaryProvider = _primaryProvider.ToString().ToLowerInvariant();
         builder.UseSetting("Authentication:Provider", primaryProvider);
+        builder.UseSetting("Authentication:Local:JwtKey", _localJwtKey);
         builder.UseSetting("SecretProvider:Provider", "Environment");
         builder.UseSetting("IdentityDatabase:Topology", _identityTopology.ToString().ToLowerInvariant());
         builder.UseSetting("IdentityDatabase:Provider", "Sqlite");
@@ -176,6 +178,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             var settings = new Dictionary<string, string?>
             {
                 ["Authentication:Provider"] = primaryProvider,
+                ["Authentication:Local:JwtKey"] = _localJwtKey,
                 ["Authentication:Local:PasswordBlocklistPath"] = _passwordBlocklistPath,
                 ["Authentication:Local:PasswordBlocklistSha256"] = _passwordBlocklistHash,
                 ["IdentityDatabase:Topology"] = _identityTopology.ToString().ToLowerInvariant(),

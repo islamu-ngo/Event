@@ -4,6 +4,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Repositories;
 using ISLAMU.Moderation.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -25,24 +26,7 @@ public sealed class ModerationReconciliationQuery(
         try
         {
             context.ModerationTrustDomainId = host.TrustDomainId;
-            // SQLite stores DateTimeOffset as text and cannot translate its relational comparisons.
-            // Keep the provider-specific time predicate in SQL, still composed with the native
-            // query filters and the exact installed coordinates. No application-side full scan.
-            var due = context.Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite"
-                ? context.ModerationSanctions.FromSqlInterpolated($"""
-                    SELECT * FROM moderation_sanctions
-                    WHERE scope_trust_domain_id = {host.TrustDomainId}
-                      AND scope_solution_id = {host.SolutionId} AND scope_instance_id = {host.InstanceId}
-                      AND (scope_tenant_id = {tenantId} OR scope_kind = {(int)ModerationScopeKind.Instance})
-                      AND ((state = {(int)ModerationSanctionState.Scheduled}
-                            AND julianday(starts_at) <= julianday({now}))
-                        OR (state IN ({(int)ModerationSanctionState.Scheduled}, {(int)ModerationSanctionState.Active})
-                            AND ends_at IS NOT NULL AND julianday(ends_at) <= julianday({now})))
-                    """)
-                : context.ModerationSanctions.Where(sanction =>
-                    sanction.State == ModerationSanctionState.Scheduled && sanction.StartsAt <= now
-                    || (sanction.State == ModerationSanctionState.Scheduled || sanction.State == ModerationSanctionState.Active)
-                        && sanction.EndsAt != null && sanction.EndsAt <= now);
+            var due = ModerationReconciliationTemporalQueries.DueSanctions(context, host, tenantId, now);
             var rows = await (
                 from sanction in due.AsNoTracking()
                 join decision in context.ModerationDecisions.AsNoTracking() on sanction.DecisionId equals decision.Id
@@ -186,14 +170,7 @@ public sealed class ModerationReconciliationQuery(
         try
         {
             context.ModerationTrustDomainId = host.TrustDomainId;
-            var pending = context.Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite"
-                ? context.ModerationEffectIntents.FromSqlInterpolated($"""
-                    SELECT * FROM moderation_effect_intents
-                    WHERE completed_at IS NULL
-                      AND (lease_expires_at IS NULL OR julianday(lease_expires_at) <= julianday({now}))
-                    """)
-                : context.ModerationEffectIntents.Where(effect =>
-                    effect.CompletedAt == null && (effect.LeaseExpiresAt == null || effect.LeaseExpiresAt <= now));
+            var pending = ModerationReconciliationTemporalQueries.RecoverableEffects(context, now);
             var rows = await (
                 from effect in pending.AsNoTracking()
                 join decision in context.ModerationDecisions.AsNoTracking() on effect.DecisionId equals decision.Id

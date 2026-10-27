@@ -3333,3 +3333,25 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 - [x] Stays in journal only; concrete adversarial-fixture restoration lesson. No dependency or production authority change.
 
 ---
+
+[2026-10-28 Europe/Brussels] — Managed launch calibration needs an absolute DLL entry
+
+**Context**: While resuming PR79's testing-assurance modernization, a host-free process-custody regression inspected its own native launch inputs before exercising identity replacement.
+
+**Symptom / Observation**: `ManagedProcessJoinCalibratesLiveParentAndRejectsIdentityReplacement` failed with `inputs:entry_unsupported` under `dotnet run --no-build`. Executing the DLL through a relative path instead failed with `inputs:entry:before:missing:file:0`. The same compiled test passed when launched through `dotnet` with the absolute DLL path.
+
+**Root Cause**: The closed entry parser intentionally accepts managed `dotnet <entry.dll>` and `dotnet exec <entry.dll>` slots, not a generated apphost. The test runner changes its working directory, so resolving the original relative command-line entry against the later process working directory does not identify the loaded assembly reliably.
+
+**Resolution**: Run this self-calibration through an absolute managed entry: `dotnet "$PWD/tests/Event.Distributed.IntegrationTests/bin/Release/net10.0/Event.Distributed.IntegrationTests.dll" --treenode-filter '/*/*/AppHostRuntimeTests/ManagedProcessJoinCalibratesLiveParentAndRejectsIdentityReplacement' --minimum-expected-tests 1`. That exact command passed one case. Five other host-free file/lifecycle controls also passed separately under the same absolute-entry invocation; this does not prove healthy container-backed hosting. Keep unsupported launch shapes fail-closed instead of weakening provenance to accommodate the test launcher.
+
+**Why This Matters for Future Work**: Tests that inspect their own command line have a launch-shape precondition. A launcher failure is not automatically a broken application process join, and a relative path cannot be reconstructed safely after a working-directory change.
+
+**References**:
+- `tests/Event.Distributed.IntegrationTests/AppHostRuntimeTests.cs:57`
+- `tests/Event.Distributed.IntegrationTests/OwnedAppHostFixture.cs` — `ManagedResourceLaunchObservation.ParseManagedEntry`
+- PR: https://github.com/islamu-ngo/Event/pull/79
+
+**Promotion Consideration**:
+- [x] Stays in journal only; bounded launch-calibration lesson, not a new general test-runner policy.
+
+---

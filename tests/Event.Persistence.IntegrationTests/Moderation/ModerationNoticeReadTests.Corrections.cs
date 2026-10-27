@@ -363,7 +363,11 @@ public sealed partial class ModerationNoticeReadTests
         notices.AddRange(capture.ContentRepresentatives.Select(proof => ModerationNotice.Create(
             Guid.CreateVersion7(), source, ModerationNoticeAudience.ContentRepresentative,
             (int)ModerationSubjectKind.Human, proof.HumanId, null, ModerationNoticeDeliveryDisposition.NativeRoutingUnavailable)));
-        context.AddRange(effect, approval, source);
+        var operationReceipt = ModerationOperationReceipt.Complete(effect.OperationId, new string('b', 64),
+            effect.TrustDomainId, effect.ScopeKind, effect.ScopeId, effect.SubjectKind, effect.SubjectId,
+            fixture.Database.AdministratorId, new string('c', 64), effect.DecisionId, effect.SanctionId,
+            effect.DecisionRevision, effect.PolicyRevision, effect.QualificationRevision, capturedAt);
+        context.AddRange(operationReceipt, effect, approval, source);
         context.AddRange(notices);
         await context.SaveChangesAsync();
         await Assert.That(source.Matches(effect)).IsTrue();

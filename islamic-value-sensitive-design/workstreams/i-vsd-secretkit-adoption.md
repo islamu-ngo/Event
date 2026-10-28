@@ -1,6 +1,6 @@
 # SecretKit adoption: credential stewardship and truthful readiness
 
-Last Updated: 2026-10-27
+Last Updated: 2026-10-28
 
 ## Review Metadata
 
@@ -10,11 +10,41 @@ Last Updated: 2026-10-27
 - Report kind: implementation-planning assessment
 - Report status: current
 - Disposition: plan-aligned
-- Evidence cutoff: 2026-10-27
+- Evidence cutoff: 2026-10-28
+- Implementation evidence revision: `8cb02c3fe28d7431a3e25577826ae606c8f6b40f`, incorporating develop `20737e450db0df748b3e5737bcb3405f54c37cd8`. This refresh preserves the five accepted findings and their owners; it does not grant release approval.
 - Reviewed input: secretkit-adoption P3/E4 full-integration activation on 2026-10-25, complete successor tasks 2.1-5.4 and the public SDK documentation supplied by the user; foundation commit `fb3f140c8c2f6ca850e589da7c6959c17582a3f5`; immutable candidate `0.1.0-local.20261024.1`. P1/P2 remain historical evidence.
 - Supersedes: none. The paused February secret-management workstream is historical, not this assessment.
 
 ## Executive Summary
+
+### October 28 merged-source qualification
+
+Keep this integration local and do not describe it as merge-ready. The merged
+source passed all 4061 Domain, 5234 Application and 21 Diagnostic cases, and
+41 distinct setup HTTP cases have retained passing receipts. The complete
+Infrastructure, BFF, Standalone and Architecture runs remain red. Their
+physically compared baseline failures are evidence of existing blockers, not
+evidence that the affected behavior works. Current API and Persistence
+qualification is partial; unexecuted cases and failures without an individual
+comparison remain unqualified.
+
+The final solution/client build fails on the same `CA1001` analyzer error at
+`PreFindingNoticeTests.cs:279` as untouched develop. SQL Server model verification
+and a clean SQLite production migration also fail on both sources. These
+failures block clean integration approval even though they do not justify
+expanding SecretKit work into unrelated fixture or migration repairs. Four
+Linux x64 images were built and inspected; credentialed serving startup,
+external provider ACLs and fleet recovery remain unverified. Local release-range
+preflight passed for 31 commits and five effective Change-Ids.
+
+For operators, the practical consequence is unchanged: bounded tests demonstrate
+specific admission, lifetime and mutation contracts, but do not promise a
+working deployment or successful recovery. Under Sidq, current failed gates
+take precedence over historical green snapshots. Under Amanah, the original
+finding owners retain responsibility for independent authority and operational
+qualification. All five findings remain accepted implementation and operational
+obligations, with no new approval, stakeholder testimony or ethical-outcome
+claim inferred from this evidence refresh.
 
 ### October 27 retirement and assurance position
 
@@ -184,6 +214,13 @@ Riba, religious-content decisions, advertising, and moderation are not applicabl
 
 ## Validation Gaps
 
+The October 28 merged-source results above supersede older build, corpus and
+model results for current acceptance. In particular, successful earlier model
+checks do not clear the current SQL Server mismatch or SQLite migration error.
+The current API/Persistence corpus is incomplete, and a baseline-matching
+initialization failure cannot establish the HTTP or database assertions that it
+prevented from running. See E17 for the current evidence boundary.
+
 The bounded native, host, HTTP and migration receipts in E08-E11 are executed
 evidence for their recorded snapshots. The current settlement candidate passed
 33 Domain cases, seven Application cases and all four offline model checks;
@@ -224,12 +261,51 @@ No material planning decision remains unresolved. Obtain separate authority befo
 | E15 | October 27 retirement and differential receipts: production library removal committed as 1768af89e5 and native ownership guidance as eb5179fa95. Exact 90-path intermediate closure passed locked solution restore and full Release build; Architecture 676 yielded 672 passes and four unchanged, previously reproduced failures. Manifest-owner comparison completed all 34 cases with identical current/base outcomes (8 passes, 26 failures). Five SQLite owner cases passed on both trees. Current GenericOutboxAdmissionTests ran 74 cases: 55 passed and 19 tenant-lease failures matched untouched base exactly. Five migration-owner failures matched base, including nested credential-validation causes. Original full Persistence corpus finished 6978 cases: 3266 passed, 3664 failed, 48 skipped; the root-failure inventory reconciles exactly after excluding five nested child duplicates | Snapshot-specific execution and attribution only. Isolated outbox results do not reclassify earlier shared-assembly failures. Most full Persistence failures remain unattributed; original API corpus and final release review remain pending. No finding is marked resolved, and no provider, credentialed startup or fleet assurance is inferred |
 | E16 | Delivery through d128e678a0: native release-range preflight passed for 25 commits and five effective Change-Ids; final intent validation passed. All 58 transient-authentication failures matched untouched develop exactly, including full exception messages. Full Persistence selected provider-labelled cases for PostgreSql, Sqlite, SqlServer, MySql and MariaDb; the retained membership witnesses are failures, not passing behavior | The original API corpus was interrupted by session restart without a final report. Automatic whole-corpus replay was stopped; only API assurance restarted from the final built snapshot with dedicated results and a restart guard. No completed API or passing matrix claim is made; full attribution and final review remain open |
 
+### E17: Merged-source acceptance boundary
+
+The merged-source qualification at `8cb02c3f` retained complete native results
+for Domain 4061/4061, Application 5234/5234 and Diagnostic 21/21. Infrastructure
+ran 3014 cases with 2494 passes and 520 failures: 515 failures reproduced on
+untouched develop, while the five owned defects were corrected and both affected
+classes passed separately, with 57 and eight cases respectively. BFF ran
+930 cases with 921 passes and nine failures; Standalone ran 104 with 55 passes
+and 49 failures; Architecture ran 694 with 687 passes and seven failures.
+All failures in those last three runs have physical baseline comparisons.
+Those complete runs remain failed, not retroactively green.
+
+Untouched develop `20737e45` also reproduces the client `CA1001` build error,
+the SQL Server Cascade/NoAction model mismatch at `moderation_case_evidence`,
+and the clean SQLite migration foreign-key mismatch between
+`ef_temp_ie_event_report_signals` and `ie_event_report_external_links`.
+The SQLite failure prevented subsequent idempotency and structured-provider
+behavior checks. API discovery contains 8587 cases and Persistence discovery
+11482; bounded execution and differential attribution do not yet cover either
+complete current corpus. Detailed paired controls establish the same PostgreSQL
+`42501` permission failure on `did_custody_types`; properly configured onboarding
+controls expose the same missing-purpose-factory validation failures on both
+sources. Neither result proves the intended endpoint behavior.
+
+Four merged-source Linux x64 images were built and content-inspected. The
+three framework-dependent images have matching frozen dependency DLL hashes;
+the Standalone bundle was not independently extracted for runtime DLL hashing.
+The immutable package closure retains its fresh-cache/source/archive evidence,
+469-pair license-policy pass and intent-validation pass. Native
+`preflight-range --target develop --head HEAD` passed for 31 commits and five
+effective Change-Ids. These are bounded construction and provenance receipts,
+not credentialed startup, external-provider ACL or fleet qualification.
+
+Exact commands, report hashes, baseline identities and evidence limits are
+indexed in the single active workstream's `integration-acceptance-evidence.md`
+and its native evidence receipts. The required final review must retain failing
+gates as merge blockers; earlier independent source arguments and their resolved
+revision-ordering finding are not final integration approval.
+
 ## Missing Evidence
 
 No stakeholder interviews, deployment audit, incident record or live external
 provider permission challenge has been produced. Controlled integration results
-are recorded in E08-E16; whole-corpus attribution and release-review evidence
-remain pending. No actual operator credential store
+are recorded in E08-E17; current whole-corpus qualification remains incomplete
+and clean release review is blocked by the recorded failing gates. No actual operator credential store
 was opened for these tests.
 
 ## Context Inventory
@@ -244,6 +320,7 @@ Per-process credentials cannot be renewed by a cluster-wide singleton job on ano
 
 | Date | Previous status | New status | Trigger | Evidence/replacement |
 |---|---|---|---|---|
+| 2026-10-28 | current / plan-aligned for P3 | current / plan-aligned; release approval not established | Refreshed merged-source evidence, retained baseline failures and incomplete corpus coverage without changing authority policy or any finding disposition | E17; source 8cb02c3f, untouched develop 20737e45 |
 | 2026-10-27 | current / plan-aligned for P3 | current / plan-aligned; findings remain accepted | Added verified retirement commits, exact differential receipts and unreclassified full Persistence failures; no new provider-controlled decision | E15 and the single active triad |
 | 2026-10-26 | current / plan-aligned for P3 | current / plan-aligned for P3; implementation obligations remain accepted | Added bounded native/runtime evidence, truthful HTTP failure attribution, owner-bound review and token-only maintenance decisions; no finding marked resolved | E08/E09 and the single active triad |
 | 2026-10-25 | current / plan-aligned for P2 foundation | current / plan-aligned for P3 complete integration | User requested complete integration and supplied local public SDK docs; revalidated all five mappings against full successor scope without claiming runtime assurance. | P3/E4; foundation fb3f140c8c; current revalidation above |
@@ -255,7 +332,7 @@ Per-process credentials cannot be renewed by a cluster-wide singleton job on ano
 
 - Workstream: secretkit-adoption
 - Status: current
-- Reviewed input: current P3 full-integration triad and October 26 working-tree evidence, foundation fb3f140c8c; P2/E2 and base e8aa58ae8f remain historical receipts.
+- Reviewed input: current P3 full-integration triad and October 28 merged-source evidence through 8cb02c3f; foundation fb3f140c8c, P2/E2 and base e8aa58ae8f remain historical receipts.
 - Findings and mitigations: IVSD-F001 -> IVSD-M001; IVSD-F002 -> IVSD-M002; IVSD-F003 -> IVSD-M003; IVSD-F004 -> IVSD-M004; IVSD-F005 -> IVSD-M005.
 - Required plan mappings: IVSD-F001/M001 -> S01/S02/S04/S09, tasks 1.1-1.3/2.1-2.3/3.1-3.3/4.1-4.3; F002/M002 -> S05/S08/S10, tasks 1.2/4.1/4.4/4.5; F003/M003 -> S06/S10, tasks 1.1-1.3/2.1-2.3/4.1-4.4; F004/M004 -> S03/S07/S11, tasks 1.2-1.3/4.2-4.5; F005/M005 -> S12, tasks 1.1/1.4/5.1-5.4. All are design-accepted implementation obligations, not resolved implementation findings.
 - Escalations required before: user implementation approval and P2 mapping revalidation are satisfied for the foundation; attributable test failures still block implementation completion; native/platform qualification is required before corresponding release claims. Successor approval and persisted-approval evidence remain separate gates.

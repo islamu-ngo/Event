@@ -102,6 +102,10 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
         string[] forbiddenContractProperties = ReachableContractTypes(
                 typeof(ConfigurationManifestV1Alpha2))
             .SelectMany(type => type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            // Neutral moderation categories cannot carry a provider account or subject identifier.
+            .Where(property => property.DeclaringType != typeof(ConfigurationModerationProfileV1)
+                || property.Name != nameof(ConfigurationModerationProfileV1.SubjectKinds)
+                || property.PropertyType != typeof(IReadOnlyList<ConfigurationModerationSubjectKind>))
             .Select(property => property.Name)
             .Where(name => new[]
             {
@@ -116,6 +120,11 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
             ConfigurationPortabilityRegistry.Sections["excluded.pii"];
 
         await Assert.That(forbiddenContractProperties).IsEmpty();
+        await Assert.That(Enum.GetValues<ConfigurationModerationSubjectKind>()).IsEquivalentTo(new[]
+        {
+            ConfigurationModerationSubjectKind.Human, ConfigurationModerationSubjectKind.Service,
+            ConfigurationModerationSubjectKind.Organization, ConfigurationModerationSubjectKind.Content
+        });
         await Assert.That(providerBindings.Scope).IsEqualTo(ConfigurationPortabilityScope.Excluded);
         await Assert.That(providerBindings.Authority).IsEqualTo(ConfigurationPortabilityAuthority.None);
         await Assert.That(providerBindings.ArtifactKinds).IsEmpty();

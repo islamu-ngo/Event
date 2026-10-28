@@ -56,4 +56,10 @@ public interface IRoleRepository : IGenericRepository<Role, int>
     /// Used to prevent deletion of roles still in use.
     /// </summary>
     Task<bool> HasActiveMembersAsync(int roleId);
+
+    /// <summary>
+    /// Deletes an unused custom Role and its permission joins atomically. References in any
+    /// tenant, including retained history, prevent deletion. Returns null if the Role is absent.
+    /// </summary>
+    Task<Role?> DeleteUnusedCustomRoleAsync(int roleId, CancellationToken cancellationToken);
 }

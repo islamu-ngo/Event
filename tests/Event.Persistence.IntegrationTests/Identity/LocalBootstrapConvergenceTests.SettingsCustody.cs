@@ -1,4 +1,5 @@
 using Explore.Application.Configuration;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Services;
@@ -20,7 +21,6 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.Identity;
 
@@ -297,7 +297,7 @@ public sealed partial class LocalBootstrapConvergenceTests
             new InstanceBootstrapAuditLogger(NullLogger<InstanceBootstrapAuditLogger>.Instance),
             deployment, new RuntimeMetadataRefresh(), NullLogger<InstanceOnboardingCompletionOperation>.Instance,
             unitOfWork, fixture.GenerationReader(scope), fixture.Configuration,
-            new PrivacyIdentityFenceOperation(Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>()),
+            NativeIdentityRecognitionBoundary.For(context, TimeProvider.System),
             enrollment, receipts,
             operatorOptions, custody);
         return new LocalAdministratorBootstrapOperation(bootstrap, provider, new BootstrapLocalScopes(fixture), fixture.Secrets,

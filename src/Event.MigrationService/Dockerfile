@@ -25,6 +25,8 @@ COPY ["src/Explore.Persistence.Migrations.MySql/Explore.Persistence.Migrations.M
 COPY ["src/Explore.Persistence.Migrations.Sqlite/Explore.Persistence.Migrations.Sqlite.csproj", "src/Explore.Persistence.Migrations.Sqlite/packages.lock.json", "src/Explore.Persistence.Migrations.Sqlite/"]
 COPY ["src/Explore.Persistence.Migrations.SqlServer/Explore.Persistence.Migrations.SqlServer.csproj", "src/Explore.Persistence.Migrations.SqlServer/packages.lock.json", "src/Explore.Persistence.Migrations.SqlServer/"]
 COPY ["src/Explore.ServiceDefaults/Explore.ServiceDefaults.csproj", "src/Explore.ServiceDefaults/packages.lock.json", "src/Explore.ServiceDefaults/"]
+COPY ["src/ISLAMU.Moderation.Application/ISLAMU.Moderation.Application.csproj", "src/ISLAMU.Moderation.Application/packages.lock.json", "src/ISLAMU.Moderation.Application/"]
+COPY ["src/ISLAMU.Moderation.Domain/ISLAMU.Moderation.Domain.csproj", "src/ISLAMU.Moderation.Domain/packages.lock.json", "src/ISLAMU.Moderation.Domain/"]
 RUN dotnet restore "src/Event.MigrationService/Event.MigrationService.csproj" -a $TARGETARCH --locked-mode
 COPY . .
 WORKDIR "/src/src/Event.MigrationService"

@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 namespace Explore.ServiceDefaults.Secrets;
 
 public enum SecretAuthorityKind { Environment, UserSecrets, Infisical }
-public enum SecretConsumerRole { Api, Bff, Combined, Migration }
+public enum SecretConsumerRole { Api, Bff, Combined, Migration, ModerationMeasurement }
 
 public sealed record SecretAuthoritySelection(
     SecretAuthorityKind Provider,

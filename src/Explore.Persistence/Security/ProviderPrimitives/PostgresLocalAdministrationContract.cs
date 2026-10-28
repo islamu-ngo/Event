@@ -33,32 +33,41 @@ public static partial class PostgresLocalAdministrationContract
 
     // Reviewed against the actual EF mappings. Adding a mapped property must require
     // an explicit inventory/compiler review, never enlarge native rights implicitly.
-    private static readonly (Type Type, string Key, string[] Properties)[] Inventory =
+    internal sealed record Relation(Type Type, string Key, string[] Properties)
+    {
+        internal string[] MappedProperties { get; init; } = Properties;
+    }
+
+    internal static readonly Relation[] Inventory =
     [
-        (typeof(LocalIdentityUser), "Id",
+        new(typeof(LocalIdentityUser), "Id",
             ["Id", "AccessFailedCount", "ConcurrencyStamp", "CreatedAt", "Email", "EmailConfirmed",
                 "FirstName", "LastName", "LockoutEnabled", "LockoutEnd", "NormalizedEmail",
                 "NormalizedUserName", "PasswordHash", "PhoneNumber", "PhoneNumberConfirmed",
                 "SecurityStamp", "TwoFactorEnabled", "UpdatedAt", "UserName"]),
-        (typeof(LocalIdentityCredentialOperation), "Id",
+        new(typeof(LocalIdentityCredentialOperation), "Id",
             ["Id", "ConcurrencyStamp", "CreatedAt", "ExternalLoginId", "InitiatingApplicationUserId",
                 "Kind", "LocalSubjectId", "PersonalActorId", "PreviousOperationConcurrencyStamp",
                 "PreviousOperationId", "ResetReason", "Stage", "UpdatedAt", "VerifiedAt",
                 "VerifiedByApplicationUserId"]),
-        (typeof(IdentityUserToken<Guid>), "UserId", ["UserId", "LoginProvider", "Name", "Value"]),
-        (typeof(User), "Id",
+        new(typeof(IdentityUserToken<Guid>), "UserId", ["UserId", "LoginProvider", "Name", "Value"]),
+        new(typeof(User), "Id",
             ["Id", "ConcurrencyStamp", "CreatedAt", "CreatedBy", "DeletedAt", "DeletedBy",
                 "EmailVerified", "IsDeleted", "LastActiveTenantId", "UpdatedAt", "UpdatedBy"]),
-        (typeof(UserPii), "UserId", ["UserId", "Email", "FirstName", "LastName"]),
-        (typeof(Actor), "Id",
+        new(typeof(UserPii), "UserId", ["UserId", "Email", "FirstName", "LastName"])
+        {
+            MappedProperties = ["UserId", "Email", "FirstName", "LastName", "_dateOfBirth",
+                "_birthDateCollectionReceiptId", "_birthDateRevision"]
+        },
+        new(typeof(Actor), "Id",
             ["Id", "ActorTypeId", "BackgroundColor", "BackgroundEffect", "BannerColor", "ConcurrencyStamp",
                 "CreatedAt", "CreatedBy", "DeletedAt", "DeletedBy", "Description", "ExternalActorSubjectId",
                 "GroupId", "IsDeleted", "IsSuspended", "ModerationReasonCode", "OrganizationId",
                 "ProfilePictureCid", "ServicePrincipalId", "SuspendedAt", "SuspendedBy", "UpdatedAt",
                 "UpdatedBy", "UserId"]),
-        (typeof(ActorPii), "ActorId",
+        new(typeof(ActorPii), "ActorId",
             ["ActorId", "DisplayName", "ExternalProfilePictureUri", "ProfilePictureStorageObjectId"]),
-        (typeof(UserExternalLogin), "Id",
+        new(typeof(UserExternalLogin), "Id",
             ["Id", "AuthenticationProviderId", "CreatedAt", "CreatedBy", "ProviderDisplayName",
                 "ProviderKey", "UpdatedAt", "UpdatedBy", "UserId"])
     ];
@@ -102,19 +111,23 @@ public static partial class PostgresLocalAdministrationContract
     internal static void RequireInventory(ExploreDbContext context)
     {
         foreach (var source in Inventory)
-        {
-            var entity = context.Model.FindEntityType(source.Type)
-                ?? throw new InvalidOperationException("local_administration_colocated_model_required");
-            if (!entity.GetProperties().Select(property => property.Name).Order(StringComparer.Ordinal)
-                    .SequenceEqual(source.Properties.Order(StringComparer.Ordinal), StringComparer.Ordinal)
-                || entity.GetProperties().Any(property => property.IsShadowProperty())
-                || entity.FindPrimaryKey() is not { } key
-                || !key.Properties.Select(property => property.Name).SequenceEqual(
-                    source.Type == typeof(IdentityUserToken<Guid>) ? ["UserId", "LoginProvider", "Name"] : [source.Key],
-                    StringComparer.Ordinal)
-                || entity.GetTableName() is null)
-                throw new InvalidOperationException("local_administration_explicit_inventory_drift");
-        }
+            RequireModel(context, source);
+    }
+
+    internal static void RequireModel(ExploreDbContext context, Relation source)
+    {
+        var entity = context.Model.FindEntityType(source.Type)
+            ?? throw new InvalidOperationException("local_administration_colocated_model_required");
+        if (!entity.GetProperties().Select(property => property.Name).Order(StringComparer.Ordinal)
+                .SequenceEqual(source.MappedProperties.Order(StringComparer.Ordinal), StringComparer.Ordinal)
+            || entity.GetProperties().Any(property => property.IsShadowProperty())
+            || source.Properties.Any(property => entity.FindProperty(property) is null)
+            || entity.FindPrimaryKey() is not { } key
+            || !key.Properties.Select(property => property.Name).SequenceEqual(
+                source.Type == typeof(IdentityUserToken<Guid>) ? ["UserId", "LoginProvider", "Name"] : [source.Key],
+                StringComparer.Ordinal)
+            || entity.GetTableName() is null)
+            throw new InvalidOperationException("local_administration_explicit_inventory_drift");
     }
 
     public static async Task ApplyAsync(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,

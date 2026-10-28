@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Exceptions;
 using Explore.Application.Features.EventRoleAssignments.Handlers.Commands;
 using Explore.Application.Features.EventRoleAssignments.Handlers.Queries;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;
@@ -97,7 +98,6 @@ public sealed partial class HumanEventTeamCustodyTests
         {
             TenantId = PlatformDefaults.DefaultTenantId,
             EventId = target.Event,
-            ActorUserId = fixture.Binding.LocalSubjectId,
             TargetUserEmail = fixture.Login.Identifier,
             RoleId = (int)RoleEnum.CheckInStaff
         };
@@ -133,13 +133,14 @@ public sealed partial class HumanEventTeamCustodyTests
         await using var request = new Request(fixture.Host.Services);
         await request.Authenticate(await fixture.SignInAsync());
         var command = Assignment(fixture, target.Event);
+        if (change == "actor") request.SubstituteSubject(Guid.CreateVersion7().ToString("D"));
         command = change switch
         {
-            "actor" => command with { ActorUserId = Guid.CreateVersion7() },
+            "actor" => command,
             "tenant" => command with { TenantId = Guid.CreateVersion7() },
             _ => command with { EventId = Guid.CreateVersion7() }
         };
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+        await Assert.ThrowsAsync<AuthorizationException>(() =>
             ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(request.Services).ExecuteAsync(command));
         await using var observer = fixture.Native.CreateDatabase();
         await Assert.That(await observer.EventRoleAssignments.CountAsync(row => row.EventId == target.Event)).IsEqualTo(1);

@@ -183,6 +183,7 @@ public static class ExploreDatabaseMigrator
         if (queueEnrollment is not null)
         {
             await PostgresTenantApiKeyStoragePermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresTenantApiKeyStoragePermissions.ApplySetupLiveAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
         }
         await PostgresInstanceApiKeyManagementContract.ApplyAsync(executionDatabase, cancellationToken);

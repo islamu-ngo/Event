@@ -130,7 +130,8 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
         internal DbContext Identity(AsyncServiceScope scope) => _topology == IdentityDatabaseTopology.External
             ? scope.ServiceProvider.GetRequiredService<ExternalIdentityDbContext>() : Application(scope);
         internal LocalIdentityCredentialStateStore Store(AsyncServiceScope scope) => new(Identity(scope), Application(scope),
-            scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System);
+            scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System,
+            identityFence: NativeIdentityRecognitionBoundary.For(Application(scope), TimeProvider.System));
 
         internal ManagementTenantProvisioningRequestDto Request() => ManagedTenantProvisioningRequestCodec.Deserialize($$$"""
             {"externalRequestId":"managed-1","externalCustomerReference":"customer-1","tenantName":"Managed Tenant","tenantSlug":"managed-tenant",

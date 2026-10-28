@@ -21,6 +21,7 @@ public static class HumanEventTeamActionPreparationRegistration
             provider.GetRequiredService<IHumanAuthenticationLifetimeObserver>(),
             provider.GetRequiredService<IMachinePrincipalAccessor>(),
             provider.GetRequiredService<ITenantContext>(),
+            provider.GetRequiredService<IAdminContext>(),
             provider.GetRequiredService<TimeProvider>(),
             provider.GetRequiredService<CerbosAuthorizationService>(),
             provider.GetRequiredService<IOptions<AuthorizationProviderDeploymentOptions>>(),

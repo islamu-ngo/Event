@@ -25,16 +25,20 @@ public sealed class UserDetailLinkPolicy : ILinkPolicy<UserDto>
             RequiresAuth: true);
 
         yield return new LinkDefinition(
-            LinkRelations.Edit,
-            RouteNames.UpdateCurrentUser,
+            "profile-completion",
+            RouteNames.GetUserProfileCompletion,
             new { id = dto.Id },
-            HttpMethods.Patch,
-            "Update profile",
+            HttpMethods.Get,
+            "Check profile collection readiness",
             RequiresAuth: true)
             .RequirePermission(
                 AuthorizationActions.Update,
                 ResourceKinds.User,
-                dto.Id.ToString());
+                 dto.Id.ToString());
+
+        yield return new LinkDefinition("profile-image", RouteNames.UpdateCurrentUserProfileImage,
+            new { id = dto.Id }, HttpMethods.Patch, "Update profile image", RequiresAuth: true)
+            .RequirePermission(AuthorizationActions.Update, ResourceKinds.User, dto.Id.ToString());
 
         // Actor link (user's actor profile)
         if (dto.ActorId != Guid.Empty)

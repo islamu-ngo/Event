@@ -16,6 +16,7 @@ public sealed class EventMaterialCollectionLinkPolicy(ITenantContext tenantConte
         if (tenantContext.TenantId == Guid.Empty || dto.Id == Guid.Empty) yield break;
         yield return Resource(LinkDefinition.Self(RouteNames.GetEventResourceManagementDetail, new { id = dto.Id })
             .Authenticated(), dto, AuthorizationActions.EventResources.ViewManagement);
+        if (dto.Status == "quarantined" || dto.Draft is null) yield break;
         if (dto.PublicationState != EventResourcePublicationStateEnum.Archived)
             yield return Resource(LinkDefinition.Edit(RouteNames.UpdateEventResource, new { id = dto.Id }),
                 dto, AuthorizationActions.EventResources.Update);

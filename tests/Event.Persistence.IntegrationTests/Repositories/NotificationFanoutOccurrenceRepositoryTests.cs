@@ -379,7 +379,7 @@ public sealed class NotificationFanoutOccurrenceRepositoryTests(PostgreSqlContai
 
         var unitOfWork = new EfCoreUnitOfWork(context);
         var mutationLock = new RelationalSettingMutationLock(context, unitOfWork);
-        var repository = new NotificationIntentRepository(context, mutationLock);
+        var repository = new NotificationIntentRepository(context, mutationLock, TimeProvider.System);
         await mutationLock.ExecuteOrderedGroupsAsync(
             [[GovernanceSettingKeys.Email.DeliveryEnabled]],
             outerToken => unitOfWork.ExecuteInTransactionAsync(token =>

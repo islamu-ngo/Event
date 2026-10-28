@@ -111,6 +111,14 @@ public sealed partial class ManagedTenantWorkerCreationPermissionsNativeTests
             $"GRANT UPDATE ({emailVerified}) ON {user} TO {globalRole}");
         await RequireDriftRejectedAsync($"GRANT SELECT ({email}) ON {pii} TO {globalRole}",
             $"REVOKE SELECT ({email}) ON {pii} FROM {globalRole}");
+        foreach (string property in new[] { "_dateOfBirth", "_birthDateCollectionReceiptId", "_birthDateRevision" })
+        {
+            string column = identifiers.DelimitIdentifier(names.ColumnName(typeof(UserPii), property));
+            await RequireDriftRejectedAsync($"GRANT SELECT ({column}) ON {pii} TO {globalRole}",
+                $"REVOKE SELECT ({column}) ON {pii} FROM {globalRole}");
+            await RequireDriftRejectedAsync($"GRANT UPDATE ({column}) ON {pii} TO {globalRole}",
+                $"REVOKE UPDATE ({column}) ON {pii} FROM {globalRole}");
+        }
         await RequireDriftRejectedAsync($"GRANT SELECT (ctid) ON {user} TO {globalRole}",
             $"REVOKE SELECT (ctid) ON {user} FROM {globalRole}");
         await RequireDriftRejectedAsync($"GRANT UPDATE ({emailVerified}) ON {user} TO {globalRole} WITH GRANT OPTION",

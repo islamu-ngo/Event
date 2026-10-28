@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5M7ZJADZZAYF4X9D8M7GGGY
+Title: "preserve reviewed material coordinates during classification submissions"
+Type: feat
+Scope: access
+Summary: "Read native material inventory and review representations, freeze exact source or acceptance coordinates and permit only safe HAL-qualified explicit submissions. Included transport tests are unrun."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Classification transport freezes inspected material and source generations, limits writes to safe native HAL actions, checks receipt identity and never treats metadata as audience access. Included transport tests are UNRUN and provider assurance is not claimed."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Register through the existing authenticated named-client pipeline with the native inventory/review endpoints and final generated contracts. This packet supplies transport, not a new screen; main owns paired guidance and execution evidence."

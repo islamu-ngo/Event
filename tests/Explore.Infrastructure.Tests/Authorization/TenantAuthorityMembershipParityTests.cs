@@ -29,7 +29,7 @@ using NSubstitute;
 
 namespace Explore.Infrastructure.Tests.Authorization;
 
-public sealed class TenantAuthorityMembershipParityTests
+public sealed partial class TenantAuthorityMembershipParityTests
 {
     public enum MembershipState { Active, Suspended, Banned, Removed, Deleted, Revoked }
 

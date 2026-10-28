@@ -192,6 +192,7 @@ public sealed class SecretKitStartupProjectionTests
     [Arguments("/api/ratelimiting", "ANONYMOUSREGISTRATION_IPPERMITLIMIT", "RateLimiting:AnonymousRegistration:IpPermitLimit")]
     [Arguments("/api/rate-limiting", "ANONYMOUSREGISTRATION_WINDOWSECONDS", "RateLimiting:AnonymousRegistration:WindowSeconds")]
     [Arguments("/api", "RATELIMITING__ANONYMOUSREGISTRATION__IPPERMITLIMIT", "RateLimiting:AnonymousRegistration:IpPermitLimit")]
+    [Arguments("/api", "MODERATION__RECONCILIATION__APIKEY", "Moderation:Reconciliation:ApiKey")]
     public async Task NativeStartupProjectionPreservesOwnedTopologyMappings(string folder, string key, string destination)
     {
         await using var authority = await SecretKitHttpAuthority.StartAsync();
@@ -222,11 +223,28 @@ public sealed class SecretKitStartupProjectionTests
         await Assert.That(authority.Reads).IsEqualTo(0);
     }
 
-    private static async Task<SecretAuthorityAcquisition> NativeOwner(SecretKitHttpAuthority authority)
+    [Test]
+    [Arguments("MODERATION_MEASUREMENT_SIGNING_PRIVATE_KEY_PEM", "Moderation:MeasurementSigningPrivateKeyPem")]
+    [Arguments("MODERATION_MEASUREMENT_TEST_DATABASE__USERNAME", "Moderation:MeasurementTestDatabase:USERNAME")]
+    [Arguments("MODERATION_MEASUREMENT_TEST_DATABASE__PASSWORD", "Moderation:MeasurementTestDatabase:PASSWORD")]
+    public async Task MeasurementProjectionUsesItsOwnAdmittedRoot(string key, string destination)
+    {
+        await using var authority = await SecretKitHttpAuthority.StartAsync();
+        string value = Guid.NewGuid().ToString("N");
+        authority.Values[key] = value;
+        await using var owner = await NativeOwner(authority, SecretConsumerRole.ModerationMeasurement);
+        var result = await owner.PrepareConfigurationGroupAsync(["/moderation"]);
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(result.Value[destination]).IsEqualTo(value);
+        await Assert.That(authority.Reads).IsEqualTo(1);
+    }
+
+    private static async Task<SecretAuthorityAcquisition> NativeOwner(
+        SecretKitHttpAuthority authority, SecretConsumerRole consumer = SecretConsumerRole.Api)
     {
         using var bootstrap = SecretMaterial.FromText(Guid.NewGuid().ToString("N"));
         var opened = await SecretAuthorityAcquisition.OpenInfisicalAsync(
-            new(SecretAuthorityKind.Infisical, "Testing", SecretConsumerRole.Api),
+            new(SecretAuthorityKind.Infisical, "Testing", consumer),
             [new("/database", "DATABASE_PROVIDER", "Database:Provider")],
             new(authority.Origin, "project", "testing", Guid.NewGuid().ToString("N"),
                 SecretKit.Infisical.InfisicalTokenLifetime.Finite, null,

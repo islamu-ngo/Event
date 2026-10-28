@@ -10,6 +10,8 @@
     <Project Path="src/Explore.API/Explore.API.csproj" />
   </Folder>
   <Folder Name="/Core/">
+    <Project Path="src/ISLAMU.Moderation.Application/ISLAMU.Moderation.Application.csproj" />
+    <Project Path="src/ISLAMU.Moderation.Domain/ISLAMU.Moderation.Domain.csproj" />
     <Project Path="src/Explore.Application/Explore.Application.csproj" />
     <Project Path="src/Explore.Domain/Explore.Domain.csproj" />
   </Folder>

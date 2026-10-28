@@ -53,7 +53,7 @@ public class EventRoleAssignment : ITenantEntity, IAuditableEntity
     {
         ValidateValidityWindow(startsAtUtc, expiresAtUtc);
 
-        if (status is EventRoleAssignmentStatus.Revoked or EventRoleAssignmentStatus.Expired)
+        if (status is not (EventRoleAssignmentStatus.Pending or EventRoleAssignmentStatus.Active))
         {
             throw new ArgumentException("New event role assignments must start as Pending or Active.", nameof(status));
         }

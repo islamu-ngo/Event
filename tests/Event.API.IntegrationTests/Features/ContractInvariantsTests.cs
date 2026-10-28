@@ -744,6 +744,58 @@ public class ContractInvariantsTests
     }
 
     [Test]
+    public async Task OpenApiDocument_ModerationRecoveryAndSafetyEnumsMatchTheJsonWireContract()
+    {
+        using var document = await GetOpenApiDocumentAsync();
+        var options = _fixture.Factory.Services
+            .GetRequiredService<Microsoft.Extensions.Options.IOptions<JsonOptions>>()
+            .Value.JsonSerializerOptions;
+        foreach (var type in new[]
+        {
+            typeof(Explore.Domain.ResourceSafetyReviewStep),
+            typeof(Explore.Domain.ResourceSafetyAttestation),
+            typeof(Explore.Domain.ModerationRecognitionDispositionGrounds),
+            typeof(Explore.Domain.ModerationRecognitionPendingState),
+            typeof(Explore.Domain.ModerationRecognitionPendingFailure),
+            typeof(Explore.Domain.ModerationRecognitionEscalationStage)
+        })
+        {
+            var schema = GetSchema(document, type.Name);
+            await Assert.That(GetStringProperty(schema, "type")).IsEqualTo("string");
+            var wireValues = System.Enum.GetValues(type).Cast<object>()
+                .Select(value => JsonSerializer.SerializeToElement(value, type, options).GetString()
+                    ?? throw new System.InvalidOperationException("A public enum must serialize as a string."));
+            await Assert.That(GetEnumValues(schema)).IsEquivalentTo(wireValues);
+        }
+
+        foreach (var (schemaName, propertyName, enumName) in new[]
+        {
+            ("ModerationResourceQuarantineReviewStateItem", "attestation", "ResourceSafetyAttestation"),
+            ("RecognitionRecoveryContextDto", "availableGrounds", "ModerationRecognitionDispositionGrounds"),
+            ("RecognitionRecoveryContextDto", "assessedGrounds", "ModerationRecognitionDispositionGrounds"),
+            ("HalResourceOfRecognitionRecoveryContextDto", "availableGrounds", "ModerationRecognitionDispositionGrounds"),
+            ("HalResourceOfRecognitionRecoveryContextDto", "assessedGrounds", "ModerationRecognitionDispositionGrounds")
+        })
+        {
+            var schema = GetSchema(document, schemaName);
+            var variants = schema.GetProperty("properties").GetProperty(propertyName).GetProperty("oneOf")
+                .EnumerateArray().ToArray();
+            await Assert.That(variants.Any(value => GetStringProperty(value, "type") == "null")).IsTrue();
+            await Assert.That(variants.Any(value => GetReference(value) == $"#/components/schemas/{enumName}")).IsTrue();
+            await Assert.That(schema.GetProperty("required").EnumerateArray()
+                .Any(value => value.GetString() == propertyName)).IsFalse();
+        }
+
+        var review = new Explore.Application.Features.Moderation.Inspection.ModerationResourceQuarantineReviewStateItem(
+            System.Guid.NewGuid(), System.Guid.NewGuid(), null,
+            Explore.Domain.ResourceSafetyReviewStep.ProposePurpose, null, 1, 1, System.DateTimeOffset.UtcNow,
+            System.DateTimeOffset.UtcNow.AddMinutes(1));
+        var wireReview = JsonSerializer.SerializeToElement(review, options);
+        await Assert.That(wireReview.GetProperty("step").GetString()).IsEqualTo("ProposePurpose");
+        await Assert.That(wireReview.TryGetProperty("attestation", out _)).IsFalse();
+    }
+
+    [Test]
     public async Task OpenApiDocument_PublicEnumSchemasUseStringValues()
     {
         using var document = await GetOpenApiDocumentAsync();

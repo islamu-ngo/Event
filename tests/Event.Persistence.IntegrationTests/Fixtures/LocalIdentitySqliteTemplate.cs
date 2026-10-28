@@ -1,6 +1,7 @@
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Security;
 using Explore.Persistence.Seed;
 using Explore.Persistence.Services;
@@ -67,6 +68,10 @@ internal static class LocalIdentitySqliteTemplate
             Configure(applicationOptions, applicationPath, metadataCache);
             await using (var application = new ExploreDbContext(applicationOptions.Options))
                 await application.Database.EnsureCreatedAsync(token);
+            var authorityOptions = TestDbContextOptions.Create<EmbeddedPrivacyErasureAuthorityDbContext>();
+            Configure(authorityOptions, applicationPath, metadataCache);
+            await using (var authority = new EmbeddedPrivacyErasureAuthorityDbContext(authorityOptions.Options))
+                await authority.Database.ExecuteSqlRawAsync(authority.Database.GenerateCreateScript(), token);
             // Pooling is disabled: the final connection close checkpoints WAL before bytes are read.
             byte[] emptyApplication = await File.ReadAllBytesAsync(applicationPath, token);
             await using (var application = new ExploreDbContext(applicationOptions.Options))

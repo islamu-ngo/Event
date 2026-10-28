@@ -12,7 +12,8 @@ namespace Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 public sealed partial class EfCorePrivacyErasureAuthorityRepository(
     PrivacyErasureAuthorityDbContext dbContext,
     IOptions<PrivacyErasureOptions> options)
-    : IPrivacyErasureAuthority, IPrivacyErasureAuthorityMaintenance, IPrivacyIdentityFenceAuthority
+    : IPrivacyErasureAuthority, IPrivacyErasureAuthorityMaintenance, IPrivacyIdentityFenceAuthority,
+        IPrivacyErasureRecoveryAuthority
 {
     public const int MaximumReadBatchSize = 500;
 

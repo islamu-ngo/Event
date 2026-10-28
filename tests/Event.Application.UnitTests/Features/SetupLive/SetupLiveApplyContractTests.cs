@@ -1,5 +1,6 @@
 namespace Event.Application.UnitTests.Features.SetupLive;
 
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.SetupLive;
 
@@ -16,7 +17,9 @@ public sealed class SetupLiveApplyContractTests
         [
             typeof(SetupLiveApplicationService),
             typeof(ConfigurationImportSessionApplicationService),
-            typeof(ConfigurationImportApplyService)
+            typeof(ConfigurationImportApplyService),
+            typeof(Func<IHumanSecuritySourceGate>),
+            typeof(Func<IEventDiscoveryEnrollmentGate>)
         ]);
         await Assert.That(typeof(SetupConfigurationImportApplicationService)
             .GetMethod("PreviewAsync")!.ReturnType)

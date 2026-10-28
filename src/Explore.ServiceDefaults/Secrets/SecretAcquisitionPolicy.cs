@@ -19,6 +19,7 @@ public static class SecretAcquisitionPolicy
         ["/runtime/bff/oidc/keycloak", "/runtime/bff/oidc/google", "/runtime/bff/atproto/oauth"];
     private static readonly string[] MigrationRoots =
         ["/database", "/database/erasure", "/database/identity", "/postgresql"];
+    private static readonly string[] ModerationMeasurementRoots = ["/database", "/moderation"];
 
     public static IReadOnlyList<string> Roots(SecretConsumerRole consumer) => consumer switch
     {
@@ -26,6 +27,7 @@ public static class SecretAcquisitionPolicy
         SecretConsumerRole.Bff => Array.AsReadOnly(BffRoots),
         SecretConsumerRole.Combined => Array.AsReadOnly<string>([.. ApiRoots, .. BffRoots]),
         SecretConsumerRole.Migration => Array.AsReadOnly(MigrationRoots),
+        SecretConsumerRole.ModerationMeasurement => Array.AsReadOnly(ModerationMeasurementRoots),
         _ => throw new InvalidOperationException("secret_consumer_scope_invalid")
     };
 
@@ -44,6 +46,7 @@ public static class SecretAcquisitionPolicy
         SecretConsumerRole.Combined => ApiRoots.Contains(folder, StringComparer.Ordinal)
             || BffRoots.Contains(folder, StringComparer.Ordinal),
         SecretConsumerRole.Migration => MigrationRoots.Contains(folder, StringComparer.Ordinal),
+        SecretConsumerRole.ModerationMeasurement => ModerationMeasurementRoots.Contains(folder, StringComparer.Ordinal),
         _ => false
     };
 

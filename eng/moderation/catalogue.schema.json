@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:islamu:moderation:measurement-catalogue:1",
+  "title": "Independently enrolled native moderation measurement catalogue",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "consumerId", "runtimeVersion", "providerCode", "providerVersion",
+    "configurationDigest", "productArtifactDigest", "jobs"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "consumerId": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z0-9.-]+$" },
+    "runtimeVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "providerCode": { "enum": ["PostgreSql", "Sqlite", "SqlServer", "MariaDb", "MySql"] },
+    "providerVersion": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "configurationDigest": { "$ref": "#/$defs/digest" },
+    "productArtifactDigest": { "$ref": "#/$defs/digest" },
+    "jobs": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        { "allOf": [{ "$ref": "#/$defs/job" }, { "properties": { "bundle": { "const": "Event.Domain.UnitTests" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/job" }, { "properties": { "bundle": { "const": "Event.API.IntegrationTests" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/job" }, { "properties": { "bundle": { "const": "Event.Persistence.IntegrationTests" } } }] }
+      ],
+      "items": false
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "identity": { "type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[^\\u0000-\\u001f\\u007f]+$" },
+    "symbol": { "type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^[^\\u0000-\\u001f\\u007f]+$" },
+    "job": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundle", "treeFilter", "cases"],
+      "properties": {
+        "bundle": { "enum": ["Event.Domain.UnitTests", "Event.API.IntegrationTests", "Event.Persistence.IntegrationTests"] },
+        "treeFilter": { "type": "string", "minLength": 2, "maxLength": 8192, "pattern": "^/[^\\u0000-\\u001f\\u007f]+$" },
+        "cases": {
+          "type": "array", "minItems": 1, "maxItems": 256,
+          "items": { "$ref": "#/$defs/case" }
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId", "journalTestId", "nodeUid", "className", "methodName", "displayName",
+        "mtpClassName", "mtpMethodName", "mtpTestName"
+      ],
+      "properties": {
+        "caseId": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[!-~]+$" },
+        "journalTestId": { "$ref": "#/$defs/identity" },
+        "nodeUid": { "$ref": "#/$defs/identity" },
+        "className": { "$ref": "#/$defs/symbol" },
+        "methodName": { "$ref": "#/$defs/symbol" },
+        "displayName": { "$ref": "#/$defs/identity" },
+        "mtpClassName": { "$ref": "#/$defs/symbol" },
+        "mtpMethodName": { "$ref": "#/$defs/symbol" },
+        "mtpTestName": { "$ref": "#/$defs/identity" }
+      }
+    }
+  }
+}

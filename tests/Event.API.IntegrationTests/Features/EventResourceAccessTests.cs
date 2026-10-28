@@ -10,11 +10,13 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
+using Explore.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -34,6 +36,9 @@ public sealed class EventResourceAccessTests
     [Arguments("cancel-parent-before-final-read")]
     [Arguments("staff-expiry-before-final-read")]
     [Arguments("window-boundaries")]
+    [Arguments("quarantine-before-access")]
+    [Arguments("quarantine-before-final-read")]
+    [Arguments("quarantine-saved-action")]
     public async Task RedirectOnlyRevealsAuthorizedProtectedDestination(string change)
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
@@ -59,20 +64,31 @@ public sealed class EventResourceAccessTests
                 StatusId = (int)TenantUserStatusEnum.Active,
                 CreatedAt = DateTime.UtcNow
             });
-            db.SystemSettings.Add(new SystemSetting
+            SystemSetting[] settings =
+            [
+                new()
+                {
+                    SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
+                    Value = "\"local\"",
+                    ValueType = SettingValueType.String,
+                    Category = "Security"
+                },
+                new()
+                {
+                    SettingKey = GovernanceSettingKeys.EventResources.ExternalOrigins,
+                    Value = "[\"https://resource.example.org\"]",
+                    ValueType = SettingValueType.Json,
+                    Category = "EventResources"
+                }
+            ];
+            foreach (var setting in settings)
             {
-                SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
-                Value = "\"local\"",
-                ValueType = SettingValueType.String,
-                Category = "Security"
-            });
-            db.SystemSettings.Add(new SystemSetting
-            {
-                SettingKey = GovernanceSettingKeys.EventResources.ExternalOrigins,
-                Value = "[\"https://resource.example.org\"]",
-                ValueType = SettingValueType.Json,
-                Category = "EventResources"
-            });
+                var existing = await db.SystemSettings.SingleOrDefaultAsync(row => row.SettingKey == setting.SettingKey);
+                if (existing is null)
+                    db.SystemSettings.Add(setting);
+                else
+                    existing.Value = setting.Value;
+            }
             var parent = new Explore.Domain.Event
             {
                 Id = eventId,
@@ -114,10 +130,11 @@ public sealed class EventResourceAccessTests
             db.EventResources.Add(resource);
             await db.SaveChangesAsync();
         }
+        var redirectBarrier = new BeforeRedirect(change, factory, eventId, resourceId, userId, clock);
         using var hosted = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
             services.Configure<MvcOptions>(options =>
-                options.Filters.Add(new BeforeRedirect(change, factory, eventId, resourceId, userId, clock)));
+                options.Filters.Add(redirectBarrier));
             if (change is "staff-expiry-before-final-read" or "window-boundaries")
             {
                 services.RemoveAll<TimeProvider>();
@@ -126,6 +143,29 @@ public sealed class EventResourceAccessTests
         }));
         using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
         { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
+        if (Environment.GetEnvironmentVariable("ISLAMU_MODERATION_MEASUREMENT_JOURNAL") == "1")
+        {
+            await using var observedScope = hosted.Services.CreateAsyncScope();
+            var observedDatabase = observedScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await observedDatabase.Database.OpenConnectionAsync();
+            var publicComposition = new Dictionary<string, string>();
+            foreach (var extension in observedDatabase.GetService<IDbContextOptions>().Extensions)
+                extension.Info.PopulateDebugInfo(publicComposition);
+            if (!publicComposition.TryGetValue("Explore:PrimaryPublicDatabaseIdentity", out var publicDigest))
+                throw new InvalidOperationException("Resource redirect measurement requires actual native primary composition.");
+            var providerVersion = observedDatabase.Database.GetDbConnection().ServerVersion;
+            var providerCode = observedDatabase.Database.ProviderName switch
+            {
+                "Microsoft.EntityFrameworkCore.Sqlite" => "Sqlite",
+                "Npgsql.EntityFrameworkCore.PostgreSQL" => "PostgreSql",
+                "Microsoft.EntityFrameworkCore.SqlServer" => "SqlServer",
+                "Pomelo.EntityFrameworkCore.MySql" => providerVersion.Contains("MariaDB", StringComparison.OrdinalIgnoreCase)
+                    ? "MariaDb" : "MySql",
+                _ => throw new InvalidOperationException("Resource redirect measurement has no native provider observation.")
+            };
+            Event.Tests.Shared.Moderation.ModerationMeasurementJournalAttribute.RecordDatabaseObservation(
+                TUnit.Core.TestContext.Current!, providerCode, providerVersion, publicDigest);
+        }
         using (var login = await client.PostAsJsonAsync("/api/auth/local/login", credentials))
         {
             login.EnsureSuccessStatusCode();
@@ -221,7 +261,7 @@ public sealed class EventResourceAccessTests
                 .Because("the authenticated staff member must have a valid redirect action before expiry");
         }
         string? savedAction = null;
-        if (change == "allow")
+        if (change is "allow" or "quarantine-saved-action")
         {
             using var document = JsonDocument.Parse(metadataBody);
             await Assert.That(document.RootElement.GetProperty("externalDestinationSafeOrigin").GetString())
@@ -231,12 +271,16 @@ public sealed class EventResourceAccessTests
             await Assert.That(savedAction).DoesNotContain(sentinel);
             await Assert.That(savedAction).Contains($"/api/eventresource/{resourceId}/access");
         }
-        using var response = await client.GetAsync($"/api/eventresource/{resourceId}/access");
+        if (change is "quarantine-before-access" or "quarantine-saved-action")
+            await QuarantineCurrentMaterialAsync(factory, resourceId);
+        using var response = await client.GetAsync(change == "quarantine-saved-action"
+            ? savedAction! : $"/api/eventresource/{resourceId}/access");
         string body = await response.Content.ReadAsStringAsync();
         if (change == "allow")
         {
             await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Redirect);
             await Assert.That(response.Headers.Location!.AbsoluteUri).IsEqualTo(destination);
+            await Assert.That(response.Headers.GetValues("Location").Count()).IsEqualTo(1);
             await Assert.That(response.Headers.GetValues("Referrer-Policy").Single()).IsEqualTo("no-referrer");
         }
         else
@@ -246,6 +290,20 @@ public sealed class EventResourceAccessTests
         }
         await Assert.That(response.Headers.CacheControl!.NoStore).IsTrue();
         await Assert.That(body).DoesNotContain(sentinel);
+        if (change == "quarantine-before-final-read")
+            await Assert.That(redirectBarrier.QuarantineObserved).IsTrue()
+                .Because("the valid protected destination was prepared before native quarantine changed terminal authority");
+        if (change.StartsWith("quarantine-", StringComparison.Ordinal))
+        {
+            await using var quarantined = factory.CreateDatabase();
+            quarantined.EnableTenantFilterBypass("Verify the accepted aggregate quarantine remains current.");
+            var resource = await quarantined.EventResources.Include(row => row.ModerationQuarantines)
+                .SingleAsync(row => row.Id == resourceId);
+            await Assert.That(resource.ModerationQuarantineCount).IsEqualTo(1);
+            await Assert.That(resource.ModerationQuarantines.Single().MaterialVersionId)
+                .IsEqualTo(resource.MaterialVersionId!.Value);
+            await Assert.That(resource.ModerationQuarantines.Single().ReleaseId).IsNull();
+        }
         if (change == "window-boundaries")
         {
             clock.Advance(TimeSpan.FromMinutes(1));
@@ -271,7 +329,7 @@ public sealed class EventResourceAccessTests
             await Assert.That(afterReads).IsEqualTo(managementAuditRows)
                 .Because($"Management audit rows changed during an attendee read: before={managementAuditRows}, after={afterReads}.");
         }
-        if (savedAction is not null)
+        if (savedAction is not null && change == "allow")
         {
             await using (var db = factory.CreateDatabase())
             {
@@ -325,12 +383,31 @@ public sealed class EventResourceAccessTests
         }
     }
 
+    private static async Task QuarantineCurrentMaterialAsync(
+        LocalAdmissionWebApplicationFactory factory, Guid resourceId)
+    {
+        await using var db = factory.CreateDatabase();
+        db.EnableTenantFilterBypass("Accept a current-material aggregate quarantine before disclosure.");
+        var resource = await db.EventResources.SingleAsync(row => row.Id == resourceId);
+        resource.ApplyModerationQuarantine(Guid.CreateVersion7(), Guid.CreateVersion7(), 0,
+            resource.MaterialVersionId!.Value, resource.ConcurrencyStamp, DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
+    }
+
     private sealed class BeforeRedirect(string change, LocalAdmissionWebApplicationFactory factory, Guid eventId,
         Guid resourceId, Guid userId, AccessClock clock)
         : IAsyncResultFilter
     {
+        public bool QuarantineObserved { get; private set; }
+
         public async Task OnResultExecutionAsync(ResultExecutingContext context, ResultExecutionDelegate next)
         {
+            if (context.Result is EventResourceRedirectResult && change == "quarantine-before-final-read")
+            {
+                await Assert.That(QuarantineObserved).IsFalse();
+                await QuarantineCurrentMaterialAsync(factory, resourceId);
+                QuarantineObserved = true;
+            }
             if (context.Result is EventResourceRedirectResult && change is "withdraw" or "policy" or "cancel-parent-before-final-read")
             {
                 await using var db = factory.CreateDatabase();

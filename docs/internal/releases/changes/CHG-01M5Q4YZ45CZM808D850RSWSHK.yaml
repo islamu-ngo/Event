@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5Q4YZ45CZM808D850RSWSHK
+Title: "Describe existing moderation HAL responses in generated contracts"
+Type: fix
+Scope: access
+Summary: "Complete explicit detail and collection schema registrations and central route names without changing endpoint payloads, routes or authorization."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Native schema/client generation describes existing HAL payloads and typed collection items. Route constants retain existing operation IDs; authorization and JSON-ignored authority fields remain unchanged. Existing strict remote contract regressions remain the verification gate."
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented
+    Detail: "Regenerate consumers from the corrected contract. No new endpoint, permission, configuration or database migration is introduced."

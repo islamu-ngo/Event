@@ -191,7 +191,15 @@ public partial class ExploreDbContext
                             // tenant preflight detects the same invisible parent.
                             if (foreignKey.PrincipalEntityType.ClrType == typeof(Explore.Domain.StorageObject))
                                 throw StorageReferenceConflict();
-                            throw new InvalidOperationException("tracked_tenant_authority_mismatch");
+                            throw new InvalidOperationException("tracked_tenant_authority_mismatch")
+                            {
+                                Data =
+                                {
+                                    ["TrackedEntityType"] = entry.Metadata.ClrType.Name,
+                                    ["PrincipalEntityType"] = foreignKey.PrincipalEntityType.ClrType.Name,
+                                    ["ForeignKeyProperties"] = string.Join(",", foreignKey.Properties.Select(property => property.Name))
+                                }
+                            };
                         }
                     }
                 }

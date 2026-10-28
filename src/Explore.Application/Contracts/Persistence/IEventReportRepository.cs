@@ -6,6 +6,16 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IEventReportRepository : IGenericRepository<EventReport, Guid>
 {
+    Task<IReadOnlyList<EventReportSignal>> GetProviderAdviceAsync(
+        Guid tenantId,
+        EventReportSignalProvider provider,
+        string advisoryIdentity,
+        CancellationToken cancellationToken);
+
+    Task PersistProviderAdviceAsync(
+        IReadOnlyList<EventReportSignal> signals,
+        CancellationToken cancellationToken);
+
     Task<EventReport?> GetByIdForProviderSyncAsync(
         Guid tenantId,
         Guid reportId,

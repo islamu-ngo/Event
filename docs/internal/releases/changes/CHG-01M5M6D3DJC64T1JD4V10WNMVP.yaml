@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5M6D3DJC64T1JD4V10WNMVP
+Title: "Deliver moderation notices only while native custody remains valid"
+Type: feat
+Scope: notifications
+Summary: "Requalify native notice, notification and email delivery obligations through current custody and cleanup; included tests are unrun and SMTP and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Native notice capture/read/status, recipient cleanup and email eligibility requalify original-account custody before disclosure or delivery; queue presence is not delivery authority. Included tests are UNRUN; SMTP/runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires separately owned notice, cleanup, receipt and email-kind model changes plus generated schema history; no migration or provider execution occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Notice/status endpoint sources, private HTTP results, HAL and security transformer ship here; cumulative generated contracts ship once in final host composition."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Complete paired notice retention, post-commit email delivery and failure-handling guidance; SMTP and provider assurance remain pending and no delivery success is certified."

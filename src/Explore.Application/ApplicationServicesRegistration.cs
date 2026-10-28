@@ -67,6 +67,7 @@ using Explore.Application.Notifications.Handlers;
 using Explore.Application.Services;
 using Explore.Application.Services.Federation;
 using Explore.Application.Services.Lifecycle;
+using Explore.Application.Services.Moderation;
 using Explore.Application.Services.Registration;
 using Explore.Application.Services.Waitlist;
 using Explore.Application.Services.Webhooks;
@@ -87,6 +88,19 @@ public static class ApplicationServicesRegistration
         IConfiguration configuration)
     {
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton(_ => ModerationCapabilityRegistry.Parse(ModerationCapabilityRegistry.ReadInventory()));
+        services.AddScoped<ISLAMU.Moderation.Application.IModerationEffectPlanner, ModerationEffectPlanner>();
+        services.AddScoped<ISLAMU.Moderation.Application.ModerationOperationService>();
+        services.AddScoped<ModerationReconciliationCredentialProvider>();
+        services.AddScoped<ModerationEffectRecoveryService>();
+        services.AddScoped<ModerationNoticeNativeMaterializer>();
+        services.AddScoped<ModerationConsumerConformanceReader>();
+        services.AddOptions<ModerationReconciliationOptions>()
+            .Bind(configuration.GetSection(ModerationReconciliationOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<
+            Microsoft.Extensions.Options.IValidateOptions<ModerationReconciliationOptions>,
+            ModerationReconciliationOptionsValidator>();
         services.AddOptions<IdentityCorrelationOptions>()
             .Bind(configuration.GetSection(IdentityCorrelationOptions.SectionName))
             .Validate(IdentityCorrelationOptions.IsValid,
@@ -328,6 +342,20 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IEventLocationReviewQueueMonitor, EventLocationReviewQueueMonitor>();
         services.AddScoped<IFanoutAttendeeLocationAuthorizationService, FanoutAttendeeLocationAuthorizationService>();
         services.AddScoped<PrivacyErasureApplier>();
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationRecognitionErasure,
+            Explore.Application.Services.Moderation.ModerationRecognitionErasure>();
+        services.AddScoped<Explore.Application.Services.Moderation.ModerationRecognitionContinuity>();
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationRecognitionContinuity>(provider =>
+            provider.GetRequiredService<Explore.Application.Services.Moderation.ModerationRecognitionContinuity>());
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationRecognitionContinuityReader>(provider =>
+            provider.GetRequiredService<Explore.Application.Services.Moderation.ModerationRecognitionContinuity>());
+        services.AddScoped<Explore.Application.Services.Moderation.ModerationRecognitionRecovery>();
+        services.AddScoped<Explore.Application.Services.Moderation.ModerationRecognitionRecoveryScheduler>();
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationRecognitionCorrectionReceiptAuthenticator,
+            Explore.Application.Services.Moderation.ModerationRecognitionCorrectionReceiptAuthenticator>();
+        services.AddScoped<Explore.Application.Services.Moderation.ModerationRecognitionKeyLifecycleService>();
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationRecognitionRecoveryNotifications,
+            Explore.Application.Services.Moderation.ModerationRecognitionRecoveryNotifications>();
         services.AddScoped<IPrivacyErasureService, RetainedAuthorityPrivacyErasureWorkflow>();
         services.AddSingleton<EventLocationDisclosureEvaluator>();
         services.AddScoped<PublicEventLocationDisclosureEvaluator>();

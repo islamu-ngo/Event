@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5M6D331D2RDQS8P4PDJY46K
+Title: "Separate private profile completion from profile image updates"
+Type: feat
+Scope: privacy
+Summary: "Move image changes out of generic user updates into dedicated image operations and expose separately admitted private completion flows; included tests are unrun and runtime assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Generic UpdateUserDto no longer accepts ProfileImage. Move image mutation to the dedicated profile-image endpoint and private birthdate/options operations to separately admitted profile-completion flows; consume the final generated client contract."
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Dedicated image and private completion handlers retain ownership checks and use the separately admitted collection owner rather than generic profile mutation. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Private completion relies on separately owned PII collection-provenance models and cumulative generated schema history; no migration or provider execution occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Introducing completion/image endpoint sources and generic update DTO removal ship here; cumulative schemas and generated client ship once in final host composition."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Coordinate callers and UI with the dedicated endpoints and admitted collection owner; complete paired private-profile guidance and runtime/provider assurance before deployment."

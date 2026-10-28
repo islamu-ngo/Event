@@ -11,11 +11,13 @@ using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.StorageObject;
+using Explore.Application.Features.EventResources;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Features.StorageObjects.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Models.Storage;
 using Explore.Application.Responses;
+using Explore.Application.Services;
 using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
@@ -54,8 +56,8 @@ public class StorageObjectController : ControllerBase
     private readonly IQueryHandler<GetPublicImageRequest, StorageObjectContentResult?> _publicImage;
     private readonly ICommandHandler<IssuePresignedDownloadUrlCommand, PresignedDownloadUrlResponseDto?> _issueDownload;
     private readonly ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _createUpload;
-    private readonly ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _finalizeUpload;
-    private readonly ICommandHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _cancelUpload;
+    private readonly ICommandHandler<FinalizeStorageUploadSessionCommand, StorageUploadSessionResult> _finalizeUpload;
+    private readonly ICommandHandler<CancelStorageUploadSessionCommand, StorageUploadSessionResult> _cancelUpload;
     private readonly ICommandHandler<UpdateStorageObjectCommand, BaseCommandResponse<Guid>> _update;
     private readonly ICommandHandler<DeleteStorageObjectCommand, BaseCommandResponse<Guid>> _delete;
     private readonly ITenantContext _tenantContext;
@@ -68,8 +70,8 @@ public class StorageObjectController : ControllerBase
         IQueryHandler<GetPublicImageRequest, StorageObjectContentResult?> publicImage,
         ICommandHandler<IssuePresignedDownloadUrlCommand, PresignedDownloadUrlResponseDto?> issueDownload,
         ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> createUpload,
-        ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> finalizeUpload,
-        ICommandHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> cancelUpload,
+        ICommandHandler<FinalizeStorageUploadSessionCommand, StorageUploadSessionResult> finalizeUpload,
+        ICommandHandler<CancelStorageUploadSessionCommand, StorageUploadSessionResult> cancelUpload,
         ICommandHandler<UpdateStorageObjectCommand, BaseCommandResponse<Guid>> update,
         ICommandHandler<DeleteStorageObjectCommand, BaseCommandResponse<Guid>> delete,
         ITenantContext tenantContext,
@@ -292,7 +294,7 @@ public class StorageObjectController : ControllerBase
         };
         var response = await _finalizeUpload.ExecuteAsync(command, cancellationToken);
 
-        return response.IsSuccess ? Ok(response) : this.ToStorageUploadProblem(response);
+        return UploadSessionResult(response);
     }
 
     // DELETE: api/storageobject/upload-sessions/{uploadSessionId}
@@ -326,7 +328,7 @@ public class StorageObjectController : ControllerBase
         };
         var response = await _cancelUpload.ExecuteAsync(command, cancellationToken);
 
-        return response.IsSuccess ? Ok(response) : this.ToStorageUploadProblem(response);
+        return UploadSessionResult(response);
     }
 
     // PATCH: api/storageobject/{id}
@@ -374,6 +376,26 @@ public class StorageObjectController : ControllerBase
         var response = await _delete.ExecuteAsync(command, cancellationToken);
         return RetirementFailurePolicy.Map(this, response, () => Accepted(response));
     }
+
+    private ActionResult UploadSessionResult(StorageUploadSessionResult result)
+    {
+        Response.RegisterForDisposeAsync(result);
+        if (result.Projection is { } projection)
+            return new EventResourceProjectionResult<BaseCommandResponse<StorageUploadSessionDto>>(projection,
+                (value, _) => Task.FromResult<ActionResult>(Ok(value)), ResourceReadFailure);
+        var response = result.Response!;
+        return response.IsSuccess ? Ok(response) : this.ToStorageUploadProblem(response);
+    }
+
+    private ActionResult ResourceReadFailure(EventResourceAuthorityOutcome outcome) => outcome switch
+    {
+        EventResourceAuthorityOutcome.AuthenticationRequired => this.ToAuthenticationRequiredProblem(),
+        EventResourceAuthorityOutcome.Forbidden => this.ToForbiddenProblem(),
+        EventResourceAuthorityOutcome.NotFound => this.ToNotFoundProblem(
+            new("Resource not found", "The requested resource was not found.")),
+        _ => this.ToServiceUnavailableProblem("Resource authority unavailable",
+            "Current resource authority could not be established.", EventResourceManagementFailureCodes.Unavailable)
+    };
 
     private FileStreamResult ToFileResult(StorageObjectContentResult result)
     {

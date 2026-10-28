@@ -6,6 +6,8 @@ public static class ApiAuthenticationClaimTypes
 
     public const string ApiKeyId = "explore:api-key:id";
 
+    public const string CredentialSource = "explore:api-key:source";
+
     public const string TenantId = "explore:tenant:id";
 
     public const string OwnerType = "explore:api-key:owner:type";

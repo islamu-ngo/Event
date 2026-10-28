@@ -1,5 +1,6 @@
 using System.Data;
 using Explore.Domain;
+using Explore.Domain.SetupLive;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Security;
@@ -12,7 +13,7 @@ namespace Explore.Persistence.Schema;
 
 /// <summary>
 /// Fixed tenant credential storage permissions. Issuance, disclosure, management and revocation remain application workflows.
-/// Runtime can insert a new hash but cannot select hashes or usage IP addresses.
+/// API-key permissions allow inserting a new hash but not selecting hashes or usage IP addresses.
 /// </summary>
 public static class PostgresTenantApiKeyStoragePermissions
 {
@@ -81,8 +82,24 @@ public static class PostgresTenantApiKeyStoragePermissions
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!context.Database.IsNpgsql()) return;
+        await ApplySourcesAsync(context, enrollment, Sources(context), cancellationToken);
+    }
+
+    /// <summary>Installs the separate setup storage descriptor without changing existing API-key grants.</summary>
+    public static async Task ApplySetupLiveAsync(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!context.Database.IsNpgsql()) return;
+        await ApplySourcesAsync(context, enrollment, SetupSources(context), cancellationToken);
+    }
+
+    private static async Task ApplySourcesAsync(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        Source[] sources, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!context.Database.IsNpgsql()) return;
         enrollment.Validate();
-        Source[] sources = Sources(context);
         await using var owned = context.Database.CurrentTransaction is null
             ? await context.Database.BeginTransactionAsync(cancellationToken) : null;
         var transaction = context.Database.CurrentTransaction!;
@@ -301,6 +318,53 @@ public static class PostgresTenantApiKeyStoragePermissions
         NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy WHERE polrelid=pg_catalog.to_regclass({Text(source.Table)}) AND polname={Text(Policy)})
         AND NOT pg_catalog.has_any_column_privilege({Role(runtime)},{Text(source.Table)},'SELECT,INSERT,UPDATE,REFERENCES')
         """));
+
+    private static Source[] SetupSources(ExploreDbContext context)
+    {
+        string[] enrollments =
+        [
+            nameof(SetupTargetEnrollment.Id), nameof(SetupTargetEnrollment.TenantId), nameof(SetupTargetEnrollment.ActorId),
+            nameof(SetupTargetEnrollment.ChallengeDigest), nameof(SetupTargetEnrollment.CapabilityDigest),
+            nameof(SetupTargetEnrollment.ScopeDigest), nameof(SetupTargetEnrollment.Generation), nameof(SetupTargetEnrollment.State),
+            nameof(SetupTargetEnrollment.CreatedAt), nameof(SetupTargetEnrollment.CreatedBy),
+            nameof(SetupTargetEnrollment.UpdatedAt), nameof(SetupTargetEnrollment.UpdatedBy),
+            nameof(SetupTargetEnrollment.ExpiresAt), nameof(SetupTargetEnrollment.RevokedAt), nameof(SetupTargetEnrollment.ExpiredAt),
+            nameof(SetupTargetEnrollment.ConcurrencyStamp)
+        ];
+        string[] claims =
+        [
+            nameof(SetupEnrollmentIssuanceClaim.Id), nameof(SetupEnrollmentIssuanceClaim.TenantId),
+            nameof(SetupEnrollmentIssuanceClaim.ActorId), nameof(SetupEnrollmentIssuanceClaim.OperationKey),
+            nameof(SetupEnrollmentIssuanceClaim.EnrollmentId), nameof(SetupEnrollmentIssuanceClaim.EnrollmentGeneration),
+            nameof(SetupEnrollmentIssuanceClaim.RequestFingerprint), nameof(SetupEnrollmentIssuanceClaim.ClaimedAt)
+        ];
+        string[] operations =
+        [
+            nameof(SetupSecretBindingOperation.Id), nameof(SetupSecretBindingOperation.TenantId), nameof(SetupSecretBindingOperation.ActorId),
+            nameof(SetupSecretBindingOperation.EnrollmentId), nameof(SetupSecretBindingOperation.EnrollmentGeneration),
+            nameof(SetupSecretBindingOperation.OperationKey), nameof(SetupSecretBindingOperation.BindingKey),
+            nameof(SetupSecretBindingOperation.RequestFingerprint), nameof(SetupSecretBindingOperation.CommitmentKeyVersion),
+            nameof(SetupSecretBindingOperation.SecretValueCommitment), nameof(SetupSecretBindingOperation.State),
+            nameof(SetupSecretBindingOperation.MutationEvidence),
+            nameof(SetupSecretBindingOperation.Outcome), nameof(SetupSecretBindingOperation.CreatedAt), nameof(SetupSecretBindingOperation.CreatedBy),
+            nameof(SetupSecretBindingOperation.UpdatedAt), nameof(SetupSecretBindingOperation.UpdatedBy),
+            nameof(SetupSecretBindingOperation.SettledAt), nameof(SetupSecretBindingOperation.ConcurrencyStamp)
+        ];
+        return
+        [
+            Map(context, typeof(SetupTargetEnrollment), enrollments, enrollments, enrollments,
+                [nameof(SetupTargetEnrollment.CapabilityDigest), nameof(SetupTargetEnrollment.Generation),
+                    nameof(SetupTargetEnrollment.State), nameof(SetupTargetEnrollment.ExpiresAt),
+                    nameof(SetupTargetEnrollment.RevokedAt), nameof(SetupTargetEnrollment.ExpiredAt),
+                    nameof(SetupTargetEnrollment.ConcurrencyStamp), nameof(SetupTargetEnrollment.UpdatedAt), nameof(SetupTargetEnrollment.UpdatedBy)]),
+            Map(context, typeof(SetupEnrollmentIssuanceClaim), claims, claims, claims, []),
+            Map(context, typeof(SetupSecretBindingOperation), operations, operations, operations,
+                [nameof(SetupSecretBindingOperation.State), nameof(SetupSecretBindingOperation.Outcome),
+                    nameof(SetupSecretBindingOperation.MutationEvidence),
+                    nameof(SetupSecretBindingOperation.SettledAt), nameof(SetupSecretBindingOperation.ConcurrencyStamp),
+                    nameof(SetupSecretBindingOperation.UpdatedAt), nameof(SetupSecretBindingOperation.UpdatedBy)])
+        ];
+    }
 
     private static Source[] Sources(ExploreDbContext context) =>
     [

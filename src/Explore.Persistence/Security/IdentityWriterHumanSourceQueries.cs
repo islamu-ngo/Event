@@ -92,7 +92,12 @@ internal static class IdentityWriterHumanSourceQueries
                                 select new { mapping.RoleId, mapping.PermissionId, permission.MasterCode, permission.IsActive };
         var permissions = await owner.Rows(mappedPermissions.Where(row => roleIds.Contains(row.RoleId))
             .Select(row => new HumanPrincipalPermissionFact(row.RoleId, row.PermissionId, row.MasterCode, row.IsActive,
-                row.MasterCode == PermissionCodes.EventCreate, row.MasterCode == PermissionCodes.EventManageFinance)),
+                row.MasterCode == PermissionCodes.EventCreate, row.MasterCode == PermissionCodes.EventManageFinance)
+            {
+                MatchesGroupMemberCreateCode = row.MasterCode == PermissionCodes.GroupMemberCreate,
+                MatchesGroupMemberUpdateCode = row.MasterCode == PermissionCodes.GroupMemberUpdate,
+                MatchesGroupMemberDeleteCode = row.MasterCode == PermissionCodes.GroupMemberDelete
+            }),
             cancellationToken);
         owner.RequireCurrent();
         bool mappingsExist = await Source<RolePermission>(context).AnyAsync(cancellationToken);

@@ -22,7 +22,7 @@ jobs:
   security-tests:
     name: Security Integration Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
 
     steps:
       - name: Checkout

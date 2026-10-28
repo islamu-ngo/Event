@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4FAGSJ0SW1VX2R1D9W1G4T9
+Title: "Recheck current machine key authority before resource metadata delivery"
+Type: fix
+Scope: access
+Summary: "Reject prepared machine resource metadata after persisted key revocation, suspension, expiration, deletion, owner changes or authority tenancy changes. Authentication carries explicit persisted or configured credential authority; snapshots select exclusively that fresh source without fallback and continuations bind the source with the original key and owner coordinates. Configured clients must remain unique, active, unexpired and well formed. Native callers must supply qualified source metadata. Canonical owner liveness, full moderation consumer conformance and profile activation remain open."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

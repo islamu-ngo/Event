@@ -179,13 +179,15 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
 
             // This is the trusted reader seam, not an HTTP authorization assertion.
             var reader = scope.ServiceProvider.GetRequiredService<ConfigurationManifestCurrentStateReader>();
-            var result = singleTenant
-                ? await reader.ReadTenantAsync(rows.B, view, CancellationToken.None)
-                : await reader.ReadAsync(view, CancellationToken.None);
+            var payload = singleTenant
+                ? (await reader.ReadTenantAsync(rows.B, view, CancellationToken.None)).Utf8Json
+                : (await reader.ReadAsync(view, CancellationToken.None)).Utf8Json;
 
-            using JsonDocument exported = JsonDocument.Parse(result.Utf8Json);
+            using JsonDocument exported = JsonDocument.Parse(payload);
             JsonElement spec = exported.RootElement.GetProperty("spec");
-            JsonElement[] tenants = spec.GetProperty("tenants").EnumerateArray().ToArray();
+            JsonElement[] tenants = singleTenant
+                ? [exported.RootElement]
+                : spec.GetProperty("tenants").EnumerateArray().ToArray();
             await Assert.That(tenants.Length).IsEqualTo(singleTenant ? 1 : 2);
             await Assert.That(tenants[0].GetProperty("metadata").GetProperty("name").GetString())
                 .IsEqualTo(TenantBSlug);
@@ -198,10 +200,17 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
                     .IsEqualTo(TenantASlug);
                 await Assert.That(tenants[1].GetProperty("spec").GetProperty("settings")
                     .GetProperty(key).GetBoolean()).IsFalse();
+                JsonElement instanceSettings = spec.GetProperty("instance").GetProperty("settings");
+                await Assert.That(instanceSettings.GetProperty(key).GetBoolean()).IsFalse();
+                await Assert.That(instanceSettings.TryGetProperty(ExcludedKey, out _)).IsFalse();
+                await Assert.That(instanceSettings.EnumerateObject().All(
+                    entry => ConfigurationManifestCatalog.TryGetInstanceSetting(entry.Name, out _))).IsTrue();
             }
-            JsonElement instanceSettings = spec.GetProperty("instance").GetProperty("settings");
-            await Assert.That(instanceSettings.GetProperty(key).GetBoolean()).IsFalse();
-            await Assert.That(instanceSettings.TryGetProperty(ExcludedKey, out _)).IsFalse();
+            else
+            {
+                await Assert.That(spec.TryGetProperty("instance", out _)).IsFalse();
+                await Assert.That(spec.TryGetProperty("tenants", out _)).IsFalse();
+            }
             foreach (JsonElement tenant in tenants)
             {
                 JsonElement settings = tenant.GetProperty("spec").GetProperty("settings");
@@ -209,8 +218,6 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
                 await Assert.That(settings.EnumerateObject().All(
                     entry => ConfigurationManifestCatalog.TryGetTenantSetting(entry.Name, out _))).IsTrue();
             }
-            await Assert.That(instanceSettings.EnumerateObject().All(
-                entry => ConfigurationManifestCatalog.TryGetInstanceSetting(entry.Name, out _))).IsTrue();
             await Assert.That(context.TenantFilterTenantId).IsEqualTo((Guid?)rows.A);
             await Assert.That(context.IsTenantFilterBypassed).IsFalse();
             await Assert.That(scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().TenantId)

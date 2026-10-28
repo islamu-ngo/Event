@@ -20,6 +20,10 @@ public sealed class EventResourceConfiguration : IEntityTypeConfiguration<EventR
             table.HasCheckConstraint("ck_event_resources_availability_order", "availability_absolute_start_utc IS NULL OR availability_absolute_end_utc IS NULL OR availability_absolute_end_utc > availability_absolute_start_utc");
             table.HasCheckConstraint("ck_event_resources_relative_availability_order", "availability_start_anchor_id IS NULL OR availability_end_anchor_id IS NULL OR availability_start_anchor_id <> availability_end_anchor_id OR availability_end_offset_ticks > availability_start_offset_ticks");
             table.HasCheckConstraint("ck_event_resources_payload", PayloadCheck());
+            table.HasCheckConstraint("ck_event_resources_quarantine",
+                "moderation_quarantine_count >= 0 AND (moderation_quarantine_count = 0 OR material_version_id IS NOT NULL)");
+            table.HasCheckConstraint("ck_event_resources_material",
+                "material_version_id IS NULL OR material_version_id <> '00000000-0000-0000-0000-000000000000'");
         });
 
         builder.Property(resource => resource.Id).ValueGeneratedNever();
@@ -33,7 +37,12 @@ public sealed class EventResourceConfiguration : IEntityTypeConfiguration<EventR
         builder.Property(resource => resource.ExternalDestinationSafeOrigin).HasMaxLength(2048);
         builder.Property(resource => resource.IsDeleted).HasConversion<int>().HasDefaultValue(0);
         builder.Property(resource => resource.ConcurrencyStamp).IsConcurrencyToken();
+        builder.Property(resource => resource.ModerationQuarantineCount).IsConcurrencyToken();
         builder.Ignore(resource => resource.Availability);
+        builder.Ignore(resource => resource.HasModerationQuarantine);
+        builder.Navigation(resource => resource.ModerationQuarantines)
+            .HasField("_moderationQuarantines")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.HasAlternateKey(resource => new { resource.TenantId, resource.Id });
         builder.HasAlternateKey(resource => new { resource.TenantId, resource.EventId, resource.Id });

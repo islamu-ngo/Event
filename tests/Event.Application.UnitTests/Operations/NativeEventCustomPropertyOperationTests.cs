@@ -25,6 +25,7 @@ public sealed class NativeEventCustomPropertyOperationTests
     [Arguments(typeof(GetEventCustomPropertyDefinitionDetailsRequest), typeof(GetEventCustomPropertyDefinitionDetailsRequestHandler), typeof(EventCustomPropertyDefinitionDto), true)]
     [Arguments(typeof(GetEventCustomPropertyDefinitionListRequest), typeof(GetEventCustomPropertyDefinitionListRequestHandler), typeof(PaginatedResult<EventCustomPropertyDefinitionListDto>), true)]
     [Arguments(typeof(GetEventCustomPropertyValuesRequest), typeof(GetEventCustomPropertyValuesRequestHandler), typeof(List<EventCustomPropertyValueDto>), true)]
+    [Arguments(typeof(GetManagedEventCustomPropertiesRequest), typeof(GetManagedEventCustomPropertiesRequestHandler), typeof(ManagedEventCustomPropertiesDto), true)]
     public async Task Operation_HasOneNativeContractAndPreservesProtection(Type request, Type handler, Type result, bool query)
     {
         await Assert.That((query ? typeof(IQuery<>) : typeof(ICommand<>)).MakeGenericType(result).IsAssignableFrom(request)).IsTrue();
@@ -43,18 +44,38 @@ public sealed class NativeEventCustomPropertyOperationTests
             await Assert.That(protection.Action).IsEqualTo(AuthorizationActions.Update);
             await Assert.That(typeof(ISecureRequest).IsAssignableFrom(request)).IsTrue();
         }
+        else if (request == typeof(GetManagedEventCustomPropertiesRequest))
+        {
+            var protection = request.GetCustomAttribute<AuthorizeResourceAttribute>()!;
+            await Assert.That(protection.Resource).IsEqualTo(ResourceKinds.Event);
+            await Assert.That(protection.Action).IsEqualTo(AuthorizationActions.Events.ViewManagement);
+            await Assert.That(typeof(ISecureRequest).IsAssignableFrom(request)).IsTrue();
+        }
     }
 
     [Test]
-    public async Task Discovery_RegistersSixScopedCommandsAndThreeScopedQueries()
+    public async Task Discovery_RegistersSixScopedCommandsAndFourScopedQueries()
     {
         var services = new ServiceCollection();
         services.AddNativeOperations(typeof(CreateEventCustomPropertyDefinitionCommand).Assembly.GetTypes()
             .Where(type => type.Namespace?.StartsWith("Explore.Application.Features.EventCustomProperties.", StringComparison.Ordinal) == true));
         var ports = services.Where(descriptor => OperationServicesRegistration.IsHandlerContract(descriptor.ServiceType)).ToArray();
-        await Assert.That(ports.Length).IsEqualTo(9);
+        await Assert.That(ports.Length).IsEqualTo(10);
+        await Assert.That(ports.Select(descriptor => descriptor.ServiceType).ToArray()).IsEquivalentTo(new[]
+        {
+            typeof(ICommandHandler<CreateEventCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>),
+            typeof(ICommandHandler<UpdateEventCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>),
+            typeof(ICommandHandler<DeleteEventCustomPropertyDefinitionCommand, bool>),
+            typeof(ICommandHandler<PurgeEventCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>>),
+            typeof(ICommandHandler<SetEventCustomPropertyValueCommand, BaseCommandResponse<Guid>>),
+            typeof(ICommandHandler<SetEventCustomPropertyMultiValuesCommand, BaseCommandResponse<Guid>>),
+            typeof(IQueryHandler<GetEventCustomPropertyDefinitionDetailsRequest, EventCustomPropertyDefinitionDto>),
+            typeof(IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>>),
+            typeof(IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>>),
+            typeof(IQueryHandler<GetManagedEventCustomPropertiesRequest, ManagedEventCustomPropertiesDto>)
+        });
         await Assert.That(ports.All(descriptor => descriptor.Lifetime == ServiceLifetime.Scoped)).IsTrue();
         await Assert.That(ports.Count(descriptor => descriptor.ServiceType.GetGenericTypeDefinition() == typeof(ICommandHandler<,>))).IsEqualTo(6);
-        await Assert.That(ports.Count(descriptor => descriptor.ServiceType.GetGenericTypeDefinition() == typeof(IQueryHandler<,>))).IsEqualTo(3);
+        await Assert.That(ports.Count(descriptor => descriptor.ServiceType.GetGenericTypeDefinition() == typeof(IQueryHandler<,>))).IsEqualTo(4);
     }
 }

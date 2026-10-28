@@ -79,6 +79,7 @@ internal static class SecretStartupConfigurationProjection
                 or "KEYCLOAK:CLIENTSECRET" or "KEYCLOAK:BLAZORCLIENTSECRET" => "/runtime/bff/oidc/keycloak",
             "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS" or "ATPROTO:OAUTHCLIENTPRIVATEJWKS" => "/runtime/bff/atproto/oauth",
             "SETUP_SECRET" => "/setup",
+            "MODERATION:RECONCILIATION:APIKEY" => "/api",
             _ => null
         };
         if (selected is null)
@@ -357,6 +358,8 @@ internal static class SecretStartupConfigurationProjection
         if (normalizedPath.Equals("api", StringComparison.OrdinalIgnoreCase))
         {
             var upper = secretKey.ToUpperInvariant();
+            if (upper == "MODERATION__RECONCILIATION__APIKEY")
+                return "Moderation:Reconciliation:ApiKey";
             if (upper.StartsWith("INSTANCE__OPERATORIDENTITY__", StringComparison.Ordinal))
             {
                 var clean = upper["INSTANCE__OPERATORIDENTITY__".Length..];
@@ -436,6 +439,19 @@ internal static class SecretStartupConfigurationProjection
         if (secretKey.Equals("AI_TOOL_PROPOSALS_ENABLED", StringComparison.OrdinalIgnoreCase))
         {
             return "AiProvider:ToolProposalsEnabled";
+        }
+
+        if (normalizedPath.Equals("api", StringComparison.OrdinalIgnoreCase)
+            && secretKey.Equals("MODERATION__RECONCILIATION__APIKEY", StringComparison.OrdinalIgnoreCase))
+            return "Moderation:Reconciliation:ApiKey";
+
+        if (normalizedPath.Equals("moderation", StringComparison.OrdinalIgnoreCase))
+        {
+            if (secretKey.Equals("MODERATION_MEASUREMENT_SIGNING_PRIVATE_KEY_PEM", StringComparison.OrdinalIgnoreCase))
+                return "Moderation:MeasurementSigningPrivateKeyPem";
+            const string testDatabasePrefix = "MODERATION_MEASUREMENT_TEST_DATABASE__";
+            if (secretKey.StartsWith(testDatabasePrefix, StringComparison.OrdinalIgnoreCase))
+                return "Moderation:MeasurementTestDatabase:" + secretKey[testDatabasePrefix.Length..];
         }
 
         // 12. Default path to section conversion

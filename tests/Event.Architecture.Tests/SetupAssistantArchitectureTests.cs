@@ -17,8 +17,8 @@ public sealed class SetupAssistantArchitectureTests
 
     private static readonly string[] RegistryKeys =
     [
-        "instance.settings", "instance.documents", "instance.legal_documents",
-        "tenant.settings", "tenant.documents", "tenant.legal_documents",
+        "instance.settings", "instance.documents", "instance.legal_documents", "instance.moderation",
+        "tenant.settings", "tenant.documents", "tenant.legal_documents", "tenant.moderation",
         "tenant.footer", "tenant.navigation", "tenant.templates", "tenant.lookups",
         "tenant.custom_property_definitions", "tenant.localization",
         "tenant.registration_policy", "tenant.modules", "extensions",
@@ -36,7 +36,7 @@ public sealed class SetupAssistantArchitectureTests
 
     private static readonly string[] BindingProperties =
     [
-        "ApplyMode", "ArtifactDigest", "ExpiresAt", "MappingDigest",
+        "ApplyMode", "ArtifactDigest", "ExpiresAt", "MappingDigest", "ModerationReservationDigest",
         "RequiredApprovalDigest", "SelectedSectionsDigest", "Target",
         "TargetRevisionDigest"
     ];
@@ -51,7 +51,7 @@ public sealed class SetupAssistantArchitectureTests
             "schemas/tenant-configuration-package-v1alpha2.schema.json",
             TenantPackageSchemaId, "TenantConfigurationPackage");
 
-        await Assert.That(ConfigurationPortabilityRegistry.Sections.Count).IsEqualTo(21);
+        await Assert.That(ConfigurationPortabilityRegistry.Sections.Count).IsEqualTo(23);
         await Assert.That(ConfigurationPortabilityRegistry.Sections.Keys)
             .IsEquivalentTo(RegistryKeys);
         foreach (string key in ExcludedRegistryKeys)
@@ -89,6 +89,32 @@ public sealed class SetupAssistantArchitectureTests
                 "AccessToken", "ArtifactBytes", "ConnectionString", "Content",
                 "FilePath", "Payload", "SecretValue", "SourceTenantId"
             }.Contains(name, StringComparer.OrdinalIgnoreCase))).IsFalse();
+    }
+
+    [Test]
+    [Arguments("instance.moderation", ConfigurationPortabilityScope.Instance,
+        ConfigurationPortabilityAuthority.InstanceAdministrator)]
+    [Arguments("tenant.moderation", ConfigurationPortabilityScope.Tenant,
+        ConfigurationPortabilityAuthority.TenantAdministrator)]
+    public async Task ModerationPolicySectionsPreserveScopeAndSupportedOperations(
+        string key, ConfigurationPortabilityScope scope, ConfigurationPortabilityAuthority authority)
+    {
+        ConfigurationPortabilitySectionDescriptor descriptor = ConfigurationPortabilityRegistry.Sections[key];
+        await Assert.That(descriptor.Scope).IsEqualTo(scope);
+        await Assert.That(descriptor.Authority).IsEqualTo(authority);
+        await Assert.That(descriptor.PortabilityClass).IsEqualTo(ConfigurationPortabilityClass.Portable);
+        ConfigurationPortabilityArtifactKind[] artifacts = scope == ConfigurationPortabilityScope.Instance
+            ? [ConfigurationPortabilityArtifactKind.ConfigurationManifest]
+            : [ConfigurationPortabilityArtifactKind.ConfigurationManifest,
+                ConfigurationPortabilityArtifactKind.TenantConfigurationPackage];
+        await Assert.That(descriptor.ArtifactKinds).IsEquivalentTo(artifacts);
+        await Assert.That(new[]
+        {
+            descriptor.SupportsExport, descriptor.SupportsPreview, descriptor.SupportsDiff,
+            descriptor.SupportsApply, descriptor.SupportsVerify
+        }.All(value => value)).IsTrue();
+        await Assert.That(descriptor.SupportsRollback).IsFalse();
+        await Assert.That(descriptor.SupportsDeletion).IsFalse();
     }
 
     [Test]

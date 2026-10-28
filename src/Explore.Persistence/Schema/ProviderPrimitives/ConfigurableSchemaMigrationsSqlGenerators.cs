@@ -56,6 +56,8 @@ internal sealed class ConfigurableNpgsqlMigrationsSqlGenerator(
         operations = ConfigurableSchemaMigrationOperations.PrepareInstanceBootstrapLifecycleBackfill(
             operations,
             Dependencies.CurrentContext.Context);
+        operations = RegistrationProviderPublicationTransfer.Prepare(
+            operations, Dependencies.SqlGenerationHelper, Dependencies.CurrentContext.Context.Database.ProviderName!, model: model);
         operations = KeycloakReceiptDropGuard.Prepare(
             operations,
             Dependencies.SqlGenerationHelper,
@@ -76,6 +78,27 @@ internal sealed class ConfigurableSqlServerMigrationsSqlGenerator(
     ICommandBatchPreparer commandBatchPreparer)
     : SqlServerMigrationsSqlGenerator(dependencies, commandBatchPreparer)
 {
+    protected override void Generate(
+        AddForeignKeyOperation operation,
+        IModel? model,
+        MigrationCommandListBuilder builder,
+        bool terminate = true)
+    {
+        // Historical Down metadata requests a cascade absent from the physical evidence predecessor.
+        var deleteAction = operation.OnDelete;
+        if (operation.Name == "fk_moderation_case_evidence_moderation_cases_case_id"
+            && deleteAction == ReferentialAction.Cascade)
+            operation.OnDelete = ReferentialAction.NoAction;
+        try
+        {
+            base.Generate(operation, model, builder, terminate);
+        }
+        finally
+        {
+            operation.OnDelete = deleteAction;
+        }
+    }
+
     public override IReadOnlyList<MigrationCommand> Generate(
         IReadOnlyList<MigrationOperation> operations,
         Microsoft.EntityFrameworkCore.Metadata.IModel? model = null,
@@ -84,6 +107,8 @@ internal sealed class ConfigurableSqlServerMigrationsSqlGenerator(
         operations = ConfigurableSchemaMigrationOperations.PrepareInstanceBootstrapLifecycleBackfill(
             operations,
             Dependencies.CurrentContext.Context);
+        operations = RegistrationProviderPublicationTransfer.Prepare(
+            operations, Dependencies.SqlGenerationHelper, Dependencies.CurrentContext.Context.Database.ProviderName!, model: model);
         operations = KeycloakReceiptDropGuard.Prepare(
             operations,
             Dependencies.SqlGenerationHelper,
@@ -113,6 +138,17 @@ internal sealed class ConfigurableSqliteMigrationsSqlGenerator(
             ConfigurableSchemaMigrationOperations.PrepareInstanceBootstrapLifecycleBackfill(
                 operations,
                 Dependencies.CurrentContext.Context);
+        executableOperations = RegistrationProviderPublicationTransfer.Prepare(
+            executableOperations, Dependencies.SqlGenerationHelper, Dependencies.CurrentContext.Context.Database.ProviderName!,
+            sqlitePostRebuildDrop: true);
+        // SQLite queues owner-table rebuilds after input operations; their old FKs still need this principal.
+        var publicationDrops = executableOperations.OfType<DropTableOperation>().Where(operation =>
+            operation.Name.EndsWith("registration_provider_binding_publications", StringComparison.Ordinal)
+            && !executableOperations.OfType<DropTableOperation>().Any(drop =>
+                drop.Name == operation.Name[..^"registration_provider_binding_publications".Length] + "registration_provider_bindings"
+                && drop.Schema == operation.Schema)).ToArray();
+        if (publicationDrops.Length != 0)
+            executableOperations = executableOperations.Where(operation => !publicationDrops.Contains(operation)).ToArray();
         executableOperations = KeycloakReceiptDropGuard.Prepare(
             executableOperations,
             Dependencies.SqlGenerationHelper,
@@ -160,12 +196,19 @@ internal sealed class ConfigurableSqliteMigrationsSqlGenerator(
             }
             executableOperations = rewritten;
         }
+        var resourceHistory = SqliteMergedResourceHistory.Prepare(
+            executableOperations, model, Dependencies.CurrentContext.Context);
         IReadOnlyList<MigrationCommand> commands =
-            base.Generate(executableOperations, model, options);
+            base.Generate(resourceHistory.OtherOperations, model, options)
+                .Concat(base.Generate(resourceHistory.ResourceOperations, resourceHistory.ResourceModel, options)).ToArray();
         commands = ConfigurableSchemaMigrationOperations.WrapSqliteTableDrops(
             commands,
             executableOperations,
             Dependencies);
+        if (publicationDrops.Length != 0)
+            commands = commands.Concat(base.Generate(publicationDrops, model, options)).ToArray();
+        if (resourceHistory.PreflightOperations.Count != 0)
+            commands = base.Generate(resourceHistory.PreflightOperations, model, options).Concat(commands).ToArray();
         return ConfigurableSchemaMigrationOperations.AppendPromotionCodeBackfill(
             commands,
             executableOperations,
@@ -199,6 +242,8 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
         operations = ConfigurableSchemaMigrationOperations.PrepareInstanceBootstrapLifecycleBackfill(
             operations,
             Dependencies.CurrentContext.Context);
+        operations = RegistrationProviderPublicationTransfer.Prepare(
+            operations, Dependencies.SqlGenerationHelper, Dependencies.CurrentContext.Context.Database.ProviderName!);
         operations = KeycloakReceiptDropGuard.Prepare(
             operations,
             Dependencies.SqlGenerationHelper,
@@ -408,7 +453,9 @@ internal static class ConfigurableSchemaMigrationOperations
         IReadOnlyList<MigrationOperation> operations,
         MigrationsSqlGeneratorDependencies dependencies)
     {
-        if (!operations.Any(operation => operation is DropTableOperation))
+        // An integer-only preflight guard has no dependents; rejection must precede FK-state changes.
+        if (!operations.Any(operation => operation is DropTableOperation drop
+            && drop[RegistrationProviderPublicationTransfer.GuardDropAnnotation] is not true))
         {
             return commands;
         }

@@ -3,6 +3,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.Events.Moderation;
+using Explore.Application.Features.Events.Handlers.Queries;
 using Explore.Application.Features.Events.OpenGraph;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.Events.Requests.Queries;
@@ -46,7 +47,7 @@ public sealed class NativeEventOperationTests
     [Arguments(typeof(HeavyRedactEventCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(UnmoderateEventCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(GetAttendeeEventCalendarExportRequest), typeof(IQuery<AttendeeEventCalendarExportDto?>))]
-    [Arguments(typeof(GetEventCalendarExportRequest), typeof(IQuery<EventCalendarExportDto?>))]
+    [Arguments(typeof(GetEventCalendarExportRequest), typeof(IQuery<PublicEventCalendarProjection?>))]
     [Arguments(typeof(GetEventCreationContextRequest), typeof(IQuery<EventCreationContextDto>))]
     [Arguments(typeof(GetEventDetailsRequest), typeof(IQuery<EventDto?>))]
     [Arguments(typeof(GetEventListRequest), typeof(IQuery<PaginatedResult<EventListDto>>))]

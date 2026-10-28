@@ -25,6 +25,9 @@ using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -252,10 +255,10 @@ public sealed partial class NativeStorageObjectHttpTests
         using (var scope = factory.Services.CreateScope())
         {
             scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(factory.OtherTenantId);
-            var result = await scope.ServiceProvider.GetRequiredService<
-                ICommandHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>>()
+            await using var result = await scope.ServiceProvider.GetRequiredService<
+                ICommandHandler<CancelStorageUploadSessionCommand, StorageUploadSessionResult>>()
                 .ExecuteAsync(new() { UploadSessionId = reserved.Id, TenantId = PlatformDefaults.DefaultTenantId }, default);
-            await Assert.That(result.FailureCode).IsEqualTo(FailureCodes.StorageUploadSessionNotFound);
+            await Assert.That(result.Response!.FailureCode).IsEqualTo(FailureCodes.StorageUploadSessionNotFound);
         }
         await Assert.That((await ReserveAsync(owner, Upload("owner"))).TotalReservedBytes).IsEqualTo(5);
         using (var canceled = await owner.DeleteAsync($"{Root}/upload-sessions/{reserved.Id}"))
@@ -404,6 +407,9 @@ public sealed partial class NativeStorageObjectHttpTests
         public bool FailWrite { get; set; }
         public int WriteCount { get; private set; }
         public int DisposedReads { get; private set; }
+        public string? UploadRepresentationPath { get; set; }
+        public Func<Task>? BeforeUploadRepresentation { get; set; }
+        public bool UploadProjectionObserved { get; private set; }
 
         private Microsoft.EntityFrameworkCore.Diagnostics.DbTransactionInterceptor? _transactionObserver;
 
@@ -465,6 +471,7 @@ public sealed partial class NativeStorageObjectHttpTests
             base.ConfigureWebHost(builder);
             builder.ConfigureTestServices(services =>
             {
+                services.Configure<MvcOptions>(options => options.Filters.Add(new UploadRepresentationBoundary(this)));
                 services.RemoveExploreDbContextRegistrations();
                 services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
                 services.AddScoped(provider =>
@@ -530,6 +537,23 @@ public sealed partial class NativeStorageObjectHttpTests
             File.Delete(_database);
             File.Delete(_database + "-wal");
             File.Delete(_database + "-shm");
+        }
+
+        private sealed class UploadRepresentationBoundary(StorageFactory factory) : IAsyncResultFilter
+        {
+            public async Task OnResultExecutionAsync(ResultExecutingContext context, ResultExecutionDelegate next)
+            {
+                if (factory.BeforeUploadRepresentation is { } revoke
+                    && context.HttpContext.Request.Path == factory.UploadRepresentationPath
+                    && context.Result is not ObjectResult { StatusCode: not StatusCodes.Status200OK })
+                {
+                    factory.BeforeUploadRepresentation = null;
+                    factory.UploadProjectionObserved = context.Result is
+                        Explore.API.Models.EventResourceProjectionResult<BaseCommandResponse<StorageUploadSessionDto>>;
+                    await revoke();
+                }
+                await next();
+            }
         }
     }
 

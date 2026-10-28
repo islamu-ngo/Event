@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Models.Storage;
 
 namespace Explore.Application.Services;
@@ -14,11 +15,15 @@ public sealed class EventResourceContentService(
     IMachinePrincipalAccessor machine)
 {
     public Task<EventResourceAuthorityResult> PrepareAsync(Guid resourceId, DateTimeOffset deadlineUtc,
-        CancellationToken cancellationToken) =>
-        authority.AuthorizeAsync(new(tenant.TenantId, resourceId,
-            user.IsAuthenticated ? user.UserId : null, machine.IsMachineCaller, "download")
+        CancellationToken cancellationToken)
+    {
+        var principal = machine.Current;
+        return authority.AuthorizeAsync(new(tenant.TenantId, resourceId,
+            principal is null && !machine.IsMachineCaller && user.IsAuthenticated ? user.UserId : null,
+            machine.IsMachineCaller, "download")
         {
-            DeadlineUtc = deadlineUtc
+            DeadlineUtc = deadlineUtc,
+            MachinePrincipal = principal is null ? null : EventResourceMachinePrincipal.Capture(principal)
         }, async (facts, ct) =>
         {
             if (facts.StorageObjectId is not { } storageId)
@@ -50,6 +55,7 @@ public sealed class EventResourceContentService(
                 throw;
             }
         }, cancellationToken);
+    }
 }
 
 /// <summary>Owns provider bytes privately until the single-use native header gate transfers them.</summary>

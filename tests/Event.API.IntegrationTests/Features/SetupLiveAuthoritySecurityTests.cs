@@ -7,10 +7,12 @@ using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Seeds;
 using Event.Testing.DataProtection;
@@ -20,6 +22,8 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.SetupLive;
 using Explore.Application.Features.SetupLive;
+using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Domain.SetupLive;
@@ -42,13 +46,15 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Serilog.Core;
+using Serilog.Events;
 using TUnit.Core;
 using TUnit.Core.Interfaces;
 
 [Category(TestCategories.Security)]
 [ClassDataSource<SetupLiveAuthorityRedFixture>(Shared = SharedType.PerClass)]
 [NotInParallel]
-public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture fixture)
+public sealed partial class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture fixture)
 {
     private const string ControllerTypeName =
         "Explore.API.Controllers.SetupTargetEnrollmentsController";
@@ -547,7 +553,8 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
 
         using HttpRequestMessage readiness = ReadinessRequest(enrollment);
         using HttpResponseMessage response = await fixture.Client.SendAsync(readiness);
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(fixture.Capture.FailureMetadata);
         using JsonDocument document = JsonDocument.Parse(
             await response.Content.ReadAsStringAsync());
         JsonElement[] items = document.RootElement.GetProperty("_embedded")
@@ -574,7 +581,8 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         using HttpRequestMessage deniedReadiness = ReadinessRequest(enrollment);
         using HttpResponseMessage deniedResponse =
             await fixture.Client.SendAsync(deniedReadiness);
-        await Assert.That(deniedResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(deniedResponse.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(fixture.Capture.FailureMetadata);
         using JsonDocument deniedDocument = JsonDocument.Parse(
             await deniedResponse.Content.ReadAsStringAsync());
         foreach (JsonElement item in deniedDocument.RootElement.GetProperty("_embedded")
@@ -603,7 +611,8 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         using HttpRequestMessage request = ReadinessRequest(enrollment);
         using HttpResponseMessage response = await fixture.Client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(fixture.Capture.FailureMetadata);
         using JsonDocument document = JsonDocument.Parse(
             await response.Content.ReadAsStringAsync());
         JsonElement signing = document.RootElement.GetProperty("_embedded")
@@ -844,7 +853,8 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         using HttpResponseMessage response = await fixture.Client.SendAsync(write);
         string body = await response.Content.ReadAsStringAsync();
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted)
+            .Because(fixture.Capture.FailureMetadata);
         OperationReceipt receipt = await AssertOperationReceipt(
             response,
             enrollment,
@@ -967,7 +977,8 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
             enrollment, "setup.encryption", secret, operationKey);
         using HttpResponseMessage response = await fixture.Client.SendAsync(write);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted)
+            .Because(fixture.Capture.FailureMetadata);
         OperationReceipt receipt = await AssertOperationReceipt(
             response,
             enrollment,
@@ -1235,7 +1246,8 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         if (completed == writeTask)
         {
             using HttpResponseMessage early = await writeTask;
-            await Assert.That(early.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+            await Assert.That(early.StatusCode).IsEqualTo(HttpStatusCode.Accepted)
+                .Because(fixture.Capture.FailureMetadata);
             throw new InvalidOperationException("missing-setup-provider-write-barrier");
         }
 
@@ -1641,7 +1653,7 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         return await ReadUnavailableProblem(response);
     }
 
-    private static async Task<ProblemTuple> ReadUnavailableProblem(
+    private async Task<ProblemTuple> ReadUnavailableProblem(
         HttpResponseMessage response)
     {
         await AssertUnavailableProblem(response);
@@ -1659,9 +1671,10 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
             response.Headers.CacheControl?.NoStore == true);
     }
 
-    private static async Task AssertUnavailableProblem(HttpResponseMessage response)
+    private async Task AssertUnavailableProblem(HttpResponseMessage response)
     {
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound)
+            .Because(fixture.Capture.FailureMetadata);
         await Assert.That(response.Content.Headers.ContentType?.MediaType)
             .IsEqualTo("application/problem+json");
         await Assert.That(response.Headers.CacheControl?.Private).IsTrue();
@@ -2001,6 +2014,8 @@ public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisp
 
     public async Task InitializeAsync()
     {
+        long started = Stopwatch.GetTimestamp();
+        WriteProgress(nameof(InitializeAsync), "host-start", started);
         Factory = new SetupLiveAuthorityWebApplicationFactory(
             Clock,
             Capture,
@@ -2014,12 +2029,15 @@ public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisp
         };
         Factory.AdditionalConfiguration["SecretProvider:Provider"] = "Environment";
         Client = Factory.CreateClient();
+        WriteProgress(nameof(InitializeAsync), "host-ready", started);
         Capture.Start();
         await ResetAsync();
     }
 
-    public async Task ResetAsync()
+    public async Task ResetAsync([CallerMemberName] string testName = "fixture")
     {
+        long started = Stopwatch.GetTimestamp();
+        WriteProgress(testName, "reset-start", started);
         Authorization.AllowAll = true;
         Authorization.CheckPredicate = null;
         Writer.Reset();
@@ -2034,16 +2052,91 @@ public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisp
         _databaseReset ??= await TestDatabaseReset.CreateAsync(
             db.Database.GetConnectionString()
             ?? throw new InvalidOperationException("The setup fixture requires its migrator connection."));
+        WriteProgress(testName, "reset-catalog-ready", started);
         await _databaseReset.ResetAsync();
+        WriteProgress(testName, "reset-complete", started);
         IHostEnvironment environment =
             scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
         await DatabaseSeeder.SeedAsync(db, environment);
+        WriteProgress(testName, "lookup-seed-complete", started);
         ILookupDataCache? cache =
             scope.ServiceProvider.GetService<ILookupDataCache>();
         if (cache is not null)
             await cache.RefreshAsync();
-        Primary = await TenantScenarioSeed.SeedActiveTenantWithUserAsync(db);
-        Secondary = await TenantScenarioSeed.SeedActiveTenantWithUserAsync(db);
+        WriteProgress(testName, "lookup-cache-ready", started);
+
+        Tenant? tenant = await db.Tenants.FindAsync(PlatformDefaults.DefaultTenantId);
+        if (tenant is null)
+        {
+            tenant = new TenantBuilder()
+                .WithId(PlatformDefaults.DefaultTenantId)
+                .WithFullName("Default Test Tenant")
+                .WithSlug("default-test")
+                .Build();
+            db.Tenants.Add(tenant);
+        }
+
+        User[] users =
+        [
+            new UserBuilder().WithId(Guid.CreateVersion7()).Build(),
+            new UserBuilder().WithId(Guid.CreateVersion7()).Build()
+        ];
+        Actor[] actors = users.Select(user => new ActorBuilder()
+            .WithId(Guid.CreateVersion7()).WithUserId(user.Id).Build()).ToArray();
+        db.Users.AddRange(users);
+        db.Actors.AddRange(actors);
+        await db.SaveChangesAsync();
+
+        // Keep membership commits separate: a shared transaction coalesces the disclosure epoch.
+        for (int index = 0; index < users.Length; index++)
+        {
+            User user = users[index];
+            Actor actor = actors[index];
+            db.TenantUsers.Add(new TenantUser
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                UserId = user.Id,
+                User = user,
+                ActorId = actor.Id,
+                Actor = actor,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+            var scenario = new TenantScenarioSeed.TenantScenarioResult(tenant.Id, user.Id, actor.Id);
+            if (index == 0)
+            {
+                Primary = scenario;
+                WriteProgress(testName, "primary-scenario-ready", started);
+            }
+            else
+            {
+                Secondary = scenario;
+            }
+        }
+        WriteProgress(testName, "fixture-ready", started);
+    }
+
+    private static void WriteProgress(string testName, string phase, long started)
+    {
+        string line = FormattableString.Invariant(
+            $"[setup-security] test={testName} phase={phase} elapsed_ms={Stopwatch.GetElapsedTime(started).TotalMilliseconds:F0}");
+        using var output = new StreamWriter(
+            Console.OpenStandardError(), new UTF8Encoding(false), leaveOpen: true);
+        output.WriteLine(line);
+        output.Flush();
+
+        // Retain checkpoints even when the test platform captures output until a cancelled run ends.
+        if (Environment.GetEnvironmentVariable("GITHUB_WORKSPACE") is { Length: > 0 } workspace)
+        {
+            string directory = Path.Combine(workspace, "artifacts", "test-progress");
+            Directory.CreateDirectory(directory);
+            File.AppendAllText(Path.Combine(directory, "setup-security.log"), line + Environment.NewLine,
+                new UTF8Encoding(false));
+        }
     }
 
     public async Task<Guid> AddBinding(SecretBinding binding)
@@ -2106,7 +2199,7 @@ public sealed class SetupLiveAuthorityWebApplicationFactory(
             services.AddSingleton<ISetupSecretBindingCommitmentAuthority>(commitmentAuthority);
             services.AddSingleton<ISetupSecretBindingCommitBarrier>(commitBarrier);
             services.AddSingleton<ISetupSecretBindingOperationCoordinator>(coordinator);
-            services.AddSingleton<ILoggerProvider>(capture.LoggerProvider);
+            services.AddSingleton<ILogEventSink>(capture);
             services.Insert(0, ServiceDescriptor.Singleton<Microsoft.AspNetCore.Diagnostics.IExceptionHandler>(capture));
             services.AddSingleton<IStartupFilter>(
                 new UnreadBodyStartupFilter(bodyProbe));
@@ -2434,7 +2527,7 @@ public sealed class ManualSetupTimeProvider : TimeProvider
     public void Reset() => _current = _initial;
 }
 
-public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnostics.IExceptionHandler
+public sealed class SetupLiveCapture : IDisposable, ILogEventSink, Microsoft.AspNetCore.Diagnostics.IExceptionHandler
 {
     private string failureMetadata = "No request exception metadata was observed.";
     public string FailureMetadata => Volatile.Read(ref failureMetadata);
@@ -2465,7 +2558,6 @@ public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnos
 
     public SetupLiveCapture()
     {
-        LoggerProvider = new SetupLiveCapturingLoggerProvider(_values, LogObserved);
         _activityListener = new ActivityListener
         {
             ShouldListenTo = _ => true,
@@ -2510,8 +2602,6 @@ public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnos
                 RecordMeasurement(instrument, measurement, tags));
     }
 
-    public ILoggerProvider LoggerProvider { get; }
-
     public void Start()
     {
         ActivitySource.AddActivityListener(_activityListener);
@@ -2548,22 +2638,26 @@ public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnos
         Reset();
         _activityListener.Dispose();
         _meterListener.Dispose();
-        LoggerProvider.Dispose();
     }
 
-    private void LogObserved(
-        EventId eventId,
-        IReadOnlyDictionary<string, object?> properties)
+    public void Emit(LogEvent logEvent)
     {
-        bool setupMilestone = properties.TryGetValue("SourceContext", out object? source)
-            && string.Equals(source?.ToString(),
-                typeof(SetupLiveApplicationService).FullName, StringComparison.Ordinal)
-            && properties.ContainsKey("SetupOperation")
-            && properties.ContainsKey("SetupMilestone");
-        if (setupMilestone)
+        _values.Enqueue(logEvent.MessageTemplate.Text);
+        _values.Enqueue(logEvent.RenderMessage(System.Globalization.CultureInfo.InvariantCulture));
+        foreach (var property in logEvent.Properties)
+            _values.Enqueue($"{property.Key}={property.Value}");
+        if (logEvent.Exception is not null)
+            _values.Enqueue(logEvent.Exception.ToString());
+
+        // Observe the native event after privacy enrichment, which intentionally removes EventId.
+        bool isSetupMilestone = string.Equals(
+            Scalar(logEvent, "SourceContext"), typeof(SetupLiveApplicationService).FullName, StringComparison.Ordinal)
+            && string.Equals(logEvent.MessageTemplate.Text,
+                "Setup live milestone {SetupOperation} {SetupMilestone}", StringComparison.Ordinal);
+        if (isSetupMilestone)
         {
-            _setupValues.Enqueue("SetupLiveMilestone");
-            foreach (KeyValuePair<string, object?> property in properties)
+            _setupValues.Enqueue(logEvent.MessageTemplate.Text);
+            foreach (var property in logEvent.Properties)
             {
                 _setupValues.Enqueue($"{property.Key}={property.Value}");
                 if (property.Key is not "SetupOperation"
@@ -2581,11 +2675,9 @@ public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnos
         }
         TelemetryBarrier? armed = _barrier;
         if (armed is null
-            || !setupMilestone
-            || !properties.TryGetValue("SetupOperation", out object? operation)
-            || !properties.TryGetValue("SetupMilestone", out object? milestone)
-            || !string.Equals(operation?.ToString(), armed.Operation, StringComparison.Ordinal)
-            || !string.Equals(milestone?.ToString(), armed.Milestone, StringComparison.Ordinal))
+            || !isSetupMilestone
+            || !string.Equals(Scalar(logEvent, "SetupOperation"), armed.Operation, StringComparison.Ordinal)
+            || !string.Equals(Scalar(logEvent, "SetupMilestone"), armed.Milestone, StringComparison.Ordinal))
             return;
         TelemetryBarrier? barrier = Interlocked.CompareExchange(
             ref _barrier, null, armed) == armed ? armed : null;
@@ -2593,6 +2685,11 @@ public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnos
             return;
         barrier.SignalAndWait();
     }
+
+    private static string? Scalar(LogEvent logEvent, string name) =>
+        logEvent.Properties.TryGetValue(name, out var property) && property is ScalarValue { Value: string value }
+            ? value
+            : null;
 
     private void RecordMeasurement<T>(
         Instrument instrument,
@@ -2638,76 +2735,5 @@ public sealed class TelemetryBarrier(
         Release();
         _release.Dispose();
         Disposed?.Invoke();
-    }
-}
-
-public sealed class SetupLiveCapturingLoggerProvider(
-    ConcurrentQueue<string> values,
-    Action<EventId, IReadOnlyDictionary<string, object?>> observed) :
-    ILoggerProvider,
-    ISupportExternalScope
-{
-    private IExternalScopeProvider _scopeProvider = new LoggerExternalScopeProvider();
-
-    public ILogger CreateLogger(string categoryName) =>
-        new CapturingLogger(categoryName, values, observed, () => _scopeProvider);
-
-    public void SetScopeProvider(IExternalScopeProvider scopeProvider) =>
-        _scopeProvider = scopeProvider;
-
-    public void Dispose()
-    {
-    }
-
-    private sealed class CapturingLogger(
-        string category,
-        ConcurrentQueue<string> values,
-        Action<EventId, IReadOnlyDictionary<string, object?>> observed,
-        Func<IExternalScopeProvider> scopeProvider) : ILogger
-    {
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull =>
-            scopeProvider().Push(state);
-
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(
-            LogLevel logLevel,
-            EventId eventId,
-            TState state,
-            Exception? exception,
-            Func<TState, Exception?, string> formatter)
-        {
-            values.Enqueue(category);
-            values.Enqueue(eventId.Name
-                ?? eventId.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            values.Enqueue(formatter(state, exception));
-            var snapshot = new Dictionary<string, object?>(StringComparer.Ordinal);
-            if (state is IEnumerable<KeyValuePair<string, object?>> properties)
-            {
-                foreach (KeyValuePair<string, object?> property in properties)
-                    snapshot[property.Key] = property.Value;
-            }
-            int scopeIndex = 0;
-            scopeProvider().ForEachScope<object?>(
-                (scope, _) =>
-                {
-                    if (scope is IEnumerable<KeyValuePair<string, object?>> pairs)
-                    {
-                        foreach (KeyValuePair<string, object?> pair in pairs)
-                            snapshot[$"Scope[{scopeIndex}].{pair.Key}"] = pair.Value;
-                    }
-                    else
-                    {
-                        snapshot[$"Scope[{scopeIndex}]"] = scope?.ToString();
-                    }
-                    scopeIndex++;
-                },
-                state: null);
-            foreach (KeyValuePair<string, object?> property in snapshot)
-                values.Enqueue($"{property.Key}={property.Value}");
-            observed(eventId, snapshot);
-            if (exception is not null)
-                values.Enqueue(exception.ToString());
-        }
     }
 }

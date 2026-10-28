@@ -7,16 +7,19 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
+using Explore.Application.Models.Storage;
 using Explore.Infrastructure.Services;
 using Microsoft.AspNetCore.Http;
 using Event.Api.IntegrationTests.Seeds;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.OrganizationTenantEvidence;
 using Explore.Application.DTOs.StorageObject;
+using Explore.Application.DTOs.EventResource;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +28,99 @@ namespace Event.Api.IntegrationTests.Features;
 
 public sealed partial class NativeStorageObjectHttpTests
 {
+    [Test]
+    [Arguments("reserve")]
+    [Arguments("finalize")]
+    [Arguments("cancel")]
+    public async Task ResourceUploadTransportRechecksAuthorityAfterResultFilters(string operation)
+    {
+        await using var factory = await StorageFactory.CreateAsync(useProductionAuthorization: true);
+        using var client = Client(factory, factory.OwnerId);
+        Guid eventId = Guid.CreateVersion7(), resourceId = Guid.CreateVersion7(), version;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var actorId = (await db.TenantUsers.SingleAsync(row => row.UserId == factory.OwnerId)).ActorId!.Value;
+            var parent = new Event.Api.IntegrationTests.Builders.EventBuilder()
+                .WithId(eventId).WithTenantId(PlatformDefaults.DefaultTenantId).WithActorId(actorId)
+                .WithStatus(EventStatusEnum.Published).Build();
+            parent.OrganizerActorId = actorId;
+            db.Events.Add(parent);
+            db.EventRoleAssignments.Add(EventRoleAssignment.Create(PlatformDefaults.DefaultTenantId, eventId,
+                factory.OwnerId, (int)RoleEnum.EventOwner, EventRoleAssignmentStatus.Active,
+                DateTime.UtcNow.AddMinutes(-1), null, factory.OwnerId));
+            var resource = EventResource.CreateDraft(resourceId, PlatformDefaults.DefaultTenantId, eventId, null,
+                new EventResourceMetadata
+                {
+                    Title = "Private upload transport resource",
+                    Kind = EventResourceKindEnum.GeneralDocument,
+                    DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
+                }, EventResourceDeliveryTypeEnum.StoredFile, EventResourceAvailability.Create(),
+                [EventResourceAudienceRule.Create(PlatformDefaults.DefaultTenantId, eventId, resourceId,
+                    EventResourceAudienceKindEnum.AuthenticatedTenantMember)], factory.OwnerId, DateTime.UtcNow);
+            db.EventResources.Add(resource);
+            await db.SaveChangesAsync();
+            version = resource.ConcurrencyStamp;
+        }
+        var reservePath = $"/api/eventresource/{resourceId}/upload-sessions";
+        var dto = new CreateEventResourceUploadSessionDto
+        {
+            ExpectedVersion = version,
+            ExpectedSizeBytes = 5,
+            ContentType = EventResourceGovernancePolicy.PdfMediaType,
+            SafeDisplayName = "private-terminal-upload.pdf",
+            Extension = "pdf",
+            IdempotencyKey = Guid.CreateVersion7().ToString("N")
+        };
+        async Task<HttpResponseMessage> ReserveResourceAsync()
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, reservePath) { Content = JsonContent.Create(dto) };
+            request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
+            return await client.SendAsync(request);
+        }
+        Guid sessionId = Guid.Empty;
+        if (operation != "reserve")
+        {
+            using var reservation = await ReserveResourceAsync();
+            await Assert.That(reservation.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            sessionId = (await reservation.Content.ReadFromJsonAsync<BaseCommandResponse<StorageUploadSessionDto>>())!.Id!.Id;
+        }
+        factory.UploadRepresentationPath = operation == "reserve" ? reservePath
+            : operation == "finalize" ? $"{Root}/upload-sessions/{sessionId}/content"
+            : $"{Root}/upload-sessions/{sessionId}";
+        factory.BeforeUploadRepresentation = async () =>
+        {
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var assignments = await db.EventRoleAssignments
+                .Where(row => row.EventId == eventId && row.UserId == factory.OwnerId).ToListAsync();
+            await Assert.That(assignments.Count).IsEqualTo(1);
+            db.EventRoleAssignments.RemoveRange(assignments);
+            (await db.Events.SingleAsync(row => row.Id == eventId)).OrganizerActorId = null;
+            await Assert.That(await db.SaveChangesAsync()).IsEqualTo(2);
+        };
+        using var response = operation switch
+        {
+            "reserve" => await ReserveResourceAsync(),
+            "finalize" => await PutAsync(client, sessionId, "%PDF-"u8.ToArray()),
+            "cancel" => await client.DeleteAsync($"{Root}/upload-sessions/{sessionId}"),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation))
+        };
+        await Assert.That(factory.UploadProjectionObserved).IsTrue();
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await Assert.That(response.Headers.CacheControl!.NoStore).IsTrue();
+        var body = await response.Content.ReadAsStringAsync();
+        await Assert.That(body).DoesNotContain(dto.SafeDisplayName);
+        await Assert.That(body).DoesNotContain(resourceId.ToString("D"));
+        await Assert.That(body).DoesNotContain("\"reservedBytes\"");
+        if (sessionId != Guid.Empty)
+            await Assert.That(body).DoesNotContain(sessionId.ToString("D"));
+        using var problem = System.Text.Json.JsonDocument.Parse(body);
+        await Assert.That(problem.RootElement.GetProperty("status").GetInt32()).IsEqualTo(403);
+        await Assert.That(problem.RootElement.TryGetProperty("id", out _)).IsFalse();
+        await Assert.That(factory.WriteCount).IsEqualTo(operation == "finalize" ? 1 : 0);
+    }
+
     [Test]
     [Arguments(false, false)]
     [Arguments(true, false)]
@@ -87,7 +183,7 @@ public sealed partial class NativeStorageObjectHttpTests
                     Content = bytes,
                     TenantId = owner.TenantId
                 };
-                var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>>();
+                var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<FinalizeStorageUploadSessionCommand, StorageUploadSessionResult>>();
                 await Assert.That(async () => await handler.ExecuteAsync(command, default))
                     .Throws<Explore.Application.Exceptions.AuthorizationException>();
             }

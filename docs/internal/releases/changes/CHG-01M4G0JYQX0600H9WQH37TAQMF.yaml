@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4G0JYQX0600H9WQH37TAQMF
+Title: "Recheck active credential tenancy before machine resource disclosure"
+Type: fix
+Scope: access
+Summary: "Every tenant-bound machine resource request now requires a current active credential tenant through a bounded fresh Tenant and TenantStatus entity read, independent of the resource tenant. Suspended, archived, purged or unavailable authority tenants prevent terminal delivery even when the same API key remains active. Tenant-owned credentials must name their exact authority tenant. Organization and group owner qualification and complete moderation consumer registration remain open."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

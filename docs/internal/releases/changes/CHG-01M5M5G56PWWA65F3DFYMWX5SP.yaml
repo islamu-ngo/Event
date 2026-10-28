@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M5G56PWWA65F3DFYMWX5SP
+Title: "Keep ticket catalog publication and retirement atomic under current authority"
+Type: fix
+Scope: ticketing
+Summary: "Qualify human publication around entitlement materialization, prior catalog retirement and both native catalog saves without changing the existing machine lane."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Details: "Human admission covers the whole native catalog transaction; existing paid-commerce checks, catalog response identities and machine behavior are preserved. Source tests remain unrun."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

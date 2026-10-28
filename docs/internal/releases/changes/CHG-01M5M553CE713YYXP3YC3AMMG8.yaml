@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M553CE713YYXP3YC3AMMG8
+Title: "Fence tenant role changes against current native authority"
+Type: fix
+Scope: access
+Summary: "Retain issuer and role-permission sources through native role grant, revocation and custom role deletion commits."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Details: "Native grant, revocation, permission replacement and unused-role deletion retain current authority sources through their owning transaction. Regression source is authored but unrun and unbuilt."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

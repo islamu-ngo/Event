@@ -1,4 +1,5 @@
 using System.Data.Common;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
@@ -279,9 +280,10 @@ public sealed partial class LocalBootstrapConvergenceTests
                 if (colocatedIdentityFence) await privacy.Database.MigrateAsync();
                 else await privacy.Database.EnsureCreatedAsync();
             }
-            fence = new PrivacyIdentityFenceOperation(new EmbeddedPrivacyErasureAuthorityRepository(
+            fence = NativeIdentityRecognitionBoundary.Create(Context, new EmbeddedPrivacyErasureAuthorityRepository(
                 privacyFactory, TimeProvider.System, Options.Create(new PrivacyErasureOptions()),
-                applicationContext: colocatedIdentityFence ? Context : null));
+                applicationContext: colocatedIdentityFence ? Context : null), TimeProvider.System,
+                NativeIdentityRecognitionBoundary.RejectHumanSettlement);
             var mutationLock = new RelationalSettingMutationLock(Context, owner);
             var receipts = scope.ServiceProvider.GetRequiredService<SetupReceiptCustody>().Source;
             var authority = new TrustedSetupSettingsAuthority(contexts, lifetimes, setup,

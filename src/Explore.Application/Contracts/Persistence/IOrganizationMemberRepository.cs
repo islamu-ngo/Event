@@ -13,7 +13,7 @@ public interface IOrganizationMemberRepository : IGenericRepository<Organization
     Task<OrganizationMember?> GetOrganizationMemberWithDetails(Guid id, CancellationToken cancellationToken = default);
     Task<List<OrganizationMember>> GetOrganizationMembersWithDetails();
     Task<List<OrganizationMember>> GetMembersByOrganizationId(Guid organizationId);
-    Task<List<OrganizationMember>> GetInvitesByEmail(string email);
+    Task<List<OrganizationMember>> GetInvitesByUserId(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets the organization member record for a specific user in an organization.

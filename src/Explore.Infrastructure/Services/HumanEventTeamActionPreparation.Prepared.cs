@@ -88,7 +88,6 @@ public sealed partial class HumanEventTeamActionPreparation
             {
                 TenantId = original.TenantId,
                 EventId = original.EventId,
-                ActorUserId = original.ActorUserId,
                 TargetUserId = userId,
                 RoleId = original.RoleId,
                 Status = original.Status,

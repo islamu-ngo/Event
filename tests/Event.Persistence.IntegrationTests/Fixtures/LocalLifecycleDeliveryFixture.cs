@@ -101,14 +101,17 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
         services.AddScoped(provider => new LocalIdentityCredentialStateStore(
             Identity(provider), provider.GetRequiredService<ExploreDbContext>(),
             provider.GetRequiredService<UserManager<LocalIdentityUser>>(), native.Clock,
+            NativeIdentityRecognitionBoundary.For(provider.GetRequiredService<ExploreDbContext>(), native.Clock),
             executionLease: provider.GetRequiredService<LocalIdentityExecutionLease>()));
         services.AddScoped<ILocalIdentityLifecycleStore>(provider => new LocalIdentityLifecycleStore(
             Identity(provider), provider.GetRequiredService<ExploreDbContext>(),
             provider.GetRequiredService<UserManager<LocalIdentityUser>>(), native.Clock,
-            provider.GetRequiredService<LocalIdentityCredentialStateStore>()));
+            provider.GetRequiredService<LocalIdentityCredentialStateStore>(),
+            NativeIdentityRecognitionBoundary.For(provider.GetRequiredService<ExploreDbContext>(), native.Clock)));
         services.AddScoped<ILocalIdentityLifecycleDeliveryStore>(provider => new LocalIdentityLifecycleDeliveryStore(
             Identity(provider), provider.GetRequiredService<ExploreDbContext>(),
-            provider.GetRequiredService<LocalIdentityCredentialStateStore>(), native.Clock));
+            provider.GetRequiredService<LocalIdentityCredentialStateStore>(), native.Clock,
+            NativeIdentityRecognitionBoundary.For(provider.GetRequiredService<ExploreDbContext>(), native.Clock)));
         return services.BuildIsolatedServiceProvider(validateScopes: true);
 
         DbContext Identity(IServiceProvider provider) => topology == IdentityDatabaseTopology.External
@@ -136,8 +139,10 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
             Application = _scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             Identity = fixture.Native.Identity(_scope);
             var states = fixture.Native.StateStore(_scope);
-            Lifecycle = new(Identity, Application, _scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), fixture.Native.Clock, states);
-            Deliveries = new(Identity, Application, states, fixture.Native.Clock);
+            Lifecycle = new(Identity, Application, _scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), fixture.Native.Clock, states,
+                NativeIdentityRecognitionBoundary.For(Application, fixture.Native.Clock));
+            Deliveries = new(Identity, Application, states, fixture.Native.Clock,
+                NativeIdentityRecognitionBoundary.For(Application, fixture.Native.Clock));
             MutationLock = new(Application, new EfCoreUnitOfWork(Application), beforeLock);
             var settings = new HierarchicalSettingsReader(SystemSettingRepository.CreateReadOnly(Application, MutationLock),
                 TenantSettingRepository.CreateReadOnly(Application, MutationLock), new OrganizationSettingRepository(Application),

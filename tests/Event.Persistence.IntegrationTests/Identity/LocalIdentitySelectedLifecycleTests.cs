@@ -1,4 +1,5 @@
 using System.Data;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Domain;
@@ -97,12 +98,13 @@ public sealed class LocalIdentitySelectedLifecycleTests
         var manager = selected.Services.GetRequiredService<UserManager<LocalIdentityUser>>();
         var user = await execution.Identity!.Set<LocalIdentityUser>().AsNoTracking()
             .SingleAsync(row => row.Id == fixture.Receipt.LocalSubjectId, fixture.CancellationToken);
-        var lifecycle = new LocalIdentityLifecycleStore(execution.Identity, execution.Application!, manager, fixture.Clock, states);
+        var fence = NativeIdentityRecognitionBoundary.For(execution.Application!, fixture.Clock);
+        var lifecycle = new LocalIdentityLifecycleStore(execution.Identity, execution.Application!, manager, fixture.Clock, states, fence);
         var pointer = await lifecycle.BeginAsync(new LocalIdentityLifecycleRequest(user.Id, fixture.Receipt.PersonalActorId,
             fixture.Receipt.ExternalLoginId, LocalIdentityLifecyclePurpose.PasswordRecovery, user.Email!), fixture.CancellationToken);
         await Assert.That(pointer).IsNotNull();
         RequireOuter(selected.Services);
-        var delivery = new LocalIdentityLifecycleDeliveryStore(execution.Identity, execution.Application!, states, fixture.Clock);
+        var delivery = new LocalIdentityLifecycleDeliveryStore(execution.Identity, execution.Application!, states, fixture.Clock, fence);
         Guid? claim = await delivery.TryAdmitAsync(pointer!, fixture.CancellationToken);
         await Assert.That(claim).IsNotNull();
         var row = await execution.Identity.Set<LocalIdentityLifecycleOperation>().AsNoTracking()
@@ -131,7 +133,8 @@ public sealed class LocalIdentitySelectedLifecycleTests
         var identity = differentPair ? fixture.Identity(other) : valid.Identity!;
         var states = new LocalIdentityCredentialStateStore(identity, application,
             (differentPair ? other.ServiceProvider : selected.Services).GetRequiredService<UserManager<LocalIdentityUser>>(),
-            fixture.Clock, differentPair ? valid : new LocalIdentityExecutionLease());
+            fixture.Clock, NativeIdentityRecognitionBoundary.For(application, fixture.Clock),
+            differentPair ? valid : new LocalIdentityExecutionLease());
         await Assert.That(async () =>
         {
             await using var unexpected = await states.EnterLifecycleAsync(identity, application, fixture.CancellationToken);
@@ -230,7 +233,8 @@ public sealed class LocalIdentitySelectedLifecycleTests
 
     private static LocalIdentityCredentialStateStore CreateStates(LocalCredentialFirstUseTests.Fixture fixture,
         IServiceProvider services, LocalIdentityExecutionLease execution) => new(execution.Identity!, execution.Application!,
-        services.GetRequiredService<UserManager<LocalIdentityUser>>(), fixture.Clock, execution);
+        services.GetRequiredService<UserManager<LocalIdentityUser>>(), fixture.Clock,
+        NativeIdentityRecognitionBoundary.For(execution.Application!, fixture.Clock), execution);
 
     private static void RequireOuter(IServiceProvider services)
     {

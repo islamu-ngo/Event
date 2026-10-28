@@ -2,6 +2,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
+using Explore.Application.Models.Storage;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Telemetry;
@@ -11,7 +12,7 @@ using Explore.Application.Contracts.Operations;
 namespace Explore.Application.Features.StorageObjects.Handlers.Commands;
 
 public class CancelStorageUploadSessionCommandHandler
-    : ICommandHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>
+    : ICommandHandler<CancelStorageUploadSessionCommand, StorageUploadSessionResult>
 {
     private readonly IStoragePolicyResolver _storagePolicyResolver;
     private readonly IStorageUploadSessionRepository _uploadSessionRepository;
@@ -45,7 +46,7 @@ public class CancelStorageUploadSessionCommandHandler
         _resourceUploads = resourceUploads;
     }
 
-    public async Task<BaseCommandResponse<StorageUploadSessionDto>> ExecuteAsync(
+    public async Task<StorageUploadSessionResult> ExecuteAsync(
         CancelStorageUploadSessionCommand request,
         CancellationToken cancellationToken)
     {
@@ -53,7 +54,7 @@ public class CancelStorageUploadSessionCommandHandler
         {
             _metrics.RecordStorageUploadSession(null, "cancel", "failed", "validation_failed");
 
-            return Failure("Upload session cancellation failed.", ["UploadSessionId is required."]);
+            return StorageUploadSessionResult.Ordinary(Failure("Upload session cancellation failed.", ["UploadSessionId is required."]));
         }
 
         var tenantId = _tenantContext.TenantId;
@@ -61,8 +62,15 @@ public class CancelStorageUploadSessionCommandHandler
         if (target?.Purpose == StorageObjectPurposes.EventResource || target?.OwningResourceKind == StorageOwningResourceKinds.EventResource
             || target?.ExpectedResourceVersion is not null)
             return _resourceUploads is null
-                ? BaseCommandResponse.Failure<StorageUploadSessionDto>("event_resource_unavailable")
+                ? StorageUploadSessionResult.Ordinary(BaseCommandResponse.Failure<StorageUploadSessionDto>("event_resource_unavailable"))
                 : await _resourceUploads.CancelAsync(request.UploadSessionId, cancellationToken);
+
+        return StorageUploadSessionResult.Ordinary(await ExecuteOrdinaryAsync(request, tenantId, cancellationToken));
+    }
+
+    private async Task<BaseCommandResponse<StorageUploadSessionDto>> ExecuteOrdinaryAsync(
+        CancelStorageUploadSessionCommand request, Guid tenantId, CancellationToken cancellationToken)
+    {
         var policy = await _storagePolicyResolver.ResolveAsync(tenantId, cancellationToken);
 
         var response = await _unitOfWork.ExecuteInTransactionAsync(

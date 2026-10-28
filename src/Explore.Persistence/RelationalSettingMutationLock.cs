@@ -135,6 +135,8 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
 
         if (_dbContext.Database.CurrentTransaction is not null)
         {
+            if (_outerOrderedKeys.Value is { } held && orderedKeys.All(held.Contains))
+                return operation(cancellationToken);
             throw new InvalidOperationException(
                 "Ordered setting-lock groups must be acquired before the caller-owned transaction begins.");
         }
@@ -145,6 +147,7 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
 
         async Task<T> ExecuteOnceAsync()
         {
+            IReadOnlySet<string>? previousKeys = _outerOrderedKeys.Value;
             var leases = new List<IAsyncDisposable>(orderedKeys.Length);
             Exception? primary = null;
             T result = default!;
@@ -152,6 +155,7 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
             {
                 foreach (string settingKey in orderedKeys)
                 {
+                    if (previousKeys?.Contains(settingKey) == true) continue;
                     if (_beforeOuterLockAcquisition is not null)
                     {
                         await _beforeOuterLockAcquisition(
@@ -165,10 +169,8 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
                         cancellationToken));
                 }
 
-                IReadOnlySet<string>? previousKeys =
-                    _outerOrderedKeys.Value;
-                _outerOrderedKeys.Value =
-                    orderedKeys.ToHashSet(StringComparer.Ordinal);
+                _outerOrderedKeys.Value = (previousKeys ?? Enumerable.Empty<string>())
+                    .Concat(orderedKeys).ToHashSet(StringComparer.Ordinal);
                 try
                 {
                     result = await operation(cancellationToken);

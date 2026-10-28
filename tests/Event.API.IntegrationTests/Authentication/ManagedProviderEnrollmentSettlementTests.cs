@@ -1,6 +1,7 @@
 using System.Data.Common;
 using Explore.Application.Authentication;
 using Explore.Application.Configuration;
+using Explore.Application.Contracts.Moderation;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
@@ -35,7 +36,7 @@ public sealed class ManagedProviderEnrollmentSettlementTests
         await fixture.Services.GetRequiredService<IHumanCommitScopePreparation>().PrepareAsync(default);
         var acquireSources = PrepareSources(fixture);
         var authority = Authority(fixture);
-        var operation = new PrivacyIdentityFenceOperation(authority);
+        var operation = CreateOperation(fixture, authority);
         IOriginalOwnerSettlementBoundary owner = externalTarget
             ? authority : new EfCoreUnitOfWork(fixture.Context);
         var account = Account(fixture, externalTarget);
@@ -104,7 +105,7 @@ public sealed class ManagedProviderEnrollmentSettlementTests
         await fixture.Services.GetRequiredService<IHumanCommitScopePreparation>().PrepareAsync(default);
         var acquireSources = PrepareSources(fixture);
         var authority = Authority(fixture);
-        var operation = new PrivacyIdentityFenceOperation(authority);
+        var operation = CreateOperation(fixture, authority);
         IOriginalOwnerSettlementBoundary owner = externalTarget
             ? authority : new EfCoreUnitOfWork(fixture.Context);
         string key = "denied-enrollment-" + Guid.CreateVersion7().ToString("N");
@@ -145,7 +146,7 @@ public sealed class ManagedProviderEnrollmentSettlementTests
         var factory = new InterceptedAuthorityFactory(fixture.Services
             .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>(), interceptor);
         var authority = Authority(fixture, factory);
-        var operation = new PrivacyIdentityFenceOperation(authority);
+        var operation = CreateOperation(fixture, authority);
         _ = await authority.GetStateAsync();
         interceptor.Armed = true;
         int attempts = 0;
@@ -178,7 +179,7 @@ public sealed class ManagedProviderEnrollmentSettlementTests
         await using var fixture = await ResourceVisitorAuthenticatedFixture.CreateAsync();
         await fixture.Services.GetRequiredService<IHumanCommitScopePreparation>().PrepareAsync(default);
         var authority = Authority(fixture);
-        var operation = new PrivacyIdentityFenceOperation(authority);
+        var operation = CreateOperation(fixture, authority);
         var account = Account(fixture, true);
         int attempts = 0;
         await operation.ExecuteEnrollmentAsync(account, async token =>
@@ -201,7 +202,7 @@ public sealed class ManagedProviderEnrollmentSettlementTests
         await using var fixture = await ResourceVisitorAuthenticatedFixture.CreateAsync();
         await fixture.Services.GetRequiredService<IHumanCommitScopePreparation>().PrepareAsync(default);
         var authority = Authority(fixture);
-        var operation = new PrivacyIdentityFenceOperation(authority);
+        var operation = CreateOperation(fixture, authority);
         var owner = (IOriginalOwnerSettlementBoundary)new EfCoreUnitOfWork(fixture.Context);
         int attempts = 0;
         await authority.ExecuteSerializedAsync(async token =>
@@ -221,6 +222,12 @@ public sealed class ManagedProviderEnrollmentSettlementTests
     private static ProviderAccountKey Account(ResourceVisitorAuthenticatedFixture fixture, bool external) =>
         external ? PlatformIdentityPrincipalExtensions.CreateOidcAccountKey("https://enrollment.example.test", "target")
             : new ProviderAccountKey(AuthenticationProviderKind.Local, fixture.UserId.ToString("D"));
+
+    private static PrivacyIdentityFenceOperation CreateOperation(ResourceVisitorAuthenticatedFixture fixture,
+        IPrivacyIdentityFenceAuthority authority) =>
+        new(authority, fixture.Services.GetRequiredService<IModerationRecognitionContinuity>(), fixture.Clock,
+            fixture.Services.GetRequiredService<IUserExternalLoginRepository>(),
+            fixture.Services.GetRequiredService<IHumanActionCommitFinalizer>);
 
     private static EmbeddedPrivacyErasureAuthorityRepository Authority(ResourceVisitorAuthenticatedFixture fixture,
         IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>? factory = null) =>

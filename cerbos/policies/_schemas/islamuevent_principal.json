@@ -30,6 +30,24 @@
       "description": "Map of groupId to role string for group administration checks.",
       "additionalProperties": { "type": "string" }
     },
+    "groupMemberCreateScopes": {
+      "type": "array",
+      "description": "Exact tenantId/groupId scopes for current group administration or group_member:create permission.",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "groupMemberUpdateScopes": {
+      "type": "array",
+      "description": "Exact tenantId/groupId scopes for current group administration or group_member:update permission.",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "groupMemberDeleteScopes": {
+      "type": "array",
+      "description": "Exact tenantId/groupId scopes for current group administration or group_member:delete permission.",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
     "eventCreateOrganizations": {
       "type": "array",
       "description": "Organization IDs where the human principal has event:create permission.",

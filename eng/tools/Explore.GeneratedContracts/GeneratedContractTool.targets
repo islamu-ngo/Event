@@ -4,7 +4,7 @@
   </PropertyGroup>
 
   <!-- Keep helper compilation in the owning MSBuild graph, not concurrent dotnet run builds. -->
-  <Target Name="BuildGeneratedContractTool">
+  <Target Name="BuildGeneratedContractTool" Condition="'$(GeneratedContractToolAssembly)' == ''">
     <MSBuild Projects="$(GeneratedContractToolProject)" Targets="Restore;Build"
              Properties="Configuration=Release"
              RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;PlatformTarget;SelfContained;PublishAot;PublishTrimmed;PublishSingleFile;UseAppHost;OutputPath;BaseOutputPath;GeneratedApiSchemaFile;OpenApiGenerateDocumentsOnBuild;ForceOpenApiGeneration;GeneratedRecordMutablePolicy;GeneratedRecordTransformerStamp;GeneratedContractCaptureDirectory;GeneratedApiClientFile">

@@ -1,3 +1,4 @@
+using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Security;
@@ -10,7 +11,12 @@ public static partial class PostgresHumanEventProviderSourceContract
         string relations = string.Join("\n", HumanEventProviderSourceSql.Sources.Select(source =>
         {
             string table = Text(sql.Names.Table(source.Type));
-            string columns = string.Join(" OR ", sql.Properties(source.Type).Select(property => $"""
+            string columns = string.Join(" OR ", sql.Properties(source.Type).Select(property =>
+            {
+                string collation = property.FindAnnotation(PortableOrdinalAsciiPropertyExtensions.AnnotationName)?.Value is true
+                    ? "a.attcollation = 'pg_catalog.\"C\"'::regcollation"
+                    : "(a.attcollation = 0 OR a.attcollation = 'pg_catalog.\"default\"'::regcollation)";
+                return $"""
                 NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                     WHERE a.attrelid = pg_catalog.to_regclass({table})
                         AND a.attname = {Text(sql.Names.ColumnName(source.Type, property.Name))}
@@ -18,8 +24,9 @@ public static partial class PostgresHumanEventProviderSourceContract
                         AND a.atttypid = pg_catalog.to_regtype({Text(property.GetRelationalTypeMapping().StoreType)})
                         AND pg_catalog.format_type(a.atttypid,a.atttypmod) = {Text(property.GetRelationalTypeMapping().StoreType)}
                         AND a.attnotnull = {(property.IsNullable ? "false" : "true")}
-                        AND (a.attcollation = 0 OR a.attcollation = 'pg_catalog."default"'::regcollation))
-                """));
+                        AND {collation})
+                """;
+            }));
             return $"""
                 IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class t WHERE t.oid = pg_catalog.to_regclass({table})
                     AND t.relkind = 'r' AND t.relowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid)

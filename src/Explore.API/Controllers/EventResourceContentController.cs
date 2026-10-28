@@ -11,6 +11,7 @@ using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.EventResources;
 using Explore.Application.Features.EventResources.Requests.Commands;
 using Explore.Application.Features.EventResources.Requests.Queries;
+using Explore.Application.Models.Storage;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -34,7 +35,7 @@ namespace Explore.API.Controllers;
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
 public sealed class EventResourceContentController(
-    ICommandHandler<CreateEventResourceUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> upload,
+    ICommandHandler<CreateEventResourceUploadSessionCommand, StorageUploadSessionResult> upload,
     IQueryHandler<GetEventResourceContentQuery, EventResourceAuthorityResult> content,
     IQueryHandler<GetEventResourceContentHeadersQuery, EventResourceHeaderResult> completion,
     IOptions<RequestTimeoutOptions> timeouts,
@@ -63,9 +64,14 @@ public sealed class EventResourceContentController(
         Guid id, [FromBody] CreateEventResourceUploadSessionDto dto, CancellationToken cancellationToken)
     {
         var result = await upload.ExecuteAsync(new(id, dto), cancellationToken);
-        return result.FailureCode == FailureCodes.QuotaExceeded
-            ? this.ToStorageUploadProblem(result)
-            : UploadFailures.Map(this, result, () => Ok(result));
+        Response.RegisterForDisposeAsync(result);
+        if (result.Projection is { } projection)
+            return new EventResourceProjectionResult<BaseCommandResponse<StorageUploadSessionDto>>(projection,
+                (value, _) => Task.FromResult<ActionResult>(Ok(value)), ReadFailure);
+        var response = result.Response!;
+        return response.FailureCode == FailureCodes.QuotaExceeded
+            ? this.ToStorageUploadProblem(response)
+            : UploadFailures.Map(this, response, () => Ok(response));
     }
 
     [HttpGet("{id:guid}/content", Name = RouteNames.GetEventResourceContent)]
@@ -82,7 +88,7 @@ public sealed class EventResourceContentController(
         return new EventResourceFileResult(result, completion, ReadFailure);
     }
 
-    private IActionResult ReadFailure(EventResourceAuthorityOutcome outcome) => outcome switch
+    private ActionResult ReadFailure(EventResourceAuthorityOutcome outcome) => outcome switch
     {
         EventResourceAuthorityOutcome.AuthenticationRequired => this.ToAuthenticationRequiredProblem(),
         EventResourceAuthorityOutcome.Forbidden => this.ToForbiddenProblem(),

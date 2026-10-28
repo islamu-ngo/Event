@@ -7,8 +7,8 @@ using Explore.Persistence.Identity;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
-using Npgsql;
 
 namespace Event.Persistence.IntegrationTests.SetupLive;
 
@@ -60,9 +60,8 @@ public sealed class PostgresSetupLiveStoragePermissionsTests(PostgresSetupStorag
         await using var runtime = fixture.CreateEnrolledTenantlessDbContext();
         var exception = await Assert.That(async () =>
                 await PostgresSetupLiveStoragePermissions.ApplyAsync(runtime, fixture.NativeQueueEnrollment))
-            .Throws<PostgresException>();
-        await Assert.That(exception!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
-        await Assert.That(exception.MessageText).IsEqualTo("setup_storage_migrator_required");
+            .Throws<UnauthorizedAccessException>();
+        await Assert.That(exception!.Message).IsEqualTo("setup_live_storage_installer_wrong_identity");
     }
 
     private ExploreDbContext CreateMigrator()
@@ -82,9 +81,9 @@ public sealed class PostgresSetupLiveStoragePermissionsTests(PostgresSetupStorag
         command.CommandText = """
             SELECT session_user = @login AND current_user = session_user
                 AND NOT (SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = session_user)
-                AND has_table_privilege(current_user, CAST(@relation AS regclass), 'SELECT')
-                AND has_table_privilege(current_user, CAST(@relation AS regclass), 'INSERT') = @writable
-                AND has_table_privilege(current_user, CAST(@relation AS regclass), 'UPDATE') = @writable
+                AND NOT has_table_privilege(current_user, CAST(@relation AS regclass), 'SELECT')
+                AND NOT has_table_privilege(current_user, CAST(@relation AS regclass), 'INSERT')
+                AND NOT has_table_privilege(current_user, CAST(@relation AS regclass), 'UPDATE')
                 AND NOT has_table_privilege(current_user, CAST(@relation AS regclass), 'DELETE')
                 AND NOT has_table_privilege(current_user, CAST(@relation AS regclass), 'TRUNCATE')
                 AND NOT has_table_privilege(current_user, CAST(@relation AS regclass), 'REFERENCES')
@@ -96,7 +95,7 @@ public sealed class PostgresSetupLiveStoragePermissionsTests(PostgresSetupStorag
         foreach (var parameter in new (string Name, object Value)[]
                  {
                      ("login", fixture.NativeQueueEnrollment.RuntimeLogin),
-                     ("relation", relation), ("writable", writable)
+                     ("relation", relation)
                  })
         {
             var value = command.CreateParameter();
@@ -105,6 +104,51 @@ public sealed class PostgresSetupLiveStoragePermissionsTests(PostgresSetupStorag
             command.Parameters.Add(value);
         }
         await Assert.That(await command.ExecuteScalarAsync()).IsEqualTo(true);
+
+        string[] updates = type == typeof(SetupTargetEnrollment)
+            ? [nameof(SetupTargetEnrollment.CapabilityDigest), nameof(SetupTargetEnrollment.Generation),
+                nameof(SetupTargetEnrollment.State), nameof(SetupTargetEnrollment.ExpiresAt),
+                nameof(SetupTargetEnrollment.RevokedAt), nameof(SetupTargetEnrollment.ExpiredAt),
+                nameof(SetupTargetEnrollment.ConcurrencyStamp), nameof(SetupTargetEnrollment.UpdatedAt),
+                nameof(SetupTargetEnrollment.UpdatedBy)]
+            : type == typeof(SetupSecretBindingOperation)
+                ? [nameof(SetupSecretBindingOperation.State), nameof(SetupSecretBindingOperation.Outcome),
+                    nameof(SetupSecretBindingOperation.MutationEvidence), nameof(SetupSecretBindingOperation.SettledAt),
+                    nameof(SetupSecretBindingOperation.ConcurrencyStamp), nameof(SetupSecretBindingOperation.UpdatedAt),
+                    nameof(SetupSecretBindingOperation.UpdatedBy)]
+                : [];
+        string[] bindingIdentity =
+        [
+            nameof(SecretBinding.Id), nameof(SecretBinding.SettingKey), nameof(SecretBinding.Qualifier),
+            nameof(SecretBinding.SettingScopeId), nameof(SecretBinding.ScopeId)
+        ];
+        var store = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+        foreach (var property in entity.GetProperties())
+        {
+            await using var column = runtime.Database.GetDbConnection().CreateCommand();
+            column.CommandText = """
+                SELECT has_column_privilege(current_user, CAST(@relation AS regclass), @column, 'SELECT') = @read
+                    AND has_column_privilege(current_user, CAST(@relation AS regclass), @column, 'INSERT') = @insert
+                    AND has_column_privilege(current_user, CAST(@relation AS regclass), @column, 'UPDATE') = @update
+                    AND NOT has_column_privilege(current_user, CAST(@relation AS regclass), @column, 'REFERENCES')
+                    AND NOT has_column_privilege(current_user, CAST(@relation AS regclass), @column, 'SELECT WITH GRANT OPTION')
+                    AND NOT has_column_privilege(current_user, CAST(@relation AS regclass), @column, 'INSERT WITH GRANT OPTION')
+                    AND NOT has_column_privilege(current_user, CAST(@relation AS regclass), @column, 'UPDATE WITH GRANT OPTION')
+                """;
+            foreach (var parameter in new (string Name, object Value)[]
+                     {
+                         ("relation", relation), ("column", property.GetColumnName(store)!),
+                         ("read", writable || bindingIdentity.Contains(property.Name)),
+                         ("insert", writable), ("update", updates.Contains(property.Name))
+                     })
+            {
+                var value = column.CreateParameter();
+                value.ParameterName = parameter.Name;
+                value.Value = parameter.Value;
+                column.Parameters.Add(value);
+            }
+            await Assert.That(await column.ExecuteScalarAsync()).IsEqualTo(true);
+        }
     }
 }
 

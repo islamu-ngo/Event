@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5M6D2F7XYJ2JH8NQFEBKKF3
+Title: "Publish exact adopted moderation policy generations"
+Type: feat
+Scope: access
+Summary: "Compose and publish exact adopted native policy generations with current-authoring, preparation and bounded export participation; included tests are unrun and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Current authoring and adopted definition/deployment/constitution/event-rights owners bind publication to the exact native policy graph; nested ordered locks reuse only already-owned coordination. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires separately owned publication, selection and native source models and generated migrations; no provider execution or upgrade validation occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: planned
+    Detail: "Native policy authoring and export/import participants depend on the separately reviewed neutral portability and import owners; transported definitions are not activation rights."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Current-policy, preparation/publication and reference-catalogue endpoint sources are introduced here; generated API contracts ship once in final host composition."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Complete paired publication/export administration guidance and provider assurance with the native source and composition checkpoints before deployment."

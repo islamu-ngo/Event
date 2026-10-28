@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5M6D4QRXR40BMS6HV059CTH
+Title: "Retain configured API key provenance through resource authority reads"
+Type: fix
+Scope: access
+Summary: "Preserve configured machine authentication origin and current resource custody through native authority snapshot reads; included tests are unrun and runtime assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Configured API-key authentication origin and current resource custody remain distinct from mutable/unqualified machine claims in authority reads; logging/custody witnesses guard that boundary. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Deploy with resource safety and final authentication composition; complete paired machine authority guidance and runtime/provider assurance without logging credential values."

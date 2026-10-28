@@ -1,9 +1,12 @@
 using System.Runtime.ExceptionServices;
+using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
+using Explore.Application.Operations.Decorators;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Operations;
 
@@ -18,6 +21,7 @@ internal sealed class MutationScopeCommandHandler<TCommand, TResult>(
             cancellationToken.ThrowIfCancellationRequested();
             await using var identity = await provider.GetRequiredService<ILocalIdentityExecutionScopeFactory>()
                 .CreateAsync(cancellationToken);
+            await AuthorizeAsync(identity.Services, command, cancellationToken);
             await PrepareHumanOwnerAsync(identity.Services, cancellationToken);
             return await ExecuteCoreAsync(identity.Services, command, cancellationToken);
         }
@@ -25,18 +29,28 @@ internal sealed class MutationScopeCommandHandler<TCommand, TResult>(
         if (selection is null && ModerationMutationCommandScope.Handles(typeof(TCommand)))
             selection = PolicyMutationScope.Instance;
         if (selection is null)
+        {
+            await AuthorizeAsync(provider, command, cancellationToken);
             return await ExecuteHumanOwnerAsync(provider, command, cancellationToken);
+        }
         if (FooterOperationScope.Handles(typeof(TCommand)))
         {
             await using var footer = await provider.GetRequiredService<IFooterExecutionScopeFactory>()
                 .CreateAsync(selection, cancellationToken);
+            await AuthorizeAsync(footer.Services, command, cancellationToken);
             return await footer.Services.GetRequiredService<IFooterOperationExecution>()
                 .ExecuteAsync(command, token => ExecuteCoreAsync(footer.Services, command, token), cancellationToken);
         }
         await using var scope = await provider.GetRequiredService<IPolicyMutationExecutionScopeFactory>()
             .CreateAsync(selection, cancellationToken);
+        await AuthorizeAsync(scope.Services, command, cancellationToken);
         return await ExecuteHumanOwnerAsync(scope.Services, command, cancellationToken);
     }
+
+    private static Task AuthorizeAsync(
+        IServiceProvider services, TCommand command, CancellationToken cancellationToken) =>
+        services.GetRequiredService<RequestAuthorization<TCommand>>().AuthorizeAsync(
+            command, services.GetRequiredService<ILogger<RequestAuthorization<TCommand>>>(), cancellationToken);
 
     private bool RequiresHumanAdministratorOwner =>
         implementation.GetConstructors().Any(constructor => constructor.GetParameters().Any(parameter =>
@@ -110,6 +124,9 @@ internal sealed class MutationScopeCommandHandler<TCommand, TResult>(
         {
             guard.Exit(contract);
         }
-        return await handler.ExecuteAsync(command, cancellationToken);
+        var timed = new PerformanceCommandHandlerDecorator<TCommand, TResult>(
+            handler, services.GetRequiredService<TimeProvider>(),
+            services.GetRequiredService<ILogger<PerformanceCommandHandlerDecorator<TCommand, TResult>>>());
+        return await timed.ExecuteAsync(command, cancellationToken);
     }
 }

@@ -6,6 +6,7 @@
     <Compile Include="..\Shared\ExternalDataProtectionTestAuthority.cs" Link="Fixtures\ExternalDataProtectionTestAuthority.cs" />
     <Compile Include="..\Shared\TransactionCleanupFault.cs" Link="Fixtures\TransactionCleanupFault.cs" />
     <Compile Include="..\Shared\Telemetry\EventLocationPrivacyMetricsFactory.cs" Link="Telemetry\EventLocationPrivacyMetricsFactory.cs" />
+    <Compile Include="..\Shared\Moderation\ModerationMeasurementJournalAttribute.cs" Link="Moderation\ModerationMeasurementJournalAttribute.cs" />
     <Compile Include="..\Explore.Infrastructure.Tests\Fixtures\CurrentHumanPrincipalFixture.cs" Link="Fixtures\CurrentHumanPrincipalFixture.cs" />
   </ItemGroup>
 

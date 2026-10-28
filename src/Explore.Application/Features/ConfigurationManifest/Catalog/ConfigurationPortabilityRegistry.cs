@@ -90,9 +90,17 @@ public static class ConfigurationPortabilityRegistry
             PortableInstance("instance.settings", "Settings"),
             PortableInstance("instance.documents", "Typed documents"),
             PortableInstance("instance.legal_documents", "Legal documents"),
+            PortableInstance("instance.moderation", "Moderation policy definitions") with
+            {
+                SupportsRollback = false
+            },
             PortableTenant("tenant.settings", "Settings"),
             PortableTenant("tenant.documents", "Typed documents"),
             PortableTenant("tenant.legal_documents", "Legal documents"),
+            PortableTenant("tenant.moderation", "Moderation policy definitions") with
+            {
+                SupportsRollback = false
+            },
             UnavailableTenant("tenant.footer", "Footer"),
             UnavailableTenant("tenant.navigation", "Navigation"),
             UnavailableTenant("tenant.templates", "Templates"),

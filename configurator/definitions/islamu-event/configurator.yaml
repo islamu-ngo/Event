@@ -4807,6 +4807,334 @@ fields:
     title: MINIO_CONSOLE_PORT
     type: integer
     validator: port-number
+  env.MODERATION_MEASUREMENT_SIGNING_PRIVATE_KEY_PEM:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: false'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: secret
+    title: MODERATION_MEASUREMENT_SIGNING_PRIVATE_KEY_PEM
+    type: string
+  env.MODERATION__MEASUREMENTTESTDATABASE__DATABASE:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: false'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: public
+    title: MODERATION__MEASUREMENTTESTDATABASE__DATABASE
+    type: string
+  env.MODERATION__MEASUREMENTTESTDATABASE__HOST:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: false'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: public
+    title: MODERATION__MEASUREMENTTESTDATABASE__HOST
+    type: string
+  env.MODERATION__MEASUREMENTTESTDATABASE__PASSWORD:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: false'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: secret
+    title: MODERATION__MEASUREMENTTESTDATABASE__PASSWORD
+    type: string
+  env.MODERATION__MEASUREMENTTESTDATABASE__PORT:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: false'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: public
+    title: MODERATION__MEASUREMENTTESTDATABASE__PORT
+    type: string
+  env.MODERATION__MEASUREMENTTESTDATABASE__PROVIDER:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: false'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: public
+    title: MODERATION__MEASUREMENTTESTDATABASE__PROVIDER
+    type: string
+  env.MODERATION__MEASUREMENTTESTDATABASE__SCHEMA:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: false'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: public
+    title: MODERATION__MEASUREMENTTESTDATABASE__SCHEMA
+    type: string
+  env.MODERATION__MEASUREMENTTESTDATABASE__SERVERFLAVOR:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: false'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: public
+    title: MODERATION__MEASUREMENTTESTDATABASE__SERVERFLAVOR
+    type: string
+  env.MODERATION__MEASUREMENTTESTDATABASE__SERVERVERSION:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: false'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: public
+    title: MODERATION__MEASUREMENTTESTDATABASE__SERVERVERSION
+    type: string
+  env.MODERATION__MEASUREMENTTESTDATABASE__TLSMODE:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: false'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: public
+    title: MODERATION__MEASUREMENTTESTDATABASE__TLSMODE
+    type: string
+  env.MODERATION__MEASUREMENTTESTDATABASE__TRUSTSERVERCERTIFICATE:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: false'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: public
+    title: MODERATION__MEASUREMENTTESTDATABASE__TRUSTSERVERCERTIFICATE
+    type: string
+  env.MODERATION__MEASUREMENTTESTDATABASE__USERNAME:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: false'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: sensitive
+    title: MODERATION__MEASUREMENTTESTDATABASE__USERNAME
+    type: string
+  env.MODERATION__RECONCILIATION__APIKEY:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: true'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: secret
+    title: MODERATION__RECONCILIATION__APIKEY
+    type: string
+  env.MODERATION__RECONCILIATION__BATCHSIZE:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: true'
+    default: "100"
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: public
+    title: MODERATION__RECONCILIATION__BATCHSIZE
+    type: string
+  env.MODERATION__RECONCILIATION__ENABLED:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: true'
+    default: false
+    disclosure: advanced
+    group: security
+    help: 'Host validator: boolean. Host validation remains required.'
+    required: false
+    sensitivity: public
+    title: MODERATION__RECONCILIATION__ENABLED
+    type: boolean
+  env.MODERATION__RECONCILIATION__INITIALDELAYSECONDS:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: true'
+    default: "60"
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: public
+    title: MODERATION__RECONCILIATION__INITIALDELAYSECONDS
+    type: string
+  env.MODERATION__RECONCILIATION__INTERVALSECONDS:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: true'
+    default: "60"
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: public
+    title: MODERATION__RECONCILIATION__INTERVALSECONDS
+    type: string
+  env.MODERATION__RECONCILIATION__TENANTID:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.security-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: true'
+    disclosure: advanced
+    group: security
+    help: 'Host validator: security-setting. Host validation remains required.'
+    required: false
+    sensitivity: sensitive
+    title: MODERATION__RECONCILIATION__TENANTID
+    type: string
   env.OSPREY_BIDI_STREAM_PORT:
     activeWhen:
       op: all
@@ -8657,7 +8985,7 @@ fields:
     type: object
 identity:
   familyId: a4bcfaa6-9979-43e5-b1f5-00d552618cdf
-  revision: 8
+  revision: 9
 locales:
 - en
 outputs:
@@ -9404,6 +9732,60 @@ outputs:
           op: copy
         MINIO_CONSOLE_PORT:
           field: env.MINIO_CONSOLE_PORT
+          op: copy
+        MODERATION_MEASUREMENT_SIGNING_PRIVATE_KEY_PEM:
+          field: env.MODERATION_MEASUREMENT_SIGNING_PRIVATE_KEY_PEM
+          op: copy
+        MODERATION__MEASUREMENTTESTDATABASE__DATABASE:
+          field: env.MODERATION__MEASUREMENTTESTDATABASE__DATABASE
+          op: copy
+        MODERATION__MEASUREMENTTESTDATABASE__HOST:
+          field: env.MODERATION__MEASUREMENTTESTDATABASE__HOST
+          op: copy
+        MODERATION__MEASUREMENTTESTDATABASE__PASSWORD:
+          field: env.MODERATION__MEASUREMENTTESTDATABASE__PASSWORD
+          op: copy
+        MODERATION__MEASUREMENTTESTDATABASE__PORT:
+          field: env.MODERATION__MEASUREMENTTESTDATABASE__PORT
+          op: copy
+        MODERATION__MEASUREMENTTESTDATABASE__PROVIDER:
+          field: env.MODERATION__MEASUREMENTTESTDATABASE__PROVIDER
+          op: copy
+        MODERATION__MEASUREMENTTESTDATABASE__SCHEMA:
+          field: env.MODERATION__MEASUREMENTTESTDATABASE__SCHEMA
+          op: copy
+        MODERATION__MEASUREMENTTESTDATABASE__SERVERFLAVOR:
+          field: env.MODERATION__MEASUREMENTTESTDATABASE__SERVERFLAVOR
+          op: copy
+        MODERATION__MEASUREMENTTESTDATABASE__SERVERVERSION:
+          field: env.MODERATION__MEASUREMENTTESTDATABASE__SERVERVERSION
+          op: copy
+        MODERATION__MEASUREMENTTESTDATABASE__TLSMODE:
+          field: env.MODERATION__MEASUREMENTTESTDATABASE__TLSMODE
+          op: copy
+        MODERATION__MEASUREMENTTESTDATABASE__TRUSTSERVERCERTIFICATE:
+          field: env.MODERATION__MEASUREMENTTESTDATABASE__TRUSTSERVERCERTIFICATE
+          op: copy
+        MODERATION__MEASUREMENTTESTDATABASE__USERNAME:
+          field: env.MODERATION__MEASUREMENTTESTDATABASE__USERNAME
+          op: copy
+        MODERATION__RECONCILIATION__APIKEY:
+          field: env.MODERATION__RECONCILIATION__APIKEY
+          op: copy
+        MODERATION__RECONCILIATION__BATCHSIZE:
+          field: env.MODERATION__RECONCILIATION__BATCHSIZE
+          op: copy
+        MODERATION__RECONCILIATION__ENABLED:
+          field: env.MODERATION__RECONCILIATION__ENABLED
+          op: copy
+        MODERATION__RECONCILIATION__INITIALDELAYSECONDS:
+          field: env.MODERATION__RECONCILIATION__INITIALDELAYSECONDS
+          op: copy
+        MODERATION__RECONCILIATION__INTERVALSECONDS:
+          field: env.MODERATION__RECONCILIATION__INTERVALSECONDS
+          op: copy
+        MODERATION__RECONCILIATION__TENANTID:
+          field: env.MODERATION__RECONCILIATION__TENANTID
           op: copy
         OSPREY_BIDI_STREAM_PORT:
           field: env.OSPREY_BIDI_STREAM_PORT

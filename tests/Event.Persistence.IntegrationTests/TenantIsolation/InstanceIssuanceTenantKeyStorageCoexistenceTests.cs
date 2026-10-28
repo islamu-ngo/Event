@@ -15,7 +15,7 @@ namespace Event.Persistence.IntegrationTests.TenantIsolation;
 
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
 [NotInParallel("PersistenceDb")]
-public sealed class InstanceIssuanceTenantKeyStorageCoexistenceTests(PostgreSqlContainerFixture fixture)
+public sealed partial class InstanceIssuanceTenantKeyStorageCoexistenceTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
     public async Task InstanceIssuanceDormantLookupPoliciesPreserveTenantKeyAndSupportReadiness()

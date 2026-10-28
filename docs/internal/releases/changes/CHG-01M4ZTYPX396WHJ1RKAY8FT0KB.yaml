@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZTYPX396WHJ1RKAY8FT0KB
+Title: "Model exact native Event observations and independent target adoption"
+Type: feat
+Scope: access
+Summary: "Retain native Event and publisher lineage separately from observation sequences, bind independently approved partitions to the exact observed subject and finite window, and preserve accountable terminal revocation without creating a sanction."
+Group: moderation-event-generation-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

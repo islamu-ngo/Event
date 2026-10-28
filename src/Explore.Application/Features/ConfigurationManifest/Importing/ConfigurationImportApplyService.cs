@@ -11,6 +11,7 @@ using Explore.Application.Features.ConfigurationManifest.Managed;
 using Explore.Application.Notifications;
 using Explore.Domain;
 using Microsoft.Extensions.Logging;
+using Explore.Application.Features.ConfigurationManifest.Moderation;
 using Microsoft.Extensions.DependencyInjection;
 
 public enum ConfigurationImportEffectStatus
@@ -73,6 +74,7 @@ public sealed class ConfigurationImportApplyService(
     ICurrentUserService currentUser,
     TimeProvider timeProvider,
     ILogger<ConfigurationImportApplyService> logger,
+    ModerationConfigurationImportAdapter moderation,
     IHumanCommitScopePreparation humanScope,
     IPolicyMutationExecutionScopeFactory selectedScopeFactory,
     IHumanConfigurationImportAdmission importAdmission,
@@ -578,13 +580,15 @@ public sealed class ConfigurationImportApplyService(
         var authorized = new ConfigurationImportAuthorizedArtifact(
             sourceBytes,
             session.ArtifactDigest,
-            session.ExpiresAt);
+            session.ExpiresAt,
+            session.ModerationReservation);
         ConfigurationImportPreviewPreparation preparation =
             await previews.PreparePreviewAsync(
                 target,
                 authorized,
                 request,
-                cancellationToken);
+                cancellationToken,
+                inCurrentTransaction: true);
         ConfigurationImportPreview freshPreview =
             previewComposer.Compose(preparation.Input);
         if (!freshPreview.IsApplyReady)
@@ -639,16 +643,70 @@ public sealed class ConfigurationImportApplyService(
                 target, sourceBytes, request, actorUserId, now, session.ArtifactDigest, parser, cancellationToken)
             : await prepared!.ExecuteApplyAsync(admittedApply!, cancellationToken);
 
+        bool nativeFidelityVerified = true;
+        string? nativeFidelityDigest = null;
+        IModerationConfigurationImportCompletion? nativeCompletion = null;
+        if (preparation.Input.ModerationPreview is not null)
+        {
+            try
+            {
+                nativeCompletion = await moderation.ApplySetInCurrentTransactionAsync(
+                    target, sourceBytes, request, session.ModerationReservation
+                        ?? throw new ConfigurationImportSessionException(ConfigurationImportFailureCodes.StalePreview),
+                    cancellationToken);
+            }
+            catch (ModerationConfigurationImportException exception)
+            {
+                throw new ConfigurationImportSessionException(
+                    exception.Outcome == ModerationPolicyPublicationOutcome.Conflict
+                        ? ConfigurationImportFailureCodes.StalePreview
+                        : ConfigurationImportFailureCodes.ApplyBlocked);
+            }
+        }
+
+        var verificationRequest = new ConfigurationImportPreviewRequest
+        {
+            SelectedSectionKeys = request.SelectedSectionKeys
+                .Where(section => !ModerationConfigurationImportSections.IsModeration(section)).ToArray(),
+            Mappings = request.Mappings,
+            ApplyMode = request.ApplyMode,
+            GrantedApprovalCodes = request.GrantedApprovalCodes
+        };
         ConfigurationImportPreviewPreparation verificationPreparation =
             await previews.PreparePreviewAsync(
                 target,
                 authorized,
-                request,
-                cancellationToken);
+                verificationRequest,
+                cancellationToken,
+                inCurrentTransaction: true);
         ConfigurationImportPreview verification =
             previewComposer.Compose(verificationPreparation.Input);
-        var selected = request.SelectedSectionKeys.ToHashSet(StringComparer.Ordinal);
-        bool fidelityVerified = verification.Items
+        if (preparation.Input.ModerationPreview is { } nativePreview)
+        {
+            // Verify the actual post-apply artifact, including every selected tenant, rather than
+            // treating a native write receipt or an instance-only export as artifact fidelity.
+            var manifest = target.Scope == ConfigurationImportScope.Instance
+                ? parser.Parse(verificationPreparation.CurrentTargetArtifact).Manifest : null;
+            var package = target.Scope == ConfigurationImportScope.Tenant
+                ? parser.ParseTenantPackage(verificationPreparation.CurrentTargetArtifact).Package : null;
+            var nativeDigests = new List<string>();
+            foreach (var item in nativePreview.Targets)
+            {
+                var wire = package is not null ? package.Spec.Moderation
+                    : item.Target.SectionKey == ModerationConfigurationImportSections.Instance
+                        ? manifest!.Spec.Instance.Moderation
+                        : manifest!.Spec.Tenants.SingleOrDefault(tenant =>
+                            tenant.Metadata.Name == item.Target.TargetName)?.Spec.Moderation;
+                var actual = wire is null ? null : ModerationConfigurationImportSections.FromWire(wire);
+                nativeFidelityVerified &= actual is not null && item.Preview.Document is { } expected
+                    && ModerationConfigurationDocumentDiff.Compare(expected, expected, actual).Changes.IsEmpty;
+                if (actual is not null)
+                    nativeDigests.Add($"{item.Target.SectionKey}\u001f{item.Target.TargetName}\u001f{ModerationConfigurationImportSections.Digest(actual)}");
+            }
+            nativeFidelityDigest = ConfigurationImportDigest.Compute(nativeDigests);
+        }
+        var selected = verificationRequest.SelectedSectionKeys.ToHashSet(StringComparer.Ordinal);
+        bool fidelityVerified = nativeFidelityVerified && verification.Items
             .Where(item => selected.Contains(item.SectionKey))
             .All(item => item.Category is
                 ConfigurationImportPreviewCategory.Unchanged
@@ -662,7 +720,8 @@ public sealed class ConfigurationImportApplyService(
         }
         string fidelityDigest = ConfigurationImportDigest.Compute(
             verification.Items.Select(item =>
-                $"{item.SectionKey}\u001f{(int)item.Category}\u001f{item.ReasonCode}"));
+                $"{item.SectionKey}\u001f{(int)item.Category}\u001f{item.ReasonCode}")
+                .Concat(nativeFidelityDigest is null ? [] : [$"moderation\u001f{nativeFidelityDigest}"]));
         string[] omittedSections = verification.Items
             .Where(item => item.Category == ConfigurationImportPreviewCategory.Omitted)
             .Select(item => item.SectionKey)
@@ -707,6 +766,12 @@ public sealed class ConfigurationImportApplyService(
             finalizer!.Register(
                 token => ValidateHumanSourcesAsync(invocation, retained!, consumed: true, token),
                 instant => RequireSourceTimes(retained!, instant.UtcDateTime, requirePreview: true));
+        if (nativeCompletion is not null)
+        {
+            await nativeCompletion.VerifyBeforeCommitAsync(cancellationToken);
+            if (finalizer is not null)
+                finalizer.Register(nativeCompletion.VerifyBeforeCommitAsync, _ => { });
+        }
         return new(operation, null);
     }
 

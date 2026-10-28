@@ -45,6 +45,9 @@ public class PathTenantResolverMiddlewareTests
 
     [Test]
     [Arguments("/_framework/blazor.web.js")]
+    [Arguments("/moderation")]
+    [Arguments("/moderation/cases")]
+    [Arguments("/MODERATION/cases")]
     [Arguments("/api/events")]
     [Arguments("/payments/checkout/success")]
     [Arguments("/forbidden")]
@@ -123,6 +126,9 @@ public class PathTenantResolverMiddlewareTests
 
     [Test]
     [Arguments("/actors/018e4e5c-7f00-7000-8000-000000000001")]
+    [Arguments("/moderation")]
+    [Arguments("/moderation/cases")]
+    [Arguments("/MODERATION/cases")]
     [Arguments("/home")]
     [Arguments("/settings/admin")]
     [Arguments("/users/42")]
@@ -250,7 +256,7 @@ public class PathTenantResolverMiddlewareTests
         PathEnabled = true,
         PathPrefix = string.Empty,
         ReservedSlugs =
-            ["admin", "_framework", "events", "api", "test", "payments", "forbidden",
+            ["admin", "moderation", "_framework", "events", "api", "test", "payments", "forbidden",
              "oauth", "signin-atproto", "manifest.webmanifest", "test-endpoint"]
     };
 

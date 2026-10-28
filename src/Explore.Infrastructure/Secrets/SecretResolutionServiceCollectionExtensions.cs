@@ -28,6 +28,7 @@ public static class SecretResolutionServiceCollectionExtensions
         services.AddSingleton<IAuthenticationCredentialProfileReader, AuthenticationCredentialProfileReader>();
         services.AddScoped<ISecretAuthorityStatusReader, SecretAuthorityStatusReader>();
         services.AddScoped<IPrivacyIdentityFenceKeyProvider, PrivacyIdentityFenceKeyProvider>();
+        services.AddScoped<IModerationReconciliationSecretProvider, ModerationReconciliationSecretProvider>();
         services.AddScoped<SetupSecretBindingWriter>();
         services.AddScoped<ISetupSecretBindingWriter>(provider =>
             provider.GetRequiredService<SetupSecretBindingWriter>());

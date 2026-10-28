@@ -1,0 +1,26 @@
+Change-Id: CHG-01M500D4GTWK5R2C3J59VRNF4E
+Title: "Retain complete finite recognition material snapshots"
+Type: feat
+Scope: privacy
+Summary: "Bind computed recognition material to exact original trust, provider, purpose, key identity and qualified contribution; snapshot complete unique sets within every retention ceiling and compare retained material without acquiring identifiers or authorizing native recognition, erasure or settlement."
+Group: moderation-recognition-computed-material
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

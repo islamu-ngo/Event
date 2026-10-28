@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZTF11V08BEZKKFXW9878FA
+Title: "Model exact classification taxonomy and immutable category provenance"
+Type: feat
+Scope: access
+Summary: "Retain reviewed category meaning and age floors independently of Event format, bind taxonomy projection to exact adopted child-age provenance, and preserve independent finite taxonomy acceptance without classifying material or granting permission."
+Group: moderation-classification-taxonomy-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

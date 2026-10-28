@@ -56,7 +56,7 @@ internal sealed class ManagedTenantWorkerCreationOwnerFactory(
         private bool attempted;
         private bool disposed;
 
-        public Task<Explore.Application.Responses.BaseCommandResponse<Explore.Application.DTOs.ManagedProviderProvisioning.ManagedProviderClientProvisioningResultDto>>
+        public Task<Explore.Application.Responses.BaseCommandResponse<ManagedTenantWorkerCreationOutcome>>
             CreateAsync(CancellationToken cancellationToken = default)
         {
             if (disposed || attempted)

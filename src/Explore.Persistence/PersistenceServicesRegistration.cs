@@ -25,6 +25,7 @@ using Explore.Persistence.Schema;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
+using ISLAMU.Moderation.Application;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
@@ -304,6 +305,7 @@ public static class PersistenceServicesRegistration
                 applicationDbContext: application,
                 userManager: serviceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(),
                 timeProvider: serviceProvider.GetRequiredService<TimeProvider>(),
+                identityFence: serviceProvider.GetRequiredService<Explore.Application.Services.PrivacyIdentityFenceOperation>(),
                 executionLease: GetSelectedLocalIdentityExecution(serviceProvider, application));
         });
         services.AddScoped<ILocalIdentityLifecycleStore>(serviceProvider => new LocalIdentityLifecycleStore(
@@ -313,14 +315,16 @@ public static class PersistenceServicesRegistration
             applicationDbContext: serviceProvider.GetRequiredService<ExploreDbContext>(),
             userManager: serviceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(),
             timeProvider: serviceProvider.GetRequiredService<TimeProvider>(),
-            credentialStates: serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>()));
+            credentialStates: serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>(),
+            identityFence: serviceProvider.GetRequiredService<Explore.Application.Services.PrivacyIdentityFenceOperation>()));
         services.AddScoped<ILocalIdentityLifecycleDeliveryStore>(serviceProvider => new LocalIdentityLifecycleDeliveryStore(
             identityDbContext: identityTopology == IdentityDatabaseTopology.External
                 ? serviceProvider.GetRequiredService<ExternalIdentityDbContext>()
                 : serviceProvider.GetRequiredService<ExploreDbContext>(),
             applicationDbContext: serviceProvider.GetRequiredService<ExploreDbContext>(),
             credentialStates: serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>(),
-            timeProvider: serviceProvider.GetRequiredService<TimeProvider>()));
+            timeProvider: serviceProvider.GetRequiredService<TimeProvider>(),
+            identityFence: serviceProvider.GetRequiredService<Explore.Application.Services.PrivacyIdentityFenceOperation>()));
         services.AddScoped<ILocalIdentityAuthService, LocalIdentityAuthService>();
         services.AddScoped<ILocalCredentialAdministration>(serviceProvider =>
             serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>());
@@ -330,6 +334,184 @@ public static class PersistenceServicesRegistration
         // Unit of Work (wraps EF Core transactions)
         Security.HumanManagedProviderProvisioningDataRegistration.AddHumanManagedProviderProvisioningData(services);
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
+        services.AddScoped<IModerationAuthoritySourceRepository, ModerationAuthoritySourceRepository>();
+        services.AddScoped<IModerationMachineSubjectBindingRepository, ModerationMachineSubjectBindingRepository>();
+        services.AddScoped<IModerationProfileCollectionAssessmentRepository, ModerationProfileCollectionAssessmentRepository>();
+        services.AddScoped<IModerationProfileCollectionSubjectObservationOwner, ModerationProfileCollectionSubjectObservationOwner>();
+        services.AddScoped<IModerationProfileSubjectConsentOwner, ModerationProfileSubjectConsentOwner>();
+        services.AddScoped<IModerationProfileCollectionAdmissionOwner, ModerationProfileCollectionAdmissionOwner>();
+        services.AddScoped<Explore.Application.Contracts.Scheduling.IModerationReconciliationQuery,
+            Explore.Persistence.Queries.ModerationReconciliationQuery>();
+        services.AddScoped<IEventResourceModerationSnapshotReader, EventResourceModerationSnapshotReader>();
+        services.AddScoped<IEventResourceUploadMutationBoundary, EventResourceUploadMutationBoundary>();
+        services.AddScoped<IEventPublicationMutationBoundary, EventPublicationMutationBoundary>();
+        services.AddScoped<ITenantUserRoleGrantMutationBoundary, TenantUserRoleGrantMutationBoundary>();
+        services.AddScoped<OrganizationMemberMutationBoundary>();
+        services.AddScoped<IOrganizationMemberMutationBoundary>(sp => sp.GetRequiredService<OrganizationMemberMutationBoundary>());
+        services.AddScoped<IOrganizationCreationMutationBoundary>(sp => sp.GetRequiredService<OrganizationMemberMutationBoundary>());
+        services.AddScoped<GroupMemberMutationBoundary>();
+        services.AddScoped<IGroupMemberMutationBoundary>(provider => provider.GetRequiredService<GroupMemberMutationBoundary>());
+        services.AddScoped<IGroupCreationMutationBoundary>(provider => provider.GetRequiredService<GroupMemberMutationBoundary>());
+        services.AddScoped<EventRoleAssignmentMutationBoundary>();
+        services.AddScoped<IEventOwnershipTransferMutationBoundary>(provider => provider.GetRequiredService<EventRoleAssignmentMutationBoundary>());
+        services.AddScoped<IEventRoleAssignmentWindowMutationBoundary>(provider => provider.GetRequiredService<EventRoleAssignmentMutationBoundary>());
+        services.AddScoped<IEventRoleAssignmentRevocationMutationBoundary>(provider => provider.GetRequiredService<EventRoleAssignmentMutationBoundary>());
+        services.AddScoped<IEventRoleAssignmentCreationMutationBoundary>(provider => provider.GetRequiredService<EventRoleAssignmentMutationBoundary>());
+        services.AddScoped<IEventInitialCreationMutationBoundary>(provider => provider.GetRequiredService<EventRoleAssignmentMutationBoundary>());
+        services.AddScoped<IAtprotoParticipationMutationFactory, AtprotoParticipationMutationFactory>();
+        services.AddScoped<ModerationQualificationRepository>();
+        services.AddScoped<IModerationQualificationRepository>(provider =>
+            provider.GetRequiredService<ModerationQualificationRepository>());
+        services.AddScoped<IModerationContentResponseRepository>(provider =>
+            provider.GetRequiredService<ModerationQualificationRepository>());
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationPreFindingRepository>(provider =>
+            provider.GetRequiredService<ModerationQualificationRepository>());
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationPreFindingResponseOwner>(provider =>
+            provider.GetRequiredService<ModerationQualificationRepository>());
+        services.AddScoped<IModerationEffectLeaseRepository, ModerationEffectLeaseRepository>();
+        services.AddScoped<IModerationResourceQuarantineRepository, ModerationResourceQuarantineRepository>();
+        services.AddScoped<IModerationOriginalEffectCompletionRepository, ModerationOriginalEffectCompletionRepository>();
+        services.AddScoped<ModerationResourceQuarantineReleaseRepository>();
+        services.AddScoped<IModerationResourceQuarantineReleaseRepository>(provider =>
+            provider.GetRequiredService<ModerationResourceQuarantineReleaseRepository>());
+        services.AddScoped<IModerationResourceQuarantineInspectionRepository, ModerationResourceQuarantineInspectionRepository>();
+        services.AddScoped<ModerationResourceQuarantineStateRepository>();
+        services.AddScoped<IModerationResourceQuarantineStateRepository>(provider =>
+            provider.GetRequiredService<ModerationResourceQuarantineStateRepository>());
+        services.AddScoped<IModerationResourceQuarantineReviewStateRepository>(provider =>
+            provider.GetRequiredService<ModerationResourceQuarantineStateRepository>());
+        services.AddScoped<Explore.Application.Services.ModerationResourceInspectionMaterialReader>();
+        services.AddScoped<ModerationResourceQuarantineDutyRepository>();
+        services.AddScoped<IModerationResourceQuarantineDutyRepository>(provider =>
+            provider.GetRequiredService<ModerationResourceQuarantineDutyRepository>());
+        services.AddScoped<IModerationScheduleRiskReviewReconciliationRepository>(provider =>
+            provider.GetRequiredService<ModerationResourceQuarantineDutyRepository>());
+        services.AddScoped<Explore.Application.Services.Moderation.ModerationResourceReviewEscalationMaterializer>();
+        services.AddScoped<ModerationRecognitionErasureRepository>();
+        services.AddScoped<IModerationRecognitionErasureRepository>(provider =>
+            provider.GetRequiredService<ModerationRecognitionErasureRepository>());
+        services.AddScoped<IModerationRecognitionContinuityRepository>(provider =>
+            provider.GetRequiredService<ModerationRecognitionErasureRepository>());
+        services.AddScoped<IModerationRecognitionRecoveryRepository>(provider =>
+            provider.GetRequiredService<ModerationRecognitionErasureRepository>());
+        services.AddSingleton<ModerationRecognitionKeyLifecycleReplicaOwner>();
+        services.AddScoped<ModerationRecognitionKeyLifecycleRepository>();
+        services.AddScoped<IModerationRecognitionKeyLifecycleRepository>(provider =>
+            provider.GetRequiredService<ModerationRecognitionKeyLifecycleRepository>());
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationRecognitionKeyLifecycleGuard>(provider =>
+            provider.GetRequiredService<ModerationRecognitionKeyLifecycleRepository>());
+        services.AddScoped<IModerationCaseTargetReceiptRepository, ModerationCaseTargetReceiptRepository>();
+        services.AddScoped<ModerationCaseTargetProofOwner>();
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationCaseTargetProofOwner>(provider =>
+            provider.GetRequiredService<ModerationCaseTargetProofOwner>());
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationCaseTargetIssuer>(provider =>
+            provider.GetRequiredService<ModerationCaseTargetProofOwner>());
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationCaseAttributionOwner>(provider =>
+            provider.GetRequiredService<ModerationCaseTargetProofOwner>());
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationCaseAttributionRepository,
+            ModerationCaseAttributionRepository>();
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationCaseReadGrantRepository,
+             ModerationCaseReadGrantRepository>();
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationAdjudicatedCaseReadGrantRepository,
+            ModerationAdjudicatedCaseReadGrantRepository>();
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationCaseIntakeRepository, ModerationCaseIntakeRepository>();
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationCaseNarrativeCustody, ModerationCaseNarrativeRepository>();
+        services.AddScoped<Explore.Application.Contracts.Moderation.IModerationCaseIntakeCommitter,
+            Explore.Persistence.Moderation.ModerationCaseIntakeCommitter>();
+        services.AddScoped<ModerationPolicyDefinitionSourceOwner>();
+        services.AddScoped<ModerationDeploymentSourceOwner>();
+        services.AddScoped<ModerationConstitutionSourceOwner>();
+        services.AddScoped<ModerationRecognitionPrivacySourceOwner>();
+        services.AddScoped<ModerationChildAgePolicySourceOwner>();
+        services.AddScoped<ModerationClassificationTaxonomySourceOwner>();
+        services.AddScoped<IModerationClassificationTaxonomySourceOwner>(provider =>
+            provider.GetRequiredService<ModerationClassificationTaxonomySourceOwner>());
+        services.AddScoped<ModerationClassificationMaterialSourceOwner>();
+        services.AddScoped<IModerationClassificationMaterialSourceOwner>(provider =>
+            provider.GetRequiredService<ModerationClassificationMaterialSourceOwner>());
+        services.AddScoped<IModerationPublicEventCalendarRepository, ModerationPublicEventCalendarRepository>();
+        services.AddScoped<ModerationEventRightsSourceOwner>();
+        services.AddScoped<ModerationProfileDeploymentSourceOwner>();
+        services.AddScoped<ModerationMeasuredOperationsSourceOwner>();
+        services.AddScoped<IModerationActivationSourceOwner, ModerationActivationSourceOwner>();
+        services.AddScoped<IModerationPolicyPublicationRepository>(provider =>
+        {
+            var context = provider.GetRequiredService<ExploreDbContext>();
+            if (context.IsConfigurationInstanceImportOwner)
+            {
+                var lease = provider.GetRequiredService<ExploreDbContextExecutionLease>();
+                if (lease.HumanScope is null || lease.HumanLifetime is null)
+                    throw new UnauthorizedAccessException("Instance export requires its original authenticated owner.");
+                return new ModerationPolicyPublicationRepository(
+                    context,
+                    provider.GetRequiredService<IAdminContext>(),
+                    provider.GetRequiredService<IMachinePrincipalAccessor>(),
+                    provider.GetRequiredService<Explore.Application.Services.Moderation.ModerationCapabilityRegistry>(),
+                    provider.GetServices<IModerationPolicyPublicationEvidenceOwner>().SingleOrDefault(),
+                    provider.GetRequiredService<TimeProvider>(),
+                    lease,
+                    provider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
+                    provider.GetRequiredService<IInstanceAdministratorCommitAuthority>(),
+                    provider.GetServices<IModerationConsumerRuntimeSource>(),
+                    provider.GetService<IModerationMeasurementReceiptVerifier>());
+            }
+            return new ModerationPolicyPublicationRepository(
+                provider.GetRequiredService<ExploreDbContext>(),
+                provider.GetRequiredService<IAdminContext>(),
+                provider.GetRequiredService<IMachinePrincipalAccessor>(),
+                provider.GetRequiredService<Explore.Application.Services.Moderation.ModerationCapabilityRegistry>(),
+                provider.GetServices<IModerationPolicyPublicationEvidenceOwner>().SingleOrDefault(),
+                provider.GetRequiredService<TimeProvider>(),
+                provider.GetServices<IModerationConsumerRuntimeSource>(),
+                provider.GetService<IModerationMeasurementReceiptVerifier>());
+        });
+        services.AddScoped<IModerationClassificationMaterialInventoryReadRepository>(provider =>
+            (IModerationClassificationMaterialInventoryReadRepository)provider.GetRequiredService<IModerationPolicyPublicationRepository>());
+        services.AddScoped<IModerationClassificationMaterialReviewReadRepository>(provider =>
+            (IModerationClassificationMaterialReviewReadRepository)provider.GetRequiredService<IModerationPolicyPublicationRepository>());
+        services.AddScoped<IModerationPolicyPublicationSelectionSource, ModerationPolicySelectionSource>();
+        services.AddScoped<IModerationPolicyPublicationNoticeAuthority>(provider =>
+            provider.GetRequiredService<ModerationAuthorityParticipant>());
+        services.AddScoped<IModerationNoticeSourceOwner, ModerationPolicySelectionNoticeSourceOwner>();
+        services.AddScoped<ModerationNoticeRecipientRepository>();
+        services.AddScoped<IModerationNoticeCleanupRepository, ModerationNoticeCleanupRepository>();
+        services.AddScoped<Explore.Application.Contracts.Notifications.IModerationNoticeStatusRepository, ModerationNoticeStatusRepository>();
+        services.AddScoped<ModerationNoticeReadRepository>();
+        services.AddScoped<Explore.Application.Contracts.Notifications.IModerationNoticeCorrectionDisclosure>(provider =>
+            provider.GetRequiredService<ModerationNoticeReadRepository>());
+        services.AddScoped<Explore.Application.Contracts.Notifications.IModerationNoticeEmailAuthority,
+            ModerationNoticeEmailAuthority>();
+        services.AddScoped<Explore.Application.Contracts.Notifications.IModerationNoticeReadRepository>(provider =>
+            provider.GetRequiredService<ModerationNoticeReadRepository>());
+        services.AddScoped<Explore.Application.Contracts.Notifications.IModerationNoticeNotificationRepository>(provider =>
+            provider.GetRequiredService<ModerationNoticeReadRepository>());
+        services.AddScoped<IModerationNoticeCapture>(provider => new ModerationNoticeCaptureRepository(
+            provider.GetRequiredService<ExploreDbContext>(),
+            provider.GetRequiredService<IPrivacyIdentityFenceAuthority>(),
+            provider.GetServices<IModerationNoticeSourceOwner>().SingleOrDefault(),
+            provider.GetRequiredService<IModerationPolicyPublicationSelectionSource>(),
+            provider.GetRequiredService<ModerationNoticeRecipientRepository>(),
+            provider.GetRequiredService<Explore.Application.Services.Moderation.ModerationNoticeNativeMaterializer>(),
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<IModerationAuthorityParticipant>()));
+        services.AddScoped<IModerationQualificationPolicySourceOwner, ModerationQualificationPolicySourceOwner>();
+        services.AddScoped(provider => new ModerationNativeActivationQualification(
+            provider.GetRequiredService<ExploreDbContext>(),
+            provider.GetRequiredService<Explore.Application.Services.Moderation.ModerationCapabilityRegistry>(),
+            provider.GetServices<IModerationActivationSourceOwner>().SingleOrDefault(),
+            provider.GetServices<IModerationQualificationPolicySourceOwner>().SingleOrDefault(),
+            provider.GetRequiredService<TimeProvider>()));
+        services.AddScoped<ModerationAuthorityParticipant>();
+        services.AddScoped<IModerationAuthorityParticipant>(provider =>
+            provider.GetRequiredService<ModerationAuthorityParticipant>());
+        services.AddScoped<IModerationAuthorityContext>(provider =>
+            provider.GetRequiredService<ModerationAuthorityParticipant>());
+        services.AddScoped<IModerationStore>(provider => new ModerationStore(
+            provider.GetRequiredService<ExploreDbContext>(),
+            provider.GetRequiredService<IModerationAuthorityParticipant>(),
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<IPrivacyIdentityFenceAuthority>(),
+            provider.GetRequiredService<IModerationNoticeCapture>()));
         services.AddScoped<IOriginalOwnerSettlementBoundary>(provider =>
             (IOriginalOwnerSettlementBoundary)provider.GetRequiredService<IUnitOfWork>());
         services.AddScoped<ISerializableAttemptOwner, EfCoreUnitOfWork>();
@@ -484,6 +666,8 @@ public static class PersistenceServicesRegistration
                     ? PostgresNativeQueueEnrollment.Bind(provider.GetRequiredService<IConfiguration>()) : null);
         });
         services.AddScoped<IHumanActionCommitFinalizer, HumanActionCommitFinalizer>();
+        services.TryAddScoped<Func<IHumanActionCommitFinalizer>>(provider =>
+            () => provider.GetRequiredService<IHumanActionCommitFinalizer>());
         services.AddScoped<IAccountMembershipPolicySource>(provider =>
         {
             var context = provider.GetRequiredService<ExploreDbContext>();
@@ -851,6 +1035,8 @@ public static class PersistenceServicesRegistration
 
         services.AddScoped<IPrivacyIdentityFenceAuthority>(provider =>
             (IPrivacyIdentityFenceAuthority)provider.GetRequiredService<IPrivacyErasureAuthority>());
+        services.AddScoped<IPrivacyErasureRecoveryAuthority>(provider =>
+            (IPrivacyErasureRecoveryAuthority)provider.GetRequiredService<IPrivacyErasureAuthority>());
         services.AddScoped<ILocalIdentityEligibilityRevocation>(provider =>
             new ConfiguredLocalIdentityEligibilityRevocation(provider.GetRequiredService<ExploreDbContext>(),
                 identityTopology, identityTopology == IdentityDatabaseTopology.External
@@ -929,6 +1115,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IWebPushSubscriptionRepository, WebPushSubscriptionRepository>();
         services.AddScoped<IAppSettingRepository, AppSettingRepository>();
         services.AddScoped<ISecretBindingRepository, SecretBindingRepository>();
+        services.AddScoped<ISetupSecretBindingCatalog, SetupSecretBindingCatalog>();
         services.AddScoped<ILocalizationSecretStatusReader, LocalizationSecretStatusReader>();
         services.AddScoped<IUiThemeRepository, UiThemeRepository>();
         services.AddScoped<IUiThemePresetRepository, UiThemePresetRepository>();
@@ -1040,8 +1227,10 @@ public static class PersistenceServicesRegistration
 
         // Notification Repository
         services.AddScoped<INotificationRepository, NotificationRepository>();
-        services.AddScoped<INotificationIntentRepository, NotificationIntentRepository>();
-        services.AddScoped<IRecipientNotificationGraphRepository, NotificationIntentRepository>();
+        services.AddScoped<NotificationIntentRepository>();
+        services.AddScoped<INotificationIntentRepository>(provider => provider.GetRequiredService<NotificationIntentRepository>());
+        services.AddScoped<IRecipientNotificationGraphRepository>(provider => provider.GetRequiredService<NotificationIntentRepository>());
+        services.AddScoped<IModerationNoticeNotificationCleanup>(provider => provider.GetRequiredService<NotificationIntentRepository>());
 
         // Idempotency Repository
         services.AddScoped<IIdempotencyRepository, IdempotencyRepository>();

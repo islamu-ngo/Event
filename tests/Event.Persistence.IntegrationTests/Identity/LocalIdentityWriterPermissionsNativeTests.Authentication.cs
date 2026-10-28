@@ -3,6 +3,7 @@ using System.Data.Common;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Authentication.Local.Models;
@@ -12,6 +13,7 @@ using Explore.Infrastructure.Authentication;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
@@ -47,6 +49,9 @@ public sealed partial class LocalIdentityWriterPermissionsNativeTests
         await fixture.InitializeAsync();
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
         CancellationToken token = timeout.Token;
+        await using var retainedContext = await NativeIdentityRecognitionBoundary.CreatePostgresAuthorityAsync(fixture, token);
+        var retained = new CoLocatedPostgresPrivacyErasureAuthorityRepository(retainedContext, TimeProvider.System,
+            Options.Create(new PrivacyErasureOptions()));
         var migratorOptions = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator);
         var writerOptions = migratorOptions with
         {
@@ -108,7 +113,9 @@ public sealed partial class LocalIdentityWriterPermissionsNativeTests
             var connector = (NpgsqlConnection)application.Database.GetDbConnection();
             int backend = connector.ProcessID;
             var contextId = application.ContextId;
-            var states = new LocalIdentityCredentialStateStore(application, application, manager, TimeProvider.System, execution);
+            var states = new LocalIdentityCredentialStateStore(application, application, manager, TimeProvider.System,
+                NativeIdentityRecognitionBoundary.Create(application, retained, TimeProvider.System,
+                    NativeIdentityRecognitionBoundary.RejectHumanSettlement), execution);
             string address = $"native-auth-{Guid.CreateVersion7():N}@example.test";
             var creation = await states.CreatePendingAsync(new LocalCredentialCreateRequest(Guid.CreateVersion7(), initiator,
                 address, "Native", "Authentication"), token);

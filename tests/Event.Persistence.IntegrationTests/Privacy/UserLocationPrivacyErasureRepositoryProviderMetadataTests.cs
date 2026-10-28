@@ -1181,6 +1181,7 @@ public sealed class UserLocationPrivacyErasureRepositoryProviderMetadataTests(
             tenant.Id,
             report.Id,
             null,
+            null,
             provider,
             $"privacy-erasure-{Guid.CreateVersion7():N}");
         link.MarkSynced(

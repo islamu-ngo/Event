@@ -3,6 +3,568 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-25
+
+- Managed event-program responses copy their sessions, groups, days and agenda
+  collections during construction and `init`/`with` replacement. Mutating a
+  caller-owned list afterwards no longer changes the published response. JSON
+  arrays, property names, routes and permissions are unchanged. Constructor and
+  replacement snapshot regressions are authored; local test compilation and
+  execution remain unperformed and require remote CI verification.
+
+- Instance administration's existing `POST /api/admin/instance/tenants` route
+  resolves the persisted provider-linked platform user before invoking the native
+  tenant creator, matching `POST /api/tenant`. Neither route assumes a GUID token
+  subject is an application user ID or falls back to an email address. The
+  multi-tenant requirement, native authorization, original-credential checks and
+  creator/membership attribution remain intact. No route, request schema or
+  permission changes. The provider-binding regression covers both routes;
+  it remains locally unbuilt/unrun and requires remote verification.
+
+## 2026-10-24
+
+- Tenant creation resolves the authenticated provider account's persisted platform
+  user binding before passing the creator ID to the native command. A GUID token
+  subject is not assumed to be that platform user ID. An unlinked provider account
+  is rejected without a GUID or email fallback. Creator audit fields and optional
+  administrator membership retain the linked platform identity; the native
+  original-credential and authorization checks remain unchanged. Routes, request
+  shapes and permissions are unchanged. A real provider-binding regression is
+  authored but locally unbuilt/unrun; remote CI must verify it.
+
+- Safety-review and recognition-recovery enums now use their existing named JSON
+  values in the explicit OpenAPI enum catalog and generated client, rather than
+  integer schemas. Nullable enum values remain nullable and may be omitted, as
+  required by the server's null-omitting serializer. Both schema adapters share
+  the catalog; runtime serializers, routes, permissions and disclosure are
+  unchanged. The native contract inventory is regenerated alongside the schema
+  and client. New wire-parity regressions are authored but locally unbuilt/unrun;
+  remote CI must verify the complete contract.
+
+- The explicit HAL schema catalog now describes the existing pre-finding notice,
+  resource-quarantine review/header and recognition-recovery detail responses,
+  with typed content-response, correction-proof and recovery-escalation collection
+  items. Generated clients can consume those existing payloads instead of empty
+  wrapper types. JSON-ignored authority facts remain excluded. The two adjudicated
+  case-read grant/revoke operation names now use central route constants with the
+  same values; URLs, verbs, operation IDs and authorization are unchanged.
+  Native schema/client generation accompanies this correction. The existing
+  strict contract regressions remain unchanged; fresh remote CI must verify it.
+
+## 2026-10-23
+
+- Source integration adds `GET /api/moderation/notice-corrections/{originalNoticeId}`
+  with explicit pending-effect/hash, approval, named-grant, case and case-revision
+  query coordinates. The single-use pending query is not permission: fresh native
+  self-recipient, grant, approved-text and original-retention checks run at result
+  execution. Only Rule, Reason, Facts, RemainingActions, Recourse, Automation and
+  Retention are written. The result awaits response completion inside native custody;
+  post-output errors abort and propagate without replay or replacement payload.
+  PrivateNoStore bypasses ETag buffering, and output caching is disabled. Invalid
+  intent is 400, missing authentication 401, unavailable disclosure 404. No public
+  discovery link, acknowledgement, notification delivery or effect completion is
+  added. Authored regression cases remain UNRUN/unbuilt. Application, Persistence,
+  API and generated-client compilation passed; generated route/projection checks
+  and all three Release capture comparisons passed. Fixture source integration
+  remains in progress, not executed endpoint or provider conformance.
+
+## 2026-10-19
+
+- Private `GET /api/User/{id}/profile-completion` options gain declared-only
+  threshold metadata: kind/outcome/minimum, declaration revision, evaluation time
+  and original finite end. The native owner matches the current PII-owned collection
+  receipt to the exact qualified observation/assessment/consent/policy context.
+  No DOB, exact age or issuer/subject provenance is returned; missing/expired
+  originals are Unknown. This is neither assured evidence nor access permission.
+  Existing declaration status and write contracts remain unchanged. Nineteen
+  additional native/contract/rendered cases are UNRUN/unbuilt. Final readiness
+  checks now withhold a shorter-lived expired display. Native/API and corrected
+  browser compilation passed, the two states use named string-enum schemas, and
+  Release/Debug generated captures align. These are source/compilation receipts,
+  not runtime, eligibility or accessibility certification.
+
+## 2026-10-18
+
+- Existing-Human profile completion now has a private preflight at
+  `GET /api/User/{id}/profile-completion`, separately revision-checked private DOB
+  recording/removal at `/api/User/{id}/private-birth-date`, and an independent
+  avatar operation at `/api/User/{id}/profile-image`. Names and DOB mutations
+  nominate their original assessment/consent through `X-Profile-Collection` and
+  acquire native admission before sensitive body binding. The names DTO no longer
+  accepts an image. User HAL links lead to preflight rather than unconditional
+  names editing. No ordinary response exposes DOB. Generated contracts and both
+  build-configuration captures are aligned; migrations and runtime verification
+  remain open. Authored tests
+  remain UNRUN/unbuilt and this source does not activate collection policy.
+
+- Organization creation retains its public route and DTO, but its native command no
+  longer carries a creator ID. The native owner resolves the actual provider-linked
+  Human, preserves the pre-create ceiling and rechecks Tenant-admin approval through
+  atomic Organization/PII/Actor/participation/initial-admin and existing-epoch commit.
+  Ordinary Pending versus Tenant-admin Approved behavior is unchanged. Sixteen authored
+  native cases remain UNRUN/unbuilt; Application/Persistence/API compilation passed
+  with 182/62/2 warnings and no errors, and scoped source review found no concrete
+  material defect. These are not runtime or provider-conformance evidence.
+  This does not complete provisioning, collection admission or canonical sanctions.
+
+- Event-team mutation routes retain their HTTP shapes, but the five native commands
+  no longer accept a caller-authored actor ID. Concrete handlers resolve the current
+  provider-linked Human before target or audit access and enforce selected-provider
+  team-management authority, or separate ownership-transfer authority. Five authored
+  cases remain UNRUN/unbuilt. Ownership transfer now commits its effective replacement,
+  old-owner revocation, success audit and existing qualification-epoch advance in one
+  native privacy/primary unit, with original permission/replacement deadline checks
+  and invocation-local uncertain-commit reconciliation before replay. Fifteen transfer
+  cases remain UNRUN/unbuilt despite successful source compilation. Assignment-window
+  updates now use the same native commit owner through a dedicated port, retaining
+  future/Pending windows while preventing self-extension of the original permission
+  deadline. Window/version, success audit and existing epoch commit together; denied
+  audit reconciliation does not advance the epoch. Original coverage includes every
+  target-role permission, not only team management, and Actor source fences precede
+  Tenant. Thirteen window/provider cases are UNRUN/unbuilt; initial compilation and
+  final Persistence compilation of the focused review corrections passed. Revocation
+  now uses the same scoped native owner: status/version, stable audit and existing
+  qualification epoch share the actual commit. It retains direct-Owner denial and
+  original permission clocks, including after self-revocation. A fenced actor cannot
+  authorize removal, but an erasure-fenced target cannot veto privilege cleanup.
+  Allowed and denied revocation telemetry now follow confirmation rather than counting
+  rolled-back denial attempts or reporting stale reasons after an early not-found retry.
+  Sixteen revocation cases are UNRUN/unbuilt; initial and final Application/API
+  compilation of telemetry corrections passed. Assignment creation and its email
+  alias now join the same native commit owner: stable grant/audit IDs and existing
+  qualification advance commit together; original email-to-Human binding is fenced
+  and rechecked through commit, without nested decorated dispatch. Twenty-three new
+  creation cases remain UNRUN/unbuilt. Domain/Application/Persistence/API compilation passed; focused source review
+  found no further concrete material defect, not runtime proof.
+  HTTP request shapes are unchanged. Initial-owner aliases, runtime/provider gates
+  and the moderation overlay remain open.
+
+- Existing constitution source/adoption routes now reject a protected complaint
+  window below the project's six-calendar-month minimum. The domain rule and
+  database model constraint agree; route and DTO shapes are unchanged. This does
+  not extend physical custody, establish universal legal applicability or grant
+  complaint submission authority. Six Domain cases and one native writer case
+  remain UNRUN/unbuilt; generated migrations and runtime assurance remain open.
+
+- Existing narrative-policy source/adoption routes now recognize the separate
+  `ProtectedContestation` purpose. Another purpose's adoption cannot authorize
+  it. No complaint payload route, retention default, eligibility floor, reviewer
+  assignment or deployment activation follows from this control-plane addition.
+  Production compilation, native client generation and Release/Debug capture
+  alignment passed. Two Domain and six native cases remain authored UNRUN/unbuilt;
+  generated migrations and runtime/provider assurance remain open.
+
+- Verified AT Protocol organization/group bootstrap now coordinates genuinely new
+  administrator membership with the existing qualification epoch under the owning
+  privacy/primary transaction. Replay does not renew qualification or approve pending
+  participation. Late onboarding failures roll back owned provisioning before returning
+  the bounded failure result. Routes and protocol DTOs are unchanged; eleven native-store
+  source cases remain UNRUN/unbuilt, not complete OAuth or provider-concurrency evidence.
+
+- `GET /api/organizationmember/invitations` now resolves the authenticated,
+  provider-bound recipient and selects their persisted user identity, not an email
+  claim. An identified caller no longer needs an email claim; claiming another
+  recipient's email does not select that person's invitations. The native list
+  request carries no recipient field. Existing tenant and soft-delete filters,
+  response shape and recipient-bound validation/decline remain. Authored native
+  HTTP/query regressions are UNRUN/unbuilt; compilation is not runtime assurance.
+
+- Selected moderation configuration previews now carry named per-destination
+  definition changes/conflicts and compiler diagnostics. Rich details are emitted
+  only through a private one-use disclosure owner that reacquires the session,
+  exact artifact/reservation, expiry and native authority before delivery.
+  Reserved native identities and the disclosure owner are not serialized.
+  Existing whole-set rejection, HAL Apply gating and draft-only import remain
+  unchanged. Authored native/schema/client contracts remain UNRUN/unbuilt;
+  generated-contract and runtime assurance are recorded separately.
+
+- Quarantine-state reads preserve successive completed safety reviews and show
+  the latest disposition (completion time, then descending receipt identity),
+  instead of failing when one cause has multiple valid review completions.
+  Exact native disclosure qualification, original duty deadlines and separate
+  release requirements remain unchanged. Two native regression cases are authored
+  UNRUN/unbuilt; provider/runtime assurance is deferred.
+
+- Added authenticated `POST /api/moderation/cases/{caseId}/findings/{findingId}/finalize`
+  and `POST /api/moderation/findings/{findingId}/reverse`. The named routes are
+  `FinalizeModerationFinding` and `ReverseModerationFinding`; decision finding
+  acceptance remains a separate operation. Route IDs replace body target IDs
+  without changing the operation ID or expected qualification/source revisions.
+  Existing typed CQS handlers and native fenced writers retain independent
+  adjudication, protected-response or qualified urgency, replay and reversal
+  checks. Bodies reject unknown members, including caller authority assertions.
+  Both writes require authentication, 64 KiB JSON, write limiting, no-store and
+  suppressed generic idempotency-response storage. Failures use ProblemDetails;
+  success returns only the existing minimized qualification response.
+  Eighteen new transport contracts and extended native writer/replay assertions
+  are authored but UNRUN/unbuilt. Application/API source compilation passed;
+  OpenAPI and the typed finding client have now been regenerated through the
+  existing targets, with matching Release/Debug captures and a successful Client
+  build (230 unsuppressed warnings, zero errors). The export host logged a
+  lifecycle-delivery scan failure; generation is not service-health evidence.
+  Hosted authenticated HTTP-to-native integration and provider/concurrency
+  assurance remain open. No qualified case HAL projection
+  or classification recurrence activation is implied by these routes.
+
+## 2026-10-15
+
+- **Breaking shared-model contract: target-owned allegations.**
+  `ISLAMU.Moderation.Domain.ModerationCase.Subject`, `SubjectKind`, `SubjectId`
+  and required subject-origin scalar fields are nullable for a material-owned
+  allegation. Shared-model consumers must require actual attribution before
+  adjudication rather than dereferencing a presumed subject. `Target` and retained
+  `Evidence` identify allegation material, not guilt or native permission.
+  Existing finding finalization still rejects an absent subject. This source
+  contract change does not enable an HTTP intake endpoint or certify schema,
+  generated clients, disclosure or provider/runtime behavior.
+
+## 2026-10-15
+
+- Added authenticated operator-budget `sources`, `adoptions` and
+  `adoptions/{adoptionId}/withdraw` POSTs under
+  `/api/moderation/operational-budgets`. Human terms retain an explicit action,
+  positive maximum/window, separate named native operator, exact source
+  generation and finite validity. Service terms do not infer a mandate.
+  Typed CQS/manual validators and native authority preserve 32 KiB JSON,
+  write limiting, no-store, suppressed response storage and route-bound withdrawal.
+  All three command bodies and nested terms reject unmapped JSON members;
+  ignored caller identity/authority assertions are not part of the contract.
+  New report acceptance finalizes native disclosure before its final target,
+  narrative and budget requalification; loss rolls back acceptance and usage.
+  Receipt minting likewise finalizes disclosure before its final authority and
+  expiry checks, withholding the bearer on late expiry or relationship loss.
+  New Human allegation intake requires current independently adopted report
+  terms and transaction-local capacity in addition to its native target proof.
+  Existing durable acceptances supply occurrence accounting; private acceptance
+  metadata now retains budget provenance. Duplicates preserve first-success
+  time; failed submissions/rollback do not charge. Public acceptance output is
+  unchanged, and historical acknowledgement replay grants no new permission.
+  Provider migrations, generated OpenAPI/Client and runtime assurance remain open.
+
+- Attributed Human decision response transitions now require the existing
+  protected pre-finding response, its original receipt and current custody.
+  Generic `RecordModerationCaseResponse` capture denies attributed cases before
+  statement persistence. An expired or missing protected response cannot be
+  replaced by generic evidence; response advancement grants neither a finding
+  nor approval. Request/response schemas are unchanged. Seven native regression
+  vectors are authored but unrun, including post-complete-flush expiry/receipt
+  loss rollback with a real-flush control, under implementation-first assurance.
+  Human `RecordResponse` also enters the native store's existing privacy
+  enrollment/primary pre-commit path; no new request fields or permissions result.
+
+## 2026-10-14
+
+- Added authenticated actual-self consent grant and route-bound terminal
+  withdrawal at `/api/moderation/profile-subject-consents` and
+  `/api/moderation/profile-subject-consents/{consentId}/withdraw`.
+  Strict assessment/original coordinates nominate actual native records, never
+  subject/provider/time/required-set or receipt authority. Grant independently
+  qualifies demanded SubjectConsent; positive-empty/other-only assessments deny.
+  Original finite windows cannot renew under a new ID. Historical withdrawal
+  retains canonical original-self identity and separate historical/current slot
+  generations after policy/assessment/parent loss. Both preserve bounded no-store
+  writes, route overwrite before manual validation, suppressed replay-response
+  storage and private 404. Native owner/CQS/DI/HTTP source is integrated; 86 native,
+  seven Application and 42 HTTP cases remain UNRUN/unbuilt. Current product
+  compilation passed in 7m06.04s; native export and regenerated Client compilation
+  passed in 6.94s/46.11s. New paths, complete strict schemas and actual Client
+  methods were inspected; Debug capture refreshed, final six-operation/seven-pair
+  parity and complete schema/JSON checks passed. Neither
+  self-consent nor earlier four-path artifacts prove collection/body permission.
+
+- Added strict authenticated actual-self subject nomination at
+  `/api/moderation/profile-collection-subject-observations` and route-bound
+  corrective withdrawal at
+  `/api/moderation/profile-collection-assessments/adoptions/{adoptionId}/withdraw`.
+  The former accepts only profile/mode; the latter preserves exact original
+  identity/policy/source/adoption coordinates and replaces the body adoption ID
+  with the route ID. Neither collects sensitive data or grants consent/collection
+  permission. Both retain manual validation, private 404 mapping, 64 KiB JSON,
+  write limiting, no-store and suppressed idempotency response storage.
+  Initial integrated API product compilation passed exit 0 in 8m00.27s.
+  Added assessment `sources` and `adoptions` POSTs with complete strict nested
+  original intent, copied explicit required set including positive empty,
+  exact source acceptance and subject/procedure-slot CAS. No client-supplied
+  subject, observation time or authority is accepted at either object level.
+  Seventy API and seventeen related Application cases are authored UNRUN/unbuilt.
+  Fresh diagnostics are clean; record/adopt compilation passed exit 0 in
+  7m18.68s. Current native export passed in 6.79s and private generated Client
+  compilation passed in 44.50s. All four paths and strict nested/outer schemas
+  are emitted; all seven published/API/Release/Debug byte comparisons and
+  complete JSON syntax/schema semantic checks passed.
+
+- Added authenticated profile procedure POSTs under
+  `/api/moderation/profile-collection-procedures`: `sources`, `adoptions` and
+  `adoptions/{adoptionId}/withdraw`. Intent preserves exact child-age parent
+  generations, explicit field choices and original finite validity; the native
+  owner independently qualifies recording and review. Withdrawal binds the route
+  ID. The HTTP boundary retains a 64 KiB JSON limit, write limiting, no-store,
+  suppressed idempotency response storage and existing RFC 7807 mapping.
+  Twenty-five API, fifteen Application and two hosted schema witnesses are
+  authored UNRUN. CQS source is integrated; targeted API compilation/native
+  export and generated Client compilation passed after a full dependency build
+  timed out. A later separate `GuardianConsentReference` and bounded five-field
+  preliminary vocabulary passed current compilation/export/Client and capture parity;
+  guardian relationship evidence is not consent. Procedure adoption grants no subject
+  consent, individual applicability or permission to collect sensitive data.
+
+- Refreshed the authoritative native OpenAPI document and generated per-tag
+  Client contracts through the existing private NSwag/record/capture pipeline.
+  Export and Client product compilation passed for the current moderation
+  transport surface. No generated code was hand-edited. Actual hosted native/
+  Swagger parity, generated-HTTP interoperability and provider/race assurance
+  remain UNRUN under the programme implementation-first override.
+
+- Added `GET /api/moderation/classification-materials/sources/{sourceId}/review`
+  for the current nominated independent reviewer of an unaccepted proposal.
+  Only the source ID is request intent; tenant/human are server-captured.
+  Original policy/epoch/complete inventory and exact proposal category selections
+  remain bound through private HAL preparation and final body delivery.
+  Publisher/manager identity, substituted metadata, a newer Event source and
+  any retained acceptance invalidate this read. The HAL acceptance action
+  requires native reviewer qualification, never role claims; the write
+  requalifies separately. This read returns review metadata, not resource
+  contents or approved audience eligibility. App/API/native source compilation
+  passed; all hosted/provider execution remains pending.
+
+- Added the material inventory Application query, private terminal projection and
+  authenticated `POST /api/moderation/classification-materials/inventory` HAL
+  contract. Its 64 KiB closed intent contains no client tenant/human, material
+  dictionary or completeness assertion; the handler captures server identity.
+  Representation finishes privately before original native revalidation and
+  body delivery. The source-record link requires mapped native ownership, never
+  role claims. The native read lease retains current policy/qualification,
+  finite taxonomy/age/governance, real Event ownership, independent reviewer and
+  full material/component sets through final output, including the unfiltered
+  latest Event source generation. App/API/native compilation passed;
+  actual hosted execution is pending. This read supplies review coordinates,
+  not accepted classification or audience permission.
+
+- Added authenticated material review POSTs under
+  `/api/moderation/classification-materials`: `sources`, `reviews` and
+  `reviews/{reviewId}/end`. They preserve native complete inventory/current Event
+  ownership, independent acceptance and accountable correction without converting
+  caller lists or digests into permission. Ending binds the route review ID.
+  Writes retain no-store, rate limiting and suppressed idempotency response
+  storage; 16 MiB permits the bounded 4096-material/component inventory and up to
+  64 exact category references per material. Native limits remain stricter.
+  API-owned material JSON accepts only six identity/GUID-stamp coordinates,
+  rejecting duplicates, computed `parent`, claimed authority and invalid paired
+  ancestry. Native and Swagger schema shapes match that closed wire contract.
+  Generated clients and full HTTP/provider execution
+  remain unfinished; classification acceptance issues no audience/age/collection
+  authority.
+
+- Added authenticated child-age policy governance writes under
+  `/api/moderation/child-age-policies`: `POST /sources`, `POST /adoptions` and
+  `POST /adoptions/{adoptionId}/withdraw`. These accept reviewed policy intent,
+  never individual DOB/consent/assurance evidence or caller authority. Native
+  CQS owners retain independently qualified privacy/legal, safeguarding and
+  collection-controller checks. Top-level command JSON rejects unknown members.
+  Writes use a 256 KiB JSON ceiling covering twelve maximum escaped grounds,
+  write limiting, response/output no-store, suppressed idempotency response
+  storage and existing RFC 7807 outcome mapping. Withdrawal binds the route ID.
+  Policy adoption alone enables no individual sensitive collection, assured age,
+  audience access or deployment readiness. Generated/hosted/provider assurance
+  remains a programme-exit obligation.
+
+- Added authenticated taxonomy governance writes under
+  `/api/moderation/classification-taxonomies`: `POST /sources`,
+  `POST /adoptions` and `POST /adoptions/{adoptionId}/withdraw`.
+  Immutable typed intent flows through manual validation to native independent
+  proposal/acceptance/correction owners; body coordinates never qualify authority.
+  Top-level unknown JSON members are rejected. Whole inventories remain bounded
+  to 64 categories, with a 2 MiB request ceiling covering maximum escaped reviewed
+  descriptions. Writes retain limiting, response/output no-store and suppressed
+  idempotency body storage; native receipts own exact retry semantics. Failures
+  use the existing RFC 7807 policy. The withdrawal route binds the adoption ID.
+  Taxonomy acceptance creates no event-material approval, individual collection
+  permission, assured age or audience grant. Generated OpenAPI/client and complete
+  runtime/provider assurance remain queued for programme completion.
+
+## 2026-10-13
+
+- Added closed authenticated `POST /api/moderation/participant-investigations/sources`
+  for native protected assessment capture. Exact incident/read/material/Human/
+  Session/window/custody coordinates and four bounded substantive grounds map
+  through manual validation to the real Kind34 qualification writer. Unknown
+  JSON members are rejected; no claimed investigator/authorization or polymorphic
+  mutation can enter the contract. Actual native independent authority, two
+  separate custody purposes, original ciphertext authentication and final
+  privacy-owned commit checks remain mandatory. The route retains 32 KiB JSON,
+  write limiting, response/output no-store and no idempotency body storage.
+  Success exposes only accepted source identity/revisions.
+  Existing attribution/renewal bodies now accept exact nullable
+  `investigationSourceId`/`investigationSourceRevision` only for Human
+  `ParticipantInvestigation` basis 5, revision 1. Native receipt/ciphertext/current
+  facts qualify under-review responsibility, never guilt/admission/sanction.
+  Authorization-only replacements cannot renew live responsibility. Scalar
+  history survives confidential assessment disposal without preserving permission.
+  EventSubmission remains actual EventVersion submitter only. Fifty-three
+  transport and 104 native/Domain/Application capture/attribution cases are
+  authored UNRUN/unbuilt. Source enum registration now exports named responsibility,
+  target-kind and custody-purpose values through the native and Swagger adapters;
+  two additional hosted enum cases are UNRUN/unbuilt. Native schema and Client
+  SDK regeneration/compilation passed; hosted/provider/race assurance remain open.
+
+- `GET /api/moderation/policies/current` accepts optional UUIDv7
+  `prospectivePolicyId` for an unreserved empty-slot creation intent. Invalid
+  identities fail validation; an already adopted selection always supplies its
+  actual identity. Native scope, delivery authority and read-lease revalidation
+  remain independent. No read reserves or writes state. The generated Client
+  transport uses this parameter to reacquire the same local creation identity
+  and fresh native HAL links without weakening the displayed-head conflict guard.
+  Five native and two transport vectors are authored UNRUN/unbuilt; native
+  schema/SDK generation and guided page Release compilation passed. These
+  source receipts do not certify runtime behavior.
+
+- Added native-authoring-qualified `GET /api/moderation/policies/current` with
+  `scope=tenant|instance`, latest adopted retained definitions/plans and separate
+  current next-write coordinates. Actual terminal delivery retains and rechecks
+  the native serializable read lease; no-store/no-referrer and distinct failure
+  outcomes prevent a stale private representation from being emitted.
+  Installed empty slots are unreserved, not missing installations. HAL offers
+  draft publication/preparation only from nonserialized native facts, never
+  activation or deployment readiness. Registered complete flattened/nested
+  schemas; forty authored native/mapping/HTTP/schema cases remain UNRUN/unbuilt.
+
+- Added public read-only `GET /api/moderation/reference-catalogue` with the
+  complete immutable native reference profiles and self/refresh HAL links only.
+  It exposes no tenant selections, subjects, private cases or current support
+  grants. Added separate authenticated policy POSTs under
+  `/api/moderation/policies/{policyId}/publications` and
+  `.../publication-preparations`, invoking the existing native handlers.
+  Route-owned policy substitution preserves all other complete immutable intent.
+  Bounded 4 MiB writes retain native receipt retries, rate limiting, no-store
+  and distinct ProblemDetails failures. Candidate preparation and publication
+  metadata supply no current activation or conformance authority.
+  Thirty-four projection/link/transport/hosted-schema cases are authored unrun.
+  Native generation and Client compilation passed after explicit HAL wrapper
+  mapping and named enum scalar/collection registration. Hosted/provider and
+  runtime assurance remain open.
+
+- Added separate authenticated revocation/supersession POST adapters under
+  `/api/moderation/decisions/{decisionId}/sanctions/{sanctionId}/revocation` and
+  `/api/moderation/decisions/{decisionId}/sanctions/{supersededSanctionId}/supersession`.
+  Route IDs own selected decision/original contribution; typed commands retain
+  stable operation/effect/new-sanction IDs, expected revisions and complete
+  old/new scope intent. Native current corrector, historical ownership and
+  supersession qualification remain unchanged. Both actions retain 16 KiB JSON,
+  write limiting, no-store and native receipt retry ownership.
+  Native build/export and direct operation/body inspection passed. Sixteen new
+  route/failure vectors are authored unrun; hosted/provider execution, HAL and
+  generated clients remain programme assurance work.
+
+## 2026-10-12
+
+- Added a shared native OpenAPI/Swagger schema adapter for the four immutable
+  moderation intent JSON shapes. Explicit native references and the existing
+  qualified Swagger references preserve recursive scope ancestry, canonical
+  subject origin and original proposal rule. Only converter-owned fields are
+  writable; optional nullable interval terms remain optional, capabilities
+  exclude protected remedies and quorum is 1 or 2. Runtime factories/handlers
+  still qualify complete ancestry, interval coherence and authority.
+  Twelve hosted contract vectors are authored unrun; generated-client and
+  full native/Swagger execution parity remain programme-exit obligations.
+  Native forced export and direct artifact inspection confirm the four typed
+  components and actual proposal-command references. Recursive references are
+  installed only after SDK CLR traversal, replacing existing opaque components.
+- Added authenticated `POST /api/moderation/decisions/{decisionId}/proposal`
+  through the existing native proposal handler. Route decision ID owns the
+  planned aggregate; expected revision names the current open case, while later
+  decision actions use decision revision. Explicit case/rule/capability/quorum/
+  interval terms remain subject to native proposer and adopted-policy checks.
+  MVC uses API-owned immutable rule/proposal converters, not JSON constructors
+  added to Domain. Unknown/duplicate terms and invalid protective-remedy/quorum/
+  interval combinations cannot bypass factories. The action retains 16 KiB
+  JSON, write rate limiting, no-store and native receipt retry semantics.
+  Twenty-five wire and six HTTP/service cases are authored unrun; no
+  finding acceptance, policy activation or completed runtime assurance is claimed.
+- Added authenticated decision POSTs under `/api/moderation/decisions/{decisionId}`:
+  `/findings/{findingId}/acceptance`, `/approval`, `/rejection`, `/withdrawal`
+  and `/activation`. Five closed typed commands invoke the existing native
+  lifecycle handlers/store; route decision/finding IDs override body selectors.
+  Bodies carry stable operation/effect IDs, expected revisions and qualified
+  subject/target intent, never caller identity or a native authority grant.
+  Factory-preserving scope/subject JSON binding retains complete ancestry.
+- Adjudication and activation remain distinct capabilities. Current findings,
+  independent approvals, correction ownership and complete activation evidence
+  are checked by native owners, not endpoint authentication alone. Success
+  returns decision/contribution IDs and accepted revision only. All actions use
+  16 KiB JSON limits, write rate limiting, no-store policies and native receipt
+  retries outside generic idempotency response storage. Errors preserve distinct
+  validation/authentication/forbidden/missing/conflict/unavailable ProblemDetails.
+  Thirty-two transport/service vectors are authored unrun; generated OpenAPI/client,
+  HAL, hosted authentication and real-provider assurance remain programme-exit gates.
+- Added authenticated pre-finding administrative POSTs:
+  `/api/moderation/pre-finding/cases/{caseId}/custodies`,
+  `.../custodies/{custodyId}/acceptance`, `.../custodies/{custodyId}/withdrawal`
+  and `/api/moderation/pre-finding/cases/{caseId}/notices`. They use the existing
+  typed native proposal, independent acceptance, withdrawal and issuance handlers;
+  route case/custody selectors override body claims. Explicit finite purposes,
+  legal mandates, native roles and recipient representation are not defaults.
+  Success returns only the authorized custody/notice ID. ProblemDetails preserves
+  validation, authentication, hidden denial, conflict and unavailable semantics.
+- Custody administration retains 16 KiB JSON bodies; subject-safe issuance allows
+  128 KiB while native accepted terms bound actual text and retention. Both
+  capabilities use write rate limiting, no-store policies and suppression of
+  generic idempotency response storage. Recipient acknowledgement and private
+  response remain separate portal capabilities. Sixteen boundary vectors are
+  authored but unrun; generated OpenAPI/client and hosted/provider assurance
+  remain mandatory at programme exit.
+- Added authenticated `POST /api/moderation/case-read-grants/{caseId}` and
+  `POST /api/moderation/case-read-grants/{grantId}/revoke`. The existing native
+  human administrator, target account and case/material owners qualify creation;
+  body `granteeUserId` names only the target account. Creation requires an exact
+  case revision, source identity, UUIDv7 operation and finite UTC deadline
+  representable at microsecond precision. Route IDs control the lookups.
+  Revocation requires an independent operation and original grant revision 1.
+- Read-grant success exposes only the committed grant ID. Native serializable
+  save/final-recheck/commit and immutable operation ownership govern retries;
+  creation cannot renew an expired grant, and a different operation cannot claim
+  an earlier revocation. Generic response-cache replay is suppressed. Both
+  actions retain write rate limits, 16 KiB bodies, no-store policies and generic
+  validation/unavailable ProblemDetails. Read-receipt minting remains a separate
+  current-authority operation. Generated client/provider/hosted assurance is
+  deferred to programme completion.
+- Added authenticated JSON commands at `POST /api/moderation/case-attributions`,
+  `POST /api/moderation/case-attributions/{caseId}/renew` and
+  `POST /api/moderation/case-attributions/sources/{sourceId}/withdraw`.
+  They call the existing native attribution CQS handlers, not an HTTP-specific
+  authority owner. Route IDs are authoritative for renewal/withdrawal; bodies
+  cannot supply tenant, host, caller or qualified authority.
+- Initial success returns the authorized subject-case ID; renewal and withdrawal
+  return the selected source ID in `BaseCommandResponse<Guid>`. No confidential
+  occurrence payload, reporter identity, source entity or response statement is
+  serialized. Malformed intents return validation ProblemDetails; unavailable
+  native qualification returns generic `503` without revealing case existence.
+  The write rate limiter, 16 KiB request limit, private/no-store policies and
+  generic idempotency-response-storage suppression apply to all three actions.
+- Renewal preserves the same proceeding and immutable opening provenance, and
+  binds the expected source/generation/head revision plus fresh qualification.
+  The nested qualification operation ID owns its native retry receipt; a generic
+  HTTP response cache is not an authority substitute. Withdrawal does not delete
+  history or reverse findings. Generated client/schema review and real HTTP/
+  provider assurance remain programme-exit obligations before deployment.
+
+## 2026-10-09
+
+- Resource audience detail and collection responses now retain action-specific
+  download, access and management decisions through private HAL preparation.
+  Changed action authority invalidates the prepared response even if metadata
+  view remains allowed; a fresh request can return metadata without the denied
+  affordance. Existing routes, cursor format and HTTP DTO shapes are unchanged.
+- Resource upload-session reservation, finalization and cancellation now keep
+  their success response private until a separate current resource read check at
+  result execution. Idempotent reservation, finalized replay and cancelled replay
+  use the same disclosure boundary, including the generic storage endpoints.
+  Revocation or unavailable adopted moderation authority can withhold stored
+  session fields after the mutation has committed; no rollback of that committed
+  mutation is implied.
+- HTTP routes and `BaseCommandResponse<StorageUploadSessionDto>` success shapes
+  remain unchanged. Native CQS consumers use the disposable
+  `StorageUploadSessionResult` and consume its resource projection, rather than
+  directly reading the upload DTO. Ordinary generic uploads retain their response.
 ## 2026-10-18
 
 - **Breaking: remove plaintext provider credentials from API contracts.**

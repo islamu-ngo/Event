@@ -59,9 +59,9 @@ public sealed class PostgresEventReportOperationsAuthorityTests(PostgreSqlContai
                 report.IsDeleted = softDeleted && tenant == rows.B;
                 reportIds.Add(report.Id);
                 seed.EventReportExternalLinks.Add(EventReportExternalLink.CreatePending(
-                    tenant, report.Id, null, EventReportExternalProvider.Osprey,
+                    tenant, report.Id, null, null, EventReportExternalProvider.Osprey,
                     Guid.CreateVersion7().ToString("N"), cutoff.AddMinutes(-1)));
-                var failed = EventReportExternalLink.CreatePending(tenant, report.Id, null,
+                var failed = EventReportExternalLink.CreatePending(tenant, report.Id, null, null,
                     EventReportExternalProvider.Osprey, Guid.CreateVersion7().ToString("N"), cutoff);
                 failed.MarkFailed("health_probe", cutoff);
                 seed.EventReportExternalLinks.Add(failed);

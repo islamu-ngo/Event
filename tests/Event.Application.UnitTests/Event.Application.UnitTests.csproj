@@ -9,6 +9,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Explore.Application\Explore.Application.csproj" />
     <ProjectReference Include="..\..\src\Explore.Domain\Explore.Domain.csproj" />
+    <ProjectReference Include="..\..\src\ISLAMU.Moderation.Application\ISLAMU.Moderation.Application.csproj" />
+    <ProjectReference Include="..\..\src\ISLAMU.Moderation.Domain\ISLAMU.Moderation.Domain.csproj" />
     <ProjectReference Include="..\..\src\Explore.ServiceDefaults\Explore.ServiceDefaults.csproj" />
   </ItemGroup>
 

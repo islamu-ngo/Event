@@ -94,6 +94,7 @@ public class SecurityWebApplicationFactory : WebApplicationFactory<Program>
             ConfigureDatabase(options);
             using (var database = new ExploreDbContext(options.Options))
             {
+                database.BindTenantLease();
                 database.Database.EnsureCreated();
                 SqliteDatabaseInitializer.InitializeAsync(database, CancellationToken.None).GetAwaiter().GetResult();
                 LookupTableSeeder.SeedAsync(database).GetAwaiter().GetResult();

@@ -33,6 +33,8 @@ public static class PrimaryDatabaseProviderComposition
             optionsBuilder,
             options,
             PrimaryDatabaseMigrationTarget.Application);
+        ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(
+            new PrimaryDatabasePublicIdentityOptionsExtension(options.Provider, PrimaryDatabasePublicIdentity.Digest(options)));
         optionsBuilder.AddInterceptors(EventDiscoveryDisclosureTransactionInterceptor.Instance);
         switch (options.Provider)
         {

@@ -22,7 +22,7 @@ public sealed class ExternalApiPhase0IntegrationTests
     [Test]
     public async Task SecureProbe_WithBearerToken_AndTenantSlug_ReturnsResolvedJwtContext()
     {
-        var tenantId = Guid.NewGuid();
+        var tenantId = Guid.CreateVersion7();
         var userId = Guid.NewGuid();
 
         await using var factory = new ExternalApiPhase0WebApplicationFactory
@@ -53,7 +53,7 @@ public sealed class ExternalApiPhase0IntegrationTests
     [Test]
     public async Task SecureProbe_WithApiKey_DerivesTenantFromKey()
     {
-        var tenantId = Guid.NewGuid();
+        var tenantId = Guid.CreateVersion7();
         var rawApiKey = ApiKeyHashing.CreateSecret();
 
         await using var factory = new ExternalApiPhase0WebApplicationFactory
@@ -91,7 +91,7 @@ public sealed class ExternalApiPhase0IntegrationTests
     [Test]
     public async Task SecureProbe_WithPersistedApiKey_DerivesTenantFromPersistedCredential()
     {
-        var tenantId = Guid.NewGuid();
+        var tenantId = Guid.CreateVersion7();
         var ownerId = Guid.NewGuid();
         const string keyId = "persisted-alpha";
         var secret = ApiKeyHashing.CreateSecret();
@@ -132,7 +132,7 @@ public sealed class ExternalApiPhase0IntegrationTests
     [Test]
     public async Task SecureProbe_WithPersistedApiKey_UpdatesUsageMetadata()
     {
-        var tenantId = Guid.NewGuid();
+        var tenantId = Guid.CreateVersion7();
         var ownerId = Guid.NewGuid();
         const string keyId = "persisted-usage";
         var secret = ApiKeyHashing.CreateSecret();
@@ -173,7 +173,7 @@ public sealed class ExternalApiPhase0IntegrationTests
     [Test]
     public async Task SecureProbe_WithPersistedApiKeys_RateLimiting_IsPartitionedPerKey()
     {
-        var tenantId = Guid.NewGuid();
+        var tenantId = Guid.CreateVersion7();
         const string firstKeyId = "persisted-rate-limit-a";
         var firstSecret = ApiKeyHashing.CreateSecret();
         const string secondKeyId = "persisted-rate-limit-b";
@@ -234,7 +234,7 @@ public sealed class ExternalApiPhase0IntegrationTests
     [Test]
     public async Task SecureProbe_WithRevokedPersistedApiKey_ReturnsUnauthorized()
     {
-        var tenantId = Guid.NewGuid();
+        var tenantId = Guid.CreateVersion7();
         const string keyId = "persisted-revoked";
         const string secret = "persisted-revoked-secret";
         var rawApiKey = ApiKeyHashing.FormatPersistedApiKey(keyId, secret);
@@ -268,8 +268,8 @@ public sealed class ExternalApiPhase0IntegrationTests
     [Test]
     public async Task SecureProbe_WithApiKey_AndConflictingTenantSlug_ReturnsNotFound()
     {
-        var apiKeyTenantId = Guid.NewGuid();
-        var hintedTenantId = Guid.NewGuid();
+        var apiKeyTenantId = Guid.CreateVersion7();
+        var hintedTenantId = Guid.CreateVersion7();
         const string rawApiKey = "phase0-conflict-key";
 
         await using var factory = new ExternalApiPhase0WebApplicationFactory
@@ -306,8 +306,8 @@ public sealed class ExternalApiPhase0IntegrationTests
     [Test]
     public async Task ExternalApiKeyManagement_WithPersistedApiKeyAndConflictingTenantSlug_ReturnsNotFoundWithoutCredentialEcho()
     {
-        var apiKeyTenantId = Guid.NewGuid();
-        var hintedTenantId = Guid.NewGuid();
+        var apiKeyTenantId = Guid.CreateVersion7();
+        var hintedTenantId = Guid.CreateVersion7();
         var keyId = ApiKeyHashing.CreateKeyId();
         var secret = ApiKeyHashing.CreateSecret();
         var rawApiKey = ApiKeyHashing.FormatPersistedApiKey(keyId, secret);
@@ -393,7 +393,7 @@ public sealed class ExternalApiPhase0IntegrationTests
     public async Task SecureProbe_WithBearerAndApiKey_ReturnsBadRequest()
     {
         var userId = Guid.NewGuid();
-        var tenantId = Guid.NewGuid();
+        var tenantId = Guid.CreateVersion7();
         var rawApiKey = ApiKeyHashing.CreateSecret();
 
         await using var factory = new ExternalApiPhase0WebApplicationFactory
@@ -455,7 +455,7 @@ public sealed class ExternalApiPhase0IntegrationTests
     [Test]
     public async Task SecureProbe_WithTrustedForwardedHost_ResolvesTenantFromCustomDomain()
     {
-        var tenantId = Guid.NewGuid();
+        var tenantId = Guid.CreateVersion7();
         var userId = Guid.NewGuid();
 
         await using var factory = new ExternalApiPhase0WebApplicationFactory
@@ -488,7 +488,7 @@ public sealed class ExternalApiPhase0IntegrationTests
     [Test]
     public async Task SecureProbe_WithDirectHost_ResolvesTenantFromCustomDomain()
     {
-        var tenantId = Guid.NewGuid();
+        var tenantId = Guid.CreateVersion7();
         var userId = Guid.NewGuid();
 
         await using var factory = new ExternalApiPhase0WebApplicationFactory

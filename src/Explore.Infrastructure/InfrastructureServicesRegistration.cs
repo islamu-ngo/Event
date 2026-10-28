@@ -43,6 +43,7 @@ using Explore.Infrastructure.Registration;
 using Explore.Infrastructure.Services;
 using Explore.Infrastructure.Services.Federation;
 using Explore.Infrastructure.Services.Keycloak;
+using Explore.Application.Contracts.Moderation;
 using Explore.Infrastructure.Services.Moderation;
 using Explore.Infrastructure.Services.Moderation.Coop;
 using Explore.Infrastructure.Services.Privacy;
@@ -248,7 +249,8 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<IEmailDeliveryCapabilityResolver>(provider => provider.GetRequiredService<EmailDeliveryCapabilityResolver>());
         services.AddScoped<SmtpEmailService>(provider => new SmtpEmailService(
             provider.GetRequiredService<ISmtpConfigResolver>(), provider.GetRequiredService<ILogger<SmtpEmailService>>(),
-            provider.GetRequiredService<TimeProvider>()));
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<Explore.Application.Contracts.Notifications.IModerationNoticeEmailAuthority>()));
         services.AddScoped<IEmailService>(provider => provider.GetRequiredService<SmtpEmailService>());
         services.AddScoped<IEmailConnectionTester>(provider => provider.GetRequiredService<SmtpEmailService>());
         services.AddSingleton<IEmailDispatchDrainService, EmailDispatchDrainService>();
@@ -363,6 +365,14 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<ISupportAccessSessionService, SupportAccessSessionService>();
         services.AddScoped<IPublicUrlBuilder, PublicUrlBuilder>();
         services.AddScoped<IEventReportEvidenceProtector, EventReportEvidenceProtector>();
+        services.AddScoped<ModerationRecognitionKeyRingProvider>();
+        services.AddScoped<IModerationRecognitionKeyRingProvider>(provider =>
+            provider.GetRequiredService<ModerationRecognitionKeyRingProvider>());
+        services.AddScoped<IModerationRecognitionKeyMaterialSource>(provider =>
+            provider.GetRequiredService<ModerationRecognitionKeyRingProvider>());
+        services.AddSingleton<IModerationMeasurementReceiptVerifier, ModerationMeasurementReceiptVerifier>();
+        services.AddSingleton<IModerationMeasurementCatalogueSource, ModerationMeasurementCatalogueSource>();
+        services.AddSingleton<IModerationMeasurementRuntimeArtifacts, ModerationMeasurementRuntimeArtifacts>();
         services.AddOptions<ModerationProviderOptions>()
             .Bind(configuration.GetSection(ModerationProviderOptions.SectionName))
             .ValidateOnStart();
@@ -722,6 +732,7 @@ public static class InfrastructureServicesRegistration
             () => provider.GetRequiredService<IHumanActionCommitFinalizer>(),
             () => provider.GetRequiredService<Explore.Application.Authorization.AuthorizationResourceContextResolver>(),
             () => provider.GetRequiredService<Explore.Application.Contracts.Persistence.ISerializableAttemptOwner>(),
+            () => provider.GetRequiredService<IHumanSecuritySourceGate>(),
             () => provider.GetRequiredService<IEventDiscoveryEnrollmentGate>(),
             () => provider.GetRequiredService<ISettingMutationLock>(),
             () => provider.GetRequiredService<IHumanTenantCreationGraphWriter>()));
@@ -919,6 +930,7 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<EventDiscoveryIdentityCorrectionDispatcher>();
         services.AddScoped<LocationPrivacyCorrectionDispatcher>();
         services.AddScoped<PrivacyErasureCacheInvalidationDispatcher>();
+        services.AddScoped<IModerationEffectDispatcher, ModerationEffectOutboxDispatcher>();
         services.AddScoped<IOutboxMessageDispatcher, CompositeOutboxMessageDispatcher>();
         services.AddOptions<EmailDispatchProcessorSettings>()
             .Bind(configuration.GetSection(EmailDispatchProcessorSettings.SectionName))

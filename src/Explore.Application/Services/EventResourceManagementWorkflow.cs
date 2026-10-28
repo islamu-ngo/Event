@@ -20,7 +20,8 @@ namespace Explore.Application.Services;
 public sealed partial class EventResourceManagementWorkflow(
     IEventResourceRepository resources, IUnitOfWork unitOfWork,
     EventResourceStorageLifecycleService lifecycle, EventResourceAuthorityOrchestrator authority, ITenantContext tenant,
-    ICurrentUserService user, IMachinePrincipalAccessor machine, TimeProvider clock)
+    ICurrentUserService user, IMachinePrincipalAccessor machine, TimeProvider clock,
+    IEventPublicationMutationBoundary publicationBoundary)
 {
     public async Task<BaseCommandResponse<Guid>> CreateAsync(Guid eventId, Guid resourceId,
         EventResourceDraftDto draft, CancellationToken cancellationToken)
@@ -123,7 +124,7 @@ public sealed partial class EventResourceManagementWorkflow(
         var audit = Audit(request, resourceId, auditAction, now);
         try
         {
-            return await unitOfWork.ExecuteSerializableAsync(async ct =>
+            async Task<BaseCommandResponse<Guid>> Mutate(CancellationToken ct)
             {
                 var outcome = await authority.RecheckMutationAsync(lease, expectedVersion, ct);
                 if (outcome != EventResourceAuthorityOutcome.Allowed) return Failure(outcome, resourceId, ct);
@@ -179,7 +180,18 @@ public sealed partial class EventResourceManagementWorkflow(
                 if (policy.AuditRetentionDays > 0) await resources.AddAuditEntryAsync(audit, ct);
                 await resources.SaveChangesAsync(ct);
                 return BaseCommandResponse.Success(resourceId);
-            }, cancellationToken);
+            }
+            var result = action == "publish"
+                ? await publicationBoundary.ExecuteAsync(eventId, Mutate, cancellationToken)
+                : await unitOfWork.ExecuteSerializableAsync(Mutate, cancellationToken);
+            return result.FailureCode switch
+            {
+                "event_publish_restricted" => BaseCommandResponse.Failure<Guid>(
+                    EventResourceManagementFailureCodes.Forbidden, result.Message, result.Errors, resourceId),
+                "event_publish_authority_unavailable" => BaseCommandResponse.Failure<Guid>(
+                    EventResourceManagementFailureCodes.Unavailable, result.Message, result.Errors, resourceId),
+                _ => result
+            };
         }
         catch (ArgumentException) { return Invalid(); }
         catch (ConcurrencyConflictException) { return BaseCommandResponse.Conflict(resourceId); }
@@ -220,9 +232,17 @@ public sealed partial class EventResourceManagementWorkflow(
         policy.EnabledDeliveryTypes.Contains(draft.DeliveryType)
         && policy.EnabledAudiences.IsSupersetOf(draft.AudienceRules.Select(rule => rule.Kind));
 
-    private EventResourceAuthorityRequest Request(Guid targetId, string action, bool collection = false) =>
-        new(tenant.TenantId, targetId, user.IsAuthenticated ? user.UserId : null, machine.IsMachineCaller, action)
-        { IsEventCollection = collection };
+    private EventResourceAuthorityRequest Request(Guid targetId, string action, bool collection = false)
+    {
+        var principal = machine.Current;
+        return new(tenant.TenantId, targetId,
+            principal is null && !machine.IsMachineCaller && user.IsAuthenticated ? user.UserId : null,
+            machine.IsMachineCaller, action)
+        {
+            IsEventCollection = collection,
+            MachinePrincipal = principal is null ? null : EventResourceMachinePrincipal.Capture(principal)
+        };
+    }
 
     private static EventResourceAuditEntry Audit(EventResourceAuthorityRequest request, Guid resourceId,
         EventResourceAuditAction action, DateTime now) => EventResourceAuditEntry.Create(request.TenantId, resourceId,

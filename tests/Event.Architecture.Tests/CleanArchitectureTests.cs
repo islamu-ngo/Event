@@ -25,6 +25,28 @@ public class CleanArchitectureTests
     #region Domain Layer Tests
 
     [Test]
+    public async Task Domain_ShouldNotHaveDependencyOn_SharedModerationApplication()
+    {
+        var result = Types.InAssembly(DomainAssembly)
+            .ShouldNot()
+            .HaveDependencyOn("ISLAMU.Moderation.Application")
+            .GetResult();
+
+        await Assert.That(result.IsSuccessful).IsTrue();
+    }
+
+    [Test]
+    public async Task SharedModerationDomain_ShouldNotHaveDependencyOn_EventApplication()
+    {
+        var result = Types.InAssembly(typeof(ISLAMU.Moderation.Domain.ModerationDecision).Assembly)
+            .ShouldNot()
+            .HaveDependencyOn(ApplicationNamespace)
+            .GetResult();
+
+        await Assert.That(result.IsSuccessful).IsTrue();
+    }
+
+    [Test]
     public async Task Domain_ShouldNotHaveDependencyOn_Application()
     {
         var result = Types.InAssembly(DomainAssembly)

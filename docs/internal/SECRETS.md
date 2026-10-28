@@ -3,6 +3,22 @@ ABOUTME: Covers bootstrap selection, safe diagnostics, health monitoring, and ro
 
 # Secrets Management
 
+## Moderation consumer ownership
+
+Reconciliation reads `MODERATION__RECONCILIATION__APIKEY` from the selected API
+owner at `/api`. Ordinary application configuration cannot supply a missing
+credential. Local Environment and User Secrets values remain bound to that
+owner's frozen generation; replacing local material requires a new owner or
+process restart. Infisical reads retain the selected session and native outcomes.
+
+The measurement launcher owns a separate `ModerationMeasurement` acquisition
+limited to `/database` and `/moderation`. API, BFF, Combined and Migration owners
+cannot acquire `/moderation`; the measurement owner cannot acquire `/api`.
+Its native authentication maintenance belongs to the launcher process and is
+disposed with its prepared configuration. Measurement signers and test-database
+credentials are not serving-host inputs. The launcher keeps the existing public
+signer and test-coordinate names documented in `eng/moderation/README.md`.
+
 ## Actor ownership reads
 
 Application workflows establish the original user and selected tenant before
@@ -1744,6 +1760,76 @@ OAuth client and session-JWT signing rings follow the same overlap rule: exactly
 
 Only the BFF OAuth-client signing ring is evaluated by the `atproto-authentication` readiness check. Validate the encryption and session-JWT rings with a controlled sign-in/session refresh before removing retired keys; their consumers otherwise fail closed when persisting/restoring a session or issuing/validating a first-party JWT.
 
+### Moderation Recognition Key Ring
+
+`SecretDefinitionRegistry.Keys.ModerationRecognitionKeyRing` identifies
+`moderation.recognition_keyring`. It is instance-only and non-bootstrap:
+ordinary startup and ordinary erasure do not require recognition material.
+`SecretBinding.Create` rejects tenant-scoped bindings. The application database
+holds binding and lifecycle metadata, never the ring's private key material.
+
+The catalogue permits `Infisical` and `EnvironmentVariable` binding source
+types. These are not the same enum as the selected secret authority:
+`SecretResolver.SelectedSourceType` maps both `Environment` and explicitly
+selected `UserSecrets` authority to `EnvironmentVariable`. User Secrets therefore
+remains supported in Development/Testing only, without becoming a third binding
+source or a fallback. Infisical bindings must match the selected Infisical
+authority. The existing no-fallback resolution contract applies in every mode.
+
+`ModerationRecognitionKeyRing` owns strict parsing and purpose-bound ring
+metadata. Its trust domain, generations, key identities and material commitments
+must agree with the lifecycle snapshot; parsing a valid external value alone
+does not establish current native permission, capture continuity or recovery.
+The operator-facing encoding and default source coordinates are documented in
+[Moderation and Banning](../public/documentation/readme/security-and-identity/moderation-and-banning.md).
+
+`GetRotationProfile` classifies this setting as `OverlapRollout`, requiring
+candidate validation and every-replica acknowledgement, with
+`drain-and-fail-closed` for stale replicas. This is a required rotation contract,
+not an acknowledgement receipt or proof that a protected operator workflow has
+completed it. Retain original readable material while current recognition,
+supported backups or restore/replay obligations still need it. HMAC tokens
+cannot be rehashed after their original qualified inputs have been destroyed.
+
+### Isolated Moderation Measurement Credentials
+
+The catalogue separately registers
+`moderation.measurement_signing_private_key_pem` and
+`moderation.measurement_test_database.password` as instance-only,
+bootstrap-owned credentials. Here bootstrap ownership selects their secret
+resolution boundary; it does not make either credential mandatory for ordinary
+API startup or enable the measurement launcher.
+
+The first credential belongs only to the launcher's P-256 signer. Its public key
+requires independent native enrollment; private signing material must not reach
+test children. The second belongs only to a separately selected measurement
+database, never the primary authority database. Registry coordinates and the
+blank deployment variables in `.env.example` do not select a measurement purpose,
+enroll a signer, prove isolation or authorize a native consumer. Missing selected
+material cannot be replaced by a generated credential or another authority.
+
+### Moderation Reconciliation Credential
+
+`moderation.reconciliation_api_key` is an instance-only, bootstrap-owned
+credential for the opt-in recovery job, not an administrator identity or an
+installation record. Its external source coordinates and operational options
+are documented in [CONFIGURATION.md](CONFIGURATION.md#native-moderation-reconciliation).
+The value is never stored in options, Quartz data, policy exports or telemetry.
+
+`ModerationReconciliationSecretProvider` rebuilds only the explicitly selected
+authority for each acquisition. Environment selection reads process injection;
+Infisical selection reads `/api` without fallback; shared User Secrets are
+accepted only in Development or Testing. Application configuration supplies
+provider selection, not the credential. A value in appsettings therefore cannot
+repair a missing selected secret.
+
+After secret acquisition, the native credential provider verifies the real
+persisted key hash, current status, expiry and credential tenant. The lifecycle
+transaction independently qualifies its exact installed maintenance-service
+binding. Neither successful hash authentication nor a binding alone supplies
+moderation authority. Credential replacement remains subject to the registry's
+coordinated restart policy and current native binding qualification.
+
 ### Promotion Code Lookup HMAC Key
 
 Promotion lookup uses the dedicated registry key `promotions.code_lookup_hmac_key`. It is instance-only, server-only, non-bootstrap secret material; it must not share a key with encryption, signing, webhook, payment, or provider credentials. Each usable key requires a qualified `SecretBinding` whose qualifier is exactly `v{version}`, such as `v1`. The default initial source coordinates are `/promotions/PROMOTIONS_CODE_LOOKUP_HMAC_KEY` for Infisical and `PROMOTIONS_CODE_LOOKUP_HMAC_KEY` for environment-variable bindings. Overlapping versions must point to distinct immutable source coordinates; do not repoint both `v1` and `v2` bindings at one environment variable whose value is replaced.
@@ -2071,6 +2157,24 @@ closed before any instance or tenant state is written. Export remains a
 secret-free configuration artifact, never a database or secret backup.
 
 ## Setup Live Secret-Binding Boundary
+
+`PostgresSetupLiveStoragePermissions` installs Runtime SELECT and INSERT rights
+on the EF-mapped enrollment, issuance-claim and secret-binding-operation tables.
+Only enrollment capability/lifecycle/expiry and operation settlement fields,
+their concurrency stamps and update audit columns receive UPDATE rights.
+Issuance claims remain immutable; no DELETE, Global-role membership, workflow
+routine or tenant-policy bypass is granted. Production migration and native test
+bootstrap invoke the same migrator-only installer on its original transaction.
+Setup Live uses `ISetupSecretBindingIdentityReader` to project only the ID of
+an unqualified instance `setup.signing` or `setup.encryption` binding. Runtime
+receives SELECT only on binding ID, key, qualifier and scope identity columns;
+provider coordinates and source references remain unreadable. Readiness and
+write ports continue to consume that ID and the canonical key, not a partially
+populated binding entity or a copied provider reference.
+The actual Runtime isolation regression checks both selected and absent tenant
+contexts; Runtime cannot invoke the installer to grant itself privileges.
+Application admission, replay, dispatch and settlement retain their existing
+serializable owner and authorization boundaries.
 
 Setup Live can submit a value only after the target reports the exact binding
 as `Ready`. The target writes through its already-selected authority; the

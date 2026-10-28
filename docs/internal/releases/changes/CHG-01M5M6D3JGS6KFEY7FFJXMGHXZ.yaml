@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5M6D3JGS6KFEY7FFJXMGHXZ
+Title: "Bind correction disclosure and case grants to original effect custody"
+Type: feat
+Scope: privacy
+Summary: "Bind correction audiences, finite adjudicated read grants and completion accounting to the original effect and disclosure purpose; included tests are unrun and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Correction disclosure and finite adjudicated read grants retain exact original effect, notice, audience and purpose; completion accounting and revocation proofs do not create general administrator read authority. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires separately owned correction/grant/cleanup/completion models and adjudicated read-grant migration families in the cumulative schema checkpoint; no migration or provider execution occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Correction and adjudicated-read-grant endpoint sources and private result ship here; cumulative generated API artifacts ship once in final host composition."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Deploy together with original custody, protected response, schema and composition owners; complete paired finite grant/correction guidance and provider assurance before PR."

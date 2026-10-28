@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Operations;
@@ -39,7 +40,7 @@ public sealed partial class HumanAccountMembershipCustodyTests
         var context = request.Services.GetRequiredService<ExploreDbContext>();
         var bodyReached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var owner = new AfterBody((ISerializableAttemptOwner)new EfCoreUnitOfWork(context), async token =>
+        request.Admission.AfterNativeSources = async token =>
         {
             await Assert.That(await context.TenantUserRoleGrants.AsNoTracking()
                 .Where(row => row.Id == target).Select(row => row.RevokedAt).SingleAsync(token)).IsNotNull();
@@ -68,19 +69,18 @@ public sealed partial class HumanAccountMembershipCustodyTests
                     await context.SystemSettings.Where(row => row.SettingKey == GovernanceSettingKeys.Security.AuthorizationProvider)
                         .ExecuteUpdateAsync(update => update.SetProperty(row => row.Value, "\"cerbos\""), token);
                     break;
-                case "credential_after_read":
-                    request.Services.GetRequiredService<IHumanActionCommitFinalizer>().Register(async finalToken =>
-                    {
-                        await context.TenantUserRoleGrants.AsNoTracking().SingleAsync(row => row.Id == target, finalToken);
-                        var lifetime = (await request.Services.GetRequiredService<IHumanAuthenticationLifetimeObserver>()
-                            .ObserveAsync(request.Context.User, finalToken))!;
-                        fixture.Clock.Advance(lifetime.ExpiresAt.Add(lifetime.ClockSkew).AddTicks(1)
-                            - fixture.Clock.GetUtcNow());
-                    }, _ => { });
-                    break;
             }
-        });
-        var handler = ActivatorUtilities.CreateInstance<RevokeTenantUserRoleGrantCommandHandler>(request.Services, owner);
+        };
+        if (change == "credential_after_read")
+            request.Admission.AfterAllSources = async token =>
+            {
+                await context.TenantUserRoleGrants.AsNoTracking().SingleAsync(row => row.Id == target, token);
+                var lifetime = (await request.Services.GetRequiredService<IHumanAuthenticationLifetimeObserver>()
+                    .ObserveAsync(request.Context.User, token))!;
+                fixture.Clock.Advance(lifetime.ExpiresAt.Add(lifetime.ClockSkew).AddTicks(1)
+                    - fixture.Clock.GetUtcNow());
+            };
+        var handler = ActivatorUtilities.CreateInstance<RevokeTenantUserRoleGrantCommandHandler>(request.Services);
         Task<bool> operation = handler.ExecuteAsync(new() { Id = target, TenantId = PlatformDefaults.DefaultTenantId }, default);
         try
         {
@@ -108,7 +108,14 @@ public sealed partial class HumanAccountMembershipCustodyTests
     }
 
     private static Task<LocalIdentityLifecycleHttpFixture> CreateFixture() =>
-        LocalIdentityLifecycleHttpFixture.CreateAsync();
+        LocalIdentityLifecycleHttpFixture.CreateAsync(configureServices: services =>
+        {
+            var registration = services.Single(service => service.ServiceType == typeof(IHumanActionCommitFinalizer));
+            services.Remove(registration);
+            services.AddScoped(provider => new CommitAdmissionProbe(
+                (IHumanActionCommitFinalizer)ActivatorUtilities.CreateInstance(provider, registration.ImplementationType!)));
+            services.AddScoped<IHumanActionCommitFinalizer>(provider => provider.GetRequiredService<CommitAdmissionProbe>());
+        });
 
     private static async Task<(Guid Target, Guid Other)> SeedTenantAdministrator(LocalIdentityLifecycleHttpFixture fixture,
         bool platform = false)
@@ -168,16 +175,29 @@ public sealed partial class HumanAccountMembershipCustodyTests
         return (target, other);
     }
 
-    private sealed class AfterBody(ISerializableAttemptOwner inner, Func<CancellationToken, Task> afterBody)
-        : ISerializableAttemptOwner
+    private sealed class CommitAdmissionProbe(IHumanActionCommitFinalizer inner) : IHumanActionCommitFinalizer
     {
-        public Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation,
-            CancellationToken cancellationToken = default) => inner.ExecuteAsync(async token =>
+        private int registrations;
+        internal Func<CancellationToken, Task>? AfterNativeSources { get; set; }
+        internal Func<CancellationToken, Task>? AfterAllSources { get; set; }
+        internal bool NativeSourcesReached { get; private set; }
+
+        public void Register(Func<CancellationToken, Task> validateSources, Action<DateTimeOffset> validateAssignments)
         {
-            T result = await operation(token);
-            await afterBody(token);
-            return result;
-        }, cancellationToken);
+            int position = ++registrations;
+            inner.Register(async token =>
+            {
+                await validateSources(token);
+                // Native admission registers first; retain its receipt and then race
+                // the human's source checks without replacing the transaction owner.
+                if (position == 1 && AfterNativeSources is { } afterNative)
+                {
+                    NativeSourcesReached = true;
+                    await afterNative(token);
+                }
+                if (position == registrations && AfterAllSources is { } afterAll) await afterAll(token);
+            }, validateAssignments);
+        }
     }
 
     private sealed class Request : IAsyncDisposable
@@ -185,6 +205,7 @@ public sealed partial class HumanAccountMembershipCustodyTests
         private readonly AsyncServiceScope scope;
         private readonly IHttpContextAccessor accessor;
         internal IServiceProvider Services => scope.ServiceProvider;
+        internal CommitAdmissionProbe Admission => Services.GetRequiredService<CommitAdmissionProbe>();
         internal DefaultHttpContext Context { get; }
 
         internal Request(IServiceProvider services)
@@ -210,6 +231,15 @@ public sealed partial class HumanAccountMembershipCustodyTests
             await Assert.That(result.Succeeded).IsTrue();
             Context.User = result.Principal!;
             await Services.GetRequiredService<IHumanCommitScopePreparation>().PrepareAsync(default);
+        }
+
+        internal void SubstituteSubject(string subject)
+        {
+            var identity = (ClaimsIdentity)Context.User.Identity!;
+            foreach (var claim in identity.FindAll("sub").Concat(identity.FindAll(ClaimTypes.NameIdentifier)).ToArray())
+                identity.RemoveClaim(claim);
+            identity.AddClaim(new Claim("sub", subject));
+            identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, subject));
         }
 
         public async ValueTask DisposeAsync()

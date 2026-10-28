@@ -149,9 +149,9 @@ public static class OperationServicesRegistration
                     guard.Enter(contract);
                     try
                     {
-                        var inner = mutationFactory is not null
-                            ? mutationFactory(provider, [provider, implementation])
-                            : queryFactory is not null
+                        if (mutationFactory is not null)
+                            return mutationFactory(provider, [provider, implementation]);
+                        var inner = queryFactory is not null
                                 ? queryFactory(provider, [provider, implementation, requiresHumanPreparation])
                                 : provider.GetRequiredService(implementation);
                         var timed = performanceFactory(provider, [inner]);

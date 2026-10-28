@@ -2,6 +2,7 @@
 
 using System.Text.Json.Serialization;
 using System.Collections.Immutable;
+using System.Reflection;
 using Explore.Application.Hateoas;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
@@ -182,6 +183,7 @@ public class HalDtoSchemaTransformer : IOpenApiDocumentTransformer
         var genericDefinition = propertyType.GetGenericTypeDefinition();
         if (genericDefinition != typeof(List<>)
             && genericDefinition != typeof(IReadOnlyList<>)
+            && genericDefinition != typeof(IReadOnlySet<>)
             && genericDefinition != typeof(IList<>)
             && genericDefinition != typeof(ImmutableArray<>))
         {
@@ -215,6 +217,7 @@ public class HalDtoSchemaTransformer : IOpenApiDocumentTransformer
     {
         var registeredDtoTypes = new HashSet<Type>(HalOpenApiSchemaCatalog.RegisteredDtoTypes);
         var registeredDtoNames = new HashSet<string>(HalOpenApiSchemaCatalog.RegisteredDtoTypes.Select(t => t.Name));
+        var nullability = new NullabilityInfoContext();
 
         foreach (var dtoType in HalOpenApiSchemaCatalog.RegisteredDtoTypes)
         {
@@ -229,14 +232,16 @@ public class HalDtoSchemaTransformer : IOpenApiDocumentTransformer
                     continue;
 
                 var camelCase = char.ToLowerInvariant(prop.Name[0]) + prop.Name[1..];
+                bool isNullable = Nullable.GetUnderlyingType(prop.PropertyType) is not null
+                    || nullability.Create(prop).ReadState == NullabilityState.Nullable;
 
-                ReplaceInlineObjectPropertyWithReference(document, dtoType.Name, camelCase, propertyType.Name);
+                ReplaceInlineObjectPropertyWithReference(document, dtoType.Name, camelCase, propertyType.Name, isNullable);
 
                 foreach (var halSchemaName in HalOpenApiSchemaCatalog.DetailResourceMappings
                     .Where(mapping => mapping.Value == dtoType)
                     .Select(mapping => mapping.Key))
                 {
-                    ReplaceInlineObjectPropertyWithReference(document, halSchemaName, camelCase, propertyType.Name);
+                    ReplaceInlineObjectPropertyWithReference(document, halSchemaName, camelCase, propertyType.Name, isNullable);
                 }
             }
         }
@@ -257,6 +262,9 @@ public class HalDtoSchemaTransformer : IOpenApiDocumentTransformer
             foreach (var prop in dtoType.GetProperties())
             {
                 var propertyType = UnwrapNullableType(prop.PropertyType);
+                bool isCollection = TryGetCollectionItemType(propertyType, out var itemType);
+                if (isCollection)
+                    propertyType = itemType;
                 if (!OpenApiStringEnumSchemaCatalog.IsStringEnum(propertyType))
                 {
                     continue;
@@ -277,13 +285,19 @@ public class HalDtoSchemaTransformer : IOpenApiDocumentTransformer
                 var jsonName = GetJsonPropertyName(prop);
 
                 var isNullable = Nullable.GetUnderlyingType(prop.PropertyType) is not null;
-                ReplacePropertyWithReference(document, dtoType.Name, jsonName, propertyType.Name, isNullable);
+                if (isCollection)
+                    ReplaceInlineArrayItemsWithReference(document, dtoType.Name, jsonName, propertyType.Name);
+                else
+                    ReplacePropertyWithReference(document, dtoType.Name, jsonName, propertyType.Name, isNullable);
 
                 foreach (var halSchemaName in HalOpenApiSchemaCatalog.DetailResourceMappings
                     .Where(mapping => mapping.Value == dtoType)
                     .Select(mapping => mapping.Key))
                 {
-                    ReplacePropertyWithReference(document, halSchemaName, jsonName, propertyType.Name, isNullable);
+                    if (isCollection)
+                        ReplaceInlineArrayItemsWithReference(document, halSchemaName, jsonName, propertyType.Name);
+                    else
+                        ReplacePropertyWithReference(document, halSchemaName, jsonName, propertyType.Name, isNullable);
                 }
             }
         }
@@ -318,6 +332,9 @@ public class HalDtoSchemaTransformer : IOpenApiDocumentTransformer
                 ]
             }
             : new OpenApiSchemaReference(targetSchemaName, document);
+
+        if (isNullable)
+            schema.Required?.Remove(propertyName);
     }
 
     private static Type UnwrapNullableType(Type type)
@@ -328,7 +345,8 @@ public class HalDtoSchemaTransformer : IOpenApiDocumentTransformer
         return type;
     }
 
-    private static void ReplaceInlineObjectPropertyWithReference(OpenApiDocument document, string schemaName, string propertyName, string targetSchemaName)
+    private static void ReplaceInlineObjectPropertyWithReference(
+        OpenApiDocument document, string schemaName, string propertyName, string targetSchemaName, bool isNullable)
     {
         if (document.Components?.Schemas?.TryGetValue(schemaName, out var schemaI) != true)
             return;
@@ -339,11 +357,11 @@ public class HalDtoSchemaTransformer : IOpenApiDocumentTransformer
         if (!schema.Properties.TryGetValue(propertyName, out var propertySchemaI))
             return;
 
-        if (propertySchemaI is OpenApiSchema propertySchema
-            && propertySchema.Type == JsonSchemaType.Object
-            && propertySchema.Properties?.Count > 0)
+        if (propertySchemaI is OpenApiSchemaReference
+            || propertySchemaI is OpenApiSchema propertySchema
+                && (propertySchema.Type & JsonSchemaType.Object) == JsonSchemaType.Object)
         {
-            schema.Properties[propertyName] = new OpenApiSchemaReference(targetSchemaName, document);
+            ReplacePropertyWithReference(document, schemaName, propertyName, targetSchemaName, isNullable);
         }
     }
 

@@ -189,7 +189,17 @@ public sealed class NativeOperationArchitectureTests
         foreach (var contract in nativeContracts)
         {
             var handler = scope.ServiceProvider.GetRequiredService(contract);
-            await Assert.That(handler.GetType().Namespace).IsEqualTo("Explore.Application.Operations.Decorators");
+            string[] expected = contract.GetGenericTypeDefinition() == typeof(IQueryHandler<,>)
+                ? ["Explore.Application.Operations.Decorators.AuthorizationQueryHandlerDecorator`2"]
+                : contract.GetGenericTypeDefinition() == typeof(ICommandHandler<>)
+                    ? ["Explore.Application.Operations.Decorators.AuthorizationCommandHandlerDecorator`1"]
+                    : [
+                        "Explore.Application.Operations.Decorators.AuthorizationCommandHandlerDecorator`2",
+                        "Explore.Application.Operations.MutationScopeCommandHandler`2"
+                    ];
+            await Assert.That(expected.Contains(handler.GetType().GetGenericTypeDefinition().FullName!)).IsTrue();
+            await Assert.That(handler.GetType().GetGenericArguments()
+                .SequenceEqual(contract.GetGenericArguments())).IsTrue();
         }
     }
 

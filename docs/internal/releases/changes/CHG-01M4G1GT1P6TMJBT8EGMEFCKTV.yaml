@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4G1GT1P6TMJBT8EGMEFCKTV
+Title: "Recheck organization and group ownership before resource disclosure"
+Type: fix
+Scope: access
+Summary: "Organization- and group-owned machine resource requests now require the actual nondeleted owner and exact nondeleted, nonsuspended placement in the active authority tenant. Bounded fresh placement reads include the owner and retain normal filters. Owner deletion, placement removal or suspension during preparation prevents terminal delivery even while the key remains active. Ownership qualification does not inherit human issuer permissions. Canonical service provenance integration and complete moderation consumer registration remain open."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

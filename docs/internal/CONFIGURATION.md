@@ -432,6 +432,48 @@ coordinates, which never enter Setup contracts, logs, metrics, or responses.
 Recovery is to revoke the enrollment and clear the adapter's in-memory state;
 there is no credential-persistence recovery path.
 
+PostgreSQL setup storage uses a separate fixed Runtime permission descriptor
+installed by `PostgresTenantApiKeyStoragePermissions.ApplySetupLiveAsync` in the
+normal migrator sequence. It covers enrollments, immutable issuance claims and
+binding-operation receipts, without changing the existing API-key descriptor.
+Runtime can SELECT and INSERT their mapped scalars; UPDATE is limited to the
+enrollment capability/lifecycle and operation settlement fields, plus audit and
+concurrency metadata. Claims, tenant/actor identity and operation commitments
+cannot be updated, and no DELETE permission is granted. Stored commitments are
+digests, not plaintext capabilities or secret values.
+
+The existing migrator-identity, physical-connection/transaction, complete-column
+ACL and forced tenant-RLS checks remain mandatory. Installation accepts a fresh
+descriptor or the exact complete descriptor; partial or widened grants are
+rejected rather than repaired. C# continues to authorize the caller, validate
+capability generation and expiry, and settle operations. This change adds no
+database migration, setting or alternate credential authority. Native lifecycle,
+cross-tenant and grant-drift regressions were authored but not locally compiled
+or executed; remote CI remains the runtime acceptance gate.
+
+Setup binding discovery uses `ISetupSecretBindingCatalog`, not the general
+secret-binding entity repository. It accepts only `setup.signing` and
+`setup.encryption`, selects an instance binding with an empty qualifier and no
+scope ID, and projects only its ID. The reader retains the original tenant
+context, physical connection and transaction across awaits; provider coordinates
+and values are not materialized by this control-plane lookup.
+
+The PostgreSQL metadata catalogue grants Runtime the four existing status
+columns plus `Id`; Global retains exactly the four status columns. The normal
+migrator accepts a fresh catalogue, the current exact catalogue, or the exact
+previous four/four catalogue and adds only Runtime `SELECT(Id)`. Partial or
+widened predecessors and foreign-grantor ACL entries are rejected without repair.
+The last cancellable ownership check precedes savepoint release; release and any
+installer-owned commit are non-cancellable, so completion wins late cancellation
+rather than reporting failure after retaining a grant. Lookup cleanup closes only
+an internally opened connection still belonging to the complete original owner;
+it does not close a replacement transaction's connection. This changes neither secret
+resolution authority nor provider-coordinate permissions. In particular, the
+provider-side full-entity binding lookup is a separate unresolved composition
+boundary; this control-plane correction does not certify live provider dispatch.
+Native projection, privilege-denial, predecessor-upgrade and rollback regression
+sources remain uncompiled and unrun locally, pending remote CI.
+
 Configurator's own release-capability metadata governs its offline surfaces.
 The old bundled capability generator is removed. Retained Event backend
 authority and the relocated client adapter do not activate live control in
@@ -1394,6 +1436,38 @@ Promotion-code lookup has one non-secret static option and one separately bound 
 The HMAC material is not stored under this configuration section. It resolves through the instance-only secret definition `promotions.code_lookup_hmac_key` with qualifier `v{ActiveKeyVersion}`; for version `1`, the exact qualifier is `v1`. The default initial source coordinates are Infisical `/promotions/PROMOTIONS_CODE_LOOKUP_HMAC_KEY` or environment variable `PROMOTIONS_CODE_LOOKUP_HMAC_KEY`, but either source still requires the matching qualified `SecretBinding`. During overlap, each retained qualifier must reference its own immutable external value, for example version-specific Infisical keys or environment-variable names.
 
 Changing `ActiveKeyVersion` changes only new code writes. Lookup reads inspect the key versions referenced by active code rows and resolve each matching qualifier, so operators must retain older qualified secrets until no active promotion code uses them. See [SECRETS.md](SECRETS.md#promotion-code-lookup-hmac-key) for value format and the rotation sequence.
+
+### Native Moderation Reconciliation
+
+`Moderation:Reconciliation` controls the opt-in maintenance sweep. `Enabled`
+defaults to false. `TenantId` selects an actual qualified execution tenant;
+no default or fleet-wide tenant enumeration is inferred. `BatchSize` defaults
+to 100 and permits 1-1000. `InitialDelaySeconds` and `IntervalSeconds` default
+to 60; delay permits 0-86400 and interval 1-86400.
+
+`ApiKey` must resolve through Infisical, documented environment injection, or
+explicitly selected shared User Secrets in Development/Testing only. Its
+environment form is `MODERATION__RECONCILIATION__APIKEY` (Infisical `/api`,
+or the same normalized configuration key in shared User Secrets).
+`ModerationReconciliationSecretProvider` builds only the selected authority,
+separately from ordinary options, and rereads it for each execution scope.
+An appsettings value cannot supply or override the credential; vault failure
+never falls back to environment or source configuration. It authenticates a
+live persisted credential explicitly bound to the installed maintenance service.
+A configured key, database binding alone or human owner's authority cannot
+substitute for possession or current transactional qualification. Neither
+credentials nor secret values belong in scheduler payloads or telemetry.
+
+Quartz persists only execution tenancy and independent last-scanned sanction,
+effect, notice-approval, resource-quarantine and schedule-risk-review identities
+as strings in the job's data map. Each cursor advances after its owning successful
+bounded pass even when a target is denied, then wraps after exhausting the
+ordered range. Tenant changes reset all five before any owner runs. A failing
+owner leaves its unfinished scan unacknowledged but does not block independent
+stages; the fire still reports failure after the remaining bounded stages.
+Requested cancellation stops the pass immediately. No target data, secret or case evidence
+is copied into the map. Logical expiry is independent of this materialization;
+scheduled activation still requires all current native qualification.
 
 ### Reporting Static Configuration
 
@@ -2528,6 +2602,27 @@ and its original connection/transaction checks. It does not fall back to
 capability. The ordinary reader's scope guard remains unchanged. Catalogue key
 validation, instance-lock precedence and non-secret manifest projection still
 apply; this dispatch grants no new database or request authority.
+
+Moderation definition export also recognizes that sealed import owner. Its
+repository requires the original `ConfigurationImport` execution lease, the
+same context/connection and Serializable transaction, and the original validated
+request credential. The existing `IInstanceAdministratorCommitAuthority` fences
+the current principal and persisted platform-administrator authority. Credential
+custody and expiry are checked again after that authority operation, including
+the final recheck before definitions are returned. After the remaining settings,
+legal-content and tenant reads have completed and the snapshot transaction has
+finished, `ConfigurationInstanceImportExecutor` revalidates the same original
+request credential and signed lifetime before returning the complete artifact.
+Credential replacement or expiry during a later read therefore prevents disclosure.
+
+This is not permission for an arbitrary Global context to export definitions.
+Machine callers, tenant-administrator-only callers, expired credentials and
+unselected Global owners remain denied. Ordinary tenant exports retain their
+immutable tenant and PostgreSQL tenant-session checks; host, service, source
+epoch and metadata ownership fences remain active. No grants, schema changes or
+tenant-filter bypass state are introduced. The new regression sources are
+unrun locally; provider behavior and the complete import lifecycle still require
+remote CI evidence.
 
 ## Related
 

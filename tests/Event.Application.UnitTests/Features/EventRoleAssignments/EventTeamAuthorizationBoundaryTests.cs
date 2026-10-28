@@ -19,6 +19,20 @@ namespace Event.Application.UnitTests.Features.EventRoleAssignments;
 public sealed class EventTeamAuthorizationBoundaryTests
 {
     [Test]
+    public async Task OwnershipTransferDeclaresItsDistinctPermissionAndTrustedEventScope()
+    {
+        var tenantId = Guid.CreateVersion7();
+        var eventId = Guid.CreateVersion7();
+        var command = new TransferEventOwnershipCommand { TenantId = tenantId, EventId = eventId };
+        var boundary = typeof(TransferEventOwnershipCommand).GetCustomAttribute<AuthorizeResourceAttribute>();
+        await Assert.That(boundary!.Resource).IsEqualTo(ResourceKinds.Event);
+        await Assert.That(boundary.Action).IsEqualTo(AuthorizationActions.Events.TransferOwnership);
+        await Assert.That(((ISecureRequest)command).ResourceId).IsEqualTo(eventId.ToString("D"));
+        await Assert.That(((ISecureRequest)command).AuthorizationFacts)
+            .IsEqualTo(new EventScopedAuthorizationFacts(tenantId, eventId));
+    }
+
+    [Test]
     public async Task ExternallyCallableEventTeamRequests_DeclareTheAuthoritativeManageTeamBoundary()
     {
         Guid tenantId = Guid.CreateVersion7();
@@ -52,7 +66,8 @@ public sealed class EventTeamAuthorizationBoundaryTests
         Guid tenantId = Guid.CreateVersion7();
         Guid eventId = Guid.CreateVersion7();
         IEventRepository eventRepository = Substitute.For<IEventRepository>();
-        eventRepository.GetEventWithDetails(eventId).Returns(AuthorizationEvent(tenantId, eventId));
+        eventRepository.GetAuthorizationTargetByIdAsync(eventId, Arg.Any<CancellationToken>())
+            .Returns(AuthorizationEvent(tenantId, eventId));
         ITenantContext tenantContext = Substitute.For<ITenantContext>();
         tenantContext.TenantId.Returns(tenantId);
         IAuthorizationProvider provider = Substitute.For<IAuthorizationProvider>();

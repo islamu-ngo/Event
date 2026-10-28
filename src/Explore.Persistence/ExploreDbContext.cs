@@ -40,6 +40,7 @@ public partial class ExploreDbContext : DbContext
             if (_tenantLeaseBound && !ReferenceEquals(_tenantContext, value))
                 throw new InvalidOperationException("tenant_lease_identity_changed");
             _tenantContext = value;
+            ModerationTrustDomainId = null;
             if (value is not null)
             {
                 ClearTenantFilterBypass();
@@ -200,5 +201,11 @@ public partial class ExploreDbContext : DbContext
 
         MySqlModelIdentifierPolicy.Apply(modelBuilder, Database.ProviderName);
         ApplyGlobalQueryFilters(modelBuilder);
+        ApplyModerationQueryFilters(modelBuilder);
+        ApplyModerationPublicationQueryFilters(modelBuilder);
+        ApplyModerationNoticeQueryFilters(modelBuilder);
+        ApplyModerationCaseSourceQueryFilters(modelBuilder);
+        ApplyPreFindingQueryFilters(modelBuilder);
+        ApplyModerationRecognitionQueryFilters(modelBuilder);
     }
 }

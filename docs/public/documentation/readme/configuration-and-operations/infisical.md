@@ -8,6 +8,19 @@ This guide describes the folder-and-key layout ISLAMU Event expects inside Infis
 
 Infisical is one of three approved authorities. See [Secrets Management](secrets.md) for how authority selection fails closed, and [Environment Variables](environment-variables.md) for the meaning and defaults of every key named below.
 
+## Moderation process identities
+
+The reconciliation credential belongs to the API identity at `/api`, using
+`MODERATION__RECONCILIATION__APIKEY`. It is optional until reconciliation is
+invoked, and cannot fall back to ordinary configuration. After changing a local
+Environment or User Secrets value, restart its API process to select the new
+generation. An Infisical-backed process retains its selected session.
+
+The measurement launcher uses the `ModerationMeasurement` consumer with its own
+authority inputs. Grant that identity only `/database` and
+`/moderation`; do not give its signer or test-database credentials to serving
+hosts or test processes. Its authority lifetime ends with the launcher.
+
 ---
 
 ## 1. Create the Project

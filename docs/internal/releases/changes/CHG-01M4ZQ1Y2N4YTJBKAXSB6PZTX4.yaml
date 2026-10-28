@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZQ1Y2N4YTJBKAXSB6PZTX4
+Title: "Model complete contribution selection and independent profile adoption"
+Type: feat
+Scope: access
+Summary: "Retain complete bounded effect and consequence partitions with exact publication provenance, independent later-generation profile adoption and irreversible revocation without granting target authority or deployment conformance."
+Group: moderation-profile-adoption-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

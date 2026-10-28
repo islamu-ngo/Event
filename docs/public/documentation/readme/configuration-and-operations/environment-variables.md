@@ -1351,6 +1351,12 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `ISLAMU_SETUP_ENCRYPTION` | security | secret | None (secret) | optional | process |
 | `ASPNETCORE_ENVIRONMENT` | deployment | public | None | optional | process |
 | `DOTNET_ENVIRONMENT` | deployment | public | None | optional | process |
+| `MODERATION__RECONCILIATION__ENABLED` | security | public | false | defaulted | process |
+| `MODERATION__RECONCILIATION__TENANTID` | security | sensitive | None | optional | process |
+| `MODERATION__RECONCILIATION__BATCHSIZE` | security | public | 100 | defaulted | process |
+| `MODERATION__RECONCILIATION__INITIALDELAYSECONDS` | security | public | 60 | defaulted | process |
+| `MODERATION__RECONCILIATION__INTERVALSECONDS` | security | public | 60 | defaulted | process |
+| `MODERATION__RECONCILIATION__APIKEY` | security | secret | None (secret) | optional | process |
 | `MAIL_SMTP_HOST` | messaging | secret | None (secret) | optional | capability |
 | `MAIL_SMTP_PORT` | messaging | secret | None (secret) | optional | capability |
 | `MAIL_SMTP_FROM_ADDRESS` | messaging | secret | None (secret) | optional | capability |

@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4FY4DHKNFKWZVKXY7401690
+Title: "Recheck current user ownership before machine resource disclosure"
+Type: fix
+Scope: access
+Summary: "User-owned machine resource requests now require a current nondeleted user and active, nondeleted membership in the credential's exact tenant. Fresh source reads before preparation and terminal delivery reject owner or membership removal even when the same API key remains active. Preserve distinct machine identity and repair coordinate-switch fixtures to use real qualified alternative owners. Other owner kinds and complete moderation consumer registration remain open."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

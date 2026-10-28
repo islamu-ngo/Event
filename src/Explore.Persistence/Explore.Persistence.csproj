@@ -29,6 +29,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Explore.Application\Explore.Application.csproj" />
     <ProjectReference Include="..\Explore.ServiceDefaults\Explore.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\ISLAMU.Moderation.Application\ISLAMU.Moderation.Application.csproj" />
+    <ProjectReference Include="..\ISLAMU.Moderation.Domain\ISLAMU.Moderation.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

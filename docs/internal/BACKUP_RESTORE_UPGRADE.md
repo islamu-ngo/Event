@@ -36,6 +36,94 @@ not proof that no provider effect occurred. Restore operation/enrollment/binding
 metadata consistently, without placing external secret values in the database,
 manifest or recovery report. See [authority recovery](TROUBLESHOOTING.md#selected-secret-authority-recovery).
 
+## Native Moderation Recovery Coordinates
+
+The canonical moderation save boundary now owns a UUIDv7
+`ModerationRecoveryStoreState`, with revision, lineage generation and contiguous
+mutation position. Tracked moderation writes advance it in the same primary
+transaction; the two bulk-only narrative/pre-finding cleanup routes explicitly
+account for successful mutations. Source qualification, intake, effect leasing
+and original completion therefore do not rely on a counter updated only by
+`ModerationStore`. Failed transactions cannot publish their staged positions.
+The internal reader requires the original live consumer evidence session and
+retains the same native recovery writer fence.
+It refuses a head staged or flushed by that same transaction, even after EF's
+change tracker becomes clean. Current requirements must describe committed
+source state, not the transaction's own uncommitted mutation.
+
+SQLite authority row fences perform actual no-op SQL updates. The original
+evidence transaction therefore is a writing connection even if no canonical
+business mutation occurred. SQLite's backup API cannot step on that writing
+source connection. A native producer needs a separately owned committed-source
+read under the retained original authority/writer fences; replacing or ending
+the evidence transaction would invalidate the acquisition.
+`ReadSqliteCommittedModerationRecoveryStateAsync` now establishes the narrower
+metadata observation: it derives a separate read-only/private-cache/unpooled
+connection from the actual file-backed native connection, reads mapped store
+coordinates and compares them with the original fenced head before/after native
+requalification. Private in-memory sources, wrong/closed sessions, wrong
+transactions and the transaction's own uncommitted head remain unavailable.
+The reader is not substituted for the original authority and neither its
+connection nor private rows are returned. Artifact capture/restore and lawful
+artifact custody remain unimplemented; no completion flag substitutes for them.
+
+The retained authority separately extends its actual `PrivacyErasureCounter`
+with store identity, revision and recovery generation. Append, first identity-key
+binding and nonempty compaction advance the revision atomically. Releasing a
+held row changes the revision even if high-water and retained floor stay equal.
+`IPrivacyErasureRecoveryAuthority` resolves the existing authority instance; its
+read requires that owner's already acquired identity/counter gate and exact
+transaction. Newly initialized or mutated-but-uncommitted tuples are unavailable,
+and inherited execution contexts cannot reuse a disposed gate. Retained-authority
+coordination follows the application-owned persistence decision: C# and EF Core
+own qualification and completion, with database transactions and the fixed
+permissions required by that purpose. CoLocated PostgreSQL/SQLite and dedicated
+EmbeddedSqlite retain their actual transaction ownership; transitional SQL is not
+a second workflow authority.
+
+These coordinates contain no narrative, secret bytes or completed recovery
+verdict. They are inputs for native recovery producers, not replacements for
+authenticated artifact capture, isolated restore, canonical replay and erasure
+reconciliation. Those completed producers, generated migrations and provider/race
+assurance remain open. No measured-recovery proof implementation is registered,
+and this source foundation does not open AG05 or qualify deployment readiness.
+
+## Merged SQLite resource history
+
+The develop and moderation histories both rebuild `event_resources`. A historical
+rebuild must not discard `material_version_id`, `moderation_quarantine_count` or
+the relative-availability ordering constraint introduced by the other history.
+The native SQLite generator now qualifies the audited resource transitions
+against the combined EF model and checks the physical column set before table
+DDL or foreign-key state changes. An unsupported feature-first installation
+attempting the earlier upstream rebuild fails closed; do not bypass that guard
+or mark the migration applied manually. Review its actual applied history and
+prepare a separately verified upgrade procedure.
+
+Generated migration `20261023160000_RestoreMergedResourceAvailabilityOrder`
+restores the relative-order check for histories already missing it. Its native
+SQL copies the existing material/quarantine values into the replacement table;
+it does not reconstruct evidence that an earlier unsafe rebuild already lost.
+Use an exclusive migration window and stop on any preflight or constraint error.
+Neither the migration nor its SQL was executed during merge integration. Provider
+upgrade/rollback assurance remains open.
+
+## SQL Server case-evidence rollback
+
+Three immutable historical `Down` operations request `CASCADE` for
+`fk_moderation_case_evidence_moderation_cases_case_id`, although its physical
+source-owner predecessor used `NO ACTION`. The SQL Server migration generator
+now emits the predecessor's non-cascading relationship for that named constraint
+and restores the operation metadata after generation. It does not rewrite
+historical migrations or change the separate private-birth-date receipt cascade
+needed for PII erasure. Regenerate rollback scripts with the corrected generator;
+do not reuse older scripts that introduce the evidence cascade.
+
+Generation regressions cover the three affected historical operations, repeatable
+generation without metadata mutation, and retention of the approved PII cascade.
+Those test sources remain unbuilt/unrun locally. SQL generation is not database
+execution or certification of the complete upgrade/downgrade path.
+
 ## Native PostgreSQL login identity
 
 Bootstrap, navigation and tenant-preference native contracts serialize declared login names

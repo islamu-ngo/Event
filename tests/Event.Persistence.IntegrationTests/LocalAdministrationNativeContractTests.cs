@@ -64,6 +64,16 @@ public sealed partial class LocalAdministrationNativeContractTests(PostgreSqlCon
         };
         var bound = await StageAsync(bind, new(UserConcurrencyStamp: Guid.CreateVersion7(), ActorConcurrencyStamp: Guid.CreateVersion7()));
         await Assert.That(bound.Outcome).IsEqualTo("Bound");
+        var boundPii = bound.Image["Data"]!["UserPii"]![0]!.AsObject();
+        await Assert.That(boundPii.Select(property => property.Key).Order(StringComparer.Ordinal)
+            .SequenceEqual(new[] { "Email", "FirstName", "LastName", "UserId" })).IsTrue();
+        await using (var observation = fixture.CreateDbContext())
+        {
+            var pii = await observation.Set<UserPii>().SingleAsync(row => row.UserId == accepted.LocalSubjectId);
+            await Assert.That(pii.ReadDeclaredBirthDate()).IsNull();
+            await Assert.That(pii.ReadBirthDateCollectionReceiptId()).IsNull();
+            await Assert.That(pii.ReadBirthDateRevision()).IsEqualTo(0L);
+        }
         foreach (string type in new[] { "User", "Actor", "UserExternalLogin" })
             await Assert.That(bound.Image["Data"]![type]![0]!["CreatedBy"]!.GetValue<string>()).IsEqualTo(reconciler.ToString("D"));
         foreach (string type in new[] { "User", "UserPii", "Actor", "ActorPii", "UserExternalLogin" })

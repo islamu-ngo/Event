@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZR3VK75DZ9K28ARQ7NFS13
+Title: "Model independently adopted child-age policy obligations"
+Type: feat
+Scope: access
+Summary: "Retain exact publication, profile and mode obligations with accountable independent child-safeguarding and privacy ownership, finite later-generation acceptance and terminal withdrawal without enabling collection, assurance or audience restrictions."
+Group: moderation-child-age-policy-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

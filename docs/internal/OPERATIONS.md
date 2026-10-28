@@ -3,6 +3,35 @@
 
 # Operations
 
+## Private Learning Rollout And Recovery
+
+Learning adds four tenant-filtered entity tables through the generated
+`AddTenantLearningState` provider cohorts. Deploy through the normal migration
+owner; MariaDB uses the MySQL cohort but still requires its own engine receipt.
+No secret, configuration flag, background worker, live AI provider or external
+lesson asset is added. Ordinary reads never seed a learner or shared source.
+
+Shared-source removal is an explicitly authorized tenant-administrator operation
+and retains a tombstone. Recreating it requires its current revision; restarting
+the application or viewing context cannot undo removal. Learners retain their
+preferences and can clear their own orphaned practice without preview authority.
+Do not repair state by inserting production events or impersonating its owner.
+
+The learning writer uses one original selected human and physical Serializable
+settlement inside recognition/retained-erasure exclusion. It checks the persisted
+completion image before commit and publishes only after transaction disposal and
+receipt consumption. A stale request returns a conflict requiring a fresh private
+context. An uncertain commit is not a refusal and must not be automatically
+replayed with a new intent. Preserve the original intent when retrying a still
+retained operation; changed payloads are conflicts.
+
+Internal-user erasure purges learning across tenants in the existing protected
+applier, including retained covered replay and native PostgreSQL execution.
+Provider migration/race receipts and failures must be recorded explicitly;
+current-model SQLite tests cannot certify an entire historical migration chain.
+See [private learning](CONTEXTUAL_LEARNING.md) and the
+[operator guide](../public/documentation/readme/getting-started/contextual-learning.md).
+
 ## Complete release-impact metadata
 
 The release-impact validator reads runner-local file metadata, not an inline

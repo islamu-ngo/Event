@@ -4,9 +4,9 @@ description: Private authored learning storage, simulation boundaries, and opera
 
 # Private learning backend
 
-The private learning backend is being implemented independently of the rendered
-onboarding experience. It stores optional learning preferences, tour progress and
-authored practice. It does not yet deliver tour overlays, practice pages or a
+The private learning backend stores optional learning preferences, tour progress
+and authored practice independently of the rendered onboarding experience.
+It does not deliver tour overlays, practice pages or a
 simulation mode in the live AI interface; those require the ordered presentation
 and guidance successors.
 
@@ -60,21 +60,48 @@ another person's state.
 Internal-account erasure must remove learning across all tenants inside the
 existing protected erasure operation, including covered replay and native
 PostgreSQL execution. The tenant's shared pack is not another learner's private
-history. Physical tenant removal cascades that tenant's learning roots and
-children without deleting production users or actors.
+history. Physical tenant removal also removes that tenant's learning roots and
+children. Learning relationships introduce no deletion path to production users
+or actors; existing tenant-retirement rules still govern production data.
 
 ## Operator Rollout Boundary
+
+The backend source defines seven `/api/learning` operations: private context and
+practice reads; tour claim/outcome, preference, authored-practice and shared-source
+actions. Even reads require the current authenticated tenant member. Responses
+and errors are private/no-store. Use the returned HAL links for actions rather
+than inferring permission from a role or an earlier response.
+
+Clients send the current scope stamp and expected revisions. Claims, outcomes and
+practice also carry one stable intent ID for a bounded retry of the same payload.
+A conflict requires refreshing the private context. Learning does not cache a
+private response to bypass current authorization, and an uncertain commit must
+not be automatically repeated as a new action. No existing endpoint or
+compatibility adapter is replaced.
 
 This backend adds learning-owned schema through the normal generated provider
 migrations. It adds no tour package, configuration flag, secret, external
 provider account or compatibility route. Apply the normal deployment migration
 procedure; never hand-edit generated migrations or reset a shared database.
+For PostgreSQL, run the existing declared-purpose migration composition as well:
+it installs Runtime tenant-scoped learning rights and the existing protected
+Global purpose's limited learner-root erasure rights. Do not grant broad child
+table access or production administrator authority to make a learning request
+succeed.
 
 API exposure and generated-client rollout remain gated on real private
 authorization, concurrency, erasure and provider verification. The later UI
 rollout also requires actual keyboard, focus, screen-reader, RTL and
 representative-comprehension evidence. Do not describe backend tests as proof
 that the complete onboarding experience is ready.
+
+This increment is not yet release-certified across the provider matrix.
+Existing schema failures block MySQL/MariaDB learning assurance, and existing
+historical migration failures block the complete SQLite/SQL Server gates.
+Native PostgreSQL tenant retirement is also blocked by an existing discovery
+permission-contract conflict before learning deletion.
+Passing isolated learning checks do not make those deployments ready. Require
+the complete migration and privacy gates for the selected provider before rollout.
 
 See [Privacy Erasure](../security-and-identity/privacy-erasure.md) and
 [Authorization](../security-and-identity/authorization.md) for the existing

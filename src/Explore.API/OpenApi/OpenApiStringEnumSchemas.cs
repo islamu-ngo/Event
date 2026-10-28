@@ -18,6 +18,7 @@ using Explore.Application.DTOs.OrganizationTenantEvidence;
 using Explore.Application.DTOs.Settings;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
+using ISLAMU.Wire.Contracts.Learning;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Features.EventReporting.Models;
@@ -95,6 +96,13 @@ internal static class OpenApiStringEnumSchemaCatalog
 
     private static IReadOnlyCollection<Type> EagerNestedEnumTypes { get; } =
     [
+        typeof(LearningTourFamily),
+        typeof(LearningTourOutcome),
+        typeof(LearningPracticeAction),
+        typeof(LearningPracticeChoiceSlot),
+        typeof(LearningSpaceAction),
+        typeof(LearningSpaceStatus),
+        typeof(LearningSimulationStatus),
         .. ModerationEnumTypes,
         typeof(AiModelDiscoveryScope),
         typeof(AiCredentialScope),
@@ -134,6 +142,13 @@ internal static class OpenApiStringEnumSchemaCatalog
 
     public static IReadOnlyCollection<Type> EnumTypes { get; } =
     [
+        typeof(LearningTourFamily),
+        typeof(LearningTourOutcome),
+        typeof(LearningPracticeAction),
+        typeof(LearningPracticeChoiceSlot),
+        typeof(LearningSpaceAction),
+        typeof(LearningSpaceStatus),
+        typeof(LearningSimulationStatus),
         .. ModerationEnumTypes,
         typeof(AiModelDiscoveryScope),
         typeof(AiCredentialScope),

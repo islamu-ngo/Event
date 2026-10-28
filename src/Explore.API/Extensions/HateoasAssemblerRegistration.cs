@@ -75,6 +75,7 @@ using Explore.Application.DTOs.TenantSettingsDocuments;
 using Explore.Application.DTOs.TenantUserRoleGrant;
 using Explore.Application.DTOs.User;
 using Explore.Application.DTOs.Webhooks;
+using ISLAMU.Wire.Contracts.Learning;
 
 /// <summary>
 /// Registers all HATEOAS resource assemblers and their link policies.
@@ -87,6 +88,9 @@ public static class HateoasAssemblerRegistration
     /// </summary>
     public static IServiceCollection AddHateoasAssemblers(this IServiceCollection services)
     {
+        services.AddHalResource<LearningContextDto, LearningContextLinkPolicy, LearningContextCollectionLinkPolicy>();
+        services.AddHalResource<LearningPracticeDto, LearningPracticeLinkPolicy, LearningPracticeCollectionLinkPolicy>();
+        services.AddHalResource<LearningMutationReceiptDto, LearningMutationReceiptLinkPolicy, LearningMutationReceiptCollectionLinkPolicy>();
         services.AddHalResource<RecognitionRecoveryEscalationDto, RecognitionRecoveryEscalationDetailLinkPolicy, RecognitionRecoveryEscalationCollectionLinkPolicy>();
         services.AddHalResource<RecognitionRecoveryContextDto, RecognitionRecoveryContextDetailLinkPolicy, RecognitionRecoveryContextCollectionLinkPolicy>();
         services.AddHalResource<RecognitionCorrectionProofDto, RecognitionCorrectionProofDetailLinkPolicy, RecognitionCorrectionProofCollectionLinkPolicy>();

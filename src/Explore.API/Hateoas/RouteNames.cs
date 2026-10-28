@@ -6,6 +6,13 @@ namespace Explore.API.Hateoas;
 /// </summary>
 public static class RouteNames
 {
+    public const string GetLearningContext = nameof(GetLearningContext);
+    public const string GetLearningPractice = nameof(GetLearningPractice);
+    public const string ClaimLearningTour = nameof(ClaimLearningTour);
+    public const string RecordLearningTourOutcome = nameof(RecordLearningTourOutcome);
+    public const string UpdateLearningPreferences = nameof(UpdateLearningPreferences);
+    public const string ApplyLearningPracticeAction = nameof(ApplyLearningPracticeAction);
+    public const string ManageTenantLearningSpace = nameof(ManageTenantLearningSpace);
     public const string GetModerationNoticeCorrection = nameof(GetModerationNoticeCorrection);
     public const string GrantModerationAdjudicatedCaseReadPurpose = nameof(GrantModerationAdjudicatedCaseReadPurpose);
     public const string RevokeModerationAdjudicatedCaseReadPurpose = nameof(RevokeModerationAdjudicatedCaseReadPurpose);

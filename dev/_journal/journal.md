@@ -3417,3 +3417,151 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 - [x] Stays in journal only pending native corrections and executed provider evidence.
 
 ---
+
+[2026-10-28 Europe/Brussels] — Wire namespaces can shadow the Domain Event type
+
+**Context**: While implementing the contextual-learning `add-cqrs-handler` and
+`openapi-contract-change` contracts, new immutable records were added to the
+`Event.Wire.Contracts` project.
+
+**Symptom / Observation**: A fresh Persistence integration-project build failed
+through existing Application mappings with `error RMG072: The source type Event?
+of the referenced mapping EventTitle does not match the expected type
+Explore.Domain.Event`. The affected mappings had not changed.
+
+**Root Cause**: The new files explicitly declared the root namespace
+`Event.Wire.Contracts.Learning`. A C# namespace rooted at `Event` shadows the
+existing unqualified Domain `Event` type throughout consumers. The project
+assembly name is not its namespace contract; its configured root is `ISLAMU`.
+
+**Resolution**: Use `ISLAMU.Wire.Contracts.Learning` in the six new wire files
+and their two consumers. Do not add aliases or rewrite unrelated mappers to
+compensate. Fresh `dotnet build tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-restore --verbosity quiet`
+then exited 0. The fresh Domain learning slice passed 27/27 and the SQLite
+storage slice passed 9/9. Application unit execution remains separately blocked
+by a reproduced pre-existing duplicate import, not by this namespace issue.
+
+**Why This Matters for Future Work**: Follow the actual native namespace
+convention when adding contracts to an existing assembly. A seemingly local
+namespace addition can produce misleading source-generator failures across
+otherwise unchanged Domain consumers.
+
+**References**:
+- `src/Event.Wire.Contracts/Event.Wire.Contracts.csproj:4`
+- `src/Event.Wire.Contracts/Learning/LearningContextDto.cs:5`
+- `src/Explore.Application/Features/Learning/LearningLessonCatalog.cs`
+- `src/Explore.Application/Mappings/EventMapper.Agenda.cs:28`
+- `docs/internal/CONTEXTUAL_LEARNING.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the existing project namespace convention suffices.
+
+---
+
+[2026-10-28 Europe/Brussels] — Register deferred human admission before dependent native reads
+
+**Context**: The closed learning writer acquired its original physical owner and
+then called its preparation's current-source validator. That validator also
+enumerated currently available actors through the existing native repository.
+
+**Symptom / Observation**: A fresh Release build succeeded and five private HTTP
+contract cases passed, but all nine valid operation cases returned 401. A bounded
+test-only FirstChance probe against those original compiled dependencies captured
+`UnauthorizedAccessException: A held original human admission is required.`
+The probe was removed after diagnosis.
+
+**Root Cause**: `AiActorContextRepository` requires registered original-human
+admission even for its private read. The learning store registered the deferred
+finalizer only after initial source validation and the effect. Physical owner
+selection alone does not satisfy this separate admission contract.
+
+**Resolution**: Register the real deferred completion/source/time callbacks
+immediately after binding the original physical owner, before initial
+`RequireCurrentAsync`. The callbacks still run against the completed persisted
+image and held current sources at the actual commit; they are not a no-op grant.
+The repaired fresh API run passed 6 contract, 9 operation and 7 final-admission
+cases, including whole rollback after saved-image, membership, credential,
+principal and save-inventory changes. Later actor/lifecycle/provider assurance
+has its own receipts and is not implied by those 22 cases.
+
+**Why This Matters for Future Work**: When composing a new closed human operation,
+check admission prerequisites on dependent reads as well as writes. Keep the
+native repository guard and correct the issuer's lifecycle order instead of
+loosening the guard or adding a temporary admission.
+
+**References**:
+- `src/Explore.Persistence/Security/HumanLearningMutationStore.cs`
+- `src/Explore.Persistence/Repositories/AiActorContextRepository.cs`
+- `src/Explore.Persistence/ExploreDbContext.HumanCommitAdmission.cs`
+- `tests/Event.API.IntegrationTests/Learning/LearningOperationTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; reuse the existing original-human admission contract.
+
+---
+
+[2026-10-28 Europe/Brussels] — Observe actual request-scope return before testing pooled human cleanup
+
+**Context**: A learning regression must reuse the actual context that held a
+refused original human write, not a different factory or a new context.
+
+**Symptom / Observation**: Renting immediately after the HTTP response returned a
+different object. The Local admission fixture normally uses an unpooled factory;
+even after opt-in pooling, the response did not prove request-scope disposal.
+
+**Resolution**: The test-only opt-in pool uses its actual factory. A scoped
+observer is resolved before the context, so reverse disposal signals after the
+context returns. It records the captured `DbContextId` as well as object identity,
+avoiding a signal from an older use of the same pooled object. An idle slot is
+held while the intercepted original write settles, making the tested original
+return/re-rental deterministic without sleeps or polling.
+
+**Evidence**: `RefusedOriginalWriteReturnsACleanReusedTenantPoolLease` passed
+against fresh compiled test source. It verifies the same object/new lease, no
+transaction, tracked rows, original human admission or audit subject, no
+cross-tenant access to a positively seeded private root, and a successful next
+authorized write.
+
+**Why This Matters for Future Work**: HTTP completion is not a context-lifetime
+signal. Subscribe to actual scope disposal before the request, then test the
+security state of the proven reused original lease.
+
+**References**:
+- `tests/Event.API.IntegrationTests/Learning/LearningRaceTests.cs`
+- `tests/Event.API.IntegrationTests/Fixtures/LocalAdmissionWebApplicationFactory.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; this is a bounded test-fixture lifetime pattern.
+
+---
+
+[2026-10-28 Europe/Brussels] — Enroll fixed Global storage rights without weakening native policy attestation
+
+**Context**: The protected PostgreSQL subject-erasure login needs to delete
+private learning roots across tenants while retaining no practice-detail or
+insert authority.
+
+**Observation**: The declared Global login is `NOINHERIT`; granting its purpose
+role root-table rights alone did not authorize the real C# purge. Granting the
+declared login fixed SELECT/DELETE rights and a purpose-membership RLS policy
+then correctly triggered the existing exact policy-readiness guard.
+
+**Resolution**: Keep the direct login rights limited to the learner root. Target
+the policy only at that declared login, require its existing erasure-purpose
+membership and reject inserts with `WITH CHECK(false)`. Extend readiness by an
+exact recognized component: login, schema, relation, policy name, command,
+permissive mode, singleton role and canonical PostgreSQL expressions. Do not
+allow every policy with a familiar name or bypass readiness.
+
+**Evidence**: The actual Runtime/Global role slice passed all three cases,
+including retained-fact cross-tenant purge and denied child-detail/insert
+authority. PostgreSQL supplied the canonical expression through a rolled-back
+temporary probe; the expected deparse was not guessed.
+
+**References**:
+- `src/Explore.Persistence/Schema/ProviderPrimitives/PostgresLearningPermissions.cs`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresTenantRuntimeReadiness.cs`
+- `tests/Event.Persistence.IntegrationTests/Learning/LearningPostgresPermissionsTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; this preserves the existing native purpose boundary.

@@ -3,6 +3,37 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
+## Private Contextual Learning
+
+`LearningController` exposes seven named `/api/learning` operations:
+`GET context`, `GET practice/{id}`, `POST tours/claim`, `POST tours/outcome`,
+`PATCH preferences`, `POST practice/actions`, and `POST space/actions`.
+The two GET actions retain `[AllowAnonymous]` metadata but their original-human
+query boundary requires a resolved authenticated account, active selected tenant
+membership and current contextual authority. Anonymous access is not a public
+progress reader. Writes are `[Authorize]` and use the standard selected-tenant
+human owner, not the instance preference or mixed-settings executor.
+
+The five body records are closed JSON objects. Learning enums use exact named
+strings; numeric and unknown tokens are invalid. `ExpectedScopeStamp` detects
+late account/tenant responses but supplies no authority. `ExpectedRevision`
+protects the learner or shared-space revision; practice also carries its own
+revision. Claims, outcomes and practice require a stable `IntentId` for bounded
+owner-local retries. Their endpoints bypass generic idempotency response storage:
+an earlier private response is never replayed instead of fresh authorization.
+
+`PrivateNoStoreMiddleware` applies `private, no-store`, `Pragma: no-cache` and
+`Referrer-Policy: no-referrer` before authentication, including rejected requests.
+Context, practice detail and receipt have separate HAL policies; collection
+policies do not reuse detail actions. Receipt `Id`, scope and revisions identify
+the settled result, not a reusable action capability. Clients must follow the
+current `_links` rather than infer permission from lesson completion or roles.
+
+See [private learning](CONTEXTUAL_LEARNING.md) for storage, original settlement,
+erasure and the explicitly separate presentation successors. Runtime acceptance
+is recorded in the workstream's verification evidence, not inferred from schema
+generation.
+
 ## Membership Discovery Read Enrollment
 
 PostgresUserTenantMembershipContract requires explicit deployment enrollment and

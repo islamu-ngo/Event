@@ -1,6 +1,6 @@
 # SecretKit adoption: credential stewardship and truthful readiness
 
-Last Updated: 2026-10-25
+Last Updated: 2026-10-27
 
 ## Review Metadata
 
@@ -10,11 +10,59 @@ Last Updated: 2026-10-25
 - Report kind: implementation-planning assessment
 - Report status: current
 - Disposition: plan-aligned
-- Evidence cutoff: 2026-10-25
-- Reviewed input: secretkit-adoption foundation plan/tasks/context revision P2/E2, dated 2026-10-25, and the dependency-ordered successor brief; execution base `e8aa58ae8f7122949153b6c49d1a5a605e3e0b9e`; unchanged SecretKit candidate `0.1.0-local.20261024.1`. P1/E1 remains historical evidence.
+- Evidence cutoff: 2026-10-27
+- Reviewed input: secretkit-adoption P3/E4 full-integration activation on 2026-10-25, complete successor tasks 2.1-5.4 and the public SDK documentation supplied by the user; foundation commit `fb3f140c8c2f6ca850e589da7c6959c17582a3f5`; immutable candidate `0.1.0-local.20261024.1`. P1/P2 remain historical evidence.
 - Supersedes: none. The paused February secret-management workstream is historical, not this assessment.
 
 ## Executive Summary
+
+### October 27 retirement and assurance position
+
+Both obsolete Secrets projects are now removed in separately verified commits.
+Shared acquisition and prepared Data Protection remain in ServiceDefaults, runtime
+policy and cache ownership in Infrastructure, and database acquisition in Persistence.
+The production-removal closure passed locked restore and the full solution build.
+Its architecture run retained four known failures among 676 cases; it was not green.
+
+Full Persistence execution exposed 3664 failures among 6978 cases, with 48 skipped.
+The reconciled inventory distinguishes parent failures from nested child reports.
+Only explicitly compared cases are attributed to untouched develop; isolated passing
+checks cannot erase failures from a shared-assembly run. The API corpus and final
+release review remain open. This distinction protects operators from a misleading
+readiness claim under Sidq, while the five accepted findings remain obligations
+rather than declared operational controls. See E15 and E16 for bounded receipts.
+
+### October 26 implementation evidence
+
+The current working tree implements the selected-owner serving boundaries and
+has removed both obsolete Secrets projects after a 52-file invariant disposition.
+The surviving native suite passes 414 cases after that retirement, including
+tenant/cache races, native revision ownership, real-resolver commitments,
+structured-output confidentiality, explicit lifetime admission and independent
+Data Protection pins. Those observations support parts of IVSD-M001/M002/M003;
+they do not resolve the five findings or certify deployment behavior.
+
+Truthful failure reporting remains an active obligation under Sidq: the actual
+PostgreSQL HTTP gate originally stopped after a readiness failure. Fixed ordinary
+Runtime storage rights repaired that path without administrator credentials or
+database-owned workflow. The readiness case and five persisted post-dispatch
+cancellation cases now pass; each interrupted operation retains its native
+effect evidence without false cancellation or automatic redispatch. These are
+bounded HTTP slices, not a full HTTP-suite pass. Provider/image gates and final
+review remain open. No passing native unit suite is presented as their substitute.
+
+Keycloak reviews are always bound to the selected owner and its retained native
+revision evidence. Restart, another replica or bounded evidence eviction requires
+a fresh review; none authorizes replay of an uncertain write. One native
+authentication-maintenance helper per selected Infisical session may renew only
+that token. These accepted choices retain operator responsibility without
+silently broadening identity, secret polling or automatic recovery.
+
+### Current P3 revalidation
+
+The user's continuation activates the full integration rather than only the unused foundation. Re-evaluation preserves all five accepted findings and mitigations: F001/M001 now includes host/process, tenant/cache and independent DP admission (2.1-3.3, 4.1-4.3); F002/M002 includes pre-bootstrap lifetime ownership and canceled native effect settlement (2.2, 4.1, 4.3-4.5); F003/M003 includes serving/runtime output capture and draining ownership (2.1-2.3, 4.1-4.4); F004/M004 includes independent capability failure, durable approval fences and stale activation races (2.2, 4.1-4.5); F005/M005 includes complete old-project/test disposition, exact package verification and supported image evidence (5.1-5.4).
+
+The affected stakeholders, ethical constraints, claim boundaries and licensing obligations are unchanged. Foundation evidence establishes only its tested acquisition boundary. Owner-bound review and the narrow maintenance exception are now explicit user decisions; their implementation still needs the corresponding evidence. Multi-replica operation remains separately qualified. No finding becomes resolved by scope activation or documentation. The foundation-only ownership table below is retained as historical P2 rationale and is superseded by these complete active mappings.
 
 Adopting a shared provider library can remove duplicated credential transport without surrendering Event's responsibility for tenant isolation, deployment authority, and safe recovery. SecretKit supplies provider-native acquisition and protected material ownership. Event must still decide which process may acquire a credential, which tenant binding wins, whether a capability is required, and when a prepared client is allowed to serve requests.
 
@@ -136,7 +184,20 @@ Riba, religious-content decisions, advertising, and moderation are not applicabl
 
 ## Validation Gaps
 
-Event product tests, real provider permissions and lifetime policy, cross-replica recovery, actual images on supported architectures, and the producer's trim/AOT profile remain unverified. Package-only producer evidence is not inherited as Event acceptance.
+The bounded native, host, HTTP and migration receipts in E08-E11 are executed
+evidence for their recorded snapshots. The current settlement candidate passed
+33 Domain cases, seven Application cases and all four offline model checks;
+its HTTP cases are now partitioned into disjoint native groups after the first
+whole-class command exceeded its external deadline. Five post-dispatch cases
+passed unchanged; eleven write/replay cases passed, and both pre-dispatch
+cancellation cases passed after correcting the test capture for sanitized
+milestone records. The corrected confidentiality witness also passed. The
+remaining twenty-two enrollment-authority cases also passed. All forty
+distinct setup HTTP cases now have passing native receipts. The
+final-source Linux x64 image
+refresh completed all four recipes and content inspection. Live external-provider ACLs,
+cross-replica recovery, other architectures and trim/AOT remain unverified.
+Package-only producer evidence is not inherited as Event acceptance.
 
 ## Escalation Needed
 
@@ -153,10 +214,23 @@ No material planning decision remains unresolved. Obtain separate authority befo
 | E05 | `AGENTS.md`, relevant secrets/bootstrap/CI intents, IP governance, scheduler rule, planning/I-VSD contracts | Normative constraints, not operational proof. |
 | E06 | Official Infisical Universal Auth and Microsoft configuration/DI disposal documentation; exact Refit factory package listing, retrieved 2026-10-25 using Anysearch and Context7. Provider web search was invoked but supplied no usable additional content. | Protocol/framework/package guidance, not validation of this integration; source mapping is verified from Event's own NuGet.Config and provenance record. |
 | E07 | `dev/active/secretkit-adoption/secretkit-adoption-plan.md`, `secretkit-adoption-tasks.md`, `secretkit-adoption-context.md`, revision P1; user maintenance answer on 2026-10-25 | Completed design/task traceability; not implementation approval. |
+| E08 | Current P3 receipts: native Infrastructure Secrets416, Domain Secrets75, migrated Persistence78 plus primary configuration57, BFF52, API authority24, admission9 all passed; per-consumer policy and explicit frontend exclusion have observed Red/Green. Late native response ordering has an observed failing case followed by passing response-order and inventory-eviction fences | Controlled executable evidence, not deployed provider or fleet assurance. Original E02 paths are historical; owners are ServiceDefaults/Secrets, Infrastructure/Secrets and Persistence/Database |
+| E09 | Restricted-role PostgreSQL readiness1 and persisted post-dispatch cancellation5 passed after attributable storage repair; four generated nullable effect-evidence migrations reviewed and all four offline pending-model checks passed again after exact settlement snapshot transfer and recompilation | Bounded HTTP/model evidence, not a full HTTP suite or five-provider matrix. Historical readiness failure remains attributed in the execution context |
+| E10 | Earlier snapshot: full isolated Release solution build passed with0errors/3388warnings; that snapshot's locked restore, four immutable package hashes and dependency-license policy passed (469 package/version pairs). Actual migration lifecycle round-trips passed SQLite1, PostgreSQL1 and SQL Server/MariaDB/MySQL3. API, BFF, MigrationService and Standalone Linux x64 images passed actual locked restore and publish. The three framework-dependent images' four DLL hashes match frozen packages, with no retired Secrets assembly; the single-file Standalone image retains its complete bundle with all four archive checksums verified | Five-provider migration and four image-construction receipts, not live external-provider ACL, credentialed image startup or fleet certification. Bundled runtime DLL hashes were not independently extracted from Standalone. Release review remains open; existing licensing exceptions stay visible and no warning suppression was added |
+| E11 | Earlier snapshot corpus: Domain1912, Blazor.Client3219 and Diagnostic21 passed. Application4009 had7 failures: five exact untouched-base reproductions; two stale writer-contract witnesses repaired and owning class passed7. Infrastructure2860 had496 failures, all496 exactly reproduced on untouched base. BFF922 had26 failures:17 task-owned failures have passing scoped receipts, including real process drain; remaining9 reproduced on base. Standalone104 had47 failures:39 exact base reproductions, six preparation failures repaired to reach their exact original base failures, one host-admission regression passed after correction and one scheduler-shutdown timeout passed unchanged on scoped replay; its original intermittent failure is retained. Persistence/API corpus remains running | Honest workstream assurance in progress, not green overall suites or permission to suppress failures. Native Secrets416 passed independently. Conventional-layout baseline executed101/56pass/45fail, eliminating the earlier isolated migration-loader obstruction; configured-startup still fails6/7 on its pre-existing missing Global credential fixture |
+| E12 | Current retirement candidate: locked restore and full retained-consumer Release build passed (0 errors, 3885 warnings); Domain Secrets 75, native Infrastructure Secrets 426 and BFF 21 passed without skips. Architecture 676 produced 672 passes and the same four retained baseline failures. Four frozen archive hashes and the 469-pair license policy passed. The October 27 Linux x64 refresh built all four recipes; the three framework-dependent images matched all four frozen DLLs each, and Standalone retained its x86-64 ELF executable and four hash-verified archives | Current bounded integration and image-construction evidence, not a clean whole corpus, credentialed image startup, live provider ACLs or fleet recovery. Later HTTP settlement qualification is recorded in E14; short external command deadlines are not passing tests or application failures |
+| E13 | Native consumer differential checks against untouched develop e8aa58ae8f: all 29 provider outcomes matched (2 passes, 27 identical failures); 44 storage failures matched, and the one JWT-blocked storage case passed after explicit canonical binding of the fixture-generated authority. All six graph outcomes matched (1 pass, 5 identical failures), and both recovery failures reproduced (2 other cases passed). Both pre-dispatch cancellation cases and the setup telemetry confidentiality case passed after native capture correction. Emergency tool --help and native commit preflight passed; isolated lock fix committed as 06759b0e | Physical baseline attribution and bounded fixture qualification, not a clean whole corpus. Tenant-lease, original-source custody, setup-authentication and enrollment-gate failures remain quarantined rather than repaired or suppressed. Final HTTP authority and release-review gates remain open |
+| E14 | Complete setup settlement qualification: 40 distinct HTTP cases passed across disjoint native groups, including 22 enrollment-authority, 13 write/replay and 5 post-dispatch cases; the two corrected pre-dispatch cases and corrected telemetry-confidentiality witness passed without weakening production logging. Domain 33, Application 7 and all four offline model checks passed. Exact 23-path settlement committed as 329f1eb72. Eleven additional PostgreSQL export-authority cases matched untouched develop exactly: eight passes and three existing tenant-lease failures | Native controlled HTTP, Domain, Application, model and PostgreSQL evidence, not live external-provider or fleet certification. The final 19 manifest-owner cases, full-corpus attribution and release review remain open |
+| E15 | October 27 retirement and differential receipts: production library removal committed as 1768af89e5 and native ownership guidance as eb5179fa95. Exact 90-path intermediate closure passed locked solution restore and full Release build; Architecture 676 yielded 672 passes and four unchanged, previously reproduced failures. Manifest-owner comparison completed all 34 cases with identical current/base outcomes (8 passes, 26 failures). Five SQLite owner cases passed on both trees. Current GenericOutboxAdmissionTests ran 74 cases: 55 passed and 19 tenant-lease failures matched untouched base exactly. Five migration-owner failures matched base, including nested credential-validation causes. Original full Persistence corpus finished 6978 cases: 3266 passed, 3664 failed, 48 skipped; the root-failure inventory reconciles exactly after excluding five nested child duplicates | Snapshot-specific execution and attribution only. Isolated outbox results do not reclassify earlier shared-assembly failures. Most full Persistence failures remain unattributed; original API corpus and final release review remain pending. No finding is marked resolved, and no provider, credentialed startup or fleet assurance is inferred |
+| E16 | Delivery through d128e678a0: native release-range preflight passed for 25 commits and five effective Change-Ids; final intent validation passed. All 58 transient-authentication failures matched untouched develop exactly, including full exception messages. Full Persistence selected provider-labelled cases for PostgreSql, Sqlite, SqlServer, MySql and MariaDb; the retained membership witnesses are failures, not passing behavior | The original API corpus was interrupted by session restart without a final report. Automatic whole-corpus replay was stopped; only API assurance restarted from the final built snapshot with dedicated results and a restart guard. No completed API or passing matrix claim is made; full attribution and final review remain open |
 
 ## Missing Evidence
 
-No stakeholder interviews, deployment audit, incident record, native Event permission challenge, or integration test result was supplied or produced. No access to actual credential stores was needed.
+No stakeholder interviews, deployment audit, incident record or live external
+provider permission challenge has been produced. Controlled integration results
+are recorded in E08-E16; whole-corpus attribution and release-review evidence
+remain pending. No actual operator credential store
+was opened for these tests.
 
 ## Context Inventory
 
@@ -170,6 +244,9 @@ Per-process credentials cannot be renewed by a cluster-wide singleton job on ano
 
 | Date | Previous status | New status | Trigger | Evidence/replacement |
 |---|---|---|---|---|
+| 2026-10-27 | current / plan-aligned for P3 | current / plan-aligned; findings remain accepted | Added verified retirement commits, exact differential receipts and unreclassified full Persistence failures; no new provider-controlled decision | E15 and the single active triad |
+| 2026-10-26 | current / plan-aligned for P3 | current / plan-aligned for P3; implementation obligations remain accepted | Added bounded native/runtime evidence, truthful HTTP failure attribution, owner-bound review and token-only maintenance decisions; no finding marked resolved | E08/E09 and the single active triad |
+| 2026-10-25 | current / plan-aligned for P2 foundation | current / plan-aligned for P3 complete integration | User requested complete integration and supplied local public SDK docs; revalidated all five mappings against full successor scope without claiming runtime assurance. | P3/E4; foundation fb3f140c8c; current revalidation above |
 | 2026-10-25 | none | draft | Shared evidence packet established; maintenance decision remains open. | E1 / E01-E06 |
 | 2026-10-25 | draft | current / plan-aligned | User selected narrow maintenance exception; completed triad reviewed and material mappings reconciled. | P1 / E1 / E07 |
 | 2026-10-25 | current for P1; stale for P2 | current / plan-aligned for P2 foundation | Re-evaluated all five findings against narrowed active tasks, explicit successor owners, observed-Red gates and unchanged authority boundaries. User requested implementation; no runtime assurance inferred. | P2/E2; base e8aa58ae8f; P2 scope revalidation above |
@@ -178,7 +255,7 @@ Per-process credentials cannot be renewed by a cluster-wide singleton job on ano
 
 - Workstream: secretkit-adoption
 - Status: current
-- Reviewed input: foundation triad P2/E2 and successor brief; implementation base e8aa58ae8f.
+- Reviewed input: current P3 full-integration triad and October 26 working-tree evidence, foundation fb3f140c8c; P2/E2 and base e8aa58ae8f remain historical receipts.
 - Findings and mitigations: IVSD-F001 -> IVSD-M001; IVSD-F002 -> IVSD-M002; IVSD-F003 -> IVSD-M003; IVSD-F004 -> IVSD-M004; IVSD-F005 -> IVSD-M005.
 - Required plan mappings: IVSD-F001/M001 -> S01/S02/S04/S09, tasks 1.1-1.3/2.1-2.3/3.1-3.3/4.1-4.3; F002/M002 -> S05/S08/S10, tasks 1.2/4.1/4.4/4.5; F003/M003 -> S06/S10, tasks 1.1-1.3/2.1-2.3/4.1-4.4; F004/M004 -> S03/S07/S11, tasks 1.2-1.3/4.2-4.5; F005/M005 -> S12, tasks 1.1/1.4/5.1-5.4. All are design-accepted implementation obligations, not resolved implementation findings.
 - Escalations required before: user implementation approval and P2 mapping revalidation are satisfied for the foundation; attributable test failures still block implementation completion; native/platform qualification is required before corresponding release claims. Successor approval and persisted-approval evidence remain separate gates.

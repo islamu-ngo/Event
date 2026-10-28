@@ -207,10 +207,10 @@ public sealed class BrowserJourneyTests
             await page.WaitForURLAsync(url => !new Uri(url).AbsolutePath.Equals("/login", StringComparison.Ordinal));
             await AssertAuthenticatedAsync(browser, true);
 
-            ILocator language = page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex("^Change language\\.") });
+            ILocator language = page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex("^Change language\\.", RegexOptions.None, TimeSpan.FromSeconds(1)) });
             await language.FocusAsync();
             await page.Keyboard.PressAsync("Enter");
-            ILocator arabic = page.GetByRole(AriaRole.Menuitem, new() { NameRegex = new Regex("\\(AR\\)") });
+            ILocator arabic = page.GetByRole(AriaRole.Menuitem, new() { NameRegex = new Regex("\\(AR\\)", RegexOptions.None, TimeSpan.FromSeconds(1)) });
             await arabic.FocusAsync();
             await page.Keyboard.PressAsync("Enter");
             await Expect(page.Locator("html")).ToHaveAttributeAsync("lang", "ar");
@@ -221,7 +221,7 @@ public sealed class BrowserJourneyTests
 
             await language.FocusAsync();
             await page.Keyboard.PressAsync("Enter");
-            ILocator english = page.GetByRole(AriaRole.Menuitem, new() { NameRegex = new Regex("\\(EN\\)") });
+            ILocator english = page.GetByRole(AriaRole.Menuitem, new() { NameRegex = new Regex("\\(EN\\)", RegexOptions.None, TimeSpan.FromSeconds(1)) });
             await english.FocusAsync();
             await page.Keyboard.PressAsync("Enter");
             await Expect(page.Locator("html")).ToHaveAttributeAsync("dir", "ltr");
@@ -270,7 +270,7 @@ public sealed class BrowserJourneyTests
             await browser.Page.GetByLabel("Quantity", new() { Exact = true }).FillAsync("1");
             await browser.Page.GetByRole(AriaRole.Button, new() { Name = "Reserve selected tickets", Exact = true })
                 .ClickAsync();
-            await browser.Page.WaitForURLAsync(new Regex($"/registration/events/{eventId:D}/orders/[0-9a-f-]+"));
+            await browser.Page.WaitForURLAsync(new Regex($"/registration/events/{eventId:D}/orders/[0-9a-f-]+", RegexOptions.None, TimeSpan.FromSeconds(1)));
 
             Guid orderId = Guid.Parse(new Uri(browser.Page.Url).Segments[^1]);
             using JsonDocument reserved = await ReadAsync(api, $"/api/events/{eventId:D}/registration-orders/{orderId:D}", cancellationToken);
@@ -448,9 +448,9 @@ public sealed class BrowserJourneyTests
 
     private static async Task ChangeLanguageAsync(IPage page, string code)
     {
-        await page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex("^Change language\\.") }).FocusAsync();
+        await page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex("^Change language\\.", RegexOptions.None, TimeSpan.FromSeconds(1)) }).FocusAsync();
         await page.Keyboard.PressAsync("Enter");
-        await page.GetByRole(AriaRole.Menuitem, new() { NameRegex = new Regex("\\(" + code + "\\)") }).FocusAsync();
+        await page.GetByRole(AriaRole.Menuitem, new() { NameRegex = new Regex("\\(" + code + "\\)", RegexOptions.None, TimeSpan.FromSeconds(1)) }).FocusAsync();
         await page.Keyboard.PressAsync("Enter");
     }
 
@@ -485,7 +485,7 @@ public sealed class BrowserJourneyTests
         await page.GetByLabel("Username or email", new() { Exact = true }).FillAsync(host.BootstrapIdentifier);
         await page.GetByLabel("Password", new() { Exact = true }).FillAsync(host.BootstrapReplacementPassword);
         await page.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true }).ClickAsync();
-        await page.WaitForURLAsync(new Regex("/events/create(?:[?#].*)?$"));
+        await page.WaitForURLAsync(new Regex("/events/create(?:[?#].*)?$", RegexOptions.None, TimeSpan.FromSeconds(1)));
         await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Create Event", Exact = true })).ToBeVisibleAsync();
     }
 

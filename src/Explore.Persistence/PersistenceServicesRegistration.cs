@@ -47,6 +47,8 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IHumanOriginalCredentialCustody>(provider =>
             (IHumanOriginalCredentialCustody)provider.GetRequiredService<IPolicyMutationExecutionScopeFactory>());
         services.AddScoped<IHumanTenantPreferenceStore, HumanTenantPreferenceStore>();
+        services.AddScoped<ILearningRepository, LearningRepository>();
+        services.AddScoped<ILearningPrivacyErasureStore, LearningPrivacyErasureStore>();
         services.AddScoped<IConfigurationManifestTenantReadScopeFactory, ConfigurationManifestTenantReadScopeFactory>();
         services.AddScoped<IConfigurationInstanceImportExecutor, ConfigurationInstanceImportExecutor>();
         return services;

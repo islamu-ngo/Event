@@ -1,0 +1,42 @@
+Change-Id: CHG-01M60AQSBSSK2Z9S08RMFQ0V53
+Title: "retain erasable private learner state"
+Type: feat
+Scope: onboarding
+Summary: "Store bounded private learning separately from production events, with tenant isolation and retained-authority erasure."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Learning state has immutable tenant/internal-user ownership, explicit owner
+      read predicates, named tenant filters and common protected erasure disposal.
+      It does not contain production effect payloads or expose another learner's
+      history. This storage packet does not yet expose learning operations.
+  Migration:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Detail: >-
+      Generated AddTenantLearningState cohorts add the shared source and private
+      learner/tour/practice tables for PostgreSQL, SQLite, SQL Server and MySQL;
+      MariaDB uses the MySQL cohort with separate execution assurance. Apply the
+      matching migration before deploying this schema consumer. Downgrading drops
+      learning-owned state and must not be used when that data must be retained.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      The operator guide distinguishes private authored learning from production
+      activity and the later rendered onboarding experience. No tour dependency,
+      configuration flag, secret or external provider account is introduced.

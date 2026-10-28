@@ -9,9 +9,11 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Learning;
 using Explore.Infrastructure.Services;
 using Explore.Infrastructure.Services.Privacy;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
@@ -19,9 +21,11 @@ using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Seed;
+using Explore.Secrets.Database;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
@@ -711,7 +715,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             time,
             NullLogger<PrivacyErasureApplier>.Instance,
             Options.Create(new PrivacyErasureOptions()),
-            recognition, localEligibility);
+            recognition, localEligibility, new LearningPrivacyErasureStore(context));
         var service = new RetainedAuthorityPrivacyErasureWorkflow(
             checkpointRepository,
             stateRepository,
@@ -1176,6 +1180,182 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
 
     private sealed record TestTenantContext(Guid TenantId) : ITenantContext;
 }
+
+[Category("LearningNativePostgreSql")]
+[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.None)]
+[NotInParallel("PersistenceDb")]
+public sealed class LearningNativePrivacyErasureTests(PostgreSqlContainerFixture fixture)
+{
+    [Test]
+    [Timeout(240_000)]
+    public Task CommonLearningPurgeRunsBeforeNativeSubjectSettlement()
+        => RunNativeErasureAsync(coveredReplay: false, refuseDeletion: false);
+
+    [Test]
+    [Timeout(240_000)]
+    public Task CoveredReplayPurgesRestoredLearningWithoutDuplicatingSettlement()
+        => RunNativeErasureAsync(coveredReplay: true, refuseDeletion: false);
+
+    [Test]
+    [Timeout(240_000)]
+    public Task LearningAbsenceFailureRollsBackNativeSettlementAndPreservesRetainedFence()
+        => RunNativeErasureAsync(coveredReplay: false, refuseDeletion: true);
+
+    private async Task RunNativeErasureAsync(bool coveredReplay, bool refuseDeletion)
+    {
+        if (Environment.GetEnvironmentVariable("Database__Provider") != "PostgreSql")
+            throw new InvalidOperationException("Learning native erasure requires exact Database__Provider=PostgreSql and the native PostgreSQL fixture lane.");
+        // Reuse the true independently committed retained authority and its Runtime login.
+        await using var authorityFixture = new ExternalDatabasePrivacyErasurePostgreSqlFixture();
+        await authorityFixture.InitializeAsync();
+        await using var authorityContext = authorityFixture.CreateAuthorityDbContext();
+        var authority = new EfCorePrivacyErasureAuthorityRepository(
+            authorityContext, Options.Create(new PrivacyErasureOptions()));
+        GlobalLocationPrivacyErasureTests.ErasureGraph graph;
+        Guid[] tenants;
+        Guid unrelatedState;
+        await using (var seed = fixture.CreateDbContext())
+        {
+            graph = await GlobalLocationPrivacyErasureTests.SeedErasureGraphAsync(seed);
+            tenants = await seed.Locations.IgnoreQueryFilters()
+                .Where(row => graph.LocationIds.Contains(row.Id)).Select(row => row.TenantId).Distinct().ToArrayAsync();
+            await Assert.That(tenants.Length).IsEqualTo(2);
+            foreach (Guid tenant in tenants)
+            {
+                seed.Add(TenantLearningSpace.Create(Guid.CreateVersion7(), tenant,
+                    Learning.LearningProviderDatabase.Now));
+                seed.Add(NewLearningState(tenant, graph.OwnerUserId));
+            }
+            var other = NewLearningState(tenants[0], graph.UnrelatedUserId);
+            unrelatedState = other.Id;
+            seed.Add(other);
+            await seed.SaveChangesAsync();
+        }
+        var fact = await authority.AppendAsync(PrivacyErasureRequest.Create(
+            Guid.CreateVersion7(), PrivacyErasureSubjectKind.User, graph.OwnerUserId,
+            PrivacyErasureReasonCode.AccountDeletion, new PrivacyErasureOptions().CurrentPolicyVersion));
+        await using (var mirror = fixture.CreateDbContext())
+        {
+            mirror.PrivacyErasureSagas.Add(PrivacyErasureSaga.Start(
+                fact, fact.AuthoritySequence,
+                System.Security.Cryptography.RandomNumberGenerator.GetBytes(32),
+                fact.RecordedAtUtc.AddHours(1), fact.RecordedAtUtc));
+            await mirror.SaveChangesAsync();
+        }
+
+        var globalOptions = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global);
+        var factory = new GlobalExploreDbContextFactory(globalOptions);
+        await using var application = await factory.CreateDbContextAsync();
+        await application.Database.OpenConnectionAsync();
+        await using (var probe = application.Database.GetDbConnection().CreateCommand())
+        {
+            probe.CommandText = """
+                SELECT current_user, rolsuper, rolbypassrls, rolcreaterole,
+                    pg_has_role(current_user, 'event_subject_erasure_global', 'MEMBER')
+                FROM pg_catalog.pg_roles WHERE rolname = current_user
+                """;
+            await using var reader = await probe.ExecuteReaderAsync();
+            await Assert.That(await reader.ReadAsync()).IsTrue();
+            await Assert.That(reader.GetString(0)).IsEqualTo(globalOptions.Username);
+            await Assert.That(reader.GetBoolean(1)).IsFalse();
+            await Assert.That(reader.GetBoolean(2)).IsFalse();
+            await Assert.That(reader.GetBoolean(3)).IsFalse();
+            await Assert.That(reader.GetBoolean(4)).IsTrue()
+                .Because("The native Global login must be enrolled by the real subject erasure contract; this test never grants itself disposal authority.");
+        }
+        await Assert.That(application.TenantFilterTenantId).IsNull();
+        await using var runtime = GlobalLocationPrivacyErasureTests.CreateRuntime(application, authority);
+        if (refuseDeletion)
+        {
+            await using (var seed = fixture.CreateDbContext())
+            {
+                var entity = seed.Model.FindEntityType(typeof(UserLearningState))!;
+                var sql = seed.GetService<ISqlGenerationHelper>();
+                string table = sql.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+                string function = sql.DelimitIdentifier("learning_assurance_keep_row", entity.GetSchema());
+                await seed.Database.ExecuteSqlRawAsync($"""
+                    CREATE FUNCTION {function}() RETURNS trigger LANGUAGE plpgsql AS $body$
+                    BEGIN RETURN NULL; END; $body$;
+                    CREATE TRIGGER learning_assurance_keep_row BEFORE DELETE ON {table}
+                    FOR EACH ROW EXECUTE FUNCTION {function}();
+                    """);
+            }
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                runtime.Service.ReplayPendingAsync(CancellationToken.None));
+            await Assert.That(failure!.Message).IsEqualTo("learning_erasure_incomplete");
+            await using var observer = fixture.CreateDbContext();
+            await Assert.That(await observer.UserLearningStates.CountAsync(row => row.UserId == graph.OwnerUserId))
+                .IsEqualTo(2);
+            await Assert.That(await observer.Set<LearningPracticeState>().CountAsync()).IsEqualTo(3);
+            await Assert.That(await observer.Set<LearningTourProgress>().CountAsync()).IsEqualTo(3);
+            await Assert.That(await observer.Set<PrivacyErasurePolicyCoverage>().AnyAsync(row => row.IntentId == fact.IntentId)).IsFalse();
+            await Assert.That(await observer.PrivacyErasureReplayCheckpoints.AnyAsync(row => row.IntentId == fact.IntentId)).IsFalse();
+            await Assert.That(await observer.Users.IgnoreQueryFilters()
+                .AnyAsync(row => row.Id == graph.OwnerUserId && !row.IsDeleted)).IsTrue();
+            await Assert.That(await observer.OutboxMessages.CountAsync()).IsEqualTo(0);
+            await Assert.That(await observer.PrivacyErasureSagas.AnyAsync(row => row.IntentId == fact.IntentId)).IsTrue();
+            await Assert.That((await authority.ReadAfterAsync(0, 10)).Select(row => row.IntentId))
+                .IsEquivalentTo([fact.IntentId]);
+            return;
+        }
+
+        await runtime.Service.ReplayPendingAsync(CancellationToken.None);
+        await AssertLearningAbsentAsync(graph.OwnerUserId, unrelatedState, tenants);
+        if (!coveredReplay) return;
+
+        Guid checkpointId;
+        int coverageCount;
+        int outboxCount;
+        await using (var restored = fixture.CreateDbContext())
+        {
+            checkpointId = await restored.PrivacyErasureReplayCheckpoints
+                .Where(row => row.IntentId == fact.IntentId).Select(row => row.Id).SingleAsync();
+            coverageCount = await restored.Set<PrivacyErasurePolicyCoverage>().CountAsync(row => row.IntentId == fact.IntentId);
+            await Assert.That(coverageCount > 0).IsTrue();
+            outboxCount = await restored.OutboxMessages.CountAsync();
+            // A restored/newly enrolled category can exist behind an already-covered fact.
+            foreach (Guid tenant in tenants) restored.Add(NewLearningState(tenant, graph.OwnerUserId));
+            await restored.SaveChangesAsync();
+            await Assert.That(await restored.UserLearningStates.CountAsync(row => row.UserId == graph.OwnerUserId)).IsEqualTo(2);
+        }
+        // A fresh context ensures neither the workflow nor the store can pass from tracked absence.
+        await using (var replay = await factory.CreateDbContextAsync())
+        await using (var restarted = GlobalLocationPrivacyErasureTests.CreateRuntime(replay, authority))
+            await restarted.Service.ReplayPendingAsync(CancellationToken.None);
+        await AssertLearningAbsentAsync(graph.OwnerUserId, unrelatedState, tenants);
+        await using var final = fixture.CreateDbContext();
+        await Assert.That(await final.PrivacyErasureReplayCheckpoints
+            .Where(row => row.IntentId == fact.IntentId).Select(row => row.Id).SingleAsync()).IsEqualTo(checkpointId);
+        await Assert.That(await final.Set<PrivacyErasurePolicyCoverage>().CountAsync(row => row.IntentId == fact.IntentId))
+            .IsEqualTo(coverageCount);
+        await Assert.That(await final.OutboxMessages.CountAsync()).IsEqualTo(outboxCount);
+    }
+
+    private async Task AssertLearningAbsentAsync(Guid subjectId, Guid unrelatedState, Guid[] tenants)
+    {
+        await using var observer = fixture.CreateDbContext();
+        await Assert.That(await observer.UserLearningStates.AnyAsync(row => row.UserId == subjectId)).IsFalse();
+        await Assert.That(await observer.UserLearningStates.Select(row => row.Id).ToArrayAsync())
+            .IsEquivalentTo([unrelatedState]);
+        await Assert.That(await observer.Set<LearningPracticeState>().Select(row => row.UserLearningStateId).ToArrayAsync())
+            .IsEquivalentTo([unrelatedState]);
+        await Assert.That(await observer.Set<LearningTourProgress>().Select(row => row.UserLearningStateId).ToArrayAsync())
+            .IsEquivalentTo([unrelatedState]);
+        await Assert.That(await observer.TenantLearningSpaces.Select(row => row.TenantId).ToArrayAsync())
+            .IsEquivalentTo(tenants);
+        await Assert.That(await observer.Users.IgnoreQueryFilters()
+            .AnyAsync(row => row.Id == subjectId && row.IsDeleted)).IsTrue();
+    }
+
+    private static UserLearningState NewLearningState(Guid tenantId, Guid userId)
+    {
+        var state = UserLearningState.Create(Guid.CreateVersion7(), tenantId, userId,
+            Learning.LearningProviderDatabase.Now);
+        Learning.LearningProviderDatabase.AddChildren(state);
+        return state;
+    }
+}
+
 [Category("EventLocationPrivacy")]
 [ClassDataSource<ExternalDatabasePrivacyErasurePostgreSqlFixture>(Shared = SharedType.None)]
 [NotInParallel("PersistenceDb")]

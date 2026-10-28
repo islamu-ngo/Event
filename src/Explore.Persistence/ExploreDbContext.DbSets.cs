@@ -1,5 +1,6 @@
 using Explore.Domain;
 using Explore.Domain.Keycloak;
+using Explore.Domain.Learning;
 using Explore.Domain.Ai;
 using Explore.Domain.Federation;
 using Explore.Domain.Modules;
@@ -19,6 +20,11 @@ namespace Explore.Persistence;
 
 public partial class ExploreDbContext
 {
+    public DbSet<TenantLearningSpace> TenantLearningSpaces { get; set; }
+    public DbSet<UserLearningState> UserLearningStates { get; set; }
+    public DbSet<LearningTourProgress> LearningTourProgress { get; set; }
+    public DbSet<LearningPracticeState> LearningPracticeStates { get; set; }
+
     public DbSet<SetupTargetEnrollment> SetupTargetEnrollments { get; set; }
     public DbSet<KeycloakOperation> KeycloakOperations { get; set; }
     public DbSet<AuthenticationCredentialCutover> AuthenticationCredentialCutovers { get; set; }

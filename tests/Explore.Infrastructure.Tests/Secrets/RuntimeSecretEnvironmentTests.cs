@@ -15,6 +15,7 @@ public sealed class RuntimeSecretEnvironmentTests
     [Arguments(SecretConsumerRole.Bff)]
     [Arguments(SecretConsumerRole.Combined)]
     [Arguments(SecretConsumerRole.Migration)]
+    [Arguments(SecretConsumerRole.ModerationMeasurement)]
     public async Task ProcessProjectionKeepsOnlyItsIdentityAndNoProviderAdministration(SecretConsumerRole consumer)
     {
         var inputs = Inputs();
@@ -386,10 +387,11 @@ public sealed class RuntimeSecretEnvironmentTests
             ["INFISICAL_PROJECT_ID"] = Guid.CreateVersion7().ToString("N"),
             ["INFISICAL_ENV"] = "test"
         };
-        foreach (string consumer in new[] { "API", "BFF", "COMBINED", "MIGRATION" })
+        foreach (SecretConsumerRole consumer in Enum.GetValues<SecretConsumerRole>())
         {
-            inputs[$"INFISICAL_{consumer}_CLIENT_ID"] = Guid.CreateVersion7().ToString("N");
-            inputs[$"INFISICAL_{consumer}_CLIENT_SECRET"] = CreateSecret();
+            string prefix = $"INFISICAL_{consumer.ToString().ToUpperInvariant()}";
+            inputs[$"{prefix}_CLIENT_ID"] = Guid.CreateVersion7().ToString("N");
+            inputs[$"{prefix}_CLIENT_SECRET"] = CreateSecret();
         }
         return inputs;
     }

@@ -198,7 +198,7 @@ public sealed class PreFindingNoticeTests
     {
         using var context = new BlazorTestContext();
         using var transport = new PreFindingNoticeTransport();
-        var clock = new NoticeExpiryClock();
+        using var clock = new NoticeExpiryClock();
         using var http = Register(context, transport, clock);
         var component = await RenderAsync(context, transport);
         await component.Find("textarea").InputAsync(new ChangeEventArgs { Value = "Private unsent draft" });
@@ -217,7 +217,7 @@ public sealed class PreFindingNoticeTests
         using var transport = new PreFindingNoticeTransport();
         transport.Respond = (_, _) => Task.FromResult(PreFindingNoticeTransport.Json(
             PreFindingNoticeTransport.Notice(expires: PreFindingNoticeTransport.Now.AddDays(100))));
-        var clock = new NoticeExpiryClock();
+        using var clock = new NoticeExpiryClock();
         using var http = Register(context, transport, clock);
         var component = await RenderAsync(context, transport);
         await Assert.That(clock.DueTime.TotalMilliseconds).IsLessThanOrEqualTo(uint.MaxValue - 1d);
@@ -226,6 +226,19 @@ public sealed class PreFindingNoticeTests
         await expired.WaitAsync(TimeSpan.FromSeconds(5));
         await Assert.That(component.FindAll("textarea, dl")).IsEmpty();
         await Assert.That(transport.Requests.Count).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task DisposingExpiryClockStopsItsOwnedTimer()
+    {
+        using var clock = new NoticeExpiryClock();
+        bool fired = false;
+        using var timer = clock.CreateTimer(_ => fired = true, null, TimeSpan.FromHours(1), Timeout.InfiniteTimeSpan);
+
+        clock.Dispose();
+        clock.Expire();
+
+        await Assert.That(fired).IsFalse();
     }
 
     private static HttpClient Register(BlazorTestContext context, PreFindingNoticeTransport transport,
@@ -276,7 +289,7 @@ public sealed class PreFindingNoticeTests
         return signal.Task;
     }
 
-    private sealed class NoticeExpiryClock : TimeProvider
+    private sealed class NoticeExpiryClock : TimeProvider, IDisposable
     {
         private DateTimeOffset _now = PreFindingNoticeTransport.Now;
         private NoticeTimer? _timer;
@@ -290,6 +303,7 @@ public sealed class PreFindingNoticeTests
             return _timer = new NoticeTimer(callback, state);
         }
         internal void Expire() => Advance(TimeSpan.FromHours(2));
+        public void Dispose() => _timer?.Dispose();
         internal void Advance(TimeSpan elapsed)
         {
             _now += elapsed;

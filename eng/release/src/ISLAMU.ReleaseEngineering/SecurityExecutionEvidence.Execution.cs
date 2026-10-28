@@ -116,6 +116,7 @@ public static partial class SecurityExecutionEvidence
             var types = new Dictionary<string, string>(StringComparer.Ordinal);
             var units = new Dictionary<string, string>(StringComparer.Ordinal);
             double? user = null, system = null; long? working = null;
+            (string? Name, string? Version)? observedScope = null;
             string[] lines = new UTF8Encoding(false, true).GetString(bytes).Split('\n');
             if (lines.Length > 65_536 || lines.Count(line => line.Trim() == "# EOF") != 1
                 || lines.LastOrDefault(line => !string.IsNullOrWhiteSpace(line))?.Trim() != "# EOF") return false;
@@ -135,19 +136,29 @@ public static partial class SecurityExecutionEvidence
                 int label = parts[0].IndexOf('{', StringComparison.Ordinal);
                 string name = label < 0 ? parts[0] : parts[0][..label];
                 if (name is not (total or memory)) continue;
-                if (parts.Length != 2) return false;
+                int valueStart = line.Length;
+                while (valueStart > 0 && !char.IsWhiteSpace(line[valueStart - 1])) valueStart--;
+                if (valueStart == 0 || !TryReadRuntimeMetricLabels(line[..valueStart].TrimEnd(), out var labels)) return false;
+                string value = line[valueStart..];
+                labels.TryGetValue("otel_scope_name", out string? scopeName);
+                labels.TryGetValue("otel_scope_version", out string? scopeVersion);
+                var scope = (scopeName, scopeVersion);
+                if (scopeVersion is not null && scopeName is null
+                    || observedScope.HasValue && observedScope.Value != scope) return false;
+                observedScope = scope;
+                labels.TryGetValue("cpu_mode", out string? mode);
                 if (name == memory)
                 {
-                    if (parts[0] != memory || working.HasValue
-                        || !long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out long number) || number < 0) return false;
+                    if (mode is not null || working.HasValue
+                        || !long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out long number) || number < 0) return false;
                     working = number;
                 }
                 else
                 {
-                    if (!double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double number)
+                    if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double number)
                         || !double.IsFinite(number) || number < 0) return false;
-                    if (parts[0] == total + "{cpu_mode=\"user\"}" && !user.HasValue) user = number;
-                    else if (parts[0] == total + "{cpu_mode=\"system\"}" && !system.HasValue) system = number;
+                    if (mode == "user" && !user.HasValue) user = number;
+                    else if (mode == "system" && !system.HasValue) system = number;
                     else return false;
                 }
             }
@@ -157,6 +168,39 @@ public static partial class SecurityExecutionEvidence
         }
         catch (Exception failure) when (failure is ArgumentException or InvalidOperationException or OverflowException or KeyNotFoundException)
         { return false; }
+    }
+
+    private static bool TryReadRuntimeMetricLabels(string series, out Dictionary<string, string> labels)
+    {
+        labels = new(StringComparer.Ordinal);
+        int opening = series.IndexOf('{', StringComparison.Ordinal);
+        if (opening < 0) return !series.Any(char.IsWhiteSpace);
+        if (!series.EndsWith('}') || series[..opening].Any(char.IsWhiteSpace)) return false;
+        int cursor = opening + 1, end = series.Length - 1;
+        while (cursor < end)
+        {
+            int separator = series.IndexOf("=\"", cursor, StringComparison.Ordinal);
+            if (separator < 0 || separator >= end) return false;
+            string key = series[cursor..separator];
+            if (key is not ("cpu_mode" or "otel_scope_name" or "otel_scope_version")) return false;
+            cursor = separator + 2;
+            int start = cursor;
+            while (cursor < end && series[cursor] != '"')
+            {
+                if (char.IsControl(series[cursor])) return false;
+                if (series[cursor] == '\\')
+                {
+                    cursor++;
+                    if (cursor >= end || series[cursor] is not ('\\' or '"' or 'n')) return false;
+                }
+                cursor++;
+            }
+            if (cursor >= end || !labels.TryAdd(key, series[start..cursor])) return false;
+            cursor++;
+            if (cursor == end) return true;
+            if (series[cursor] != ',' || ++cursor == end) return false;
+        }
+        return true;
     }
 
     internal static bool TryCreateParentPressureDelta(ParentPressureSample previous, ParentPressureSample current,

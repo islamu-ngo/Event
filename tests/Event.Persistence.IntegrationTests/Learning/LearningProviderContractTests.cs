@@ -258,10 +258,10 @@ public sealed class LearningProviderContractTests
     [Test]
     public async Task PhysicalTenantDeletionCascadesLearningOnlyWithinThatTenant()
     {
-        await using var database = await LearningProviderDatabase.CreateAsync();
+        await using var database = await LearningProviderDatabase.CreateTenantDeletionAsync();
         await database.SeedLearningAsync(withChildren: true);
         await database.SeedLearningAsync(database.OtherTenantId, withChildren: true);
-        await using (var context = database.OpenSystem())
+        await using (var context = database.Open(database.TenantId))
         {
             Tenant tenant = await context.Tenants.SingleAsync(row => row.Id == database.TenantId);
             await using var sourceOwner = new HumanSecuritySourceGate(context);
@@ -284,22 +284,48 @@ public sealed class LearningProviderContractTests
 /// <summary>
 /// Uses only the explicitly selected engine and native migration composition.
 /// Every destructive operation targets the unique database created by this instance.
+/// Storage contracts use the selected Migrator; restricted Runtime/Global authority
+/// is proved separately by LearningPostgresPermissionsTests.
 /// </summary>
 internal sealed class LearningProviderDatabase : IAsyncDisposable
 {
     internal static readonly DateTime Now = new(2026, 10, 28, 12, 0, 0, DateTimeKind.Utc);
     private readonly PrimaryDatabaseProviderBehaviorFixture _fixture;
     private readonly PrimaryDatabaseConnectionOptions _options;
+    private readonly PostgreSqlContainerFixture? _enrolled;
     internal Guid TenantId { get; } = Guid.CreateVersion7();
     internal Guid OtherTenantId { get; } = Guid.CreateVersion7();
     internal Guid UserId { get; } = Guid.CreateVersion7();
     internal Guid OtherUserId { get; } = Guid.CreateVersion7();
     internal PrimaryDatabaseProvider Provider => _options.Provider;
 
-    private LearningProviderDatabase(PrimaryDatabaseConnectionOptions options)
+    private LearningProviderDatabase(
+        PrimaryDatabaseConnectionOptions options, PostgreSqlContainerFixture? enrolled = null)
     {
         _options = options;
         _fixture = PrimaryDatabaseProviderBehaviorFixture.Create(options);
+        _enrolled = enrolled;
+    }
+
+    internal static async Task<LearningProviderDatabase> CreateTenantDeletionAsync()
+    {
+        if (Environment.GetEnvironmentVariable("Database__Provider") != "PostgreSql")
+            return await CreateAsync();
+        var enrolled = new PostgreSqlContainerFixture();
+        try
+        {
+            await enrolled.InitializeAsync();
+            var database = new LearningProviderDatabase(
+                enrolled.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator), enrolled);
+            await using var context = database.OpenSystem();
+            await database.SeedOwnersAsync(context);
+            return database;
+        }
+        catch
+        {
+            await enrolled.DisposeAsync();
+            throw;
+        }
     }
 
     internal static async Task<LearningProviderDatabase> CreateAsync(bool seed = true, bool migrations = false)
@@ -434,7 +460,13 @@ internal sealed class LearningProviderDatabase : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (_enrolled is not null)
+        {
+            await _enrolled.DisposeAsync();
+            return;
+        }
         await using var context = OpenSystem();
         await context.Database.EnsureDeletedAsync();
     }
+
 }

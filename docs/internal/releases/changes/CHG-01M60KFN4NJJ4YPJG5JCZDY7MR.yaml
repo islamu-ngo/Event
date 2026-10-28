@@ -1,0 +1,42 @@
+Change-Id: CHG-01M60KFN4NJJ4YPJG5JCZDY7MR
+Title: "authorize private learning against current human scope"
+Type: feat
+Scope: onboarding
+Summary: "Bind private learning actions to current tenant, identity and membership, with closed simulation intents and final commit admission."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Learning uses original selected-human custody, current tenant/actor/event
+      sources, retained-erasure exclusion and final completion-image admission.
+      No production effect or reusable authorization grant is accepted.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: >-
+      PostgreSQL migration composition installs fixed Runtime learning rights and
+      the existing Global erasure purpose's learner-root select/delete rights.
+      Workflow authority remains in C#; no business routine is added.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Detail: >-
+      Immutable learning wire contracts contain strict closed requests, exact
+      string enums, stable intent IDs, scope stamps and bounded synthetic state.
+      Route exposure and generated consumers follow in the private API packet.
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      Optional learning is private and does not grant publishing or live AI
+      authority. Rendered practice and contextual guidance are separate deliveries.

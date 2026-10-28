@@ -1,4 +1,5 @@
 using Explore.Domain.Learning;
+using Explore.Persistence.Privacy;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;

@@ -15,6 +15,7 @@ using Explore.Infrastructure.Services.Privacy;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Privacy;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.QueryFilters;

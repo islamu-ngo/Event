@@ -68,7 +68,11 @@ internal sealed class MutationScopeCommandHandler<TCommand, TResult>(
         // A delegating command does not own the ambient database attempt. Resolve
         // custody only for the direct administrator owner after final selection.
         if (!RequiresHumanAdministratorOwner)
+        {
+            if (PolicyMutationCommandScope.HandlesLearning(typeof(TCommand)))
+                await services.GetRequiredService<IHumanCommitScopePreparation>().PrepareAsync(cancellationToken);
             return await ExecuteCoreAsync(services, command, cancellationToken);
+        }
 
         cancellationToken.ThrowIfCancellationRequested();
         var gate = services.GetRequiredService<Func<IHumanSecuritySourceGate>>()();

@@ -1,18 +1,17 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 
-namespace Explore.Persistence.Repositories;
+namespace Explore.Persistence.Privacy;
 
 public sealed class LearningPrivacyErasureStore(ExploreDbContext context) : ILearningPrivacyErasureStore
 {
     public async Task PurgeAsync(PrivacyErasureIntent intent, CancellationToken cancellationToken)
     {
         RequireProtectedTransaction(intent);
-        await context.UserLearningStates.IgnoreTenantFilter(TenantFilterBypassReasons.UserPrivacyErasure)
-            .Where(value => value.UserId == intent.SubjectId)
-            .ExecuteDeleteAsync(cancellationToken);
+        await LearningLifecyclePersistence.PurgeSubjectAsync(context, intent.SubjectId, cancellationToken);
     }
 
     public async Task RequireAbsentAsync(PrivacyErasureIntent intent, CancellationToken cancellationToken)

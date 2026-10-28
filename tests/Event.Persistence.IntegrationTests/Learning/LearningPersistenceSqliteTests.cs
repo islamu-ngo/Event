@@ -5,6 +5,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Learning;
 using Explore.Persistence;
+using Explore.Persistence.Privacy;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;

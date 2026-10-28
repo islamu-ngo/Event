@@ -5,6 +5,7 @@ using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Learning;
 using Explore.Infrastructure.Services;
 using Explore.Infrastructure.Services.Privacy;
 using Explore.Persistence;
@@ -35,16 +36,33 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
     [Test]
     [Arguments(false)]
     [Arguments(true)]
-    public async Task RetainedSubjectSettlesBothTenantsWithoutPrivateTableAuthority(bool injectFailure)
+    public async Task RetainedSubjectSettlesBothTenantsWithoutLegacyPrivateTableAuthority(bool injectFailure)
     {
         GlobalLocationPrivacyErasureTests.ErasureGraph graph;
         StorageGraph storage;
         Guid tenantA;
         IdempotencyRecord[] receipts;
+        Guid[] learningSpaces;
+        Guid[] learningStates;
         await using (var seed = fixture.CreateDbContext())
         {
             await PostgresSubjectPrivacyErasureContract.ApplyAsync(seed);
             graph = await GlobalLocationPrivacyErasureTests.SeedErasureGraphAsync(seed);
+            Guid[] learningTenants = await seed.Locations.IgnoreQueryFilters()
+                .Where(row => graph.LocationIds.Contains(row.Id)).Select(row => row.TenantId).Distinct().ToArrayAsync();
+            var spaces = learningTenants.Select(tenant => TenantLearningSpace.Create(
+                Guid.CreateVersion7(), tenant, DateTime.UtcNow)).ToArray();
+            var states = learningTenants.Select(tenant => UserLearningState.Create(
+                Guid.CreateVersion7(), tenant, graph.OwnerUserId, DateTime.UtcNow)).ToArray();
+            foreach (var state in states)
+                state.ApplyPractice(Guid.CreateVersion7(), "self", "event-details", 1,
+                    LearningPracticeAction.Start, LearningPracticeChoice.None, 0, 0,
+                    Guid.CreateVersion7(), 0, 0, state.UpdatedAtUtc);
+            learningSpaces = spaces.Select(row => row.Id).ToArray();
+            learningStates = states.Select(row => row.Id).ToArray();
+            seed.AddRange(spaces);
+            seed.AddRange(states);
+            await seed.SaveChangesAsync();
             tenantA = await seed.Locations.IgnoreQueryFilters()
                 .Where(row => row.Id == graph.LocationIds[0]).Select(row => row.TenantId).SingleAsync();
             receipts = new[] { graph.OwnerUserId.ToString("D"), graph.OwnerUserId.ToString("N"), graph.UnrelatedUserId.ToString("D") }
@@ -154,6 +172,13 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         await Assert.That(application.TenantFilterTenantId).IsNull();
         await AssertPrivateReadDeniedAsync(application);
         await using var receiptObserver = fixture.CreateDbContext();
+        await Assert.That(await receiptObserver.TenantLearningSpaces.CountAsync(row => learningSpaces.Contains(row.Id)))
+            .IsEqualTo(learningSpaces.Length);
+        await Assert.That(await receiptObserver.UserLearningStates.CountAsync(row => learningStates.Contains(row.Id)))
+            .IsEqualTo(settled ? 0 : learningStates.Length);
+        await Assert.That(await receiptObserver.Set<LearningPracticeState>()
+            .CountAsync(row => learningStates.Contains(row.UserLearningStateId)))
+            .IsEqualTo(settled ? 0 : learningStates.Length);
         var retainedReceipts = await receiptObserver.IdempotencyRecords.AsNoTracking()
             .Where(row => receipts.Select(receipt => receipt.Id).Contains(row.Id)).ToArrayAsync();
         await Assert.That(retainedReceipts.Length).IsEqualTo(3);

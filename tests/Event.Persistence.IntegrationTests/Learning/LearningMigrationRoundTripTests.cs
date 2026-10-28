@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Event.Persistence.IntegrationTests.Learning;
@@ -13,6 +14,46 @@ namespace Event.Persistence.IntegrationTests.Learning;
 [Category("LearningProvider")]
 public sealed class LearningMigrationRoundTripTests
 {
+    [Test]
+    public async Task GeneratedLearningCohortRoundTripsWithoutForgingPriorMigrationHistory()
+    {
+        await using var database = await LearningProviderDatabase.CreateAsync(seed: false);
+        await using var context = database.OpenSystem();
+        await context.Database.OpenConnectionAsync();
+        var assembly = context.GetService<IMigrationsAssembly>();
+        var selected = assembly.Migrations.Single(pair =>
+            pair.Key.EndsWith("_AddTenantLearningState", StringComparison.Ordinal));
+        var migration = assembly.CreateMigration(selected.Value, context.Database.ProviderName!);
+        var generator = context.GetService<IMigrationsSqlGenerator>();
+        string query = database.Provider switch
+        {
+            PrimaryDatabaseProvider.Sqlite => "SELECT name FROM sqlite_master WHERE type = 'table'",
+            PrimaryDatabaseProvider.PostgreSql or PrimaryDatabaseProvider.SqlServer =>
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = @schema",
+            PrimaryDatabaseProvider.MySql or PrimaryDatabaseProvider.MariaDb =>
+                "SELECT TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA = DATABASE()",
+            _ => throw new InvalidOperationException("Unsupported Learning schema provider.")
+        };
+        string? schema = context.Model.GetDefaultSchema();
+        string[] complete = await ReadNamesAsync(context, query, string.Empty, schema);
+        string[] learning = migration.UpOperations.OfType<CreateTableOperation>()
+            .Select(operation => operation.Name).ToArray();
+        string[] preceding = complete.Except(learning, StringComparer.Ordinal).ToArray();
+        bool present = false;
+        // Exercise only the generated cohort; the separate full-chain test remains mandatory.
+        foreach (var operations in new[]
+            { migration.DownOperations, migration.UpOperations, migration.DownOperations, migration.UpOperations })
+        {
+            foreach (var command in generator.Generate(operations, context.GetService<IDesignTimeModel>().Model))
+                await context.Database.ExecuteSqlRawAsync(command.CommandText);
+            await AssertSchemaAsync(context, database.Provider, present);
+            await Assert.That(await ReadNamesAsync(context, query, string.Empty, schema))
+                .IsEquivalentTo(present ? complete : preceding);
+            present = !present;
+        }
+        await Assert.That(await context.Database.GetAppliedMigrationsAsync()).IsEmpty();
+    }
+
     [Test]
     public async Task GeneratedLearningMigrationAppliesTwiceDownAndUpWithRealSchemaObjects()
     {
@@ -107,10 +148,13 @@ public sealed class LearningMigrationRoundTripTests
     {
         await using DbCommand command = context.Database.GetDbConnection().CreateCommand();
         command.CommandText = query;
-        var tableParameter = command.CreateParameter();
-        tableParameter.ParameterName = "table";
-        tableParameter.Value = table;
-        command.Parameters.Add(tableParameter);
+        if (query.Contains("@table", StringComparison.Ordinal))
+        {
+            var tableParameter = command.CreateParameter();
+            tableParameter.ParameterName = "table";
+            tableParameter.Value = table;
+            command.Parameters.Add(tableParameter);
+        }
         if (query.Contains("@schema", StringComparison.Ordinal))
         {
             var schemaParameter = command.CreateParameter();

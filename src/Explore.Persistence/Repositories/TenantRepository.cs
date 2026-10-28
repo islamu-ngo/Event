@@ -103,6 +103,7 @@ public class TenantRepository : GenericRepository<Tenant, Guid>, ITenantReposito
                              or EventDiscoverySnapshotItem or EventDiscoverySnapshot or EventDiscoverySnapshotReservation)
                      .ToArray())
             entry.State = EntityState.Detached;
+        await LearningLifecyclePersistence.PrepareTenantDeletionAsync(_dbContext, entity.Id, cancellationToken);
         await base.Delete(entity);
         _dbContext.DisclosureMutations.RecordTenantDeletion(entity.Id);
         Task<int> DeleteDiscoveryAsync<TEntity>() where TEntity : class, ITenantEntity =>

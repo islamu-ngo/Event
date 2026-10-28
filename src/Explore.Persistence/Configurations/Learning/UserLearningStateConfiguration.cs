@@ -18,15 +18,19 @@ public sealed class UserLearningStateConfiguration : IEntityTypeConfiguration<Us
         builder.HasIndex(value => new { value.TenantId, value.UserId }).IsUnique();
         builder.HasOne<Tenant>().WithMany().HasForeignKey(value => value.TenantId)
             .OnDelete(DeleteBehavior.Cascade);
+        // SQL Server's provider convention marks the model before configurations run.
+        // Keep orphan deletion in EF without introducing database cascade paths.
+        var childDeleteBehavior = builder.Metadata.Model.FindAnnotation("SqlServer:ValueGenerationStrategy") is not null
+            ? DeleteBehavior.ClientCascade : DeleteBehavior.Cascade;
         builder.HasMany(value => value.Tours).WithOne()
             .HasForeignKey(value => new { value.TenantId, value.UserLearningStateId })
             .HasPrincipalKey(value => new { value.TenantId, value.Id })
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(childDeleteBehavior);
         builder.Navigation(value => value.Tours).HasField("_tours").UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.HasMany(value => value.Practices).WithOne()
             .HasForeignKey(value => new { value.TenantId, value.UserLearningStateId })
             .HasPrincipalKey(value => new { value.TenantId, value.Id })
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(childDeleteBehavior);
         builder.Navigation(value => value.Practices).HasField("_practices").UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

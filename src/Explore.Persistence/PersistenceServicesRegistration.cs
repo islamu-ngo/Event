@@ -18,6 +18,7 @@ using Explore.Domain;
 using Explore.Persistence.Caching;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Privacy;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.Queries;
@@ -47,6 +48,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IHumanOriginalCredentialCustody>(provider =>
             (IHumanOriginalCredentialCustody)provider.GetRequiredService<IPolicyMutationExecutionScopeFactory>());
         services.AddScoped<IHumanTenantPreferenceStore, HumanTenantPreferenceStore>();
+        services.AddScoped<IHumanLearningMutationStore, HumanLearningMutationStore>();
         services.AddScoped<ILearningRepository, LearningRepository>();
         services.AddScoped<ILearningPrivacyErasureStore, LearningPrivacyErasureStore>();
         services.AddScoped<IConfigurationManifestTenantReadScopeFactory, ConfigurationManifestTenantReadScopeFactory>();

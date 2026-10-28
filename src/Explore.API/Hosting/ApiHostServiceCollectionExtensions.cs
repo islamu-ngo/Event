@@ -402,6 +402,7 @@ public static class ApiHostServiceCollectionExtensions
             options.AddSchemaTransformer<ExternalApiKeyIssuanceSchemaTransformer>();
             options.AddSchemaTransformer<ModerationIntentSchemaTransformer>();
             options.AddSchemaTransformer<LocalizationImportSchemaTransformer>();
+            options.AddSchemaTransformer<LearningRequestSchemaTransformer>();
             options.AddDocumentTransformer<QuotaExceededDetailsOpenApiTransformer>();
             options.AddDocumentTransformer<OpenApiStringEnumDocumentTransformer>();
             options.AddDocumentTransformer<ModerationIntentSchemaTransformer>();

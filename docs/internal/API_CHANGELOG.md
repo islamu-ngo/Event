@@ -3,6 +3,20 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-28
+
+- Added the private `/api/learning` context, practice, tour, preference and
+  tenant-source operations. State belongs to the original active tenant member;
+  actor/event contexts require current contextual authority and source lifecycle
+  requires current tenant administration. Closed string-enum requests reject
+  ownership/effect payloads. Stable intent IDs and revisions protect bounded
+  retries; no private response is replayed from generic idempotency storage.
+  Successes and errors are private/no-store. Authored practice changes only
+  learning state, not events, orders, attendees, outboxes or AI conversations.
+  Rendered practice and contextual guidance remain separate required deliveries.
+  Source integration is present; final runtime/provider acceptance is tracked
+  separately and is not implied by this changelog entry.
+
 ## 2026-10-25
 
 - Managed event-program responses copy their sessions, groups, days and agenda

@@ -13,6 +13,7 @@ using Explore.Application.Features.TenantOnboarding.Requests.Commands;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.ManagedProviderProvisioning.Requests.Commands;
 using Explore.Application.Features.Tenants.Requests.Commands;
+using Explore.Application.Features.Learning.Requests.Commands;
 using Explore.Domain.Settings;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,6 +23,7 @@ internal static class PolicyMutationCommandScope
 {
     internal static bool Handles(Type request) =>
         FooterOperationScope.Handles(request)
+        || HandlesLearning(request)
         || request == typeof(UpdateLocalizationGovernanceCommand)
         || request == typeof(UpdateUserLastActiveTenantCommand)
         || request == typeof(UpdateSettingCommand) || request == typeof(UpdateSettingBatchCommand)
@@ -49,12 +51,27 @@ internal static class PolicyMutationCommandScope
         || request == typeof(CompleteTenantOnboardingCommand)
         || request == typeof(UpdateTenantReportingIntakePolicyCommand);
 
+    internal static bool HandlesLearning(Type request) =>
+        request == typeof(ClaimLearningTourCommand)
+        || request == typeof(RecordLearningTourOutcomeCommand)
+        || request == typeof(UpdateLearningPreferencesCommand)
+        || request == typeof(ApplyLearningPracticeActionCommand)
+        || request == typeof(ManageTenantLearningSpaceCommand);
+
     internal static ValueTask<PolicyMutationScope?> SelectAsync(
         object request, IServiceProvider services, CancellationToken cancellationToken)
     {
         if (FooterOperationScope.Handles(request.GetType()))
             return ValueTask.FromResult<PolicyMutationScope?>(FooterOperationScope.Select(request, services.GetService<ITenantContextAccessor>()));
         cancellationToken.ThrowIfCancellationRequested();
+        if (HandlesLearning(request.GetType()))
+        {
+            if (services.GetRequiredService<IMachinePrincipalAccessor>().IsMachineCaller
+                || services.GetService<ITenantContextAccessor>() is not { IsResolved: true, TenantId: { } tenant }
+                || tenant == Guid.Empty)
+                throw new UnauthorizedAccessException("Learning requires the original authenticated tenant selection.");
+            return ValueTask.FromResult<PolicyMutationScope?>(new(tenant));
+        }
         if (request is CreateTenantCommand)
         {
             if (services.GetRequiredService<IMachinePrincipalAccessor>().IsMachineCaller)

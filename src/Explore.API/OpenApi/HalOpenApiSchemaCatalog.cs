@@ -4,6 +4,29 @@ internal static class HalOpenApiSchemaCatalog
 {
     public static IReadOnlyList<Type> RegisteredDtoTypes { get; } =
     [
+        // Private learning wire contracts, including named nested and strict input objects.
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningContextDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningPracticeSummaryDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningPreferencesDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningCapabilitiesDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningTourProgressDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningPracticeDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningSimulationStateDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningSyntheticPresentationDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningSyntheticFactDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningSimulationReceiptDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningMutationReceiptDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningSpaceDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningTourClaimDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningLessonDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningDisplayTextDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningChoiceDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningRecipeTransitionDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningClaimTourRequest),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningRecordTourOutcomeRequest),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningUpdatePreferencesRequest),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningApplyPracticeActionRequest),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningManageSpaceRequest),
         typeof(Explore.Application.Contracts.Identity.LocalIdentitySummary),
         typeof(Explore.Application.Contracts.Identity.LocalCredentialOperationStatus),
         typeof(Explore.Application.Contracts.Identity.LocalCredentialOperationReceipt),
@@ -378,6 +401,9 @@ internal static class HalOpenApiSchemaCatalog
 
     public static IReadOnlyDictionary<string, Type> DetailResourceMappings { get; } = new Dictionary<string, Type>
     {
+        ["HalResourceOfLearningContextDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningContextDto),
+        ["HalResourceOfLearningPracticeDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningPracticeDto),
+        ["HalResourceOfLearningMutationReceiptDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningMutationReceiptDto),
         ["HalResourceOfModerationNoticeDto"] = typeof(Explore.Application.Features.Moderation.Notices.ModerationNoticeDto),
         ["HalResourceOfModerationNoticeStatusDto"] = typeof(Explore.Application.Features.Moderation.Notices.ModerationNoticeStatusDto),
         ["HalResourceOfModerationContentResponseAvailability"] = typeof(Explore.Application.Contracts.Persistence.ModerationContentResponseAvailability),

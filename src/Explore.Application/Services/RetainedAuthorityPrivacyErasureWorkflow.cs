@@ -203,11 +203,8 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
                     await applier.InvalidateRetainedIntentAsync(intent, cancellationToken);
                 }
 
-                bool covered = await stateRepository.HasCoverageAsync(
-                    intent.IntentId,
-                    _options.CurrentPolicyVersion,
-                    cancellationToken);
-                if (latest?.AuthoritySequence < intent.AuthoritySequence || latest is null || !covered)
+                // Covered replay still enters the protected applier: newly enrolled private
+                // learning data must be purged before its existing coverage early return.
                 {
                     await using var eligibilityRevocation = await localEligibility.AcquireAsync(intent, cancellationToken);
                     await EnsureFenceForReplayAsync(intent, cancellationToken);

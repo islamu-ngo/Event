@@ -64,6 +64,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority;
     private string? _connectionString;
     private IInterceptor? _persistenceInterceptor;
+    private bool _poolContexts;
+    internal event Action<ExploreDbContext, DbContextId>? ContextReturned;
     private ILoggerProvider? _logCapture;
     private IdentityDatabaseTopology _identityTopology = IdentityDatabaseTopology.Colocated;
     private string? _identityConnectionString;
@@ -134,11 +136,13 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         bool enableRateLimiting = false,
         bool enableAtproto = false,
         string? postgreSqlConnectionString = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        bool poolContexts = false)
     {
         var factory = new LocalAdmissionWebApplicationFactory(primaryProvider, enableAtproto, timeProvider)
         {
             _persistenceInterceptor = persistenceInterceptor,
+            _poolContexts = poolContexts,
             _logCapture = logCapture,
             _identityTopology = identityTopology,
             _incompleteSetup = incompleteSetup,
@@ -255,7 +259,14 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             services.RemoveAll<IExternalDataProtectionSource>();
             services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
             services.RemoveExploreDbContextRegistrations();
-            services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
+            if (_poolContexts)
+            {
+                services.AddPooledDbContextFactory<ExploreDbContext>(ConfigureDatabase, poolSize: 1);
+                services.AddScoped(_ => new PooledContextReturn(
+                    (context, lease) => ContextReturned?.Invoke(context, lease)));
+            }
+            else
+                services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
             if ((_postgreSqlConnectionString is null && _measurementDatabase is null)
                 || _measurementDatabase?.Provider == PrimaryDatabaseProvider.Sqlite)
             {
@@ -277,14 +288,19 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             }
             services.AddScoped(provider =>
             {
+                var returned = _poolContexts ? provider.GetRequiredService<PooledContextReturn>() : null;
                 if (provider.GetRequiredService<ExploreDbContextExecutionLease>().Context is { } selected)
+                {
+                    returned?.Observe(selected);
                     return selected;
+                }
                 var context = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>()
                     .CreateDbContext();
                 context.TenantContext = provider.GetService<ITenantContext>();
                 context.CurrentUserService = provider.GetService<ICurrentUserService>();
                 context.ClearTenantFilterBypass();
                 context.BindTenantLease();
+                returned?.Observe(context);
                 return context;
             });
             if (_externalSigningKey is not null)
@@ -305,6 +321,21 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 ConfigureAtprotoAuthorities(services);
             }
         });
+    }
+
+    /// <summary>Resolved before the scoped context so reverse disposal signals its completed pool return.</summary>
+    private sealed class PooledContextReturn(Action<ExploreDbContext, DbContextId> returned) : IDisposable
+    {
+        private ExploreDbContext? _context;
+        private DbContextId _lease;
+
+        public void Observe(ExploreDbContext context) => (_context, _lease) = (context, context.ContextId);
+
+        public void Dispose()
+        {
+            if (_context is not null)
+                returned(_context, _lease);
+        }
     }
 
     public string ExternalIssuer => _externalIssuer;

@@ -33,6 +33,7 @@ internal static class PostgresTenantRuntimeReadiness
                 OR ({PostgresIntegrationSyncReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresExternalApiKeyAuthenticationContract.GlobalPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresAdmissionScannerAuthenticationContract.GlobalPolicyException(context, enrolledGlobalLogin)})
+                OR ({PostgresLearningPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
                 """;
         command.CommandText = $$"""
             SELECT

@@ -145,6 +145,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
                 WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
                 """);
             await PostgresSubjectPrivacyErasureContract.ApplyAsync(migratorContext);
+            await PostgresLearningPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresPdsSettlementContract.ApplyAsync(migratorContext);
             await PostgresPdsQueueAdmissionContract.ApplyAsync(migratorContext);
             await PostgresAtprotoModerationCompensationContract.ApplyAsync(migratorContext);

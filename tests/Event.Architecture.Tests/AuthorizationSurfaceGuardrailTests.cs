@@ -21,6 +21,26 @@ public sealed class AuthorizationSurfaceGuardrailTests
     private static readonly InventoryEntry[] NamedOperationExceptions =
     [
         new(
+            "Explore.Application.Features.Learning.Requests.Commands.ClaimLearningTourCommand",
+            "original-human-private-learning-owner",
+            "IHumanLearningMutationPreparation accepts this exact intent under the original active human, selected tenant, retained-erasure exclusion and current contextual sources. HumanLearningMutationStore validates the original physical owner, completion image and terminal claim/credential clocks before committing. LearningFinalAdmissionTests and LearningRaceTests cover rejection and rollback."),
+        new(
+            "Explore.Application.Features.Learning.Requests.Commands.RecordLearningTourOutcomeCommand",
+            "original-human-private-learning-owner",
+            "The closed learning preparation retains original human/tenant custody and validates the exact tour claim, scope, revision and terminal deadline inside the physical settlement owner. It accepts no caller callback or cached grant; LearningFinalAdmissionTests exercises final admission failures."),
+        new(
+            "Explore.Application.Features.Learning.Requests.Commands.UpdateLearningPreferencesCommand",
+            "original-human-private-learning-owner",
+            "The exact closed learning intent checks current self/tenant authority, original retained-erasure custody and persisted sources through physical settlement. LearningOperationTests and LearningRaceTests verify private ownership, erasure exclusion and concurrent rollback."),
+        new(
+            "Explore.Application.Features.Learning.Requests.Commands.ApplyLearningPracticeActionCommand",
+            "original-human-private-learning-owner",
+            "The closed learning owner resolves actual actor placement and current membership before applying one authored synthetic action. It validates the original transaction and final scalar image, rejects nonlearning writes and retains owner-only orphan clearing. LearningActorContextTests, LearningFinalAdmissionTests and LearningOperationTests cover these boundaries."),
+        new(
+            "Explore.Application.Features.Learning.Requests.Commands.ManageTenantLearningSpaceCommand",
+            "original-human-private-learning-owner",
+            "The exact learning owner distinguishes tenant space authority from ordinary learner access and retains current native sources through commit. LearningSpaceLifecycleTests proves tombstones, explicit removal and rejection of claim renewal after source removal; LearningFinalAdmissionTests guards the original settlement image."),
+        new(
             "Explore.Application.Features.Tenants.Requests.Commands.DeleteTenantCommand",
             "original-human-tenant-deletion-owner",
             "DeleteTenantCommandHandler delegates deletion to IHumanTenantMutationPreparation.ExecuteDeletionAsync, which retains the original request and selected human tenant owner before persistence."),

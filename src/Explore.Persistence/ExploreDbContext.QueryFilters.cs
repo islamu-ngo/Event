@@ -1,6 +1,7 @@
 using Explore.Domain;
 using Explore.Domain.Ai;
 using Explore.Domain.Federation;
+using Explore.Domain.Learning;
 using Explore.Domain.Modules;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.SetupLive;
@@ -18,6 +19,19 @@ public partial class ExploreDbContext
     /// </summary>
     private void ApplyGlobalQueryFilters(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<TenantLearningSpace>()
+            .HasQueryFilter(QueryFilterNames.Tenant, value =>
+                IsTenantFilterBypassed || value.TenantId == TenantFilterTenantId);
+        modelBuilder.Entity<UserLearningState>()
+            .HasQueryFilter(QueryFilterNames.Tenant, value =>
+                IsTenantFilterBypassed || value.TenantId == TenantFilterTenantId);
+        modelBuilder.Entity<LearningTourProgress>()
+            .HasQueryFilter(QueryFilterNames.Tenant, value =>
+                IsTenantFilterBypassed || value.TenantId == TenantFilterTenantId);
+        modelBuilder.Entity<LearningPracticeState>()
+            .HasQueryFilter(QueryFilterNames.Tenant, value =>
+                IsTenantFilterBypassed || value.TenantId == TenantFilterTenantId);
+
         modelBuilder.Entity<SetupTargetEnrollment>()
             .HasQueryFilter(QueryFilterNames.Tenant, value =>
                 IsTenantFilterBypassed || value.TenantId == TenantFilterTenantId);

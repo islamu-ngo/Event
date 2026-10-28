@@ -12,7 +12,8 @@ namespace Explore.Persistence.Privacy.ErasureAuthority;
 
 /// <summary>
 /// Execute-only, subject/intent-qualified disposal. The NOLOGIN owner has only
-/// the compiled policy's relation grants; Global receives no private table grant.
+/// the compiled policy's relation grants; Global receives no legacy private table grant.
+/// Application-owned learning disposal has separate fixed root-only storage rights.
 /// </summary>
 public static partial class PostgresSubjectPrivacyErasureContract
 {

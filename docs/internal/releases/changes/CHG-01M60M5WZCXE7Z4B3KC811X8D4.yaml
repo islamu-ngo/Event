@@ -1,0 +1,39 @@
+Change-Id: CHG-01M60M5WZCXE7Z4B3KC811X8D4
+Title: "expose private learning without production effects"
+Type: feat
+Scope: onboarding
+Summary: "Expose current-user learning through private strict contracts and HAL links, with generated clients and operator privacy guidance."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Private learning GETs require the original active tenant human despite
+      anonymous route metadata. All responses are private/no-store; writes use
+      current server authority and never replay a cached private response.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Seven named learning operations expose strict closed request schemas,
+      exact string enums and named bounded response/simulation contracts.
+      The schema and per-tag clients are generated through native build targets.
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      This is a private backend, not rendered onboarding. Practice presentation
+      and contextual guidance remain required separate successors; simulations
+      do not create events, orders, attendees, outbox work or AI conversations.

@@ -174,6 +174,8 @@ public static class ExploreDatabaseMigrator
                 executionDatabase, queueEnrollment, cancellationToken);
         }
         await PostgresSubjectPrivacyErasureContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresLearningPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
         await PostgresPdsSettlementContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresPdsQueueAdmissionContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresAtprotoModerationCompensationContract.ApplyAsync(executionDatabase, cancellationToken);

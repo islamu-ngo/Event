@@ -559,6 +559,10 @@ Bash; without it, a successful run only establishes workflow/expression validity
 Keep related step outputs in one redirected block so the same shell checks pass
 locally and on GitHub-hosted runners.
 
+Assurance jobs derive private temporary, browser and tool paths from `RUNNER_TEMP`
+inside their preparation step and persist them through `GITHUB_ENV`. Do not use
+the `runner` expression context in job-level `env`, where GitHub disallows it.
+
 ### Workflow Cache Poisoning Policy
 
 Fork pull requests and untrusted contribution events must not write caches that are later consumed by trusted deployment, release, or publish workflows. `Workflow Security` enforces this with `.ci/scripts/validate-workflow-cache-policy.cs`.

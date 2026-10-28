@@ -24,11 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
-      TMPDIR: ${{ runner.temp }}/islamu-security-private
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_RYUK_DISABLED: "true"
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/islamu-assurance-headless-browsers
-      ISLAMU_K6_PATH: ${{ runner.temp }}/islamu-security-tools/k6
 
     steps:
       - name: Checkout
@@ -42,12 +39,18 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
+          export TMPDIR="$RUNNER_TEMP/islamu-security-private"
           mkdir -p "$TMPDIR" "$RUNNER_TEMP/islamu-security-tools"
           chmod 700 "$TMPDIR" "$RUNNER_TEMP/islamu-security-tools"
           [[ "$DOCKER_HOST" == unix:///* ]]
           selected_socket="$(readlink --canonicalize-existing -- "${DOCKER_HOST#unix://}")"
           test -S "$selected_socket"
-          printf 'DOCKER_HOST=unix://%s\n' "$selected_socket" >> "$GITHUB_ENV"
+          {
+            printf 'TMPDIR=%s\n' "$TMPDIR"
+            printf 'PLAYWRIGHT_BROWSERS_PATH=%s/islamu-assurance-headless-browsers\n' "$RUNNER_TEMP"
+            printf 'ISLAMU_K6_PATH=%s/islamu-security-tools/k6\n' "$RUNNER_TEMP"
+            printf 'DOCKER_HOST=unix://%s\n' "$selected_socket"
+          } >> "$GITHUB_ENV"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0

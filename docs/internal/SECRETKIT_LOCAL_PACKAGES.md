@@ -156,6 +156,55 @@ Do not force these two graphs into a shared lock or disable lock enforcement.
 The standard lock basename also keeps the container graph in the repository's
 existing dependency-submission and policy inventories.
 
+### Merged-source image qualification (2026-10-28)
+
+The merged integration source at
+`fc1d64b42d754c0d9085e04d6e0aa00f6d288fa8` completed actual Linux x64
+construction for all four recipes. Local tags are
+`localhost/islamu-secretkit-<name>:qualification-merged-20261028`:
+
+| Name | Image ID prefix | Successful builder memory limit |
+| --- | --- | --- |
+| `api` | `d55f00c005b6` | 12 GiB |
+| `bff` | `85421b56acbe` | 4 GiB |
+| `migration` | `f2bcd306b59d` | 12 GiB |
+| `standalone` | `bf2f809a4c5f` | 12 GiB |
+
+The command retained `--pull=never --layers`,
+`--cpu-period=100000 --cpu-quota=200000`,
+`--build-arg TARGETARCH=amd64` and
+`--build-arg BUILDPLATFORM=linux/amd64`, selecting each existing Dockerfile.
+API, MigrationService and Standalone initially exhausted the 4 GiB limit
+while Roslyn compiled Persistence. Only those three images were retried
+with `--memory=12g`; the passing BFF image was not rebuilt. No compiler,
+analyzer or locked-restore policy was relaxed.
+
+Each resulting image reports `amd64` and UID 1654. Network-disabled shell
+inspection of API, BFF and MigrationService verified all four retained
+archive checksums, the four runtime DLL hashes against the unchanged
+frozen packages, and absence of the retired Secrets and Infisical SDK
+assemblies. Standalone's chiseled image was inspected through a stopped
+container: its executable is stripped ELF64/x86-64, all four retained
+archive checksums pass, and its filesystem inventory contains no loose
+retired DLLs. Its bundled runtime DLLs were not separately extracted or
+hashed.
+
+Private build logs are
+`$HOME/.cache/agent-tmp/secretkit-merged-image-bff.log` and
+`secretkit-merged-image-12g-{api,migration,standalone}.log` in that same
+directory. Inspection logs use `secretkit-merged-image-inspect-<name>.log`.
+The stopped diagnostic container was removed after inspection; no serving
+or migration entrypoint was invoked. These receipts establish construction
+and bounded content inspection only, not credentialed startup, provider
+permissions, fleet recovery, arm64, trimming or Native AOT qualification.
+
+The current complete Architecture run executes 694 cases: 687 pass and
+seven fail. All seven failures reproduce on untouched develop
+`20737e450db0df748b3e5737bcb3405f54c37cd8` with identical complete errors
+and first repository frames. The guardrails remain red; historical
+foundation results below do not replace this merged-source result.
+Complete API and Persistence corpus qualification remains in progress.
+
 The approved foundation pins all four packages to `[0.1.0-local.20261024.1]`
 and aligns `Refit` and `Refit.HttpClientFactory` at **16.3.0**. Reconcile actual
 Microsoft.Extensions minima with existing pins, keeping higher compatible

@@ -143,7 +143,8 @@ Those historical package receipts are separate from Event's foundation checks.
 The shared acquisition boundary has a passing Release build,
 controlled-provider invariant tests, backend/browser Refit checks, fresh-cache
 source/hash verification and dependency-license inventory. The architecture
-suite still has four independently reproduced baseline failures; it is not
+suite's current merged-source run has seven independently reproduced
+develop-baseline failures; it is not
 reported as clean. Exact commands and evidence are in the technical provenance
 guide.
 
@@ -152,12 +153,20 @@ suite assurance remains open, with newly exposed failures being attributed
 before they can be accepted as unrelated baseline defects. Native Infisical
 actor/ACL enforcement and fleet recovery remain unqualified. API, BFF,
 MigrationService and Standalone Linux x64 images completed actual locked
-restore and publish. The October 27, 2026 refresh covers the later routing and
-writer corrections and completed all four recipes. The three
+restore and publish. The October 27, 2026 refresh covered the later routing and
+writer corrections. A further October 28, 2026 qualification completed all four
+recipes after merging develop. On that source, API, MigrationService and
+Standalone exhausted a 4 GiB builder limit during Persistence compilation
+and succeeded with a 12 GiB limit; BFF succeeded at 4 GiB. These are measured
+local Podman build budgets, not a runtime memory requirement. Locked restore
+and compiler checks stayed enabled. The three
 framework-dependent images' four native
 DLL hashes match the frozen packages, and the retired Secrets assembly
 is absent. Standalone's single-file image retains the complete package
-bundle with all four archive checksums verified. These checks do not
+bundle with all four archive checksums verified; its stopped-container
+inspection also confirmed the Linux x64 executable and absence of loose
+retired DLLs. Bundled runtime DLLs were not separately extracted or hashed.
+These checks do not
 certify credentialed service startup or another architecture.
 Standalone's normal container profile uses untrimmed IL;
 trimming/Native AOT support must not be inferred from that profile.

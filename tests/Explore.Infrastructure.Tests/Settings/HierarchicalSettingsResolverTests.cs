@@ -445,6 +445,48 @@ public class HierarchicalSettingsResolverTests : IDisposable
         await Assert.That(refreshed.EventsBackfillMode).IsEqualTo("full");
     }
 
+    [Test]
+    [Arguments(GovernanceSettingKeys.Events.UserSubmissionEnabled, false)]
+    [Arguments(GovernanceSettingKeys.Events.UserSubmissionEnabled, true)]
+    [Arguments(GovernanceSettingKeys.Events.OrganizationSubmissionEnabled, false)]
+    [Arguments(GovernanceSettingKeys.Events.OrganizationSubmissionEnabled, true)]
+    [Arguments(GovernanceSettingKeys.Events.GroupSubmissionEnabled, false)]
+    [Arguments(GovernanceSettingKeys.Events.GroupSubmissionEnabled, true)]
+    [Arguments(GovernanceSettingKeys.Events.RequireApproval, false)]
+    [Arguments(GovernanceSettingKeys.Events.RequireApproval, true)]
+    public async Task Event_creation_policy_changes_are_visible_without_replica_cache_invalidation(string key, bool tenantOverride)
+    {
+        var tenantId = Guid.CreateVersion7();
+        var initialValue = key == GovernanceSettingKeys.Events.RequireApproval ? "false" : "true";
+        var deniedValue = key == GovernanceSettingKeys.Events.RequireApproval ? "true" : "false";
+        SetupSystemSettings(new SystemSetting
+        {
+            SettingKey = key,
+            Value = initialValue,
+            ValueType = SettingValueType.Boolean,
+            IsLocked = false
+        });
+        SetupTenantSettings(tenantId, tenantOverride
+            ? [new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = key, Value = initialValue }]
+            : []);
+        var context = new SettingContext(TenantId: tenantId);
+        var initial = await _resolver.ResolveWithMetadataAsync(key, context);
+        if (tenantOverride)
+            SetupTenantSettings(tenantId,
+                new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = key, Value = deniedValue });
+        else
+            SetupSystemSettings(new SystemSetting
+            {
+                SettingKey = key,
+                Value = deniedValue,
+                ValueType = SettingValueType.Boolean,
+                IsLocked = false
+            });
+        var refreshed = await _resolver.ResolveWithMetadataAsync(key, context);
+        await Assert.That(initial!.Value).IsEqualTo(initialValue);
+        await Assert.That(refreshed!.Value).IsEqualTo(deniedValue);
+    }
+
     // --- Batch resolution ---
 
     private void SetupFederationInstance(params AtprotoFederationInstanceSetting[] settings) =>

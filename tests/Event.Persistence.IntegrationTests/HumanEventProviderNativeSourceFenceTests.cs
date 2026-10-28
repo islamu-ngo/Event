@@ -11,6 +11,7 @@ using Explore.Persistence.Security;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
@@ -209,6 +210,50 @@ public sealed class HumanEventProviderNativeSourceFenceTests(PostgreSqlContainer
         await using var restored = Open(seed.TenantId);
         using var current = JsonDocument.Parse(await ReadAsync(restored, seed, false));
         await Assert.That(current.RootElement.GetProperty("1").GetArrayLength()).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task SourceCollationMustMatchItsDeclaredComparisonSemantics(bool ordinal)
+    {
+        var seed = await SeedAsync();
+        await using var migration = fixture.CreateDbContext();
+        await using var context = Open(seed.TenantId);
+        using (var healthy = JsonDocument.Parse(await ReadAsync(context, seed, false)))
+            await Assert.That(healthy.RootElement.GetProperty("1").GetArrayLength()).IsEqualTo(1);
+
+        await migration.Database.ExecuteSqlRawAsync(CollationChange(migration, ordinal, ordinal ? "default" : "C"));
+        try
+        {
+            var readFailure = await Assert.ThrowsAsync<PostgresException>(() => ReadAsync(context, seed, false));
+            await Assert.That(readFailure!.SqlState).IsEqualTo("55000");
+            await Assert.That(readFailure.MessageText).IsEqualTo("human_event_provider_source_drift");
+            var installFailure = await Assert.ThrowsAsync<PostgresException>(() =>
+                PostgresHumanEventProviderSourceContract.ApplyAsync(migration, fixture.NativeQueueEnrollment));
+            await Assert.That(installFailure!.SqlState).IsEqualTo("55000");
+            await Assert.That(installFailure.MessageText).IsEqualTo("human_event_provider_source_drift");
+        }
+        finally
+        {
+            await migration.Database.ExecuteSqlRawAsync(CollationChange(migration, ordinal, ordinal ? "C" : "default"));
+        }
+
+        using var restored = JsonDocument.Parse(await ReadAsync(context, seed, false));
+        await Assert.That(restored.RootElement.GetProperty("1").GetArrayLength()).IsEqualTo(1);
+    }
+
+    private static string CollationChange(ExploreDbContext context, bool ordinal, string collation)
+    {
+        Type type = ordinal ? typeof(RegistrationProviderBinding) : typeof(RegistrationProviderConnection);
+        string name = ordinal ? nameof(RegistrationProviderBinding.PublishedMappingRevisionHash)
+            : nameof(RegistrationProviderConnection.Name);
+        var entity = context.Model.FindEntityType(type)!;
+        var property = entity.FindProperty(name)!;
+        string column = property.GetColumnName(StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema()))!;
+        var identifiers = context.GetService<ISqlGenerationHelper>();
+        return $"ALTER TABLE {Table(context, type)} ALTER COLUMN {identifiers.DelimitIdentifier(column)} "
+            + $"TYPE {property.GetRelationalTypeMapping().StoreType} COLLATE {identifiers.DelimitIdentifier(collation)}";
     }
 
     private sealed record Seed(Guid TenantId, Guid UserId, Guid EventId, RegistrationProviderConnection Connection,

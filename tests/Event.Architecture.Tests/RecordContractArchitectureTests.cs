@@ -39,11 +39,22 @@ namespace Event.Architecture.Tests
         "Explore.Application.DTOs.RegistrationOrders.RegistrationRefundCommandResultDto",
         "Explore.Application.DTOs.SupportAccess.SupportAccessSessionCommandResponseDto",
         "Explore.Application.Features.Authentication.Atproto.Models.AtprotoTransientCommandResult",
+        "Explore.Application.Features.Moderation.Requests.Commands.ModerationAllegationResponse",
+        "Explore.Application.Features.Moderation.Requests.Commands.ModerationAuthoritySourcesResponse",
+        "Explore.Application.Features.Moderation.Requests.Commands.ModerationLifecycleResponse",
+        "Explore.Application.Features.Moderation.Requests.Commands.ModerationMachineSubjectResponse",
+        "Explore.Application.Features.Moderation.Requests.Commands.ModerationPolicyPublicationCandidateResponse",
+        "Explore.Application.Features.Moderation.Requests.Commands.ModerationPolicyPublicationResponse",
+        "Explore.Application.Features.Moderation.Requests.Commands.ModerationQualificationResponse",
+        "Explore.Application.Features.Moderation.Requests.Commands.ModerationReadReceiptResponse",
+        "Explore.Application.Features.Moderation.Requests.Commands.ModerationResourceSafetyResponse",
+        "Explore.Application.Features.Moderation.Requests.Commands.ModerationSubmissionReceiptResponse",
         "Explore.Application.Features.Promotions.PromotionCodeIssuedCommandResponseDto",
         "Explore.Application.Features.Promotions.PromotionManagementCommandResponseDto",
         "Explore.Application.Features.Promotions.Requests.Commands.PromotionRedemptionResponseDto",
         "Explore.Application.Features.RegistrationOrders.Commands.AnonymousRegistrationChallengeIssueResult",
         "Explore.Application.Responses.CreateExternalApiKeyCommandResponse",
+        "Explore.Application.Responses.EventAddOnPublicationResponse",
         "Explore.Application.Responses.LocalCredentialIssueCommandResponse",
         "Explore.Application.Responses.WebhookProviderPortalAccessCommandResponse",
     ];
@@ -284,7 +295,7 @@ namespace Event.Architecture.Tests
             await Assert.That(classBaseline.Failures).IsEmpty();
             await Assert.That(bodyBaseline.Failures).IsEmpty();
             await Assert.That(classBaseline.Entries).IsEmpty();
-            await Assert.That(bodyBaseline.Entries).Count().IsEqualTo(10);
+            await Assert.That(bodyBaseline.Entries).Count().IsEqualTo(12);
             await Assert.That(bodyBaseline.Entries.All(entry => entry.Category == "legitimate-target")).IsTrue();
             await Assert.That(DiscoverConcreteApplicationClassRequests()).IsEmpty();
         }

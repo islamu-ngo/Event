@@ -1,12 +1,14 @@
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Configuration;
+using Explore.Application.Contracts.Moderation;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.PrivacyErasure;
 using Explore.Application.Exceptions;
+using Explore.Application.Services.Moderation;
 using Explore.Domain;
 using Microsoft.Extensions.Options;
 
@@ -20,6 +22,8 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
     PrivacyErasureApplier applier,
     IOptions<PrivacyErasureOptions> options,
     TimeProvider timeProvider,
+    IModerationRecognitionErasure recognition,
+    ModerationRecognitionRecoveryScheduler recoveryScheduler,
     ILocalIdentityEligibilityRevocation localEligibility) : IPrivacyErasureService
 {
     private const int ReplayBatchSize = 100;
@@ -45,6 +49,7 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
             return ToStartDto(current, null);
         }
 
+        ModerationRecognitionPending? received = await recognition.FindAsync(intentId, cancellationToken);
         string receipt = CreateReceipt();
         byte[] receiptHash = HashReceipt(receipt);
         PrivacyErasureRequest request = PrivacyErasureRequest.Create(
@@ -53,9 +58,15 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
             userId,
             PrivacyErasureReasonCode.AccountDeletion,
             _options.CurrentPolicyVersion);
-        PrivacyErasureIntent fact = await AppendWithAmbiguousAcknowledgementRetryAsync(
-            request,
-            cancellationToken);
+        PrivacyErasureIntent? fact = await recognition.AppendAsync(request, receiptHash,
+            timeProvider.GetUtcNow().Add(_options.ReceiptLifetime), cancellationToken);
+        if (fact is null)
+        {
+            var pending = await recognition.FindAsync(intentId, cancellationToken)
+                ?? throw new InvalidOperationException("moderation_recognition_request_unavailable");
+            return new PrivacyErasureStartDto(PendingStatus(pending),
+                received is null ? receipt : null, pending.ReceiptExpiresAt.UtcDateTime);
+        }
         DateTime fencedAtUtc = LaterOf(timeProvider.GetUtcNow().UtcDateTime, fact.RecordedAtUtc);
         bool created = await unitOfWork.ExecuteSerializableAsync(async ct =>
         {
@@ -99,7 +110,9 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
                 receiptHash,
                 cancellationToken);
             DateTime nowUtc = timeProvider.GetUtcNow().UtcDateTime;
-            return saga?.Authenticates(receiptHash, nowUtc) == true ? saga.IntentId : null;
+            if (saga?.Authenticates(receiptHash, nowUtc) == true) return saga.IntentId;
+            var pending = await recognition.FindReceiptAsync(receiptHash, cancellationToken);
+            return pending?.Authenticates(receiptHash, new DateTimeOffset(nowUtc)) == true ? pending.IntentId : null;
         }
         finally
         {
@@ -113,9 +126,13 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
     {
         RequireUuidV7(intentId, nameof(intentId));
         PrivacyErasureSaga? saga = await stateRepository.GetByIntentAsync(intentId, cancellationToken);
-        return saga is null
-            ? null
-            : new PrivacyErasureStatusDto(
+        if (saga is null)
+        {
+            var pending = await recognition.FindAsync(intentId, cancellationToken);
+            return pending is null ? null : new PrivacyErasureStatusDto(PendingStatus(pending),
+                0, 0, pending.ReceiptExpiresAt.UtcDateTime, null, null);
+        }
+        return new PrivacyErasureStatusDto(
                 StatusCode(saga.Status),
                 saga.ProviderWorkCount,
                 saga.CompletedProviderWorkCount,
@@ -126,6 +143,11 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
 
     public async Task ReplayPendingAsync(CancellationToken cancellationToken)
     {
+        // Privacy-linked retention is independent of available keys or retained
+        // authority transport; later recovery failure cannot prolong this ceiling.
+        await recoveryScheduler.ForgetExpiredReceiptsAsync(cancellationToken);
+        await recognition.ReconcileReceivedAsync(cancellationToken);
+        await recoveryScheduler.ReconcileAsync(cancellationToken);
         PrivacyErasureReplayCheckpoint? latest = await checkpointRepository.GetLatestAsync(cancellationToken);
         PrivacyErasureAuthorityState state = await authority.GetStateAsync(cancellationToken);
         long latestSequence = latest?.AuthoritySequence ?? 0;
@@ -157,6 +179,9 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
                     throw new PrivacyErasureSequenceGapException();
                 }
 
+                // Material pruning requires the selected authority's current replay floor.
+                // Running it before catch-up could prevent that very catch-up from completing.
+                await recoveryScheduler.PruneExpiredMaterialAsync(cancellationToken);
                 return;
             }
 
@@ -189,8 +214,9 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
                     PrivacyErasureApplier.PreparedErasure prepared = await applier.PrepareAsync(
                         intent,
                         cancellationToken);
-                    PrivacyErasureApplier.AppliedErasure applied = await unitOfWork.ExecuteSerializableAsync(
-                        ct => applier.ApplyInCurrentTransactionAsync(intent, prepared, authority, ct),
+                    PrivacyErasureApplier.AppliedErasure applied = await recognition.ExecutePurgeAsync(
+                        ct => unitOfWork.ExecuteSerializableAsync(
+                            inner => applier.ApplyInCurrentTransactionAsync(intent, prepared, authority, inner), ct),
                         cancellationToken);
                     await applier.InvalidateAfterCommitAsync(applied);
                     latest = await checkpointRepository.GetLatestAsync(cancellationToken);
@@ -231,22 +257,12 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
         }, cancellationToken);
     }
 
-    private async Task<PrivacyErasureIntent> AppendWithAmbiguousAcknowledgementRetryAsync(
-        PrivacyErasureRequest request,
-        CancellationToken cancellationToken)
+    private string PendingStatus(ModerationRecognitionPending pending) => pending.StateAt(timeProvider.GetUtcNow()) switch
     {
-        try
-        {
-            return await authority.AppendAsync(request, cancellationToken);
-        }
-        catch (Exception exception) when (
-            !cancellationToken.IsCancellationRequested
-            && exception is TimeoutException or IOException or InvalidOperationException or OperationCanceledException)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return await authority.AppendAsync(request, cancellationToken);
-        }
-    }
+        ModerationRecognitionPendingState.LawfulDispositionRequired => "lawful_disposition_required",
+        ModerationRecognitionPendingState.EscalationRequired => "recognition_escalation_required",
+        _ => "received_unsettled"
+    };
 
     private static PrivacyErasureStartDto ToStartDto(PrivacyErasureSaga saga, string? receipt) =>
         new(StatusCode(saga.Status), receipt, saga.ReceiptExpiresAtUtc);

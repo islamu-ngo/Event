@@ -1,4 +1,5 @@
 using Explore.Application.DTOs.Notification;
+using Explore.Application.Notifications;
 using Explore.Domain;
 using Riok.Mapperly.Abstractions;
 
@@ -20,7 +21,8 @@ public static partial class NotificationMapper
     [MapperIgnoreSource(nameof(Notification.DeletedAt))]
     [MapperIgnoreSource(nameof(Notification.DeletedBy))]
     [MapProperty(nameof(Notification.NotificationType), nameof(NotificationDto.NotificationTypeName), Use = nameof(TypeName))]
-    [MapProperty(nameof(Notification.NotificationEntityType), nameof(NotificationDto.NotificationEntityTypeName), Use = nameof(EntityTypeName))]
+    [MapperIgnoreSource(nameof(Notification.NotificationEntityType))]
+    [MapPropertyFromSource(nameof(NotificationDto.NotificationEntityTypeName), Use = nameof(EntityTypeName))]
     [MapProperty(nameof(Notification.NotificationScope), nameof(NotificationDto.NotificationScopeName), Use = nameof(ScopeName))]
     [MapProperty(nameof(Notification.NotificationReason), nameof(NotificationDto.NotificationReasonName), Use = nameof(ReasonName))]
     [MapProperty(nameof(Notification.SourceActor), nameof(NotificationDto.SourceActorName), Use = nameof(ActorName))]
@@ -42,7 +44,8 @@ public static partial class NotificationMapper
     [MapperIgnoreSource(nameof(Notification.DeletedAt))]
     [MapperIgnoreSource(nameof(Notification.DeletedBy))]
     [MapProperty(nameof(Notification.NotificationType), nameof(NotificationListDto.NotificationTypeName), Use = nameof(TypeName))]
-    [MapProperty(nameof(Notification.NotificationEntityType), nameof(NotificationListDto.NotificationEntityTypeName), Use = nameof(EntityTypeName))]
+    [MapperIgnoreSource(nameof(Notification.NotificationEntityType))]
+    [MapPropertyFromSource(nameof(NotificationListDto.NotificationEntityTypeName), Use = nameof(EntityTypeName))]
     [MapProperty(nameof(Notification.NotificationScope), nameof(NotificationListDto.NotificationScopeName), Use = nameof(ScopeName))]
     [MapProperty(nameof(Notification.NotificationReason), nameof(NotificationListDto.NotificationReasonName), Use = nameof(ReasonName))]
     [MapProperty(nameof(Notification.SourceActor), nameof(NotificationListDto.SourceActorName), Use = nameof(ActorName))]
@@ -50,7 +53,18 @@ public static partial class NotificationMapper
     public static partial NotificationListDto ToListItem(Notification source);
 
     private static string? TypeName(NotificationType? type) => type?.FullName;
-    private static string? EntityTypeName(NotificationEntityType? type) => type?.FullName;
+    // This discriminator routes a fixed in-app pointer; it never grants notice access.
+    private static string? EntityTypeName(Notification source) =>
+        source.NotificationEntityTypeId is null && source.NotificationEntityType is null
+        && source.NotificationIntentId is { } intentId && intentId != Guid.Empty
+        && source.UserId != Guid.Empty
+        && Guid.TryParseExact(source.EntityId, "D", out var noticeId)
+        && noticeId.Version == 7 && noticeId.Variant is >= 8 and <= 11
+        && string.Equals(source.DeduplicationKey,
+            ModerationPreFindingNoticeTemplate.DeduplicationKey(noticeId, source.UserId) + ":in-app",
+            StringComparison.Ordinal)
+            ? ModerationPreFindingNoticeTemplate.NotificationEntityTypeName
+            : source.NotificationEntityType?.FullName;
     private static string? ScopeName(NotificationScopeType? scope) => scope?.FullName;
     private static string? ReasonName(NotificationReason? reason) => reason?.FullName;
     private static string? ActorName(Actor? actor) => actor?.Pii?.DisplayName;

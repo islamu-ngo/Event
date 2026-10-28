@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZKMQDGH2R4W9KP2H2QQ67K
+Title: "Preserve distinct Event ancestry throughout shared moderation state"
+Type: feat
+Scope: access
+Summary: "Keep Event and Resource jurisdictions distinct through checked eight-coordinate scalar reconstruction and restrict new Event reference-profile eligibility to classification correction."
+Group: moderation-event-scope-contract
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

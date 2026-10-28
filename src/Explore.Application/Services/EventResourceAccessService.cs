@@ -18,11 +18,15 @@ public sealed class EventResourceAccessService(
     IMachinePrincipalAccessor machine)
 {
     public Task<EventResourceAuthorityResult> PrepareAsync(Guid resourceId, DateTimeOffset deadlineUtc,
-        CancellationToken cancellationToken) =>
-        authority.AuthorizeAsync(new(tenant.TenantId, resourceId,
-            user.IsAuthenticated ? user.UserId : null, machine.IsMachineCaller, "access")
+        CancellationToken cancellationToken)
+    {
+        var principal = machine.Current;
+        return authority.AuthorizeAsync(new(tenant.TenantId, resourceId,
+            principal is null && !machine.IsMachineCaller && user.IsAuthenticated ? user.UserId : null,
+            machine.IsMachineCaller, "access")
         {
-            DeadlineUtc = deadlineUtc
+            DeadlineUtc = deadlineUtc,
+            MachinePrincipal = principal is null ? null : EventResourceMachinePrincipal.Capture(principal)
         }, async (facts, ct) =>
         {
             var resource = await resources.GetAuthorityResourceAsync(tenant.TenantId, resourceId, ct);
@@ -46,6 +50,7 @@ public sealed class EventResourceAccessService(
                 throw new InvalidOperationException("Resource destination is unavailable.");
             return new EventResourcePreparedDestination(generation, destination);
         }, cancellationToken);
+    }
 }
 
 /// <summary>Private single-use destination; never serialize or log this preparation.</summary>

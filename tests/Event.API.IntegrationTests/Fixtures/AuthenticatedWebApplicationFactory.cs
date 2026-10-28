@@ -288,6 +288,7 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
             await using var db = createNativeSeedingContext is null
                 ? scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
                 : createNativeSeedingContext();
+            db.BindTenantLease();
             await DatabaseSeeder.SeedAsync(db, environment, NullLogger.Instance, cancellationToken: cancellationToken);
             if (seedActiveDefaultTenant && await db.Tenants.FindAsync([PlatformDefaults.DefaultTenantId], cancellationToken) is null)
             {

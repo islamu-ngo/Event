@@ -473,6 +473,14 @@ public static class QuartzSchedulerExtensions
         IConfiguration configuration,
         ISet<JobKey> desiredRecurringJobs)
     {
+        var moderation = Bind<ModerationReconciliationOptions>(
+            configuration, ModerationReconciliationOptions.SectionName);
+        AddSweepJob<ModerationReconciliationJob>(
+            quartz, QuartzSchedulerKeys.ModerationReconciliation,
+            "Reconciles bounded due moderation contributions under installed maintenance authority.",
+            moderation.Enabled, moderation.InitialDelaySeconds,
+            TimeSpan.FromSeconds(moderation.IntervalSeconds), desiredRecurringJobs);
+
         // Retained login rows must expire even after the optional ATProto provider is disabled.
         AddSweepJob<EventDiscoverySnapshotPurgeJob>(
             quartz, QuartzSchedulerKeys.EventDiscoverySnapshotPurge,

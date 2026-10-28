@@ -20,8 +20,9 @@ public sealed class EventResourceCapabilityAuthorizer(
             AuthorizationProviderMetadata.Runtime, AuthorizationDecisionReasonCodes.InvalidRequest)).ToArray();
         if (requests.Count == 0 || requests.Count > EventResourceAuthorityRequest.MaximumBatchChecks) return results;
         Guid tenantId = tenantContext.TenantId;
+        var key = machinePrincipal.Current;
         bool machine = machinePrincipal.IsMachineCaller;
-        Guid? userId = !machine && currentUser.IsAuthenticated ? currentUser.UserId : null;
+        Guid? userId = key is null && !machine && currentUser.IsAuthenticated ? currentUser.UserId : null;
         if (tenantId == Guid.Empty || userId == Guid.Empty) return results;
         var targets = new List<EventResourceAuthorityRequest>();
         var positions = new List<int>();
@@ -49,7 +50,8 @@ public sealed class EventResourceCapabilityAuthorizer(
             positions.Add(index);
             targets.Add(new(tenantId, resourceId, userId, machine, request.Action)
             {
-                IsEventCollection = request.Facts is EventResourceCollectionAuthorizationFacts
+                IsEventCollection = request.Facts is EventResourceCollectionAuthorizationFacts,
+                MachinePrincipal = key is null ? null : EventResourceMachinePrincipal.Capture(key)
             });
         }
         if (targets.Count == 0) return results;

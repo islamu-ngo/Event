@@ -35,6 +35,7 @@
     <!-- The combined host is the only topology where Blazor and the scheduler share a process, so it is the
          only project that may reference the dashboard. -->
     <PackageReference Include="Quartz.Dashboard" />
+    <!-- Keep the dashboard's existing SignalR 8 client family on its patched security floor. -->
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
   </ItemGroup>
 

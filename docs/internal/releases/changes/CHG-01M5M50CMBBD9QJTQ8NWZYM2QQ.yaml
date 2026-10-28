@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M50CMBBD9QJTQ8NWZYM2QQ
+Title: "Requalify organization membership at the native commit boundary"
+Type: fix
+Scope: access
+Summary: "Keep organization creation, invitations and member changes tied to current native issuer and membership authority."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Native organization writers retain current issuer, membership and privacy authority through actual commit. Invitation identities do not substitute for current authority; regression source remains unrun."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

@@ -361,7 +361,8 @@ public sealed class LocalCredentialCreationTests
             identityDbContext: Identity(scope),
             applicationDbContext: scope.ServiceProvider.GetRequiredService<ExploreDbContext>(),
             userManager: scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(),
-            timeProvider: TimeProvider.System);
+            timeProvider: TimeProvider.System,
+            identityFence: NativeIdentityRecognitionBoundary.For(scope.ServiceProvider.GetRequiredService<ExploreDbContext>(), TimeProvider.System));
 
         internal LocalCredentialCreateRequest Request(string? email = null) => new(
             operationId: Guid.CreateVersion7(), initiatingApplicationUserId: InitiatorId,

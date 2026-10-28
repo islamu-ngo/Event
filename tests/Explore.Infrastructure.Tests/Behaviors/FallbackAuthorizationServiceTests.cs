@@ -1650,7 +1650,7 @@ public class FallbackAuthorizationServiceTests
     // === Group Member Access ===
 
     [Test]
-    public async Task IsAllowed_AuthenticatedUser_AllowsGroupMemberViewAndCreate()
+    public async Task IsAllowed_AuthenticatedUser_AllowsGroupMemberViewButNotUnqualifiedCreation()
     {
         _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
         _adminContext.IsTenantAdminAsync(TestTenantId, Arg.Any<CancellationToken>()).Returns(false);
@@ -1659,7 +1659,7 @@ public class FallbackAuthorizationServiceTests
         var createResult = await _service.IsAllowedAsync("islamuevent_group_member", Guid.NewGuid().ToString(), "create");
 
         await Assert.That(viewResult).IsTrue();
-        await Assert.That(createResult).IsTrue();
+        await Assert.That(createResult).IsFalse();
     }
 
     [Test]

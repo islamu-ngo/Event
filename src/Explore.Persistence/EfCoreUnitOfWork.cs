@@ -13,7 +13,7 @@ using Npgsql;
 
 namespace Explore.Persistence;
 
-public sealed partial class EfCoreUnitOfWork : IUnitOfWork, ISerializableAttemptOwner
+public sealed partial class EfCoreUnitOfWork : IUnitOfWork, IPrivacyIdentityEnrollmentTransaction, ISerializableAttemptOwner
 {
     private const int BootstrapConvergenceAttemptLimit = 4;
     private const int SqliteConstraintPrimaryKey = 1555;
@@ -95,11 +95,33 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, ISerializableAttempt
             ? ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct)
             : ExecuteBootstrapConflictRetryAsync(() => ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct), ct);
 
+    public Task<T> ExecuteRecognitionEnrollmentAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        Func<CancellationToken, Task> beforeCommit,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(beforeCommit);
+        return _dbContext.IdentityFenceOwnsTransaction
+            ? ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct, beforeCommit)
+            : ExecuteBootstrapConflictRetryAsync(
+                () => ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct, beforeCommit), ct);
+    }
+
     public Task<T> ExecuteReadCommittedAsync<T>(
         Func<CancellationToken, Task<T>> operation,
         CancellationToken ct = default) =>
         ExecuteCoreAsync(operation,
             _dbContext.Database.IsSqlite() ? IsolationLevel.Serializable : IsolationLevel.ReadCommitted, ct);
+
+    // Receipt-owning callers reconcile the previous outcome before replaying the whole privacy/primary unit.
+    internal Task<T> ExecuteRecognitionEnrollmentAttemptAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        Func<CancellationToken, Task> beforeCommit,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(beforeCommit);
+        return ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct, beforeCommit);
+    }
 
     internal static async Task<T> ExecuteBootstrapConflictRetryAsync<T>(
         Func<Task<T>> operation, CancellationToken ct)
@@ -124,6 +146,7 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, ISerializableAttempt
         Func<CancellationToken, Task<T>> operation,
         IsolationLevel? isolationLevel,
         CancellationToken ct,
+        Func<CancellationToken, Task>? beforeCommit = null,
         bool allowReplay = true)
     {
         // Co-located SQLite shares the authority write transaction: the gate
@@ -136,6 +159,8 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, ISerializableAttempt
             {
                 _dbContext.HumanCommitAttemptOwnsTransaction = !allowReplay;
                 var result = await operation(ct);
+                if (beforeCommit is not null)
+                    await _dbContext.SaveChangesAsync(ct);
                 if (_dbContext.StorageReferenceTransactionFailed)
                     throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
                         "The storage reference transaction has failed.");
@@ -162,7 +187,13 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, ISerializableAttempt
         {
             try
             {
-                return await operation(ct);
+                var result = await operation(ct);
+                if (beforeCommit is not null)
+                {
+                    await _dbContext.SaveChangesAsync(ct);
+                    await beforeCommit(ct);
+                }
+                return result;
             }
             catch (DbUpdateConcurrencyException ex)
             {
@@ -209,12 +240,17 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, ISerializableAttempt
                 {
                     _dbContext.HumanCommitAttemptOwnsTransaction = !allowReplay;
                     var result = await operation(ct);
+                    if (beforeCommit is not null)
+                        await _dbContext.SaveChangesAsync(ct);
                     if (_dbContext.StorageReferenceTransactionFailed)
                         throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
                             "The storage reference transaction has failed.");
                     await _dbContext.FlushDisclosureAsync(ct);
                     await _dbContext.ValidateTrustedSetupSettingsSourcesAsync(ct);
                     await _dbContext.ValidateHumanCommitAdmissionsAsync(ct);
+                    if (beforeCommit is not null)
+                        await beforeCommit(ct);
+                    _dbContext.ValidateHumanCommitAdmissionTimes();
                     _dbContext.ValidateTrustedSetupSettingsTimes();
                     AdmissionTargetTransaction.RequireCurrentIfHeld(_dbContext);
                     commitAttempted = true;

@@ -1,0 +1,99 @@
+name: Focused Grant Settlement
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  grant-settlement:
+    name: Grant Settlement Regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore
+        run: dotnet restore tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --locked-mode
+
+      - name: Build Persistence Tests
+        id: build
+        run: dotnet build tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-restore --verbosity minimal
+
+      - name: Ordinary Grant Settlement
+        id: ordinary
+        env:
+          GRANT_TEST_PROGRESS_PATH: ${{ runner.temp }}/ordinary-grant-progress.log
+        run: |
+          trap 'result=$?; if [ -f "$GRANT_TEST_PROGRESS_PATH" ]; then cat -- "$GRANT_TEST_PROGRESS_PATH"; fi; exit "$result"' EXIT
+          timeout --signal=TERM --kill-after=15s 5m dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
+            --configuration Release --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/ModerationCaseNativeProofTests/ReadGrantSettlement*" \
+            --minimum-expected-tests 8 --maximum-parallel-tests 1 --no-progress \
+            --report-trx --report-trx-filename ordinary-grant-settlement.trx
+
+      - name: Adjudicated Grant Settlement
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        id: adjudicated
+        env:
+          GRANT_TEST_PROGRESS_PATH: ${{ runner.temp }}/adjudicated-grant-progress.log
+        run: |
+          trap 'result=$?; if [ -f "$GRANT_TEST_PROGRESS_PATH" ]; then cat -- "$GRANT_TEST_PROGRESS_PATH"; fi; exit "$result"' EXIT
+          timeout --signal=TERM --kill-after=15s 5m dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
+            --configuration Release --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/ModerationNoticeReadTests/Adjudicated_grant_settlement*" \
+            --minimum-expected-tests 14 --maximum-parallel-tests 1 --no-progress \
+            --report-trx --report-trx-filename adjudicated-grant-settlement.trx
+
+      - name: Retain Grant Settlement Results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: grant-settlement-results
+          path: |
+            **/TestResults/**/*grant-settlement.trx
+            ${{ runner.temp }}/*-grant-progress.log
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Summarize Grant Settlement Execution
+        if: ${{ always() }}
+        env:
+          TESTED_SHA: ${{ github.sha }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          ORDINARY_OUTCOME: ${{ steps.ordinary.outcome }}
+          ADJUDICATED_OUTCOME: ${{ steps.adjudicated.outcome }}
+        run: |
+          {
+            echo "## Focused Grant Settlement"
+            echo
+            echo "Tested Git object: ${TESTED_SHA} (PR runs use the merge object)."
+            echo
+            echo "| Stage | Outcome |"
+            echo "|---|---|"
+            echo "| Build | ${BUILD_OUTCOME:-not-run} |"
+            echo "| Ordinary grants (minimum 8 cases) | ${ORDINARY_OUTCOME:-not-run} |"
+            echo "| Adjudicated grants (minimum 14 cases) | ${ADJUDICATED_OUTCOME:-not-run} |"
+            echo
+            echo 'TRX artifact: grant-settlement-results. Skipped tests are not passing evidence.'
+            echo 'SQLite fixture coverage includes separate and colocated privacy authority; this is not multi-provider assurance.'
+            echo 'This supplementary lane does not replace or relax any existing merge gate.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -65,6 +65,14 @@ internal sealed class LocalIdentityLifecycleExecutionCustody : IAsyncDisposable
         RequireCurrent();
     }
 
+    internal async Task CommitAsync(LocalIdentityMutationTransaction transaction, CancellationToken cancellationToken)
+    {
+        RequireCurrent();
+        transaction.RequireOwner(identity, application);
+        await transaction.CommitAsync(cancellationToken, RequireCurrent).ConfigureAwait(false);
+        RequireCurrent();
+    }
+
     public ValueTask DisposeAsync()
     {
         lock (lifecycle) return new(disposal ??= owned?.DisposeAsync().AsTask() ?? Task.CompletedTask);

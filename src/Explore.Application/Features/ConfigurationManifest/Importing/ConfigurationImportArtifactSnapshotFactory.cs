@@ -5,6 +5,8 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
+using Explore.Application.Features.ConfigurationManifest.Application;
+using Explore.Application.Features.ConfigurationManifest.Moderation;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 
 public static class ConfigurationImportArtifactSnapshotFactory
@@ -13,6 +15,20 @@ public static class ConfigurationImportArtifactSnapshotFactory
         ConfigurationManifestV1Alpha2 manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
+        manifest = manifest with
+        {
+            Spec = manifest.Spec with
+            {
+                Instance = manifest.Spec.Instance with
+                {
+                    LegalDocuments = NormalizeLegalDocuments(manifest.Spec.Instance.LegalDocuments)
+                },
+                Tenants = manifest.Spec.Tenants.Select(tenant => tenant with
+                {
+                    Spec = tenant.Spec with { LegalDocuments = NormalizeLegalDocuments(tenant.Spec.LegalDocuments) }
+                }).ToArray()
+            }
+        };
         JsonElement root = JsonSerializer.SerializeToElement(
             manifest,
             ConfigurationPortabilityJsonContext.Default.ConfigurationManifestV1Alpha2);
@@ -22,6 +38,13 @@ public static class ConfigurationImportArtifactSnapshotFactory
 
         return
         [
+            .. ModerationSection(ModerationConfigurationImportSections.Instance, manifest.Spec.Instance.Moderation),
+            .. manifest.Spec.Tenants.Any(tenant => tenant.Spec.Moderation is not null)
+                ? new[] { ModerationConfigurationImportSections.TenantSnapshot(manifest.Spec.Tenants
+                    .Where(tenant => tenant.Spec.Moderation is not null)
+                    .Select(tenant => KeyValuePair.Create(tenant.Metadata.Name,
+                        ModerationConfigurationImportSections.FromWire(tenant.Spec.Moderation!)))) }
+                : [],
             Section("instance.settings", instance.GetProperty("settings")),
             Section("instance.documents", instance.GetProperty("documents")),
             Section(
@@ -50,6 +73,10 @@ public static class ConfigurationImportArtifactSnapshotFactory
                 StringComparison.Ordinal))
             ?? throw new ConfigurationImportSessionException(
                 ConfigurationImportFailureCodes.TargetMismatch);
+        tenant = tenant with
+        {
+            Spec = tenant.Spec with { LegalDocuments = NormalizeLegalDocuments(tenant.Spec.LegalDocuments) }
+        };
         JsonElement root = JsonSerializer.SerializeToElement(
             tenant,
             ConfigurationPortabilityJsonContext.Default
@@ -58,6 +85,7 @@ public static class ConfigurationImportArtifactSnapshotFactory
 
         return
         [
+            .. ModerationSection(ModerationConfigurationImportSections.Tenant, tenant.Spec.Moderation),
             TenantSettingsSection(spec),
             Section("tenant.documents", spec.GetProperty("documents")),
             Section(
@@ -71,6 +99,10 @@ public static class ConfigurationImportArtifactSnapshotFactory
         TenantConfigurationPackageV1Alpha2 package)
     {
         ArgumentNullException.ThrowIfNull(package);
+        package = package with
+        {
+            Spec = package.Spec with { LegalDocuments = NormalizeLegalDocuments(package.Spec.LegalDocuments) }
+        };
         JsonElement root = JsonSerializer.SerializeToElement(
             package,
             ConfigurationPortabilityJsonContext.Default
@@ -79,6 +111,7 @@ public static class ConfigurationImportArtifactSnapshotFactory
 
         return
         [
+            .. ModerationSection(ModerationConfigurationImportSections.Tenant, package.Spec.Moderation),
             TenantSettingsSection(spec),
             Section("tenant.documents", spec.GetProperty("documents")),
             Section(
@@ -87,6 +120,11 @@ public static class ConfigurationImportArtifactSnapshotFactory
         ];
     }
 
+    private static IReadOnlyDictionary<string, ConfigurationManifestLegalDocumentV1Alpha2> NormalizeLegalDocuments(
+        IReadOnlyDictionary<string, ConfigurationManifestLegalDocumentV1Alpha2> documents) =>
+        documents.ToDictionary(pair => pair.Key,
+            pair => LegalConfigurationSnapshotProjection.NormalizeDraft(pair.Value), StringComparer.Ordinal);
+
     public static string RevisionDigest(
         IEnumerable<ConfigurationImportSectionSnapshot> sections)
     {
@@ -94,6 +132,11 @@ public static class ConfigurationImportArtifactSnapshotFactory
         return ConfigurationImportDigest.Compute(sections.Select(section =>
             $"{section.SectionKey}\u001f{section.NormalizedDigest}"));
     }
+
+    private static IEnumerable<ConfigurationImportSectionSnapshot> ModerationSection(
+        string key, ConfigurationModerationDocumentV1? document) =>
+        document is null ? [] : [ModerationConfigurationImportSections.Snapshot(
+            key, ModerationConfigurationImportSections.FromWire(document))];
 
     private static ConfigurationImportSectionSnapshot TenantProjection(
         string sectionKey,
@@ -134,7 +177,10 @@ public static class ConfigurationImportArtifactSnapshotFactory
             writer.WriteEndArray();
         }
 
-        return Section(sectionKey, buffer.WrittenSpan);
+        return Section(sectionKey, buffer.WrittenSpan,
+            propertyName == "legalDocuments" && tenants.EnumerateArray().Any(tenant =>
+                HasUnsupportedLegalMetadata(tenant.GetProperty("spec").GetProperty(propertyName)))
+                ? "configuration_import_legal_metadata_not_supported" : null);
     }
 
     private static ConfigurationImportSectionSnapshot Section(
@@ -146,8 +192,18 @@ public static class ConfigurationImportArtifactSnapshotFactory
         {
             WriteNormalized(writer, value);
         }
-        return Section(sectionKey, buffer.WrittenSpan);
+        return Section(sectionKey, buffer.WrittenSpan,
+            sectionKey.EndsWith(".legal_documents", StringComparison.Ordinal)
+                && HasUnsupportedLegalMetadata(value)
+                ? "configuration_import_legal_metadata_not_supported" : null);
     }
+
+    private static bool HasUnsupportedLegalMetadata(JsonElement documents) =>
+        documents.EnumerateObject().Any(document =>
+            document.Value.TryGetProperty("jurisdictionAssumptions", out var assumptions)
+                && assumptions.GetArrayLength() != 0
+            || document.Value.TryGetProperty("changeSummary", out var summary)
+                && summary.ValueKind != JsonValueKind.Null);
 
     private static ConfigurationImportSectionSnapshot TenantSettingsSection(
         JsonElement spec)
@@ -175,7 +231,8 @@ public static class ConfigurationImportArtifactSnapshotFactory
 
     private static ConfigurationImportSectionSnapshot Section(
         string sectionKey,
-        ReadOnlySpan<byte> normalizedBytes)
+        ReadOnlySpan<byte> normalizedBytes,
+        string? blockingReasonCode = null)
     {
         ConfigurationPortabilitySectionDescriptor descriptor =
             ConfigurationPortabilityRegistry.Sections[sectionKey];
@@ -185,7 +242,8 @@ public static class ConfigurationImportArtifactSnapshotFactory
             descriptor.PortabilityClass,
             descriptor.SupportsPreview,
             descriptor.SupportsDiff,
-            requiresExternalSetup: false);
+            requiresExternalSetup: false,
+            blockingReasonCode: blockingReasonCode);
     }
 
     private static void WriteNormalized(

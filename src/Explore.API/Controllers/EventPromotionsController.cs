@@ -51,6 +51,10 @@ public sealed class EventPromotionsController(
 
     private static readonly CommandFailurePolicy PromotionManagementFailures = CommandFailurePolicy
         .ValidatedBy(PromotionValidationProblem)
+        .Forbidden("Promotion publication restricted", "Current publication restrictions prevent publishing this promotion.",
+            "promotion_publish_restricted")
+        .Unavailable("Promotion publication authority unavailable", "Current publication authority could not be established.",
+            "promotion_publish_authority_unavailable")
         .NotFound(PromotionNotFoundProblem, PromotionManagementNotFound);
 
     [HttpGet("", Name = RouteNames.GetEventPromotions)]
@@ -170,6 +174,7 @@ public sealed class EventPromotionsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<PromotionManagementCommandResponseDto>> Publish(
         Guid eventId,
         Guid promotionDefinitionId,

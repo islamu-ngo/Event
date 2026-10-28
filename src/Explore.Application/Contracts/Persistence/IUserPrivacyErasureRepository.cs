@@ -4,6 +4,15 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IUserPrivacyErasureRepository
 {
+    /// <summary>
+    /// Removes only the original reporter's confidential narrative ciphertext across every
+    /// tenant inside the authority-verified serializable erasure settlement. The exact native
+    /// saga must already exist; custody and recognition adoption are not erasure authority.
+    /// </summary>
+    Task EraseModerationCaseNarrativesAsync(
+        PrivacyErasureIntent intent,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<PrivacyErasureProviderCandidate>> GetProviderCandidatesAsync(
         Guid subjectId,
         CancellationToken cancellationToken);

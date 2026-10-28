@@ -149,4 +149,3 @@ internal sealed class ConfigurationManifestBootstrapExecutor(
         return await owner.ApplyAsync(source, cancellationToken);
     }
 }
-

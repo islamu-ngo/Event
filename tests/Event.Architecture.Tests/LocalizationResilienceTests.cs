@@ -78,19 +78,16 @@ public class LocalizationResilienceTests
         services.ConfigureInfrastructureServices(new ConfigurationBuilder().Build(), registerBackgroundWorkers: false);
         await using var provider = services.BuildServiceProvider();
         var handler = provider.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler(clientName);
-        var handlers = new List<DelegatingHandler>();
-        while (handler is DelegatingHandler delegatingHandler)
+        var policyHandlers = new List<Type>();
+        while (handler is DelegatingHandler delegating)
         {
-            handlers.Add(delegatingHandler);
-            handler = delegatingHandler.InnerHandler!;
+            if (handler is ResilienceHandler || handler.GetType().Assembly == InfrastructureAssembly)
+                policyHandlers.Add(handler.GetType());
+            handler = delegating.InnerHandler!;
         }
 
-        await Assert.That(handlers.OfType<ResilienceHandler>().Count()).IsEqualTo(1)
-            .Because("each TMS client must have one resilience pipeline to avoid layered retries");
-        await Assert.That(handlers.OfType<TmsResponseBoundaryHandler>().Count()).IsEqualTo(1)
-            .Because("response-size protection must remain active for each TMS client");
-        await Assert.That(handlers.FindIndex(item => item is ResilienceHandler))
-            .IsLessThan(handlers.FindIndex(item => item is TmsResponseBoundaryHandler))
-            .Because("each retry must pass through the response boundary before metadata readers consume its body");
+        await Assert.That(policyHandlers.SequenceEqual([typeof(ResilienceHandler), typeof(TmsResponseBoundaryHandler)]))
+            .IsTrue()
+            .Because("Each TMS client needs exactly one retry pipeline followed by one bounded response reader, with no additional infrastructure handlers");
     }
 }

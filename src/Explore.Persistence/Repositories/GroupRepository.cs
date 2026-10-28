@@ -2,6 +2,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Repositories;
 
@@ -283,6 +284,14 @@ public class GroupRepository : GenericRepository<Group, Guid>, IGroupRepository
 
     public async Task<T> ExecuteWithHierarchyMutationLock<T>(Guid tenantId, Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
     {
+        if (_dbContext.Database.CurrentTransaction is { } current)
+        {
+            if (current.GetDbTransaction().IsolationLevel != System.Data.IsolationLevel.Serializable)
+                throw new InvalidOperationException("Group hierarchy mutation requires a Serializable transaction.");
+            await using var lease = await RelationalNamedLock.AcquireTransactionAsync(
+                _dbContext, $"group-hierarchy:{tenantId}", cancellationToken);
+            return await operation(cancellationToken);
+        }
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {

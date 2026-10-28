@@ -2,6 +2,7 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Services;
+using ISLAMU.Moderation.Domain;
 
 namespace Explore.Application.Services;
 
@@ -49,11 +50,19 @@ public sealed partial class EventResourceAuthorityOrchestrator(
                 if (a!.Evaluation.ProviderInput is { } input)
                 {
                     var decision = await provider.CheckAsync(input, ct);
+                    ct.ThrowIfCancellationRequested();
+                    if (timeProvider.GetUtcNow() >= request.DeadlineUtc)
+                        return new(EventResourceAuthorityOutcome.Expired);
                     if (decision != EventResourceProviderDecision.Allow)
                         return new(concealFailure ? EventResourceAuthorityOutcome.NotFound
                             : decision == EventResourceProviderDecision.Deny
                             ? EventResourceAuthorityOutcome.Forbidden : EventResourceAuthorityOutcome.Unavailable);
                 }
+                ct.ThrowIfCancellationRequested();
+                var publicationTime = timeProvider.GetUtcNow();
+                if (publicationTime >= request.DeadlineUtc) return new(EventResourceAuthorityOutcome.Expired);
+                var publicationDenial = PublicationDenial(request, a, publicationTime);
+                if (publicationDenial.HasValue) return new(publicationDenial.Value);
                 ct.ThrowIfCancellationRequested();
                 IEventResourcePrivatePreparation? preparation = null;
                 try
@@ -66,10 +75,14 @@ public sealed partial class EventResourceAuthorityOrchestrator(
                     if (bTime >= request.DeadlineUtc) return new(EventResourceAuthorityOutcome.Expired);
                     var b = await unitOfWork.ExecuteSerializableAsync(token => ReadAsync(request, bTime, token), ct);
                     ct.ThrowIfCancellationRequested();
+                    publicationTime = timeProvider.GetUtcNow();
+                    if (publicationTime >= request.DeadlineUtc) return new(EventResourceAuthorityOutcome.Expired);
                     denial = Denial(request, b);
                     if (denial.HasValue) return new(denial.Value == EventResourceAuthorityOutcome.Unavailable && concealFailure
                         ? EventResourceAuthorityOutcome.NotFound : denial.Value);
                     if (!SameAuthority(a, b!)) continue;
+                    publicationDenial = PublicationDenial(request, b!, publicationTime);
+                    if (publicationDenial.HasValue) return new(publicationDenial.Value);
                     var acceptedPreparation = preparation;
                     preparation = null;
                     return new(request, b!, acceptedPreparation, cancellationToken);
@@ -94,7 +107,10 @@ public sealed partial class EventResourceAuthorityOrchestrator(
         }
     }
 
-    /// <summary>Single-use ownership transfer immediately before headers; emits neither bytes nor Location.</summary>
+    /// <summary>
+    /// Requalifies native authority in a fresh transaction before the single-use header handoff.
+    /// The preparation stays private throughout requalification; this emits neither bytes nor Location.
+    /// </summary>
     public async Task<EventResourceHeaderResult> CompleteHeadersAsync(EventResourceAuthorityLease lease,
         CancellationToken cancellationToken = default)
     {
@@ -112,6 +128,28 @@ public sealed partial class EventResourceAuthorityOrchestrator(
                 if (!current.Allowed || current.ProviderInput != lease.Snapshot.Evaluation.ProviderInput
                     || current.Disclosure != lease.Snapshot.Evaluation.Disclosure)
                     return new(EventResourceAuthorityOutcome.Forbidden);
+                using var deadline = lease.Request.DeadlineUtc is { } end
+                    ? new CancellationTokenSource(end - now, timeProvider) : null;
+                using var linked = deadline is null
+                    ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lease.CallerCancellation)
+                    : CancellationTokenSource.CreateLinkedTokenSource(
+                        cancellationToken, lease.CallerCancellation, deadline.Token);
+                var latest = await unitOfWork.ExecuteSerializableAsync(
+                    token => ReadAsync(lease.Request, timeProvider.GetUtcNow(), token), linked.Token);
+                linked.Token.ThrowIfCancellationRequested();
+                var denial = Denial(lease.Request, latest);
+                bool conceal = ConcealsFailure(lease.Request, lease.Snapshot);
+                if (denial.HasValue)
+                    return new(denial.Value == EventResourceAuthorityOutcome.Unavailable && conceal
+                        ? EventResourceAuthorityOutcome.NotFound : denial.Value);
+                if (!SameAuthority(lease.Snapshot, latest!))
+                    return new(conceal ? EventResourceAuthorityOutcome.NotFound : EventResourceAuthorityOutcome.Forbidden);
+                now = timeProvider.GetUtcNow();
+                if (now >= lease.Request.DeadlineUtc) return new(EventResourceAuthorityOutcome.Expired);
+                current = latest!.Facts.Evaluate(lease.Request, latest.Route, now);
+                if (!current.Allowed || current.ProviderInput != latest.Evaluation.ProviderInput
+                    || current.Disclosure != latest.Evaluation.Disclosure)
+                    return new(EventResourceAuthorityOutcome.Forbidden);
                 var released = preparation;
                 preparation = null;
                 return new(EventResourceAuthorityOutcome.Allowed, current.Disclosure, released);
@@ -121,8 +159,18 @@ public sealed partial class EventResourceAuthorityOrchestrator(
                 if (preparation is not null) await preparation.DisposeAsync();
             }
         }
-        catch (OperationCanceledException) { return new(EventResourceAuthorityOutcome.Cancelled); }
-        catch (Exception) { return new(EventResourceAuthorityOutcome.Unavailable); }
+        catch (OperationCanceledException)
+        {
+            return new(cancellationToken.IsCancellationRequested || lease.CallerCancellation.IsCancellationRequested
+                ? EventResourceAuthorityOutcome.Cancelled
+                : lease.Request.DeadlineUtc.HasValue ? EventResourceAuthorityOutcome.Expired
+                    : EventResourceAuthorityOutcome.Unavailable);
+        }
+        catch (Exception)
+        {
+            return new(ConcealsFailure(lease.Request, lease.Snapshot)
+                ? EventResourceAuthorityOutcome.NotFound : EventResourceAuthorityOutcome.Unavailable);
+        }
     }
 
     /// <summary>
@@ -149,6 +197,8 @@ public sealed partial class EventResourceAuthorityOrchestrator(
             return EventResourceAuthorityOutcome.Cancelled;
         var finalTime = timeProvider.GetUtcNow();
         if (finalTime >= lease.Request.DeadlineUtc) return EventResourceAuthorityOutcome.Expired;
+        var publicationDenial = PublicationDenial(lease.Request, current, finalTime);
+        if (publicationDenial.HasValue) return publicationDenial.Value;
         var final = current.Facts.Evaluate(lease.Request, current.Route, finalTime);
         return final.Allowed && final.ProviderInput == current.Evaluation.ProviderInput
             && final.Disclosure == current.Evaluation.Disclosure
@@ -162,7 +212,24 @@ public sealed partial class EventResourceAuthorityOrchestrator(
         if (facts is null) return null;
         var route = request.SubjectUserId.HasValue && !request.IsMachineCaller
             ? await routes.ReadAsync(request.TenantId, ct) : null;
-        return new(facts, route, facts.Evaluate(request, route, evaluationUtc));
+        return new(facts, route, request.Action == "publish"
+            ? facts.EvaluatePublicationAuthority(request, route, evaluationUtc)
+            : facts.Evaluate(request, route, evaluationUtc));
+    }
+
+    private static EventResourceAuthorityOutcome? PublicationDenial(EventResourceAuthorityRequest request,
+        EventResourceAuthoritySnapshot snapshot, DateTimeOffset now)
+    {
+        if (request.Action != "publish" || snapshot.Facts.Moderation.PermitsNativeEvaluationAt(now)) return null;
+        // A delayed provider or snapshot read must not disclose moderation after ordinary authority expires.
+        var current = snapshot.Facts.EvaluatePublicationAuthority(request, snapshot.Route, now);
+        var denial = Denial(request, snapshot with { Evaluation = current });
+        if (denial.HasValue) return denial;
+        if (current.ProviderInput != snapshot.Evaluation.ProviderInput || current.Disclosure != snapshot.Evaluation.Disclosure)
+            return current.Disclosure.DiscloseMetadata
+                ? EventResourceAuthorityOutcome.Forbidden : EventResourceAuthorityOutcome.NotFound;
+        return snapshot.Facts.Moderation.Outcome == ModerationRestrictionOutcome.Denied
+            ? EventResourceAuthorityOutcome.Forbidden : EventResourceAuthorityOutcome.Unavailable;
     }
 
     private static EventResourceAuthorityOutcome? Denial(EventResourceAuthorityRequest request,
@@ -184,6 +251,8 @@ public sealed partial class EventResourceAuthorityOrchestrator(
         && a.Evaluation.Disclosure == b.Evaluation.Disclosure
         && Equals(a.Facts.Access.GovernancePolicy, b.Facts.Access.GovernancePolicy)
         && a.Facts.ResourceVersion == b.Facts.ResourceVersion
+        && a.Facts.MachinePrincipal == b.Facts.MachinePrincipal
+        && a.Facts.Moderation == b.Facts.Moderation
         && a.Facts.StorageObjectId == b.Facts.StorageObjectId
         && a.Facts.AttachmentGeneration == b.Facts.AttachmentGeneration;
 }

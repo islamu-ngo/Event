@@ -8,6 +8,14 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 If startup fails and cleanup also reports an error, both failures are retained. Diagnose the startup error as well as the cleanup error; a cleanup failure does not replace the original startup failure. No configuration change or data reset is required for this behavior.
 
+Setup Live enrollment and write receipts require the Runtime storage permissions
+installed by the current database migration process. If an enrollment request
+fails with PostgreSQL permission error `42501`, apply the updated migration
+process using the configured migrator account. Keep Runtime and migrator
+credentials separate: do not run the API as migrator or give Runtime Global
+membership. Setup Live's fixed table and column permissions retain tenant
+isolation and do not authorize a provider write by themselves.
+
 Cross-tenant membership discovery requires the enrolled Global database login,
 not Runtime inheritance of a discovery executor. Reconcile unexpected role grants
 through the approved database process before reinstalling. This does not change
@@ -662,6 +670,15 @@ management authority at commit. It is separate from Tenant connection
 administration. Failed business results roll back local work; uncertain rollback
 is reported as conflict. Remote provider workflows and final runtime controls
 remain unfinished.
+
+On PostgreSQL, `human_event_provider_source_drift` can indicate that a provider
+source column does not match its declared schema or comparison semantics.
+Publication mapping hashes deliberately use ordinal (`C`) collation; the source
+guard now recognizes that declaration without accepting unexpected collations
+on ordinary columns. It still rejects mismatches rather than repairing them.
+Do not bypass the check or alter columns just to silence it. This correction
+adds no setting, permission or migration; native runtime acceptance still
+depends on the provider verification gates.
 
 Webhook endpoint archive, pause and resume now use prepared current requester
 authority in the state/audit transaction. Already-archived requests are checked

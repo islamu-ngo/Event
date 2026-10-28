@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4G7S0WY2ZRN0GESZ15A0TPJ
+Title: "Enforce adopted canonical resource-read protection"
+Type: feat
+Scope: access
+Summary: "Evaluate explicitly adopted ReadResource protection using current canonical human or service provenance, exact credential binding revisions, policy and qualification generations, and persisted sanctions. Installation alone preserves native resource authorization; retiring activation support does not erase existing sanctions. Recheck the same moderation facts before the single-use private response handoff, and never treat unrestricted moderation as a native permission grant. Complete consumer registration and lifecycle activation remain separate open gates."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

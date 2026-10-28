@@ -385,7 +385,8 @@ public sealed partial class LocalBootstrapConvergenceTests
         internal ExploreDbContext Application(AsyncServiceScope scope) => scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         internal LocalIdentityCredentialStateStore Store(AsyncServiceScope scope) => new(
             _topology == IdentityDatabaseTopology.External ? scope.ServiceProvider.GetRequiredService<ExternalIdentityDbContext>() : Application(scope),
-            Application(scope), scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System);
+            Application(scope), scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System,
+            identityFence: NativeIdentityRecognitionBoundary.For(Application(scope), TimeProvider.System));
 
         private IOptions<InstanceOperatorIdentityOptions> OperatorOptions => Options.Create(new InstanceOperatorIdentityOptions
         {
@@ -467,8 +468,7 @@ public sealed partial class LocalBootstrapConvergenceTests
                 deployment, new RuntimeMetadataRefresh(),
                 NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork,
                 GenerationReader(scope), Configuration,
-                new PrivacyIdentityFenceOperation(
-                    Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>()),
+                NativeIdentityRecognitionBoundary.For(Application(scope), TimeProvider.System),
                 enrollment, receipts,
                 OperatorOptions, trustedWriter);
             return new LocalAdministratorBootstrapOperation(bootstrap, provider, new BootstrapLocalScopes(this), Secrets, completion,

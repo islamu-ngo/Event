@@ -1,10 +1,14 @@
 using System.Data;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
+using Explore.Application.Exceptions;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Requests.Queries;
 using Explore.Application.Responses;
+using Explore.Application.Services;
 using Explore.Persistence.Security;
+using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
@@ -16,6 +20,8 @@ internal sealed partial class LocalIdentityCredentialStateStore
 {
     private DbContext IdentityOwner => identityDbContext;
     private ExploreDbContext ApplicationOwner => applicationDbContext;
+    private PrivacyIdentityFenceOperation IdentityFence => identityFence;
+    private TimeProvider Clock => timeProvider;
     private OriginalOwnerSettlement? _administrationSettlement;
     private HumanAdministrationAttempt? _administrationAttempt;
     private SelfResetPostimage? _selfReset;
@@ -164,58 +170,89 @@ internal sealed partial class LocalIdentityCredentialStateStore
                 cancellationToken).ConfigureAwait(false);
             var owner = store._administrationSettlement ??= new OriginalOwnerSettlement(store.ApplicationOwner);
             bool committed = false;
+            bool settlementAcknowledged = false;
+            HumanAdministrationAttempt? originalHuman = null;
+            var originalContextLease = store.ApplicationOwner.ContextId;
             try
             {
-                var settled = await owner.ExecuteAsync(invocation, async attempt =>
+                return await store.IdentityFence.ExecuteOriginalOwnerIdentityMutationAsync<T>(async (guard, scopeToken) =>
                 {
-                    await using var transaction = await store.IdentityOwner.Database
-                        .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-                    var human = new HumanAdministrationAttempt(invocation, stage, transaction);
-                    store._administrationAttempt = human;
-                    return await owner.SettleAsync(attempt, transaction, async token =>
+                    var authority = services.GetRequiredService<IPrivacyIdentityFenceAuthority>()
+                        as IOriginalPrivacyIdentityFenceAuthority
+                        ?? throw new NotSupportedException("Local administration requires an original privacy authority.");
+                    var joined = authority is EmbeddedPrivacyErasureAuthorityRepository embedded
+                        && embedded.UsesOriginalApplicationContext(store.ApplicationOwner) ? embedded : null;
+                    return joined is not null ? await ExecuteOwnerAsync(scopeToken)
+                        : await authority.ExecuteOriginalEnrollmentAsync(ExecuteOwnerAsync, scopeToken);
+
+                    async Task<OriginalOwnerDecision<T>> ExecuteOwnerAsync(CancellationToken ownerToken)
                     {
-                        if (store.ApplicationOwner.Database.IsNpgsql())
+                        var settled = await owner.ExecuteAsync(invocation, async attempt =>
                         {
-                            store._nativeAdministration = new(store, human, request,
-                                store.NativeRequest(invocation, request, stage, snapshot), nativeEnrollment());
-                            await store._nativeAdministration.ReadAsync(token);
-                            store.RequireIssuedImage(store._nativeAdministration);
-                        }
-                        await preparation.AcquireAsync(invocation, request, stage, token);
-                        lifecycle.RequireCurrent();
-                        if (store._nativeAdministration is { } acquired)
-                            await acquired.AcquireAsync(token);
-                        lifecycle.RequireCurrent();
-                        var decision = await body(human, token);
-                        lifecycle.RequireCurrent();
-                        if (decision.Disposition == OriginalOwnerDisposition.Committed)
-                            store.ApplicationOwner.RegisterHumanCommitAdmission(
-                                _ => { lifecycle.RequireCurrent(); return Task.CompletedTask; }, lifecycle.RequireCurrent);
-                        if (store._nativeAdministration is { } native
-                            && decision.Disposition == OriginalOwnerDisposition.Committed)
-                        {
-                            // Preparation has registered every original asynchronous
-                            // S/P/route/H comparison. DATA Complete is registered last;
-                            // all authentic synchronous deadlines still run after it.
-                            store.ApplicationOwner.RegisterHumanCommitAdmission(
-                                native.CompleteAsync, native.RequireCompleted);
-                        }
-                        return decision;
-                    }, cancellationToken);
-                }, cancellationToken);
-                var value = owner.Consume(invocation, settled, settled.Disposition);
-                committed = settled.Disposition == OriginalOwnerDisposition.Committed;
-                if (stage == LocalAdministrationStage.Reset && store._selfReset is { } reset
-                    && ReferenceEquals(reset.Invocation, invocation))
-                    reset.Committed = committed;
-                preparation.Settle(invocation, stage, committed);
-                if (store._nativeIssued is { } issued)
-                    issued.Committed = committed;
-                return value;
+                            await using var transaction = await store.IdentityOwner.Database
+                                .BeginTransactionAsync(IsolationLevel.Serializable, ownerToken);
+                            var human = new HumanAdministrationAttempt(invocation, stage, transaction);
+                            originalHuman = human;
+                            store._administrationAttempt = human;
+                            store.ApplicationOwner.HumanCommitAttemptOwnsTransaction = true;
+                            return joined is not null
+                                ? await joined.ExecuteJoinedOriginalEnrollmentAsync(store.ApplicationOwner, SettleAsync, ownerToken)
+                                : await SettleAsync(ownerToken);
+
+                            Task<OriginalOwnerDecision<T>> SettleAsync(CancellationToken settlementToken) =>
+                                owner.SettleAsync(attempt, transaction, async token =>
+                                {
+                                    if (store.ApplicationOwner.Database.IsNpgsql())
+                                    {
+                                        store._nativeAdministration = new(store, human, request,
+                                            store.NativeRequest(invocation, request, stage, snapshot), nativeEnrollment());
+                                        await store._nativeAdministration.ReadAsync(token);
+                                        store.RequireIssuedImage(store._nativeAdministration);
+                                    }
+                                    await preparation.AcquireAsync(invocation, request, stage, token);
+                                    lifecycle.RequireCurrent();
+                                    if (store._nativeAdministration is { } acquired)
+                                        await acquired.AcquireAsync(token);
+                                    lifecycle.RequireCurrent();
+                                    var decision = await body(human, token);
+                                    lifecycle.RequireCurrent();
+                                    if (decision.Disposition == OriginalOwnerDisposition.Committed)
+                                    {
+                                        if (store._nativeAdministration is { } native)
+                                            store.ApplicationOwner.RegisterHumanCommitAdmission(
+                                                native.CompleteAsync, native.RequireCompleted);
+                                        // Enrollment validation follows every blocking native/source check.
+                                        store.ApplicationOwner.RegisterHumanCommitAdmission(async finalToken =>
+                                        {
+                                            await RequireOriginalOwnerAsync(finalToken);
+                                            await guard.ValidateAsync(finalToken);
+                                        }, () =>
+                                        {
+                                            lifecycle.RequireCurrent();
+                                            guard.RequireCurrent(store.Clock.GetUtcNow());
+                                        });
+                                    }
+                                    return decision;
+                                }, settlementToken);
+                        }, ownerToken);
+                        settlementAcknowledged = true;
+                        var value = owner.Consume(invocation, settled, settled.Disposition);
+                        committed = settled.Disposition == OriginalOwnerDisposition.Committed;
+                        if (stage == LocalAdministrationStage.Reset && store._selfReset is { } reset
+                            && ReferenceEquals(reset.Invocation, invocation))
+                            reset.Committed = committed;
+                        preparation.Settle(invocation, stage, committed);
+                        if (store._nativeIssued is { } issued)
+                            issued.Committed = committed;
+                        return committed ? OriginalOwnerDecision<T>.Commit(value) : OriginalOwnerDecision<T>.RollBack(value);
+                    }
+                }, RequireOriginalOwnerAsync, cancellationToken);
             }
-            catch
+            catch (Exception exception)
             {
                 preparation.Settle(invocation, stage, committed: false);
+                if (settlementAcknowledged && exception is not HumanMutationOutcomeUnknownException)
+                    throw new HumanMutationOutcomeUnknownException(exception);
                 throw;
             }
             finally
@@ -227,6 +264,20 @@ internal sealed partial class LocalIdentityCredentialStateStore
                     store._selfReset = null;
                     store._nativeIssued = null;
                 }
+            }
+
+            Task RequireOriginalOwnerAsync(CancellationToken token)
+            {
+                token.ThrowIfCancellationRequested();
+                lifecycle.RequireCurrent();
+                if (originalHuman is null || !ReferenceEquals(store._administrationAttempt, originalHuman)
+                    || store.ApplicationOwner.ContextId != originalContextLease
+                    || !ReferenceEquals(store.IdentityOwner, store.ApplicationOwner)
+                    || !ReferenceEquals(store.IdentityOwner.Database.CurrentTransaction, originalHuman.Transaction)
+                    || !store.ApplicationOwner.HasHumanCommitContextLease
+                    || !store.ApplicationOwner.HumanCommitAttemptOwnsTransaction || store.ApplicationOwner.IsTenantFilterBypassed)
+                    throw new UnauthorizedAccessException("Joined enrollment left its original Local physical owner.");
+                return Task.CompletedTask;
             }
         }
 

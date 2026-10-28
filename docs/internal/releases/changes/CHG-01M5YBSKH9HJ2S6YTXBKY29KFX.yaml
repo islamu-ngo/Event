@@ -1,0 +1,31 @@
+Change-Id: CHG-01M5YBSKH9HJ2S6YTXBKY29KFX
+Title: "Install restricted Runtime storage rights for Setup Live"
+Type: fix
+Scope: self-hosting
+Summary: "Setup Live uses fixed Runtime storage permissions and identity-only secret-binding reads without exposing provider coordinates or granting migrator authority."
+Impacts:
+  Breaking:
+    Reference: docs/internal/SECRETS.md
+    Disposition: not-applicable
+    Detail: Existing Setup Live HTTP contracts remain unchanged.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Only named setup storage and secret-binding identity columns are granted; Runtime cannot install its own privileges, read provider coordinates, or bypass tenant isolation.
+  Migration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Run the updated database migration process with the configured migrator account to install fixed permissions; no generated EF schema migration is added.
+  Configuration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: not-applicable
+    Detail: Runtime and migrator continue using their existing separately configured identities.
+  OpenAPI:
+    Reference: docs/internal/SECRETS.md
+    Disposition: not-applicable
+    Detail: No routes, generated clients, or request and response shapes change.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Apply updated migration permissions before using Setup Live; never run the API as migrator or give Runtime Global membership.

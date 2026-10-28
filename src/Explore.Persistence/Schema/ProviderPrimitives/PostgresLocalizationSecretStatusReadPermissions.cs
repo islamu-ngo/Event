@@ -15,6 +15,7 @@ namespace Explore.Persistence.Schema;
 /// <summary>
 /// Fixed binding metadata access, not secret resolution or human authorization.
 /// The existing non-RLS source remains unchanged; C# selects the requested key and scope.
+/// Runtime additionally reads binding IDs for setup; Global retains only the four status columns.
 /// </summary>
 public static class PostgresLocalizationSecretStatusReadPermissions
 {
@@ -67,38 +68,51 @@ public static class PostgresLocalizationSecretStatusReadPermissions
                 RequireOriginal();
                 string fresh = Fresh(source, enrollment);
                 string complete = Manifest(source, enrollment, complete: true);
+                string predecessor = Manifest(source, enrollment, complete: true, includeRuntimeId: false);
                 if (!await IsTrueAsync(context,
-                    $"({Manifest(source, enrollment, complete: false)}) AND (({fresh}) OR ({complete}))", cancellationToken))
+                    $"({Manifest(source, enrollment, complete: false)}) AND (({fresh}) OR ({predecessor}) OR ({complete}))", cancellationToken))
                     throw new InvalidOperationException(Drift);
                 RequireOriginal();
-                if (await IsTrueAsync(context, fresh, cancellationToken))
+                if (!await IsTrueAsync(context, complete, cancellationToken))
                 {
+                    RequireOriginal();
+                    bool installFresh = await IsTrueAsync(context, fresh, cancellationToken);
+                    RequireOriginal();
+                    if (!installFresh && !await IsTrueAsync(context, predecessor, cancellationToken))
+                        throw new InvalidOperationException(Drift);
                     RequireOriginal();
                     var names = context.GetService<ISqlGenerationHelper>();
                     string logins = string.Join(',', new[] { enrollment.RuntimeLogin, enrollment.GlobalLogin }
                         .Select(names.DelimitIdentifier));
                     await using var command = context.Database.GetDbConnection().CreateCommand();
                     command.Transaction = physical;
-                    command.CommandText = $"""
+                    string commonGrants = installFresh ? $"""
                         GRANT USAGE ON SCHEMA {names.DelimitIdentifier(source.Schema)} TO {logins};
                         GRANT SELECT ({string.Join(',', source.Columns.Select(column => names.DelimitIdentifier(column.Name)))})
                             ON {source.Table} TO {logins};
+                        """ : "";
+                    command.CommandText = commonGrants + $"""
+
+                        GRANT SELECT ({names.DelimitIdentifier(source.Id.Name)}) ON {source.Table}
+                            TO {names.DelimitIdentifier(enrollment.RuntimeLogin)};
                         """;
                     await command.ExecuteNonQueryAsync(cancellationToken);
                     RequireOriginal();
-                    if (!await IsTrueAsync(context, complete, cancellationToken))
-                        throw new InvalidOperationException(Drift);
                 }
                 RequireOriginal();
+                if (!await IsTrueAsync(context, complete, cancellationToken))
+                    throw new InvalidOperationException(Drift);
+                RequireOriginal();
+                // Completion wins cancellation after admission; release and any owned commit are non-cancellable.
+                await transaction.ReleaseSavepointAsync(savepoint, CancellationToken.None);
             }
             catch
             {
                 await transaction.RollbackToSavepointAsync(savepoint, CancellationToken.None);
+                await transaction.ReleaseSavepointAsync(savepoint, CancellationToken.None);
                 throw;
             }
-            finally { await transaction.ReleaseSavepointAsync(savepoint, CancellationToken.None); }
-            RequireOriginal();
-            if (owned is not null) await owned.CommitAsync(cancellationToken);
+            if (owned is not null) await owned.CommitAsync(CancellationToken.None);
         }
         finally { connection.StateChange -= Changed; }
     }
@@ -167,12 +181,15 @@ public static class PostgresLocalizationSecretStatusReadPermissions
 
     internal static IReadOnlyList<string> GlobalCatalogueRelations(ExploreDbContext context) => [Mapping(context).Table];
 
-    private static string Manifest(Source source, PostgresNativeQueueEnrollment enrollment, bool complete)
+    private static string Manifest(Source source, PostgresNativeQueueEnrollment enrollment, bool complete,
+        bool includeRuntimeId = true)
     {
         string runtime = Text(enrollment.RuntimeLogin), global = Text(enrollment.GlobalLogin);
-        string allowed = "ARRAY[" + string.Join(',', source.Columns.Select(column => Text(column.Name))) + "]::text[]";
+        string Allowed(IEnumerable<Column> columns) => "ARRAY[" + string.Join(',', columns.Select(column => Text(column.Name))) + "]::text[]";
+        string commonAllowed = Allowed(source.Columns);
+        string runtimeAllowed = includeRuntimeId ? Allowed(source.Columns.Append(source.Id)) : commonAllowed;
         string required = complete ? $"""
-            AND NOT EXISTS (SELECT 1 FROM callers CROSS JOIN unnest({allowed}) expected(name)
+            AND NOT EXISTS (SELECT 1 FROM callers CROSS JOIN LATERAL unnest(callers.allowed) expected(name)
                 WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                     CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl
                     WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)}) AND a.attname=expected.name
@@ -182,10 +199,18 @@ public static class PostgresLocalizationSecretStatusReadPermissions
             AND NOT EXISTS (SELECT 1 FROM callers WHERE NOT pg_catalog.has_schema_privilege(login,{Text(source.Schema)},'USAGE'))
             """ : "";
         return $"""
-            (WITH callers(login) AS (VALUES ({runtime}),({global})), members AS
-                (SELECT callers.login,r.* FROM callers CROSS JOIN pg_catalog.pg_roles r
+            (WITH callers(login,allowed) AS (VALUES ({runtime},{runtimeAllowed}),({global},{commonAllowed})), members AS
+                (SELECT callers.login,callers.allowed,r.* FROM callers CROSS JOIN pg_catalog.pg_roles r
                     WHERE pg_catalog.pg_has_role(callers.login,r.oid,'MEMBER'))
             SELECT (SELECT count(*)=2 FROM pg_catalog.pg_roles WHERE rolname IN ({runtime},{global}) AND rolcanlogin)
+                AND NOT EXISTS (SELECT 1 FROM callers CROSS JOIN pg_catalog.pg_attribute a
+                    CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl
+                    WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)})
+                        AND acl.grantee IN (0,(SELECT oid FROM pg_catalog.pg_roles WHERE rolname=callers.login))
+                        AND NOT (a.attnum>0 AND acl.grantee<>0
+                            AND acl.grantor={RoleOid(enrollment.MigratorLogin)}
+                            AND acl.privilege_type='SELECT' AND NOT acl.is_grantable
+                            AND a.attname=ANY(callers.allowed)))
                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members WHERE roleid IN ({RoleOid(enrollment.RuntimeLogin)},{RoleOid(enrollment.GlobalLogin)}))
                 AND NOT EXISTS (SELECT 1 FROM members r
                     WHERE r.rolsuper OR r.rolbypassrls OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication
@@ -198,7 +223,7 @@ public static class PostgresLocalizationSecretStatusReadPermissions
                             WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)}) AND a.attnum<>0 AND NOT a.attisdropped
                                 AND (pg_catalog.has_column_privilege(r.oid,a.attrelid,a.attnum,permission.privilege || ' WITH GRANT OPTION')
                                     OR (pg_catalog.has_column_privilege(r.oid,a.attrelid,a.attnum,permission.privilege) AND NOT (
-                                        a.attnum>0 AND r.rolname=r.login AND permission.privilege='SELECT' AND a.attname=ANY({allowed})
+                                        a.attnum>0 AND r.rolname=r.login AND permission.privilege='SELECT' AND a.attname=ANY(r.allowed)
                                         AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=r.oid
                                             AND acl.grantor={RoleOid(enrollment.MigratorLogin)} AND acl.privilege_type='SELECT' AND NOT acl.is_grantable)
                                         AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=0 AND acl.privilege_type='SELECT'))))))
@@ -214,7 +239,7 @@ public static class PostgresLocalizationSecretStatusReadPermissions
                 AND n.nspname={Text(source.Schema)})
         AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_inherits WHERE inhrelid=pg_catalog.to_regclass({Text(source.Table)}) OR inhparent=pg_catalog.to_regclass({Text(source.Table)}))
         AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class=pg_catalog.to_regclass({Text(source.Table)}))
-        AND ({string.Join(" AND ", source.Columns.Select(column => $"""
+        AND ({string.Join(" AND ", source.Columns.Append(source.Id).Select(column => $"""
             EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)})
                 AND a.attname={Text(column.Name)} AND a.attnum>0 AND NOT a.attisdropped AND a.attidentity='' AND a.attgenerated=''
                 AND pg_catalog.format_type(a.atttypid,a.atttypmod)={Text(column.StoreType)} AND a.attnotnull={(column.Required ? "true" : "false")})
@@ -245,13 +270,14 @@ public static class PostgresLocalizationSecretStatusReadPermissions
         if (entity.BaseType is not null || entity.GetDerivedTypes().Any() || entity.GetComplexProperties().Any()
             || entity.FindPrimaryKey()?.Properties is not [var key] || key.Name != nameof(SecretBinding.Id))
             throw new InvalidOperationException("localization_status_model_shape_drift");
-        var columns = Properties.Select(name =>
+        Column MapColumn(string name)
         {
             var property = entity.FindProperty(name)!;
             if (property.IsShadowProperty()) throw new InvalidOperationException("localization_status_model_shape_drift");
             return new Column(property.GetColumnName(store)!, property.GetRelationalTypeMapping().StoreType, !property.IsNullable);
-        }).ToArray();
-        return new Source(schema, context.GetService<ISqlGenerationHelper>().DelimitIdentifier(table, schema), columns);
+        }
+        return new Source(schema, context.GetService<ISqlGenerationHelper>().DelimitIdentifier(table, schema),
+            Properties.Select(MapColumn).ToArray(), MapColumn(nameof(SecretBinding.Id)));
     }
 
     private static string Identity(string login) => $"session_user={Text(login)} AND current_user=session_user AND pg_catalog.current_setting('role') IN ('none',session_user::text)";
@@ -264,7 +290,7 @@ public static class PostgresLocalizationSecretStatusReadPermissions
         return await command.ExecuteScalarAsync(cancellationToken) is true;
     }
     private sealed record Column(string Name, string StoreType, bool Required);
-    private sealed record Source(string Schema, string Table, Column[] Columns);
+    private sealed record Source(string Schema, string Table, Column[] Columns, Column Id);
     private static string Text(string value) => "E'" + value.Replace("\\", "\\\\", StringComparison.Ordinal)
         .Replace("'", "''", StringComparison.Ordinal).Replace("$", "\\044", StringComparison.Ordinal) + "'";
 }

@@ -25,11 +25,16 @@ public partial class ExploreDbContext
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
-        return await SaveWithStorageReferencesAsync(async acceptChanges =>
+        ValidateModerationReadGrantSettlement();
+        var saved = await SaveWithStorageReferencesAsync(async acceptChanges =>
         {
             PrepareTrackedEntities();
+            await PrepareModerationRecoveryAsync(bulkMutation: false, cancellationToken);
+            ValidateModerationReadGrantSettlement();
             return await SaveWithProvisioningPolicyAsync(acceptChanges, cancellationToken);
         }, acceptAllChangesOnSuccess, cancellationToken);
+        ValidateModerationReadGrantSettlement();
+        return saved;
     }
 
     internal async Task<int> SavePrivacyErasureChangesAsync(CancellationToken cancellationToken)
@@ -78,16 +83,20 @@ public partial class ExploreDbContext
             }
         }
 
+        await PrepareModerationRecoveryAsync(bulkMutation: false, cancellationToken);
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     internal void PrepareTrackedEntities()
     {
+        PrepareClassificationMaterialStamps();
         ValidateEventLocationCarrierConsistency();
         ValidateRegistrationProviderConnectionSecrets();
         ValidateRegistrationProviderBindingSecrets();
+        ValidateRegistrationProviderPublications();
         ValidateRegistrationAttemptProviderRevisions();
         ValidateAdmissionIntegrity();
+        ValidateAdjudicatedCaseReadGrants();
         PopulateMySqlPortableComputedValues();
         var userId = GetCurrentUserId();
         var now = DateTime.UtcNow;
@@ -287,12 +296,20 @@ public partial class ExploreDbContext
                 continue;
             }
 
-            RegistrationProviderBinding? binding = ChangeTracker.Entries<RegistrationProviderBinding>()
-                .Select(item => item.Entity)
-                .FirstOrDefault(candidate => candidate.TenantId == attempt.TenantId && candidate.Id == attempt.RegistrationProviderBindingId)
+            var tracked = ChangeTracker.Entries<RegistrationProviderBinding>()
+                .FirstOrDefault(item => item.Entity.TenantId == attempt.TenantId && item.Entity.Id == attempt.RegistrationProviderBindingId);
+            RegistrationProviderBinding? binding = tracked?.Entity
                 ?? RegistrationProviderBindings.IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
                     .FirstOrDefault(candidate => candidate.TenantId == attempt.TenantId && candidate.Id == attempt.RegistrationProviderBindingId);
-            if (binding?.PublishedMappingRevisionHash?.Value != attempt.ProviderMappingRevisionHash?.Value)
+            if (attempt.RegistrationProviderBindingId is null || attempt.ProviderMappingRevisionHash is null
+                || tracked?.State == EntityState.Deleted || binding is null || binding.IsDeleted
+                || binding.StateId != (int)RegistrationProviderBindingStateEnum.Published
+                || binding.PublishedMappingRevisionHash?.Value != attempt.ProviderMappingRevisionHash.Value
+                || binding.Publication is not { } publication
+                || publication.TenantId != attempt.TenantId
+                || publication.RegistrationProviderBindingId != binding.Id
+                || publication.MappingRevisionHashKey != attempt.ProviderMappingRevisionHash.Value
+                || publication.PublishedAt != binding.PublishedAt)
             {
                 throw new InvalidOperationException("Registration attempts must pin the published provider binding mapping revision.");
             }

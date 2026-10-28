@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M6CATK6FF5MH6PDV9V7029
+Title: "Qualify external form import before publishing frozen artifacts"
+Type: fix
+Scope: registration
+Summary: "Apply current human publication authority to the whole existing external schema import without changing managed machine or drift evidence behavior."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Current human authority brackets connection lookup, remote schema reads and local frozen-artifact publication. Existing drift evidence on failure and native response identifiers remain unchanged. Regressions are authored but unrun."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable

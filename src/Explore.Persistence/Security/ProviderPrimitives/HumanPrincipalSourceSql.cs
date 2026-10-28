@@ -134,7 +134,10 @@ internal sealed class HumanPrincipalSourceSql(ExploreDbContext context, bool cur
         $"""
         SELECT {Fields<RolePermission>("rp", "RoleId", "PermissionId")}, {Fields<Permission>("p", "MasterCode", "IsActive")},
             {A(Boolean($"p.{C<Permission>("MasterCode")} = '{PermissionCodes.EventCreate}'"), "MatchesEventCreateCode")},
-            {A(Boolean($"p.{C<Permission>("MasterCode")} = '{PermissionCodes.EventManageFinance}'"), "MatchesEventFinanceCode")}
+            {A(Boolean($"p.{C<Permission>("MasterCode")} = '{PermissionCodes.EventManageFinance}'"), "MatchesEventFinanceCode")},
+            {A(Boolean($"p.{C<Permission>("MasterCode")} = '{PermissionCodes.GroupMemberCreate}'"), "MatchesGroupMemberCreateCode")},
+            {A(Boolean($"p.{C<Permission>("MasterCode")} = '{PermissionCodes.GroupMemberUpdate}'"), "MatchesGroupMemberUpdateCode")},
+            {A(Boolean($"p.{C<Permission>("MasterCode")} = '{PermissionCodes.GroupMemberDelete}'"), "MatchesGroupMemberDeleteCode")}
         FROM {T<RolePermission>()} rp JOIN {T<Permission>()} p ON p.{C<Permission>("Id")} = rp.{C<RolePermission>("PermissionId")}
         WHERE {ActorRolePredicate($"rp.{C<RolePermission>("RoleId")}")}
         """,
@@ -157,7 +160,10 @@ internal sealed class HumanPrincipalSourceSql(ExploreDbContext context, bool cur
         SELECT {Fields<RolePermission>("rp", "RoleId", "PermissionId")},
             {Fields<Permission>("p", "MasterCode", "IsActive")},
             {A(Boolean($"p.{C<Permission>("MasterCode")} = '{PermissionCodes.EventCreate}'"), "MatchesEventCreateCode")},
-            {A(Boolean($"p.{C<Permission>("MasterCode")} = '{PermissionCodes.EventManageFinance}'"), "MatchesEventFinanceCode")}
+            {A(Boolean($"p.{C<Permission>("MasterCode")} = '{PermissionCodes.EventManageFinance}'"), "MatchesEventFinanceCode")},
+            {A(Boolean($"p.{C<Permission>("MasterCode")} = '{PermissionCodes.GroupMemberCreate}'"), "MatchesGroupMemberCreateCode")},
+            {A(Boolean($"p.{C<Permission>("MasterCode")} = '{PermissionCodes.GroupMemberUpdate}'"), "MatchesGroupMemberUpdateCode")},
+            {A(Boolean($"p.{C<Permission>("MasterCode")} = '{PermissionCodes.GroupMemberDelete}'"), "MatchesGroupMemberDeleteCode")}
         FROM {T<RolePermission>()} rp
         JOIN {T<Permission>()} p
             ON p.{C<Permission>("Id")} = rp.{C<RolePermission>("PermissionId")}

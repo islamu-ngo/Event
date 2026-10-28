@@ -11,15 +11,12 @@ using Explore.Application.Responses;
 
 namespace Explore.Application.Features.ManagedProviderProvisioning.Handlers.Commands;
 
-/// <summary>
-/// Keeps genuine human provisioning and admitted durable workers on distinct
-/// creation ports. Neither caller can lend its source or database owner to the other.
-/// </summary>
+/// <summary>Separates original human provisioning from admitted durable worker creation.</summary>
 public sealed class EnsureManagedProviderClientProvisionedCommandHandler(
     HumanManagedProviderProvisioningCoordinator humanProvisioning,
     IManagedTenantWorkerCreationPort workerCreation)
     : ICommandHandler<EnsureManagedProviderClientProvisionedCommand, BaseCommandResponse<ManagedProviderClientProvisioningResultDto>>,
-        IManagedProviderClientProvisioner
+      IManagedProviderClientProvisioner
 {
     public Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> ExecuteAsync(
         EnsureManagedProviderClientProvisionedCommand command, CancellationToken cancellationToken) =>
@@ -41,15 +38,12 @@ public sealed class EnsureManagedProviderClientProvisionedCommandHandler(
                 ExpectedOutboxMessageId = expectedOutboxMessageId
             }, cancellationToken);
 
-        var validation = await new ManagedProviderClientProvisioningDtoValidator()
-            .ValidateAsync(provisioningDto, cancellationToken);
+        var validation = await new ManagedProviderClientProvisioningDtoValidator().ValidateAsync(provisioningDto, cancellationToken);
         if (!validation.IsValid)
             return BaseCommandResponse.Validation<ManagedProviderClientProvisioningResultDto>(
                 validation.Errors.Select(error => error.ErrorMessage),
                 "Managed provider client provisioning failed due to validation errors.");
-
-        var managementValidation = await new ManagementTenantProvisioningRequestValidator()
-            .ValidateAsync(managementRequest, cancellationToken);
+        var managementValidation = await new ManagementTenantProvisioningRequestValidator().ValidateAsync(managementRequest, cancellationToken);
         if (!managementValidation.IsValid)
             return BaseCommandResponse.Validation<ManagedProviderClientProvisioningResultDto>(
                 managementValidation.Errors.Select(error => error.ErrorMessage));
@@ -60,25 +54,22 @@ public sealed class EnsureManagedProviderClientProvisionedCommandHandler(
         if (operationId is not { } operation || operation == Guid.Empty
             || expectedOutboxMessageId is not { } message || message == Guid.Empty)
             return BaseCommandResponse.Failure<ManagedProviderClientProvisioningResultDto>(
-                "tenant_provisioning_operation_missing",
-                "Durable operation and outbox-generation identifiers are required.");
+                "tenant_provisioning_operation_missing", "Durable operation and outbox-generation identifiers are required.");
 
-        // The port independently reloads the persisted full request. These IDs and
-        // caller DTOs confer no authority without its concrete original delivery.
+        // The port reloads the full persisted request under its original delivery authority.
         var response = await workerCreation.CreateAsync(operation, message, cancellationToken);
-        var result = response.Id;
         return BaseCommandResponse.Restore(
-            result is null ? null : new ManagedProviderClientProvisioningResultDto
+            response.Id is { } outcome ? new ManagedProviderClientProvisioningResultDto
             {
-                TenantId = result.TenantId,
-                UserId = result.UserId,
-                TenantUserId = result.TenantUserId,
-                TenantUserProfileId = result.TenantUserProfileId,
-                UserActorId = result.UserActorId,
-                UserExternalLoginId = result.UserExternalLoginId,
-                TenantUserRoleGrantId = result.TenantUserRoleGrantId,
-                TenantPlanAssignmentId = result.TenantPlanAssignmentId
-            },
+                TenantId = outcome.TenantId,
+                UserId = outcome.UserId,
+                UserActorId = outcome.UserActorId,
+                UserExternalLoginId = outcome.UserExternalLoginId,
+                TenantUserId = outcome.TenantUserId,
+                TenantUserProfileId = outcome.TenantUserProfileId,
+                TenantUserRoleGrantId = outcome.TenantUserRoleGrantId,
+                TenantPlanAssignmentId = outcome.TenantPlanAssignmentId
+            } : null,
             response.IsSuccess,
             response.Message,
             response.Errors,

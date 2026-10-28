@@ -11,7 +11,6 @@ public sealed record UpdateEventRoleAssignmentWindowCommand : ICommand<BaseComma
     public Guid TenantId { get; init; }
     public Guid EventId { get; init; }
     public Guid AssignmentId { get; init; }
-    public Guid ActorUserId { get; init; }
     public DateTime StartsAtUtc { get; init; }
     public DateTime? ExpiresAtUtc { get; init; }
 

@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M7ZHHGAKCRYNRVJAN1JQCK
+Title: "distinguish denied add-on publication from unavailable authority"
+Type: fix
+Scope: ticketing
+Summary: "Return bounded ProblemDetails for restricted, unavailable or missing add-on publication while retaining the successful catalog HAL payload. Included controller tests are unrun."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Restricted add-on publication and unavailable current authority remain distinct fail-closed outcomes with bounded ProblemDetails. Included controller tests are UNRUN; no provider-conformance claim is made."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Add-on publication declares HTTP 403 and 503 failure responses and maps the native result without exposing its internal envelope; successful responses remain catalog HAL resources. Cumulative schema and client output is a separate final checkpoint."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Deploy with the matching publication handler and cumulative contract. Public/internal documentation completion and execution evidence remain main-session responsibilities; included tests were not run here."

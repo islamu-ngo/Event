@@ -15,8 +15,13 @@ public sealed partial class EventResourceManagementPersistenceTests
         var (scope, actor) = await SeedAsync();
         var id = Guid.CreateVersion7();
         await using (var seed = database.CreateContext())
-            await Assert.That((await Workflow(seed, scope.TenantAId, actor)
+        {
+            await using var creation = Workflow(seed, scope.TenantAId, actor);
+            await creation.InitializeAsync();
+            await creation.PrepareAsync();
+            await Assert.That((await creation.Workflow
                 .CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
+        }
         bool changed = false;
         var provider = Substitute.For<IEventResourceAuthorizationProvider>();
         provider.CheckBatchAsync(Arg.Any<IReadOnlyList<EventResourceProviderInput>>(), Arg.Any<CancellationToken>())
@@ -39,10 +44,13 @@ public sealed partial class EventResourceManagementPersistenceTests
                 return (IReadOnlyList<EventResourceProviderDecision>)inputs.Select(_ => EventResourceProviderDecision.Allow).ToArray();
             });
         await using var context = database.CreateIndependentContext();
-        var result = await Workflow(context, scope.TenantAId, actor, provider: provider)
+        await using var request = Workflow(context, scope.TenantAId, actor, provider: provider);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var result = await request.Workflow
             .ListAsync(scope.EventAId, 1, 20, default);
         await Assert.That(changed).IsTrue();
-        await Assert.That(result.Value).IsNull();
+        await Assert.That(result.Projection).IsNull();
         await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
     }
 
@@ -52,8 +60,13 @@ public sealed partial class EventResourceManagementPersistenceTests
         var (scope, actor) = await SeedAsync();
         var id = Guid.CreateVersion7();
         await using (var seed = database.CreateContext())
-            await Assert.That((await Workflow(seed, scope.TenantAId, actor)
+        {
+            await using var creation = Workflow(seed, scope.TenantAId, actor);
+            await creation.InitializeAsync();
+            await creation.PrepareAsync();
+            await Assert.That((await creation.Workflow
                 .CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
+        }
         var provider = Substitute.For<IEventResourceAuthorizationProvider>();
         provider.CheckAsync(Arg.Any<EventResourceProviderInput>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<EventResourceProviderInput>().Resource.Id == scope.EventAId
@@ -62,9 +75,12 @@ public sealed partial class EventResourceManagementPersistenceTests
             .Returns(call => call.Arg<IReadOnlyList<EventResourceProviderInput>>().Select(input =>
                 input.Resource.Id == scope.EventAId ? EventResourceProviderDecision.Allow : EventResourceProviderDecision.Deny).ToArray());
         await using var context = database.CreateContext();
-        var result = await Workflow(context, scope.TenantAId, actor, provider: provider)
+        await using var request = Workflow(context, scope.TenantAId, actor, provider: provider);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var result = await request.Workflow
             .ListAsync(scope.EventAId, 1, 20, default);
-        await Assert.That(result.Value).IsNull();
+        await Assert.That(result.Projection).IsNull();
         await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
     }
 }

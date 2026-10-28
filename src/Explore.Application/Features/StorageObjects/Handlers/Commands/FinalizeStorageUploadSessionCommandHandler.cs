@@ -14,7 +14,7 @@ using Explore.Application.Contracts.Operations;
 namespace Explore.Application.Features.StorageObjects.Handlers.Commands;
 
 public class FinalizeStorageUploadSessionCommandHandler
-    : ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>
+    : ICommandHandler<FinalizeStorageUploadSessionCommand, StorageUploadSessionResult>
 {
     private const string PrivacyErasureFencedFailureCode = "privacy_erasure_fenced";
 
@@ -59,7 +59,7 @@ public class FinalizeStorageUploadSessionCommandHandler
         _resourceUploads = resourceUploads;
     }
 
-    public async Task<BaseCommandResponse<StorageUploadSessionDto>> ExecuteAsync(
+    public async Task<StorageUploadSessionResult> ExecuteAsync(
         FinalizeStorageUploadSessionCommand request,
         CancellationToken cancellationToken)
     {
@@ -67,20 +67,20 @@ public class FinalizeStorageUploadSessionCommandHandler
         {
             _metrics.RecordStorageUploadSession(null, "finalize", "failed", "validation_failed");
 
-            return Failure("Upload finalization failed.", ["UploadSessionId is required."]);
+            return StorageUploadSessionResult.Ordinary(Failure("Upload finalization failed.", ["UploadSessionId is required."]));
         }
 
         if (request.Content is null || !request.Content.CanRead)
         {
             _metrics.RecordStorageUploadSession(null, "finalize", "failed", "validation_failed");
 
-            return Failure("Upload finalization failed.", ["A readable upload content stream is required."]);
+            return StorageUploadSessionResult.Ordinary(Failure("Upload finalization failed.", ["A readable upload content stream is required."]));
         }
 
         Guid? userId = _currentUserService.UserId;
         if (await IsFencedAsync(userId, cancellationToken))
         {
-            return FencedFailure();
+            return StorageUploadSessionResult.Ordinary(FencedFailure());
         }
 
         var tenantId = _tenantContext.TenantId;
@@ -88,9 +88,15 @@ public class FinalizeStorageUploadSessionCommandHandler
         if (target?.Purpose == StorageObjectPurposes.EventResource || target?.OwningResourceKind == StorageOwningResourceKinds.EventResource
             || target?.ExpectedResourceVersion is not null)
             return _resourceUploads is null
-                ? BaseCommandResponse.Failure<StorageUploadSessionDto>("event_resource_unavailable")
+                ? StorageUploadSessionResult.Ordinary(BaseCommandResponse.Failure<StorageUploadSessionDto>("event_resource_unavailable"))
                 : await _resourceUploads.FinalizeAsync(request, cancellationToken);
 
+        return StorageUploadSessionResult.Ordinary(await ExecuteOrdinaryAsync(request, tenantId, cancellationToken));
+    }
+
+    private async Task<BaseCommandResponse<StorageUploadSessionDto>> ExecuteOrdinaryAsync(
+        FinalizeStorageUploadSessionCommand request, Guid tenantId, CancellationToken cancellationToken)
+    {
         var sessionResponse = await _unitOfWork.ExecuteInTransactionAsync(
             async ct => await MarkUploadingAsync(request, tenantId, ct),
             cancellationToken);

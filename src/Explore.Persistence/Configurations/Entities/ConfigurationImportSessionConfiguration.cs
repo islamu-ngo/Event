@@ -1,6 +1,7 @@
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Application.Features.ConfigurationManifest.Importing;
+using Explore.Application.Features.ConfigurationManifest.Moderation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -97,6 +98,11 @@ public sealed class ConfigurationImportSessionConfiguration :
         builder.Property(session => session.PreviewRequiredApprovalDigest)
             .HasMaxLength(64)
             .IsFixedLength();
+        builder.Property(session => session.ModerationReservation)
+            .HasConversion(
+                value => value == null ? null : value.Serialize(),
+                value => value == null ? null : ModerationConfigurationImportReservationSet.Parse(value))
+            .HasMaxLength(ModerationConfigurationImportReservationSet.MaximumSerializedLength);
         builder.Property(session => session.Revision)
             .IsConcurrencyToken()
             .IsRequired();

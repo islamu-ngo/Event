@@ -24,6 +24,18 @@ public sealed record EventResourceAuthorityRequest(
     public const int MaximumBatchResources = 500;
     public const int MaximumBatchChecks = MaximumBatchResources * 13;
 
+    public EventResourceMachinePrincipal? MachinePrincipal { get; init; }
+
+    /// <summary>Server-selected upload boundary; quarantined material cannot be replaced or disclosed through upload responses.</summary>
+    public bool RequiresUnquarantinedMaterial { get; init; }
+    /// <summary>Server-selected upload mutation, never ordinary metadata editing or cleanup.</summary>
+    public bool IsUploadMutation { get; init; }
+    public bool HasConsistentUploadPurpose => !IsUploadMutation
+        || (Action == "update" && !TargetsParentEvent && ResourceId != Guid.Empty && RequiresUnquarantinedMaterial);
+    public bool HasConsistentPrincipal => IsMachineCaller
+        ? SubjectUserId is null && MachinePrincipal is not null
+        : MachinePrincipal is null;
+
     /// <summary>Server-selected parent-event authority for management collection and export reads.</summary>
     public bool IsEventCollection { get; init; }
     public bool TargetsParentEvent => Action == "create" || IsEventCollection;
@@ -33,6 +45,9 @@ public sealed record EventResourceAuthorityRequest(
 
     /// <summary>Binds descriptive file metadata to the exact privately prepared attachment.</summary>
     public string? ExpectedAttachmentGeneration { get; init; }
+
+    /// <summary>Binds prepared audit entries to the retention policy that qualified their disclosure.</summary>
+    public int? ExpectedAuditRetentionDays { get; init; }
 
     /// <summary>Binds prepared audience metadata to its exact disclosure, not merely an unchanged row stamp.</summary>
     public Explore.Domain.Services.EventResourceAccessDecision? ExpectedDisclosure { get; init; }

@@ -154,6 +154,13 @@ the application transport. Do not construct a provider URL or attach a generic
 storage object. A successful upload is not permission to download or publish.
 If a version conflicts, refresh the resource before starting another operation.
 
+Quarantined material cannot start, replay or disclose an upload operation, even
+for a manager with ordinary edit permission. If quarantine arrives while a
+replacement is being written, attachment is denied and the application retains
+the staged object for exact cleanup. The existing attachment stays in place;
+the failed replacement does not release the quarantine or publish new material.
+Refresh the resource rather than retrying a saved upload action as permission.
+
 Supported declarations are PDF, DOCX and PPTX, within the effective instance,
 tenant and storage size/quota limits. HTML, SVG, arbitrary archives and
 macro-enabled Office formats are not accepted. PDF inspection checks a

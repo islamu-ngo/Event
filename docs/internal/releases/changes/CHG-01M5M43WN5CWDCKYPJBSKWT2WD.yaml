@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M43WN5CWDCKYPJBSKWT2WD
+Title: "Require independent reviewer identity qualification"
+Type: fix
+Scope: access
+Summary: "Reject interested identity qualifiers and cross-controlled reviewer quorum. This source correction does not establish measured runtime conformance."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Reviewer identity qualification rejects interested or cross-controlled quorum participants. Authored invariant tests remain unrun under the implementation-first restriction."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

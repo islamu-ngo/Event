@@ -33,7 +33,6 @@ namespace Explore.API.Controllers;
 public sealed class EventResourceController(
     IQueryHandler<GetEventResourceAudienceDetailQuery, EventResourceAudienceDetailResult> detail,
     IQueryHandler<ListEventResourcesQuery, EventResourceAudiencePageResult> list,
-    IQueryHandler<AuthorizeEventResourceAudienceDisclosureQuery, EventResourceAudienceFailure> disclosure,
     IResourceAssembler<EventResourceAudienceDetailDto, EventResourceAudienceDetailDto> assembler,
     ITenantContext tenant) : ControllerBase
 {
@@ -43,11 +42,10 @@ public sealed class EventResourceController(
     public async Task<ActionResult<HalResource<EventResourceAudienceDetailDto>>> Get(Guid id, CancellationToken cancellationToken)
     {
         var result = await detail.QueryAsync(new(id), cancellationToken);
-        if (result.Failure != EventResourceAudienceFailure.None || result.Value is not { } value || result.Proof is not { } proof)
+        if (result.Failure != EventResourceAudienceFailure.None || result.Projection is not { } projection)
             return ReadFailure(result.Failure);
-        var representation = await assembler.ToResource(value, HttpContext);
-        var failure = await disclosure.QueryAsync(new(proof), cancellationToken);
-        return failure == EventResourceAudienceFailure.None ? Ok(representation) : ReadFailure(failure);
+        return new EventResourceProjectionResult<EventResourceAudienceDetailDto>(projection,
+            async (value, _) => Ok(await assembler.ToResource(value, HttpContext)), ReadFailure);
     }
 
     [HttpGet("event/{eventId:guid}/resources", Name = RouteNames.ListEventResources)]
@@ -57,16 +55,24 @@ public sealed class EventResourceController(
         Guid eventId, [FromQuery] int pageSize = 20, [FromQuery] string? cursor = null, CancellationToken cancellationToken = default)
     {
         var result = await list.QueryAsync(new(eventId, pageSize, cursor), cancellationToken);
-        if (result.Failure != EventResourceAudienceFailure.None || result.Value is not { } value || result.Proof is not { } proof)
+        if (result.Failure != EventResourceAudienceFailure.None || result.Projection is not { } projection)
             return ReadFailure(result.Failure);
-        var representation = await assembler.ToCollectionResource(value.Items, RouteNames.ListEventResources,
-            new EventMaterialAudienceCollectionContext(tenant.TenantId, eventId, pageSize, cursor, value.NextCursor), HttpContext);
-        var failure = await disclosure.QueryAsync(new(proof), cancellationToken);
-        return failure == EventResourceAudienceFailure.None
-            ? Ok(new EventResourceAudiencePageResource(value.NextCursor,
-                representation.Links.ToImmutableDictionary(), representation.Embedded))
-            : ReadFailure(failure);
+        return new EventResourceProjectionResult<EventResourcePageDto>(projection, async (value, _) =>
+        {
+            var representation = await assembler.ToCollectionResource(value.Items, RouteNames.ListEventResources,
+                new EventMaterialAudienceCollectionContext(tenant.TenantId, eventId, pageSize, cursor, value.NextCursor), HttpContext);
+            return Ok(new EventResourceAudiencePageResource(value.NextCursor,
+                representation.Links.ToImmutableDictionary(), representation.Embedded));
+        }, ReadFailure);
     }
+
+    private ActionResult ReadFailure(EventResourceAuthorityOutcome outcome) => ReadFailure(outcome switch
+    {
+        EventResourceAuthorityOutcome.AuthenticationRequired => EventResourceAudienceFailure.AuthenticationRequired,
+        EventResourceAuthorityOutcome.Forbidden => EventResourceAudienceFailure.Forbidden,
+        EventResourceAuthorityOutcome.NotFound => EventResourceAudienceFailure.NotFound,
+        _ => EventResourceAudienceFailure.Unavailable
+    });
 
     private ActionResult ReadFailure(EventResourceAudienceFailure failure) => failure switch
     {

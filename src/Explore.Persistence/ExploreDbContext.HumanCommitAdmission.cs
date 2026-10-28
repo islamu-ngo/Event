@@ -58,6 +58,11 @@ public partial class ExploreDbContext
             RequireOriginalAdmission(admission.Transaction, admission.ContextLease, admission.Tenant);
             await admission.ValidateSources(cancellationToken);
         }
+        ValidateHumanCommitAdmissionTimes();
+    }
+
+    internal void ValidateHumanCommitAdmissionTimes()
+    {
         // All blocking source admission completes before any authentic-lifetime or
         // timed-assignment sampling. The owner commits immediately after this method.
         foreach (var admission in _humanCommitAdmissions)

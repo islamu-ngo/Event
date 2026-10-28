@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZW1WFGM14PDTN7HA9EDZ0A
+Title: "Bind classification control selection and independent Event target adoption"
+Type: feat
+Scope: access
+Summary: "Retain complete typed whole-Event classification bindings against exact independently accepted material receipts, separate control authorship from owner and reviewer controllers, and preserve independently adopted finite targets through accountable terminal revocation without manufacturing sanction timing or disclosure authority."
+Group: moderation-classification-control-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

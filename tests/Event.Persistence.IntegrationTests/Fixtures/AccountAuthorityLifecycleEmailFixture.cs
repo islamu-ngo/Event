@@ -54,6 +54,8 @@ internal sealed class AccountAuthorityLifecycleEmailFixture : IAsyncDisposable
     {
         var fixture = new AccountAuthorityLifecycleEmailFixture();
         await EmailDispatchSqliteFixture.CreateDatabaseAsync(fixture._path);
+        await using (ExploreDbContext setup = EmailDispatchSqliteFixture.CreateContext(fixture._path))
+            await NativeIdentityRecognitionBoundary.InitializeColocatedSchemaAsync(setup, CancellationToken.None);
         var configuration = new ConfigurationBuilder().Build();
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
@@ -63,12 +65,15 @@ internal sealed class AccountAuthorityLifecycleEmailFixture : IAsyncDisposable
         services.AddScoped(_ => EmailDispatchSqliteFixture.CreateContext(fixture._path));
         services.AddIdentityCore<LocalIdentityUser>().AddEntityFrameworkStores<ExploreDbContext>().AddLocalLifecycleTokenProviders();
         services.AddScoped(provider => new LocalIdentityCredentialStateStore(provider.GetRequiredService<ExploreDbContext>(),
-            provider.GetRequiredService<ExploreDbContext>(), provider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System));
+            provider.GetRequiredService<ExploreDbContext>(), provider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System,
+            NativeIdentityRecognitionBoundary.For(provider.GetRequiredService<ExploreDbContext>(), TimeProvider.System)));
         services.AddScoped<ILocalIdentityLifecycleStore>(provider => new LocalIdentityLifecycleStore(provider.GetRequiredService<ExploreDbContext>(),
             provider.GetRequiredService<ExploreDbContext>(), provider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System,
-            provider.GetRequiredService<LocalIdentityCredentialStateStore>()));
+            provider.GetRequiredService<LocalIdentityCredentialStateStore>(),
+            NativeIdentityRecognitionBoundary.For(provider.GetRequiredService<ExploreDbContext>(), TimeProvider.System)));
         services.AddScoped<ILocalIdentityLifecycleDeliveryStore>(provider => new LocalIdentityLifecycleDeliveryStore(provider.GetRequiredService<ExploreDbContext>(),
-            provider.GetRequiredService<ExploreDbContext>(), provider.GetRequiredService<LocalIdentityCredentialStateStore>(), TimeProvider.System));
+            provider.GetRequiredService<ExploreDbContext>(), provider.GetRequiredService<LocalIdentityCredentialStateStore>(), TimeProvider.System,
+            NativeIdentityRecognitionBoundary.For(provider.GetRequiredService<ExploreDbContext>(), TimeProvider.System)));
         services.AddScoped<IUserExternalLoginRepository, UserExternalLoginRepository>();
         services.AddScoped<ITenantUserRepository, TenantUserRepository>();
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();

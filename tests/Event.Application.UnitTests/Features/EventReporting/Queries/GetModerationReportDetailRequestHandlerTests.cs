@@ -190,6 +190,7 @@ public sealed class GetModerationReportDetailRequestHandlerTests
             tenantId,
             report.Id,
             reportCase.Id,
+            reportCase.ConcurrencyStamp,
             EventReportExternalProvider.Coop,
             "link-corr");
         externalLink.MarkSynced("coop-case-1", "coop-signal-1", "https://coop.example/cases/1", DateTime.UtcNow);

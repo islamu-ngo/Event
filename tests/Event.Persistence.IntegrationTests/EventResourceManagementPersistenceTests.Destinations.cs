@@ -43,8 +43,11 @@ public sealed partial class EventResourceManagementPersistenceTests
             await seed.SaveChangesAsync();
         }
         await using var context = database.CreateContext();
-        var workflow = Workflow(context, scope.TenantAId, actor,
+        await using var request = Workflow(context, scope.TenantAId, actor,
             Policy(origins: ["https://files.example.com"]));
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var workflow = request.Workflow;
         var protector = Substitute.For<IEventResourceDestinationProtector>();
         protector.CurrentVersion.Returns(1);
         protector.Protect(Arg.Any<string>(), scope.TenantAId, resource.Id, 1)
@@ -83,8 +86,11 @@ public sealed partial class EventResourceManagementPersistenceTests
     {
         var (scope, actor) = await SeedAsync();
         await using var context = database.CreateContext();
-        var workflow = Workflow(context, scope.TenantAId, actor,
+        await using var request = Workflow(context, scope.TenantAId, actor,
             Policy(origins: ["https://files.example.com"]));
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var workflow = request.Workflow;
         var draft = Draft() with { DeliveryType = EventResourceDeliveryTypeEnum.ExternalLink };
         var resourceId = Guid.CreateVersion7();
         await Assert.That((await workflow.CreateAsync(scope.EventAId, resourceId, draft, default)).IsSuccess).IsTrue();
@@ -108,7 +114,7 @@ public sealed partial class EventResourceManagementPersistenceTests
         await Assert.That(JsonSerializer.Serialize(await verify.EventResourceAuditEntries.SingleAsync(item =>
             item.EventResourceId == resourceId && item.Action == EventResourceAuditAction.ConfigureDelivery)))
             .DoesNotContain(secret);
-        var detail = (await workflow.GetAsync(resourceId, default)).Value!;
+        var detail = await DiscloseAsync(await workflow.GetAsync(resourceId, default));
         await Assert.That(detail.ExternalDestinationSafeOrigin).IsEqualTo("https://files.example.com");
         string serialized = JsonSerializer.Serialize(detail);
         await Assert.That(serialized).DoesNotContain(secret);
@@ -127,8 +133,11 @@ public sealed partial class EventResourceManagementPersistenceTests
     {
         var (scope, actor) = await SeedAsync();
         await using var context = database.CreateContext();
-        var workflow = Workflow(context, scope.TenantAId, actor,
+        await using var request = Workflow(context, scope.TenantAId, actor,
             Policy(origins: ["https://files.example.com"]));
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var workflow = request.Workflow;
         var resourceId = Guid.CreateVersion7();
         await Assert.That((await workflow.CreateAsync(scope.EventAId, resourceId,
             Draft() with { DeliveryType = EventResourceDeliveryTypeEnum.ExternalLink }, default)).IsSuccess).IsTrue();

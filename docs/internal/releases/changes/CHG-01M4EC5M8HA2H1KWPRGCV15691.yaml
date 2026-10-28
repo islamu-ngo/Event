@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4EC5M8HA2H1KWPRGCV15691
+Title: "Persist explicit moderation authority ownership"
+Type: feat
+Scope: access
+Summary: "Keep one installation-owned trust binding and one positive qualification revision owner per actual tenant. Native uniqueness, foreign keys and expected-revision writes reject reparenting, missing parents and stale updates without granting permission or activating policy."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

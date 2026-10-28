@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5MG5K29YD8AJ4EZDTS0F3PK
+Title: "Preserve resource evidence across merged migration histories"
+Type: fix
+Scope: database
+Summary: "Reconcile develop with moderation authority, regenerate combined provider models and API contracts, and guard SQLite resource rebuilds against losing the other branch's columns or constraints."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Merge integration preserves current native identity, privacy and original-owner settlement checks. Product compilation is not authorization, race or provider conformance; test sources remain unrun and unbuilt."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Four snapshots were regenerated natively without rewriting existing migrations. SQLite has a generated tail correction and a physical-column preflight; unsafe feature-first late-upstream resource rebuilds fail closed. No migration was applied. The separately known SQL Server downgrade discrepancy remains unresolved."
+  Configuration:
+    Reference: docs/internal/CONFIGURATOR_DEFINITION_EXPORT.md
+    Disposition: documented
+    Detail: "The eighteen moderation inputs survive in the external Configurator definition, revision 9; retired bundled Setup projects are not restored."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Merged OpenAPI and browser clients were regenerated from the combined source, not manually reconciled."
+  Operator:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Review each installation's applied migration order before upgrading. Generated SQL was inspected without database execution; this merge does not certify an upgrade, rollback or production deployment."

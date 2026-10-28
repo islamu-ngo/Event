@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventAddOns;
+using Explore.Application.Responses;
 
 namespace Explore.Application.Features.EventAddOns.Requests.Commands;
 
@@ -20,7 +21,7 @@ public sealed record AddEventAddOnCatalogItemCommand(
 
 public sealed record PublishEventAddOnCatalogCommand(
     Guid EventId,
-    DateTime PublishedAtUtc) : ICommand<EventAddOnCatalogDto?>;
+    DateTime PublishedAtUtc) : ICommand<EventAddOnPublicationResponse>;
 
 public sealed record RetireEventAddOnCatalogCommand(
     Guid EventId,

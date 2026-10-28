@@ -18,6 +18,8 @@ using Explore.Application.Features.EventSessions.Requests.Queries;
 using Explore.Application.Features.Federation.Atproto.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.Events.Handlers.Queries;
 using Explore.Application.Responses;
 using Explore.Application.Specifications.Events;
 using Microsoft.AspNetCore.Authorization;
@@ -46,7 +48,7 @@ public class EventCalendarController : EventControllerBase
         "Event not found",
         "Event not found.");
 
-    private readonly IQueryHandler<GetEventCalendarExportRequest, EventCalendarExportDto?> _calendarExportHandler;
+    private readonly IQueryHandler<GetEventCalendarExportRequest, PublicEventCalendarProjection?> _calendarExportHandler;
     private readonly IQueryHandler<GetAttendeeEventCalendarExportRequest, AttendeeEventCalendarExportDto?> _attendeeExportHandler;
     private readonly IEventCalendarFileBuilder _calendarFileBuilder;
     private readonly Explore.Application.Contracts.Infrastructure.IPublicUrlBuilder _publicUrlBuilder;
@@ -56,7 +58,7 @@ public class EventCalendarController : EventControllerBase
     private const string CalendarRetentionWarningHeader = "X-Calendar-Retention-Warning";
 
     public EventCalendarController(
-        IQueryHandler<GetEventCalendarExportRequest, EventCalendarExportDto?> calendarExportHandler,
+        IQueryHandler<GetEventCalendarExportRequest, PublicEventCalendarProjection?> calendarExportHandler,
         IQueryHandler<GetAttendeeEventCalendarExportRequest, AttendeeEventCalendarExportDto?> attendeeExportHandler,
         IEventCalendarFileBuilder calendarFileBuilder,
         Explore.Application.Contracts.Infrastructure.IPublicUrlBuilder publicUrlBuilder)
@@ -72,29 +74,28 @@ public class EventCalendarController : EventControllerBase
     /// </summary>
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
+    [PrivateNoStore]
     [HttpGet("{id:guid}/calendar", Name = RouteNames.GetEventCalendar)]
     [EndpointSummary("Download Event Calendar")]
     [EndpointDescription("Downloads a published public event as an RFC 5545 iCalendar file using only public-purpose location disclosure. Third-party calendar providers may retain imported event and location details after access is revoked or the event changes; the warning is also returned in X-Calendar-Retention-Warning.")]
     [Produces("text/calendar")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> GetCalendar(Guid id, CancellationToken cancellationToken = default)
     {
         AddCalendarRetentionWarning();
-        var export = await _calendarExportHandler.QueryAsync(new GetEventCalendarExportRequest(id), cancellationToken);
-        if (export is null)
+        var projection = await _calendarExportHandler.QueryAsync(new GetEventCalendarExportRequest(id), cancellationToken);
+        if (projection is null)
         {
             return this.ToNotFoundProblem(EventNotFoundProblem);
         }
 
-        Uri publicUrl = new(_publicUrlBuilder.GetEventUrl(export.EventId));
-        string calendarContent = _calendarFileBuilder.Build(export, publicUrl);
-        string fileName = $"{SanitizeCalendarFileName(export.Slug ?? export.Title)}.ics";
-
-        return File(
-            System.Text.Encoding.UTF8.GetBytes(calendarContent),
-            "text/calendar; charset=utf-8",
-            fileName);
+        return new PublicEventCalendarHttpResult(projection, _calendarFileBuilder, _publicUrlBuilder,
+            outcome => outcome == ModerationPublicEventCalendarOutcome.NotFound
+                ? this.ToNotFoundProblem(EventNotFoundProblem)
+                : Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Calendar authority unavailable",
+                    detail: "Current complete anonymous calendar authority is unavailable."));
     }
 
     /// <summary>

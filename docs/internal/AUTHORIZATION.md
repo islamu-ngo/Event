@@ -241,6 +241,33 @@ The actual logic of "is this user allowed to do this?" is delegated to a runtime
 
 ### Persisted targets and public-action mutations
 
+Human `CreateTenantCommand` authorization is evaluated by
+`HumanTenantCreationPort` after the mutation decorator selects the dedicated
+tenant-creation Global owner. The outer `RequestAuthorization` delegates only
+this exact human command; projecting a human principal earlier would bind an
+ordinary owner and correctly prevent later purpose retargeting. The creator
+still evaluates the unchanged `Tenant/create` question against original native
+principal sources and the selected Local or instance Cerbos provider. A denied
+or unavailable provider cannot fall back to administrator claims. Original
+credential, purpose, source, transaction and final lifetime checks remain in
+force through commit; machine callers retain outer evaluation and are rejected
+by the human creation scope. This is ordering, not a new authorization exemption
+for other requests or a relaxation of immutable owner selection. Authored API
+regressions remain locally unbuilt/unrun; remote verification is required.
+
+The native creator acquires original Human security-source custody before
+Discovery enrollment, before beginning its serializable transaction. Both gates
+remain held through source revalidation, graph persistence and commit settlement;
+cleanup releases Discovery before Human custody. An already-retained Discovery
+gate is rejected rather than acquiring Human custody in reverse order. Failed
+Discovery acquisition releases the newly acquired Human gate without creating a
+tenant. Transaction-outcome evidence and cleanup failures must be preserved
+together, so failed release cannot turn an uncertain commit into an apparently
+safe retry. The existing missing-custody checks remain enforced; no permissions,
+schema, migration or configuration setting are added. The native HTTP regressions
+cover creation with and without administrator membership and failed enrollment
+acquisition; they remain locally unbuilt/unrun pending remote verification.
+
 `AuthorizationResourceContextResolver` does not substitute request facts when an
 Event, Session, OrganizationMember, persisted StorageObject or projection parent
 cannot be loaded. Persisted targets must match the nonempty server tenant.

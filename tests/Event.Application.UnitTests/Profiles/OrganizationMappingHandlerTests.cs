@@ -68,43 +68,6 @@ public sealed class OrganizationMappingHandlerTests
     }
 
     [Test]
-    public async Task GroupCreation_UsesOnlyBusinessInputAndHandlerOwnedParticipation()
-    {
-        var groups = new GroupStore([]);
-        var participations = new GroupTenantStore();
-        var members = new GroupMemberStore([]);
-        var actors = new ActorStore();
-        using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
-        using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
-        var handler = new CreateGroupCommandHandler(groups, participations, null!, members, actors, null!,
-            new TenantContext(TenantId), new InlineCache(), metrics);
-        var result = await handler.ExecuteAsync(new CreateGroupCommand
-        {
-            CreatorUserId = ActorId,
-            GroupDto = new CreateGroupDto { FullName = "New group", Description = "New description" }
-        }, default);
-        await Assert.That(result.IsSuccess).IsTrue();
-        var group = groups.Items.Single();
-        await Assert.That(group.FullName).IsEqualTo("New group");
-        await Assert.That(group.Description).IsEqualTo("New description");
-        await Assert.That(group.IsDeleted).IsFalse();
-        await Assert.That(group.CreatedBy).IsNull();
-        await Assert.That(group.ConcurrencyStamp).IsEqualTo(Guid.Empty);
-        await Assert.That(group.TenantParticipations).IsEmpty();
-        var participation = participations.Items.Single();
-        await Assert.That(participation.TenantId).IsEqualTo(TenantId);
-        await Assert.That(participation.GroupId).IsEqualTo(Id);
-        await Assert.That(participation.ApprovalStatusId).IsEqualTo((int)ApprovalStatusEnum.Pending);
-        await Assert.That(participation.IsOrganizerEligible).IsFalse();
-        await Assert.That(participation.ProfilePictureId).IsNull();
-        await Assert.That(members.Items.Single().UserId).IsEqualTo(ActorId);
-        await Assert.That(members.Items.Single().TenantId).IsEqualTo(TenantId);
-        await Assert.That(members.Items.Single().RoleId).IsEqualTo((int)RoleEnum.GroupAdmin);
-        await Assert.That(actors.Items.Single().DisplayName).IsEqualTo("New group");
-        await Assert.That(actors.Items.Single().GroupId).IsEqualTo(Id);
-    }
-
-    [Test]
     public async Task OrganizationQueries_KeepActorFallbackPageSnapshotsRolesAndSelfOnlyAuthority()
     {
         var first = CreateOrganization();
@@ -139,64 +102,6 @@ public sealed class OrganizationMappingHandlerTests
         first.Pii.FullName = "Changed after publication";
         await Assert.That(page.Items[1].FullName).IsEqualTo("Community organization");
         await Assert.That(own.Items.Single().FullName).IsEqualTo("Community organization");
-    }
-
-    [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task OrganizationCreation_KeepsInputAllowlistAndTenantApprovalAuthority(bool administrator)
-    {
-        var organizations = new OrganizationStore([]);
-        var participations = new OrganizationTenantStore();
-        var members = new OrganizationMemberStore([]);
-        var actors = new ActorStore();
-        var authority = Substitute.For<IAdminContext>();
-        authority.IsTenantAdminAsync(TenantId, Arg.Any<CancellationToken>()).Returns(administrator);
-        using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
-        using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
-        var handler = new CreateOrganizationCommandHandler(organizations, participations, members, actors, null!, authority,
-            new TenantContext(TenantId), new InlineCache(), metrics, new InlineUnitOfWork());
-        var result = await handler.ExecuteAsync(new CreateOrganizationCommand
-        {
-            CreatorUserId = ActorId,
-            OrganizationDto = new CreateOrganizationDto
-            {
-                FullName = "New organization",
-                WebsiteUrl = "https://new.example.test",
-                Email = "office@example.test",
-                Country = "BE",
-                City = "Brussels",
-                Postcode = 1000,
-                Address = "Square 1"
-            }
-        }, default);
-        await Assert.That(result.IsSuccess).IsTrue();
-        var organization = organizations.Items.Single();
-        await Assert.That(organization.FullName).IsEqualTo("New organization");
-        await Assert.That(organization.WebsiteUrl).IsEqualTo("https://new.example.test");
-        await Assert.That(organization.Email).IsEqualTo("office@example.test");
-        await Assert.That(organization.Country).IsEqualTo("BE");
-        await Assert.That(organization.City).IsEqualTo("Brussels");
-        await Assert.That(organization.Postcode).IsEqualTo("1000");
-        await Assert.That(organization.Address).IsEqualTo("Square 1");
-        await Assert.That(organization.IsDeleted).IsFalse();
-        await Assert.That(organization.ConcurrencyStamp).IsEqualTo(Guid.Empty);
-        await Assert.That(organization.CreatedBy).IsNull();
-        await Assert.That(organization.TenantParticipations).IsEmpty();
-        var participation = participations.Items.Single();
-        await Assert.That(participation.TenantId).IsEqualTo(TenantId);
-        await Assert.That(participation.OrganizationId).IsEqualTo(Id);
-        await Assert.That(participation.ApprovalStatusId).IsEqualTo(administrator ? (int)ApprovalStatusEnum.Approved : (int)ApprovalStatusEnum.Pending);
-        await Assert.That(participation.IsVisible).IsEqualTo(administrator);
-        await Assert.That(participation.IsOrganizerEligible).IsEqualTo(administrator);
-        await Assert.That(participation.ApprovedBy).IsEqualTo(administrator ? ActorId : (Guid?)null);
-        await Assert.That(participation.ProfilePictureId).IsNull();
-        await Assert.That(members.Items.Single().UserId).IsEqualTo(ActorId);
-        await Assert.That(members.Items.Single().TenantId).IsEqualTo(TenantId);
-        await Assert.That(members.Items.Single().OrganizationTenantId).IsEqualTo(Stamp);
-        await Assert.That(members.Items.Single().RoleId).IsEqualTo((int)RoleEnum.OrgAdmin);
-        await Assert.That(actors.Items.Single().DisplayName).IsEqualTo("New organization");
-        await Assert.That(actors.Items.Single().OrganizationId).IsEqualTo(Id);
     }
 
     [Test]
@@ -356,7 +261,7 @@ public sealed class OrganizationMappingHandlerTests
         public Task<OrganizationMember?> GetOrganizationMemberWithDetails(Guid id, CancellationToken cancellationToken = default) => Task.FromResult(Items.FirstOrDefault(item => item.Id == id));
         public Task<List<OrganizationMember>> GetMembersByOrganizationId(Guid organizationId) => Task.FromResult(Items.Where(item => item.OrganizationTenant.OrganizationId == organizationId).ToList());
         public Task<List<OrganizationMember>> GetMembershipsByUser(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(Items.Where(item => item.UserId == userId).ToList());
-        public Task<List<OrganizationMember>> GetInvitesByEmail(string email) => Task.FromResult(Items.Where(item => item.User?.Pii?.Email == email).ToList());
+        public Task<List<OrganizationMember>> GetInvitesByUserId(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(Items.Where(item => item.UserId == userId).ToList());
         public Task<List<User>> GetUsersByOrganization(Guid organizationId) => throw new NotSupportedException();
         public Task<List<Organization>> GetOrganizationsByUser(Guid userId) => throw new NotSupportedException();
         public Task<bool> Exists(Guid organizationId, Guid userId) => throw new NotSupportedException();

@@ -2,8 +2,10 @@ using Explore.Application.Authorization;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventTicketing;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventTicketing.Requests.Commands;
@@ -23,6 +25,8 @@ public sealed class PublishEventTicketCatalogCommandHandler(
     IAdmissionTargetMaterializer admissionTargets,
     ITenantContext tenant,
     IUnitOfWork unitOfWork,
+    IEventPublicationMutationBoundary publicationBoundary,
+    IMachinePrincipalAccessor machine,
     PaidEventPublicationPreflightService paidPreflight,
     HybridCache cache) : ICommandHandler<PublishEventTicketCatalogCommand, BaseCommandResponse<Guid>>
 {
@@ -37,15 +41,16 @@ public sealed class PublishEventTicketCatalogCommandHandler(
         }
 
         Guid failureId = command.EventId;
-        Guid? catalogId;
+        BaseCommandResponse<Guid> result;
         try
         {
-            catalogId = await unitOfWork.ExecuteInTransactionAsync<Guid?>(async token =>
+            async Task<BaseCommandResponse<Guid>> PublishAsync(CancellationToken token)
             {
+                failureId = command.EventId;
                 Event? trustedEventTarget = await events.GetEventWithDetails(command.EventId);
                 if (!IsPlatformManaged(trustedEventTarget, tenant.TenantId))
                 {
-                    return null;
+                    return Missing(command.EventId);
                 }
 
                 EventTicketCatalogVersion? draft = await catalogs.GetDraftCatalogForUpdateAsync(
@@ -54,7 +59,7 @@ public sealed class PublishEventTicketCatalogCommandHandler(
                     token);
                 if (draft is null)
                 {
-                    return null;
+                    return Missing(command.EventId);
                 }
 
                 failureId = draft.Id;
@@ -99,8 +104,12 @@ public sealed class PublishEventTicketCatalogCommandHandler(
                 }
 
                 await catalogs.SaveChangesAsync(token);
-                return draft.Id;
-            }, cancellationToken);
+                return Ok(draft.Id, "Ticket catalog published.");
+            }
+
+            result = machine.Current is not null
+                ? await unitOfWork.ExecuteInTransactionAsync(PublishAsync, cancellationToken)
+                : await publicationBoundary.ExecuteAsync(command.EventId, PublishAsync, cancellationToken);
         }
         catch (ArgumentException exception)
         {
@@ -111,13 +120,16 @@ public sealed class PublishEventTicketCatalogCommandHandler(
             return Conflict(failureId, exception.Message);
         }
 
-        if (catalogId is null)
-        {
-            return Missing(command.EventId);
-        }
+        if (result.FailureCode is "event_publish_restricted" or "event_publish_authority_unavailable")
+            return BaseCommandResponse.Failure<Guid>(
+                result.FailureCode == "event_publish_restricted"
+                    ? "event_ticketing_publish_restricted" : "event_ticketing_publish_authority_unavailable",
+                result.Message, result.Errors, command.EventId);
+
+        if (!result.IsSuccess) return result;
 
         await cache.RemoveByTagAsync(CacheTags.Event(command.EventId), cancellationToken);
-        return Ok(catalogId.Value, "Ticket catalog published.");
+        return result;
     }
 
     private async Task ValidateEntitlementTargetsAsync(

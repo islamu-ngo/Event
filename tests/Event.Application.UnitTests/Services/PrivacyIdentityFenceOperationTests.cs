@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.PrivacyErasure;
+using Explore.Application.Contracts.Moderation;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -75,7 +77,27 @@ public sealed class PrivacyIdentityFenceOperationTests
     }
 
     private static PrivacyIdentityFenceOperation Create(
-        IPrivacyIdentityFenceAuthority authority) => new(authority);
+        IPrivacyIdentityFenceAuthority authority) => new(authority, new EmptyRecognitionInventory(),
+            TimeProvider.System, NSubstitute.Substitute.For<IUserExternalLoginRepository>(),
+            () => throw new InvalidOperationException("This fixture does not settle human enrollment."));
+}
+
+internal sealed class EmptyRecognitionInventory : IModerationRecognitionContinuity
+{
+    public Task<T> ExecuteWithRecognitionLockAsync<T>(Func<CancellationToken, Task<T>> operation,
+        CancellationToken token) => operation(token);
+    public Task<ModerationRecognitionContinuityFailure> GuardExistingSubjectAsync(Guid subjectId,
+        CancellationToken token) => Task.FromResult(ModerationRecognitionContinuityFailure.None);
+    public Task<ModerationRecognitionContinuityResult> MatchAndBindAsync(
+        ModerationRecognitionContinuityRequest request, CancellationToken token) =>
+        Task.FromResult(new ModerationRecognitionContinuityResult
+        {
+            ActionFailure = ModerationRecognitionContinuityFailure.None,
+            AdmissionFailure = ModerationRecognitionContinuityFailure.None,
+            AdmissionExcluded = false,
+            ActionRecoveryStaged = false,
+            Actions = []
+        });
 }
 
 internal sealed class FenceTestKeyProvider : IPrivacyIdentityFenceKeyProvider
@@ -91,6 +113,9 @@ internal sealed class FenceTestAuthority : IPrivacyIdentityFenceAuthority
     public PrivacyErasureIntent? Retained { get; set; }
     public Task<T> ExecuteSerializedAsync<T>(Func<CancellationToken, Task<T>> operation,
         CancellationToken cancellationToken) => operation(cancellationToken);
+    public Task<T> ExecuteEnrollmentSerializedAsync<T>(Func<CancellationToken, Task<T>> operation,
+        Func<CancellationToken, Task> beforePrimaryCommit, CancellationToken cancellationToken) =>
+        operation(cancellationToken);
     public Task ValidateKeyAsync(string keyId, string verificationTag, CancellationToken cancellationToken)
     {
         Counter.BindIdentityKey(keyId, verificationTag);

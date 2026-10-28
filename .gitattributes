@@ -2,3 +2,4 @@ src/Explore.Persistence/Migrations/** linguist-generated=true
 src/Explore.Persistence.Migrations.*/Migrations/** linguist-generated=true
 src/Explore.Persistence.DataProtection.Migrations.*/Migrations/** linguist-generated=true
 src/Explore.Persistence.PrivacyErasureAuthority.Migrations.*/Migrations/** linguist-generated=true
+vendor/secretkit/feed/*.nupkg binary

@@ -12,7 +12,7 @@ public sealed class ManagedTenantWorkerCreationPort(
     IManagedTenantWorkerCreationAdmission admission, IManagedTenantWorkerCreationOwnerFactory creators)
     : IManagedTenantWorkerCreationPort
 {
-    public async Task<BaseCommandResponse<ManagedTenantWorkerCreationResult>> CreateAsync(
+    public async Task<BaseCommandResponse<ManagedTenantWorkerCreationOutcome>> CreateAsync(
         Guid operationId, Guid outboxMessageId, CancellationToken cancellationToken = default)
     {
         bool settled = false;

@@ -3,6 +3,7 @@ namespace Explore.Application.Features.ConfigurationManifest.Importing;
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.ConfigurationManifest.Moderation;
 
 public sealed record ConfigurationImportSessionCreated(
     ConfigurationImportSession Session,
@@ -14,7 +15,8 @@ public sealed record ConfigurationImportSessionCreated(
 public sealed record ConfigurationImportAuthorizedArtifact(
     ReadOnlyMemory<byte> Bytes,
     string Digest,
-    DateTime ExpiresAt)
+    DateTime ExpiresAt,
+    ModerationConfigurationImportReservationSet? ModerationReservation = null)
 {
     public override string ToString() =>
         nameof(ConfigurationImportAuthorizedArtifact);
@@ -177,7 +179,7 @@ public sealed class ConfigurationImportSessionManager(
 
                 ConfigurationImportPreview preview =
                     previewComposer.Compose(input);
-                session.MarkPreviewReady(preview.Binding, occurredAt);
+                session.MarkPreviewReady(preview.Binding, occurredAt, input.ModerationPreview?.Reservation);
                 await repository.UpdateAsync(session, token);
                 return preview;
             });
@@ -240,9 +242,15 @@ public sealed class ConfigurationImportSessionManager(
                 return new ConfigurationImportAuthorizedArtifact(
                     artifact,
                     session.ArtifactDigest,
-                    session.ExpiresAt);
+                    session.ExpiresAt,
+                    session.ModerationReservation);
             });
     }
+
+    internal Task<ConfigurationImportAuthorizedArtifact> ReadArtifactForPreviewInCurrentTransactionAsync(
+        Guid sessionId, ConfigurationImportTarget target, string accessToken,
+        DateTime occurredAt, CancellationToken cancellationToken) =>
+        ReadArtifactOperation(sessionId, target, accessToken, occurredAt).Execute(cancellationToken);
 
     public Task CancelAsync(
         IPreparedHumanConfigurationImport preparedOwner,

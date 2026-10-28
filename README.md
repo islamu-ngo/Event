@@ -172,10 +172,10 @@ git clone https://github.com/islamu-ngo/Event.git
 cd Event
 cp .env.example .env
 curl -sSL https://aspire.dev/install.sh | bash # only needed when aspire CLI is not installed
-aspire run --apphost Explore.AppHost/Explore.AppHost.csproj
+aspire run --apphost src/Explore.AppHost/Explore.AppHost.csproj
 ```
 
-This automatically orchestrates PostgreSQL, Keycloak, Mailpit, `Explore.API`, `Explore.Blazor`, and the Aspire dashboard (`http://localhost:18888`).
+This automatically orchestrates PostgreSQL, Keycloak, Mailpit, `src/Explore.API`, `src/Explore.Blazor`, and the Aspire dashboard (`http://localhost:18888`).
 
 For Docker-only local development:
 
@@ -466,7 +466,7 @@ For the full ethical and strategic design analysis, see the [I-VSD Strategy Revi
 
 ### Standalone Core And Optional Services
 
-The minimum operational deployment is the single `Event.Standalone` image: the ISLAMU Event API and Blazor BFF/UI run in one process with SQLite persistence. Application, Data Protection, and embedded privacy-erasure migrations run in that process before it accepts traffic. PostgreSQL, SQL Server, MariaDB, MySQL, Redis, Keycloak, Cerbos, MinIO/S3, SMTP/Mailpit, Svix, Weblate, Formbricks, Coop, Osprey, AI providers, federation services, and external observability backends are optional capabilities, not requirements of the standalone core.
+The minimum operational deployment is the single `src/Event.Standalone` image: the ISLAMU Event API and Blazor BFF/UI run in one process with SQLite persistence. Application, Data Protection, and embedded privacy-erasure migrations run in that process before it accepts traffic. PostgreSQL, SQL Server, MariaDB, MySQL, Redis, Keycloak, Cerbos, MinIO/S3, SMTP/Mailpit, Svix, Weblate, Formbricks, Coop, Osprey, AI providers, federation services, and external observability backends are optional capabilities, not requirements of the standalone core.
 
 The AGPL-3.0-or-later license and any alternative license offered by ISLAMU apply only to material that ISLAMU owns or is authorized to license. Third-party libraries, container images, services, datasets, fonts, and other assets retain their respective licenses, public-domain status, and other applicable terms. Including an optional integration or deployment manifest in this repository does not relicense that third-party material. See the [Self-Hosting Technical Specs](docs/internal/SELF_HOSTING.md#third-party-software-and-license-boundary) and [release dependency policy](docs/internal/CI_CD_GOVERNANCE.md#standalone-and-optional-service-license-boundary).
 

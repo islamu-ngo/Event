@@ -125,7 +125,6 @@ public class OrganizationMemberController : EventControllerBase
         var command = new AddOrganizationMemberCommand
         {
             AddOrganizationMemberDto = dto,
-            RequesterUserId = userId,
             TenantId = _tenantContext.TenantId
         };
         var response = await _addMember.ExecuteAsync(command, cancellationToken);
@@ -146,7 +145,7 @@ public class OrganizationMemberController : EventControllerBase
             return this.ToAuthenticationRequiredProblem();
         }
 
-        var command = new UpdateOrganizationMemberRoleCommand { UpdateOrganizationMemberRoleDto = dto, RequesterUserId = userId };
+        var command = new UpdateOrganizationMemberRoleCommand { UpdateOrganizationMemberRoleDto = dto };
         var response = await _updateRole.ExecuteAsync(command, cancellationToken);
         return Ok(response);
     }
@@ -158,15 +157,14 @@ public class OrganizationMemberController : EventControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<List<OrganizationInvitationDto>>> GetMyInvitations(CancellationToken cancellationToken = default)
     {
-        var email = User.GetEmail();
-        if (string.IsNullOrEmpty(email))
+        if (CurrentUserId is null)
         {
             return this.ToAuthenticationRequiredProblem(
-                title: "Email claim not found",
-                detail: "The authenticated principal does not include an email claim required to list invitations.");
+                title: "User identity not found",
+                detail: "The authenticated principal does not include a user identity required to list invitations.");
         }
 
-        var response = await _invitations.QueryAsync(new GetMyInvitationsRequest { Email = email }, cancellationToken);
+        var response = await _invitations.QueryAsync(new GetMyInvitationsRequest(), cancellationToken);
         return Ok(response);
     }
 
@@ -183,7 +181,7 @@ public class OrganizationMemberController : EventControllerBase
             return this.ToAuthenticationRequiredProblem();
         }
 
-        var query = new ValidateOrganizationInvitationQuery { InvitationId = id, UserId = userGuid.Value };
+        var query = new ValidateOrganizationInvitationQuery { InvitationId = id };
         var response = await _validateInvitation.QueryAsync(query, cancellationToken);
         return Ok(response);
     }
@@ -200,7 +198,7 @@ public class OrganizationMemberController : EventControllerBase
         {
             return this.ToAuthenticationRequiredProblem();
         }
-        var command = new DeclineInvitationCommand { InvitationId = id, UserId = userGuid.Value };
+        var command = new DeclineInvitationCommand { InvitationId = id };
         var response = await _declineInvitation.ExecuteAsync(command, cancellationToken);
         return Ok(response);
     }
@@ -219,7 +217,7 @@ public class OrganizationMemberController : EventControllerBase
             return this.ToAuthenticationRequiredProblem();
         }
 
-        var command = new DeleteOrganizationMemberCommand { MemberId = id, RequesterUserId = userId };
+        var command = new DeleteOrganizationMemberCommand { MemberId = id };
         var response = await _deleteMember.ExecuteAsync(command, cancellationToken);
         return Ok(response);
     }

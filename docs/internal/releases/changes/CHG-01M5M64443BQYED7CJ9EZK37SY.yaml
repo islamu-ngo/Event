@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5M64443BQYED7CJ9EZK37SY
+Title: "Preserve local moderation edits during preset comparison"
+Type: feat
+Scope: self-hosting
+Summary: "Compare baseline, local and incoming neutral definitions, preserve independent edits and withhold the entire proposed merge on conflict; complete mapped validation remains nonauthorizing."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: documented
+    Detail: "Projection strips native identities and acquired permission. Complete mapped validation is a nonauthorizing draft check; comparison and merge neither mutate storage nor activate policy. Invariant test sources remain unrun."
+  Migration:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: not-applicable
+    Detail: "Neutral projection, comparison and draft validation do not mutate persistence or introduce a database shape."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: documented
+    Detail: "Three-way comparison preserves local-only edits, canonicalizes equivalent selection ordering and retains exact recipe sequence. Any semantic conflict withholds the entire merged document instead of partially applying independent incoming changes."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: "This packet adds neutral Application semantics and invariant witnesses, not HTTP routes or response contracts."
+  Operator:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: planned
+    Detail: "Paired comparison and portability guidance is included in the native-import source packet. A merged proposal still requires destination mapping, current native qualification and complete recompilation; it grants no activation or unconditional rollback capability."

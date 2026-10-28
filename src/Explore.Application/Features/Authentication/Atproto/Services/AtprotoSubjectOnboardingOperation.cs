@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
 using Explore.Domain;
@@ -23,8 +24,10 @@ public sealed class AtprotoSubjectOnboardingOperation(
     IGroupTenantRepository groupTenants, IGroupMemberRepository groupMembers, IActorReferenceConsolidationRepository references,
     IGenericRepository<ActorMerge, Guid> merges)
 {
-    public async Task<AtprotoSubjectOnboardingResult> ExecuteAsync(BootstrapAtprotoSessionCommand request, AtprotoVerifiedOAuthSession verified, User user, Actor userActor, Guid tenantId, DateTime at, CancellationToken cancellationToken)
+    public async Task<AtprotoSubjectOnboardingResult> ExecuteAsync(BootstrapAtprotoSessionCommand request, AtprotoVerifiedOAuthSession verified, User user, Actor userActor, Guid tenantId, DateTime at, IAtprotoParticipationMutation? participationMutation, CancellationToken cancellationToken)
     {
+        if (request.Classification is AtprotoSubjectClassification.Organization or AtprotoSubjectClassification.Group
+            && participationMutation is null) throw new InvalidOperationException("AT Protocol membership requires its native transaction participant.");
         AtprotoDid did = verified.Did;
         ProviderAccountKey accountKey = PlatformIdentityPrincipalExtensions.CreateAtprotoAccountKey(did);
         if (user.IsDeleted || userActor.IsDeleted || userActor.IsSuspended || userActor.UserId != user.Id)
@@ -40,6 +43,12 @@ public sealed class AtprotoSubjectOnboardingOperation(
         if (tenantUser is not null && (tenantUser.IsDeleted || tenantUser.StatusId != (int)TenantUserStatusEnum.Active
             || tenantUser.ActorId is Guid tenantActorId && tenantActorId != userActor.Id)) return AtprotoSubjectOnboardingResult.Failed("linked_identity_incomplete");
 
+        if (participationMutation is not null)
+        {
+            await participationMutation.FenceActorAsync(userActor.Id, cancellationToken).ConfigureAwait(false);
+            if (request.TargetActorId is { } targetId)
+                await participationMutation.FenceActorAsync(targetId, cancellationToken).ConfigureAwait(false);
+        }
         var identity = await identities.GetByDid(did, cancellationToken).ConfigureAwait(false);
         Actor represented;
         if (identity is null)
@@ -96,7 +105,9 @@ public sealed class AtprotoSubjectOnboardingOperation(
             await tenantUsers.Update(tenantUser).ConfigureAwait(false);
         }
 
-        var participationId = await EnsureParticipationAsync(request.Classification, represented, tenantUser, user, tenantId, await tenantRoles.IsTenantAdminInCurrentTenantAsync(tenantId, user.Id, cancellationToken).ConfigureAwait(false), at, cancellationToken).ConfigureAwait(false);
+        if (participationMutation is not null)
+            await participationMutation.FenceActorAsync(represented.Id, cancellationToken).ConfigureAwait(false);
+        var participationId = await EnsureParticipationAsync(request.Classification, represented, tenantUser, user, tenantId, await tenantRoles.IsTenantAdminInCurrentTenantAsync(tenantId, user.Id, cancellationToken).ConfigureAwait(false), at, participationMutation, cancellationToken).ConfigureAwait(false);
         return AtprotoSubjectOnboardingResult.Succeeded(represented.Id, participationId);
     }
 
@@ -194,19 +205,27 @@ public sealed class AtprotoSubjectOnboardingOperation(
         return await actors.Create(new Actor { ActorTypeId = (int)ActorTypeEnum.Group, ActorType = null!, GroupId = group.Id, Group = group, Pii = new ActorPii { DisplayName = handle }, CreatedAt = at, CreatedBy = userId }).ConfigureAwait(false);
     }
 
-    private async Task<Guid> EnsureParticipationAsync(AtprotoSubjectClassification classification, Actor represented, TenantUser tenantUser, User user, Guid tenantId, bool isTenantAdmin, DateTime at, CancellationToken ct)
+    private async Task<Guid> EnsureParticipationAsync(AtprotoSubjectClassification classification, Actor represented, TenantUser tenantUser, User user, Guid tenantId, bool isTenantAdmin, DateTime at, IAtprotoParticipationMutation? mutation, CancellationToken ct)
     {
         if (classification == AtprotoSubjectClassification.Person) return tenantUser.Id;
         if (classification == AtprotoSubjectClassification.Organization)
         {
             var id = represented.OrganizationId!.Value;
             var participation = await organizationTenants.GetByOrganizationAndTenant(id, tenantId, ct).ConfigureAwait(false) ?? await organizationTenants.Create(new OrganizationTenant { TenantId = tenantId, Tenant = null!, OrganizationId = id, Organization = null!, ApprovalStatusId = isTenantAdmin ? (int)ApprovalStatusEnum.Approved : (int)ApprovalStatusEnum.Pending, ApprovalStatus = null!, IsVisible = isTenantAdmin, IsOrganizerEligible = isTenantAdmin, ApprovedAt = isTenantAdmin ? at : null, ApprovedBy = isTenantAdmin ? user.Id : null, CreatedAt = at, CreatedBy = user.Id }).ConfigureAwait(false);
-            if (!await organizationMembers.Exists(id, user.Id).ConfigureAwait(false)) await organizationMembers.Create(new OrganizationMember { OrganizationTenantId = participation.Id, OrganizationTenant = participation, UserId = user.Id, User = user, RoleId = (int)RoleEnum.OrgAdmin, Role = null!, TenantId = tenantId, Tenant = null!, CreatedAt = at, CreatedBy = user.Id }).ConfigureAwait(false);
+            if (!await organizationMembers.Exists(id, user.Id).ConfigureAwait(false))
+            {
+                var member = await organizationMembers.Create(new OrganizationMember { OrganizationTenantId = participation.Id, OrganizationTenant = participation, UserId = user.Id, User = user, RoleId = (int)RoleEnum.OrgAdmin, Role = null!, TenantId = tenantId, Tenant = null!, CreatedAt = at, CreatedBy = user.Id }).ConfigureAwait(false);
+                await mutation!.RecordMembershipAsync(member.Id, ct).ConfigureAwait(false);
+            }
             return participation.Id;
         }
         var groupId = represented.GroupId!.Value;
         var groupParticipation = await groupTenants.GetByGroupAndTenant(groupId, tenantId, ct).ConfigureAwait(false) ?? await groupTenants.Create(new GroupTenant { TenantId = tenantId, Tenant = null!, GroupId = groupId, Group = null!, ApprovalStatusId = (int)ApprovalStatusEnum.Pending, ApprovalStatus = null!, CreatedAt = at, CreatedBy = user.Id }).ConfigureAwait(false);
-        if (!await groupMembers.Exists(groupId, user.Id).ConfigureAwait(false)) await groupMembers.Create(new GroupMember { GroupTenantId = groupParticipation.Id, GroupTenant = groupParticipation, UserId = user.Id, User = user, RoleId = (int)RoleEnum.GroupAdmin, Role = null!, TenantId = tenantId, Tenant = null!, CreatedAt = at, CreatedBy = user.Id }).ConfigureAwait(false);
+        if (!await groupMembers.Exists(groupId, user.Id).ConfigureAwait(false))
+        {
+            var member = await groupMembers.Create(new GroupMember { GroupTenantId = groupParticipation.Id, GroupTenant = groupParticipation, UserId = user.Id, User = user, RoleId = (int)RoleEnum.GroupAdmin, Role = null!, TenantId = tenantId, Tenant = null!, CreatedAt = at, CreatedBy = user.Id }).ConfigureAwait(false);
+            await mutation!.RecordMembershipAsync(member.Id, ct).ConfigureAwait(false);
+        }
         return groupParticipation.Id;
     }
 

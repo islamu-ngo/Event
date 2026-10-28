@@ -36,6 +36,24 @@ public sealed class VisitorAccessSettingsWriterTests
     private static string ModeKey => GovernanceSettingKeys.PublicExperience.VisitorAccessMode;
 
     [Test]
+    public async Task Publication_boundary_does_not_flush_or_discard_pending_caller_changes()
+    {
+        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
+        var seeded = await fixture.SeedEventAsync();
+        var tracked = await fixture.Context.Events.SingleAsync(row => row.Id == seeded.Id);
+        var original = tracked.Title;
+        tracked.Title = "Unsaved caller-owned title";
+        var boundary = fixture.Services.GetRequiredService<IEventPublicationMutationBoundary>();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => boundary.ExecuteAsync(seeded.Id,
+            _ => Task.FromResult(BaseCommandResponse.Success(seeded.Id, "Must not flush caller state")), default));
+        await Assert.That(fixture.Context.Entry(tracked).State).IsEqualTo(EntityState.Modified);
+        await Assert.That(tracked.Title).IsEqualTo("Unsaved caller-owned title");
+        await Assert.That(await fixture.Context.Events.AsNoTracking().Where(row => row.Id == seeded.Id)
+            .Select(row => row.Title).SingleAsync()).IsEqualTo(original);
+        await Assert.That(fixture.Context.Database.CurrentTransaction).IsNull();
+    }
+
+    [Test]
     [Arguments("AnonymousOnly")]
     [Arguments("DirectoryListingOnly")]
     public async Task InstanceModeChange_RejectsInheritedAccountRequiredConfiguration(string mode)

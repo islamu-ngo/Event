@@ -14,6 +14,8 @@ WORKDIR /src
 
 # Copy restore inputs and project graph first for deterministic locked restore caching
 COPY ["global.json", "Directory.Build.props", "Directory.Packages.props", "./"]
+COPY ["NuGet.Config", "./"]
+COPY ["vendor/secretkit/", "vendor/secretkit/"]
 COPY ["eng/tools/Explore.GeneratedContracts/GeneratedContractTool.targets", "eng/tools/Explore.GeneratedContracts/"]
 COPY ["src/Explore.API/Explore.API.csproj", "src/Explore.API/packages.lock.json", "src/Explore.API/"]
 COPY ["src/Explore.Application/Explore.Application.csproj", "src/Explore.Application/packages.lock.json", "src/Explore.Application/"]
@@ -48,6 +50,7 @@ RUN mkdir -p /app/bootstrap && chown $APP_UID:$APP_UID /app/bootstrap
 
 # Copy published application
 COPY --from=publish /app/publish .
+COPY --from=build /src/vendor/secretkit /app/vendor/secretkit
 
 # Bundle Cerbos policy package assets for manual download and boot sync fallback.
 # Compose deployments may still mount /app/cerbos/policies read-only to override this copy.

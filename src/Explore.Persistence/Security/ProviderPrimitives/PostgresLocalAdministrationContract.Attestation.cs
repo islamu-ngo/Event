@@ -47,17 +47,21 @@ public static partial class PostgresLocalAdministrationContract
             var entity = context.Model.FindEntityType(source.Type)!;
             string table = Text(sql.Table(source.Type));
             bool tenant = tenantTables.Any(candidate => candidate.TableName == entity.GetTableName());
-            string columns = string.Join(" OR ", source.Properties.Select(name =>
+            string columns = string.Join(" OR ", source.MappedProperties.Select(name =>
             {
                 var property = entity.FindProperty(name)!;
                 string collation = property.FindAnnotation(PortableOrdinalAsciiPropertyExtensions.AnnotationName)?.Value is true
                     ? "C" : "default";
+                // The generated source-owner migration retains this zero default; it is not a new PII grant.
+                string defaultValue = source.Type == typeof(Explore.Domain.UserPii) && name == "_birthDateRevision"
+                    ? "a.atthasdef AND EXISTS (SELECT 1 FROM pg_catalog.pg_attrdef d WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND pg_catalog.pg_get_expr(d.adbin,d.adrelid) IN ('0','''0''::bigint'))"
+                    : "NOT a.atthasdef";
                 return $"""
                     NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid = pg_catalog.to_regclass({table})
                         AND a.attname = {Text(sql.ColumnName(source.Type, name))} AND a.attnum > 0 AND NOT a.attisdropped
                         AND pg_catalog.format_type(a.atttypid,a.atttypmod) = {Text(property.GetRelationalTypeMapping().StoreType)}
                         AND a.attnotnull = {(!property.IsNullable).ToString().ToLowerInvariant()}
-                        AND a.attgenerated = '' AND a.attidentity = '' AND NOT a.atthasdef
+                        AND a.attgenerated = '' AND a.attidentity = '' AND {defaultValue}
                         AND (a.attcollation = 0 OR a.attcollation = pg_catalog.to_regcollation({Text("pg_catalog." + sql.Quote(collation))})))
                     """;
             }));
@@ -115,7 +119,7 @@ public static partial class PostgresLocalAdministrationContract
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_inherits i
                         WHERE i.inhrelid = pg_catalog.to_regclass({table}) OR i.inhparent = pg_catalog.to_regclass({table}))
                     OR (SELECT count(*) FROM pg_catalog.pg_attribute a WHERE a.attrelid = pg_catalog.to_regclass({table})
-                        AND a.attnum > 0 AND NOT a.attisdropped) <> {source.Properties.Length}
+                        AND a.attnum > 0 AND NOT a.attisdropped) <> {source.MappedProperties.Length}
                     OR (SELECT count(*) FROM pg_catalog.pg_index i WHERE i.indrelid = pg_catalog.to_regclass({table})
                         AND i.indisunique) <> {entity.GetKeys().Count() + entity.GetIndexes().Count(index => index.IsUnique)}
                     OR (SELECT count(*) FROM pg_catalog.pg_constraint c WHERE c.conrelid = pg_catalog.to_regclass({table})

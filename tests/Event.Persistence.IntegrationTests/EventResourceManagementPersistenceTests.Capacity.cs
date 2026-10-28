@@ -19,7 +19,10 @@ public sealed partial class EventResourceManagementPersistenceTests
         }
         await using var context = database.CreateContext();
         var id = Guid.CreateVersion7();
-        var result = await new CreateEventResourceCommandHandler(Workflow(context, scope.TenantAId, actor))
+        await using var request = Workflow(context, scope.TenantAId, actor);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var result = await new CreateEventResourceCommandHandler(request.Workflow)
             .ExecuteAsync(new(scope.EventAId, id, Draft()));
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.FailureCode).IsEqualTo(EventResourceManagementFailureCodes.CapacityExceeded);

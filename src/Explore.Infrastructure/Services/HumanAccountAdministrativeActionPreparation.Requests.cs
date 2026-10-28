@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Explore.Application.Authentication;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.GroupMembers.Requests.Commands;
@@ -39,17 +40,17 @@ public sealed partial class HumanAccountAdministrativeActionPreparation
     public Task<IPreparedHumanAccountAdministrativeAction> PrepareAsync(RevokeTenantUserRoleGrantCommand request, CancellationToken cancellationToken) =>
         Prepare(request, null, ResourceKinds.TenantUserRoleGrant, AuthorizationActions.Delete, true, cancellationToken);
     public Task<IPreparedHumanAccountAdministrativeAction> PrepareAsync(AddOrganizationMemberCommand request, CancellationToken cancellationToken) =>
-        Prepare(request, request.RequesterUserId ?? string.Empty, ResourceKinds.OrganizationMember, AuthorizationActions.Create, true, cancellationToken);
+        Prepare(request, httpContext.HttpContext?.User.GetPlatformUserId() ?? Guid.Empty, ResourceKinds.OrganizationMember, AuthorizationActions.Create, true, cancellationToken);
     public Task<IPreparedHumanAccountAdministrativeAction> PrepareAsync(UpdateOrganizationMemberRoleCommand request, CancellationToken cancellationToken) =>
-        Prepare(request, request.RequesterUserId ?? string.Empty, ResourceKinds.OrganizationMember, AuthorizationActions.Update, true, cancellationToken);
+        Prepare(request, httpContext.HttpContext?.User.GetPlatformUserId() ?? Guid.Empty, ResourceKinds.OrganizationMember, AuthorizationActions.Update, true, cancellationToken);
     public Task<IPreparedHumanAccountAdministrativeAction> PrepareAsync(DeleteOrganizationMemberCommand request, CancellationToken cancellationToken) =>
-        Prepare(request, request.RequesterUserId ?? string.Empty, ResourceKinds.OrganizationMember, AuthorizationActions.Delete, true, cancellationToken);
+        Prepare(request, httpContext.HttpContext?.User.GetPlatformUserId() ?? Guid.Empty, ResourceKinds.OrganizationMember, AuthorizationActions.Delete, true, cancellationToken);
     public Task<IPreparedHumanAccountAdministrativeAction> PrepareAsync(AddGroupMemberCommand request, CancellationToken cancellationToken) =>
-        Prepare(request, request.RequesterUserId ?? string.Empty, ResourceKinds.GroupMember, AuthorizationActions.Create, false, cancellationToken);
+        Prepare(request, httpContext.HttpContext?.User.GetPlatformUserId() ?? Guid.Empty, ResourceKinds.GroupMember, AuthorizationActions.Create, false, cancellationToken);
     public Task<IPreparedHumanAccountAdministrativeAction> PrepareAsync(UpdateGroupMemberRoleCommand request, CancellationToken cancellationToken) =>
-        Prepare(request, request.RequesterUserId ?? string.Empty, ResourceKinds.GroupMember, AuthorizationActions.Update, false, cancellationToken);
+        Prepare(request, httpContext.HttpContext?.User.GetPlatformUserId() ?? Guid.Empty, ResourceKinds.GroupMember, AuthorizationActions.Update, false, cancellationToken);
     public Task<IPreparedHumanAccountAdministrativeAction> PrepareAsync(DeleteGroupMemberCommand request, CancellationToken cancellationToken) =>
-        Prepare(request, request.RequesterUserId ?? string.Empty, ResourceKinds.GroupMember, AuthorizationActions.Delete, false, cancellationToken);
+        Prepare(request, httpContext.HttpContext?.User.GetPlatformUserId() ?? Guid.Empty, ResourceKinds.GroupMember, AuthorizationActions.Delete, false, cancellationToken);
     public Task<IPreparedHumanAccountAdministrativeAction> PrepareAsync(GetTenantUserRoleGrantDetailsRequest request, CancellationToken cancellationToken) =>
         Prepare(request, null, ResourceKinds.TenantUserRoleGrant, AuthorizationActions.View, true, cancellationToken);
     public Task<IPreparedHumanAccountAdministrativeAction> PrepareAsync(GetTenantUserRoleGrantListRequest request, CancellationToken cancellationToken) =>

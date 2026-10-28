@@ -3,7 +3,13 @@
 @using Explore.Blazor.Client.Clients
 @using Microsoft.AspNetCore.Components
 @using Explore.Blazor.Client.Pages.User.Components.Dialogs
+@using Explore.Blazor.Client.Helpers
+@using Explore.Blazor.Client.Contracts.Services.Accessibility
+@using System.Globalization
+@implements IDisposable
 @inject IUserService UserService
+@inject IUserProfileCompletionService Completion
+@inject IAccessibilityFocusService Focus
 @inject ISnackbar Snackbar
 @inject CurrentUserState CurrentUserState
 
@@ -40,16 +46,19 @@
         <div class="settings-profile-picture mb-8">
             <MudText Typo="Typo.subtitle2" Style="font-weight: 600;" Class="mb-4">Profile Picture</MudText>
             <div class="d-flex align-center gap-6">
-                <MudImage Src="@_user.ProfileImageUri" Width="120" Height="120" ObjectFit="ObjectFit.Cover" Class="rounded-circle" />
+                <MudImage Src="@_user.ProfileImageUri" Alt="Your profile picture" Width="120" Height="120" ObjectFit="ObjectFit.Cover" Class="rounded-circle" />
                 <div>
                     <MudText Typo="Typo.body2" Color="Color.Secondary">
                         Recommended: Square image, at least 400x400px
                     </MudText>
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2 rounded-pill"
+                    @if (_canChangeImage)
+                    {
+                    <MudButton id="change-profile-image" Disabled="@_busy" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2 rounded-pill"
                                StartIcon="@Icons.Material.Filled.PhotoCamera"
                                OnClick="OpenEditProfileImageDialogAsync">
                         Change
                     </MudButton>
+                    }
                 </div>
             </div>
         </div>
@@ -61,13 +70,68 @@
             <MudText Typo="Typo.subtitle2" Style="font-weight: 600;" Class="mb-4">Name</MudText>
             <div class="d-flex align-center justify-space-between flex-wrap gap-2">
                 <MudText Typo="Typo.body1">@_user.FirstName @_user.LastName</MudText>
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="rounded-pill"
+                @if (HasCollectionLink("edit"))
+                {
+                <MudButton id="edit-profile-names" Disabled="@_busy" Variant="Variant.Outlined" Color="Color.Primary" Class="rounded-pill"
                            StartIcon="@Icons.Material.Filled.Edit"
                            OnClick="OpenEditNamesDialogAsync">
                     Edit
                 </MudButton>
+                }
             </div>
         </div>
+
+        @if ((_readiness?.Options?.Count ?? 0) > 1 || ((_readiness?.Options?.Count ?? 0) == 1 && _selectedOption < 0))
+        {
+            <label for="profile-collection-context">Collection context</label>
+            <select id="profile-collection-context" value="@_selectedOption" @onchange="SelectOption" disabled="@(_busy || _refreshing)">
+                <option value="-1">Choose a collection context</option>
+                @for (var index = 0; index < _readiness!.Options!.Count; index++)
+                {
+                    <option value="@index">Context @(index + 1)</option>
+                }
+            </select>
+        }
+
+        <section aria-labelledby="private-birth-date-heading" class="mb-8">
+            <h3 id="private-birth-date-heading">Private date of birth</h3>
+            <p>A declaration is private and is not verified age evidence. The stored date is never displayed here.</p>
+            @if (SelectedOption?.DeclaredAge is { } declared && DateTimeOffset.UtcNow < declared.ValidUntil)
+            {
+                <p id="declared-age-summary">
+                    Declared-only calendar result:
+                    @if (declared.Kind == ModerationAgeEvidenceKind.Declared
+                        && declared.Outcome == ModerationDeclaredAgeOutcome.AtLeastThreshold)
+                    { <span>at least the adopted threshold of @declared.MinimumAge</span> }
+                    else if (declared.Kind == ModerationAgeEvidenceKind.Declared
+                        && declared.Outcome == ModerationDeclaredAgeOutcome.UnderThreshold)
+                    { <span>below the adopted threshold of @declared.MinimumAge</span> }
+                    else
+                    { <span>unknown</span> }
+                    — not verified age evidence or access permission.
+                    Evaluated <time datetime="@declared.EvaluatedAt.ToString("O", CultureInfo.InvariantCulture)">@declared.EvaluatedAt.ToString("u", CultureInfo.InvariantCulture)</time>;
+                    original validity ends <time datetime="@declared.ValidUntil.ToString("O", CultureInfo.InvariantCulture)">@declared.ValidUntil.ToString("u", CultureInfo.InvariantCulture)</time>.
+                </p>
+            }
+            @if (_birthDateOpen)
+            {
+                <form @onsubmit="SaveBirthDateAsync" @onsubmit:preventDefault>
+                    <label for="private-birth-date">Date of birth</label>
+                    <input id="private-birth-date" type="date" @bind="_birthDate" @bind:format="yyyy-MM-dd"
+                           max="@DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" required disabled="@_busy" />
+                    <MudButton ButtonType="ButtonType.Submit" Disabled="@_busy">Save private declaration</MudButton>
+                    <MudButton id="cancel-private-birth-date" ButtonType="ButtonType.Button" Disabled="@_busy" OnClick="CloseBirthDate">Cancel</MudButton>
+                </form>
+            }
+            else if (HasCollectionLink("record-birth-date"))
+            {
+                <MudButton id="open-private-birth-date" Disabled="@_busy" OnClick="OpenBirthDateAsync">Declare or correct date of birth</MudButton>
+            }
+            @if (HasCollectionLink("clear-birth-date"))
+            {
+                <MudButton id="clear-private-birth-date" Disabled="@_busy" OnClick="ClearBirthDateAsync">Remove private declaration</MudButton>
+            }
+        </section>
 
         <MudDivider Class="my-6" />
 
@@ -103,11 +167,70 @@
     private bool _loading = true;
     private string? _successMessage;
     private UserDto? _user;
+    private HalResourceOfPrivateProfileCompletionDto? _readiness;
+    private bool _canChangeImage;
+    private bool _busy;
+    private bool _refreshing;
+    private bool _readinessLoaded;
+    private bool _disposed;
+    private bool _birthDateOpen;
+    private DateTime? _birthDate;
+    private int _selectedOption = -1;
+    private string? _nextFocus;
+    private readonly CancellationTokenSource _lifetime = new();
+    private CancellationTokenSource? _formLifetime;
 
     protected override async Task OnInitializedAsync()
     {
-        _user = new UserDto();
         await LoadUserDataAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_nextFocus is not { } target || _disposed) return;
+        _nextFocus = null;
+        await Focus.FocusByIdAsync(target, true);
+    }
+
+    private bool HasCollectionLink(string relation) => _readiness?._links?.ContainsKey(relation) == true;
+
+    private ModerationProfileCollectionOption? SelectedOption => _selectedOption >= 0
+        ? _readiness?.Options?.ElementAtOrDefault(_selectedOption) : null;
+
+    private void SelectOption(ChangeEventArgs args)
+    {
+        if (_busy || _refreshing) return;
+        ScrubBirthDate();
+        _selectedOption = int.TryParse(args.Value?.ToString(), out var value) ? value : -1;
+    }
+
+    private async Task RefreshReadinessAsync()
+    {
+        if (_user?.Id is not Guid id) return;
+        var selected = SelectedOption?.Assessment;
+        _refreshing = true;
+        try
+        {
+            _readiness = await Completion.ReadAsync(id, _lifetime.Token);
+            _selectedOption = selected is not null
+                ? _readiness.Options?.ToList().FindIndex(option =>
+                    option.Assessment?.SourceId == selected.SourceId
+                    && option.Assessment?.AdoptionId == selected.AdoptionId
+                    && option.Assessment?.Original?.ObservationId == selected.Original?.ObservationId) ?? -1
+                : !_readinessLoaded && _readiness.Options?.Count == 1 ? 0 : -1;
+            _readinessLoaded = true;
+            if (!HasCollectionLink("record-birth-date") || SelectedOption is not { } option
+                || option.ValidUntil <= DateTimeOffset.UtcNow)
+                ScrubBirthDate();
+        }
+        catch
+        {
+            _readiness = null;
+            _selectedOption = -1;
+            ScrubBirthDate();
+            throw;
+        }
+        finally { _refreshing = false; }
     }
 
     private async Task LoadUserDataAsync()
@@ -115,10 +238,15 @@
         try
         {
             _loading = true;
-            var loadedUser = await UserService.GetCurrentUserAsync();
-            if (loadedUser is not null)
+            var resource = await UserService.GetCurrentUserResourceAsync();
+            _user = resource?.ToDto();
+            _canChangeImage = resource?._links?.ContainsKey("profile-image") == true;
+            _readiness = null;
+            if (_user is not null)
             {
-                _user = loadedUser;
+                try { await RefreshReadinessAsync(); }
+                catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+                catch (ApiException) { _readiness = null; }
             }
         }
         catch (Exception)
@@ -133,62 +261,112 @@
 
     private async Task OpenEditNamesDialogAsync()
     {
-        if (_user is null) return;
-
-        var dialog = await DialogService.ShowAsync<EditUserNamesDialog>(
-            "Edit name",
-            DialogOptionsFactory.Small());
-        var result = await dialog.Result;
-        if (result is { Canceled: false } && result.Data is UpdateUserNamesDto names)
+        if (_user is null || _busy || _refreshing) return;
+        try
         {
-            await SavePartialAsync(new UpdateUserDto { Names = names });
+            await RefreshReadinessAsync();
+            if (!HasCollectionLink("edit") || SelectedOption is not { } option || option.ValidUntil <= DateTimeOffset.UtcNow) return;
+            await Focus.SaveFocusAsync();
+            var dialog = await DialogService.ShowAsync<EditUserNamesDialog>("Edit name", DialogOptionsFactory.Small());
+            var result = await dialog.Result;
+            if (result is { Canceled: false } && result.Data is UpdateUserNamesDto names
+                && _user.Id is Guid id && _user.ConcurrencyStamp is Guid stamp)
+                await SaveAsync(() => Completion.UpdateNamesAsync(id, stamp, names, option, _lifetime.Token));
         }
+        catch (ApiException) { Snackbar.Add("Profile collection is unavailable. Refresh and try again.", Severity.Error); }
+        finally { await Focus.RestoreFocusAsync("#edit-profile-names"); }
     }
 
     private async Task OpenEditProfileImageDialogAsync()
     {
-        if (_user is null) return;
-
+        if (_user is null || !_canChangeImage || _busy) return;
+        await Focus.SaveFocusAsync();
+        try
+        {
         var dialog = await DialogService.ShowAsync<EditUserProfileImageDialog>(
             "Change profile picture",
             DialogOptionsFactory.Small());
         var result = await dialog.Result;
         if (result is { Canceled: false } && result.Data is EditUserProfileImageDialog.ProfileImageUploadResult img)
         {
-            await SavePartialAsync(new UpdateUserDto
-            {
-                ProfileImage = new UpdateUserProfileImageDto { ProfilePictureId = img.StorageObjectId }
-            });
+            if (_user.Id is Guid id && _user.ConcurrencyStamp is Guid stamp)
+                await SaveAsync(() => Completion.UpdateImageAsync(id, stamp,
+                    new UpdateUserProfileImageDto { ProfilePictureId = img.StorageObjectId }, _lifetime.Token));
         }
+        }
+        finally { await Focus.RestoreFocusAsync("#change-profile-image"); }
     }
 
-    private async Task SavePartialAsync(UpdateUserDto dto)
+    private async Task OpenBirthDateAsync()
     {
-        if (_user?.Id is not Guid userId)
-        {
-            Snackbar.Add("Unable to save profile because the user identifier is missing.", Severity.Error);
-            return;
-        }
-
-        if (_user.ConcurrencyStamp is not Guid concurrencyStamp || concurrencyStamp == Guid.Empty)
-        {
-            Snackbar.Add("Unable to save profile because the latest profile version is missing. Refresh and try again.", Severity.Error);
-            return;
-        }
-
+        if (_busy || _refreshing) return;
         try
         {
-            var response = await UserService.UpdateUserAsync(userId, concurrencyStamp, dto);
+            await RefreshReadinessAsync();
+            if (!HasCollectionLink("record-birth-date") || SelectedOption is not { } option || option.ValidUntil <= DateTimeOffset.UtcNow) return;
+            _birthDate = null;
+            _birthDateOpen = true;
+            _nextFocus = "private-birth-date";
+            _formLifetime?.Cancel();
+            _formLifetime?.Dispose();
+            _formLifetime = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+            _ = ExpireFormAsync(option.ValidUntil, _formLifetime.Token);
+        }
+        catch (ApiException) { Snackbar.Add("Profile collection is unavailable. Refresh and try again.", Severity.Error); }
+    }
+
+    private async Task ExpireFormAsync(DateTimeOffset until, CancellationToken token)
+    {
+        try
+        {
+            while (until - DateTimeOffset.UtcNow is var remaining && remaining > TimeSpan.Zero)
+                await Task.Delay(remaining > TimeSpan.FromDays(1) ? TimeSpan.FromDays(1) : remaining, token);
+            await InvokeAsync(() => { CloseBirthDate(); StateHasChanged(); });
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+    }
+
+    private void CloseBirthDate()
+    {
+        var wasOpen = _birthDateOpen;
+        ScrubBirthDate();
+        if (wasOpen && HasCollectionLink("record-birth-date")) _nextFocus = "open-private-birth-date";
+    }
+
+    private void ScrubBirthDate()
+    {
+        _formLifetime?.Cancel();
+        _birthDate = null;
+        _birthDateOpen = false;
+        _nextFocus = null;
+    }
+
+    private async Task SaveBirthDateAsync()
+    {
+        if (_user?.Id is not Guid id || _birthDate is not DateTime date || SelectedOption is not { } option
+            || _readiness?.BirthDateStatus is not { } status || !HasCollectionLink("record-birth-date")) return;
+        await SaveAsync(() => Completion.RecordBirthDateAsync(id, DateOnly.FromDateTime(date), status.Revision, option, _lifetime.Token));
+        CloseBirthDate();
+    }
+
+    private async Task ClearBirthDateAsync()
+    {
+        if (_user?.Id is not Guid id || _readiness?.BirthDateStatus is not { } status || !HasCollectionLink("clear-birth-date")) return;
+        await SaveAsync(() => Completion.ClearBirthDateAsync(id, status.Revision, _lifetime.Token));
+        CloseBirthDate();
+    }
+
+    private async Task SaveAsync(Func<Task<BaseCommandResponseOfGuid>> write)
+    {
+        if (_busy) return;
+        _busy = true;
+        try
+        {
+            var response = await write();
             if (response?.Success == true)
             {
-                // Re-fetch authoritative user (backend cache was invalidated) and notify shared state
-                // so the navbar avatar refreshes live without a page reload.
-                var freshUser = await UserService.GetCurrentUserAsync();
-                if (freshUser is not null)
-                {
-                    _user = freshUser;
-                    CurrentUserState.NotifyUpdated(freshUser);
-                }
+                await LoadUserDataAsync();
+                if (_user is not null) CurrentUserState.NotifyUpdated(_user);
                 _successMessage = "Profile updated successfully!";
             }
             else
@@ -196,13 +374,19 @@
                 Snackbar.Add(response?.Message ?? "Failed to save profile.", Severity.Error);
             }
         }
-        catch (ApiException ex)
-        {
-            Snackbar.Add($"Failed to save profile: {ex.Message}", Severity.Error);
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Failed to save profile: {ex.Message}", Severity.Error);
-        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (ApiException) { Snackbar.Add("The profile was not saved. Refresh before trying again.", Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _birthDate = null;
+        _readiness = null;
+        _formLifetime?.Cancel();
+        _formLifetime?.Dispose();
+        _lifetime.Cancel();
+        _lifetime.Dispose();
     }
 }

@@ -55,6 +55,8 @@ public sealed class UpdateUserCommandContractTests
 
         await Assert.That(result.IsValid).IsFalse();
         await Assert.That(result.Errors.Select(error => error.ErrorMessage))
-            .Contains("At least one of Names or ProfileImage must be provided.");
+            .Contains("Names must be provided.");
+        await Assert.That(result.Errors.Select(error => error.PropertyName))
+            .Contains(nameof(UpdateUserDto.Names));
     }
 }

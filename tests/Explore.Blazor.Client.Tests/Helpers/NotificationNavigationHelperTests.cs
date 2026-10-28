@@ -5,6 +5,27 @@ namespace Explore.Blazor.Client.Tests.Helpers;
 public sealed class NotificationNavigationHelperTests
 {
     [Test]
+    public async Task ProtectedNoticePointerReturnsOnlyTheRecipientPortalRoute()
+    {
+        var id = Guid.Parse("01910000-0000-7000-8000-000000000001");
+        var notification = CreateNotification("ModerationPreFindingNotice", id.ToString("D"));
+
+        await Assert.That(NotificationNavigationHelper.GetEntityUrl(notification))
+            .IsEqualTo($"/moderation/pre-finding/notices/{id:D}");
+    }
+
+    [Test]
+    [Arguments("https://example.test/private")]
+    [Arguments("01910000-0000-7000-8000-000000000001?reviewResponse=true")]
+    [Arguments("00000000-0000-0000-0000-000000000000")]
+    [Arguments("01910000-0000-4000-8000-000000000001")]
+    public async Task ProtectedNoticePointerRejectsNonCanonicalNoticeIdentifiers(string entityId)
+    {
+        var notification = CreateNotification("ModerationPreFindingNotice", entityId);
+        await Assert.That(NotificationNavigationHelper.GetEntityUrl(notification)).IsNull();
+    }
+
+    [Test]
     public async Task GetEntityUrl_WithEventNotification_ReturnsEventDetailRoute()
     {
         var eventId = Guid.NewGuid().ToString();

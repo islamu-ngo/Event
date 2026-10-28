@@ -9,6 +9,7 @@ using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
+using Explore.Application.Models.Storage;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
@@ -28,7 +29,7 @@ public sealed class ConfirmAiProposedActionCommandHandler(
     ICurrentUserService currentUserService,
     ICommandHandler<CreateEventCommand, BaseCommandResponse<Guid>> createEventCommand,
     ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> createUpload,
-    ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> finalizeUpload,
+    ICommandHandler<FinalizeStorageUploadSessionCommand, StorageUploadSessionResult> finalizeUpload,
     IUnitOfWork unitOfWork,
     IAiEventDraftRecoveryRepository recovery,
     IAiToolContractRegistry registry,
@@ -372,7 +373,7 @@ public sealed class ConfirmAiProposedActionCommandHandler(
                 return CreateEventDraftAiFeaturedImageResolutionResult.Failure(
                     "proposed_action_expired", "No further image effects are permitted.");
             await using var content = new MemoryStream(imageBytes, writable: false);
-            var finalizeResult = await finalizeUpload.ExecuteAsync(new FinalizeStorageUploadSessionCommand
+            await using var finalized = await finalizeUpload.ExecuteAsync(new FinalizeStorageUploadSessionCommand
             {
                 UploadSessionId = sessionId,
                 Content = content,
@@ -380,7 +381,8 @@ public sealed class ConfirmAiProposedActionCommandHandler(
                 ContentLength = imageBytes.LongLength,
                 TenantId = action.TenantId
             }, cancellationToken);
-            if (!finalizeResult.IsSuccess || finalizeResult.Id?.StorageObjectId is not { } uploadedId || uploadedId == Guid.Empty)
+            var finalizeResult = finalized.Response;
+            if (finalizeResult is null || !finalizeResult.IsSuccess || finalizeResult.Id?.StorageObjectId is not { } uploadedId || uploadedId == Guid.Empty)
                 return CreateEventDraftAiFeaturedImageResolutionResult.Failure(
                     "ai_image_recovery_required", "The original image transfer requires reconciliation.");
             storageObjectId = uploadedId;

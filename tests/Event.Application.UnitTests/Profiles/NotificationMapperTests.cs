@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Explore.Application.Mappings;
+using Explore.Application.Notifications;
 using Explore.Domain;
 
 namespace Event.Application.UnitTests.Profiles;
@@ -13,6 +14,52 @@ public sealed class NotificationMapperTests
     private static readonly Guid TenantId = Guid.Parse("01910000-0000-7000-8000-000000000003");
     private static readonly Guid SourceId = Guid.Parse("01910000-0000-7000-8000-000000000004");
     private static readonly Guid RecipientId = Guid.Parse("01910000-0000-7000-8000-000000000005");
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task ProtectedNoticePointerProjectsNavigationWithoutRecipientOrDeduplicationKey(bool detail)
+    {
+        var source = CreateNotification();
+        source.NotificationEntityTypeId = null;
+        source.NotificationEntityType = null;
+        source.EntityId = NotificationId.ToString("D");
+        source.Body = null;
+        source.DeduplicationKey = ModerationPreFindingNoticeTemplate.DeduplicationKey(NotificationId, UserId) + ":in-app";
+        var expected = Expected(detail);
+        expected["notificationEntityTypeId"] = null;
+        expected["notificationEntityTypeName"] = "ModerationPreFindingNotice";
+        expected["entityId"] = NotificationId.ToString("D");
+        expected["body"] = null;
+
+        await AssertContract(source, expected, detail);
+    }
+
+    [Test]
+    [Arguments("recipient")]
+    [Arguments("notice")]
+    [Arguments("delivery")]
+    [Arguments("entityType")]
+    [Arguments("intent")]
+    public async Task OrdinaryOrMismatchedNotificationsDoNotBecomeProtectedNoticePointers(string mismatch)
+    {
+        var source = CreateNotification();
+        source.NotificationEntityTypeId = null;
+        source.NotificationEntityType = null;
+        source.EntityId = NotificationId.ToString("D");
+        source.DeduplicationKey = ModerationPreFindingNoticeTemplate.DeduplicationKey(NotificationId, UserId) + ":in-app";
+        switch (mismatch)
+        {
+            case "recipient": source.UserId = RecipientId; break;
+            case "notice": source.EntityId = SourceId.ToString("D"); break;
+            case "delivery": source.DeduplicationKey += ":email"; break;
+            case "entityType": source.NotificationEntityTypeId = 12; break;
+            default: source.NotificationIntentId = null; break;
+        }
+
+        await Assert.That(NotificationMapper.ToDetail(source).NotificationEntityTypeName).IsNull();
+        await Assert.That(NotificationMapper.ToListItem(source).NotificationEntityTypeName).IsNull();
+    }
 
     [Test]
     [Arguments(true)]

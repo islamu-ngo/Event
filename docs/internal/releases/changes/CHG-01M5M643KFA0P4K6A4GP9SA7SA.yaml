@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M643KFA0P4K6A4GP9SA7SA
+Title: "Retain bounded notice and contestation custody models"
+Type: feat
+Scope: privacy
+Summary: "Checkpoint protected contestation, unresolved correction obligations, finite adjudicated read grants and custody records without certifying disclosure or delivery."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Finite grants bind named recipients to retained original custody and permit one complete revocation; unresolved corrections remain undelivered obligations. Host read/disclosure authorization is separate and tests are unrun."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Notice, response, cleanup and adjudicated-grant mappings depend on the cumulative generated history; no migration or provider validation was executed."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/MODERATION.md
+    Disposition: planned
+    Detail: "Deploy with host custody, disclosure, cleanup and notification owners and the shared save hooks. Retention is neither readable content nor delivery evidence."

@@ -7,6 +7,7 @@ using Explore.Blazor.Client.Models.Responses;
 using Explore.Blazor.Client.Pages.Events;
 using Explore.Blazor.Client.Services.Docking;
 using Explore.Blazor.Client.Services.Interop;
+using Explore.Blazor.Client.Services;
 
 namespace Explore.Blazor.Client.Serialization;
 
@@ -20,6 +21,8 @@ namespace Explore.Blazor.Client.Serialization;
     WriteIndented = false,
     AllowTrailingCommas = true)]
 [JsonSerializable(typeof(JsonElement))]
+[JsonSerializable(typeof(UserProfileCollectionNomination))]
+[JsonSerializable(typeof(HalResourceOfPrivateProfileCompletionDto))]
 [JsonSerializable(typeof(HalResourceOfInstanceSmtpSettingsDto))]
 [JsonSerializable(typeof(HalResourceOfEmailDeliveryDisablePreviewDto))]
 [JsonSerializable(typeof(HalResourceOfSettingGroupResponseDto))]

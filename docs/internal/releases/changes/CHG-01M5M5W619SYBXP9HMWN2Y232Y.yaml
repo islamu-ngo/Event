@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M5W619SYBXP9HMWN2Y232Y
+Title: "Qualify native and imported form publication before artifact writes"
+Type: fix
+Scope: registration
+Summary: "Retain ordinary registration authority and current Human publication qualification through frozen form artifact persistence."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Details: Current Human authority is retained through native publication; regression sources remain unrun.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

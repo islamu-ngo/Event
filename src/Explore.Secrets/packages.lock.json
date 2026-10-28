@@ -276,6 +276,8 @@
           "Event.Wire.Contracts": "[1.0.0, )",
           "Explore.Domain": "[1.0.0, )",
           "FluentValidation.DependencyInjectionExtensions": "[12.1.1, )",
+          "ISLAMU.Moderation.Application": "[1.0.0, )",
+          "ISLAMU.Moderation.Domain": "[1.0.0, )",
           "Microsoft.Extensions.Caching.Hybrid": "[10.8.0, )",
           "OpenFeature": "[2.14.0, )"
         }
@@ -284,8 +286,18 @@
         "type": "Project",
         "dependencies": {
           "Event.Wire.Contracts": "[1.0.0, )",
+          "ISLAMU.Moderation.Domain": "[1.0.0, )",
           "Microsoft.Extensions.Compliance.Abstractions": "[10.8.0, )"
         }
+      },
+      "islamu.moderation.application": {
+        "type": "Project",
+        "dependencies": {
+          "ISLAMU.Moderation.Domain": "[1.0.0, )"
+        }
+      },
+      "islamu.moderation.domain": {
+        "type": "Project"
       },
       "Azure.Identity": {
         "type": "CentralTransitive",

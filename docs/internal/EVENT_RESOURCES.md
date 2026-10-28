@@ -249,6 +249,14 @@ routes resolve resource ownership server-side and call that same workflow:
 they neither require generic-storage create permission nor bypass resource
 update authority. Their HTTP replay filters reauthorize committed results.
 
+Upload mutation and private response requests select
+`EventResourceAuthorityRequest.RequiresUnquarantinedMaterial`. Fresh
+`EventResourceAuthorizationFacts` capture the aggregate's native quarantine
+state, and the shared evaluator enforces this precondition at acquisition,
+mutation rechecks and final response release. General management reads retain
+their separate metadata-only quarantine status; management permission does not
+authorize an upload DTO containing stored file details.
+
 Reservation retains the resource version. Finalization spools a bounded,
 delete-on-close inspection snapshot, persists an inaccessible delete-requested
 staging identity, and writes the selected provider outside a transaction.
@@ -257,6 +265,13 @@ new object, record the success audit, finalize the session and retire the old
 attachment. A failed commit leaves durable cleanup state rather than relying
 on in-memory compensation. A replacement does not remove the old attachment
 before the new one commits.
+
+Quarantine before finalization returns the existing structured denial without
+starting a provider write. If quarantine arrives during an acknowledged write,
+the final transaction denies attachment, transfers the exact staged object to
+durable retirement and releases its reservation through native accounting.
+The previous attachment and current quarantine causes remain unchanged;
+`SetStoredFile` is never used as an exception-driven authorization check.
 
 `EventResourceDocumentInspection` and `EventResourceDocumentPolicy` accept only
 PDF, non-macro DOCX and non-macro PPTX declarations. PDF validation is signature

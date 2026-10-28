@@ -3,6 +3,8 @@ ARG TARGETARCH
 WORKDIR /src
 
 COPY ["global.json", "Directory.Build.props", "Directory.Packages.props", "./"]
+COPY ["NuGet.Config", "./"]
+COPY ["vendor/secretkit/", "vendor/secretkit/"]
 COPY ["eng/tools/Explore.GeneratedContracts/GeneratedContractTool.targets", "eng/tools/Explore.GeneratedContracts/"]
 COPY ["dotnet-tools.json", "./"]
 COPY ["src/Event.Standalone/Event.Standalone.csproj", "src/Event.Standalone/packages.lock.json", "src/Event.Standalone/"]
@@ -45,6 +47,7 @@ ENV HttpsRedirection__HttpsPort=
 ENV SETUP_SECRET_FILE=/app/data/setup-secret
 EXPOSE 8080
 COPY --from=build /app/publish .
+COPY --from=build /src/vendor/secretkit /app/vendor/secretkit
 COPY --chown=$APP_UID:$APP_UID --from=build /app/data /app/data
 COPY --chown=$APP_UID:$APP_UID --from=build /src/deploy/bootstrap/README.md /etc/islamu-event/bootstrap/README.md
 COPY --chown=$APP_UID:$APP_UID --from=build /src/schemas/configuration-manifest-v1alpha2.schema.json /app/schemas/configuration-manifest-v1alpha2.schema.json

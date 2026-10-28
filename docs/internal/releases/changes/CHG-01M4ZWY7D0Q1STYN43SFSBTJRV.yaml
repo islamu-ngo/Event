@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZWY7D0Q1STYN43SFSBTJRV
+Title: "Retain accountable measurement issuer trust and exact receipt bytes"
+Type: feat
+Scope: access
+Summary: "Retain finite approved measurement issuer key and executable metadata through terminal revocation, and preserve exact native accepted compact-JWS receipt coordinates with canonical byte spelling and SHA256 integrity without treating token presence as signature verification, honest execution or conformance."
+Group: moderation-measurement-trust-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

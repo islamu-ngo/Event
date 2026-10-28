@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4E7FMR944FMM4KFR0S11K9E
+Title: "Persist qualified moderation transitions atomically"
+Type: feat
+Scope: access
+Summary: "Keep revision-bound proposals, independent restrictions, exact corrections and minimized effect intent in one qualified local transaction. Identical retries preserve the accepted result; schema installation does not activate a moderation profile."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

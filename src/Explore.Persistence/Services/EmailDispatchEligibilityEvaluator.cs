@@ -102,6 +102,40 @@ public sealed class EmailDispatchEligibilityEvaluator(
             return await SkipAsync(dispatch, delivery, request, "delivery_authority_missing", cancellationToken);
         }
 
+        if ((dispatch.Kind == EmailDispatchKind.AccountModerationOriginalNotice)
+            != (delivery.NotificationIntent.TemplateKey == ModerationNoticeEmailTemplate.Key))
+            return await SkipAsync(dispatch, delivery, request, "moderation_notice_kind_mismatch", cancellationToken);
+
+        if (dispatch.Kind == EmailDispatchKind.AccountModerationOriginalNotice)
+        {
+            var host = await dbContext.ModerationHostBindings.AsNoTracking().SingleOrDefaultAsync(cancellationToken);
+            var previousDomain = dbContext.ModerationTrustDomainId;
+            var retained = false;
+            try
+            {
+                if (host is not null && previousDomain is null
+                    && ModerationNoticeEmailTemplate.Matches(dispatch, delivery.NotificationIntent, dispatch.SourceId))
+                {
+                    dbContext.ModerationTrustDomainId = host.TrustDomainId;
+                    var evaluatedAt = new DateTimeOffset(request.EvaluatedAt);
+                    var ceiling = await (
+                        from notice in dbContext.ModerationNotices.AsNoTracking()
+                        join source in dbContext.ModerationNoticeSources.AsNoTracking()
+                            on notice.EffectId equals source.EffectId
+                        where notice.Id == dispatch.SourceId && notice.TenantId == request.TenantId
+                            && notice.NativeIntentId == delivery.NotificationIntentId
+                            && notice.RecipientSubjectKind == 1 && notice.RecipientSubjectId == dispatch.RecipientUserId
+                            && source.TenantId == request.TenantId
+                            && source.SnapshotHash == delivery.NotificationIntent.SafePayloadHash
+                        select source.RetainUntil).SingleOrDefaultAsync(cancellationToken);
+                    retained = ceiling is { } until && evaluatedAt < until;
+                }
+            }
+            finally { dbContext.ModerationTrustDomainId = previousDomain; }
+            if (!retained)
+                return await SkipAsync(dispatch, delivery, request, "moderation_notice_authority_unavailable", cancellationToken);
+        }
+
         long originalPolicyRevision = delivery.NotificationIntent.EmailDeliveryPolicyRevision;
         if (fanoutAuthorityHint is { OccurrenceId: { } hintedOccurrenceId })
         {

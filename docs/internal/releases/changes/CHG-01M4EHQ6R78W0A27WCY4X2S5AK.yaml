@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4EHQ6R78W0A27WCY4X2S5AK
+Title: "Separate inactive moderation adoption from qualified publication"
+Type: feat
+Scope: access
+Summary: "Publish immutable owner-qualified rule terms with monotonic complete-state replacement. Keep adoption inactive until exact scoped and revision-bound prerequisite and registered-consumer evidence supports enabled effects; native publication and enforcement integration remain separately qualified."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

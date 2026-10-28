@@ -17,6 +17,7 @@ using Explore.Infrastructure.Authentication;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
@@ -89,6 +90,9 @@ public sealed class HumanPrincipalNativeSourceFenceTests(PostgreSqlContainerFixt
             return services.BuildIsolatedServiceProvider(validateScopes: true);
         }
         await fixture.PrepareLocalIdentityWriterAsync();
+        await using var retainedContext = await NativeIdentityRecognitionBoundary.CreatePostgresAuthorityAsync(fixture, token);
+        var retained = new CoLocatedPostgresPrivacyErasureAuthorityRepository(retainedContext, TimeProvider.System,
+            Options.Create(new PrivacyErasureOptions()));
         ServiceProvider WriterServices(Guid? tenantId)
         {
             var services = new ServiceCollection();
@@ -122,7 +126,9 @@ public sealed class HumanPrincipalNativeSourceFenceTests(PostgreSqlContainerFixt
         await using var setupDiscovery = new EventDiscoveryEnrollmentGate(migration);
         await using var setupDiscoveryLease = await setupDiscovery.AcquireAsync(token);
         var manager = setupScope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>();
-        var store = new LocalIdentityCredentialStateStore(migration, migration, manager, TimeProvider.System);
+        var store = new LocalIdentityCredentialStateStore(migration, migration, manager, TimeProvider.System,
+            NativeIdentityRecognitionBoundary.Create(migration, retained, TimeProvider.System,
+                NativeIdentityRecognitionBoundary.RejectHumanSettlement));
         var initiator = new User
         {
             Id = Guid.CreateVersion7(),
@@ -398,7 +404,8 @@ public sealed class HumanPrincipalNativeSourceFenceTests(PostgreSqlContainerFixt
                 execution.RequireCurrent(application, application);
                 await Assert.That(application.TenantFilterTenantId).IsEqualTo(selectedTenant);
                 var states = new LocalIdentityCredentialStateStore(application, application, selectedManager,
-                    TimeProvider.System, execution);
+                    TimeProvider.System, NativeIdentityRecognitionBoundary.Create(application, retained, TimeProvider.System,
+                        NativeIdentityRecognitionBoundary.RejectHumanSettlement), execution);
                 var selectedAuthentication = new LocalIdentityAuthService(selectedManager, signer, states);
                 await Assert.That(await selectedAuthentication.ValidateSessionAsync(authority, token)).IsEqualTo(expected);
                 execution.RequireCurrent(application, application);

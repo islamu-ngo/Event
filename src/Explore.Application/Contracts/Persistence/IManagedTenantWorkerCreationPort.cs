@@ -8,7 +8,7 @@ namespace Explore.Application.Contracts.Persistence;
 /// </summary>
 public interface IManagedTenantWorkerCreationPort
 {
-    Task<BaseCommandResponse<ManagedTenantWorkerCreationResult>> CreateAsync(
+    Task<BaseCommandResponse<ManagedTenantWorkerCreationOutcome>> CreateAsync(
         Guid operationId, Guid outboxMessageId, CancellationToken cancellationToken = default);
 }
 
@@ -40,6 +40,6 @@ public interface IManagedTenantWorkerCreationOwnerFactory
 /// <summary>One complete durable request; no arbitrary entities, subject selectors or callbacks are accepted.</summary>
 public interface IManagedTenantWorkerCreationOwner : IAsyncDisposable
 {
-    Task<BaseCommandResponse<ManagedTenantWorkerCreationResult>> CreateAsync(
+    Task<BaseCommandResponse<ManagedTenantWorkerCreationOutcome>> CreateAsync(
         CancellationToken cancellationToken = default);
 }

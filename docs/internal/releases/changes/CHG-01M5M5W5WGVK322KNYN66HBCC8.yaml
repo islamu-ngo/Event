@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M5W5WGVK322KNYN66HBCC8
+Title: "Keep add-on publication and prior retirement atomic"
+Type: fix
+Scope: registration
+Summary: "Qualify the current Human at entry and commit while preserving catalog HAL responses and the existing machine publication path."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Details: Current Human authority is retained through native publication; regression sources remain unrun.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

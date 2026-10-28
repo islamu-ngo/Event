@@ -30,8 +30,8 @@ public sealed class StorageUploadSessionControllerTests
 {
     private readonly Guid _tenantId = Guid.CreateVersion7();
     private readonly ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _create = Substitute.For<ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>>();
-    private readonly ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _finalize = Substitute.For<ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>>();
-    private readonly ICommandHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _cancel = Substitute.For<ICommandHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>>();
+    private readonly ICommandHandler<FinalizeStorageUploadSessionCommand, StorageUploadSessionResult> _finalize = Substitute.For<ICommandHandler<FinalizeStorageUploadSessionCommand, StorageUploadSessionResult>>();
+    private readonly ICommandHandler<CancelStorageUploadSessionCommand, StorageUploadSessionResult> _cancel = Substitute.For<ICommandHandler<CancelStorageUploadSessionCommand, StorageUploadSessionResult>>();
     private readonly ICommandHandler<IssuePresignedDownloadUrlCommand, PresignedDownloadUrlResponseDto?> _issue = Substitute.For<ICommandHandler<IssuePresignedDownloadUrlCommand, PresignedDownloadUrlResponseDto?>>();
     private readonly IQueryHandler<GetStorageObjectContentRequest, StorageObjectContentResult?> _content = Substitute.For<IQueryHandler<GetStorageObjectContentRequest, StorageObjectContentResult?>>();
     private readonly IQueryHandler<GetPublicImageRequest, StorageObjectContentResult?> _publicImage = Substitute.For<IQueryHandler<GetPublicImageRequest, StorageObjectContentResult?>>();
@@ -70,13 +70,14 @@ public sealed class StorageUploadSessionControllerTests
         var body = new MemoryStream(Encoding.UTF8.GetBytes("hello"));
         var response = Success(sessionId);
         _finalize.ExecuteAsync(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
-            .Returns(response);
+            .Returns(StorageUploadSessionResult.Ordinary(response));
         var controller = CreateController(body, "text/plain", body.Length);
 
         var actionResult = await controller.UploadSessionContent(sessionId, CancellationToken.None);
 
         var ok = actionResult.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
+        await Assert.That(ok!.Value).IsEqualTo(response);
         await _finalize.Received(1).ExecuteAsync(
             Arg.Is<FinalizeStorageUploadSessionCommand>(command =>
                 command.UploadSessionId == sessionId &&
@@ -93,7 +94,7 @@ public sealed class StorageUploadSessionControllerTests
         var sessionId = Guid.CreateVersion7();
         var body = new MemoryStream(Encoding.UTF8.GetBytes("hello"));
         _finalize.ExecuteAsync(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
-            .Returns(Success(sessionId));
+            .Returns(StorageUploadSessionResult.Ordinary(Success(sessionId)));
         var controller = CreateController(body, "application/octet-stream", body.Length);
 
         _ = await controller.UploadSessionContent(sessionId, CancellationToken.None);
@@ -114,13 +115,14 @@ public sealed class StorageUploadSessionControllerTests
         var sessionId = Guid.CreateVersion7();
         var response = Success(sessionId);
         _cancel.ExecuteAsync(Arg.Any<CancelStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
-            .Returns(response);
+            .Returns(StorageUploadSessionResult.Ordinary(response));
         var controller = CreateController();
 
         var actionResult = await controller.CancelUploadSession(sessionId, CancellationToken.None);
 
         var ok = actionResult.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
+        await Assert.That(ok!.Value).IsEqualTo(response);
         await _cancel.Received(1).ExecuteAsync(
             Arg.Is<CancelStorageUploadSessionCommand>(command =>
                 command.UploadSessionId == sessionId &&
@@ -245,7 +247,7 @@ public sealed class StorageUploadSessionControllerTests
         foreach (var testCase in cases)
         {
             _finalize.ExecuteAsync(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
-                .Returns(Failure(testCase.Message, testCase.FailureCode));
+                .Returns(StorageUploadSessionResult.Ordinary(Failure(testCase.Message, testCase.FailureCode)));
             var controller = CreateController(new MemoryStream([1]), "text/plain", 1);
 
             var actionResult = await controller.UploadSessionContent(Guid.CreateVersion7(), CancellationToken.None);
@@ -267,7 +269,7 @@ public sealed class StorageUploadSessionControllerTests
     {
         const string unsafeMessage = "S3 SignatureDoesNotMatch at https://storage.internal.example/bucket/tenants/tenant-1/raw-key?X-Amz-Signature=secret";
         _finalize.ExecuteAsync(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
-            .Returns(Failure(unsafeMessage, FailureCodes.StorageUploadWriteFailed));
+            .Returns(StorageUploadSessionResult.Ordinary(Failure(unsafeMessage, FailureCodes.StorageUploadWriteFailed)));
         var controller = CreateController(new MemoryStream([1]), "text/plain", 1);
 
         var actionResult = await controller.UploadSessionContent(Guid.CreateVersion7(), CancellationToken.None);
@@ -294,7 +296,7 @@ public sealed class StorageUploadSessionControllerTests
     {
         const string unsafeMessage = "ContentType must equal application/private-tenant-secret; objectKey=tenants/tenant-1/raw-key";
         _finalize.ExecuteAsync(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
-            .Returns(Failure(unsafeMessage, FailureCodes.StorageUploadContentTypeMismatch));
+            .Returns(StorageUploadSessionResult.Ordinary(Failure(unsafeMessage, FailureCodes.StorageUploadContentTypeMismatch)));
         var controller = CreateController(new MemoryStream([1]), "text/plain", 1);
 
         var actionResult = await controller.UploadSessionContent(Guid.CreateVersion7(), CancellationToken.None);

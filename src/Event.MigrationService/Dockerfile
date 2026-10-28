@@ -7,6 +7,8 @@ ARG BUILD_CONFIGURATION=Release
 ARG TARGETARCH
 WORKDIR /src
 COPY ["global.json", "Directory.Build.props", "Directory.Packages.props", "./"]
+COPY ["NuGet.Config", "./"]
+COPY ["vendor/secretkit/", "vendor/secretkit/"]
 COPY ["src/Event.MigrationService/Event.MigrationService.csproj", "src/Event.MigrationService/packages.lock.json", "src/Event.MigrationService/"]
 COPY ["src/Explore.Atproto.Transport/Explore.Atproto.Transport.csproj", "src/Explore.Atproto.Transport/packages.lock.json", "src/Explore.Atproto.Transport/"]
 COPY ["src/Explore.Application/Explore.Application.csproj", "src/Explore.Application/packages.lock.json", "src/Explore.Application/"]
@@ -30,6 +32,7 @@ RUN dotnet publish "Event.MigrationService.csproj" -c $BUILD_CONFIGURATION -o /a
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
+COPY --from=build /src/vendor/secretkit /app/vendor/secretkit
 COPY --chown=$APP_UID:$APP_UID --from=build /src/deploy/bootstrap/README.md /etc/islamu-event/bootstrap/README.md
 COPY --chown=$APP_UID:$APP_UID --from=build /src/schemas/configuration-manifest-v1alpha2.schema.json /app/schemas/configuration-manifest-v1alpha2.schema.json
 COPY --chown=$APP_UID:$APP_UID --from=build /src/schemas/tenant-configuration-package-v1alpha2.schema.json /app/schemas/tenant-configuration-package-v1alpha2.schema.json

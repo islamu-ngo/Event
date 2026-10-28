@@ -1,0 +1,31 @@
+Change-Id: CHG-01M5YBSKBQQK9KG9VEFZN9PBS7
+Title: "Select mutation execution authority before authorization"
+Type: fix
+Scope: access
+Summary: "Native mutation commands select their execution owner before authorization prepares principal sources, allowing tenant creation without changing database authority mid-operation."
+Impacts:
+  Breaking:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: Existing request and response contracts remain unchanged.
+  Security:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Authorization executes inside the selected owner before constructing the business handler; original credential and tenant authority remain fenced.
+  Migration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No schema or data migration is required.
+  Configuration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No configuration keys or authority selection settings change.
+  OpenAPI:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No HTTP routes or wire contracts change.
+  Operator:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Deploy the application update to repair tenant creation while retaining existing authorization and database ownership guards.

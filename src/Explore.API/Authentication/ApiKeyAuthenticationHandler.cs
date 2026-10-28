@@ -45,9 +45,20 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
             return persistedResult;
         }
 
-        var configuredClient = Options.Clients.FirstOrDefault(candidate =>
-            candidate.IsActive &&
-            ApiKeyHashing.MatchesHash(rawApiKey, candidate.SecretHash));
+        var timestamp = TimeProvider.GetTimestamp();
+        var observedAt = TimeProvider.GetUtcNow();
+        ApiKeyClientDescriptor? configuredClient = null;
+        string? verifiedHash = null;
+        DateTimeOffset? configuredExpiry = null;
+        foreach (var candidate in Options.Clients)
+        {
+            var hash = candidate.SecretHash;
+            if (!candidate.IsActive || !ApiKeyHashing.MatchesHash(rawApiKey, hash)) continue;
+            configuredClient = candidate;
+            verifiedHash = hash;
+            configuredExpiry = candidate.ExpiresAtUtc;
+            break;
+        }
 
         if (configuredClient is null)
         {
@@ -56,7 +67,7 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
             return AuthenticateResult.Fail("Invalid API key.");
         }
 
-        if (configuredClient.ExpiresAtUtc is DateTimeOffset expiresAtUtc && expiresAtUtc <= DateTimeOffset.UtcNow)
+        if (configuredExpiry is DateTimeOffset expiresAtUtc && expiresAtUtc <= TimeProvider.GetUtcNow())
         {
             _metrics.RecordExternalApiKeyAuthentication(
                 "expired",
@@ -66,13 +77,18 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
             return AuthenticateResult.Fail("API key expired.");
         }
 
-        return BuildSuccessResult(
+        var configuredResult = BuildSuccessResult(
             configuredClient.KeyId,
             configuredClient.TenantId,
             configuredClient.OwnerType,
             configuredClient.OwnerId,
             configuredClient.Scopes,
             "configured");
+        if (configuredResult.Principal?.TryGetApiKeyPrincipalContext() is { } configuredPrincipal)
+            Context.Features.Set(new ConfiguredApiKeyAuthenticationOrigin(
+                Options, configuredClient, verifiedHash!, configuredPrincipal, configuredExpiry,
+                TimeProvider, timestamp, observedAt));
+        return configuredResult;
     }
 
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)
@@ -156,6 +172,7 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
             new(ClaimTypes.Name, $"api-key:{keyId}"),
             new(ApiAuthenticationClaimTypes.AuthMethod, "api_key"),
             new(ApiAuthenticationClaimTypes.ApiKeyId, keyId),
+            new(ApiAuthenticationClaimTypes.CredentialSource, source),
             new(ApiAuthenticationClaimTypes.OwnerType, ownerType),
             new(ApiAuthenticationClaimTypes.OwnerId, ownerId)
         };

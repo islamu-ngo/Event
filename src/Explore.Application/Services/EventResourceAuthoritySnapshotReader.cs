@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Explore.Application.Authentication;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -15,7 +16,10 @@ namespace Explore.Application.Services;
 public sealed partial class EventResourceAuthoritySnapshotReader(
     IEventResourceRepository resources,
     IEventAuthoritySnapshotService eventAuthority,
-    IEventResourceGovernancePolicyReader governance) : IEventResourceAuthoritySnapshotReader
+    IEventResourceGovernancePolicyReader governance,
+    IExternalApiKeyAuthenticationRepository apiKeys,
+    IConfiguredApiKeyResourceAuthorityReader configuredApiKeys,
+    IEventResourceModerationSnapshotReader moderation) : IEventResourceAuthoritySnapshotReader
 {
     private const int FactLimit = EventResourceAuthorityRequest.MaximumBatchChecks;
 
@@ -42,10 +46,16 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
         if (evaluationUtc.Offset != TimeSpan.Zero) return result;
 
         EventResourceAuthorityRequest first = requests[0];
-        if (first.TenantId == Guid.Empty || first.SubjectUserId == Guid.Empty
+        if (first.TenantId == Guid.Empty || first.SubjectUserId == Guid.Empty || !first.HasConsistentPrincipal
             || requests.Any(request => request.TenantId != first.TenantId
+                || !request.HasConsistentPrincipal
                 || request.SubjectUserId != first.SubjectUserId
-                || request.IsMachineCaller != first.IsMachineCaller))
+                || request.IsMachineCaller != first.IsMachineCaller
+                || request.MachinePrincipal != first.MachinePrincipal))
+            return result;
+
+        if (first.IsMachineCaller
+            && !await HasCurrentMachineAuthorityAsync(first.MachinePrincipal!, evaluationUtc, cancellationToken))
             return result;
 
         Guid tenantId = first.TenantId;
@@ -81,6 +91,8 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
             .OfType<Guid>().Where(eventsById.ContainsKey).Distinct().ToArray();
         SubjectBatchFacts subject = await ReadSubjectBatchFactsAsync(
             first, eventRows, resourceRows, sessionsById, evaluationUtc, moderationEventIds, cancellationToken);
+        var moderationFacts = await moderation.ReadBatchAsync(requests, evaluationUtc, cancellationToken);
+        if (moderationFacts.Count != requests.Count) return result;
 
         for (int index = 0; index < requests.Count; index++)
         {
@@ -126,7 +138,10 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
             if (resource is null)
             {
                 result[index] = new(parent, parentEvent.ConcurrencyStamp, request.SubjectUserId,
-                    request.IsMachineCaller, management, governancePolicy);
+                    request.IsMachineCaller, management, governancePolicy, request.MachinePrincipal)
+                {
+                    Moderation = moderationFacts[index]
+                };
                 continue;
             }
 
@@ -134,9 +149,91 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
             result[index] = new(resource,
                 new(tenantId, request.SubjectUserId, request.IsMachineCaller, parent, audience, payloadSafe, governancePolicy),
                 management, generation, request.Action == "moderate" && subject.ModerationPrincipal is { } principal
-                    ? new(principal, CaptureNativeParent(parentEvent)) : null);
+                    ? new(principal, CaptureNativeParent(parentEvent)) : null, request.MachinePrincipal)
+            {
+                Moderation = moderationFacts[index]
+            };
         }
         return result;
+    }
+
+    private async Task<bool> HasCurrentMachineAuthorityAsync(
+        EventResourceMachinePrincipal principal, DateTimeOffset evaluationUtc, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(principal.KeyId) || principal.OwnerId == Guid.Empty)
+            return false;
+
+        if (principal.AuthorityTenantId is { } authorityTenantId)
+        {
+            var tenant = await resources.GetAuthorityTenantAsync(authorityTenantId, cancellationToken);
+            if (tenant is null || !tenant.IsActive)
+                return false;
+        }
+        else if (principal.OwnerType != ExternalApiKeyOwnerType.InstanceAdmin)
+            return false;
+
+        if (principal.OwnerType == ExternalApiKeyOwnerType.Tenant
+            && principal.OwnerId != principal.AuthorityTenantId)
+            return false;
+
+        if (principal.OwnerType == ExternalApiKeyOwnerType.User)
+        {
+            if (principal.AuthorityTenantId is not { } ownerTenantId)
+                return false;
+            var owner = await resources.GetTenantUserAsync(
+                ownerTenantId, principal.OwnerId, cancellationToken);
+            if (owner is not
+                {
+                    IsDeleted: false, StatusId: (int)TenantUserStatusEnum.Active,
+                    User: { IsDeleted: false }
+                })
+                return false;
+        }
+        else if (principal.OwnerType == ExternalApiKeyOwnerType.InstanceAdmin)
+        {
+            if (principal.AuthorityTenantId is not null)
+                return false;
+            var assignments = await resources.GetSubjectPlatformRolesAsync(
+                principal.OwnerId, FactLimit, cancellationToken);
+            if (!IsNativeInstanceAdmin(principal.OwnerId,
+                assignments.Where(assignment => assignment.User is { IsDeleted: false })))
+                return false;
+        }
+        else if (principal.OwnerType == ExternalApiKeyOwnerType.Organization)
+        {
+            var placement = await resources.GetAuthorityOrganizationTenantAsync(
+                principal.AuthorityTenantId!.Value, principal.OwnerId, cancellationToken);
+            if (placement is not { IsDeleted: false, IsSuspended: false, Organization: { IsDeleted: false } })
+                return false;
+        }
+        else if (principal.OwnerType == ExternalApiKeyOwnerType.Group)
+        {
+            var placement = await resources.GetAuthorityGroupTenantAsync(
+                principal.AuthorityTenantId!.Value, principal.OwnerId, cancellationToken);
+            if (placement is not { IsDeleted: false, IsSuspended: false, Group: { IsDeleted: false } })
+                return false;
+        }
+
+        switch (principal.CredentialSource)
+        {
+            case ApiKeyCredentialSource.Persisted:
+                ExternalApiKey? key = await apiKeys.GetByKeyIdForAuthentication(principal.KeyId, cancellationToken);
+                return key is not null
+                    && key.ExternalApiKeyStatusId is (int)ExternalApiKeyStatusEnum.Active
+                        or (int)ExternalApiKeyStatusEnum.PendingRotation
+                    && (!key.ExpiresAt.HasValue || key.ExpiresAt.Value > evaluationUtc.UtcDateTime)
+                    && string.Equals(key.KeyId, principal.KeyId, StringComparison.Ordinal)
+                    && key.TenantId == principal.AuthorityTenantId
+                    && key.OwnerType == principal.OwnerType && key.OwnerId == principal.OwnerId;
+            case ApiKeyCredentialSource.Configured:
+                ApiKeyPrincipalContext? configured = await configuredApiKeys.ReadAsync(
+                    principal.KeyId, evaluationUtc, cancellationToken);
+                return configured is not null
+                    && configured.CredentialSource == ApiKeyCredentialSource.Configured
+                    && EventResourceMachinePrincipal.Capture(configured) == principal;
+            default:
+                return false;
+        }
     }
 
     private async Task<SubjectBatchFacts> ReadSubjectBatchFactsAsync(

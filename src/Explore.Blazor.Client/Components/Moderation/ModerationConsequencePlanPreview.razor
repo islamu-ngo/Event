@@ -1,0 +1,63 @@
+@using Explore.Blazor.Client.Clients
+
+<section class="moderation-consequence-preview" data-plan-index="@PlanIndex">
+    @if (NestedUnderProfile)
+    {
+        <h5>@(PlanIndex == 0 ? "Base plan" : $"Additive plan {PlanIndex}")</h5>
+    }
+    else
+    {
+        <h4>@(PlanIndex == 0 ? "Base plan" : $"Additive plan {PlanIndex}")</h4>
+    }
+    <dl class="moderation-consequence-preview__facts">
+        <dt>Content</dt><dd data-dimension="content" data-mode="@Plan.Content">@ModerationValueLabel.Format(Plan.Content)</dd>
+        <dt>Management</dt><dd data-dimension="management" data-mode="@Plan.Management">@ModerationValueLabel.Format(Plan.Management)</dd>
+        <dt>Resources</dt><dd data-dimension="resources" data-mode="@Plan.Resources">@ModerationValueLabel.Format(Plan.Resources)</dd>
+        <dt>New admission</dt><dd data-dimension="newAdmission" data-mode="@Plan.NewAdmission">@ModerationValueLabel.Format(Plan.NewAdmission)</dd>
+        <dt>Existing admission</dt><dd data-dimension="existingAdmission" data-mode="@Plan.ExistingAdmission">@ModerationValueLabel.Format(Plan.ExistingAdmission)</dd>
+        <dt>Private disclosure</dt><dd data-dimension="privateDisclosure" data-mode="@Plan.PrivateDisclosure">@ModerationValueLabel.Format(Plan.PrivateDisclosure)</dd>
+        <dt>Settlement</dt><dd data-dimension="settlement" data-mode="@Plan.Settlement">@ModerationValueLabel.Format(Plan.Settlement)</dd>
+        <dt>Capacity</dt><dd data-dimension="capacity" data-mode="@Plan.Capacity">@ModerationValueLabel.Format(Plan.Capacity)</dd>
+        <dt>Credentials</dt><dd data-dimension="credentials" data-mode="@Plan.Credentials">@ModerationValueLabel.Format(Plan.Credentials)</dd>
+        <dt>Notifications</dt><dd data-dimension="notifications" data-mode="@Plan.Notifications">@ModerationValueLabel.Format(Plan.Notifications)</dd>
+        <dt>Recognition</dt><dd data-dimension="recognition" data-mode="@Plan.Recognition">@ModerationValueLabel.Format(Plan.Recognition)</dd>
+        <dt>Pending work</dt><dd data-dimension="pendingWork" data-mode="@Plan.PendingWork">@ModerationValueLabel.Format(Plan.PendingWork)</dd>
+        <dt>Restoration</dt><dd data-dimension="restoration" data-mode="@Plan.Restoration">@ModerationValueLabel.Format(Plan.Restoration)</dd>
+    </dl>
+    @if (Plan.Safeguards is { } safeguards)
+    {
+        @if (NestedUnderProfile)
+        {
+            <h6>Reference safeguards</h6>
+        }
+        else
+        {
+            <h5>Reference safeguards</h5>
+        }
+        <dl class="moderation-consequence-preview__facts">
+            <dt>Ordinary permission required</dt><dd data-safeguard="ordinaryPermissionRequired" data-value="@safeguards.OrdinaryPermissionRequired?.ToString()">@safeguards.OrdinaryPermissionRequired</dd>
+            <dt>Independent people, roles and origin preserved</dt><dd data-safeguard="preserveIndependentPeopleRolesAndOrigin" data-value="@safeguards.PreserveIndependentPeopleRolesAndOrigin?.ToString()">@safeguards.PreserveIndependentPeopleRolesAndOrigin</dd>
+            <dt>Prohibited effects rechecked at use and dispatch</dt><dd data-safeguard="recheckProhibitedEffectsAtUseAndDispatch" data-value="@safeguards.RecheckProhibitedEffectsAtUseAndDispatch?.ToString()">@safeguards.RecheckProhibitedEffectsAtUseAndDispatch</dd>
+            <dt>Protected remedies preserved</dt><dd data-safeguard="preserveProtectedRemedies" data-value="@safeguards.PreserveProtectedRemedies?.ToString()">@safeguards.PreserveProtectedRemedies</dd>
+            <dt>Qualified settlement routes preserved</dt><dd data-safeguard="preserveQualifiedSettlementRoutes" data-value="@safeguards.PreserveQualifiedSettlementRoutes?.ToString()">@safeguards.PreserveQualifiedSettlementRoutes</dd>
+            <dt>Remaining contributions recomputed</dt><dd data-safeguard="recomputeRemainingContributions" data-value="@safeguards.RecomputeRemainingContributions?.ToString()">@safeguards.RecomputeRemainingContributions</dd>
+            <dt>Automatic historical restoration</dt><dd data-safeguard="automaticHistoricalRestoration" data-value="@safeguards.AutomaticHistoricalRestoration?.ToString()">@safeguards.AutomaticHistoricalRestoration</dd>
+            <dt>Disclosed copies can be recalled</dt><dd data-safeguard="canRecallDisclosedCopies" data-value="@safeguards.CanRecallDisclosedCopies?.ToString()">@safeguards.CanRecallDisclosedCopies</dd>
+            <dt>Owning target transitions deduplicated</dt><dd data-safeguard="deduplicateByOwningTargetTransition" data-value="@safeguards.DeduplicateByOwningTargetTransition?.ToString()">@safeguards.DeduplicateByOwningTargetTransition</dd>
+            <dt>Irreversible conflicts require owning resolution</dt><dd data-safeguard="irreversibleCauseConflictRequiresOwningResolution" data-value="@safeguards.IrreversibleCauseConflictRequiresOwningResolution?.ToString()">@safeguards.IrreversibleCauseConflictRequiresOwningResolution</dd>
+            <dt>Each contribution's scope and interval preserved</dt><dd data-safeguard="preserveEachContributionScopeAndInterval" data-value="@safeguards.PreserveEachContributionScopeAndInterval?.ToString()">@safeguards.PreserveEachContributionScopeAndInterval</dd>
+            <dt>Both protective purposes preserved</dt><dd data-safeguard="preserveBothProtectivePurposes" data-value="@safeguards.PreserveBothProtectivePurposes?.ToString()">@safeguards.PreserveBothProtectivePurposes</dd>
+            <dt>Continuity limited to denied essential operations</dt><dd data-safeguard="continuityOnlyForActuallyDeniedEssentialOperations" data-value="@safeguards.ContinuityOnlyForActuallyDeniedEssentialOperations?.ToString()">@safeguards.ContinuityOnlyForActuallyDeniedEssentialOperations</dd>
+            <dt>Rescheduling extensions require new authority</dt><dd data-safeguard="rescheduleRequiresNewAuthorityToExtend" data-value="@safeguards.RescheduleRequiresNewAuthorityToExtend?.ToString()">@safeguards.RescheduleRequiresNewAuthorityToExtend</dd>
+            <dt>Operation composition</dt><dd data-safeguard="operations" data-value="@safeguards.Operations">@ModerationValueLabel.Format(safeguards.Operations)</dd>
+            <dt>Resource composition</dt><dd data-safeguard="resources" data-value="@safeguards.Resources">@ModerationValueLabel.Format(safeguards.Resources)</dd>
+            <dt>Participant composition</dt><dd data-safeguard="participants" data-value="@safeguards.Participants">@ModerationValueLabel.Format(safeguards.Participants)</dd>
+        </dl>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ModerationConsequenceModes Plan { get; set; } = default!;
+    [Parameter] public int PlanIndex { get; set; }
+    [Parameter] public bool NestedUnderProfile { get; set; }
+}

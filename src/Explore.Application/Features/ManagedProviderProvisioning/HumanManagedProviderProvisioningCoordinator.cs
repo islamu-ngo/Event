@@ -92,6 +92,8 @@ public sealed class HumanManagedProviderProvisioningCoordinator(
                     CancellationToken applyToken)
                 {
                     var rows = await data.ApplyAsync(applyToken);
+                    await identityFence.MatchAndBindAsync(account, rows.UserId, rows.UserExternalLoginId,
+                        rows.TenantId, replacementProvisioning: !rows.AlreadyProvisioned, applyToken);
                     return OriginalOwnerDecision<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>>.Commit(
                         BaseCommandResponse.Success(new ManagedProviderClientProvisioningResultDto
                         {

@@ -15,4 +15,5 @@ using System.Text.Json.Serialization;
 [JsonSerializable(typeof(TenantConfigurationPackageV1Alpha2))]
 [JsonSerializable(typeof(ConfigurationManifestLegalDocumentV1Alpha2))]
 [JsonSerializable(typeof(ConfigurationManifestPaidEventPolicyPayloadV1Alpha2))]
+[JsonSerializable(typeof(ConfigurationModerationDocumentV1))]
 public sealed partial class ConfigurationPortabilityJsonContext : JsonSerializerContext;

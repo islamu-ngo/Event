@@ -30,6 +30,7 @@ public sealed class RegistrationProviderBinding : ITenantEntity, IAuditableEntit
     public RegistrationEvidenceHash? PublishedMappingRevisionHash { get; private set; }
     public string PublishedMappingRevisionHashKey { get; private set; } = string.Empty;
     public DateTime? PublishedAt { get; private set; }
+    public RegistrationProviderBindingPublication? Publication { get; private set; }
     public IReadOnlyList<RegistrationProviderFieldMapping> FieldMappings => _fieldMappings;
     public IReadOnlyList<RegistrationProviderOptionMapping> OptionMappings => _optionMappings;
     public IReadOnlyList<RegistrationProviderCapability> Capabilities => _capabilities;
@@ -136,9 +137,12 @@ public sealed class RegistrationProviderBinding : ITenantEntity, IAuditableEntit
         ArgumentNullException.ThrowIfNull(revisionHash);
         if (BlocksPublication((RegistrationProviderDriftClassEnum)DriftClassId))
             throw new InvalidOperationException("Blocking schema drift prevents provider binding publication.");
+        DateTime instant = RegistrationProviderConnection.EnsureUtc(publishedAt, nameof(publishedAt));
+        var publication = RegistrationProviderBindingPublication.Create(TenantId, Id, revisionHash, instant);
         PublishedMappingRevisionHash = revisionHash;
         PublishedMappingRevisionHashKey = revisionHash.Value;
-        PublishedAt = RegistrationProviderConnection.EnsureUtc(publishedAt, nameof(publishedAt));
+        PublishedAt = instant;
+        Publication = publication;
         StateId = (int)RegistrationProviderBindingStateEnum.Published;
         ConcurrencyStamp = Guid.CreateVersion7();
     }

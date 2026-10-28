@@ -10,13 +10,7 @@ public class UpdateUserDtoValidator : AbstractValidator<UpdateUserDto>
             .SetValidator(new UpdateUserNamesDtoValidator())
             .When(p => p.Names is not null);
 
-        RuleFor(p => p.ProfileImage!)
-            .SetValidator(new UpdateUserProfileImageDtoValidator())
-            .When(p => p.ProfileImage is not null);
-
-        RuleFor(p => p)
-            .Must(p => p.Names is not null || p.ProfileImage is not null)
-            .WithMessage("At least one of Names or ProfileImage must be provided.");
+        RuleFor(p => p.Names).NotNull().WithMessage("Names must be provided.");
     }
 }
 

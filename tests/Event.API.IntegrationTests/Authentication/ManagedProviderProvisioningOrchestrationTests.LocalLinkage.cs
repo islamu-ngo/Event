@@ -7,6 +7,7 @@ using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Management;
 using Explore.Application.Features.ManagedProviderProvisioning.Requests.Commands;
 using Explore.Application.Responses;
+using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -247,7 +248,8 @@ public sealed partial class ManagedProviderProvisioningOrchestrationTests
         internal DbContext Identity(AsyncServiceScope scope) => topology == IdentityDatabaseTopology.External
             ? scope.ServiceProvider.GetRequiredService<ExternalIdentityDbContext>() : Application(scope);
         internal LocalIdentityCredentialStateStore Store(AsyncServiceScope scope) => new(Identity(scope), Application(scope),
-            scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), Lifecycle.Clock);
+            scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), Lifecycle.Clock,
+            scope.ServiceProvider.GetRequiredService<PrivacyIdentityFenceOperation>());
 
         internal ManagementTenantProvisioningRequestDto ManagedRequest() =>
             ManagedTenantProvisioningRequestCodec.Deserialize($$$"""

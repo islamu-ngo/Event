@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5M63QEFFDJ3EW2ZXW09696D
+Title: "Clarify selected moderation secret authority responsibilities"
+Type: docs
+Scope: privacy
+Summary: "Preserve the corrected source-type and selected-authority guidance without rewriting the already recorded catalogue fragment."
+Group: moderation-selected-secret-authorities
+Supersedes:
+  - CHG-01M502NVMF004QXK6BRM7PJ1TP
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Recognition bindings permit only Infisical or environment-variable source types under the explicitly selected authority, including Development/Testing-only UserSecrets; acknowledged overlap is required, while instance-only maintenance and measurement credentials do not supply native permission."
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: planned
+    Detail: "Paired guides explain catalogue ownership, binding source types versus selected authority, and blank configuration coordinates; complete programme deployment and recovery guidance before PR. Metadata does not select runtime configuration."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: planned
+    Detail: "Selected-authority and isolated launcher responsibilities are documented in paired guides; complete programme operation, restore and activation assurance before PR. No deployment support is certified here."

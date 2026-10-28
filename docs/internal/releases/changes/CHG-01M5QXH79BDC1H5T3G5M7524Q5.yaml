@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5QXH79BDC1H5T3G5M7524Q5
+Title: "Resolve tenant creators through persisted provider bindings"
+Type: fix
+Scope: access
+Summary: "Use the authenticated provider account's platform user binding for tenant creation and creator membership instead of treating a GUID token subject as the application user ID."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: mitigated
+    Detail: "The HTTP adapter uses the existing binding-aware identity query; the native creator still checks the original credential, linked platform identity, provider decision and commit fences. Unlinked provider accounts do not fall back to a GUID subject or email. The regression remains locally unbuilt and unrun."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Tenant creator attribution and optional administrator membership follow the existing persisted provider link. No new permission, link, setting or schema migration is introduced; source and product checks do not certify runtime behavior."

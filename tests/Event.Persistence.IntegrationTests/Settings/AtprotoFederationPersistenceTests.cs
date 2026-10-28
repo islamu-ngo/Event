@@ -42,6 +42,8 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
             ]);
         string[] movedKeys = dedicated.Select(setting => setting.SettingKey).ToArray();
         await Assert.That(await context.SystemSettings.AnyAsync(setting => movedKeys.Contains(setting.SettingKey))).IsFalse();
+        await Assert.That(await context.SystemSettings.AnyAsync(setting =>
+            setting.SettingKey == "federation.decentralization_enabled")).IsFalse();
         await Assert.That(AtprotoFederationSettingDefinitions.EventsBackfillMode.AllowedValues!)
             .IsEquivalentTo(["downtime_only", "full"]);
         await Assert.That(settings.Any(setting =>

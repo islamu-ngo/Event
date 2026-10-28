@@ -1,0 +1,46 @@
+Change-Id: CHG-01M4M0P4BT5JVA0BTY2BPKSMZS
+Title: "Compute purpose-bound recognition tokens without retaining identifiers"
+Type: feat
+Scope: privacy
+Summary: >-
+  Add the native recognition computation primitive without enabling capture.
+  HMAC-SHA-256 binds the exact provider account to serialization version,
+  action/enrollment purpose, trust domain and key identity/generation using
+  strict length-prefixed UTF-8. Retain only minimized digest coordinates and
+  clear ephemeral key material. Seven Domain and fourteen Application scenarios
+  are authored but unrun and unbuilt under the implementation-first programme
+  override. Native identity, policy, sanction and secret authority, key-ring
+  provisioning, durable capture, erasure settlement and recovery remain required.
+Group: moderation-recognition-foundation
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Purpose, trust and key-generation separation prevents token reuse across
+      those coordinates. Invalid Unicode rejects rather than collapsing into
+      a replacement identity. Computation is not proof of native identity or
+      permission to retain, match or enforce a sanction.
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+    Detail: "No startup key setting, key-ring provider or capture service is registered."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented
+    Detail: >-
+      This additive source primitive does not enable moderation recognition.
+      The selected secret authority and qualified native capture, matching,
+      erasure ordering, recovery and complete consumer readiness remain separate
+      obligations before activation.

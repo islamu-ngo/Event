@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5YRZSZEZZTVG6RZ5BFK2D4J
+Title: "Keep read grants bound to their original settlement"
+Type: fix
+Scope: access
+Summary: "Freeze qualified read-grant coordinates before saving, reject unrelated tracked writes through final commit, and admit only the native recovery advancement owned by the original transaction."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Bind exact grant objects and pre-save values to the original transaction, validate owned writes through both saves and final admission, and accept recovery advancement only from the DbContext's native object and coordinates. Added regression sources remain unbuilt/unrun; remote provider verification is required."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented
+    Detail: "Read-grant requests, responses, retry intent, finite retention, native authorization and database permissions are unchanged. Unexpected tracked writes or changed grant coordinates abort settlement; no data migration or tenant cleanup is required."

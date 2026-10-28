@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZHG3C1EGM152KZZ3J604GZ
+Title: "Model independent finite narrative custody adoption"
+Type: feat
+Scope: access
+Summary: "Keep confidential-allegation and participant-investigation custody terms purpose-specific, independently accepted and bound to exact finite source generations without enabling payload capture or access."
+Group: moderation-narrative-custody-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

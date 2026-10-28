@@ -5,3 +5,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Event.Benchmarks")]
 [assembly: InternalsVisibleTo("Explore.Infrastructure.Tests")]
 [assembly: InternalsVisibleTo("Event.Persistence.MutationTests")]
+[assembly: InternalsVisibleTo("Event.API.IntegrationTests")]

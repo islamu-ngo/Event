@@ -20,6 +20,8 @@ internal sealed class SecretKitHttpAuthority : IAsyncDisposable
     internal int Renewals => Volatile.Read(ref _renewals);
     internal int Inventories => Volatile.Read(ref _inventories);
     internal string[]? AdvertisedKeys { get; set; }
+    internal Dictionary<string, string[]>? InventoryKeysByFolder { get; set; }
+    internal Dictionary<string, int> InventoryStatusCodes { get; } = new(StringComparer.Ordinal);
     internal double MaximumTtl { get; set; } = 3600;
     internal string? BlockedKey { get; set; }
     internal string? ReturnedProject { get; set; }
@@ -89,9 +91,18 @@ internal sealed class SecretKitHttpAuthority : IAsyncDisposable
         server.MapGet("/api/v4/secrets", async context =>
         {
             Interlocked.Increment(ref authority._inventories);
+            string folder = context.Request.Query["secretPath"].ToString();
+            if (authority.InventoryStatusCodes.TryGetValue(folder, out int statusCode))
+            {
+                context.Response.StatusCode = statusCode;
+                return;
+            }
+            string[] keys = authority.InventoryKeysByFolder is { } folders
+                ? folders.GetValueOrDefault(folder, [])
+                : authority.AdvertisedKeys ?? authority.Values.Keys.ToArray();
             await context.Response.WriteAsJsonAsync(new
             {
-                secrets = (authority.AdvertisedKeys ?? authority.Values.Keys.ToArray()).Select(key => new
+                secrets = keys.Select(key => new
                 {
                     id = authority.OmitRevisionEvidence ? null : authority.ResourceId,
                     workspace = authority.ReturnedProject ?? context.Request.Query["projectId"].ToString(),

@@ -71,6 +71,12 @@ admitted value. A listed-then-missing member fails the group rather than
 publishing a smaller generation. Inventory and the staged local result are not
 remote transactional snapshots or provisioning-approval evidence.
 
+API startup treats only `Absent` as an unconfigured optional `/smtp` or
+`/analytics` group. Inventory denial, provider unavailability, invalid material
+and a listed member disappearing before its exact read fail startup with
+`secret_api_configuration_unavailable`. Mappings remain staged until every group
+is admitted, so a later optional-group failure publishes no partial configuration.
+
 Selected Environment/User Secrets runtime values are frozen when their process
 owner opens. Their owner generation changes on replacement, not on cache expiry
 or token renewal. The specialized Data Protection reader remains fresh against

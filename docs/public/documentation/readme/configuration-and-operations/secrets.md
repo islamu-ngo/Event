@@ -90,6 +90,13 @@ renewal starts before slow preparation, and startup failure retires the owner.
 Runtime status reports authentication health only; it does not certify provider
 ACLs or permission to write a particular secret.
 
+SMTP and analytics may be unconfigured when their selected authority genuinely
+reports no configuration. A provider outage, access denial, malformed value or
+secret disappearing during startup is not optional absence: the API refuses to
+start rather than silently disabling that capability. Restore the selected
+provider's availability, permissions or valid configuration, then restart.
+No partial startup mapping or fallback to another secret source is published.
+
 Review and apply Keycloak provisioning on the same running replica. Restarting,
 moving to another replica or losing retained comparison evidence requires a
 fresh review, even when both replicas use identical injected credentials.

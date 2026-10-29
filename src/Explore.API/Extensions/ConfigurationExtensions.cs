@@ -27,7 +27,7 @@ public static class ConfigurationExtensions
             var prepared = await owner.PrepareConfigurationGroupAsync(groups[index], cancellationToken).ConfigureAwait(false);
             if (!prepared.IsSuccess)
             {
-                if (prepared.Status == SecretKit.Core.SecretStatus.Absent || index > 0)
+                if (prepared.Status == SecretKit.Core.SecretStatus.Absent)
                     continue;
                 throw new InvalidOperationException("secret_api_configuration_unavailable");
             }

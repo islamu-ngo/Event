@@ -20,7 +20,7 @@ public sealed partial class SecretAuthorityAcquisition : IAsyncDisposable
     private readonly SocketsHttpHandler? _ownedTransport;
     private readonly LocalAuthorityReader? _local;
     private readonly CancellationTokenSource _lifetime = new();
-    private readonly TaskCompletionSource _retired = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<Task> _retired = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object _operationGate = new();
     private TaskCompletionSource? _preparationsDrained;
     private int _activePreparations;
@@ -207,12 +207,12 @@ public sealed partial class SecretAuthorityAcquisition : IAsyncDisposable
         }
         finally
         {
+            using var unpublishedTransport = ownedTransport;
             await using var unpublishedOwner = owner;
             if (client is not null)
                 await client.DisposeAsync().ConfigureAwait(false);
             if (session is not null)
                 await session.DisposeAsync().ConfigureAwait(false);
-            ownedTransport?.Dispose();
         }
     }
 
@@ -496,57 +496,49 @@ public sealed partial class SecretAuthorityAcquisition : IAsyncDisposable
             }
         }
         if (retire)
-            _ = RetireAsync();
-        return new ValueTask(_retired.Task);
+            _retired.TrySetResult(RetireAsync());
+        return new ValueTask(_retired.Task.Unwrap());
     }
 
     private async Task RetireAsync()
     {
-        try
+        using (_lifetime)
+        using (_ownedTransport)
+        using (_local)
         {
-            using (_lifetime)
-            using (_ownedTransport)
-            using (_local)
+            try
             {
                 try
                 {
-                    try
-                    {
-                        await _lifetime.CancelAsync().ConfigureAwait(false);
-                    }
-                    finally
-                    {
-                        if (_preparationsDrained is not null)
-                            await _preparationsDrained.Task.ConfigureAwait(false);
-                    }
+                    await _lifetime.CancelAsync().ConfigureAwait(false);
+                }
+                finally
+                {
+                    if (_preparationsDrained is not null)
+                        await _preparationsDrained.Task.ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (_maintenance is not null)
+                        await _maintenance.DisposeAsync().ConfigureAwait(false);
                 }
                 finally
                 {
                     try
                     {
-                        if (_maintenance is not null)
-                            await _maintenance.DisposeAsync().ConfigureAwait(false);
+                        if (_client is not null)
+                            await _client.DisposeAsync().ConfigureAwait(false);
                     }
                     finally
                     {
-                        try
-                        {
-                            if (_client is not null)
-                                await _client.DisposeAsync().ConfigureAwait(false);
-                        }
-                        finally
-                        {
-                            if (_session is not null)
-                                await _session.DisposeAsync().ConfigureAwait(false);
-                        }
+                        if (_session is not null)
+                            await _session.DisposeAsync().ConfigureAwait(false);
                     }
                 }
             }
-            _retired.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            _retired.TrySetException(exception);
         }
     }
 
@@ -608,11 +600,11 @@ public sealed partial class SecretAuthorityAcquisition : IAsyncDisposable
         }
         finally
         {
-            lease?.Dispose();
-            (configuration as IDisposable)?.Dispose();
-            export?.Dispose();
-            handle?.Dispose();
-            loader?.Dispose();
+            using var unpublishedLoader = loader;
+            using var unpublishedHandle = handle;
+            using var unpublishedExport = export;
+            using var unpublishedConfiguration = configuration as IDisposable;
+            using var unpublishedLease = lease;
         }
     }
 

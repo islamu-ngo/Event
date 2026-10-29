@@ -13,6 +13,42 @@ namespace Explore.Infrastructure.Tests.Secrets;
 public sealed class SecretKitAuthorityAcquisitionTests
 {
     [Test]
+    [Arguments(300)]
+    [Arguments(3600)]
+    public async Task BorrowedTransportSurvivesRejectedAndRetiredOwners(int maximumTtl)
+    {
+        await using var authority = await SecretKitHttpAuthority.StartAsync();
+        authority.MaximumTtl = maximumTtl;
+        string password = Guid.NewGuid().ToString("N");
+        authority.Values["password"] = password;
+        using var transport = new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            UseCookies = false,
+            ActivityHeadersPropagator = null
+        };
+        using var bootstrap = SecretMaterial.FromText(Guid.NewGuid().ToString("N"));
+        SecretAcquisitionEntry[] entries = [new("/database", "password", "Database:Password")];
+        var first = await SecretAuthorityAcquisition.OpenInfisicalAsync(
+            new(SecretAuthorityKind.Infisical, "Testing", SecretConsumerRole.Api),
+            entries, Options(authority), bootstrap, new(), hostTransport: transport);
+        if (first.IsSuccess)
+            await first.Value.DisposeAsync();
+        await Assert.That(first.Status).IsEqualTo(maximumTtl == 300 ? SecretStatus.Invalid : SecretStatus.Success);
+
+        authority.MaximumTtl = 3600;
+        var reopened = await SecretAuthorityAcquisition.OpenInfisicalAsync(
+            new(SecretAuthorityKind.Infisical, "Testing", SecretConsumerRole.Api),
+            entries, Options(authority), bootstrap, new(), hostTransport: transport);
+        await Assert.That(reopened.IsSuccess).IsTrue();
+        await using var owner = reopened.Value;
+        var prepared = await owner.PrepareGroupAsync(entries);
+        await Assert.That(prepared.IsSuccess).IsTrue();
+        using var lease = prepared.Value;
+        await Assert.That(lease.Configuration["Database:Password"]).IsEqualTo(password);
+    }
+
+    [Test]
     [Arguments("APPHOST:CLIENT_SECRET")]
     [Arguments("DATA_PROTECTION:WRAPPING_KEY")]
     [Arguments("EVENT_DP:PIN")]

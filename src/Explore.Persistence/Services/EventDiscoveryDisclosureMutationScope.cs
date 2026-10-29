@@ -1,4 +1,6 @@
 using Explore.Domain;
+using Explore.Domain.Enums;
+using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Settings;
 using Explore.Domain.Federation;
@@ -11,6 +13,8 @@ using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Services;
 
@@ -20,6 +24,7 @@ namespace Explore.Persistence.Services;
 /// </summary>
 internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext context)
 {
+    private ExploreDbContext Context => context;
     internal const int MaximumAffectedTenants = 1024;
     private const string Reason = TenantFilterBypassReasons.DiscoveryDisclosureMutation;
     private static readonly string[] OwnershipFields =
@@ -40,6 +45,115 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
     private bool _finalizationFailed;
     private bool _tenantEnrollmentFenced;
     private ManagedSettingsDiscoveryDisclosure? _managedSettings;
+    private PrivateHomeErasureObservation? _privateHomeErasure;
+    private long _privacyObservationVersion;
+
+    internal void RequireOriginalPrivacyErasureTransaction(Guid subjectId)
+    {
+        context.RequireBoundTenantLease();
+        if (subjectId == Guid.Empty || context.TenantFilterTenantId is not null || context.IsTenantFilterBypassed
+            || context.Database.CurrentTransaction is not { } transaction
+            || transaction.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("privacy_erasure_disclosure_owner_invalid");
+        HumanSecuritySourceGate.RequireCurrent(context);
+        EventDiscoveryEnrollmentGate.RequireCurrent(context);
+        if (transaction.TransactionId != _transactionId || !_users.Contains(subjectId)
+            || _terminal || _finalizationFailed || _managedSettings is not null)
+            throw new InvalidOperationException("privacy_erasure_disclosure_owner_invalid");
+    }
+
+    internal Task<PrivateHomeErasureObservation> CreatePrivateHomeErasureObservationAsync(
+        Guid subjectId, IReadOnlyCollection<Guid> exactHomeIds, CancellationToken cancellationToken) =>
+        PrivateHomeErasureObservation.CreateAsync(this, subjectId, exactHomeIds, cancellationToken);
+
+    internal IDisposable BeginPrivateHomeErasureObservation(PrivateHomeErasureObservation observation)
+    {
+        observation.RequireCurrent();
+        if (_privateHomeErasure is not null || !observation.TryUse(this))
+            throw new InvalidOperationException("privacy_erasure_disclosure_observation_conflict");
+        _privateHomeErasure = observation;
+        return new PrivateHomeErasureLease(this, observation);
+    }
+
+    internal sealed class PrivateHomeErasureObservation
+    {
+        private readonly EventDiscoveryDisclosureMutationScope _scope;
+        private readonly ExploreDbContext _context;
+        private readonly DbContextId _contextId;
+        private readonly IDbContextTransaction _transaction;
+        private readonly RelationalConnectionIdentity _connection;
+        private readonly long _version;
+        private readonly Dictionary<Guid, (Guid Tenant, Guid Subject, int Kind)> _owners = [];
+        private bool _sealed;
+        private bool _used;
+        private bool _invalid;
+
+        private PrivateHomeErasureObservation(EventDiscoveryDisclosureMutationScope scope, Guid subjectId)
+        {
+            _scope = scope;
+            _context = scope.Context;
+            _contextId = _context.ContextId;
+            _transaction = _context.Database.CurrentTransaction!;
+            _connection = RelationalConnectionIdentity.Capture(_context);
+            _version = scope._privacyObservationVersion;
+            SubjectId = subjectId;
+        }
+
+        internal Guid SubjectId { get; }
+        internal static async Task<PrivateHomeErasureObservation> CreateAsync(EventDiscoveryDisclosureMutationScope scope,
+            Guid subjectId, IReadOnlyCollection<Guid> exactHomeIds, CancellationToken cancellationToken)
+        {
+            scope.RequireOriginalPrivacyErasureTransaction(subjectId);
+            if (scope._privateHomeErasure is not null)
+                throw new InvalidOperationException("privacy_erasure_disclosure_observation_conflict");
+            Guid[] keys = exactHomeIds.Distinct().ToArray();
+            if (keys.Length != exactHomeIds.Count || keys.Contains(Guid.Empty))
+                throw new InvalidOperationException("privacy_erasure_disclosure_owner_invalid");
+            var observation = new PrivateHomeErasureObservation(scope, subjectId);
+            var owners = await scope.Context.Locations.AsNoTracking()
+                .IgnoreTenantFilter(TenantFilterBypassReasons.UserPrivacyErasure)
+                .Where(home => keys.Contains(home.Id) && home.OwnerUserId == subjectId
+                    && home.LocationKindId == (int)LocationKindEnum.PrivateHome)
+                .Select(home => new { home.Id, home.TenantId, home.OwnerUserId, home.LocationKindId })
+                .ToArrayAsync(cancellationToken);
+            observation.RequireCurrent();
+            if (owners.Length != keys.Length || owners.Any(owner => owner.TenantId == Guid.Empty))
+                throw new InvalidOperationException("discovery_disclosure_owner_unavailable");
+            foreach (var owner in owners)
+                observation._owners.Add(owner.Id, (owner.TenantId, owner.OwnerUserId!.Value, owner.LocationKindId));
+            observation._sealed = true;
+            return observation;
+        }
+        internal bool Contains(Guid id) => _owners.ContainsKey(id);
+        internal bool Matches(Guid id, Guid tenant, Guid subject, int kind) =>
+            _owners.TryGetValue(id, out var owner) && owner == (tenant, subject, kind);
+        internal bool TryUse(EventDiscoveryDisclosureMutationScope scope)
+        {
+            if (!_sealed || _used || !ReferenceEquals(scope, _scope)) return false;
+            _used = true;
+            return true;
+        }
+        internal void Invalidate() => _invalid = true;
+        internal void RequireCurrent()
+        {
+            _scope.RequireOriginalPrivacyErasureTransaction(SubjectId);
+            if (_invalid || _version != _scope._privacyObservationVersion
+                || _contextId != _context.ContextId || !ReferenceEquals(_transaction, _context.Database.CurrentTransaction)
+                || !_connection.Matches(_context) || _connection.State != ConnectionState.Open
+                || !_connection.Owns(_transaction.GetDbTransaction()))
+                throw new InvalidOperationException("privacy_erasure_disclosure_observation_expired");
+        }
+    }
+
+    private sealed class PrivateHomeErasureLease(EventDiscoveryDisclosureMutationScope scope,
+        PrivateHomeErasureObservation observation) : IDisposable
+    {
+        public void Dispose()
+        {
+            if (ReferenceEquals(scope._privateHomeErasure, observation)) scope._privateHomeErasure = null;
+            observation.Invalidate();
+        }
+    }
 
     private static readonly HashSet<Type> TenantSources =
     [
@@ -421,7 +535,14 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
                     break;
                 case LocationPii:
                     keys = Keys(entry, nameof(LocationPii.LocationId));
-                    await EnlistOwnersAsync<Location>(keys, ownerChecks, cancellationToken);
+                    if (_privateHomeErasure is { } observation)
+                    {
+                        if (entry.State != EntityState.Deleted)
+                            throw new InvalidOperationException("privacy_erasure_disclosure_owner_invalid");
+                        await EnlistPrivateHomeErasureOwnersAsync(keys, observation, ownerChecks, cancellationToken);
+                    }
+                    else
+                        await EnlistOwnersAsync<Location>(keys, ownerChecks, cancellationToken);
                     break;
                 case EventIslamicAspect or EventTechAspect:
                     keys = Keys(entry, "Id");
@@ -491,6 +612,35 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
                 await RelationalEntityRowFence.AcquireGlobalAsync<Tenant>(context, tenantId, cancellationToken);
             }
             _tenantParents.Add(tenantId);
+        }
+    }
+
+    private async Task EnlistPrivateHomeErasureOwnersAsync(Guid[] keys, PrivateHomeErasureObservation observation,
+        List<Func<Task>> ownerChecks, CancellationToken cancellationToken)
+    {
+        observation.RequireCurrent();
+        if (keys.Length == 0 || keys.Any(key => !observation.Contains(key)))
+            throw new InvalidOperationException("discovery_disclosure_owner_unavailable");
+        var owners = await EventDiscoverySourceProviderOperations.ReadNonRetainingPlanAsync(
+            context, ReadOwnersAsync, cancellationToken);
+        observation.RequireCurrent();
+        Enlist(owners.Values);
+        ownerChecks.Add(async () => { _ = await ReadOwnersAsync(context); });
+
+        async Task<Dictionary<Guid, Guid>> ReadOwnersAsync(ExploreDbContext reader)
+        {
+            observation.RequireCurrent();
+            var rows = await reader.Locations.AsNoTracking()
+                .IgnoreTenantFilter(TenantFilterBypassReasons.UserPrivacyErasure)
+                .Where(home => keys.Contains(home.Id) && home.OwnerUserId == observation.SubjectId
+                    && home.LocationKindId == (int)LocationKindEnum.PrivateHome)
+                .Select(home => new { home.Id, home.TenantId, home.OwnerUserId, home.LocationKindId })
+                .ToArrayAsync(cancellationToken);
+            observation.RequireCurrent();
+            if (rows.Length != keys.Length || rows.Any(home =>
+                !observation.Matches(home.Id, home.TenantId, home.OwnerUserId!.Value, home.LocationKindId)))
+                throw new InvalidOperationException("discovery_disclosure_owner_unavailable");
+            return rows.ToDictionary(home => home.Id, home => home.TenantId);
         }
     }
 
@@ -606,6 +756,9 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
 
     internal void Reset()
     {
+        _privateHomeErasure?.Invalidate();
+        _privateHomeErasure = null;
+        _privacyObservationVersion++;
         context.ResetDiscoveryEnrollmentCreations();
         _transactionId = null;
         _tenants.Clear();

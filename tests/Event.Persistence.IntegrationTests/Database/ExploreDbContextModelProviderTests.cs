@@ -6,6 +6,7 @@ using Explore.Persistence.Identity;
 using Explore.Persistence.Models;
 using Explore.Persistence.Schema;
 using Explore.Secrets.Database;
+using Event.Persistence.IntegrationTests.Migrations;
 using Microsoft.Extensions.Configuration;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,33 @@ namespace Event.Persistence.IntegrationTests.Database;
 
 public sealed class ExploreDbContextModelProviderTests
 {
+    [Test]
+    [Arguments("PostgreSql")]
+    [Arguments("Sqlite")]
+    [Arguments("SqlServer")]
+    [Arguments("MariaDb")]
+    [Arguments("MySql")]
+    public async Task EveryLocationCarrierRetainsItsPhysicalReferenceConstraint(string provider)
+    {
+        using var context = CreateContext(provider);
+        IModel model = context.GetService<IDesignTimeModel>().Model;
+        foreach (var carrier in EventLocationContractionAssertions.Carriers)
+        {
+            IEntityType entity = model.FindEntityType(carrier.Type)!;
+            var store = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+            await Assert.That(entity.FindProperty(nameof(Explore.Domain.EventSession.LocationId))!.GetColumnName(store))
+                .IsEqualTo("location_id");
+            await Assert.That(entity.FindProperty(nameof(Explore.Domain.EventSession.EventLocationId))!.GetColumnName(store))
+                .IsEqualTo("event_location_id");
+            string expectedName = carrier.PhysicalName(provider);
+            ICheckConstraint check = entity.GetCheckConstraints().Single(item => item.Name == expectedName);
+            await Assert.That(check.Sql).IsEqualTo("location_id IS NULL OR event_location_id IS NOT NULL");
+            ITable table = model.GetRelationalModel().FindTable(store.Name, store.Schema)!;
+            await Assert.That(table.CheckConstraints.Single(item => item.Name == expectedName).Sql)
+                .IsEqualTo("location_id IS NULL OR event_location_id IS NOT NULL");
+        }
+    }
+
     [Test]
     [Arguments("PostgreSql")]
     [Arguments("Sqlite")]

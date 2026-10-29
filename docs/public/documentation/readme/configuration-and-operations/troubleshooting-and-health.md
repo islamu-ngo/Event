@@ -6,6 +6,8 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+If startup fails and cleanup also reports an error, both failures are retained. Diagnose the startup error as well as the cleanup error; a cleanup failure does not replace the original startup failure. No configuration change or data reset is required for this behavior.
+
 Setup Live enrollment and write receipts require the Runtime storage permissions
 installed by the current database migration process. If an enrollment request
 fails with PostgreSQL permission error `42501`, apply the updated migration

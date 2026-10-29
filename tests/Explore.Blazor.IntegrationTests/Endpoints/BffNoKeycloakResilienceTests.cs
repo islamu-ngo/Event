@@ -3,7 +3,8 @@ using Explore.Blazor.Client.Clients;
 using Explore.Blazor.HealthChecks;
 using Explore.Blazor.IntegrationTests.Fixtures;
 using Explore.Blazor.Services;
-using Microsoft.AspNetCore.DataProtection;
+using Event.Testing.DataProtection;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -405,8 +406,9 @@ public class BffNoKeycloakResilienceTests : IAsyncDisposable
 
             builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<Microsoft.Extensions.Options.IConfigureOptions<Microsoft.AspNetCore.DataProtection.KeyManagement.KeyManagementOptions>>();
-                services.AddDataProtection().UseEphemeralDataProtectionProvider();
+                services.AddTestBffSessionAuthority();
+                services.Replace(ServiceDescriptor.Singleton<IExternalDataProtectionSource>(provider =>
+                    new ExternalDataProtectionTestAuthority("bff", provider.GetRequiredService<TimeProvider>())));
 
                 services.RemoveAll<IDistributedCache>();
                 services.AddDistributedMemoryCache();

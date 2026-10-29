@@ -37,225 +37,68 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: "eng/release/**/packages.lock.json"
+
+      - name: Build Native Selection
+        run: |
+          dotnet restore eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --locked-mode
+          dotnet build eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release --no-restore --verbosity quiet --nologo
+
       - name: Detect Build/Test-Relevant Changes
         id: changes
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
+          base_sha="HEAD~1"
+          if [[ "$EVENT_NAME" == "pull_request" && -n "$PR_BASE_SHA" ]]; then
+            base_sha="$PR_BASE_SHA"
+          elif [[ "$EVENT_NAME" == "merge_group" && -n "$MERGE_GROUP_BASE_SHA" ]]; then
+            base_sha="$MERGE_GROUP_BASE_SHA"
+          elif [[ "$EVENT_NAME" == "push" && -n "$PUSH_BEFORE_SHA" && "$PUSH_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            base_sha="$PUSH_BEFORE_SHA"
+          fi
 
-          is_build_test_ignored() {
-            case "$1" in
-              .env.example|docker-compose.yml|docs/internal/CONFIGURATION.md|configurator/definitions/*) return 1 ;;
-              schemas/configuration-manifest-v1alpha2.schema.json|schemas/tenant-configuration-package-v1alpha2.schema.json) return 1 ;;
-              .agents/*|.claude/*|.codex/*|.copilot/*|.gemini/*|.opencode/*|.repomix/*|.sisyphus/*|.taskmaster/*) return 0 ;;
-              _bmad/*|_bmad-output/*) return 0 ;;
-              docs/*|schemas/*|assets/*|dev/*|event/*) return 0 ;;
-              cerbos/*|docker/*|src/Explore.AppHost/*|tests/Event.Benchmarks/*|amp/*) return 0 ;;
-              *.md|LICENSE|.editorconfig|.dockerignore|.mcp.json|repomix.config.json|opencode.json|jean.json) return 0 ;;
-              *) return 1 ;;
+          changed_paths="$RUNNER_TEMP/build-test-changed-paths.txt"
+          if ! git diff --name-only --no-renames "$base_sha" "$GITHUB_SHA" > "$changed_paths"; then
+            : > "$changed_paths"
+          fi
+          selection="$(dotnet eng/release/src/ISLAMU.ReleaseEngineering/bin/Release/net10.0/ISLAMU.ReleaseEngineering.dll select-build-test-changes "$changed_paths")"
+          declare -A decisions=()
+          any_lane=false
+          while IFS='=' read -r key value; do
+            case "$key" in
+              run-tests|run-app-tests|run-domain-tests|run-architecture-tests|run-setup-tests|run-infrastructure-tests|run-blazor-tests|run-secrets-tests) ;;
+              *) echo "Invalid native selection key" >&2; exit 1 ;;
             esac
-          }
-
-          is_global_dependency() {
-            case "$1" in
-              Directory.Build.props|Directory.Packages.props|NuGet.Config|global.json|.ci/*|Explore.slnx|packages.lock.json|.github/workflows/*) return 0 ;;
-              *) return 1 ;;
-            esac
-          }
-
-          base_sha=""
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base_sha="${{ github.event.pull_request.base.sha }}"
-          elif [ "${{ github.event_name }}" = "merge_group" ]; then
-            base_sha="${{ github.event.merge_group.base_sha }}"
-          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-            base_sha="${{ github.event.before }}"
-          fi
-
-          if [ -z "$base_sha" ]; then
-            base_sha="HEAD~1"
-          fi
-
-          changed_files="$(git diff --name-only "$base_sha" "$GITHUB_SHA" || true)"
-
-          if [ -z "$changed_files" ]; then
-            {
-              echo "run-tests=true"
-              echo "run-app-tests=true"
-              echo "run-domain-tests=true"
-              echo "run-architecture-tests=true"
-              echo "run-setup-tests=true"
-              echo "run-infrastructure-tests=true"
-              echo "run-blazor-tests=true"
-              echo "run-secrets-tests=true"
-            } >> "$GITHUB_OUTPUT"
-            {
-              echo "## Build & Test Change Detection"
-              echo
-              echo "Could not determine changed files; running all subsystem test suites."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          relevant_files=""
-          while IFS= read -r changed_file; do
-            [ -z "$changed_file" ] && continue
-
-            if ! is_build_test_ignored "$changed_file"; then
-              relevant_files="${relevant_files}${changed_file}"$'\n'
+            if [[ "$value" != true && "$value" != false ]] || [[ -v "decisions[$key]" ]]; then
+              echo "Invalid or duplicate native selection decision" >&2
+              exit 1
             fi
-          done <<< "$changed_files"
-
-          if [ -z "$relevant_files" ]; then
-            {
-              echo "run-tests=false"
-              echo "run-app-tests=false"
-              echo "run-domain-tests=false"
-              echo "run-architecture-tests=false"
-              echo "run-setup-tests=false"
-              echo "run-infrastructure-tests=false"
-              echo "run-blazor-tests=false"
-              echo "run-secrets-tests=false"
-            } >> "$GITHUB_OUTPUT"
-            {
-              echo "## Build & Test Change Detection"
-              echo
-              echo "Only paths owned by dedicated or documentation workflows changed; Build & Test will report an intentional no-op pass."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            decisions[$key]="$value"
+            if [[ "$key" != run-tests && "$value" == true ]]; then any_lane=true; fi
+          done <<< "$selection"
+          if [[ "${#decisions[@]}" != 8 || "${decisions[run-tests]}" != "$any_lane" ]]; then
+            echo "Incomplete or inconsistent native selection" >&2
+            exit 1
           fi
-
-          echo "run-tests=true" >> "$GITHUB_OUTPUT"
-
-          run_app="false"
-          run_domain="false"
-          run_arch="false"
-          run_setup="false"
-          run_infra="false"
-          run_blazor="false"
-          run_secrets="false"
-
-          all_subsystems="false"
-          while IFS= read -r file; do
-            [ -z "$file" ] && continue
-            if is_global_dependency "$file"; then
-              all_subsystems="true"
-              break
-            fi
-          done <<< "$relevant_files"
-
-          if [ "$all_subsystems" = "true" ]; then
-            run_app="true"
-            run_domain="true"
-            run_arch="true"
-            run_setup="true"
-            run_infra="true"
-            run_blazor="true"
-            run_secrets="true"
-          else
-            while IFS= read -r file; do
-              [ -z "$file" ] && continue
-              case "$file" in
-                src/Explore.Domain/*|tests/Event.Domain.UnitTests/*)
-                  run_domain="true"
-                  run_app="true"
-                  run_arch="true"
-                  run_infra="true"
-                  ;;
-                src/Explore.Application/*|tests/Event.Application.UnitTests/*)
-                  run_app="true"
-                  run_arch="true"
-                  run_infra="true"
-                  ;;
-                src/Explore.API/*|tests/Event.API.IntegrationTests/*)
-                  run_app="true"
-                  run_infra="true"
-                  run_arch="true"
-                  ;;
-                src/Explore.Infrastructure/*|src/Explore.Persistence/*|src/Explore.Atproto.Transport/*|src/Event.MigrationService/*|tests/Explore.Infrastructure.Tests/*|tests/Event.Persistence.IntegrationTests/*)
-                  run_infra="true"
-                  run_arch="true"
-                  ;;
-                src/Explore.Secrets/*|tests/Explore.Secrets.UnitTests/*)
-                  run_secrets="true"
-                  run_infra="true"
-                  run_arch="true"
-                  ;;
-                src/Explore.Blazor/*|src/Explore.Blazor.Client/*|src/Event.Web.BffHosting/*|tests/Explore.Blazor.Client.Tests/*|tests/Explore.Blazor.IntegrationTests/*)
-                  run_blazor="true"
-                  run_arch="true"
-                  ;;
-                NuGet.Config|.env.example|docker-compose.yml|docs/internal/CONFIGURATION.md|configurator/definitions/*|tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/*)
-                  run_arch="true"
-                  run_setup="true"
-                  ;;
-                src/Event.Wire.Contracts/*|tests/Event.Wire.Contracts.UnitTests/*|eng/tools/Explore.GeneratedContracts/*|tests/Explore.GeneratedContracts.Tests/*)
-                  run_arch="true"
-                  ;;
-                src/Explore.Diagnostic/*|tests/Explore.Diagnostic.UnitTests/*)
-                  run_arch="true"
-                  ;;
-                src/Event.Standalone/*|tests/Event.Standalone.IntegrationTests/*)
-                  run_arch="true"
-                  run_infra="true"
-                  run_blazor="true"
-                  ;;
-                tests/Event.Architecture.Tests/*)
-                  run_arch="true"
-                  ;;
-                schemas/configuration-manifest-v1alpha2.schema.json|schemas/tenant-configuration-package-v1alpha2.schema.json|eng/configuration-manifest-schema/*)
-                  run_arch="true"
-                  ;;
-                src/*)
-                  run_app="true"
-                  run_domain="true"
-                  run_arch="true"
-                  run_setup="true"
-                  run_infra="true"
-                  run_blazor="true"
-                  run_secrets="true"
-                  ;;
-              esac
-              case "$file" in
-                src/Explore.Blazor.Client/Services/SetupLive/*|tests/Explore.Blazor.Client.Tests/SetupLive/*)
-                  run_arch="true"
-                  run_setup="true"
-                  ;;
-                src/Event.Wire.Contracts/SetupLive/*|src/Explore.Domain/SetupLive/*|src/Explore.Application/ApplicationServicesRegistration.cs|src/Explore.Application/Contracts/SetupLive/*|src/Explore.Application/Contracts/Persistence/ISetupLiveRepository.cs|src/Explore.Application/Contracts/Infrastructure/ISetupSecretBindingReadinessReader.cs|src/Explore.Application/Contracts/Secrets/ISetupSecretBindingWriter.cs|src/Explore.Application/Contracts/Secrets/ISetupSecretBindingCommitBarrier.cs|src/Explore.Application/Features/SetupLive/*|src/Explore.Application/Telemetry/SetupLiveTelemetry.cs|src/Explore.Persistence/PersistenceServicesRegistration.cs|src/Explore.Persistence/ExploreDbContext.DbSets.cs|src/Explore.Persistence/ExploreDbContext.QueryFilters.cs|src/Explore.Persistence/Configurations/Entities/SetupLiveConfigurations.cs|src/Explore.Persistence/Repositories/SetupLiveRepository.cs|src/Explore.Persistence/RelationalSetupSecretBindingOperationCoordinator.cs|src/Explore.Persistence/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Persistence.Migrations.MySql/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence.Migrations.MySql/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Persistence.Migrations.SqlServer/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence.Migrations.SqlServer/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Persistence.Migrations.Sqlite/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence.Migrations.Sqlite/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Secrets/Services/SetupSecretBindingAuthority.cs|src/Explore.Secrets/Extensions/SecretResolutionServiceCollectionExtensions.cs|src/Explore.Infrastructure/InfrastructureServicesRegistration.cs|src/Explore.Infrastructure/Services/SetupSecretProvider.cs|src/Explore.API/Controllers/SetupTargetEnrollmentsController.cs|src/Explore.API/OpenApi/SetupLiveRequestBodyTransformer.cs|src/Explore.Blazor.Client/Clients/EventApiClients.cs|src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs|tests/Event.Wire.Contracts.UnitTests/SetupLive/*|tests/Event.Domain.UnitTests/SetupLive/*|tests/Event.Application.UnitTests/Features/SetupLive/*|tests/Event.Persistence.IntegrationTests/SetupLive/*|tests/Explore.Secrets.UnitTests/SetupLive/*|tests/Event.API.IntegrationTests/Features/SetupLive*|tests/Explore.GeneratedContracts.Tests/SetupLive*)
-                  run_arch="true"
-                  run_setup="true"
-                  ;;
-              esac
-            done <<< "$relevant_files"
-          fi
-
+          printf '%s\n' "$selection" >> "$GITHUB_OUTPUT"
           {
-            echo "run-app-tests=$run_app"
-            echo "run-domain-tests=$run_domain"
-            echo "run-architecture-tests=$run_arch"
-            echo "run-setup-tests=$run_setup"
-            echo "run-infrastructure-tests=$run_infra"
-            echo "run-blazor-tests=$run_blazor"
-            echo "run-secrets-tests=$run_secrets"
-          } >> "$GITHUB_OUTPUT"
-
-          {
-            echo "## Build & Test Subsystem Routing"
+            echo "## Build & Test Native Routing"
             echo
-            echo "| Subsystem Lane | Run Status |"
-            echo "|---|---|"
-            echo "| Application Unit Tests | $run_app |"
-            echo "| Domain Unit Tests | $run_domain |"
-            echo "| Architecture Tests | $run_arch |"
-            echo "| Setup Project Gates | $run_setup |"
-            echo "| Infrastructure Tests | $run_infra |"
-            echo "| Blazor UI Tests | $run_blazor |"
-            echo "| Secrets Tests | $run_secrets |"
-            echo
-            echo "### Changed Relevant Files"
             echo '```text'
-            printf '%s' "$relevant_files"
+            printf '%s\n' "$selection"
             echo '```'
+            echo "Only known public Markdown can skip; ambiguous detection runs every lane."
           } >> "$GITHUB_STEP_SUMMARY"
 
   run-tests:

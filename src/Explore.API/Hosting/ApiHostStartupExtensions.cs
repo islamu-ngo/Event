@@ -99,6 +99,7 @@ public static class ApiHostStartupExtensions
                                 await DatabaseSeeder.SeedAsync(
                                     db,
                                     app.Environment,
+                                    logger,
                                     seedDevelopmentData,
                                     app.Configuration,
                                     cancellationToken);

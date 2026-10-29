@@ -81,6 +81,12 @@ internal static class ActorPublisherCatalogProof
         }).ToArray();
         string[] globalMutations = sources.SelectMany(type => PostgresTenantMembershipMutationPermissions.GlobalUpdateColumns(context, type)
             .Select(column => $"(t.oid={Text(names.Table(type))}::regclass AND a.attname={Text(column)} AND permission.privilege='UPDATE')")).ToArray();
+        string preferenceColumns = sources.Contains(typeof(User))
+            ? string.Join(" OR ", PostgresTenantPreferencePermissions.GlobalReadColumns(context)
+                .Select(column => (column, Privilege: "SELECT"))
+                .Concat(PostgresTenantPreferencePermissions.GlobalUpdateColumns(context).Select(column => (column, Privilege: "UPDATE")))
+                .Select(grant => $"(t.oid={Text(names.Table(typeof(User)))}::regclass AND a.attname={Text(grant.column)} AND permission.privilege={Text(grant.Privilege)})"))
+            : "false";
         return string.Join("\n", new[] { enrollment.RuntimeLogin, enrollment.GlobalLogin }.Select(login =>
         {
             string[] mutationGrants = login == enrollment.RuntimeLogin ? runtimeMutations : globalMutations;
@@ -123,6 +129,7 @@ internal static class ActorPublisherCatalogProof
                         AND ({PostgresUserTenantNavigationReadPermissions.AllowedGlobalReadPredicate(context, enrollment)})
                         AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
                             WHERE acl.grantee=(SELECT oid FROM pg_catalog.pg_roles WHERE rolname={Text(enrollment.GlobalLogin)})
+                                AND acl.grantor=t.relowner
                                 AND acl.privilege_type='SELECT' AND NOT acl.is_grantable)
                         AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
                             WHERE acl.grantee=0 AND acl.privilege_type='SELECT'))
@@ -148,6 +155,17 @@ internal static class ActorPublisherCatalogProof
                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
                     WHERE acl.grantee=0 AND acl.privilege_type='SELECT')
                 """ : "false";
+            bool preferenceIntersection = login == enrollment.GlobalLogin && sources.Contains(typeof(User));
+            string preferenceGrant = preferenceIntersection ? $"""
+                r.rolname={Text(enrollment.GlobalLogin)} AND a.attnum>0 AND ({preferenceColumns})
+                AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
+                    WHERE acl.grantee=r.oid AND acl.grantor=t.relowner
+                        AND acl.privilege_type=permission.privilege AND NOT acl.is_grantable)
+                AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
+                    WHERE acl.grantee=0 AND acl.privilege_type=permission.privilege)
+                """ : "false";
+            string preferenceProof = preferenceIntersection
+                ? PostgresTenantPreferencePermissions.OptionalGlobalCataloguePredicate(context, enrollment) : "true";
             return $"""
                 IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                     WHERE pg_catalog.pg_has_role({Text(login)},r.oid,'MEMBER')
@@ -155,20 +173,22 @@ internal static class ActorPublisherCatalogProof
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_class t CROSS JOIN pg_catalog.pg_roles r
                         WHERE t.oid IN ({relations}) AND pg_catalog.pg_has_role({Text(login)},r.oid,'MEMBER')
                             AND (r.oid = t.relowner
-                                OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                                OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,TRUNCATE,REFERENCES,TRIGGER')
+                                    OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                                 OR (pg_catalog.has_table_privilege(r.oid,t.oid,'DELETE') AND NOT ({delete}))
                                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                                     CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                                     WHERE a.attrelid = t.oid AND a.attnum <> 0 AND NOT a.attisdropped
                                         AND (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege || ' WITH GRANT OPTION')
                                             OR (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege)
-                                                AND NOT ((permission.privilege='SELECT' AND ({referenceRead})) OR ({creatorGrant}) OR ({workerGrant}) OR ({membershipRead}) OR ({mutationGrant})))))))
+                                                AND NOT ((permission.privilege='SELECT' AND ({referenceRead})) OR ({creatorGrant}) OR ({workerGrant}) OR ({membershipRead}) OR ({mutationGrant}) OR ({preferenceGrant})))))))
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                         WHERE pg_catalog.pg_has_role({Text(login)},r.oid,'MEMBER')
                             AND pg_catalog.has_schema_privilege(r.oid,pg_catalog.to_regnamespace({Text(names.Schema)}),'CREATE'))
                     OR NOT ({creatorProof})
                     OR NOT ({workerProof})
                     OR NOT ({mutationProof})
+                    OR NOT ({preferenceProof})
                 THEN RAISE EXCEPTION '{diagnosticPrefix}_private_source_privilege' USING ERRCODE = '42501'; END IF;
                 """;
         }));

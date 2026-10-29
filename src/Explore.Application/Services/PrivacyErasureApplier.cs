@@ -15,8 +15,6 @@ namespace Explore.Application.Services;
 
 public sealed class PrivacyErasureApplier(
     IUserRepository userRepository,
-    IGenericRepository<UserPii, Guid> userPiiRepository,
-    IUserAuthenticationTokenRepository tokenRepository,
     IUserLocationPrivacyErasureRepository erasureRepository,
     IUserPrivacyErasureRepository privacyErasureRepository,
     IAiConversationRepository aiConversationRepository,
@@ -182,19 +180,11 @@ public sealed class PrivacyErasureApplier(
         }
 
         await erasureRepository.SaveChangesAsync(audits, cancellationToken);
-        User? user = await userRepository.GetById(intent.SubjectId);
-        UserPii? userPii = await userPiiRepository.GetById(intent.SubjectId);
-        if (userPii is not null)
-        {
-            await userPiiRepository.Delete(userPii);
-        }
+        await privacyErasureRepository.EraseUserPiiAsync(intent.SubjectId, cancellationToken);
+        // This read is provider-neutral and skips the erased profile's auto-include.
+        User? user = await userRepository.GetLocalIdentityBindingAsync(intent.SubjectId, cancellationToken);
 
-        IReadOnlyList<UserAuthenticationToken> tokens =
-            await tokenRepository.GetByUser(intent.SubjectId, cancellationToken);
-        foreach (UserAuthenticationToken token in tokens)
-        {
-            await tokenRepository.Delete(token);
-        }
+        await privacyErasureRepository.EraseAuthenticationTokensAsync(intent.SubjectId, cancellationToken);
 
         if (user is not null)
         {

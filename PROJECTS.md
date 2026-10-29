@@ -86,6 +86,7 @@ projects and their focused test/release owners are removed from this solution.
 | `tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj` | bUnit component render, parameter updates, HAL affordance gating | < 5s | **Ring 2** (Phase Exit) |
 | `tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj` | HTTP controllers, route naming, RFC 7807 error responses, auth | < 10s | **Ring 2** (Phase Exit) |
 | `tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj` | EF Core multi-provider queries, tenant RLS, concurrency, outbox | < 30s | **Ring 3** (Plan Exit) |
+| `tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj` | Owned Aspire topology/lifecycle, browser journeys and bounded load orchestration | Host-free `Harness`; minutes for actual graph/browser/load | Harness on change; real profiles **Ring 3** |
 | `tests/Event.Benchmarks/Event.Benchmarks.csproj` | BenchmarkDotNet microbenchmarks | Manual | On demand |
 | `tests/Event.Setup.*.Tests/...` | Setup Assistant unit and integration tests | < 5s | On change |
 
@@ -112,10 +113,10 @@ All commands run from the repository root (`/home/amir/ISLAMU/Github/Event`) unl
 ### Inner Loop — Fast Subtask Slicing (Ring 1, < 2s)
 ```bash
 # Sliced Domain Unit Test (fastest inner loop):
-dotnet run --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --no-build -- --treenode-filter "/*/*/*<TestClassName>/*"
+dotnet run --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/<TestClassName>/*" --minimum-expected-tests 1
 
 # Sliced Application Unit Test:
-dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --no-build -- --treenode-filter "/*/*/*<TestClassName>/*"
+dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/<TestClassName>/*" --minimum-expected-tests 1
 ```
 
 ### Phase Exit — Target Project Build & Test (Ring 2, < 15s)
@@ -124,16 +125,44 @@ dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTes
 dotnet build <TargetProject.csproj> --configuration Release --verbosity quiet --nologo
 
 # 2. Run affected test project with Release configuration:
-dotnet test <TestProject.csproj> --configuration Release --verbosity quiet --nologo --no-build
+dotnet test --project <TestProject.csproj> --configuration Release --verbosity quiet --no-build -- --minimum-expected-tests 1
 
 # 3. Targeted test execution by method/class filter:
-dotnet test <TestProject.csproj> --configuration Release --verbosity quiet --nologo --no-build --filter "FullyQualifiedName~<TestClassName>"
+dotnet test --project <TestProject.csproj> --configuration Release --verbosity quiet --no-build -- --treenode-filter "/*/*/<TestClassName>/*" --minimum-expected-tests 1
 
 # 4. Architecture guardrail check:
-dotnet test tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet --nologo --no-build
+dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet --no-build -- --minimum-expected-tests 1
 ```
 
+`EventAddOnLifecycleTests` and `TicketingRecoveryInvariantTests` belong to
+`Event.Domain.UnitTests/Entities/` and execute in its existing normal CI lane.
+Their catalog, inventory/refund and recovery state assertions need no containers.
+The [scoped disposition](docs/internal/testing/TEST_COHORT_DISPOSITIONS.md)
+records exact retained cases and the limits of their evidence. Build the selected
+project after changing source before using `--no-build`; reconcile required named
+results and unexpected skips as well as the minimum-count floor.
+
 ### Plan Exit & PR Readiness (Ring 3 Gate)
+
+The [owned distributed guide](docs/internal/testing/DISTRIBUTED_ASSURANCE.md)
+separates container-free ownership/projection tests from actual `Assurance`
+environment startup. Build this project before using the commands below:
+
+```bash
+dotnet run --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/AppHostOwnershipTests/*" --minimum-expected-tests 58
+dotnet run --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/AppHostRuntimeTests/*" --minimum-expected-tests 7 --maximum-parallel-tests 1
+```
+
+Ownership checks passing does not establish live graph readiness. Retain the
+exact selected method, topology and failure outcome; the guide records current
+startup/lifecycle limitations. The fixture supplies its own marked roots and
+ephemeral Environment authority, never an interactive `.env` profile.
+
+The [browser guide](docs/internal/testing/BROWSER_ASSURANCE.md) and
+[load guide](docs/internal/testing/LOAD_ASSURANCE.md) describe separate profiles
+in the same executable. Isolated script/process controls do not establish a
+successful real-host journey, workload, recovery or calibrated capacity result.
+
 ```bash
 # 1. Full solution build:
 dotnet build Explore.slnx --configuration Release --verbosity quiet

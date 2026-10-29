@@ -14,6 +14,36 @@ ISLAMU Event follows **Convention over Configuration**. The platform includes se
 
 ---
 
+## Shared browser session authority
+
+These inputs are required for browser sign-in in BFF and Standalone hosts,
+regardless of the primary authentication or database provider. The session backend
+is separate from the ordinary cache and Data Protection key authority.
+
+| Input | Authority and deployment rule |
+| --- | --- |
+| `BFF_SESSION_REDIS_ENDPOINT` | Nonsecret absolute `redis://host:port` or `rediss://host:port` URI. No embedded credentials, query, fragment or non-root path. |
+| `BFF_SESSION_NAMESPACE` | Stable deployment identifier: 1–64 ASCII letters, digits, `_` or `-`. Intended peers and restarts share it; unrelated deployments must differ. |
+| `BFF_SESSION_REDIS_PASSWORD` | Password from the explicitly selected Environment authority, shared User Secrets in Development/Testing only, or the exact Infisical `/runtime/bff/session` key. Missing selected authority never falls back to merged settings. |
+
+Provision the dedicated session service with the same intended password. Retain
+its data and compatible BFF encryption authority for restart continuity. The API
+and ordinary cache do not use this password. See
+[shared browser sessions and logout](authentication-providers.md#shared-browser-sessions-and-logout)
+for revocation, failure recovery and the required new sign-in after activation.
+
+The bundled Compose authority is opt-in through `--profile bff-session`. Its
+provisioner and the BFF runtime secret source are separate: explicitly provision
+matching values, including when BFF selects Infisical. A stale or unknown-freshness
+session restore requires a new namespace and fresh sign-in.
+
+Local/Compose cache and session resources use the admitted pinned Redis image.
+They remain separate services. An image pin is not a data downgrade procedure:
+do not attach an older server to existing newer-format data. Use an explicitly
+disposable fresh development store or a reviewed version-compatible export and
+restore. No automatic volume conversion or deletion is performed; optional
+third-party cache consumers still need separate compatibility checks.
+
 ## Runtime actor ownership access
 
 The existing Runtime database login can read only the Actor linkage identifiers

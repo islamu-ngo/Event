@@ -26,6 +26,10 @@ public interface IStorageConfigurationSource
     Task<bool> ObserveProviderAsync(StorageConfigurationState state, CancellationToken token);
     Task RequireExternalSourcesAsync(CancellationToken token);
     Task RequireSourcesAsync(CancellationToken token);
+    /// <summary>Checks original request custody without observing idle-only database sources.</summary>
+    Task RequireRequestAsync(CancellationToken token);
+    /// <summary>Compares fresh facts; the original Settings coordinator retains all acquisition authority.</summary>
+    void RequireAcquiredFacts(HumanPrincipalSourceFacts principal, HumanSupportAccessSourceFacts support);
     void RequireTime();
 }
 

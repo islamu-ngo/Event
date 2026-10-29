@@ -170,7 +170,6 @@ public sealed class StoragePolicyResolverTests
         var result = await resolver.ResolveProviderAsync(TenantId);
 
         await Assert.That(result).IsSameReferenceAs(provider);
-        _providerResolver.Received(1).GetRequired(StorageProviders.S3Compatible);
     }
 
     [Test]

@@ -94,7 +94,7 @@ public class InstanceStorageSettingService : IInstanceStorageSettingService
         await using var scope = await _scopeFactory.CreateAsync(PolicyMutationScope.Instance, cancellationToken);
         var result = await scope.Services.GetRequiredService<IStorageProbeOriginalAction>().ExecuteAsync(query, cancellationToken);
         _metrics.RecordStorageProviderTest(result.Provider, result.IsAvailable ? "succeeded" : "failed", result.FailureCode);
-        return result;
+        return MapProviderStatus(result);
     }
 
     public async Task<InstanceStorageProviderStatusDto> TestProviderAsync(
@@ -103,7 +103,7 @@ public class InstanceStorageSettingService : IInstanceStorageSettingService
         await using var scope = await _scopeFactory.CreateAsync(PolicyMutationScope.Instance, cancellationToken);
         var result = await scope.Services.GetRequiredService<IStorageProbeOriginalAction>().ExecuteAsync(query, cancellationToken);
         _metrics.RecordStorageProviderTest(result.Provider, result.IsAvailable ? "succeeded" : "failed", result.FailureCode);
-        return result;
+        return MapProviderStatus(result);
     }
 
     private async Task<InstanceStorageProviderStatusDto> ReadProviderHealthAsync(CancellationToken cancellationToken)

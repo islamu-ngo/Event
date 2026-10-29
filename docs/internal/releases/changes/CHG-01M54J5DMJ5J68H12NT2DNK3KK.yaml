@@ -21,7 +21,7 @@ Impacts:
   Configuration:
     Reference: docs/internal/AI_PROVIDER_CONSUMPTION.md
     Disposition: documented
-    Detail: Local-provider opt-in is restricted to the configured instance origin and never opens metadata traffic.
+    Detail: Local-provider opt-in applies only to the configured instance origin and never opens metadata traffic.
   OpenAPI:
     Reference: docs/internal/API.md
     Disposition: not-applicable

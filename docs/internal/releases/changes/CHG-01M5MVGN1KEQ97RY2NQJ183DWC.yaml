@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5MVGN1KEQ97RY2NQJ183DWC
+Title: "Revoke shared browser sessions across hosts"
+Type: feat
+Scope: access
+Summary: "Require a selected shared BFF session authority for browser sign-in and reject replayed or revoked browser sessions across hosts and circuits, while preserving independent API JWT and other-device semantics."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Browser sign-in now requires an explicitly selected shared session backend and stable deployment namespace. Old self-contained development cookies are rejected; users must sign in again. No API or database schema migration is introduced.
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Revoke the exact browser session across BFF hosts and circuits, fail closed on missing or unavailable authority, and prevent renewal or refresh from recreating a removed session. Independent API JWTs, account security stamps and other devices retain their own authority.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: Configure BFF_SESSION_REDIS_ENDPOINT, BFF_SESSION_NAMESPACE and the selected BFF_SESSION_REDIS_PASSWORD authority; peers and restarts share the same intended session namespace and independent Data Protection authority. Dedicated optional local and Compose service uses the admitted pinned Redis image.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Provision and protect the dedicated shared backend before browser sign-in, keep session authority separate from cache and Data Protection, retain backend state and the admitted Data Protection authority for restart continuity, and handle ambiguous logout failure through safe retry. Compose removes bootstrap environment fallback from the .NET process for non-Environment selection; Docker metadata remains inside the trusted daemon-operator boundary.

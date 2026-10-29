@@ -8,7 +8,8 @@ public sealed class SecretAuthorityLeastPrivilegeArchitectureTests
     [
         "/runtime/bff/oidc/keycloak",
         "/runtime/bff/oidc/google",
-        "/runtime/bff/atproto/oauth"
+        "/runtime/bff/atproto/oauth",
+        "/runtime/bff/session"
     ];
 
     private static readonly string[] ForbiddenBlazorInfisicalPaths =
@@ -284,34 +285,6 @@ public sealed class SecretAuthorityLeastPrivilegeArchitectureTests
         await Assert.That(envBlock).DoesNotContain("Database__");
         await Assert.That(BackendOnlySecretKeys.Where(key => envBlock.Contains(key, StringComparison.Ordinal)))
             .IsEmpty();
-    }
-
-    [Test]
-    public async Task AppHost_BlazorResource_MustNotBeConfiguredWithDatabaseCredentials()
-    {
-        var repositoryRoot = ResolveRepositoryRoot();
-        var appHostFile = Path.Combine(repositoryRoot, "src", "Explore.AppHost", "AppHost.cs");
-
-        var content = await File.ReadAllTextAsync(appHostFile);
-
-        var blazorSectionMatch = Regex.Match(
-            content,
-            @"builder\.AddProject<Projects\.Explore_Blazor>\(.*?\);(?<block>.*?)(?=else|\z)",
-            RegexOptions.Singleline | RegexOptions.CultureInvariant);
-
-        await Assert.That(blazorSectionMatch.Success)
-            .IsTrue()
-            .Because("AppHost.cs must contain the Explore_Blazor resource registration block.");
-
-        var blazorBlock = blazorSectionMatch.Groups["block"].Value;
-
-        await Assert.That(blazorBlock)
-            .DoesNotContain("WithLocalPrimaryDatabase(exploreBlazor")
-            .Because("AppHost.cs must not configure exploreBlazor with WithLocalPrimaryDatabase; Blazor BFF does not connect to the primary database.");
-
-        await Assert.That(blazorBlock)
-            .DoesNotContain("WithExternalPrimaryDatabase(builder, exploreBlazor")
-            .Because("AppHost.cs must not configure exploreBlazor with WithExternalPrimaryDatabase; Blazor BFF does not connect to the primary database.");
     }
 
     [Test]

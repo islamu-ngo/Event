@@ -103,9 +103,9 @@ public sealed class StudioEventResourcesTests : IDisposable
                 new Dictionary<string, IEnumerable<string>>(), null));
         var cut = Render();
         var publish = cut.WaitForElement("[data-testid='resource-publish']");
-        publish.Click();
+        await publish.ClickAsync();
 
-        cut.WaitForAssertion(() => Assert.That(cut.FindAll("[data-testid='resource-publish']")).IsEmpty());
+        await Assert.That(cut.FindAll("[data-testid='resource-publish']")).IsEmpty();
         await _management.Received(1).PublishEventResourceAsync(_resourceId, Arg.Any<string>(),
             Arg.Is<EventResourceVersionRequestDto>((EventResourceVersionRequestDto request) => request.ExpectedVersion == _version),
             Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
@@ -225,8 +225,8 @@ public sealed class StudioEventResourcesTests : IDisposable
                 Items = [new EventResourceMetadataExportDto { Id = _resourceId, Title = "Authorized handout" }]
             });
         var cut = Render();
-        cut.WaitForElement("[data-testid='resource-export']").Click();
-        cut.WaitForAssertion(() => Assert.That(cut.Markup).Contains("Authorized handout"));
+        await cut.WaitForElement("[data-testid='resource-export']").ClickAsync();
+        await Assert.That(cut.Markup).Contains("Authorized handout");
         await _export.Received(1).ExportEventResourceMetadataAsync(_eventId, Arg.Any<int?>(), Arg.Any<int?>(),
             Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
@@ -243,8 +243,8 @@ public sealed class StudioEventResourcesTests : IDisposable
             Arg.Any<CancellationToken>()).Returns(Item("publish"), changed, Item("self"));
 
         var cut = Render();
-        cut.WaitForElement("[data-testid='resource-publish']").Click();
-        cut.WaitForAssertion(() => Assert.That(cut.FindAll("[data-testid='resource-publish']")).IsEmpty());
+        await cut.WaitForElement("[data-testid='resource-publish']").ClickAsync();
+        await Assert.That(cut.FindAll("[data-testid='resource-publish']")).IsEmpty();
         await _management.DidNotReceive().PublishEventResourceAsync(Arg.Any<Guid>(), Arg.Any<string>(),
             Arg.Any<EventResourceVersionRequestDto>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }

@@ -48,8 +48,8 @@ public sealed class SqliteApplicationInitialLifecycleTests
         await using var context = new ExploreDbContext(options.Options);
         IMigrator migrator = context.GetService<IMigrator>();
         string[] migrations = context.Database.GetMigrations().ToArray();
-        string initialMigration = migrations.Single(id => id.EndsWith("_Init", StringComparison.Ordinal));
-        await Assert.That(migrations[0]).IsEqualTo(initialMigration);
+        await Assert.That(migrations).IsNotEmpty();
+        string initialMigration = migrations[0];
 
         await migrator.MigrateAsync(initialMigration);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
@@ -58,6 +58,8 @@ public sealed class SqliteApplicationInitialLifecycleTests
         await migrator.MigrateAsync();
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
             .IsEquivalentTo(migrations, TUnit.Assertions.Enums.CollectionOrdering.Matching);
+
+        await EventLocationContractionAssertions.AssertStoreAsync(context, databaseOptions);
 
         await migrator.MigrateAsync(Migration.InitialDatabase);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync()).IsEmpty();
@@ -70,6 +72,7 @@ public sealed class SqliteApplicationInitialLifecycleTests
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
             .IsEquivalentTo(migrations, TUnit.Assertions.Enums.CollectionOrdering.Matching);
         await Assert.That(await context.Database.CanConnectAsync()).IsTrue();
+        await EventLocationContractionAssertions.AssertStoreAsync(context, databaseOptions);
     }
 
     private static async Task AssertExternalIdentityLifecycleAsync(

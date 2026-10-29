@@ -107,25 +107,20 @@ public class NamingConventionTests
     [Test]
     public async Task Repositories_ShouldEndWith_Repository()
     {
-        // Exclude generic repository base class
-        var result = Types.InAssembly(PersistenceAssembly)
-            .That()
-            .ResideInNamespace("Explore.Persistence.Repositories")
-            .And()
-            .AreClasses()
-            .And()
-            .AreNotAbstract()
-            .And()
-            .AreNotGeneric()
-            .And()
-            .AreNotNested()
-            .And()
-            .DoNotHaveName("CustomPropertyExposureScope")
-            .Should()
-            .HaveNameEndingWith("Repository")
-            .GetResult();
+        var repositories = PersistenceAssembly.GetTypes()
+            .Where(type => type.Namespace == "Explore.Persistence.Repositories"
+                && type.IsClass && !type.IsAbstract
+                && type.GetInterfaces().Any(contract =>
+                    contract.Namespace == "Explore.Application.Contracts.Persistence"
+                    && contract.Name.Split('`')[0].EndsWith("Repository", StringComparison.Ordinal)))
+            .ToArray();
+        var violations = repositories
+            .Where(type => !type.Name.Split('`')[0].EndsWith("Repository", StringComparison.Ordinal))
+            .Select(type => type.FullName)
+            .ToArray();
 
-        await Assert.That(result.FailingTypeNames ?? []).IsEmpty();
+        await Assert.That(repositories).IsNotEmpty();
+        await Assert.That(violations).IsEmpty();
     }
 
     #endregion

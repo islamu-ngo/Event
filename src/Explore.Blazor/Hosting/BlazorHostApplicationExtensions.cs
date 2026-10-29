@@ -6,6 +6,7 @@ using Explore.Blazor.Components;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.HealthChecks;
 using Explore.Blazor.Services;
+using Explore.Blazor.Services.Auth;
 using Explore.ServiceDefaults;
 
 namespace Explore.Blazor.Hosting;
@@ -125,6 +126,21 @@ public static class BlazorHostApplicationExtensions
             pipeline.UseHsts();
         }
 
+        pipeline.Use(async (context, next) =>
+        {
+            try
+            {
+                await next(context);
+            }
+            catch (BffSessionAuthorityUnavailableException) when (!context.Response.HasStarted)
+            {
+                context.Response.Headers.CacheControl = "no-store";
+                await Results.Problem(
+                    title: "Browser session unavailable",
+                    statusCode: StatusCodes.Status503ServiceUnavailable).ExecuteAsync(context);
+            }
+        });
+
         pipeline.UseWhen(
             context => !context.Request.Path.StartsWithSegments(
                 "/bff",
@@ -180,7 +196,7 @@ public static class BlazorHostApplicationExtensions
         BffAuthEndpoints.MapAuthEndpoints(app);
         BffEndpointExtensions.MapBffEndpoints(app);
         app.MapBffAuthenticationCredentialReceiptEndpoints();
-        app.MapStaticAssets();
+        app.MapSelectedStaticAssets();
 
         if (profile == BlazorHostProfile.Split)
         {

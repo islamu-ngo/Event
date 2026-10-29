@@ -49,6 +49,7 @@ public sealed class AuthenticationCredentialProfileReaderTests
         {
             var reader = CreateReader(provider, environmentName);
             await Assert.That(() => reader.ReadCurrent()).Throws<InvalidOperationException>();
+            await Assert.That(() => reader.ObserveCurrent()).Throws<InvalidOperationException>();
         });
 
     [Test]
@@ -62,6 +63,47 @@ public sealed class AuthenticationCredentialProfileReaderTests
                 AuthenticationCredentialProfileReader.RevisionEnvironmentVariable, replacement.ToString("D"));
             await Assert.That(reader.ReadCurrent().Revision).IsEqualTo(replacement);
             await Assert.That(reader.ReadCurrent().Revision).IsNotEqualTo(original.Revision);
+        });
+
+    [Test]
+    [Arguments(SecretProviderType.Environment, "Production", AuthenticationCredentialCutover.CredentialAuthority.Environment)]
+    [Arguments(SecretProviderType.Infisical, "Production", AuthenticationCredentialCutover.CredentialAuthority.Infisical)]
+    [Arguments(SecretProviderType.UserSecrets, "Testing", AuthenticationCredentialCutover.CredentialAuthority.UserSecrets)]
+    public Task AbsentRevisionObservationRetainsSelectedAuthorityWithoutAuthorizingMaintenance(
+        SecretProviderType provider, string environmentName, AuthenticationCredentialCutover.CredentialAuthority expected) =>
+        WithRevisionAsync(null, async () =>
+        {
+            var reader = CreateReader(provider, environmentName);
+            var observation = reader.ObserveCurrent();
+            await Assert.That(observation.Authority).IsEqualTo(expected);
+            await Assert.That(observation.Revision).IsNull();
+            await Assert.That(() => reader.ReadCurrent()).Throws<InvalidOperationException>();
+        });
+
+    [Test]
+    [Arguments("not-a-uuid")]
+    [Arguments(" ")]
+    [Arguments("00000000-0000-0000-0000-000000000000")]
+    public Task MalformedConfiguredRevisionCannotBecomeAnAbsentObservation(string revision) =>
+        WithRevisionAsync(revision, async () =>
+        {
+            var reader = CreateReader(SecretProviderType.Environment, "Production");
+            await Assert.That(() => reader.ObserveCurrent()).Throws<InvalidOperationException>();
+        });
+
+    [Test]
+    public Task InstallingAProfileChangesTheRealAbsentObservation() =>
+        WithRevisionAsync(null, async () =>
+        {
+            var reader = CreateReader(SecretProviderType.Environment, "Production");
+            var original = reader.ObserveCurrent();
+            Guid revision = Guid.CreateVersion7();
+            Environment.SetEnvironmentVariable(AuthenticationCredentialProfileReader.RevisionEnvironmentVariable, revision.ToString("D"));
+            var current = reader.ObserveCurrent();
+            await Assert.That(original.Revision).IsNull();
+            await Assert.That(current.Authority).IsEqualTo(original.Authority);
+            await Assert.That(current.Revision).IsEqualTo(revision);
+            await Assert.That(current).IsNotEqualTo(original);
         });
 
     private static AuthenticationCredentialProfileReader CreateReader(

@@ -10,6 +10,8 @@ public static class AssuranceAudit
     public const string ReflectiveBehaviorDispatch = "reflective-behavior-dispatch";
     public const string StringSelectedProductionType = "string-selected-production-type";
     public const string RawProductSourceAssurance = "raw-product-source-assurance";
+    public const string CommentedOutTest = "commented-out-test";
+    public const string UngovernedUnconditionalSkip = "ungoverned-unconditional-skip";
 
     private static readonly HashSet<string> RawProductExtensions =
         new(StringComparer.OrdinalIgnoreCase) { ".cs", ".razor", ".css", ".md" };
@@ -57,13 +59,21 @@ public static class AssuranceAudit
     }
 
     public static IReadOnlyList<AssuranceDiagnostic> AnalyzeSource(string source, string path)
+        => AnalyzeSource(source, path, PlatformReferences.Value);
+
+    internal static IReadOnlyList<AssuranceDiagnostic> AnalyzeSource(
+        string source, string path, IReadOnlyList<string> referencePaths)
+        => AnalyzeSource(source, path, referencePaths.Select(assembly => MetadataReference.CreateFromFile(assembly)).ToArray());
+
+    private static IReadOnlyList<AssuranceDiagnostic> AnalyzeSource(
+        string source, string path, IReadOnlyList<MetadataReference> references)
     {
         SyntaxTree tree = CSharpSyntaxTree.ParseText(source, path: path);
         CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
         CSharpCompilation compilation = CSharpCompilation.Create(
             "AssuranceAudit",
             [tree],
-            PlatformReferences.Value,
+            references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         SemanticModel semanticModel = compilation.GetSemanticModel(tree);
         var diagnostics = new List<AssuranceDiagnostic>();
@@ -73,8 +83,140 @@ public static class AssuranceAudit
             ClassifyInvocation(invocation, semanticModel, diagnostics, path);
         }
 
+        ClassifyTestGovernance(root, semanticModel, diagnostics, path);
         return Sort(diagnostics);
     }
+
+    private static void ClassifyTestGovernance(
+        CompilationUnitSyntax root,
+        SemanticModel semanticModel,
+        ICollection<AssuranceDiagnostic> diagnostics,
+        string path)
+    {
+        foreach (AttributeSyntax attribute in root.DescendantNodes().OfType<AttributeSyntax>())
+        {
+            if (FrameworkAttribute(attribute, attribute, semanticModel) != "Skip")
+                continue;
+
+            AttributeArgumentSyntax? reason = attribute.ArgumentList?.Arguments
+                .FirstOrDefault(argument => argument.NameEquals is null);
+            if (reason is null || semanticModel.GetConstantValue(reason.Expression).Value is not string value
+                || !HasSkipGovernanceFields(value))
+            {
+                AddDiagnostic(diagnostics, attribute, path, UngovernedUnconditionalSkip,
+                    "An unconditional TUnit Skip needs nonempty Category: and Removal: fields in its constant reason.");
+            }
+        }
+
+        foreach (MethodDeclarationSyntax method in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
+        {
+            if (method.AttributeLists.SelectMany(list => list.Attributes)
+                .Any(attribute => FrameworkAttribute(attribute, attribute, semanticModel) == "Test"))
+                continue;
+
+            int headerEnd = method.Body?.OpenBraceToken.SpanStart
+                ?? method.ExpressionBody?.ArrowToken.SpanStart
+                ?? method.SemicolonToken.SpanStart;
+            foreach (SyntaxTrivia trivia in method.DescendantTrivia().Where(trivia => trivia.SpanStart < headerEnd))
+            {
+                string? payload = trivia.Kind() switch
+                {
+                    SyntaxKind.SingleLineCommentTrivia => trivia.ToString()[2..],
+                    SyntaxKind.MultiLineCommentTrivia => trivia.ToString()[2..^2],
+                    _ => null
+                };
+                if (payload is null)
+                    continue;
+
+                var parsed = SyntaxFactory.ParseCompilationUnit(
+                    "class CommentedMarker {\n" + payload + "\nvoid Marker() {}\n}");
+                if (parsed.ContainsDiagnostics || !parsed.DescendantNodes().OfType<MethodDeclarationSyntax>()
+                    .SelectMany(member => member.AttributeLists.SelectMany(list => list.Attributes))
+                    .Any(attribute => FrameworkAttribute(attribute, method, semanticModel) == "Test"))
+                    continue;
+
+                AddDiagnostic(diagnostics, method, path, CommentedOutTest,
+                    "A commented TUnit Test marker hides this method; use a governed Skip or remove the obsolete test.");
+                break;
+            }
+        }
+    }
+
+    private static bool HasSkipGovernanceFields(string reason)
+    {
+        const string categoryLabel = "Category:";
+        const string removalLabel = "Removal:";
+        string fields = reason.Trim();
+        if (!fields.StartsWith(categoryLabel, StringComparison.Ordinal))
+            return false;
+
+        fields = fields[categoryLabel.Length..];
+        int removal = fields.IndexOf(removalLabel, StringComparison.Ordinal);
+        return removal > 0
+            && (char.IsWhiteSpace(fields[removal - 1]) || fields[removal - 1] == ';')
+            && fields[..removal].Trim().TrimEnd(';').Trim().Length > 0
+            && fields[(removal + removalLabel.Length)..].Trim().Length > 0;
+    }
+
+    private static string? FrameworkAttribute(
+        AttributeSyntax attribute, SyntaxNode context, SemanticModel semanticModel)
+    {
+        if (attribute.SyntaxTree == semanticModel.SyntaxTree)
+        {
+            SymbolInfo binding = semanticModel.GetSymbolInfo(attribute);
+            if (binding.CandidateReason == CandidateReason.Ambiguous || binding.CandidateSymbols.Length != 0)
+                return null;
+            if (binding.Symbol is IMethodSymbol constructor && constructor.ContainingType.TypeKind != TypeKind.Error)
+                return FrameworkAttributeName(constructor.ContainingType.ToDisplayString());
+        }
+
+        var resolvedTypes = new HashSet<string>(StringComparer.Ordinal);
+        string writtenName = attribute.Name.ToString();
+        foreach (string candidate in writtenName.EndsWith("Attribute", StringComparison.Ordinal)
+                     ? new[] { writtenName } : new[] { writtenName, writtenName + "Attribute" })
+        {
+            SymbolInfo binding = semanticModel.GetSpeculativeSymbolInfo(context.SpanStart,
+                SyntaxFactory.ParseName(candidate), SpeculativeBindingOption.BindAsTypeOrNamespace);
+            if (binding.CandidateReason == CandidateReason.Ambiguous || binding.CandidateSymbols.Length != 0)
+                return null;
+            ISymbol? symbol = binding.Symbol;
+            if (symbol is IAliasSymbol alias)
+                symbol = alias.Target;
+            if (symbol is INamedTypeSymbol { TypeKind: not TypeKind.Error } type)
+                resolvedTypes.Add(type.ToDisplayString());
+        }
+        if (resolvedTypes.Count != 0)
+            return resolvedTypes.Count == 1 ? FrameworkAttributeName(resolvedTypes.Single()) : null;
+
+        // The standalone audit has no TUnit reference. Its fallback recognizes the repository's
+        // implicit Test/Skip convention and scoped aliases, not arbitrary unresolved attribute types.
+        string name = writtenName.Replace("global::", string.Empty, StringComparison.Ordinal)
+            .Replace("::", ".", StringComparison.Ordinal);
+        var usings = context.AncestorsAndSelf().OfType<BaseNamespaceDeclarationSyntax>()
+            .SelectMany(declaration => declaration.Usings)
+            .Concat(((CompilationUnitSyntax)semanticModel.SyntaxTree.GetRoot()).Usings)
+            .ToArray();
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (visited.Add(name))
+        {
+            int separator = name.IndexOf('.', StringComparison.Ordinal);
+            string first = separator < 0 ? name : name[..separator];
+            UsingDirectiveSyntax? alias = usings.FirstOrDefault(directive =>
+                directive.Alias?.Name.Identifier.ValueText == first);
+            if (alias?.Name is null)
+                return FrameworkAttributeName(name.Contains('.', StringComparison.Ordinal) ? name : "TUnit.Core." + name);
+            name = alias.Name.ToString().Replace("global::", string.Empty, StringComparison.Ordinal)
+                + (separator < 0 ? string.Empty : name[separator..]);
+        }
+        return null;
+    }
+
+    private static string? FrameworkAttributeName(string qualifiedName) => qualifiedName switch
+    {
+        "TUnit.Core.Test" or "TUnit.Core.TestAttribute" => "Test",
+        "TUnit.Core.Skip" or "TUnit.Core.SkipAttribute" => "Skip",
+        _ => null
+    };
 
     private static void ClassifyInvocation(
         InvocationExpressionSyntax invocation,

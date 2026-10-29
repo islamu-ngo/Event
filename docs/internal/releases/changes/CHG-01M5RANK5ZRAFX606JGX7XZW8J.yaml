@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5RANK5ZRAFX606JGX7XZW8J
+Title: "Complete retained account erasure under its original storage owner"
+Type: fix
+Scope: privacy
+Summary: "Keep local account erasure and replay under their original transaction and custody, remove residual profile data and cross-tenant authentication tokens for the exact subject, and retain durable recovery intent after an interrupted purge."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Exact-subject disposal preserves ordinary tenant isolation and caller authorization; failed local settlement rolls back its changes while retained intent and fencing support replay.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/privacy-erasure.md
+    Disposition: documented
+    Detail: Preserve the retained erasure authority when restoring the primary database; required replay must finish before HTTP serving, and unavailable or invalid authority must fail closed.

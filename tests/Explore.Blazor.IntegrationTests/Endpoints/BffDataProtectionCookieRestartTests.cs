@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Claims;
 using Event.Testing.DataProtection;
 using Explore.Blazor.Extensions;
+using Explore.Blazor.IntegrationTests.Fixtures;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -32,10 +33,11 @@ public sealed class BffDataProtectionCookieRestartTests
     public async Task CookieTicketSurvivesFreshBffHostWhenKeyRingPersists()
     {
         var authority = new ExternalDataProtectionTestAuthority("bff");
+        var sessions = new TestBffSessionAuthority();
 
         string cookieHeader;
 
-        await using (var firstHost = await StartCookieHostAsync(authority))
+        await using (var firstHost = await StartCookieHostAsync(authority, sessions))
         {
             using var firstClient = firstHost.GetTestClient();
             using var loginResponse = await firstClient.GetAsync("/login-test");
@@ -44,7 +46,7 @@ public sealed class BffDataProtectionCookieRestartTests
             cookieHeader = GetCookieHeader(loginResponse);
         }
 
-        await using (var secondHost = await StartCookieHostAsync(authority))
+        await using (var secondHost = await StartCookieHostAsync(authority, sessions))
         {
             using var secondClient = secondHost.GetTestClient();
             secondClient.DefaultRequestHeaders.Add("Cookie", cookieHeader);
@@ -57,7 +59,8 @@ public sealed class BffDataProtectionCookieRestartTests
         }
     }
 
-    private static async Task<WebApplication> StartCookieHostAsync(IExternalDataProtectionSource authority)
+    private static async Task<WebApplication> StartCookieHostAsync(IExternalDataProtectionSource authority,
+        TestBffSessionAuthority sessions)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -79,6 +82,7 @@ public sealed class BffDataProtectionCookieRestartTests
                 };
             });
         builder.Services.AddAuthorization();
+        builder.Services.AddTestBffSessionAuthority(sessions);
 
         var app = builder.Build();
 
@@ -88,7 +92,8 @@ public sealed class BffDataProtectionCookieRestartTests
         app.MapGet("/login-test", async context =>
         {
             var identity = new ClaimsIdentity(
-                [new Claim(ClaimTypes.Name, "restart-user")],
+                [new Claim(ClaimTypes.Name, "restart-user"),
+                    new Claim(ClaimTypes.NameIdentifier, Guid.CreateVersion7().ToString())],
                 CookieAuthenticationDefaults.AuthenticationScheme);
 
             await context.SignInAsync(

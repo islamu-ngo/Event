@@ -36,6 +36,20 @@ public sealed class BffSessionRefreshService(
 
     public async Task<IResult> RefreshSessionAsync(HttpContext context, CancellationToken cancellationToken)
     {
+        try
+        {
+            return await RefreshSessionCoreAsync(context, cancellationToken);
+        }
+        catch (BffSessionAuthorityUnavailableException)
+        {
+            var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("AuthEndpoints");
+            ClearCircuitTokenState(context, context.User, logger, "session_authority_unavailable");
+            return Results.Problem(title: "Browser session unavailable", statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+    }
+
+    private async Task<IResult> RefreshSessionCoreAsync(HttpContext context, CancellationToken cancellationToken)
+    {
         var logger = context.RequestServices.GetRequiredService<ILoggerFactory>()
             .CreateLogger("AuthEndpoints");
 
@@ -44,6 +58,12 @@ public sealed class BffSessionRefreshService(
         {
             logger.LogWarning("[AuthEndpoints] Refresh session failed because cookie authentication did not succeed");
             return Results.Unauthorized();
+        }
+
+        if (!BffSessionIdentity.TryGetBinding(authResult.Principal, out var binding)
+            || !await IsSessionActiveAsync(context, authResult, binding, cancellationToken))
+        {
+            return await RejectBrowserSessionAsync(context, authResult.Principal, logger);
         }
 
         if (HasSingleClaim(authResult.Principal, "auth_provider", "atproto"))
@@ -109,10 +129,14 @@ public sealed class BffSessionRefreshService(
                 "onboarding_authority_rejected").ConfigureAwait(false);
         }
 
-        var userId = tokenAssessmentService.ResolveUserId(authResult.Principal);
+        if (!await IsSessionActiveAsync(context, authResult, binding, cancellationToken))
+        {
+            return await RejectBrowserSessionAsync(context, authResult.Principal, logger);
+        }
+
+        var userId = binding.OwnerPartitionKey;
         var tokenStoreResult = context.RequestServices.GetRequiredService<ICircuitTokenStore>()
-            .Store(userId ?? string.Empty,
-                authResult.Principal.TryGetSessionId(out var sessionId) ? sessionId.PartitionKey : null, accessToken);
+            .Store(userId, binding.Handle, accessToken);
         if (!tokenStoreResult.Accepted)
         {
             logger.LogWarning(
@@ -190,22 +214,10 @@ public sealed class BffSessionRefreshService(
         context.RequestServices.GetService<ICircuitUserContext>()?.Clear();
         context.RequestServices.GetService<IBffAuthCookieStore>()?.Clear();
 
-        // ICircuitAccessTokenService.ClearToken() already delegates to ICircuitTokenStore
-        // for the scoped user/session. For full user-wide clearing (e.g., signout with
-        // unknown session), also clear via the store directly.
-        var userId = tokenAssessmentService.ResolveUserId(principal);
-        if (!string.IsNullOrWhiteSpace(userId))
+        if (principal is not null && BffSessionIdentity.TryGetBinding(principal, out var binding))
         {
             var tokenStore = context.RequestServices.GetService<ICircuitTokenStore>();
-            var sessionId = principal.TryGetSessionId(out var resolvedSessionId) ? resolvedSessionId.PartitionKey : null;
-            if (string.IsNullOrWhiteSpace(sessionId))
-            {
-                tokenStore?.ClearUser(userId);
-            }
-            else
-            {
-                tokenStore?.ClearSession(userId, sessionId);
-            }
+            tokenStore?.ClearSession(binding.OwnerPartitionKey, binding.Handle);
         }
 
         logger.LogDebug(
@@ -222,6 +234,10 @@ public sealed class BffSessionRefreshService(
         CancellationToken cancellationToken)
     {
         var started = Stopwatch.GetTimestamp();
+        if (!BffSessionIdentity.TryGetBinding(authentication.Principal!, out var binding))
+        {
+            return await RejectBrowserSessionAsync(context, authentication.Principal, logger);
+        }
         if (!TryCreateAtprotoRequestContext(context, authentication, out var session))
         {
             return await RequireAtprotoReauthenticationAsync(
@@ -311,6 +327,11 @@ public sealed class BffSessionRefreshService(
                     logger,
                     "onboarding_authority_rejected").ConfigureAwait(false);
             }
+            if (!await IsSessionActiveAsync(context, authentication, binding, cancellationToken))
+            {
+                return await RejectBrowserSessionAsync(context, authentication.Principal, logger);
+            }
+
             await context.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 authentication.Principal!,
@@ -328,6 +349,10 @@ public sealed class BffSessionRefreshService(
                 AtprotoAuthenticationOperation.Refresh,
                 AtprotoAuthenticationOutcome.Cancelled,
                 Stopwatch.GetElapsedTime(started));
+            throw;
+        }
+        catch (BffSessionAuthorityUnavailableException)
+        {
             throw;
         }
         catch (Exception)
@@ -358,6 +383,31 @@ public sealed class BffSessionRefreshService(
             outcome,
             Stopwatch.GetElapsedTime(started));
         return result;
+    }
+
+    private static async Task<bool> IsSessionActiveAsync(
+        HttpContext context, AuthenticateResult authentication, BffSessionBinding expected, CancellationToken cancellationToken)
+    {
+        if (authentication.Principal is null || authentication.Properties is null
+            || !BffSessionIdentity.TryGetBinding(authentication.Principal, out var binding) || binding != expected
+            || !authentication.Properties.Items.TryGetValue(BffSessionIdentity.HandleProperty, out var handle)
+            || !string.Equals(handle, binding.Handle, StringComparison.Ordinal)
+            || !authentication.Properties.Items.TryGetValue(BffSessionIdentity.RevisionProperty, out var revision)
+            || string.IsNullOrWhiteSpace(revision))
+        {
+            return false;
+        }
+
+        var authority = context.RequestServices.GetService<IBffSessionAuthority>()
+            ?? throw new BffSessionAuthorityUnavailableException();
+        return await authority.IsActiveAsync(binding, cancellationToken);
+    }
+
+    private async Task<IResult> RejectBrowserSessionAsync(HttpContext context, ClaimsPrincipal? principal, ILogger logger)
+    {
+        ClearCircuitTokenState(context, principal, logger, "session_rejected");
+        await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        return Results.Problem(title: "Browser session rejected", statusCode: StatusCodes.Status401Unauthorized);
     }
 
     private async Task<IResult> RequireOnboardingReauthenticationAsync(

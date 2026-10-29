@@ -194,6 +194,15 @@ public static class PostgresAtprotoFederationSettingPermissions
     internal static string GlobalTenantPolicy(ExploreDbContext context, string login) =>
         GlobalPolicyPredicate(Sources(context).Single(value => value.Tenant), login);
 
+    internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        ValidateModel(context);
+        return ManifestPredicate(context, enrollment, complete: true);
+    }
+
+    internal static IReadOnlyList<string> GlobalCatalogueRelations(ExploreDbContext context) =>
+        Sources(context).Select(source => source.Table).ToArray();
+
     private static string ManifestPredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment, bool complete)
     {
         var sources = Sources(context);

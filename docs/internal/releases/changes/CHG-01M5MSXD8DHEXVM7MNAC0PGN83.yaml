@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5MSXD8DHEXVM7MNAC0PGN83
+Title: "Preserve native credentials during configuration changes"
+Type: fix
+Scope: onboarding
+Summary: "Resolver, operator identity and provider configuration retain authenticated identity and credential facts across renewed framework wrappers while keeping human and setup authority separate."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Native human credential evidence and accepted setup-secret authority remain distinct while identity, claim, scheme and ticket-time snapshots reject changed authentication facts.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Equivalent native authentication wrappers do not require a new sign-in or extend the original credential deadline; no configuration or migration change is required.

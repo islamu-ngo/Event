@@ -111,8 +111,9 @@ public static class PostgresRefundReconciliationHealthContract
                         OR policy.polroles IS DISTINCT FROM ARRAY[pg_catalog.to_regrole('{OwnerRole}')::oid]
                         OR pg_catalog.pg_get_expr(policy.polqual, policy.polrelid) IS DISTINCT FROM 'true'
                         OR policy.polwithcheck IS NOT NULL
-                        OR pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)}, relation.oid,
-                            'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                        OR (pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)}, relation.oid,
+                            'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                            OR {PostgresPrivilegeGuard.MaintainPrivilegeSql(Text(enrollment.GlobalLogin), "relation.oid", false)})
                         OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)}, relation.oid,
                             'SELECT,INSERT,UPDATE,REFERENCES')
                         OR EXISTS (SELECT 1 FROM pg_catalog.pg_policy other

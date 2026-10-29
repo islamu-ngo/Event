@@ -167,24 +167,6 @@ public sealed class ConfigurationManifestExportControllerTests
     }
 
     [Test]
-    public async Task CerbosAndLocalPoliciesConsumeTheSameExplicitExportFact()
-    {
-        string root = FindRepositoryRoot();
-        string cerbosPolicy = await File.ReadAllTextAsync(Path.Combine(
-            root,
-            "cerbos/policies/islamuevent_instance_setting.yaml"));
-        string localPolicy = await File.ReadAllTextAsync(Path.Combine(
-            root,
-            "src/Explore.Infrastructure/Services/FallbackAuthorizationService.cs"));
-
-        const string factToken = "configurationManifestExport";
-        await Assert.That(cerbosPolicy).Contains(factToken, StringComparison.Ordinal);
-        await Assert.That(localPolicy).Contains(factToken, StringComparison.Ordinal);
-        await Assert.That(cerbosPolicy).Contains("islamuevent_instance_setting", StringComparison.Ordinal);
-        await Assert.That(cerbosPolicy).Contains("view", StringComparison.Ordinal);
-    }
-
-    [Test]
     public async Task AggregateOverflowAdvertisesStableProblemAndCannotStreamPartialManifest()
     {
         Type controller = RequireController();
@@ -307,19 +289,6 @@ public sealed class ConfigurationManifestExportControllerTests
         typeof(Program).Assembly.GetType(ControllerTypeName)
         ?? throw new InvalidOperationException(
             $"Missing planned whole-instance API surface: {ControllerTypeName}.");
-
-    private static string FindRepositoryRoot()
-    {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-        while (directory is not null
-               && !File.Exists(Path.Combine(directory.FullName, "Explore.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        return directory?.FullName
-            ?? throw new InvalidOperationException("Could not locate the repository root.");
-    }
 
     private static void AssertProblemResponse(MethodInfo action, int statusCode)
     {

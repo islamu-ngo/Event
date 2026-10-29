@@ -15,11 +15,14 @@ namespace Explore.Blazor.IntegrationTests.Configuration;
 public sealed class InfisicalConfigurationProviderTests
 {
     [Test]
-    public async Task AcquiredOidcSettingsSurviveStartupProjection()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task AcquiredOidcSettingsSurviveStartupProjection(bool hasSessionCredential)
     {
         string keycloakSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         string googleSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         string accessToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        string sessionPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         var roots = new Dictionary<string, Dictionary<string, string>>
         {
             ["/runtime/bff/oidc/keycloak"] = new()
@@ -34,7 +37,9 @@ public sealed class InfisicalConfigurationProviderTests
                 ["GOOGLE_CLIENT_ID"] = "replacement-google-client",
                 ["GOOGLE_CLIENT_SECRET"] = googleSecret
             },
-            ["/runtime/bff/atproto/oauth"] = new()
+            ["/runtime/bff/atproto/oauth"] = new(),
+            ["/runtime/bff/session"] = hasSessionCredential
+                ? new() { ["BFF_SESSION_REDIS_PASSWORD"] = sessionPassword } : new()
         };
         var host = WebApplication.CreateBuilder();
         host.Logging.ClearProviders();
@@ -64,7 +69,8 @@ public sealed class InfisicalConfigurationProviderTests
             ["SecretProvider:Infisical:ProjectId"] = Guid.CreateVersion7().ToString("N"),
             ["SecretProvider:Infisical:ClientId"] = Guid.CreateVersion7().ToString("N"),
             ["SecretProvider:Infisical:ClientSecret"] = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
-            ["SecretProvider:Infisical:Environment"] = "development"
+            ["SecretProvider:Infisical:Environment"] = "development",
+            ["Bff:SessionAuthority:Password"] = Convert.ToHexString(RandomNumberGenerator.GetBytes(32))
         };
         var previous = bootstrap.Keys
             .Where(key => key.StartsWith("SecretProvider:Infisical:", StringComparison.Ordinal))
@@ -80,14 +86,15 @@ public sealed class InfisicalConfigurationProviderTests
             var receipts = new AuthenticationCredentialAcquisitionReceipts(profileRevision);
             application.AddSecretAuthorityConfiguration("Testing", receipts);
             IConfiguration configuration = application.Build();
-            var expected = new Dictionary<string, string>
+            var expected = new Dictionary<string, string?>
             {
                 ["Keycloak:Realm"] = "operators",
                 ["Keycloak:ClientId"] = "replacement-keycloak-client",
                 ["Keycloak:Authority"] = "https://identity.example.test/realms/operators",
                 ["Keycloak:ClientSecret"] = keycloakSecret,
                 ["Google:ClientId"] = "replacement-google-client",
-                ["Google:ClientSecret"] = googleSecret
+                ["Google:ClientSecret"] = googleSecret,
+                ["Bff:SessionAuthority:Password"] = hasSessionCredential ? sessionPassword : null
             };
             foreach (var setting in expected)
                 await Assert.That(configuration[setting.Key] == setting.Value).IsTrue()
@@ -116,6 +123,8 @@ public sealed class InfisicalConfigurationProviderTests
     [Arguments("/atproto")]
     [Arguments("/runtime/bff/oidc/keycloak/nested")]
     [Arguments("/runtime/bff/oidc/google/nested")]
+    [Arguments("/runtime/bff/session/nested")]
+    [Arguments("/runtime/api/session")]
     public async Task NonOidcRootIsRejectedBeforeAuthorityAuthentication(string path)
     {
         using var transport = new AuthorityTransport();
@@ -221,6 +230,37 @@ public sealed class InfisicalConfigurationProviderTests
         await Assert.That(query["secretPath"].ToString()).IsEqualTo("/runtime/bff/atproto/oauth");
         await Assert.That(query["recursive"].ToString()).IsEqualTo("false");
         await Assert.That(query["expandSecretReferences"].ToString()).IsEqualTo("false");
+    }
+
+    [Test]
+    [Arguments("/runtime/bff/session", "BFF_SESSION_REDIS_PASSWORD", true)]
+    [Arguments("/runtime/bff/session/nested", "BFF_SESSION_REDIS_PASSWORD", false)]
+    [Arguments("/runtime/bff/session", "GOOGLE_CLIENT_SECRET", false)]
+    [Arguments("/runtime/bff/session", "DATABASE_PASSWORD", false)]
+    public async Task SessionCredentialRequiresExactRootAndKey(string returnedPath, string key, bool admitted)
+    {
+        string canary = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        using var transport = new AuthorityTransport(
+            returnedPath: returnedPath, returnedKey: key, returnedValue: canary);
+        var provider = new InfisicalConfigurationProvider(CreateSource(transport, "/runtime/bff/session"));
+        InvalidOperationException? rejection = null;
+        try { provider.Load(); }
+        catch (InvalidOperationException exception) { rejection = exception; }
+
+        await Assert.That(rejection is null).IsEqualTo(admitted);
+        await Assert.That(provider.TryGet("Bff:SessionAuthority:Password", out var value)).IsEqualTo(admitted);
+        await Assert.That(value == (admitted ? canary : null)).IsTrue();
+        Uri acquisition = transport.Requests.Single(request => request.AbsolutePath == "/api/v3/secrets/raw");
+        var query = QueryHelpers.ParseQuery(acquisition.Query);
+        await Assert.That(query["secretPath"].ToString()).IsEqualTo("/runtime/bff/session");
+        await Assert.That(query["recursive"].ToString()).IsEqualTo("false");
+        await Assert.That(query["expandSecretReferences"].ToString()).IsEqualTo("false");
+        await Assert.That(query["include_imports"].ToString()).IsEqualTo("false");
+        if (rejection is not null)
+        {
+            await Assert.That(rejection.InnerException).IsNull();
+            await Assert.That(rejection.Message.Contains(canary, StringComparison.Ordinal)).IsFalse();
+        }
     }
 
     [Test]

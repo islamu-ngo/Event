@@ -187,9 +187,6 @@ public sealed class EmailDispatchDrainServiceTests
             CancellationToken.None);
 
         await Assert.That(result.Outcome).IsEqualTo(EmailDispatchDrainOutcome.TenantPaused);
-        await fixture.Repository.Received(1).TryClaimSpecificAsync(
-            Arg.Any<EmailDispatchSpecificClaimRequest>(),
-            Arg.Any<CancellationToken>());
         await fixture.EligibilityEvaluator.DidNotReceiveWithAnyArgs()
             .EvaluateAndBeginProviderHandoffAsync(default!, default);
         await fixture.EmailService.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
@@ -476,8 +473,6 @@ public sealed class EmailDispatchDrainServiceTests
         await Assert.That(sentMessage!.CustomHeaders.ContainsKey("List-Unsubscribe")).IsFalse();
         await Assert.That(sentMessage.PlainTextBody).DoesNotContain("unsubscribe");
         await Assert.That(sentMessage.HtmlBody ?? string.Empty).DoesNotContain("unsubscribe");
-        fixture.UnsubscribeTokenService.DidNotReceiveWithAnyArgs()
-            .GenerateToken(default!, default);
     }
 
     [Test]

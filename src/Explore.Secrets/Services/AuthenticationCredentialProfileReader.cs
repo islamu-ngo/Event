@@ -15,10 +15,14 @@ public sealed class AuthenticationCredentialProfileReader(
 
     public AuthenticationCredentialProfile ReadCurrent()
     {
-        if (!Guid.TryParse(Environment.GetEnvironmentVariable(RevisionEnvironmentVariable), out Guid revision)
-            || revision == Guid.Empty)
+        var observation = ObserveCurrent();
+        if (observation.Revision is not { } revision)
             throw new InvalidOperationException("authentication_credential_profile_unavailable");
+        return new(observation.Authority, revision);
+    }
 
+    public AuthenticationCredentialProfileObservation ObserveCurrent()
+    {
         var authority = options.Value.Provider switch
         {
             SecretProviderType.Environment => AuthenticationCredentialCutover.CredentialAuthority.Environment,
@@ -27,6 +31,10 @@ public sealed class AuthenticationCredentialProfileReader(
                 => AuthenticationCredentialCutover.CredentialAuthority.UserSecrets,
             _ => throw new InvalidOperationException("authentication_credential_profile_authority_invalid")
         };
+        string? configured = Environment.GetEnvironmentVariable(RevisionEnvironmentVariable);
+        if (configured is null) return new(authority, null);
+        if (!Guid.TryParse(configured, out Guid revision) || revision == Guid.Empty)
+            throw new InvalidOperationException("authentication_credential_profile_unavailable");
         return new(authority, revision);
     }
 }

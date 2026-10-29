@@ -160,6 +160,16 @@
           "Serilog": "4.3.0"
         }
       },
+      "StackExchange.Redis": {
+        "type": "Direct",
+        "requested": "[2.13.1, )",
+        "resolved": "2.13.1",
+        "contentHash": "jC5wkRe8K6HPoDENUws+fl2d7+GKz+ky8SWEDzYzPx6hHt2EwxWm01gmYPWLzlT49jfYYap0guB5bExtyX9aIQ==",
+        "dependencies": {
+          "Pipelines.Sockets.Unofficial": "2.2.16",
+          "System.IO.Hashing": "10.0.2"
+        }
+      },
       "Yarp.ReverseProxy": {
         "type": "Direct",
         "requested": "[2.3.0, )",
@@ -385,15 +395,6 @@
         "contentHash": "fKL7mXv7qaiNBUC71ssvn/dU0k9t0o45+qm2XgKAlSt19xF+ijjxyA3R6HmCgfKEKwfcfkwWjayuQtRueZFkYw==",
         "dependencies": {
           "Serilog": "4.2.0"
-        }
-      },
-      "StackExchange.Redis": {
-        "type": "Transitive",
-        "resolved": "2.13.1",
-        "contentHash": "jC5wkRe8K6HPoDENUws+fl2d7+GKz+ky8SWEDzYzPx6hHt2EwxWm01gmYPWLzlT49jfYYap0guB5bExtyX9aIQ==",
-        "dependencies": {
-          "Pipelines.Sockets.Unofficial": "2.2.16",
-          "System.IO.Hashing": "10.0.2"
         }
       },
       "System.IO.Hashing": {

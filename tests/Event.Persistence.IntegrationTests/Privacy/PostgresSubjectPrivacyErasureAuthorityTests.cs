@@ -13,6 +13,7 @@ using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
 using Explore.Secrets.Database;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using FixtureStage = Event.Persistence.IntegrationTests.Fixtures.PostgreSqlContainerFixture.AssuranceStage;
 
 namespace Event.Persistence.IntegrationTests.Privacy;
 
@@ -37,11 +39,12 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
     [Arguments(true)]
     public async Task RetainedSubjectSettlesBothTenantsWithoutPrivateTableAuthority(bool injectFailure)
     {
+        fixture.RecordStage(FixtureStage.SettlementEntered, injectFailure);
         GlobalLocationPrivacyErasureTests.ErasureGraph graph;
         StorageGraph storage;
         Guid tenantA;
         IdempotencyRecord[] receipts;
-        await using (var seed = fixture.CreateDbContext())
+        await using (var seed = await CreateBoundFixtureContextAsync(fixture))
         {
             await PostgresSubjectPrivacyErasureContract.ApplyAsync(seed);
             graph = await GlobalLocationPrivacyErasureTests.SeedErasureGraphAsync(seed);
@@ -82,6 +85,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
             await seed.SaveChangesAsync();
             storage = await SeedStorageAsync(seed, graph, tenantA);
         }
+        fixture.RecordStage(FixtureStage.SharedSeedReturned, injectFailure);
 
         await using (var migrations = new CoLocatedPrivacyErasureAuthorityDbContext(
             AuthorityOptions(PrimaryDatabaseRole.Migrator)))
@@ -93,15 +97,17 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         PrivacyErasureIntent fact = await retained.AppendAsync(PrivacyErasureRequest.Create(
             Guid.CreateVersion7(), PrivacyErasureSubjectKind.User, graph.OwnerUserId,
             PrivacyErasureReasonCode.AccountDeletion, new PrivacyErasureOptions().CurrentPolicyVersion));
-        await using (var mirror = fixture.CreateDbContext())
+        await using (var mirror = await CreateBoundFixtureContextAsync(fixture))
         {
             mirror.PrivacyErasureSagas.Add(PrivacyErasureSaga.Start(
                 fact, fact.AuthoritySequence, RandomNumberGenerator.GetBytes(32),
                 fact.RecordedAtUtc.AddHours(1), fact.RecordedAtUtc));
             await mirror.SaveChangesAsync();
         }
+        fixture.RecordStage(FixtureStage.RetainedMirrorReturned, injectFailure);
 
         await using var logins = await OrdinaryLogins.CreateAsync(fixture);
+        fixture.RecordStage(FixtureStage.PurposeEnrollmentReturned, injectFailure);
         var runtimeFactory = new TenantExploreDbContextFactory(logins.RuntimeOptions);
         await using (var request = await runtimeFactory.CreateDbContextAsync(tenantA))
         {
@@ -116,9 +122,10 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         await AssertOrdinaryAsync(application, logins.GlobalOptions.Username!);
         await Assert.That(application.TenantFilterTenantId).IsNull();
         await AssertPrivateReadDeniedAsync(application);
+        fixture.RecordStage(FixtureStage.OrdinaryBoundariesReturned, injectFailure);
         if (injectFailure)
         {
-            await using var administration = fixture.CreateDbContext();
+            await using var administration = await CreateBoundFixtureContextAsync(fixture);
             await GlobalLocationPrivacyErasureTests.InstallOutboxFailureTriggerAsync(administration);
         }
         bool settled = false;
@@ -126,6 +133,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         try
         {
             await using var workflow = CreateRuntime(application, retained, locatorProtector);
+            fixture.RecordStage(FixtureStage.ReplayEntered, injectFailure);
             if (injectFailure)
             {
                 var failure = await Assert.ThrowsAsync<Exception>(() =>
@@ -133,27 +141,31 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
                 await Assert.That(failure).IsTypeOf<DbUpdateException>()
                     .Because(failure!.GetBaseException().Message);
                 await Assert.That(((PostgresException)failure!.InnerException!).SqlState).IsEqualTo("P0001");
+                fixture.RecordStage(FixtureStage.ExpectedFaultAsserted, injectFailure);
             }
             else
             {
                 await workflow.Service.ReplayPendingAsync(CancellationToken.None);
-                await workflow.Service.ReplayPendingAsync(CancellationToken.None);
                 settled = true;
+                fixture.RecordStage(FixtureStage.ReplayReturned, injectFailure);
+                await workflow.Service.ReplayPendingAsync(CancellationToken.None);
+                fixture.RecordStage(FixtureStage.ReplayRepeatReturned, injectFailure);
             }
         }
         finally
         {
             if (injectFailure)
             {
-                await using var administration = fixture.CreateDbContext();
+                await using var administration = await CreateBoundFixtureContextAsync(fixture);
                 await GlobalLocationPrivacyErasureTests.RemoveOutboxFailureTriggerAsync(administration);
             }
             await AssertRetainedAndApplicationAsync(retained, fact, graph, !settled, locatorProtector);
             await AssertStorageAsync(storage, graph, !settled);
         }
+        fixture.RecordStage(FixtureStage.CommittedStateAsserted, injectFailure);
         await Assert.That(application.TenantFilterTenantId).IsNull();
         await AssertPrivateReadDeniedAsync(application);
-        await using var receiptObserver = fixture.CreateDbContext();
+        await using var receiptObserver = await CreateBoundFixtureContextAsync(fixture);
         var retainedReceipts = await receiptObserver.IdempotencyRecords.AsNoTracking()
             .Where(row => receipts.Select(receipt => receipt.Id).Contains(row.Id)).ToArrayAsync();
         await Assert.That(retainedReceipts.Length).IsEqualTo(3);
@@ -183,6 +195,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
             await Assert.That(result.Lookup.Outcome).IsEqualTo(Explore.Application.Contracts.Persistence.IdempotencyLookupOutcome.RequestMismatch);
             await Assert.That(result.Record).IsNull();
         }
+        fixture.RecordStage(FixtureStage.SettlementAssertionsReturned, injectFailure);
     }
 
     [Test]
@@ -192,8 +205,9 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
     [Arguments("policy")]
     public async Task ForgedPreparationAndMismatchedNativeTupleCannotErase(string changed)
     {
+        fixture.RecordStage(FixtureStage.ForgedTupleEntered);
         GlobalLocationPrivacyErasureTests.ErasureGraph graph;
-        await using (var seed = fixture.CreateDbContext())
+        await using (var seed = await CreateBoundFixtureContextAsync(fixture))
         {
             await PostgresSubjectPrivacyErasureContract.ApplyAsync(seed);
             graph = await GlobalLocationPrivacyErasureTests.SeedErasureGraphAsync(seed);
@@ -206,7 +220,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         var fact = await retained.AppendAsync(PrivacyErasureRequest.Create(Guid.CreateVersion7(),
             PrivacyErasureSubjectKind.User, graph.OwnerUserId, PrivacyErasureReasonCode.AccountDeletion,
             new PrivacyErasureOptions().CurrentPolicyVersion));
-        await using (var mirror = fixture.CreateDbContext())
+        await using (var mirror = await CreateBoundFixtureContextAsync(fixture))
         {
             mirror.PrivacyErasureSagas.Add(PrivacyErasureSaga.Start(fact, fact.AuthoritySequence,
                 RandomNumberGenerator.GetBytes(32), fact.RecordedAtUtc.AddHours(1), fact.RecordedAtUtc));
@@ -243,20 +257,23 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
                 return await command.ExecuteScalarAsync(token);
             }, CancellationToken.None));
         await Assert.That(nativeRejected!.SqlState).IsEqualTo("42501");
-        await using var persisted = fixture.CreateDbContext();
+        fixture.RecordStage(FixtureStage.ForgedTupleRefusalAsserted);
+        await using var persisted = await CreateBoundFixtureContextAsync(fixture);
         await Assert.That(await persisted.UserPii.CountAsync(row => row.UserId == graph.OwnerUserId || row.UserId == graph.UnrelatedUserId)).IsEqualTo(2);
         await Assert.That(await persisted.Locations.IgnoreQueryFilters()
             .CountAsync(row => row.OwnerUserId == graph.OwnerUserId && row.PiiErasedAtUtc == null)).IsEqualTo(2);
         await Assert.That(await persisted.PrivacyErasureProviderWork.CountAsync()).IsEqualTo(0);
         await Assert.That(await persisted.PrivacyErasureReplayCheckpoints.CountAsync()).IsEqualTo(0);
         await AssertPrivateReadDeniedAsync(application);
+        fixture.RecordStage(FixtureStage.ForgedTupleStateAsserted);
     }
 
     [Test]
     public async Task DisposalCannotPrecedeProtectedProviderWork()
     {
+        fixture.RecordStage(FixtureStage.ProtectedWorkEntered);
         GlobalLocationPrivacyErasureTests.ErasureGraph graph;
-        await using (var seed = fixture.CreateDbContext())
+        await using (var seed = await CreateBoundFixtureContextAsync(fixture))
         {
             await PostgresSubjectPrivacyErasureContract.ApplyAsync(seed);
             graph = await GlobalLocationPrivacyErasureTests.SeedErasureGraphAsync(seed);
@@ -269,7 +286,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         var fact = await retained.AppendAsync(PrivacyErasureRequest.Create(Guid.CreateVersion7(),
             PrivacyErasureSubjectKind.User, graph.OwnerUserId, PrivacyErasureReasonCode.AccountDeletion,
             new PrivacyErasureOptions().CurrentPolicyVersion));
-        await using (var mirror = fixture.CreateDbContext())
+        await using (var mirror = await CreateBoundFixtureContextAsync(fixture))
         {
             mirror.PrivacyErasureSagas.Add(PrivacyErasureSaga.Start(fact, fact.AuthoritySequence,
                 RandomNumberGenerator.GetBytes(32), fact.RecordedAtUtc.AddHours(1), fact.RecordedAtUtc));
@@ -293,7 +310,8 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         var rejected = (PostgresException)cause;
         await Assert.That(rejected!.SqlState).IsEqualTo("55000");
         await Assert.That(rejected.MessageText).IsEqualTo("subject_erasure_protected_work_required");
-        await using var persisted = fixture.CreateDbContext();
+        fixture.RecordStage(FixtureStage.ProtectedWorkRefusalAsserted);
+        await using var persisted = await CreateBoundFixtureContextAsync(fixture);
         await Assert.That(await persisted.UserExternalLogins.IgnoreQueryFilters()
             .CountAsync(row => row.UserId == graph.OwnerUserId)).IsEqualTo(2);
         await Assert.That(await persisted.Locations.IgnoreQueryFilters()
@@ -302,6 +320,26 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         await Assert.That(await persisted.OutboxMessages.CountAsync(row =>
             row.EventType == "LocationPiiErased" || row.EventType == "LocationPrivacyCorrectionRequested"
                 || row.EventType == "PrivacyErasureCacheInvalidationRequested")).IsEqualTo(0);
+        fixture.RecordStage(FixtureStage.ProtectedWorkStateAsserted);
+    }
+
+    private static async Task<ExploreDbContext> CreateBoundFixtureContextAsync(PostgreSqlContainerFixture fixture)
+    {
+        var context = fixture.CreateDbContext();
+        try
+        {
+            context.BindTenantLease();
+            return context;
+        }
+        catch (Exception primary)
+        {
+            try { await context.DisposeAsync(); }
+            catch (Exception cleanup)
+            {
+                throw new AggregateException("Fixture context binding and cleanup failed.", primary, cleanup);
+            }
+            throw;
+        }
     }
 
     private DbContextOptions<CoLocatedPrivacyErasureAuthorityDbContext> AuthorityOptions(PrimaryDatabaseRole role)
@@ -336,7 +374,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         await Assert.That(await retained.ExecuteSerializedAsync(
             token => retained.IsSubjectFencedAsync(graph.OwnerUserId, token),
             CancellationToken.None)).IsTrue();
-        await using var persisted = fixture.CreateDbContext();
+        await using var persisted = await CreateBoundFixtureContextAsync(fixture);
         var homes = await persisted.Locations.IgnoreQueryFilters()
             .Where(row => graph.LocationIds.Contains(row.Id)).ToArrayAsync();
         await Assert.That(homes.Length).IsEqualTo(2);
@@ -525,7 +563,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
     private async Task AssertStorageAsync(
         StorageGraph storage, GlobalLocationPrivacyErasureTests.ErasureGraph graph, bool rolledBack)
     {
-        await using var persisted = fixture.CreateDbContext();
+        await using var persisted = await CreateBoundFixtureContextAsync(fixture);
         await Assert.That(await persisted.StorageObjects.IgnoreQueryFilters().CountAsync(row =>
             row.Id == storage.First || row.Id == storage.Second)).IsEqualTo(rolledBack ? 2 : 0);
         var shared = await persisted.StorageObjects.IgnoreQueryFilters().SingleAsync(row => row.Id == storage.Shared);
@@ -602,6 +640,8 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         private readonly string _runtime = $"erasure_runtime_{Guid.CreateVersion7():N}";
         private string[] _mirrorTables = [];
         private string[] _requestTables = [];
+        private string _eligibilityTable = null!;
+        private readonly Dictionary<string, bool> _eligibilityColumns = new(StringComparer.Ordinal);
         private string _schema = null!;
         internal PrimaryDatabaseConnectionOptions GlobalOptions { get; private set; } = null!;
         internal PrimaryDatabaseConnectionOptions RuntimeOptions { get; private set; } = null!;
@@ -609,65 +649,197 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         internal static async Task<OrdinaryLogins> CreateAsync(PostgreSqlContainerFixture fixture)
         {
             var logins = new OrdinaryLogins(fixture);
-            await using var metadata = fixture.CreateDbContext();
-            var sql = metadata.GetService<ISqlGenerationHelper>();
-            logins._schema = metadata.Model.FindEntityType(typeof(Location))!.GetSchema()!;
-            logins._mirrorTables = new[] { typeof(PrivacyErasureSaga), typeof(PrivacyErasurePolicyCoverage),
-                typeof(PrivacyErasureReplayCheckpoint), typeof(PrivacyErasureProviderWork), typeof(OutboxMessage) }
-                .Select(Table).ToArray();
-            logins._requestTables = new[] { typeof(Location), typeof(LocationPii) }.Select(Table).ToArray();
-            string globalPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-            string runtimePassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-            await using var administration = new NpgsqlConnection(fixture.ConnectionString);
-            await administration.OpenAsync();
-            await using var grant = administration.CreateCommand();
-            grant.CommandText = $"""
-                CREATE ROLE "{logins._global}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '{globalPassword}';
-                CREATE ROLE "{logins._runtime}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '{runtimePassword}';
-                GRANT USAGE ON SCHEMA "{logins._schema}" TO "{logins._global}", "{logins._runtime}";
-                GRANT {PostgresSubjectPrivacyErasureContract.GlobalRole} TO "{logins._global}";
-                GRANT SELECT, INSERT, UPDATE ON {string.Join(", ", logins._mirrorTables)} TO "{logins._global}";
-                GRANT SELECT ON {string.Join(", ", logins._requestTables)} TO "{logins._runtime}";
-                """;
-            await grant.ExecuteNonQueryAsync();
-            var connection = new NpgsqlConnectionStringBuilder(fixture.ConnectionString);
-            logins.GlobalOptions = Options(PrimaryDatabaseRole.Global, logins._global, globalPassword);
-            logins.RuntimeOptions = Options(PrimaryDatabaseRole.Runtime, logins._runtime, runtimePassword);
-            return logins;
-
-            string Table(Type type)
+            ExploreDbContext? metadata = null;
+            NpgsqlConnection? administration = null;
+            NpgsqlCommand? grant = null;
+            var failures = new List<Exception>();
+            bool provisioningAttempted = false;
+            try
             {
-                var entity = metadata.Model.FindEntityType(type)!;
-                return sql.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+                var originalMetadata = await CreateBoundFixtureContextAsync(fixture);
+                metadata = originalMetadata;
+                var sql = metadata.GetService<ISqlGenerationHelper>();
+                logins._schema = metadata.Model.FindEntityType(typeof(Location))!.GetSchema()!;
+                logins._mirrorTables = new[] { typeof(PrivacyErasureSaga), typeof(PrivacyErasurePolicyCoverage),
+                    typeof(PrivacyErasureReplayCheckpoint), typeof(PrivacyErasureProviderWork), typeof(OutboxMessage) }
+                    .Select(Table).ToArray();
+                logins._requestTables = new[] { typeof(Location), typeof(LocationPii) }.Select(Table).ToArray();
+                var eligibility = metadata.Model.FindEntityType(typeof(LocalIdentityEligibility))!;
+                logins._eligibilityTable = Table(typeof(LocalIdentityEligibility));
+                var eligibilityStore = Microsoft.EntityFrameworkCore.Metadata.StoreObjectIdentifier.Table(
+                    eligibility.GetTableName()!, eligibility.GetSchema());
+                foreach (var property in eligibility.GetProperties())
+                    logins._eligibilityColumns.Add(property.GetColumnName(eligibilityStore)!,
+                        property.Name is nameof(LocalIdentityEligibility.State)
+                            or nameof(LocalIdentityEligibility.Generation) or nameof(LocalIdentityEligibility.UpdatedAt));
+                string globalPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+                string runtimePassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+                administration = new NpgsqlConnection(fixture.ConnectionString);
+                await administration.OpenAsync();
+                grant = administration.CreateCommand();
+                grant.CommandText = $"""
+                    CREATE ROLE "{logins._global}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '{globalPassword}';
+                    CREATE ROLE "{logins._runtime}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '{runtimePassword}';
+                    GRANT USAGE ON SCHEMA "{logins._schema}" TO "{logins._global}", "{logins._runtime}";
+                    GRANT {PostgresSubjectPrivacyErasureContract.GlobalRole} TO "{logins._global}";
+                    GRANT SELECT, INSERT, UPDATE ON {string.Join(", ", logins._mirrorTables)} TO "{logins._global}";
+                    GRANT SELECT ON {string.Join(", ", logins._requestTables)} TO "{logins._runtime}";
+                    """;
+                provisioningAttempted = true;
+                await grant.ExecuteNonQueryAsync();
+                await PostgresLocalIdentityWriterPermissions.ApplyAsync(metadata,
+                    new PostgresLocalIdentityWriterEnrollment(fixture.NativeQueueEnrollment.MigratorLogin,
+                        logins._runtime, fixture.GetNativeQueueOptions(PrimaryDatabaseRole.LocalIdentityWriter).Username!,
+                        logins._global), IdentityDatabaseTopology.Colocated, LocalIdentityWriterInventory.Store.Application);
+                await logins.AssertEligibilityPermissionsAsync(administration);
+                var connection = new NpgsqlConnectionStringBuilder(fixture.ConnectionString);
+                logins.GlobalOptions = Options(PrimaryDatabaseRole.Global, logins._global, globalPassword);
+                logins.RuntimeOptions = Options(PrimaryDatabaseRole.Runtime, logins._runtime, runtimePassword);
+
+                string Table(Type type)
+                {
+                    var entity = originalMetadata.Model.FindEntityType(type)!;
+                    return sql.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+                }
+
+                PrimaryDatabaseConnectionOptions Options(PrimaryDatabaseRole role, string login, string password) => new()
+                {
+                    Role = role,
+                    Provider = PrimaryDatabaseProvider.PostgreSql,
+                    Host = connection.Host,
+                    Port = connection.Port,
+                    Database = connection.Database,
+                    Username = login,
+                    Password = password,
+                    Schema = logins._schema,
+                    TlsMode = PrimaryDatabaseTlsMode.Disabled
+                };
             }
-
-            PrimaryDatabaseConnectionOptions Options(PrimaryDatabaseRole role, string login, string password) => new()
+            catch (Exception failure) { failures.Add(failure); }
+            finally
             {
-                Role = role,
-                Provider = PrimaryDatabaseProvider.PostgreSql,
-                Host = connection.Host,
-                Port = connection.Port,
-                Database = connection.Database,
-                Username = login,
-                Password = password,
-                Schema = logins._schema,
-                TlsMode = PrimaryDatabaseTlsMode.Disabled
-            };
+                try { if (grant is not null) await grant.DisposeAsync(); }
+                catch (Exception failure) { failures.Add(failure); }
+                try { if (administration is not null) await administration.DisposeAsync(); }
+                catch (Exception failure) { failures.Add(failure); }
+                try { if (metadata is not null) await metadata.DisposeAsync(); }
+                catch (Exception failure) { failures.Add(failure); }
+            }
+            if (failures.Count != 0)
+            {
+                if (provisioningAttempted)
+                {
+                    try { await logins.DisposeAsync(); }
+                    catch (Exception cleanup) { failures.Add(cleanup); }
+                }
+                if (failures.Count == 1)
+                    System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+                throw new AggregateException("Temporary erasure login acquisition failed.", failures);
+            }
+            return logins;
+        }
+
+        private async Task AssertEligibilityPermissionsAsync(NpgsqlConnection administration)
+        {
+            NpgsqlCommand? probe = null;
+            var failures = new List<Exception>();
+            try
+            {
+                probe = administration.CreateCommand();
+                foreach (string login in new[] { _global, _runtime })
+                {
+                    probe.Parameters.Clear();
+                    probe.CommandText = "SELECT has_table_privilege(@login, @table, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')";
+                    probe.Parameters.Add(new NpgsqlParameter("login", login));
+                    probe.Parameters.Add(new NpgsqlParameter("table", _eligibilityTable));
+                    await Assert.That((bool)(await probe.ExecuteScalarAsync())!).IsFalse();
+                    probe.CommandText = "SELECT has_column_privilege(@login, @table, @column, @privilege)";
+                    var column = new NpgsqlParameter("column", string.Empty);
+                    var privilege = new NpgsqlParameter("privilege", string.Empty);
+                    probe.Parameters.Add(column);
+                    probe.Parameters.Add(privilege);
+                    foreach (var mapped in _eligibilityColumns)
+                    {
+                        column.Value = mapped.Key;
+                        foreach (string permission in new[] { "SELECT", "INSERT", "UPDATE", "REFERENCES" })
+                        {
+                            privilege.Value = permission;
+                            bool expected = login == _global && (permission == "SELECT"
+                                || permission == "UPDATE" && mapped.Value);
+                            await Assert.That((bool)(await probe.ExecuteScalarAsync())!).IsEqualTo(expected);
+                            privilege.Value = permission + " WITH GRANT OPTION";
+                            await Assert.That((bool)(await probe.ExecuteScalarAsync())!).IsFalse();
+                        }
+                    }
+                }
+            }
+            catch (Exception failure) { failures.Add(failure); }
+            finally
+            {
+                try { if (probe is not null) await probe.DisposeAsync(); }
+                catch (Exception failure) { failures.Add(failure); }
+            }
+            if (failures.Count == 1)
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            if (failures.Count != 0)
+                throw new AggregateException("Eligibility permission observation failed.", failures);
         }
 
         public async ValueTask DisposeAsync()
         {
-            await using var administration = new NpgsqlConnection(fixture.ConnectionString);
-            await administration.OpenAsync();
-            await using var revoke = administration.CreateCommand();
-            revoke.CommandText = $"""
-                REVOKE ALL ON {string.Join(", ", _mirrorTables)} FROM "{_global}";
-                REVOKE {PostgresSubjectPrivacyErasureContract.GlobalRole} FROM "{_global}";
-                REVOKE ALL ON {string.Join(", ", _requestTables)} FROM "{_runtime}";
-                REVOKE USAGE ON SCHEMA "{_schema}" FROM "{_global}", "{_runtime}";
-                DROP ROLE "{_global}", "{_runtime}";
-                """;
-            await revoke.ExecuteNonQueryAsync();
+            NpgsqlConnection? administration = null;
+            var failures = new List<Exception>();
+            try
+            {
+                administration = new NpgsqlConnection(fixture.ConnectionString);
+                await administration.OpenAsync();
+                foreach (string login in new[] { _runtime, _global })
+                {
+                    NpgsqlCommand? revoke = null;
+                    try
+                    {
+                        revoke = administration.CreateCommand();
+                        revoke.CommandText = "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = @login)";
+                        revoke.Parameters.Add(new NpgsqlParameter("login", login));
+                        if ((bool)(await revoke.ExecuteScalarAsync())! is false) continue;
+                        revoke.Parameters.Clear();
+                        if (login == _global)
+                        {
+                            string selected = string.Join(", ", _eligibilityColumns.Keys.Select(Quote));
+                            string updated = string.Join(", ", _eligibilityColumns.Where(pair => pair.Value).Select(pair => Quote(pair.Key)));
+                            revoke.CommandText = $"""
+                                REVOKE SELECT ({selected}), UPDATE ({updated}) ON {_eligibilityTable} FROM "{_global}";
+                                REVOKE ALL ON {string.Join(", ", _mirrorTables)} FROM "{_global}";
+                                REVOKE {PostgresSubjectPrivacyErasureContract.GlobalRole} FROM "{_global}";
+                                REVOKE USAGE ON SCHEMA "{_schema}" FROM "{_global}";
+                                DROP ROLE "{_global}";
+                                """;
+                        }
+                        else
+                            revoke.CommandText = $"""
+                                REVOKE ALL ON {string.Join(", ", _requestTables)} FROM "{_runtime}";
+                                REVOKE USAGE ON SCHEMA "{_schema}" FROM "{_runtime}";
+                                DROP ROLE "{_runtime}";
+                                """;
+                        await revoke.ExecuteNonQueryAsync();
+                    }
+                    catch (Exception failure) { failures.Add(failure); }
+                    finally
+                    {
+                        try { if (revoke is not null) await revoke.DisposeAsync(); }
+                        catch (Exception failure) { failures.Add(failure); }
+                    }
+                }
+            }
+            catch (Exception failure) { failures.Add(failure); }
+            finally
+            {
+                try { if (administration is not null) await administration.DisposeAsync(); }
+                catch (Exception failure) { failures.Add(failure); }
+            }
+            if (failures.Count != 0) throw new AggregateException("Temporary erasure login cleanup failed.", failures);
+
+            static string Quote(string identifier) => '"' + identifier.Replace("\"", "\"\"", StringComparison.Ordinal) + '"';
         }
     }
 }

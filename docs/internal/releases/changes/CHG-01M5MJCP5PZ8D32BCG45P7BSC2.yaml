@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5MJCP5PZ8D32BCG45P7BSC2
+Title: "Install tenant policies before guarded migration contracts"
+Type: fix
+Scope: database
+Summary: "Fresh PostgreSQL startup installs canonical tenant policies before validating guarded storage contracts through either migration entrypoint."
+Group: postgres-migration-prerequisites
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MULTI_TENANCY.md
+    Disposition: documented
+    Detail: Both migration entrypoints install canonical forced tenant row security before guarded discovery contracts validate their source tables; enrollment and source-catalog guards remain fail-closed.
+  Migration:
+    Reference: docs/internal/MULTI_TENANCY.md
+    Disposition: documented
+    Detail: Existing model constraint and tenant policy installers run once in the shared migration core after EF migrations and schema mapping. No generated migration or migration history is changed.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

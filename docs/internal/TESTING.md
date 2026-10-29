@@ -75,6 +75,33 @@ Key TUnit features used:
 | `Assert.That(x).IsEqualTo(y)` | Fluent async assertions |
 | `Assert.Multiple()` | Group multiple assertions |
 
+### Ordinary Commercial And Recovery Domain Ownership
+
+`EventAddOnLifecycleTests` and `TicketingRecoveryInvariantTests` in
+`Event.Domain.UnitTests/Entities/` own the add-on catalog, checked commercial
+totals, inventory/refund replay and ticketing recovery state assertions. They
+run in the existing ordinary Domain CI lane. The former standalone mutation
+projects and their Stryker configurations are retired after named replacement
+proof; no mutation score or test-count target justifies removing an invariant.
+See the [scoped cohort dispositions](testing/TEST_COHORT_DISPOSITIONS.md) for the
+complete mapping and bounded evidence.
+
+Build after edits, then select one class at a time using the pinned runner:
+
+```bash
+dotnet build tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --verbosity quiet
+dotnet run --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/EventAddOnLifecycleTests/*" --minimum-expected-tests 12 --report-trx
+dotnet run --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/TicketingRecoveryInvariantTests/*" --minimum-expected-tests 7 --report-trx
+```
+
+The four filter segments are assembly, namespace, class and method. Use
+`--results-directory <unique-run-directory>` to preserve independent TRX artifacts.
+Require every mapped identity, passing outcomes and zero unexpected skips;
+`--minimum-expected-tests` only rejects an insufficient total. Immediate state
+comparisons after rejected/replayed operations prevent later valid transitions
+from hiding a partial mutation. These pure in-memory tests prove no real-provider
+race, distributed exactly-once effect or production authentication boundary.
+
 ## The 3-Ring Progressive Verification Model
 
 To eliminate the 50% test diagnosis and 15% container troubleshooting bottleneck during agentic and contributor workflows, the repository strictly enforces a **3-Ring Progressive Verification** hierarchy:
@@ -117,11 +144,43 @@ Each project has a specific role. Run individually — never use solution-level 
 | `Explore.Diagnostic.UnitTests` | Diagnostic tooling | Doctor exit codes, bounded command evidence, and redaction | No |
 | `ISLAMU.AgentWorkflow.Tests` | Repository tooling | Intents YAML syntax and literal-file commit guard | No |
 | `Event.Standalone.IntegrationTests` | Standalone host | In-process transport, combined host graph, configuration, and API parity | No |
+| `Event.Distributed.IntegrationTests` | Real AppHost, browser and load | Owned resources/authorities, topology/lifecycle, actual browser scripts/journeys and bounded process/workload profiles | No host for Harness; selected real profiles require their documented runtime/browser/k6 tools |
 | External `Configurator.Terminal.Tests` | Offline terminal (Configurator repository) | Definition workspace, localization and native secret/protected-save boundaries | No |
 | `ISLAMU.ReleaseEngineering.Tests` | Release engineering | Commit/scope policy, release artifact, Git trust, renderer, tag-anchored attestation, provider adapter plans | No (spawns `git`, `ssh-keygen`, and disposable repositories under the temp directory) |
 | `Event.Benchmarks` | Benchmarks | Advisory BenchmarkDotNet performance scenarios; build-only in PRs and executed by `performance-smoke.yml` | Optional PostgreSQL only for the dedicated provider benchmark |
 
 ### Run Commands
+
+The [owned distributed assurance guide](testing/DISTRIBUTED_ASSURANCE.md)
+defines the real AppHost profile, exact ownership inputs and current execution
+limits. The fixture exclusively supplies `ISLAMU_TEST_RUN_ID`,
+`ISLAMU_TEST_ROOT` and the browser-only `ISLAMU_TEST_REPLACEMENT_PASSWORD` through
+its selected Environment authority. Their commented `.env.example` entries
+document the interface; they are not interactive deployment settings. A passing
+Harness selection proves its admission/ownership/projection checks only, not
+healthy application startup or completed browser/load journeys.
+
+The [browser](testing/BROWSER_ASSURANCE.md) and
+[load](testing/LOAD_ASSURANCE.md) guides distinguish artifact/process controls
+from actual host execution and measurement. The integrated project owns all
+four categories; neither discovery nor a passing host-free selection admits
+an unexecuted browser, enabled worker, load or recovery profile.
+
+`AppHostCompositionContractTests` uses
+`OwnedAppHostFixture.InspectCompositionAsync` to inspect the real AppHost resource
+registration without starting the graph. Its internal
+`ISLAMU_TEST_PROFILE=ClosedCompositionModel` profile accepts explicit topology,
+run mode, privacy-erasure topology, optional migration stage and webhook-provider
+inputs. Public fixture creation and startup reject that inspection-only profile.
+The owned callback and cancellation token control completion; an arbitrary
+callback exception or cancellation cannot become successful model evidence.
+Builder disposal and owned-root cleanup remain part of that completion boundary.
+
+These checks establish resource registration and the project-owned Docker
+customization callback's environment/volume projection. They do not execute the
+SDK publisher, build an image, start containers or establish service readiness.
+Keep parsed solution, project, YAML and Compose contracts, and use the real
+runtime lanes for authority, role, database, browser and load evidence.
 
 The seven bundled Event setup test roots are removed. Portable engine and
 packaging coverage belongs to Configurator. Event retains client adapter tests under
@@ -607,6 +666,115 @@ dotnet test --project <ProjectPath> --configuration Release -- --report-trx --re
 
 ## Persistence Hardening Verification
 
+### Fresh PostgreSQL settings contract bootstrap
+
+Native privilege checks evaluate `MAINTAIN` and its grant option only on
+PostgreSQL 17 and later, where that capability exists. PostgreSQL 16 still checks
+every existing privilege without passing the unsupported name to PostgreSQL.
+Constraint attestation reads `conenforced` through the existing JSON metadata
+fallback when older catalogues lack that field; validation state, constraint
+shape and enforcement-trigger checks remain independent. An absent field does
+not prove that existing rows were validated. These capability corrections add
+no application permission, grant or tenant-policy exception.
+
+The declared-capability controls passed on PostgreSQL 16 and 18, and the three
+existing unexpected-MAINTAIN denial controls passed on PostgreSQL 18 in the
+integrated candidate. The complete PostgreSQL 16 public migration/idempotency
+case ended at the FreshEF process wait with cancellation and did not produce a
+whole-case pass. The final supported-engine matrix remains pending. This
+HEAD-only capability commit projection has not been compiled independently.
+
+The managed-worker settings attestation composes the complete installed Storage,
+OrdinarySettings, EventResource and PolicySourceSet trigger cohorts with each
+owner's exact readiness checks. Canonical constraints and row-level security must
+exist before strict source-catalogue installers run. Recognition of a trigger
+does not replace its owner/body/ACL/stamp/target-shape validation or permit an
+unknown trigger. The existing worker's fixed column INSERT permissions remain
+distinct from forbidden table-wide writes and runtime/public grants.
+
+Storage-probe source validation accepts only the canonical Global policies with
+an absent-or-complete worker catalogue. Traversal readiness reuses the unchanged
+complete Runtime parent-read guard for `Tenant.Id`; an extra `Tenant.Slug` read
+remains forbidden. Shared read projections also compose the fixed Runtime
+reference, Actor ownership and catalogue-backed membership SELECT/UPDATE/DELETE
+permissions needed by existing application purposes. Actor/publisher catalogue
+proof and publication fanout also compose the exact fixed Global preference
+profile, retaining their source shape, row security and native-body checks.
+The closed composition also includes the fixed worker/outbox delivery INSERT
+profile, Runtime storage reconciliation/quarantine readiness, and the existing
+API-key and scanner capability catalogue profiles. The resulting nine complete
+Global profiles retain their native owner, body, policy and privilege proofs;
+composing their mapped relations does not add a grant. Remaining
+settings owners reuse the complete registered purpose-profile proofs; relations
+outside those mappings and unsupported grants remain forbidden. A matching
+relation name or an empty privilege count cannot replace the complete proof.
+Within one Mixed guard evaluation, repeated canonical proofs are factored and
+reused by its existing relation checks. This retains the same validation and
+does not cache authority across operations or bypass native enrollment checks.
+
+Fresh composition installs `PostgresCategoryReadPermissions` after the fixed
+lookup catalogue profile. The declared migration identity provisions schema
+access and direct, non-grantable Runtime SELECT on exactly the six mapped
+Category columns: `Id`, `ConcurrencyStamp`, `MasterCode`, `FullName`, `ParentId`
+and `TenantId`. The profile checks model shape, the tenant-qualified parent
+relationship and forced tenant RLS. It adds no table-wide read or write, Global
+permission or role membership. Shared event-read guards recognize this exact
+direct read purpose only when Category belongs to the owner's fixed source
+inventory.
+
+Installation retains the originally captured transaction and savepoint. A
+failure while the savepoint remains available restores that savepoint and
+preserves earlier caller work. After release or uncertain selective restoration,
+cleanup aborts the captured physical transaction; it closes the captured
+connection if abort fails. Original denial/cancellation and cleanup failures
+remain observable together. Unknown commit outcomes and post-commit cleanup
+failures do not prove that committed effects were rolled back.
+
+The native evidence consists of separate cohorts: the original class ran 33
+cases with 32 passes and one fresh-reader prerequisite failure; the corrected
+fresh-reader case later passed alone; the repaired public Runtime detail control
+passed separately; and the private-management API control later passed after
+its existing fixture bound setup leases and installed the canonical Local
+identity writer profile before host construction. The private control reached
+private draft graph, disabled action, session/parent and raw Runtime denial
+assertions. These receipts do not form a fresh full current 33-case Green run.
+A final coherent full Category class and required provider matrix remain
+outstanding, and these results do not establish Global storage readiness or a
+full current suite pass.
+
+Fresh bootstrap also binds the existing quarantine capability role to the
+configured Global role with inheritance enabled, role switching disabled and
+membership administration disabled. The real Global positive must obtain this
+binding from the installer; a test-only `GRANT` cannot manufacture eligibility.
+Other purpose privileges remain unchanged.
+
+The outer Npgsql migration seeding context clones its existing options and uses
+supported EF statement batches of one. The Core mapped context retains its
+ordinary batching. This purpose-limited selection preserves the existing Save
+transaction, retries, command timeout and native guards; it is not the temporary
+120-second diagnostic command setting. Permanent controls must verify preserved
+options, all seeded rows after success, and no seeded rows after a later batch
+fails. Their actual native execution remains required.
+
+Permanent canaries add an unknown Global policy or grant an extra read, verify
+refusal without implicit
+cleanup, then explicitly restore the test target. These compositions do not grant
+arbitrary application privileges.
+
+These changed native body fingerprints target a **fresh development bootstrap**.
+Older installed bodies remain rejected by fail-closed validation; this change
+provides no supported in-place transition from them and performs no automatic
+reset or data deletion. See the [operator development-bootstrap boundary](../public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md#postgresql-settings-contract-development-bootstrap).
+
+`PostgresMigrationPrerequisiteTests` selects both public migration paths twice in
+an owned nondefault PostgreSQL schema. Its negative cases disable canonical
+triggers, add an unknown trigger and escalate Global INSERT rights, then verify
+refusal without implicit repair before explicit test restoration. Fresh-path
+execution and the existing Global reattestation selection remain required
+runtime gates; source review or two fresh invocations alone cannot prove an
+upgrade from older installed bodies. No user database is modified by this
+verification.
+
 Run provider classes separately. Combining long-lived container classes in one
 tree filter can bypass the intended TUnit isolation and obscure which engine
 failed.
@@ -649,6 +817,17 @@ reflection, runtime endpoint and dependency-injection metadata, HTTP/HAL
 behavior, or parsed machine-consumed schemas. They must not freeze raw C#,
 Razor, CSS, Markdown prose, class-name inventories, line counts, or historical
 debt allowlists.
+
+`CleanArchitectureTests.Persistence_DeclaredStorageContracts_ShouldNotExpose_ApplicationDtos`
+checks declared Persistence fields, properties, method results/parameters and
+constructor parameters, plus Application persistence-port outputs. It traverses
+generic arguments and element types and excludes compiler-generated types and
+their nested implementation types. This protects the actual storage contract
+without treating a compiler's captured original command as a presentation result.
+Original immutable request inputs retain their existing custody checks; handlers
+map Domain operations or neutral completion facts to public DTOs only after the
+original storage owner completes. This test does not replace transaction,
+cleanup, authorization or real-provider execution evidence.
 
 Structured manifests are appropriate only when they are shipped
 machine-consumed contracts or generator inputs and the test derives the
@@ -713,9 +892,22 @@ These tests verify structural accessibility requirements:
 
 ### Authorization Parity Tests
 
-- `RegisteredResourceKinds_ShouldHave_FallbackCase` — every resource kind handles unknown permissions
-- `RegisteredResourceKinds_ShouldHave_CerbosPolicy` — policy file exists per resource
-- `CerbosPolicies_ShouldHave_FallbackCase` — Cerbos YAML includes default deny
+`AuthorizationParityTests` checks the compiled resource catalog and parsed
+Cerbos policy, schema and derived-role artifacts. Missing artifact roots fail
+closed, and YAML comments cannot substitute for policy identifiers. These
+artifact checks do not establish runtime authorization behavior.
+
+Infrastructure tests exercise the real Local evaluator's allow/deny corpus,
+dedicated event-resource ceilings, ticket and paid-commerce boundaries, and
+persisted principal enrichment. Captured Cerbos SDK projections verify typed
+request facts; the native Cerbos CLI policy tests separately execute policy
+outcomes. Neither the captured SDK seam nor artifact parsing proves a live PDP
+request. API permission-action and missing-action controls exercise the actual
+HAL adapter and link assembly without claiming an HTTP round trip.
+
+Keep these evidence seams distinct. Source-token or method-presence checks are
+not runtime authorization proof; final affected-project and provider gates
+remain separate requirements.
 
 ## TDD Workflow
 
@@ -864,6 +1056,25 @@ Per Test: ResetAsync (Respawn) → Seed scenario data → Execute test
 ```
 
 Respawn resets ALL tables except `__EFMigrationsHistory` and 27 lookup tables.
+
+The bare `RecipientDeliveryMigrationContainerFixture` leaves migrations and
+scenario setup to its caller. Its ordinary default remains PostgreSQL 18. The
+existing test selector `EVENT_PERSISTENCE_TEST_POSTGRES_PROFILE=PostgreSql16`
+chooses the fixture's checked-in PostgreSQL 16.14 image digest; arbitrary image
+selection is not supported. The PostgreSQL 16 profile requires the existing
+validated Linux assurance ownership context. Before constructing a container,
+the fixture durably records its intended name and labels, then uses the validated endpoint
+and cached image without pulling. Instrumented PostgreSQL 18 follows the same
+protocol; an ordinary PostgreSQL 18 run with both ownership inputs absent keeps
+its existing behavior without ownership records.
+Disposal joins active initialization and attempts stop and disposal independently;
+a stage record alone proves neither successful creation nor complete cleanup.
+
+The declared-capability guard control has passed on actual PostgreSQL 16 and 18
+in the integrated candidate. It proves an ordinary callable baseline before
+checking an unavailable capability on PostgreSQL 16 or a retained grant option
+on PostgreSQL 18. The complete public migration/idempotency case on PostgreSQL 16
+and three unexpected-MAINTAIN denial controls remain separate, pending verification.
 
 ### Testcontainers Benchmarks Versus Tests
 

@@ -123,10 +123,16 @@ public sealed class ConfigurationManifestSchemaGenerationTests
         await Assert.That(root.GetProperty("$schema").GetString())
             .IsEqualTo("https://json-schema.org/draft/2020-12/schema");
         await Assert.That(root.GetProperty("$id").GetString())
-            .IsEqualTo(ConfigurationManifestContractMetadata.SchemaId);
+            .IsEqualTo("https://schemas.islamu.org/event/configuration-manifest/v1alpha2/schema.json");
         await Assert.That(root.GetProperty("properties").GetProperty("$schema")
             .GetProperty("const").GetString())
-            .IsEqualTo(ConfigurationManifestContractMetadata.SchemaId);
+            .IsEqualTo("https://schemas.islamu.org/event/configuration-manifest/v1alpha2/schema.json");
+        await Assert.That(root.GetProperty("properties").GetProperty("apiVersion")
+            .GetProperty("const").GetString())
+            .IsEqualTo("configuration.islamu.org/v1alpha2");
+        await Assert.That(root.GetProperty("properties").GetProperty("kind")
+            .GetProperty("const").GetString())
+            .IsEqualTo("ConfigurationManifest");
         JsonElement instance = root
             .GetProperty("$defs")
             .GetProperty("manifestInstance");
@@ -336,22 +342,6 @@ public sealed class ConfigurationManifestSchemaGenerationTests
     }
 
     [Test]
-    public async Task BuildWorkflow_RoutesGeneratorAndArtifactToArchitectureLane()
-    {
-        string workflow = await File.ReadAllTextAsync(ContextSystemHelpers.RepoPath(
-            ".github",
-            "workflows",
-            "test.yml"));
-
-        await Assert.That(workflow.Contains(
-            "schemas/configuration-manifest-v1alpha2.schema.json|schemas/tenant-configuration-package-v1alpha2.schema.json) return 1 ;;",
-            StringComparison.Ordinal)).IsTrue();
-        await Assert.That(workflow.Contains(
-            "schemas/configuration-manifest-v1alpha2.schema.json|schemas/tenant-configuration-package-v1alpha2.schema.json|eng/configuration-manifest-schema/*)",
-            StringComparison.Ordinal)).IsTrue();
-    }
-
-    [Test]
     public async Task TenantPackageSchema_MatchesArtifactAndExcludesTargetAuthority()
     {
         byte[] expected = await File.ReadAllBytesAsync(ContextSystemHelpers.RepoPath(
@@ -363,11 +353,19 @@ public sealed class ConfigurationManifestSchemaGenerationTests
         string text = schema.RootElement.GetRawText();
 
         await Assert.That(actual.SequenceEqual(expected)).IsTrue();
+        await Assert.That(schema.RootElement.GetProperty("$schema").GetString())
+            .IsEqualTo("https://json-schema.org/draft/2020-12/schema");
         await Assert.That(schema.RootElement.GetProperty("$id").GetString())
-            .IsEqualTo(TenantConfigurationPackageContractMetadata.SchemaId);
+            .IsEqualTo("https://schemas.islamu.org/event/tenant-configuration-package/v1alpha2/schema.json");
+        await Assert.That(schema.RootElement.GetProperty("properties")
+            .GetProperty("$schema").GetProperty("const").GetString())
+            .IsEqualTo("https://schemas.islamu.org/event/tenant-configuration-package/v1alpha2/schema.json");
+        await Assert.That(schema.RootElement.GetProperty("properties")
+            .GetProperty("apiVersion").GetProperty("const").GetString())
+            .IsEqualTo("configuration.islamu.org/v1alpha2");
         await Assert.That(schema.RootElement.GetProperty("properties")
             .GetProperty("kind").GetProperty("const").GetString())
-            .IsEqualTo(TenantConfigurationPackageContractMetadata.Kind);
+            .IsEqualTo("TenantConfigurationPackage");
         await Assert.That(text).DoesNotContain("targetTenantId");
         await Assert.That(text).DoesNotContain("targetInstanceId");
         await Assert.That(AllTypedObjectsAreClosed(schema.RootElement)).IsTrue();

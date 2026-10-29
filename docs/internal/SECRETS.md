@@ -185,6 +185,16 @@ The conservative inventory below is about retained ciphertext, not key expiry.
 No expiration date authorizes deleting a key. Existing data, outbox items and
 restorable backups must all be included in any later separately approved retirement.
 
+For BFF session storage, `keyPrefix` is `event:bff-session:v1:` followed by the
+uppercase SHA-256 digest of deployment namespace, external partition name,
+`ExternalDataProtectionRegistration.ApplicationName(partition)` and cookie scheme,
+joined with newline separators, then `:`. Only BFF/Combined partitions participate.
+The nested random handle binds each ciphertext to its Redis entry. Neither active
+key ID nor process/admission generation enters this stable deployment partition.
+The protected ticket carries `.event.bff-session` and
+`.event.bff-session-revision` properties and the server-only
+`urn:islamu:event:bff-session` claim. These values are not public session metadata.
+
 | Owner / purpose | Protection lifetime and retention consequence |
 | --- | --- |
 | `EventResourceDestinationProtector`: `EventResource / ExternalDestination / v1 / tenant / resource` | No cryptographic expiry; retain indefinitely while any destination or backup needs it. |
@@ -201,6 +211,7 @@ restorable backups must all be included in any later separately approved retirem
 | `EmailUnsubscribeTokenService`: `ISLAMU.Email.Unsubscribe.v1` | Time-limited DP, 180-day default with caller-selected lifetime. |
 | `EmailDeliveryDisableTokenService`: `ISLAMU.Email.DeliveryDisable.v1` | Time-limited DP, five minutes, bound to the actor and impact snapshot. |
 | `PrivacyErasureProviderLocatorProtector`: `ISLAMU.PrivacyErasure.ProviderLocator.v1` | Caller-selected time-limited DP lifetime, not a universal upper retention bound. |
+| `RedisBffTicketStore`: `islamu-event:bff-session-storage:v1 / keyPrefix / random handle` | Protects the native server-held ticket. Ticket `ExpiresUtc` and Redis TTL are application/storage expiry, not cryptographic key-retirement authority. Retain admitted keys while live entries or restorable session backups depend on them. |
 | BFF authentication cookies, OIDC state, antiforgery, Blazor circuit state | Framework scheme/purpose isolation; cookie default is 12 hours with sliding renewal; protocol settings own other lifetimes. Not all framework state has a fixed cryptographic expiry. |
 | `LocalIdentityLifecycleTokenProviders` in API/Combined | Distinct Identity verification/recovery providers validate token lifespans of 30/15 minutes; default Identity providers are also registered. |
 | `BffSelfCallTokenService`, `SetupSecretCookieProtector`, `LocalCredentialChallengeCookie` | Distinct versioned BFF purposes; time-limited DP: 2 minutes, 30 minutes and at most 5 minutes respectively. |
@@ -617,6 +628,30 @@ role's credential fallback; explicit empty values remain unavailable. Backend
 projection masks unselected aliases, and Compose forwards these pairs only to
 the API database environment anchor. Infisical uses the exact `/database` root;
 BFF consumers receive none of these credentials.
+
+Migration enrollment identifies the `InstanceKeyRead`, `InstanceKeyWrite` and
+`PlatformKeyReport` accounts by their existing username declarations. The
+Environment authority projects these three usernames to API, Combined and
+Migration consumers without adding purpose-password forwarding. A declared
+`Database:<role>:Username` takes precedence over its flat environment alias;
+an explicit empty canonical value masks the alias and keeps enrollment
+unavailable. An explicit Aspire target value survives when no canonical
+operator value is declared. BFF remains excluded, and Infisical consumers
+continue acquiring configuration through their own selected authority.
+
+`EmailPolicyInstanceMutation` and `EmailPolicyTenantMutation` use their existing
+dedicated username/password pairs. For Environment and permitted User Secrets
+authorities, AppHost projects these pairs as structured `Database:<role>:*`
+values only to API and Combined resources. The API also maps these purposes from
+its own selected authority, including Infisical's `/database` root. A declared
+canonical value takes precedence over its flat alias, including an empty value;
+missing selected values mask lower-priority credentials rather than inheriting
+them. Startup composition snapshots all declared values, including null, empty
+and whitespace, before adding locked provider metadata.
+`PreserveProviderSelection` borrows its input; `SecretAuthorityConfiguration.Build`
+disposes its private source roots after capture. API isolation owns its private
+snapshot and retains the caller's host configuration. Neither the migration
+worker nor the BFF receives these purpose passwords.
 
 `InstanceApiKeyDbContextFactories` checks the common database/namespace/TLS
 target and distinct server logins/passwords before creating four independent

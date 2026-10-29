@@ -2,6 +2,7 @@ using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Pages.Moderation;
 using Explore.Blazor.Client.Services.Accessibility;
 using Explore.Blazor.Client.Services.Moderation;
+using Microsoft.AspNetCore.Components;
 using System.Net;
 
 namespace Explore.Blazor.Client.Tests.Moderation;
@@ -118,7 +119,8 @@ public sealed class PreFindingNoticeTests
         await component.Find("form").SubmitAsync();
         await Assert.That(component.Find("textarea").GetAttribute("aria-invalid")).IsEqualTo("true");
         await Assert.That(component.Find("#pre-finding-response-error").TextContent).IsNotEmpty();
-        await Assert.That(((AngleSharp.Html.Dom.IHtmlTextAreaElement)component.Find("textarea")).Value).IsEqualTo(statement);
+        // bUnit exposes Blazor's bound value as a render attribute, not a browser DOM property.
+        await Assert.That(component.Find("textarea").GetAttribute("value")).IsEqualTo(statement);
         await Assert.That((string)focus.Invocations.Last(invocation => invocation.Identifier == "setFocusById")
             .Arguments[0]!).IsEqualTo("pre-finding-response");
         await Assert.That(transport.Requests.Count).IsEqualTo(1);
@@ -147,21 +149,26 @@ public sealed class PreFindingNoticeTests
         using var context = new BlazorTestContext();
         using var transport = new PreFindingNoticeTransport();
         var oldReply = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         transport.Respond = (_, token) =>
         {
             token.Register(() => cancelled.TrySetResult());
+            started.TrySetResult();
             // Deliberately ignores cancellation to prove stale-response exclusion independently.
             return oldReply.Task;
         };
         using var http = Register(context, transport);
         var component = context.Render<PreFindingNotice>(parameters => parameters
             .Add(page => page.NoticeId, PreFindingNoticeTransport.NoticeId));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var nextId = Guid.CreateVersion7();
         transport.Respond = (_, _) => Task.FromResult(PreFindingNoticeTransport.Json(
             PreFindingNoticeTransport.Notice(nextId).Replace("Approved allegation", "New safe allegation")));
+        var currentRendered = NextRender(component, () => component.FindAll("p")
+            .Any(node => node.TextContent == "New safe allegation"));
         await component.InvokeAsync(() => component.Render(parameters => parameters.Add(page => page.NoticeId, nextId)));
-        await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.WhenAll(cancelled.Task, currentRendered).WaitAsync(TimeSpan.FromSeconds(5));
         var oldFinished = NextRender(component, () => component.Find("section").GetAttribute("aria-busy") == "false");
         oldReply.SetResult(PreFindingNoticeTransport.Json(PreFindingNoticeTransport.Notice()));
         await oldFinished.WaitAsync(TimeSpan.FromSeconds(5));
@@ -174,6 +181,7 @@ public sealed class PreFindingNoticeTests
     {
         using var context = new BlazorTestContext();
         using var transport = new PreFindingNoticeTransport();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var pending = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
         transport.Respond = (_, token) =>
@@ -183,12 +191,14 @@ public sealed class PreFindingNoticeTests
                 cancelled.TrySetResult();
                 pending.TrySetCanceled(token);
             });
+            started.TrySetResult();
             return pending.Task;
         };
         using var http = Register(context, transport);
-        var component = context.Render<PreFindingNotice>(parameters => parameters
+        context.Render<PreFindingNotice>(parameters => parameters
             .Add(page => page.NoticeId, PreFindingNoticeTransport.NoticeId));
-        component.Dispose();
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await context.DisposeComponentsAsync();
         await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Assert.That(transport.Requests.Count).IsEqualTo(1);
     }
@@ -198,7 +208,7 @@ public sealed class PreFindingNoticeTests
     {
         using var context = new BlazorTestContext();
         using var transport = new PreFindingNoticeTransport();
-        var clock = new NoticeExpiryClock();
+        using var clock = new NoticeExpiryClock();
         using var http = Register(context, transport, clock);
         var component = await RenderAsync(context, transport);
         await component.Find("textarea").InputAsync(new ChangeEventArgs { Value = "Private unsent draft" });
@@ -217,7 +227,7 @@ public sealed class PreFindingNoticeTests
         using var transport = new PreFindingNoticeTransport();
         transport.Respond = (_, _) => Task.FromResult(PreFindingNoticeTransport.Json(
             PreFindingNoticeTransport.Notice(expires: PreFindingNoticeTransport.Now.AddDays(100))));
-        var clock = new NoticeExpiryClock();
+        using var clock = new NoticeExpiryClock();
         using var http = Register(context, transport, clock);
         var component = await RenderAsync(context, transport);
         await Assert.That(clock.DueTime.TotalMilliseconds).IsLessThanOrEqualTo(uint.MaxValue - 1d);
@@ -226,6 +236,19 @@ public sealed class PreFindingNoticeTests
         await expired.WaitAsync(TimeSpan.FromSeconds(5));
         await Assert.That(component.FindAll("textarea, dl")).IsEmpty();
         await Assert.That(transport.Requests.Count).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task DisposingExpiryClockStopsItsOwnedTimer()
+    {
+        using var clock = new NoticeExpiryClock();
+        bool fired = false;
+        using var timer = clock.CreateTimer(_ => fired = true, null, TimeSpan.FromHours(1), Timeout.InfiniteTimeSpan);
+
+        clock.Dispose();
+        clock.Expire();
+
+        await Assert.That(fired).IsFalse();
     }
 
     private static HttpClient Register(BlazorTestContext context, PreFindingNoticeTransport transport,
@@ -250,9 +273,10 @@ public sealed class PreFindingNoticeTests
             started.TrySetResult((request, token));
             return release.Task;
         };
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            $"/moderation/pre-finding/notices/{PreFindingNoticeTransport.NoticeId}?reviewResponse={review}");
         var component = context.Render<PreFindingNotice>(parameters => parameters
-            .Add(page => page.NoticeId, PreFindingNoticeTransport.NoticeId)
-            .Add(page => page.ReviewResponse, review));
+            .Add(page => page.NoticeId, PreFindingNoticeTransport.NoticeId));
         var rendered = NextRender(component, () => component.Find("section").GetAttribute("aria-busy") == "false");
         var pending = await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
         transport.Respond = respond;
@@ -276,7 +300,7 @@ public sealed class PreFindingNoticeTests
         return signal.Task;
     }
 
-    private sealed class NoticeExpiryClock : TimeProvider
+    private sealed class NoticeExpiryClock : TimeProvider, IDisposable
     {
         private DateTimeOffset _now = PreFindingNoticeTransport.Now;
         private NoticeTimer? _timer;
@@ -290,6 +314,7 @@ public sealed class PreFindingNoticeTests
             return _timer = new NoticeTimer(callback, state);
         }
         internal void Expire() => Advance(TimeSpan.FromHours(2));
+        public void Dispose() => _timer?.Dispose();
         internal void Advance(TimeSpan elapsed)
         {
             _now += elapsed;

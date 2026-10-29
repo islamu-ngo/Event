@@ -1,6 +1,11 @@
 using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using DotNet.Testcontainers.Images;
+using Event.Testing;
+using Event.Testing.PostgreSql;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -28,7 +33,17 @@ namespace Event.Persistence.IntegrationTests.Fixtures;
 /// </summary>
 public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
 {
-    private readonly PostgreSqlContainer _container;
+    private const string PostgreSqlImage = "postgres:18-alpine";
+    private const string OwnerLabel = "islamu.assurance.owner";
+    private const string ResourceLabel = "islamu.assurance.resource";
+    private const string FixtureLabel = "islamu.assurance.fixture";
+    private PostgreSqlContainer? _container;
+    private AssuranceOwnershipContext? _assurance;
+    private readonly string _fixtureNonce = Guid.CreateVersion7().ToString("N");
+    private readonly DateTime _constructedAtUtc = DateTime.UtcNow;
+    private readonly DateTime _constructorReturnedAtUtc;
+    private string? _intendedContainerName;
+    private int _stageSequence;
     private readonly IdentityDatabaseTopology _identityTopology;
     private readonly object _initializationLock = new();
     private Task? _initialization;
@@ -50,11 +65,6 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         if (!Enum.IsDefined(identityTopology))
             throw new ArgumentOutOfRangeException(nameof(identityTopology));
         _identityTopology = identityTopology;
-        _container = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithDatabase("explore_db_test")
-            .WithUsername("postgres")
-            .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
-            .Build();
         string suffix = Guid.CreateVersion7().ToString("N");
         var purposes = new[]
         {
@@ -75,12 +85,16 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             _nativeQueueLogins[PrimaryDatabaseRole.Runtime].Username,
             _nativeQueueLogins[PrimaryDatabaseRole.EmailPolicyInstanceMutation].Username,
             _nativeQueueLogins[PrimaryDatabaseRole.EmailPolicyTenantMutation].Username);
+        _constructorReturnedAtUtc = DateTime.UtcNow;
     }
 
     /// <summary>
     /// Connection string for the running PostgreSQL container.
     /// </summary>
-    public string ConnectionString => _runtimeConnectionString ?? _container.GetConnectionString();
+    public string ConnectionString => _runtimeConnectionString ?? Container.GetConnectionString();
+
+    private PostgreSqlContainer Container => _container
+        ?? throw new InvalidOperationException("postgresql_fixture_not_started");
 
     public Task InitializeAsync()
     {
@@ -113,14 +127,36 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
 
     private async Task InitializeCoreAsync()
     {
+        _assurance = await AssuranceOwnershipContext.ValidateAssuranceContextAsync(
+            Environment.GetEnvironmentVariable("ISLAMU_TEST_RUN_ID"),
+            Environment.GetEnvironmentVariable("ISLAMU_TEST_ROOT"), Path.GetTempPath(),
+            Environment.GetEnvironmentVariable("DOCKER_HOST"));
+        if (_assurance is not null)
+            _intendedContainerName = $"islamu-assurance-postgres-{_assurance.Owner}-{_fixtureNonce}";
+        RecordStage(AssuranceStage.ConstructorReturned);
+        RecordStage(AssuranceStage.InitializationEntered);
+        RecordStage(AssuranceStage.CreationEntered);
+        var builder = new PostgreSqlBuilder(PostgreSqlImage)
+            .WithDatabase("explore_db_test")
+            .WithUsername("postgres")
+            .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)));
+        if (_assurance is { } owner)
+            builder = builder.WithDockerEndpoint(owner.DockerEndpoint)
+                .WithName(_intendedContainerName!)
+                .WithLabel(OwnerLabel, owner.Owner).WithLabel(ResourceLabel, "postgres")
+                .WithLabel(FixtureLabel, _fixtureNonce).WithImagePullPolicy(PullPolicy.Never);
+        _container = builder.Build();
         await _container.StartAsync();
+        RecordStage(AssuranceStage.ContainerStartReturned);
         await ProvisionNativeQueueLoginsAsync();
+        RecordStage(AssuranceStage.PurposeLoginsReturned);
 
         // Apply all migrations for production-faithful schema
         await using (var migratorContext = CreateDbContextInternal(PrimaryDatabaseRole.Migrator))
         {
             migratorContext.BindTenantLease();
             await migratorContext.Database.MigrateAsync();
+            RecordStage(AssuranceStage.MigrationsReturned);
             await PostgresModelConstraintApplier.ApplyAsync(migratorContext);
             await PostgresTenantRowLevelSecurityModel.ApplyAsync(migratorContext);
             await PostgresDiscoveryDisclosureContract.ApplyAsync(migratorContext);
@@ -199,6 +235,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresRegistrationPrivateReadContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresPublicEventResponseClockContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresLookupCatalogueReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresCategoryReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresAtprotoFederationSettingPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await migratorContext.Database.ExecuteSqlRawAsync(
                 $"""
@@ -309,21 +346,98 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresPaidPolicyCeilingContract.ApplyAsync(migratorContext);
             await PostgresInstanceStorageAdministrationContract.ApplyAsync(migratorContext);
             await PostgresStorageReconciliationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresLocalStorageQuarantineContract.ApplyAsync(migratorContext);
+            await PostgresLocalStorageQuarantineContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresDiscoveryMetadataPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresTenantMembershipMutationPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresActorOwnershipReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresSetupLiveStoragePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
         }
 
+        RecordStage(AssuranceStage.ContractsReturned);
         // Retain source custody metadata; ordinary DELETE must invalidate the original rows.
-        await using var connection = new NpgsqlConnection(ConnectionString);
-        await connection.OpenAsync();
-        _reset = await PostgreSqlDatabaseReset.CreateAsync(connection, ApplicationSchema);
+        await using (var connection = new NpgsqlConnection(ConnectionString))
+        {
+            await connection.OpenAsync();
+            _reset = await PostgreSqlDatabaseReset.CreateAsync(connection, ApplicationSchema);
+        }
+        RecordStage(AssuranceStage.ResetReady);
+    }
+
+    internal enum AssuranceStage
+    {
+        ConstructorReturned, InitializationEntered, CreationEntered, ContainerStartReturned,
+        PurposeLoginsReturned, MigrationsReturned, ContractsReturned, ResetReady,
+        DisposalEntered, StopReturned, ContainerDisposalReturned,
+        SettlementEntered, SharedSeedReturned, RetainedMirrorReturned, PurposeEnrollmentReturned,
+        OrdinaryBoundariesReturned, ReplayEntered, ReplayReturned, ReplayRepeatReturned,
+        ExpectedFaultAsserted, CommittedStateAsserted, SettlementAssertionsReturned,
+        ForgedTupleEntered, ForgedTupleRefusalAsserted, ForgedTupleStateAsserted,
+        ProtectedWorkEntered, ProtectedWorkRefusalAsserted, ProtectedWorkStateAsserted
+    }
+
+    /// <summary>Persists only a closed source-stage observation, never a test result or creation acknowledgement.</summary>
+    internal void RecordStage(AssuranceStage stage, bool? injectFailure = null)
+    {
+        if (!Enum.IsDefined(stage)) throw new InvalidOperationException("test_resource_witness_invalid");
+        if (_assurance is not { } owner) return;
+        if (!OperatingSystem.IsLinux()) throw new InvalidOperationException("test_resource_witness_invalid");
+        int sequence = Interlocked.Increment(ref _stageSequence);
+        string file = $"postgres-{_fixtureNonce}-{sequence:D3}-{stage}.json";
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            schemaVersion = 1,
+            owner = owner.Owner,
+            fixtureNonce = _fixtureNonce,
+            writerPid = Environment.ProcessId,
+            constructedAtUtc = _constructedAtUtc,
+            constructorReturnedAtUtc = _constructorReturnedAtUtc,
+            recordedAtUtc = DateTime.UtcNow,
+            sequence,
+            stage = stage.ToString(),
+            injectFailure,
+            resource = "postgres",
+            intendedContainerName = _intendedContainerName,
+            imageReference = PostgreSqlImage,
+            imagePullPolicy = "never",
+            dockerEndpointSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(owner.DockerEndpoint.OriginalString))),
+            intendedLabels = new Dictionary<string, string>
+            {
+                [OwnerLabel] = owner.Owner,
+                [ResourceLabel] = "postgres",
+                [FixtureLabel] = _fixtureNonce
+            }
+        });
+        FileStream? stream = null;
+        var failures = new List<Exception>();
+        try
+        {
+            stream = new FileStream(Path.Combine(owner.Root, file), new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+                UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite,
+                Options = FileOptions.WriteThrough
+            });
+            stream.Write(bytes);
+            stream.Flush(flushToDisk: true);
+        }
+        catch (Exception failure) { failures.Add(failure); }
+        finally
+        {
+            try { stream?.Dispose(); }
+            catch (Exception failure) { failures.Add(failure); }
+        }
+        if (failures.Count == 1)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count != 0) throw new AggregateException("Test resource witness persistence failed.", failures);
     }
 
     public async ValueTask DisposeAsync()
     {
+        var failures = new List<Exception>();
+        try { RecordStage(AssuranceStage.DisposalEntered); }
+        catch (Exception failure) { failures.Add(failure); }
         try
         {
             if (!_isolatedSchemas.IsEmpty)
@@ -349,19 +463,31 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         {
             // Container teardown takes precedence
         }
+        catch (Exception failure) { failures.Add(failure); }
         finally
         {
-            try
+            if (_container is { } container)
             {
-                await _container.StopAsync();
-                await _container.DisposeAsync();
+                try
+                {
+                    await container.StopAsync();
+                    RecordStage(AssuranceStage.StopReturned);
+                }
+                catch (Exception failure) { failures.Add(failure); }
+                try
+                {
+                    await container.DisposeAsync();
+                    RecordStage(AssuranceStage.ContainerDisposalReturned);
+                }
+                catch (Exception failure) { failures.Add(failure); }
             }
-            finally
-            {
-                _metadataCache.Dispose();
-                GC.SuppressFinalize(this);
-            }
+            try { _metadataCache.Dispose(); }
+            catch (Exception failure) { failures.Add(failure); }
+            GC.SuppressFinalize(this);
         }
+        if (failures.Count == 1)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count != 0) throw new AggregateException("PostgreSQL fixture cleanup failed.", failures);
     }
 
     /// <summary>
@@ -511,24 +637,8 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         return new ExploreDbContext(builder.Options) { TenantContext = tenantContext };
     }
 
-    private async Task ProvisionNativeQueueLoginsAsync()
-    {
-        NativeQueueEnrollment.Validate();
-        await using var connection = new NpgsqlConnection(_container.GetConnectionString());
-        await connection.OpenAsync();
-        foreach (var (role, login) in _nativeQueueLogins)
-        {
-            await using var command = connection.CreateCommand();
-            string username = "\"" + login.Username.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
-            string password = "'" + login.Password.Replace("'", "''", StringComparison.Ordinal) + "'";
-            // Only the opt-in migration administrator is demoted after creating its own schema.
-            string attributes = role == PrimaryDatabaseRole.Migrator
-                ? "SUPERUSER CREATEDB CREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS"
-                : "NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS";
-            command.CommandText = $"CREATE ROLE {username} LOGIN {attributes} PASSWORD {password}";
-            await command.ExecuteNonQueryAsync();
-        }
-    }
+    private Task ProvisionNativeQueueLoginsAsync() =>
+        PostgresTestRoleBootstrap.ProvisionAsync(Container.GetConnectionString(), NativeQueueEnrollment, _nativeQueueLogins);
 
     private ExploreDbContext CreateDbContextInternal(
         PrimaryDatabaseRole role = PrimaryDatabaseRole.Runtime,
@@ -561,7 +671,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         PrimaryDatabaseRole role,
         string? schema = null)
     {
-        var container = new NpgsqlConnectionStringBuilder(_container.GetConnectionString());
+        var container = new NpgsqlConnectionStringBuilder(Container.GetConnectionString());
         bool declaredMigrator = _nativeQueueLogins.TryGetValue(PrimaryDatabaseRole.Migrator, out var migrator);
         return new PrimaryDatabaseConnectionOptions
         {

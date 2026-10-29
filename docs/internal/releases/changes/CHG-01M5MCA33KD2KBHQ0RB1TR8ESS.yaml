@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5MCA33KD2KBHQ0RB1TR8ESS
+Title: "Isolate automated AppHost resources"
+Type: feat
+Scope: self-hosting
+Summary: "Automated application runs require explicit ownership and an Environment authority before starting isolated storage, volumes, and endpoints."
+Group: distributed-assurance
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/testing/DISTRIBUTED_ASSURANCE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/testing/DISTRIBUTED_ASSURANCE.md
+    Disposition: documented
+    Detail: Automation must prove run-root ownership before dotenv or builder side effects and explicitly select Environment authority; shared interactive stores and User Secrets are excluded.
+  Migration:
+    Reference: docs/internal/testing/DISTRIBUTED_ASSURANCE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/contributing/distributed-testing.md
+    Disposition: documented
+    Detail: ISLAMU_TEST_RUN_ID and ISLAMU_TEST_ROOT admit the automation profile; generated password replacement uses test-only ISLAMU_TEST_REPLACEMENT_PASSWORD.
+  OpenAPI:
+    Reference: docs/internal/testing/DISTRIBUTED_ASSURANCE.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/contributing/distributed-testing.md
+    Disposition: documented
+    Detail: Distributed tests require a Docker-compatible runtime and disk-backed owned scratch; cleanup targets only each run's resources and readiness requires actual migration and HTTP health.

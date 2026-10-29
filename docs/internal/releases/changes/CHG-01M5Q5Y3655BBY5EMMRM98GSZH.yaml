@@ -1,0 +1,42 @@
+Change-Id: CHG-01M5Q5Y3655BBY5EMMRM98GSZH
+Title: "Require owned native security execution evidence"
+Type: fix
+Scope: ci
+Summary: "Require freshly owned native security test execution before emitting closed public evidence; reject detached report harvesting."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/contributing/tunit.md
+    Disposition: documented
+    Detail: >-
+      Regenerate execution packets with execute-security-execution; detached
+      report harvesting and former command/descriptor shapes are rejected.
+  Security:
+    Reference: docs/internal/CI_CD_GOVERNANCE.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: >-
+      Terminal-owned native execution is required to produce proofs. Supplied
+      packets remain operator-trusted structural evidence and required candidate
+      checks remain separate; no cryptographic CI-origin claim is added.
+  Migration:
+    Reference: docs/internal/CI_CD_GOVERNANCE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/contributing/tunit.md
+    Disposition: documented
+    Detail: >-
+      Instrumented execution requires explicit Unix DOCKER_HOST, caller-selected
+      TESTCONTAINERS_RYUK_DISABLED=true, cached images and private temporary
+      context. Ordinary uninstrumented fixtures keep their existing configuration.
+  OpenAPI:
+    Reference: docs/internal/CI_CD_GOVERNANCE.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/contributing/tunit.md
+    Disposition: documented
+    Detail: >-
+      Bounded helper checks passed; clean-candidate native API execution, the
+      copied-real-report successor, post-launch resource cleanup and final
+      seven-profile admission remain pending. Build the exact committed source,
+      retain raw diagnostics privately and upload only admitted public proofs.

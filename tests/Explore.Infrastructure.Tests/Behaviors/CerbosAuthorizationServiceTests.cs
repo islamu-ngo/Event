@@ -8,6 +8,7 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
@@ -32,7 +33,7 @@ public class CerbosAuthorizationServiceTests : IAsyncDisposable
 {
     private const string ArtifactRelativePath = ".omo/start-work/artifacts/authorization-platform-redesign/phase0-task02/cerbos-provider-scenarios.json";
     private const string FixedUserId = "11111111-1111-1111-1111-111111111111";
-    private const string FixedTenantId = "22222222-2222-2222-2222-222222222222";
+    private static readonly string FixedTenantId = Guid.CreateVersion7().ToString("D");
     private const string FixedEventId = "33333333-3333-3333-3333-333333333333";
     private readonly CurrentHumanPrincipalFixture _human = new(Guid.Parse(FixedUserId), Guid.Parse(FixedTenantId));
 
@@ -90,6 +91,47 @@ public class CerbosAuthorizationServiceTests : IAsyncDisposable
         _clientFactory = Substitute.For<ICerbosClientFactory>();
 
         _clientFactory.GetOrCreate(Arg.Any<string>()).Returns(_cerbosClient);
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task ConfigurationManifestExport_ProjectsOnlyTheTrustedExportFact(bool includeExportFacts)
+    {
+        Cerbos.Api.V1.Request.CheckResourcesRequest? captured = null;
+        _cerbosClient.CheckResourcesAsync(Arg.Any<CheckResourcesRequest>(), Arg.Any<Metadata>())
+            .Returns(call =>
+            {
+                captured = call.ArgAt<CheckResourcesRequest>(0).ToCheckResourcesRequest();
+                var response = new Cerbos.Api.V1.Response.CheckResourcesResponse
+                {
+                    RequestId = captured.RequestId
+                };
+                response.Results.Add(CreateResultEntry(
+                    "instance.configuration-manifest.export", "islamuevent_instance_setting", "view", Effect.Deny));
+                return new CheckResourcesResponse(response);
+            });
+
+        var decision = await CreateService().AuthorizeAsync(new AuthorizationRequest(
+            ResourceKinds.InstanceSetting,
+            ExportConfigurationManifestQuery.ResourceKey,
+            AuthorizationActions.InstanceSettings.View,
+            Facts: includeExportFacts ? new ConfigurationManifestExportAuthorizationFacts() : null));
+
+        await Assert.That(decision.IsAllowed).IsFalse();
+        await Assert.That(captured).IsNotNull();
+        var resource = captured!.Resources.Single();
+        await Assert.That(resource.Resource.Kind).IsEqualTo("islamuevent_instance_setting");
+        await Assert.That(resource.Resource.Id).IsEqualTo("instance.configuration-manifest.export");
+        await Assert.That(resource.Actions).IsEquivalentTo(["view"]);
+        bool hasExportFact = resource.Resource.Attr.TryGetValue("configurationManifestExport", out var exportFact);
+        await Assert.That(hasExportFact).IsEqualTo(includeExportFacts);
+        if (includeExportFacts)
+        {
+            await Assert.That(exportFact!.KindCase)
+                .IsEqualTo(Google.Protobuf.WellKnownTypes.Value.KindOneofCase.BoolValue);
+            await Assert.That(exportFact.BoolValue).IsTrue();
+        }
     }
 
     [Test]

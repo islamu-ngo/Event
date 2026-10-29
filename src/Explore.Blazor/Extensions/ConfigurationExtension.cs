@@ -70,6 +70,13 @@ public static class ConfigurationExtensions
         AuthenticationCredentialAcquisitionReceipts? receipts = null)
     {
         var bootstrapConfig = configBuilder.Build();
+        configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Bff:SessionAuthority:Endpoint"] = bootstrapConfig["BFF_SESSION_REDIS_ENDPOINT"]
+                ?? bootstrapConfig["Bff:SessionAuthority:Endpoint"],
+            ["Bff:SessionAuthority:Namespace"] = bootstrapConfig["BFF_SESSION_NAMESPACE"]
+                ?? bootstrapConfig["Bff:SessionAuthority:Namespace"],
+        });
         string? configuredProvider = bootstrapConfig["SecretProvider:Provider"]
             ?? bootstrapConfig["SECRET_PROVIDER"];
 
@@ -131,7 +138,8 @@ public static class ConfigurationExtensions
         {
             source.Paths.Clear();
             source.Paths.AddRange(
-                ["/runtime/bff/oidc/keycloak", "/runtime/bff/oidc/google", "/runtime/bff/atproto/oauth"]);
+                ["/runtime/bff/oidc/keycloak", "/runtime/bff/oidc/google", "/runtime/bff/atproto/oauth",
+                    "/runtime/bff/session"]);
         }, environmentName);
         ApplyBlazorMapping(configBuilder, authorityBuilder.Build(), fromInfisical: true, receipts,
             AuthenticationCredentialAcquisitionReceipts.Authority.Infisical);
@@ -145,6 +153,7 @@ public static class ConfigurationExtensions
     ///   /runtime/bff/oidc/keycloak: Keycloak confidential-client configuration.
     ///   /runtime/bff/oidc/google: Google confidential-client configuration.
     ///   /runtime/bff/atproto/oauth: ATProto frontend signing key only.
+    ///   /runtime/bff/session: Dedicated shared browser-session authority credential.
     /// </remarks>
     private static void ApplyBlazorMapping(
         IConfigurationBuilder configBuilder,
@@ -195,6 +204,8 @@ public static class ConfigurationExtensions
         {
             ["Keycloak:ClientSecret"] = rawClientSecret,
             ["Google:ClientSecret"] = rawGoogleClientSecret,
+            ["Bff:SessionAuthority:Password"] = config[
+                fromInfisical ? "Bff:SessionAuthority:Password" : "BFF_SESSION_REDIS_PASSWORD"],
         };
 
         if (!string.IsNullOrWhiteSpace(rawAtprotoOAuthClientPrivateJwks))

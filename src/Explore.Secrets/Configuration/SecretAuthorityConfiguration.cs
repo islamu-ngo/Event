@@ -19,6 +19,7 @@ public static class SecretAuthorityConfiguration
         if (string.IsNullOrEmpty(configured) && IsDevelopmentOrTesting(env))
         {
             var userSecrets = BuildUserSecrets();
+            using var userSecretsOwner = (IDisposable)userSecrets;
             configured = userSecrets[$"{SecretProviderOptions.SectionName}:Provider"]
                 ?? userSecrets["SECRET_PROVIDER"];
 
@@ -65,13 +66,16 @@ public static class SecretAuthorityConfiguration
             IConfiguration environment = new ConfigurationBuilder()
                 .AddEnvironmentVariables()
                 .Build();
+            using var environmentOwner = (IDisposable)environment;
             return PreserveProviderSelection(environment, provider, consumer: consumer);
         }
 
         if (provider == SecretProviderType.UserSecrets)
         {
             EnsureUserSecretsEnvironment(environmentName);
-            return PreserveProviderSelection(BuildUserSecrets(), provider, consumer: consumer);
+            IConfiguration userSecrets = BuildUserSecrets();
+            using var userSecretsOwner = (IDisposable)userSecrets;
+            return PreserveProviderSelection(userSecrets, provider, consumer: consumer);
         }
 
         SecretAcquisitionPolicy.AdmitPaths(consumer, infisicalPaths);
@@ -84,7 +88,9 @@ public static class SecretAuthorityConfiguration
             source.ThrowOnFirstLoadFailure = true;
         }, environmentName);
         var source = (InfisicalConfigurationSource)builder.Sources.Single();
-        return PreserveProviderSelection(builder.Build(), provider, source, consumer);
+        IConfiguration authority = builder.Build();
+        using var authorityOwner = (IDisposable)authority;
+        return PreserveProviderSelection(authority, provider, source, consumer);
     }
 
     public static string GetEnvironmentName(IConfiguration configuration) =>
@@ -121,8 +127,9 @@ public static class SecretAuthorityConfiguration
             for (int index = 0; index < infisicalSource.Paths.Count; index++)
                 runtime[$"{prefix}:Paths:{index}"] = infisicalSource.Paths[index];
         }
+        // Preserve empty declarations that must block credential-alias fallback.
         return new ConfigurationBuilder()
-            .AddConfiguration(authority)
+            .AddInMemoryCollection(authority.AsEnumerable())
             .AddInMemoryCollection(runtime)
             .Build();
     }

@@ -327,6 +327,7 @@ public sealed partial class PublicEventDetailNativeContractTests(PostgreSqlConta
     private async Task<(Guid Tenant, Guid Event, Guid Hidden, string Code)> SeedAsync()
     {
         await using var writer = fixture.CreateDbContext();
+        writer.BindTenantLease();
         await PostgresPublicEventDetailContract.ApplyAsync(writer, fixture.NativeQueueEnrollment);
         var tenant = new Tenant
         {

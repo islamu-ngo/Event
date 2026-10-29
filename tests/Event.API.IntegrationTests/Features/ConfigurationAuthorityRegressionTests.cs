@@ -25,30 +25,67 @@ public sealed class ConfigurationAuthorityRegressionTests
     [Arguments(true)]
     public async Task Api_InfisicalGlobalCredentialsCannotInheritLowerAuthority(bool present)
     {
-        string username = Guid.CreateVersion7().ToString("N");
-        string password = " " + Guid.CreateVersion7().ToString("N") + " ";
-        await using var server = await SecretServer.StartAsync(path => path == "/database"
-            ? present
-                ? [new("DATABASE_GLOBAL_USERNAME", username, path), new("DATABASE_GLOBAL_PASSWORD", password, path)]
-                : []
-            : []);
-        using var environment = BootstrapEnvironment(server.Url, Guid.CreateVersion7().ToString("N"), structured: false);
-        var builder = Bootstrap("Infisical");
-        builder.AddInMemoryCollection(new Dictionary<string, string?>
+        foreach (string purpose in new[] { "Global", "EmailPolicyInstanceMutation", "EmailPolicyTenantMutation" })
         {
-            ["DATABASE_GLOBAL_USERNAME"] = Guid.CreateVersion7().ToString("N"),
-            ["DATABASE_GLOBAL_PASSWORD"] = Guid.CreateVersion7().ToString("N"),
-            ["Database:Global:Username"] = Guid.CreateVersion7().ToString("N"),
-            ["Database:Global:Password"] = Guid.CreateVersion7().ToString("N"),
-        });
+            string prefix = purpose switch
+            {
+                "Global" => "DATABASE_GLOBAL_",
+                "EmailPolicyInstanceMutation" => "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_",
+                _ => "DATABASE_EMAIL_POLICY_TENANT_MUTATION_"
+            };
+            string canonical = $"Database:{purpose}:";
+            string username = Guid.CreateVersion7().ToString("N");
+            string password = " " + Guid.CreateVersion7().ToString("N") + " ";
+            await using var server = await SecretServer.StartAsync(path => path == "/database"
+                ? present
+                    ? [new(prefix + "USERNAME", username, path), new(prefix + "PASSWORD", password, path)]
+                    : []
+                : []);
+            using var environment = BootstrapEnvironment(server.Url, Guid.CreateVersion7().ToString("N"), structured: false);
+            var lowerAuthority = new Dictionary<string, string?>
+            {
+                [prefix + "USERNAME"] = Guid.CreateVersion7().ToString("N"),
+                [prefix + "PASSWORD"] = Guid.CreateVersion7().ToString("N"),
+                [canonical + "Username"] = Guid.CreateVersion7().ToString("N"),
+                [canonical + "Password"] = Guid.CreateVersion7().ToString("N"),
+            };
+            var builder = Bootstrap("Infisical");
+            builder.AddInMemoryCollection(lowerAuthority);
 
-        builder.AddSecretAuthorityConfiguration("Testing");
-        var configuration = builder.Build();
+            builder.AddSecretAuthorityConfiguration("Testing");
+            var configuration = builder.Build();
+            using var configurationOwner = (IDisposable)configuration;
 
-        await Assert.That(configuration["Database:Global:Username"]).IsEqualTo(present ? username : null);
-        await Assert.That(configuration["Database:Global:Password"]).IsEqualTo(present ? password : null);
-        await Assert.That(configuration["DATABASE_GLOBAL_USERNAME"]).IsNull();
-        await Assert.That(configuration["DATABASE_GLOBAL_PASSWORD"]).IsNull();
+            await Assert.That(configuration[canonical + "Username"] == (present ? username : null)
+                && configuration[canonical + "Password"] == (present ? password : null)
+                && configuration[prefix + "USERNAME"] is null && configuration[prefix + "PASSWORD"] is null).IsTrue()
+                .Because("Only the selected authority may supply a database purpose credential pair.");
+            if (purpose == "Global") continue;
+            foreach (int form in new[] { 0, 1, 2 })
+            {
+                string environmentPrefix = canonical.Replace(":", "__", StringComparison.Ordinal);
+                using var selectedEnvironment = new EnvironmentScope(new()
+                {
+                    ["SECRET_PROVIDER"] = "Environment",
+                    ["SecretProvider__Provider"] = "Environment",
+                    ["ERASURE_DATABASE_TOPOLOGY"] = "EmbeddedSqlite",
+                    [prefix + "USERNAME"] = form == 0 ? username : Guid.CreateVersion7().ToString("N"),
+                    [prefix + "PASSWORD"] = form == 0 ? password : Guid.CreateVersion7().ToString("N"),
+                    [environmentPrefix + "Username"] = form == 0 ? null : username,
+                    [environmentPrefix + "Password"] = form == 0 ? null : form == 1 ? password : string.Empty
+                });
+                var selectedBuilder = Bootstrap("Environment");
+                selectedBuilder.AddInMemoryCollection(lowerAuthority);
+                selectedBuilder.AddSecretAuthorityConfiguration("Testing");
+                var selectedConfiguration = selectedBuilder.Build();
+                using var selectedConfigurationOwner = (IDisposable)selectedConfiguration;
+                await Assert.That(selectedConfiguration[canonical + "Username"] == username
+                    && selectedConfiguration[canonical + "Password"] == (form == 2 ? string.Empty : password)
+                    && selectedConfiguration[prefix + "USERNAME"] is null
+                    && selectedConfiguration[prefix + "PASSWORD"] is null).IsTrue()
+                    .Because($"Canonical declaration including empty must win over flat aliases and lower authority. purpose={purpose};form={form};usernameMatch={selectedConfiguration[canonical + "Username"] == username};passwordMatch={selectedConfiguration[canonical + "Password"] == (form == 2 ? string.Empty : password)};flatUsernameNull={selectedConfiguration[prefix + "USERNAME"] is null};flatPasswordNull={selectedConfiguration[prefix + "PASSWORD"] is null}");
+            }
+        }
     }
 
     [Test]

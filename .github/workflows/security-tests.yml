@@ -146,12 +146,16 @@ jobs:
         if: ${{ steps.changes.outputs.run-tests == 'true' }}
         run: dotnet restore --locked-mode
 
+      - name: Restore .NET Tools
+        if: ${{ steps.changes.outputs.run-tests == 'true' }}
+        run: dotnet tool restore
+
       - name: Build Registered Security Hosts
         if: ${{ steps.changes.outputs.run-tests == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
-          dotnet build tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-restore --verbosity quiet -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
+          dotnet build tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-restore --verbosity normal -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
           dotnet build tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-restore --verbosity quiet -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
 
       - name: Prepare Private Execution Prerequisites

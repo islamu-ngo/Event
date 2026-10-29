@@ -103,7 +103,7 @@ public sealed class SecretKitAuthenticationLifetimeTests
             .IsEqualTo(HealthStatus.Healthy);
         Func<Task> duplicate = () => owner.StartAuthenticationMaintenanceAsync();
         await Assert.That(duplicate).Throws<InvalidOperationException>();
-        await Assert.That(ReferenceEquals(helper, owner.AuthenticationMaintenance)).IsTrue();
+        await Assert.That(owner.AuthenticationMaintenance).IsSameReferenceAs(helper);
         await owner.DisposeAsync();
         await Assert.That((await helper.CheckHealthAsync(new HealthCheckContext())).Status)
             .IsEqualTo(HealthStatus.Unhealthy);

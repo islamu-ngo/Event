@@ -1,6 +1,6 @@
 # I-VSD: Contextual Tenant Onboarding And Separate Learning Resources
 
-Last Updated: 2026-10-28
+Last Updated: 2026-10-29
 
 ## Review Metadata
 
@@ -10,12 +10,13 @@ Last Updated: 2026-10-28
 - Report kind: implementation-plan-review
 - Report status: current
 - Disposition: plan-aligned
-- Evidence cutoff: 2026-10-28
-- Reviewed input: revision-4 plan/task-contract and context, both ordered successor briefs, all 18 inherited findings/mitigations, and the current user's explicit implementation request. October 11 source/research receipts below remain historical, not fresh runtime evidence.
-- Supersedes: none; in-place revalidation of the revision-1 report
+- Evidence cutoff: 2026-10-29
+- Reviewed input: exact revision-5 plan/task-contract and worktree context; every Section 9 mapping, Sections 3/5.10-5.15/13/15, G0 and C04-C12 execution/acceptance contracts; all 18 inherited finding/mitigation records; and the current user's explicit revision-5 implementation request. Earlier source/research/runtime receipts remain historical, not fresh assurance for revision 5.
+- Supersedes: none; in-place revalidation preserving revision-1 and revision-4 history
 - Source consultation: [full consultation](../consultations/i-vsd-tenant-onboarding-consultancy-report.md) and [readable companion](../consultations/i-vsd-tenant-onboarding-readable-summary.md)
-- Plan binding: [plan revision 4](../../dev/active/contextual-tenant-onboarding/contextual-tenant-onboarding-plan.md), [task-contract revision 4](../../dev/active/contextual-tenant-onboarding/contextual-tenant-onboarding-tasks.md), and [shared context/evidence](../../dev/active/contextual-tenant-onboarding/contextual-tenant-onboarding-context.md)
-- Decision authority: the user retained onboarding core and explicitly requested full revision-4 implementation on 2026-10-28. This authorizes implementation, not ethical outcomes, operational approval or scholarly certification.
+- Plan binding: [plan revision 5](../../dev/active/contextual-tenant-onboarding/contextual-tenant-onboarding-plan.md), [task-contract revision 5](../../dev/active/contextual-tenant-onboarding/contextual-tenant-onboarding-tasks.md), and [shared context/evidence](../../dev/active/contextual-tenant-onboarding/contextual-tenant-onboarding-context.md)
+- Decision authority: the user explicitly requests full revision-5 implementation on 2026-10-29 with no backward compatibility. This supersedes the triad's older planning-only wording; main owns that ledger reconciliation. This reviewer is authorized to edit only this report, not product code, the triad, commits or external publications. Neither implementation authority nor this disposition supplies stakeholder, scholarly, runtime or release approval.
+- Conditional scope: C12 trigger is false by the current request and context. No concrete multiple-publication, scheduling, audience-targeting, snooze or message-acknowledgement requirement is selected; S70 is a recorded non-applicability decision, not a delivered publication feature.
 
 ## Executive Summary
 
@@ -44,13 +45,39 @@ archive/federation behavior. New public archives and historical recovery are
 excluded and must graduate as separately actionable backlog work. This is a
 resolved boundary, not an open question transferred to execution.
 
-Revision 4 is ethically plan-aligned: every inherited pair has a concrete backend
-owner, required successor, or explicit exclusion below. The active deliverable is
-the durable private backend, followed by isolated practice presentation and then
-contextual guidance. Backend completion does not deliver the rendered onboarding
-experience. No finding is resolved by this document review; actual admission,
-erasure races, simulation callbacks, accessibility and comprehension remain
-evidence gates in their respective workstreams.
+Revision 5 is ethically **current / plan-aligned** at the design-review level.
+Every inherited pair now maps to a concrete packet within the same programme or
+to the retained explicit archive/recovery exclusion. Semantic progress, tenant
+policy, private practice, simulated AI, contextual tours, permanent Help and the
+single announcement bar are included; the old successor briefs are reference
+inputs, not permission to defer the requested presentation.
+
+The consequential choice is to let a tenant govern guidance availability without
+turning learning into a permission or surveillance system. Defaults remain
+optional for active members. Invitation eligibility and manual access are
+independent. Disabling interactive learning preserves static Help and self-data
+rights; manual-only still permits authorized Start/replay. An opt-in administrator
+orientation records only that person's explicit acknowledgement of identified
+material, not competence, consent to unrelated terms, or production readiness.
+It cannot block login, recovery, privacy operations or unrelated business work.
+
+Stable step/version records preserve meaningful completion when a layout changes
+without pretending an old positional index proves a newly applicable step was
+seen. Their limits and the two retained acknowledgement versions bound stored
+evidence; original-owner admission and complete erasure must include both new
+child types before exposure. These are planned controls, not demonstrated results.
+The announcement repair likewise separates an authorized material edition from
+cosmetic changes, and local hiding from confirmed tenant/account persistence.
+Anonymous state remains tenant-qualified and local, with no account-history merge.
+
+No blocking ethical contradiction was found in the specified revision-5
+behavior. All 18 findings retain their inherited lifecycle and mitigation IDs;
+none is resolved by this review. C12 is not applicable, not approved in advance.
+This disposition closes the ethical revalidation item of G0 only. Main still
+owns source/ownership/baseline admission, implementation and technical review.
+Fresh security/privacy/provider evidence, actual composed simulation checks,
+renderer admission, hosted accessibility and representative comprehension remain
+implementation or release gates.
 
 ## Scope
 
@@ -66,11 +93,14 @@ demo resources into events, and a tenant-editable lesson authoring platform.
 Existing history actions remain truthful when actually available. Existing
 production capabilities are taught, not rebuilt or advertised before they exist.
 
-This assessment revalidates the plan, not implementation. The active backend
+This assessment revalidates the plan, not implementation. The historical backend
 implements Domain/storage/erasure, authorized native CQS and private API/HAL with
-generated contracts. Two separately approved successors own actual practice
-presentation and contextual guidance. The paused enterprise tenant-setup
-programme concerns configuration/provisioning, not learner tours.
+generated contracts. Revision 5 extends it with semantic step coverage, typed
+tenant guidance policy and private current-admin acknowledgement, then delivers
+practice, simulated AI, tours, Help/admin/public states and the existing
+announcement-bar repair through C04-C11 in one triad. C12's publication/receipt
+extension is outside the selected execution scope. The paused enterprise
+tenant-setup programme concerns configuration/provisioning, not learner tours.
 
 ## Claim Boundary
 
@@ -87,6 +117,14 @@ organization/group collaborators with different permissions; event teams;
 visitors who must not mistake demos for community activity; account owners whose
 learning data must be private and erasable; and operators responsible for
 dependency provenance, resource limits, and accurate feature promises.
+Revision 5 also directly affects admins asked to acknowledge orientation,
+members whose manual-access audience differs from the invitation audience,
+same-origin anonymous visitors to several tenants, and account holders returning
+after policy or announcement changes. Tenant administrators control policy and
+publication but do not gain access to individual learning or acknowledgement
+records. Instance governance can constrain tenant policy editing, not confer
+cross-tenant learner ownership. These are identified stakeholders, not evidence
+that any of them has been interviewed or approved the design.
 
 ## I-VSD Principles And Domains
 
@@ -108,8 +146,13 @@ operations, and evaluation.
 
 The inherited IDs preserve consultation meaning. "Accepted" concerns and
 mitigations are planned, not proved implemented; no finding is resolved from
-planning alone. The traceability index and explanations below bind revision 4;
-historical evidence IDs retain their original dates and limits.
+planning alone. The index and 18 individual entries immediately below preserve
+the revision-4 finding records, including their original evidence and task
+bindings. The subsequent **Revision-5 Revalidation And Current Bindings** section
+is the current mapping and explicitly reassesses changed responsibilities.
+P18-P20 support that reassessment; historical evidence IDs retain their original
+dates and limits. There are still exactly 18 inherited pairs, with no new
+accepted finding or altered historical lifecycle.
 
 | Finding / mitigation | Assessment and controlled decision | Lifecycle / severity | Evidence / owner / required validation |
 | --- | --- | --- | --- |
@@ -366,6 +409,175 @@ positioning, and isolation across actual contexts.
 - Mitigation / owner / binding: IVSD-M018; dependency/accessibility; S32/S34; no backend dependency; guidance successor must admit the exact artifact/transitive/license/framework before dependent code. Both successors retain actual-host accessibility gates.
 - Escalation: failed admission requires a concrete dependency decision, not an unapproved fallback.
 
+### Revision-5 Revalidation And Current Bindings
+
+Every row in plan Section 9 was compared with the normative scenarios, design
+sections and current task packets, rather than accepted because its ID appeared
+in a table. C10 below means C10a browser repair followed by C10b authoritative
+editions. The dispositions describe design coverage only; the inherited open or
+accepted lifecycle remains as recorded above.
+
+| Preserved pair | Exact revision-5 binding | Revalidation and remaining evidence |
+| --- | --- | --- |
+| IVSD-F001 / IVSD-M001 | C05/C09; S01/S49-S53 | Aligned: optional member defaults and independent manual/invitation audiences preserve access without production authority. Policy may restrict interactive availability, not turn learning into compulsory organizer practice. Prove effective-policy and current-admin boundaries. |
+| IVSD-F002 / IVSD-M002 | C04/C07/C08; S19/S57-S62 | Aligned: native no-effect/final-admission checks and actual composed callback/result tests cover stale plans and late UI continuations. The live positive control is required; a simulation label is not evidence. |
+| IVSD-F003 / IVSD-M003 | C06/C09; S18/S28/S29 | Aligned: private synthetic exercises never become public cards, counts or business inventory. Verify the rendered hub and public states, not only separate backend tables. |
+| IVSD-F004 / IVSD-M004 | C05-C09; S03-S10/S38-S48/S54 | Aligned: current capability inventory, server-resolved steps and separate member/publisher/admin facts teach what is actually installed. Configuration changes may uncover steps without rewriting historical completion. Feature-owner and comprehension evidence remain open. |
+| IVSD-F005 / IVSD-M005 | Explicit historical-recovery exclusion; S29 and existing backlog | Non-applicable to new recovery implementation: preserve current archive/federation behavior and the inherited follow-up responsibility. Neither this review nor C11 resolves historical recovery. |
+| IVSD-F006 / IVSD-M006 | C04/C05; S15-S18/S22/S54-S59 | Aligned: semantic children, bounded carry-forward, source-bound claims and explicit tombstones retain lifecycle intent. Policy disable is not removal; GET and upgrades cannot recreate removed sources. Prove concurrency, caps and complete child deletion. |
+| IVSD-F007 / IVSD-M007 | C06-C09; S32/S41/S60-S63 | Aligned: provider-independent practice, persistent static Help and accessible dismissal/recovery remain required. Disabled interactive learning and failed guidance cannot block real work. Hosted assistive/accessibility evidence remains a release gate. |
+| IVSD-F008 / IVSD-M008 | C09/C10; S28/S64-S69 | Aligned: actual empty/filter/error states and failed/null/unapplied dismissal saves receive truthful presentation. Local hiding is not durable success, and an OS browser check is not interactive readiness. Prove failure and host transitions. |
+| IVSD-F009 / IVSD-M009 | C05/C09/C10; S02/S23/S31/S51/S52/S69 | Aligned: public welcome/announcement content stays separate from authenticated progress, policy actions and private requirement status. HAL and fresh server authority govern actions; no private prerender/cache state or admin learner dashboard. |
+| IVSD-F010 / IVSD-M010 | C09; S28/S29 | Aligned within the original limit: show existing authoritative history affordances, not new archives or invented navigation. Rendering evidence is still required. |
+| IVSD-F011 / IVSD-M011 | C05/C09; S35-S43/S50-S53 | Aligned: orientation is a private explicit notice acknowledgement, not compulsory practice, a persona classification or a production gate. Suppression does not fabricate satisfaction or hide a pending readiness item; Escape and recovery remain usable. |
+| IVSD-F012 / IVSD-M012 | C04/C05/C09/C10; S20/S23/S30/S31/S49/S59/S65/S68 | Aligned: subject/tenant/actor scopes are non-transferable; new acknowledgement records are private. Anonymous markers never merge into an account. Prove revocation, stale response/write, scope replacement and erasure behavior. |
+| IVSD-F013 / IVSD-M013 | C04/C05/C08/C10; S12-S17/S54-S58/S64-S68 | Aligned: historical Outcome, CurrentCoverage, snooze, skip, interruption and suppression have distinct meanings. Stable semantic versions and server announcement editions replace positional/content-hash inference. Prove replay preservation and truthful persistence without cross-device anonymous promises. |
+| IVSD-F014 / IVSD-M014 | C04/C06/C07; S18-S22/S29 | Aligned: learning identities/storage/commands remain separate through actual UI composition, with no fake Event IDs, production-host mounting, conversion or legacy callback fallback. Preserve normal live-path behavior as a separate control. |
+| IVSD-F015 / IVSD-M015 | C08/C09; S03-S11/S45-S48/S57/S61/S62 | Aligned: the entered workspace determines relevance, not consent; only explicit Start opens a tour. One cancellable transition/focus owner and current generation prevent chains, dirty-form interference and unseen-step completion. |
+| IVSD-F016 / IVSD-M016 | C07; S24-S27/S33 | Aligned: real chat presentation uses authored synthetic results and safe ephemeral input, with no live rail/provider/history initialization or cross-mode transfer. Actual result navigation and delayed confirmation require integration evidence. |
+| IVSD-F017 / IVSD-M017 | C04/C05; S30/S31/S59; C12/S70 only if enabled | Aligned: exact native tracked/persisted inventories and erasure/absence must adopt step and acknowledgement children before reachability. Child-before-parent deletion and covered replay remain mandatory. C12 is not applicable; no new publication receipt storage is approved. |
+| IVSD-F018 / IVSD-M018 | C08; S60-S63 | Aligned as an unresolved admission gate: exact artifact/license/transitive/framework and actual-host contract evidence precede dependent tour code. Documented hooks are not presumed absent; no package marketing, compile result or unapproved substitute closes the gate. |
+
+#### Optional Policy And Acknowledgement Do Not Grant Authority
+
+Plan Sections 3.9 and 5.11 distinguish three decisions that users could otherwise
+confuse: whether interactive learning is enabled, who may be invited, and who
+may start manually. Defaults permit optional member learning. An admin-only
+invitation audience does not silently remove member Help/manual access, while
+manual replay bypasses frequency or suppression only, never current policy or
+membership. When Enabled is false, interactive practice/tour start and replay
+are unavailable, but static Help, history and self-data deletion/export remain.
+This qualifies the inherited S01/S13 availability wording; it is not a promise
+that a disabled tour remains launchable. Governance locks constrain tenant edits
+through existing instance authority, not client role guesses or broader rights.
+
+The opt-in `TenantAdminOrientationAcknowledgement` is defensible as accountable
+notice delivery because the requirement is narrow, explicit and private. The
+current admin acknowledges identified material under current policy/identity;
+neither tour callbacks nor successful practice can make that statement for them.
+Only that subject sees pending/satisfied/not-applicable status. Admin power does
+not supply another person's receipt. The requirement is not a qualification,
+legal consent, religious duty, permission to publish/pay, or proof that a service
+is ready. Disabled-plus-required policy is rejected rather than leaving an
+impossible pending task, and suppression cannot silently satisfy or hide it.
+An unacknowledged person can still log in, recover access, exercise privacy
+rights and perform unrelated work. This limits coercion while allowing an
+operator to present orientation; it does not establish that admins find the
+wording fair or understandable. C05 authority/conflict tests and C09
+representative-use evidence must examine those distinctions before release.
+Any later hard business gate or administrator compliance dashboard is a material
+scope change, not an interpretation of this design disposition.
+
+#### Semantic Evidence Has A Purpose And Bounded History
+
+Plan Sections 5.10-5.12 and 13 replace an ordinal position with semantic keys and
+versions, so a reordered control does not erase learning and an unseen new step
+is not falsely marked complete. `Outcome` records the historical terminal
+event; `CurrentCoverage` answers a different question about currently applicable
+steps. Compatible evidence carries forward only during explicit mutation before
+pruning, never by a GET write. Material version 2 does not infer semantic
+completion from old positions or terminal flags. Practice versions/preferences
+are preserved without compatibility readers or dual writes.
+
+The new data inventory is deliberately narrow: `LearningTourStepProgress`
+stores identity/tenant/parent, a bounded semantic key/version and completion
+time; `LearningRequirementAcknowledgement` stores identity/tenant/parent,
+requirement/material, explicit acknowledgement time and policy-source evidence.
+The limits are four families times 32 steps times two retained versions, at most
+256 step rows per tenant-user, plus at most two acknowledgement rows for the
+initial requirement. These support recall and an honest self-visible receipt,
+not attendance, competence, conversion, member monitoring or an impression log.
+The existing six-recipe/20-context/1 KiB-record/128 KiB-practice bounds remain
+distinct; do not misrepresent that practice cap as the new children's byte cap.
+
+Retention is version- and purpose-bounded, not specified as a fixed number of
+days. If the material never changes, retained records may remain until explicit
+clearing/account erasure or tenant deletion; neither policy disable nor
+suppression is deletion. That persistence is proportionate at design level to
+cross-device recall and durable refusal, provided the private data controls and
+disclosures in C05/C09 and the guides actually work. It is not a claim of an
+automatic expiry service or indefinite operational audit entitlement. Extending
+this to an attempt stream, extra requirement families, longer history, analytics
+or new retention purposes requires revalidation.
+
+Count limits alone do not protect privacy. C04/C05 must enroll both child types
+in exact tracked and persisted save inventories, owner predicates, tenant
+constraints, read enclosure and erasure coverage. Source absence/presence,
+policy locks/defaults, original human custody and clock must remain witnessed
+through final admission, not just compared before saving. Common protected purge
+and all-tenant absence precede covered replay/native exits; SQL Server deletion
+ordering includes children. Extra-row injection and both erase/write race orders
+are required evidence. No new rows may be exposed before this adoption, and
+revision-4 passing tests cannot prove it.
+
+#### Announcement Dismissal Is A Private Preference, Not A Receipt Of Consent
+
+The single-bar design in Section 5.14 is within existing findings F008/F009/
+F012/F013 rather than a new notification/marketing platform. An operator owns
+the published content and intentional redisplay decision. Resolving content
+and edition together from instance defaults, a complete tenant override or
+override removal prevents a dismissal from silently applying to unseen content.
+Cosmetic edits do not automatically reset it; authorized explicit republishing
+is a distinct intent, not a client increment or arbitrary branding hash.
+Repeated redisplay must not be described as user consent or reading evidence.
+An edition is presentation identity, not proof of delivery, comprehension,
+incident response or fulfilment of a safety-notice duty.
+
+Authenticated dismissal remains a tenant/internal-user `UserPreference` under
+its existing privacy/erasure ownership, not a new per-viewer receipt history.
+Final admission rechecks the effective source and prior marker so an old tab
+cannot hide a newer edition. Anonymous browser state uses the canonical
+registered namespace and verified public tenant identity with edition matching.
+It is local to that browser: there is no authenticated cross-device promise,
+tracking persona or silent account merge. Ambiguous old unscoped markers are
+ignored, not attributed to a guessed tenant. This may redisplay a notice;
+that is preferable to carrying an unverifiable dismissal across communities.
+The browser reset must find its own canonical keys; server account erasure is
+not a promise to remotely erase an anonymous marker on an offline device.
+
+Checking batch and per-key save results makes a failed write truthful without
+blocking real work. Account/tenant/edition generations discard late callbacks,
+and no automatic stale mutation replay is permitted. Public content and private
+preferences have different cache/SSR boundaries; Auto, Server, WebAssembly and
+prerender each need the actual interactive-lifecycle evidence specified in C10.
+Optional tour priority must not obscure a critical banner or steal its focus.
+This design supports trust and attention without asserting that announcement
+copy, host behavior or critical communications have been operationally validated.
+
+#### Conditional Publications Remain Outside This Disposition
+
+C12's trigger is **false** under the selected plan and current context: no
+concrete publication-extension requirement was selected. This is the executor's
+application of the conditional scope, not a separate quoted user decision.
+S70 is satisfied here only as a recorded scope decision. The proposed
+20-active/draft, 100-total publication caps, per-publication private receipt,
+schedule/audience model and separate instance/tenant delivery identities are
+future specifications, not approved retention or shipped capability. No
+publication table, scheduler, user acknowledgement dashboard or new receipt
+collection follows from repairing the bar. If a concrete trigger is selected,
+revalidate necessity, affected audiences, retention/retirement, acknowledgements
+versus consent, private erasure and time/cache boundaries before enabling it.
+This preserves the F017 conditional mapping without calling deferred code done.
+
+#### Presentation And Evidence Remain Programme Obligations
+
+C06-C09 now own practice, actual simulated chat, four contextual families and
+permanent Help inside the same programme. This removes the revision-4 risk of
+calling a private API the complete onboarding experience. Explicit Start,
+no auto-chaining, truthful capability inventory, safe result navigation and
+normal-path positive controls preserve F002/F004/F014-F016. Missing targets,
+failed saves and stale generations cannot mark unseen steps complete.
+
+GuideFlow remains only a candidate. The narrow renderer seam keeps Event's
+policy, progress, privacy and authority independent of it; dependency provenance
+and actual cancellation/focus/readiness behavior must be established before
+dependent tour work. A current design report cannot supply those results.
+Keyboard/mobile/RTL/zoom/reduced-motion and representative tasks with tours
+skipped/Help recalled remain release evidence. Recruitment, consent and minimal
+aggregate notes must be real; no stakeholder testimony or usability percentage
+is inferred from the plan. The ordinary feature-teaching scope introduces no
+new religious-legal determination requiring a scholarly ruling here.
+
 ## Recommendations
 
 Keep confirmed product decisions fixed. Use one shared evidence packet for the
@@ -392,6 +604,33 @@ as distinct state. No tour is a permission gate. A completed management family
 must not repeat for each event or actor, and changing AI host must not repeat
 normal chat guidance.
 
+For revision 5, implement the current mapping above rather than the inherited
+successor split. Keep the policy/step/acknowledgement data purposes and audience
+boundaries explicit in the public and internal guides as each feature ships.
+Main must reconcile the triad's stale-report and earlier planning-only labels
+with this receipt and the current user request; those labels are not independent
+ethical contradictions or new product decisions. No architectural correction is
+required for design alignment on the reviewed inputs.
+
+Rejected alternatives and their practical costs:
+
+- A mandatory organizer course or hidden permission gate would burden browsers,
+  admins and recovery users without teaching their actual goal. The separate
+  notice acknowledgement retains accountable communication without claiming
+  competence; it costs an explicit action and private bounded storage.
+- An ordinal backfill or whole-configuration progress key would either invent
+  completion or proliferate repeat courses. Stable semantic coverage preserves
+  truthful history at the cost of versioned catalogue and child-erasure work.
+- Erasing data whenever policy is disabled would confuse availability with
+  removal and destroy durable refusal/history. Explicit clearing and erasure
+  preserve intent, at the cost of disclosing that disable does not delete.
+- Browser-only authenticated dismissal, client-generated editions or automatic
+  anonymous/account merging would weaken tenant ownership and saved-state
+  promises. Native edition/source admission adds concurrency work but avoids
+  carrying an old intent into a different account, tenant or message.
+- Building a publication CMS now would collect extra private state without a
+  selected purpose. C12 remains conditional; its proposed design is not approval.
+
 ## Common Overlooked Failures And Outcomes
 
 Live history/provider initialization hidden behind a simulation badge; ordinary
@@ -400,6 +639,13 @@ tours on public details; stacked tours on a deep link; a skipped family mistaken
 for global suppression; progress keyed to every event; orphan learning data after
 erasure; practice recreation while deletion is fenced; and unavailable analytics
 or team features advertised as shipped.
+Revision-5-specific failures include using a cosmetic change to reset completion;
+treating admin-only invitation targeting as a manual-access grant; letting
+policy-disabled Help hide the only data-clearing path; treating acknowledgement
+as competence or exposing it to other admins; preserving the root while missing
+new child erasure; and reporting announcement persistence after a null or
+unapplied save. The current design addresses these as testable obligations,
+not observed outcomes.
 
 ## Evidence Reviewed
 
@@ -416,6 +662,9 @@ or team features advertised as shipped.
 | P09 | Historical user answer "Scope: Onboarding core (Recommended)"; authorized planning the core while preserving archive/federation behavior |
 | P16 | 2026-10-28 document-only revalidation of exact plan/task revision 4, context and ordered practice/guidance successor briefs; all 18 pairs preserved and mapped, with no runtime or scholarly assurance |
 | P17 | 2026-10-28 current user explicitly requested full implementation of `dev/active/contextual-tenant-onboarding/` using `implement-tasks`; implementation approval, not proof of outcomes or successor-plan approval |
+| P18 | 2026-10-29 native document reads in `.worktrees/contextual-tenant-onboarding`: exact `contextual-tenant-onboarding-plan.md` revision 5/task-contract 5, Sections 0-18 including every Section 9 row; `contextual-tenant-onboarding-tasks.md` current G0/C04-C12 requirements, coverage, acceptance and exact packet manifests; complete `contextual-tenant-onboarding-context.md` current request/decisions and historical receipts/quarantines. This is plan/task traceability, not independent source, Git-object, runtime or test verification. |
+| P19 | Current user explicitly requests full revision-5 implementation through implement-tasks with no backward compatibility and repository conventions. The plan requires G0 and preservation of all 18 pairs. Main delegated independent report-only revalidation with no commands/external research and applied the plan's conditional C12 trigger as false because no concrete extension requirement is selected. Those assignment constraints and scope interpretation are not additional user testimony. Implementation authority comes from the user's current request, not the reviewer or prior approvals. |
+| P20 | Loaded I-VSD skill plus integration/report/reader-first/scope contracts, resource index, principles/domains, derivation protocol, evidence levels, scholarly boundaries, data-governance, UX/defaults and marketing/communication heuristics, and shared reader-first writing guide. These support design reasoning and evidence classification, not stakeholder or scholarly approval. |
 
 The context packet additionally binds P10-P15 generation, host, test, overlap,
 source-conflict and provider evidence. It is the detailed authoritative packet;
@@ -430,34 +679,68 @@ those documents, not an independent runtime investigation. Current application-
 owned persistence, common erasure exits and generated wire ownership supersede
 the old seam assumptions.
 
-No copied third-party code, expressive assets, or implementation structure enters
-the plan. External research is reduced to functional requirements for contextual
-timing, truthful capability disclosure, focus/dismissal, and portable concurrency.
+Revision 5's plan/context identify worktree source `6e51fbec5fa0886290d07a109183673f5a8651c7`
+and a graph at `d7c2cda83d9834c15fa55dcec97cf29e6d361442` that is stale for that
+HEAD. These are supplied document anchors, not Git or graph observations by this
+reviewer. No code investigation or external retrieval was needed for the ethical
+document review. Historical web/package/source claims were not independently
+refreshed, and no third-party source was ingested in this pass.
+
+The exact current evidence boundary is the revision-5 behavioral contract and
+task mappings read on 2026-10-29. Concurrent task-status or authority-receipt
+updates by main do not invalidate it; a material change to the behavior, data,
+audiences or mapped obligations does. Plan/task historical planning-only text
+does not override P19. Main owns all triad changes.
 
 ## Validation Gaps
 
-Revision 4 separates backend evidence from required successor evidence. Backend
-execution must prove original-transaction admission, erasure/write races, covered
-replay/native PostgreSQL purge and five-engine concurrency/migrations. Practice
-must prove actual simulation callbacks/navigation with a live positive control.
-Guidance owns package admission; both successors retain hosted accessibility and
-representative comprehension release gates. This document review ran no product
-tests, migrations or hosted sessions.
+Revision-4 receipts remain bounded historical evidence, including their unrun
+Application cases and reproduced baseline provider/architecture failures.
+Revision-5 C04/C05 must prove semantic carry-forward/caps, policy absence/edit/
+lock races, explicit current-admin acknowledgement, exact child inventories,
+original-transaction admission, erasure/write races and covered-replay absence.
+Five-engine/four-cohort assurance remains required as specified; this review
+neither reruns it nor reclassifies quarantined failures as passes.
+
+C06/C07 must prove actual practice and simulation callbacks/navigation with a
+live positive control. C08 owns exact package admission and hosted renderer
+behavior; C09 retains all audience, disabled/manual/required-state and
+representative comprehension gates. C10 must prove browser namespace/reset,
+effective editions, stale/failed saves, scope changes and actual render modes.
+Public/internal guides must accurately describe retention and non-deletion on
+disable. No product test, migration, build, shell/Git command, automated
+Markdown/link check, external research or hosted session was run by this review.
+Validation here is manual document/field/mapping consistency, not operational
+assurance or an independently verified history of other agents' commands.
 
 ## Escalation Needed
 
-The adjacent-discovery boundary is resolved. No additional ethical scope
-decision or scholarly escalation was identified in revision-4 revalidation.
-Security/privacy assurance remains a backend completion gate; hosted
-accessibility/comprehension remains a programme release gate after successors.
-Live AI simulation, actual payment/provider exercises, real publication, or
-cross-mode prompt/history transfer would change the confirmed scope.
+No additional ethical scope decision or scholarly escalation is required for
+the specified revision-5 design. The adjacent archive/recovery boundary remains
+resolved as excluded, and C12 is explicitly not applicable. This is not a
+scholarly endorsement; religious instruction, finance/consent claims or material
+exclusion of vulnerable users would need the appropriate separate review.
+
+Before exposing new storage/policy writes, the implementation owner must satisfy
+native source/inventory/erasure adoption and scoped security/privacy tests.
+Before dependent renderer code, the C08 owner must satisfy provenance and host
+contract admission. Before programme release, security/privacy review, required
+provider/generated evidence, actual hosted accessibility and representative
+comprehension must be recorded with honest treatment of quarantined failures.
+Plan alignment does not waive any of these gates.
+
+Live AI rehearsal, actual payment/provider exercises, real demo publication,
+cross-mode history transfer, a hard production requirement, learner reporting
+or activation of C12 changes the reviewed responsibility and requires refresh.
 
 ## Missing Evidence
 
-Generated-client/migration receipts, package admission, operational/UI assurance,
-and erasure race/completeness results remain missing. The aligned triad and
-finding/scenario/task coverage are planning artifacts, not runtime receipts.
+Fresh revision-5 generated-client/migration and new-child erasure/source-race
+receipts, exact package admission, actual renderer/announcement host results,
+policy/acknowledgement comprehension, and representative stakeholder evidence
+remain missing from this review. Existing revision-4 receipts are not erased
+by that statement; they do not establish the changed behavior. No scholarly,
+stakeholder, runtime or release approval was supplied or manufactured.
 
 ## Review Lifecycle
 
@@ -468,17 +751,22 @@ finding/scenario/task coverage are planning artifacts, not runtime receipts.
 | 2026-10-11 | current / plan-aligned | Bound plan revision 1 and its single tasks/context triad; all 18 findings map to scenarios/tasks or explicit core-scope non-applicability; implementation assurance remains open |
 | 2026-10-28 | stale / changes-required | Material revision-4 delivery split and current persistence/erasure/wire boundaries invalidated revision-1 bindings |
 | 2026-10-28 | current / plan-aligned | Revalidated all 18 pairs against exact plan/task-contract revision 4 and both successor boundaries; current user authorizes backend implementation, with operational evidence still open |
+| 2026-10-29 | stale / changes-required | Revision-5 semantic coverage, policy/acknowledgement, audiences, integrated presentation and announcement responsibilities invalidate the revision-4 current binding; preserved historical report awaited G0 |
+| 2026-10-29 | current / plan-aligned | P18-P20 revalidation assesses all 18 Section 9 mappings and changed data/authority/attention responsibilities; no blocking design contradiction found. C12 false/non-applicable; no finding resolved and no implementation, stakeholder, scholarly or release assurance inferred |
 
 ## Planning Handoff
 
 - Workstream: contextual-tenant-onboarding.
 - Status: current; disposition: plan-aligned.
-- Reviewed input: plan revision 4, task-contract revision 4, context and ordered practice-presentation then contextual-guidance briefs.
-- Findings and mitigations: all IVSD-F001-F018 map to the identically numbered IVSD-M001-M018 in the binding entries above; no IDs or historical lifecycle states were removed.
-- Required plan mappings: protected storage owns lifecycle/erasure/claims; authorized operations own current human scope and closed simulation; private contracts own transport/HAL/generated and provider assurance. Presentation/guidance successors own actual UI and release evidence; F005 historical recovery is explicitly excluded, F010 preserves only existing history.
-- Escalations required before: backend completion requires physical privacy/security/provider assurance; dependent tour code requires exact package admission; programme release requires hosted accessibility and representative comprehension. No new ethical decision blocks the specified backend.
-- Refresh triggers: changed scope, consent, retention, telemetry, authority, actual simulation effects, private rendering, dependency choice or successor boundaries.
+- Reviewed input: exact plan revision 5, task-contract revision 5 and current context; P18-P20 identify the document and user-authority boundary.
+- Findings and mitigations: 18/18 inherited pairs, IVSD-F001-F018 to the identically numbered IVSD-M001-M018, preserved with historical evidence, open/accepted lifecycle and current mapping. No finding was resolved or newly accepted by metadata change.
+- Required plan mappings: the Revision-5 Revalidation table above covers every Section 9 row. C04/C05 own semantic/requirement storage, current policy and erasure; C06/C07 own actual practice/simulation; C08/C09 own admitted tours, Help, policy/admin and public states; C10a/C10b own scoped truthful announcement dismissal/editions; C11 graduates evidence. F005 is excluded; F010 preserves existing history. C12/S70 is false/non-applicable, not delivered or pre-approved.
+- G0 ethical disposition: complete at design-review level; no blocking ethical contradiction or additional product decision. Main must update the triad's stale/authority wording and retains the other G0 source, ownership and baseline tasks. This report does not mark those tasks complete.
+- Implementation gates: exact new-type/source admission and complete erasure before exposure; intended security/privacy Red then fresh targeted evidence; actual no-effects simulation with a live positive control; exact dependency/provenance and host admission before renderer-dependent work.
+- Release gates: required provider/migration/generated/security review, honest disposition of historical quarantines, actual-host accessibility, every audience's representative comprehension and accurate public/internal data/policy/announcement guides. No runtime approval follows from this document.
+- Verification receipt: only native document reads and an `apply_patch` report edit; manually checked metadata, 18 preserved pairs, all 18 current mappings, lifecycle/evidence separation, C12 non-applicability and known relative link destinations. Commands executed: none. Automated link/schema/whitespace, Git diff, builds, tests and hosted QA: not run, as required by the report-only assignment.
+- Refresh triggers: changed scope, consent/acknowledgement meaning, retention/caps, telemetry, audiences, required production gates, current authority, simulation effects, private rendering, dependency/host contract, announcement redisplay/source semantics or C12 activation.
 
 Refresh this assessment for material changes to admission, storage/retention,
 resource identity, tour triggers/suppression, live AI boundaries, erasure,
-dependency choice, or discovery/federation scope.
+dependency choice, announcement responsibility, or discovery/federation scope.

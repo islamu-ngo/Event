@@ -48,7 +48,8 @@ public sealed partial class HumanSettingsMutationPreparationTests
         await SeedPlatformAdministratorAsync(fixture);
         await using var host = fixture.Host.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
             configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Authorization:Provider"] = "" })));
-        await using var request = await ProviderRequestAsync(host.Services, await fixture.SignInAsync(), null);
+        await using var request = await ProviderRequestAsync(host.Services, await fixture.SignInAsync(), null,
+            "/api/instance/settings/authz-provider");
         var service = request.Services.GetRequiredService<IAuthorizationProviderConfigurationService>();
         await using var original = await service.ObserveConfigurationAsync(new UpdateAuthorizationProviderConfigurationCommand
         {
@@ -91,7 +92,8 @@ public sealed partial class HumanSettingsMutationPreparationTests
                 new Dictionary<string, string?> { ["Authorization:Provider"] = "" }));
             builder.ConfigureTestServices(services => RegisterNativeProvider(services, observer));
         });
-        await using var request = await ProviderRequestAsync(host.Services, null, native.SetupSecret);
+        await using var request = await ProviderRequestAsync(host.Services, null, native.SetupSecret,
+            "/api/instance/settings/authz-provider");
         var service = request.Services.GetRequiredService<IAuthorizationProviderConfigurationService>();
         await using var original = await service.ObserveConfigurationAsync(new UpdateAuthorizationProviderConfigurationDuringSetupCommand
         {

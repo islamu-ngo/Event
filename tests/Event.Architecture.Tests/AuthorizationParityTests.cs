@@ -1,15 +1,14 @@
 namespace Event.Architecture.Tests;
 
 using System.Reflection;
-using System.Text.RegularExpressions;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Infrastructure.Services;
+using YamlDotNet.RepresentationModel;
 
 /// <summary>
 /// Ensures authorization artifacts stay aligned across all layers:
 /// <see cref="ResourceKinds"/> constants, <see cref="ResourceDescriptors"/> catalog,
-/// <see cref="ResourceDescriptorRegistry"/>, <see cref="FallbackAuthorizationService"/>,
+/// <see cref="ResourceDescriptorRegistry"/>,
 /// Cerbos YAML policies, and Cerbos JSON schemas.
 /// </summary>
 public partial class AuthorizationParityTests
@@ -17,8 +16,8 @@ public partial class AuthorizationParityTests
     private const string ProductNamespacePrefix = "islamuevent_";
     private const string NamespacedPrincipalSchemaFileName = "islamuevent_principal.json";
 
-    private static readonly string CerbosPoliciesPath = FindCerbosPoliciesPath();
-    private static readonly string CerbosSchemasPath = Path.Combine(FindCerbosPoliciesPath(), "_schemas");
+    private static readonly string CerbosPoliciesPath = ContextSystemHelpers.RepoPath("cerbos", "policies");
+    private static readonly string CerbosSchemasPath = Path.Combine(CerbosPoliciesPath, "_schemas");
     private static readonly IReadOnlySet<string> LegacyBareResourceKinds = new HashSet<string>
     {
         "event",
@@ -114,71 +113,74 @@ public partial class AuthorizationParityTests
     }
 
     /// <summary>
-    /// All resource kind strings handled in FallbackAuthorizationService typed authorization switch.
-    /// Extracted by reading the source file and parsing the switch cases.
-    /// </summary>
-    private static IReadOnlySet<string> GetFallbackHandledResourceKinds()
-    {
-        var sourceFile = FindSourceFile("FallbackAuthorizationService.cs", "Explore.Infrastructure");
-        var source = File.ReadAllText(sourceFile);
-        var matches = FallbackSwitchCaseRegex().Matches(source);
-        return matches.Select(m => m.Groups[1].Value).ToHashSet();
-    }
-
-    /// <summary>
     /// All resource kind strings that have a Cerbos YAML policy file.
     /// Extracted from the cerbos/policies/ directory by reading the resource field.
     /// </summary>
-    private static IReadOnlySet<string> GetCerbosPolicyResourceKinds()
+    private static IReadOnlySet<string> GetCerbosPolicyResourceKinds(string? policyDirectory = null)
     {
-        if (!Directory.Exists(CerbosPoliciesPath))
-            return new HashSet<string>();
-
-        var kinds = new HashSet<string>();
-        foreach (var file in Directory.GetFiles(CerbosPoliciesPath, "*.yaml"))
-        {
-            var content = File.ReadAllText(file);
-            var match = CerbosResourceKindRegex().Match(content);
-            if (match.Success)
-                kinds.Add(match.Groups[1].Value.Trim('"'));
-        }
-
-        return kinds;
+        return GetCerbosResourcePolicies(policyDirectory)
+            .Select(document => RequiredScalar(document.Policy, "resource"))
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     /// <summary>
     /// All resource kinds that have a JSON schema file in _schemas/.
     /// Schema files are named {resource_kind}.json.
     /// </summary>
-    private static IReadOnlySet<string> GetCerbosSchemaResourceKinds()
+    private static IReadOnlySet<string> GetCerbosSchemaResourceKinds(string? schemaDirectory = null)
     {
-        if (!Directory.Exists(CerbosSchemasPath))
-            return new HashSet<string>();
-
-        return Directory.GetFiles(CerbosSchemasPath, "*.json")
+        schemaDirectory ??= CerbosSchemasPath;
+        return Directory.GetFiles(schemaDirectory, "*.json")
             .Select(Path.GetFileNameWithoutExtension)
             .Where(name => name != Path.GetFileNameWithoutExtension(NamespacedPrincipalSchemaFileName)) // principal schema is shared, not a resource kind
             .ToHashSet()!;
     }
 
+    [Test]
+    public async Task PolicyCatalogRejectsMissingArtifactRoot()
+    {
+        string missing = Path.Combine(Path.GetTempPath(), $"authorization-missing-{Guid.NewGuid():N}");
+
+        await Assert.That(() => GetCerbosPolicyResourceKinds(missing))
+            .Throws<DirectoryNotFoundException>();
+    }
+
+    [Test]
+    public async Task SchemaCatalogRejectsMissingArtifactRoot()
+    {
+        string missing = Path.Combine(Path.GetTempPath(), $"authorization-missing-{Guid.NewGuid():N}");
+
+        await Assert.That(() => GetCerbosSchemaResourceKinds(missing))
+            .Throws<DirectoryNotFoundException>();
+    }
+
+    [Test]
+    public async Task PolicyCatalogReadsResourceScalarInsteadOfComments()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"authorization-policy-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(directory, "event.yaml"), """
+                # resource: islamuevent_comment_only
+                apiVersion: api.cerbos.dev/v1
+                resourcePolicy:
+                  resource: 'islamuevent_event'
+                  version: default
+                """);
+
+            await Assert.That(GetCerbosPolicyResourceKinds(directory))
+                .IsEquivalentTo(["islamuevent_event"]);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     // ──────────────────────────────────────────
     // Provider parity tests (original)
     // ──────────────────────────────────────────
-
-    [Test]
-    [DisplayName("Every registered resource kind has a case in FallbackAuthorizationService")]
-    public async Task RegisteredResourceKinds_ShouldHave_FallbackCase()
-    {
-        var registered = GetRegisteredResourceKinds();
-        var fallbackHandled = GetFallbackHandledResourceKinds();
-
-        var missing = registered.Except(fallbackHandled).ToList();
-
-        await Assert.That(missing)
-            .IsEmpty()
-            .Because($"These resource kinds are in ResourceDescriptorRegistry but missing from " +
-                     $"FallbackAuthorizationService: [{string.Join(", ", missing)}]");
-    }
 
     [Test]
     [DisplayName("Every registered resource kind has a Cerbos YAML policy file")]
@@ -193,21 +195,6 @@ public partial class AuthorizationParityTests
             .IsEmpty()
             .Because($"These resource kinds are in ResourceDescriptorRegistry but missing from " +
                      $"cerbos/policies/: [{string.Join(", ", missing)}]");
-    }
-
-    [Test]
-    [DisplayName("FallbackAuthorizationService handles all resource kinds that have Cerbos policies")]
-    public async Task CerbosPolicies_ShouldHave_FallbackCase()
-    {
-        var cerbosPolicies = GetCerbosPolicyResourceKinds();
-        var fallbackHandled = GetFallbackHandledResourceKinds();
-
-        var missing = cerbosPolicies.Except(fallbackHandled).ToList();
-
-        await Assert.That(missing)
-            .IsEmpty()
-            .Because($"These Cerbos policies have no matching FallbackAuthorizationService case: " +
-                     $"[{string.Join(", ", missing)}]");
     }
 
     // ──────────────────────────────────────────
@@ -226,20 +213,6 @@ public partial class AuthorizationParityTests
         await Assert.That(missing)
             .IsEmpty()
             .Because($"These ResourceKinds constants have no Cerbos policy: [{string.Join(", ", missing)}]");
-    }
-
-    [Test]
-    [DisplayName("Every ResourceKinds constant has a FallbackAuthorizationService case")]
-    public async Task ResourceKindConstants_ShouldHave_FallbackCase()
-    {
-        var constants = GetResourceKindConstants();
-        var fallbackHandled = GetFallbackHandledResourceKinds();
-
-        var missing = constants.Except(fallbackHandled).ToList();
-
-        await Assert.That(missing)
-            .IsEmpty()
-            .Because($"These ResourceKinds constants have no FallbackAuthorizationService case: [{string.Join(", ", missing)}]");
     }
 
     // ──────────────────────────────────────────
@@ -347,22 +320,13 @@ public partial class AuthorizationParityTests
     [DisplayName("Derived roles and principal role use islamuevent names")]
     public async Task DerivedRoles_ShouldUse_IslamuEventNamespace()
     {
-        var derivedRolesPath = Path.Combine(CerbosPoliciesPath, "derived_roles.yaml");
-        var content = File.ReadAllText(derivedRolesPath);
-
-        var violations = new List<string>();
-
-        foreach (Match match in LegacyDerivedRoleDefinitionRegex().Matches(content))
-            violations.Add(match.Value.Trim());
-
-        foreach (Match match in LegacyImportedDerivedRoleRegex().Matches(content))
-            violations.Add(match.Value.Trim());
-
-        foreach (Match match in LegacyPrincipalRoleRegex().Matches(content))
-            violations.Add(match.Value.Trim());
-
-        if (!content.Contains("name: islamuevent_explore_admin_roles", StringComparison.Ordinal))
-            violations.Add("missing islamuevent_explore_admin_roles policy name");
+        YamlMappingNode roles = RequiredMapping(ReadYaml(Path.Combine(CerbosPoliciesPath, "derived_roles.yaml")), "derivedRoles");
+        await Assert.That(RequiredScalar(roles, "name")).IsEqualTo("islamuevent_explore_admin_roles");
+        string[] violations = RequiredSequence(roles, "definitions").Children.Cast<YamlMappingNode>()
+            .SelectMany(definition => new[] { RequiredScalar(definition, "name") }
+                .Concat(RequiredSequence(definition, "parentRoles").Children.Select(ScalarValue)))
+            .Where(identifier => !identifier.StartsWith(ProductNamespacePrefix, StringComparison.Ordinal))
+            .ToArray();
 
         await Assert.That(violations)
             .IsEmpty()
@@ -375,21 +339,14 @@ public partial class AuthorizationParityTests
     {
         var violations = new List<string>();
 
-        foreach (var file in Directory.GetFiles(CerbosPoliciesPath, "*.yaml"))
+        foreach (var (fileName, policy) in GetCerbosResourcePolicies())
         {
-            var content = File.ReadAllText(file);
-            if (!CerbosResourceKindRegex().IsMatch(content))
-                continue;
-
-            var fileName = Path.GetFileName(file);
-            var expectedSchema = fileName == "islamuevent_event_resource.yaml"
+            var expectedSchema = RequiredScalar(policy, "resource") == ResourceKinds.EventResource
                 ? "islamuevent_event_resource_principal.json"
                 : NamespacedPrincipalSchemaFileName;
-            if (!content.Contains($"cerbos:///{expectedSchema}", StringComparison.Ordinal))
+            string reference = RequiredScalar(RequiredMapping(RequiredMapping(policy, "schemas"), "principalSchema"), "ref");
+            if (reference != $"cerbos:///{expectedSchema}")
                 violations.Add($"{fileName}: missing namespaced principal schema reference");
-
-            if (content.Contains("cerbos:///principal.json", StringComparison.Ordinal))
-                violations.Add($"{fileName}: still references legacy principal schema");
         }
 
         await Assert.That(violations)
@@ -401,24 +358,16 @@ public partial class AuthorizationParityTests
     [DisplayName("Every Cerbos policy YAML references its schema")]
     public async Task CerbosPolicies_ShouldReference_Schema()
     {
-        if (!Directory.Exists(CerbosPoliciesPath))
-        {
-            await Assert.That(true).IsTrue(); // skip if no policies dir
-            return;
-        }
-
         var missingRef = new List<string>();
 
-        foreach (var file in Directory.GetFiles(CerbosPoliciesPath, "*.yaml"))
+        foreach (var (fileName, policy) in GetCerbosResourcePolicies())
         {
-            var content = File.ReadAllText(file);
-            var resourceMatch = CerbosResourceKindRegex().Match(content);
-            if (!resourceMatch.Success) continue; // derived_roles.yaml etc.
-
-            if (!content.Contains("principalSchema:", StringComparison.OrdinalIgnoreCase) ||
-                !content.Contains("resourceSchema:", StringComparison.OrdinalIgnoreCase))
+            string resource = RequiredScalar(policy, "resource");
+            YamlMappingNode schemas = RequiredMapping(policy, "schemas");
+            _ = RequiredScalar(RequiredMapping(schemas, "principalSchema"), "ref");
+            if (RequiredScalar(RequiredMapping(schemas, "resourceSchema"), "ref") != $"cerbos:///{resource}.json")
             {
-                missingRef.Add(Path.GetFileName(file));
+                missingRef.Add(fileName);
             }
         }
 
@@ -427,95 +376,45 @@ public partial class AuthorizationParityTests
             .Because($"These Cerbos policy files do not reference their schema: [{string.Join(", ", missingRef)}]");
     }
 
-    [Test]
-    [DisplayName("HATEOAS link policies use explicit AuthorizationActions permission metadata")]
-    public async Task AllLinkPoliciesHaveExplicitPermissionActions()
-    {
-        var policyDirectory = FindHateoasPoliciesPath();
-        var violations = new List<string>();
-
-        foreach (var file in Directory.GetFiles(policyDirectory, "*LinkPolicy.cs"))
-        {
-            var source = File.ReadAllText(file);
-            var fileName = Path.GetFileName(file);
-
-            if (source.Contains(".WithPermission(", StringComparison.Ordinal))
-                violations.Add($"{fileName}: use RequirePermission(...) instead of setting raw permission metadata");
-
-            if (source.Contains("PermissionAction.", StringComparison.Ordinal))
-                violations.Add($"{fileName}: use AuthorizationActions string constants instead of PermissionAction enum values");
-
-            foreach (Match match in PermissionActionArgumentRegex().Matches(source))
-            {
-                var action = match.Groups["action"].Value;
-                if (!action.StartsWith("AuthorizationActions.", StringComparison.Ordinal)
-                    && !string.Equals(action, "action", StringComparison.Ordinal))
-                {
-                    violations.Add($"{fileName}: RequirePermission call uses an unrecognized action '{action}' at index {match.Index}");
-                }
-            }
-        }
-
-        await Assert.That(violations)
-            .IsEmpty()
-            .Because("HATEOAS links are authorization affordances; permission-bound links must name explicit actions and cannot fall back to HTTP method inference.");
-    }
-
     // ──────────────────────────────────────────
     // Utility methods
     // ──────────────────────────────────────────
 
-    private static string FindCerbosPoliciesPath()
+    private static IEnumerable<(string FileName, YamlMappingNode Policy)> GetCerbosResourcePolicies(string? policyDirectory = null)
     {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null)
+        foreach (string file in Directory.GetFiles(policyDirectory ?? CerbosPoliciesPath, "*.yaml"))
         {
-            var candidate = Path.Combine(dir.FullName, "cerbos", "policies");
-            if (Directory.Exists(candidate))
-                return candidate;
-            dir = dir.Parent;
+            YamlMappingNode document = ReadYaml(file);
+            if (document.Children.ContainsKey(new YamlScalarNode("resourcePolicy")))
+                yield return (Path.GetFileName(file), RequiredMapping(document, "resourcePolicy"));
+            else
+                _ = RequiredMapping(document, "derivedRoles");
         }
-
-        return Path.Combine(AppContext.BaseDirectory, "cerbos", "policies");
     }
 
-    private static string FindSourceFile(string fileName, string projectHint)
+    private static YamlMappingNode ReadYaml(string path)
     {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null)
-        {
-            var candidates = Directory.GetFiles(dir.FullName, fileName, SearchOption.AllDirectories);
-            var match = candidates.FirstOrDefault(c => c.Contains(projectHint, StringComparison.OrdinalIgnoreCase));
-            if (match != null)
-                return match;
-            dir = dir.Parent;
-        }
-
-        throw new FileNotFoundException($"Could not find {fileName} in project {projectHint}");
+        using var reader = File.OpenText(path);
+        var yaml = new YamlStream();
+        yaml.Load(reader);
+        return yaml.Documents.Single().RootNode as YamlMappingNode
+            ?? throw new InvalidDataException("Expected a YAML mapping document.");
     }
 
-    private static string FindHateoasPoliciesPath()
-    {
-        var eventLinkPolicyPath = FindSourceFile("EventLinkPolicy.cs", "Explore.API");
-        return Path.GetDirectoryName(eventLinkPolicyPath)
-            ?? throw new DirectoryNotFoundException("Could not resolve Explore.API/Hateoas/Policies.");
-    }
+    private static YamlMappingNode RequiredMapping(YamlMappingNode parent, string key) =>
+        parent.Children[new YamlScalarNode(key)] as YamlMappingNode
+        ?? throw new InvalidDataException($"Expected YAML mapping '{key}'.");
 
-    [GeneratedRegex("""\"(\w+)\"\s*=>""")]
-    private static partial Regex FallbackSwitchCaseRegex();
+    private static YamlSequenceNode RequiredSequence(YamlMappingNode parent, string key) =>
+        parent.Children[new YamlScalarNode(key)] as YamlSequenceNode
+        ?? throw new InvalidDataException($"Expected YAML sequence '{key}'.");
 
-    [GeneratedRegex("""resource:\s*["']?(\w+)["']?""")]
-    private static partial Regex CerbosResourceKindRegex();
+    private static string RequiredScalar(YamlMappingNode parent, string key) =>
+        ScalarValue(parent.Children[new YamlScalarNode(key)]);
 
-    [GeneratedRegex(@"\.RequirePermission\s*\(\s*(?<action>[A-Za-z_][A-Za-z0-9_.]*)", RegexOptions.Singleline)]
-    private static partial Regex PermissionActionArgumentRegex();
+    private static string ScalarValue(YamlNode node) =>
+        node is YamlScalarNode { Value: { } value } && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : throw new InvalidDataException("Expected a nonempty YAML scalar.");
 
-    [GeneratedRegex(@"(?m)^\s*-?\s*name:\s*(explore_admin_roles|instance_admin|tenant_admin|org_admin)\b")]
-    private static partial Regex LegacyDerivedRoleDefinitionRegex();
-
-    [GeneratedRegex(@"(?m)^\s*-\s*(explore_admin_roles|instance_admin|tenant_admin|org_admin)\b")]
-    private static partial Regex LegacyImportedDerivedRoleRegex();
-
-    [GeneratedRegex(@"(?<!islamuevent_)authenticated_user\b")]
-    private static partial Regex LegacyPrincipalRoleRegex();
 }

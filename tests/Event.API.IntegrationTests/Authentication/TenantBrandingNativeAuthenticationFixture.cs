@@ -105,6 +105,7 @@ internal sealed class TenantBrandingNativeAuthenticationFixture : IAsyncDisposab
         Action<IServiceCollection>? configureServices, bool actorReadsOnly, IInterceptor[] ownerInterceptors,
         bool originalRuntime = false)
     {
+        await postgres.PrepareLocalIdentityWriterAsync();
         var host = new TenantBrandingNativeAuthenticationHost(
             postgres, tenantId, ownerInterceptors, clock, configureServices);
         TenantBrandingNativeAuthenticationFixture? fixture = null;
@@ -210,6 +211,7 @@ internal sealed class TenantBrandingNativeAuthenticationFixture : IAsyncDisposab
     private async Task SeedTenantGrantsAsync(Guid tenantId, Guid userId)
     {
         await using var setup = postgres.CreateDbContext();
+        setup.BindTenantLease();
         DateTime now = DateTime.UtcNow;
         var member = new TenantUser
         {

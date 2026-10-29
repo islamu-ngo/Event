@@ -112,12 +112,20 @@ public static partial class PostgresOperatorIdentityEditorContract
                         '{Stamp}' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(f.prosrc,'UTF8')),'hex'))
             THEN RAISE EXCEPTION 'operator_editor_routine_drift' USING ERRCODE = '55000'; END IF;
             """));
-        string directWrites = string.Join(" OR ", Sources.Select(source => $"""
+        string directWrites = string.Join(" OR ", Sources.Select(source =>
+        {
+            string insertDenial = $"pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},pg_catalog.to_regclass({Text(sql.Table(source.Type))}),'INSERT')";
+            if (PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, source.Type, out _, out var insert, out _)
+                && insert.Count != 0)
+                insertDenial += $" AND ({PostgresManagedTenantWorkerCreationPermissions.CompleteGlobalCataloguePredicate(context, enrollment)}) IS NOT TRUE";
+            return $"""
             pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},
                 pg_catalog.to_regclass({Text(sql.Table(source.Type))}),'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
             OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},
-                pg_catalog.to_regclass({Text(sql.Table(source.Type))}),'INSERT,UPDATE,REFERENCES')
-            """));
+                pg_catalog.to_regclass({Text(sql.Table(source.Type))}),'UPDATE,REFERENCES')
+            OR ({insertDenial})
+            """;
+        }));
         return $"""
             {SourceGuard(context, enrollment)}
             {PostgresPrivilegeGuard.BuildAssertSql(Privileges(context, enrollment))}

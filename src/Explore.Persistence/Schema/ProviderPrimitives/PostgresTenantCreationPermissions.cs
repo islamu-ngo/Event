@@ -259,7 +259,8 @@ public static class PostgresTenantCreationPermissions
                         WHERE pg_catalog.has_schema_privilege(r.oid,s.name,'CREATE')))
                 AND NOT EXISTS (SELECT 1 FROM unnest({tables}) source(relation)
                     JOIN pg_catalog.pg_class t ON t.oid=pg_catalog.to_regclass(source.relation) CROSS JOIN members r
-                    WHERE r.oid=t.relowner OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                    WHERE r.oid=t.relowner OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,TRUNCATE,REFERENCES,TRIGGER')
+                        OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                         OR (pg_catalog.has_table_privilege(r.oid,t.oid,'DELETE') AND NOT
                             ({PostgresTenantMembershipMutationPermissions.RuntimeDeletePredicate(context, enrollment, "r.oid", "t.oid")}))
                         OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
@@ -372,7 +373,8 @@ public static class PostgresTenantCreationPermissions
         string requiredChecks = string.Concat(checks.Select(check => $"""
             AND EXISTS (SELECT 1 FROM pg_catalog.pg_constraint c
                 WHERE c.conrelid=pg_catalog.to_regclass({Text(source.Table)}) AND c.contype='c'
-                    AND c.conname={Text(check.Name)} AND c.conenforced AND c.convalidated AND c.conislocal AND c.coninhcount=0
+                    AND c.conname={Text(check.Name)}
+                    AND COALESCE((pg_catalog.to_jsonb(c)->>'conenforced')::boolean,true) AND c.convalidated AND c.conislocal AND c.coninhcount=0
                     AND NOT c.connoinherit AND NOT c.condeferrable AND NOT c.condeferred
                     AND pg_catalog.pg_get_expr(c.conbin,c.conrelid)=({check.Expression})
                     AND ({BuiltinExpressionDependencies("pg_constraint", "c.oid")}))

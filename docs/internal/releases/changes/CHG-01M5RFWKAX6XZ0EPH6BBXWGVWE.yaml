@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5RFWKAX6XZ0EPH6BBXWGVWE
+Title: "Restore PostgreSQL 16 native privilege validation"
+Type: fix
+Scope: self-hosting
+Summary: "Avoid unsupported privilege names during PostgreSQL 16 startup while preserving fixed application-purpose permissions and newer-engine checks."
+Group: postgresql16-native-capability
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/TESTING.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/TESTING.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Gate only the unavailable MAINTAIN capability on older engines; retain legacy privileges, grant options, owners, validation and tenant isolation without adding an application permission.
+  Migration:
+    Reference: docs/internal/TESTING.md
+    Disposition: documented
+    Detail: Native checks use supported engine capabilities; generated EF migrations are unchanged and the existing fresh-development bootstrap boundary remains in effect.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: PostgreSQL 16 retains supported native checks without broader grants; development-bootstrap and retained-data precautions remain unchanged, and final migration verification is still required.

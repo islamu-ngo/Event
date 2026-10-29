@@ -16,7 +16,8 @@ public static class SecretAcquisitionPolicy
         "/analytics", "/localization"
     ];
     private static readonly string[] BffRoots =
-        ["/runtime/bff/oidc/keycloak", "/runtime/bff/oidc/google", "/runtime/bff/atproto/oauth"];
+        ["/runtime/bff/oidc/keycloak", "/runtime/bff/oidc/google", "/runtime/bff/atproto/oauth",
+            "/runtime/bff/session"];
     private static readonly string[] MigrationRoots =
         ["/database", "/database/erasure", "/database/identity", "/postgresql"];
     private static readonly string[] ModerationMeasurementRoots = ["/database", "/moderation"];

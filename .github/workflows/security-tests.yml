@@ -22,7 +22,10 @@ jobs:
   security-tests:
     name: Security Integration Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 360
+    env:
+      DOCKER_HOST: unix:///var/run/docker.sock
+      TESTCONTAINERS_RYUK_DISABLED: "true"
 
     steps:
       - name: Checkout
@@ -30,6 +33,24 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+
+      - name: Prepare Private Runner Directories
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          export TMPDIR="$RUNNER_TEMP/islamu-security-private"
+          mkdir -p "$TMPDIR" "$RUNNER_TEMP/islamu-security-tools"
+          chmod 700 "$TMPDIR" "$RUNNER_TEMP/islamu-security-tools"
+          [[ "$DOCKER_HOST" == unix:///* ]]
+          selected_socket="$(readlink --canonicalize-existing -- "${DOCKER_HOST#unix://}")"
+          test -S "$selected_socket"
+          {
+            printf 'TMPDIR=%s\n' "$TMPDIR"
+            printf 'PLAYWRIGHT_BROWSERS_PATH=%s/islamu-assurance-headless-browsers\n' "$RUNNER_TEMP"
+            printf 'ISLAMU_K6_PATH=%s/islamu-security-tools/k6\n' "$RUNNER_TEMP"
+            printf 'DOCKER_HOST=unix://%s\n' "$selected_socket"
+          } >> "$GITHUB_ENV"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -41,7 +62,7 @@ jobs:
       - name: Build Security Selection
         run: |
           dotnet restore eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --locked-mode
-          dotnet build eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release --no-restore --verbosity quiet --nologo
+          dotnet build eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release --no-restore --verbosity quiet --nologo -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
           dotnet eng/release/src/ISLAMU.ReleaseEngineering/bin/Release/net10.0/ISLAMU.ReleaseEngineering.dll verify-security-register eng/security/security-control-register.json
 
       - name: Detect Security-Relevant Changes
@@ -92,6 +113,10 @@ jobs:
           changed_paths="$RUNNER_TEMP/security-changed-paths.txt"
           printf '%s\n' "$changed_files" > "$changed_paths"
           selection="$(dotnet eng/release/src/ISLAMU.ReleaseEngineering/bin/Release/net10.0/ISLAMU.ReleaseEngineering.dll select-security-changes "$changed_paths")"
+          case "$selection" in
+            run-tests=true|run-tests=false) ;;
+            *) echo "Security selection returned an invalid result." >&2; exit 1 ;;
+          esac
           printf '%s\n' "$selection" >> "$GITHUB_OUTPUT"
 
           if [[ "$selection" == "run-tests=true" ]]; then
@@ -121,49 +146,53 @@ jobs:
         if: ${{ steps.changes.outputs.run-tests == 'true' }}
         run: dotnet restore --locked-mode
 
-      - name: Restore .NET Tools
+      - name: Build Registered Security Hosts
         if: ${{ steps.changes.outputs.run-tests == 'true' }}
-        run: dotnet tool restore
-
-      - name: Build
-        if: ${{ steps.changes.outputs.run-tests == 'true' }}
-        run: dotnet build tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-restore --verbosity minimal -p:RunAnalyzers=false -p:RunAnalyzersDuringBuild=false
-
-      - name: Security Integration Tests
-        if: ${{ steps.changes.outputs.run-tests == 'true' }}
-        id: security_integration_tests
         shell: bash
         run: |
-          set -o pipefail
-          mkdir -p artifacts/security-tests
-          dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build --verbosity minimal -- --treenode-filter "/*/*/*/*[Category=Security]" --minimum-expected-tests 1 --maximum-parallel-tests 1 --no-progress --report-trx --report-trx-filename security-integration-tests.trx 2>&1 | tee artifacts/security-tests/security-integration-tests.log
+          set -euo pipefail
+          dotnet build tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-restore --verbosity quiet -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
+          dotnet build tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-restore --verbosity quiet -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
 
-      - name: Cerbos Policy Contract Tests
+      - name: Prepare Private Execution Prerequisites
         if: ${{ steps.changes.outputs.run-tests == 'true' }}
-        id: cerbos_policy_contract_tests
         shell: bash
         run: |
-          set -o pipefail
-          mkdir -p artifacts/security-tests
-          dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build --verbosity minimal -- --treenode-filter "/*/*/*/*[Category=PolicyContract]" --minimum-expected-tests 1 --no-progress --report-trx --report-trx-filename cerbos-policy-contract-tests.trx 2>&1 | tee artifacts/security-tests/cerbos-policy-contract-tests.log
+          set -euo pipefail
+          umask 077
+          docker --host "$DOCKER_HOST" pull quay.io/keycloak/keycloak:26.1.2 > "$TMPDIR/keycloak-provisioning.log" 2>&1
+          docker --host "$DOCKER_HOST" pull ghcr.io/cerbos/cerbos:0.53.0 > "$TMPDIR/cerbos-provisioning.log" 2>&1
+          dotnet run eng/tools/InstallAssuranceBrowser.cs > "$TMPDIR/browser-provisioning.log" 2>&1
+          archive="$RUNNER_TEMP/islamu-security-tools/k6-v2.3.0-linux-amd64.tar.gz"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            https://github.com/grafana/k6/releases/download/v2.3.0/k6-v2.3.0-linux-amd64.tar.gz \
+            --output "$archive" > "$TMPDIR/k6-provisioning.log" 2>&1
+          printf '%s  %s\n' 39c3117b6af817592dcd0ce4242105c0a7af10948c2a425306f0be8f7a8a8ab1 "$archive" | sha256sum --check --status
+          member="k6-v2.3.0-linux-amd64/k6"
+          members="$(tar --list --gzip --file "$archive")"
+          [[ "$members" == $'k6-v2.3.0-linux-amd64/\nk6-v2.3.0-linux-amd64/k6' ]]
+          [[ "$(tar --list --verbose --gzip --file "$archive" -- "$member" | cut -c1)" == '-' ]]
+          test ! -e "$ISLAMU_K6_PATH"
+          tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP/islamu-security-tools" \
+            --strip-components=1 --no-same-owner --no-same-permissions -- "$member"
+          chmod 700 "$ISLAMU_K6_PATH"
+          printf '%s  %s\n' e001bbf39ba67424a85c9c8516440ba5c73ecf7a6021be96c76194380c15f260 "$ISLAMU_K6_PATH" | sha256sum --check --status
 
-      - name: Produce Security Execution Evidence
-        if: ${{ success() && steps.changes.outputs.run-tests == 'true' && steps.security_integration_tests.outcome == 'success' && steps.cerbos_policy_contract_tests.outcome == 'success' }}
+      - name: Execute Registered Security Profiles
+        if: ${{ steps.changes.outputs.run-tests == 'true' }}
         id: security_execution_evidence
         shell: bash
         run: |
           set -euo pipefail
-          dotnet eng/release/src/ISLAMU.ReleaseEngineering/bin/Release/net10.0/ISLAMU.ReleaseEngineering.dll produce-security-execution artifacts/security-tests "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_EVENT_NAME"
+          dotnet eng/release/src/ISLAMU.ReleaseEngineering/bin/Release/net10.0/ISLAMU.ReleaseEngineering.dll execute-security-execution "$TMPDIR/public" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_EVENT_NAME"
 
-      - name: Upload Security Test Evidence
-        if: ${{ always() && steps.changes.outputs.run-tests == 'true' }}
+      - name: Upload Admitted Public Security Evidence
+        if: ${{ success() && steps.changes.outputs.run-tests == 'true' && steps.security_execution_evidence.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: security-test-evidence
-          path: |
-            artifacts/security-tests/**
-            tests/Event.API.IntegrationTests/**/TestResults/**/*.trx
-          if-no-files-found: warn
+          path: ${{ runner.temp }}/islamu-security-private/public/
+          if-no-files-found: error
           retention-days: 30
 
       - name: Write Security Test Evidence Summary
@@ -172,8 +201,6 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           REF_NAME: ${{ github.ref_name }}
           COMMIT_SHA: ${{ github.sha }}
-          SECURITY_OUTCOME: ${{ steps.security_integration_tests.outcome }}
-          CERBOS_OUTCOME: ${{ steps.cerbos_policy_contract_tests.outcome }}
           PACKET_OUTCOME: ${{ steps.security_execution_evidence.outcome }}
         shell: bash
         run: |
@@ -188,16 +215,14 @@ jobs:
             echo "| Ref | ${REF_NAME} |"
             echo "| Commit | ${COMMIT_SHA} |"
             echo "| Execution packet production | ${PACKET_OUTCOME:-not-run} |"
-            echo "| Execution scope | Testing dedicated API test-host; database provider, database role, and authentication scheme are not-attested |"
-            echo "| Execution packet | \`artifacts/security-tests/security-execution.v1.json\` (only after both lanes and packet validation pass) |"
+            echo "| Execution scope | Registered API, runtime, browser and load profiles; provider, role and authentication remain not-attested unless independently measured |"
+            echo "| Execution packet | \`security-execution.v1.json\` in the admitted public artifact, only after every registered profile and owned cleanup pass |"
             echo "| Reliability inventory | docs/TEST_RELIABILITY.md |"
             echo
-            echo "| Test lane | Step outcome | Evidence |"
-            echo "|---|---|---|"
-            echo "| Security integration tests | ${SECURITY_OUTCOME:-not-run} | Log plus \`security-integration-tests.trx\` |"
-            echo "| Cerbos policy contract tests | ${CERBOS_OUTCOME:-not-run} | Log plus \`cerbos-policy-contract-tests.trx\` |"
+            echo "Raw test identities, TRX, configuration and process diagnostics stay private and are never uploaded by this workflow. Failure produces no public artifact."
             echo
             echo "The packet identifies the exact tested GITHUB_SHA, including the PR merge SHA when applicable; it does not relabel that object as a release candidate or attest live operational controls."
+            echo "Public validation checks structure and digests under the trusted operator/default-branch boundary. Workflow/run metadata does not authenticate CI origin; required GitHub checks remain separate for the exact final candidate."
             echo
             echo "Repeated scheduled failures require an owner/date entry in docs/TEST_RELIABILITY.md before they are treated as accepted baseline noise."
           } >> "$GITHUB_STEP_SUMMARY"

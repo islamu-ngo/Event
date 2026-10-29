@@ -46,6 +46,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Serilog.Core;
 using Serilog.Events;
 using TUnit.Core;
@@ -2057,7 +2058,7 @@ public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisp
         WriteProgress(testName, "reset-complete", started);
         IHostEnvironment environment =
             scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
-        await DatabaseSeeder.SeedAsync(db, environment);
+        await DatabaseSeeder.SeedAsync(db, environment, NullLogger.Instance);
         WriteProgress(testName, "lookup-seed-complete", started);
         ILookupDataCache? cache =
             scope.ServiceProvider.GetService<ILookupDataCache>();

@@ -366,6 +366,55 @@ distributed transaction or immediate push invalidation of idle browser tabs.
 
 Local login carries `SuppressIdempotencyResponseStorage` and `PrivateNoStore` metadata. Every request must evaluate current admission policy, even when a client repeats an `Idempotency-Key`; the generic middleware must neither persist a token-bearing response nor replay a prior success. Browser cache headers alone do not disable application-level idempotency storage.
 
+## Shared BFF Browser Session Authority
+
+Browser authentication uses the native ASP.NET Core cookie handler with a mandatory
+`RedisBffTicketStore`. The browser carries a protected opaque session reference;
+the shared authority stores the protected native authentication ticket, including
+server-held provider tokens. `IBffSessionAuthority` is separate from the ordinary
+availability cache and from external Data Protection key acquisition. Local,
+Keycloak and AT Protocol browser sessions use this same boundary, including
+Standalone deployments with SQLite.
+
+The binding identifies one browser session and its authoritative owner. Store
+creates a random handle with a bounded ticket lifetime; renewal compares the
+protected revision and original immutable identity facts before replacing the
+entry. A deleted or expired entry cannot be recreated through renewal, a retained
+ticket, or a refresh completing after logout. Peers share the intended backend,
+deployment namespace and admitted BFF Data Protection application partition.
+Process names and active encryption-key changes do not create new session scopes.
+
+Successful logout revokes that exact shared session before reporting success.
+An unavailable authority fails closed; an ambiguous logout result must not be
+reported as successful revocation. This does not revoke independently issued API
+JWTs, change account security stamps, or sign out other browser sessions/devices.
+Existing Local credential checks remain additional authority. A successful live
+authority read admits that request or circuit activity; it does not cancel an
+already admitted downstream operation or push invalidation into idle tabs.
+
+The native cookie path propagates typed authority unavailability to a bounded
+HTTP503 boundary around authentication instead of converting it to rejection or
+reexecuting the general error route through the same failed authentication.
+Transient failure does not issue a replacement/deletion cookie. Anonymous
+requests without a session cookie remain available; an unexpired, unrevoked
+original cookie can recover after the same backend returns. Missing/revoked
+authority remains refusal, not an outage
+or a reason to repopulate the entry.
+
+Circuit and forwarding paths retain the original owner/handle binding, check its
+live authority before forwarding, and prevent a pooled HTTP handler from capturing
+one browser's session as another browser's state. Refresh preserves the binding
+and revision and cannot restore a removed session. Session handles, revisions,
+provider tokens and server-only binding claims stay out of public status/HAL
+payloads and telemetry.
+
+Old self-contained development cookies are rejected. Operators must provision
+the selected shared backend before browser sign-in and require a new sign-in
+after activation. There is no API or database schema migration. See
+[session configuration](CONFIGURATION.md#shared-bff-session-authority-inputs),
+[protected-purpose retention](SECRETS.md#protected-purpose-and-lifetime-inventory)
+and the [operator guide](../public/documentation/readme/configuration-and-operations/authentication-providers.md#shared-browser-sessions-and-logout).
+
 ## Local Verification, Email Change And Password Recovery
 
 Local login maps missing identifiers, incorrect passwords and locked accounts to

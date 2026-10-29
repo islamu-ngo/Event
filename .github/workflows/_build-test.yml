@@ -173,6 +173,15 @@ jobs:
           fi
           dotnet test --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Domain.UnitTests.trx "${coverage_args[@]}"
 
+      - name: Distributed Ownership Harness Tests
+        if: ${{ inputs.run-fast-tests }}
+        id: test_distributed_harness
+        run: |
+          dotnet test --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj \
+            --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/*/*[Category=Harness]" --minimum-expected-tests 1 \
+            --no-progress --report-trx --report-trx-filename Event.Distributed.Harness.trx
+
       - name: Unit Tests — Infrastructure
         if: ${{ inputs.run-fast-tests && inputs.run-infrastructure-tests }}
         id: test_infrastructure
@@ -290,6 +299,7 @@ jobs:
         env:
           APPLICATION_OUTCOME: ${{ steps.test_application.outcome }}
           DOMAIN_OUTCOME: ${{ steps.test_domain.outcome }}
+          DISTRIBUTED_HARNESS_OUTCOME: ${{ steps.test_distributed_harness.outcome }}
           ARCHITECTURE_OUTCOME: ${{ steps.test_architecture.outcome }}
           INFRASTRUCTURE_OUTCOME: ${{ steps.test_infrastructure.outcome }}
           BLAZOR_CLIENT_OUTCOME: ${{ steps.test_blazor_client.outcome }}
@@ -309,6 +319,7 @@ jobs:
             echo "|---|---|"
             echo "| Event.Application.UnitTests | ${APPLICATION_OUTCOME:-not-run} |"
             echo "| Event.Domain.UnitTests | ${DOMAIN_OUTCOME:-not-run} |"
+            echo "| Event.Distributed.IntegrationTests (Harness) | ${DISTRIBUTED_HARNESS_OUTCOME:-not-run} |"
             echo "| Event.Architecture.Tests | ${ARCHITECTURE_OUTCOME:-not-run} |"
             echo "| Explore.Infrastructure.Tests | ${INFRASTRUCTURE_OUTCOME:-not-run} |"
             echo "| Explore.Blazor.Client.Tests | ${BLAZOR_CLIENT_OUTCOME:-not-run} |"

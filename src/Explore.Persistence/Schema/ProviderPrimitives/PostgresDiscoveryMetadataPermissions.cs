@@ -267,6 +267,8 @@ public static class PostgresDiscoveryMetadataPermissions
             PostgresUserTenantMembershipReadPermissions.TryGetGlobalReadColumns(context, source.Type, out var membershipRead);
             return read.Concat(membershipRead).Distinct(StringComparer.Ordinal).Select(column => (column, Privilege: "SELECT"))
                 .Concat(insert.Select(column => (column, Privilege: "INSERT")))
+                .Concat(PostgresTenantMembershipMutationPermissions.GlobalUpdateColumns(context, source.Type)
+                    .Select(column => (column, Privilege: "UPDATE")))
                 .Select(grant => $"({Text(source.Table)},{Text(grant.column)},{Text(creatorEnrollment.GlobalLogin)},{Text(grant.Privilege)})");
         }).ToArray();
         string[] declaredRuntimeParents = context is null || creatorEnrollment is null ? [] : sources.SelectMany(source =>
@@ -293,7 +295,8 @@ public static class PostgresDiscoveryMetadataPermissions
                     WHERE pg_catalog.has_schema_privilege(r.oid,schema_name,'CREATE')))
             AND NOT EXISTS (SELECT 1 FROM unnest({tables}) source(relation) JOIN pg_catalog.pg_class t ON t.oid=pg_catalog.to_regclass(source.relation)
                 CROSS JOIN members r WHERE r.oid=t.relowner
-                    OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                    OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                        OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                         WHERE a.attrelid=t.oid AND a.attnum<>0 AND NOT a.attisdropped
                             AND (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege || ' WITH GRANT OPTION')

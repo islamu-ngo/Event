@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using TUnit.Assertions;
 using TUnit.Core;
 
@@ -29,7 +30,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
         await using (var context = fixture.CreateDbContext())
         {
             context.BindTenantLease();
-            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment);
+            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment, NullLogger.Instance);
         }
 
         CatalogLocationAuthoritySnapshot firstSeed;
@@ -45,7 +46,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
         await using (var context = fixture.CreateDbContext())
         {
             context.BindTenantLease();
-            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment);
+            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment, NullLogger.Instance);
         }
 
         await using var verifyContext = fixture.CreateDbContext();
@@ -262,7 +263,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
 
         await using (var context = fixture.CreateDbContext())
         {
-            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment);
+            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment, NullLogger.Instance);
         }
 
         await using (var staleContext = fixture.CreateDbContext())
@@ -288,7 +289,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
 
         await using (var context = fixture.CreateDbContext())
         {
-            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment);
+            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment, NullLogger.Instance);
         }
 
         await using var verifyContext = fixture.CreateDbContext();
@@ -331,7 +332,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
 
         await using (var context = fixture.CreateDbContext())
         {
-            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment);
+            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment, NullLogger.Instance);
         }
 
         Guid sessionId = SeedData.IslamicEventSessions[0].Id;
@@ -347,7 +348,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
 
         await using (var context = fixture.CreateDbContext())
         {
-            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment);
+            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment, NullLogger.Instance);
         }
 
         EventSessionStatusEnum expected = status is
@@ -379,7 +380,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
 
         await using (var context = fixture.CreateDbContext())
         {
-            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment);
+            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment, NullLogger.Instance);
         }
 
         Guid sessionId = SeedData.IslamicEventSessions[0].Id;
@@ -395,7 +396,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
 
         await using (var context = fixture.CreateDbContext())
         {
-            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment);
+            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment, NullLogger.Instance);
         }
 
         await using var verifyContext = fixture.CreateDbContext();
@@ -415,7 +416,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
 
         await using (var context = fixture.CreateDbContext())
         {
-            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment);
+            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment, NullLogger.Instance);
         }
 
         var orderId = Guid.Parse("018e4e5c-7f00-7001-8000-000000010001");
@@ -502,7 +503,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
 
         await using (var context = fixture.CreateDbContext())
         {
-            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment);
+            await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment, NullLogger.Instance);
         }
 
         await using var verifyContext = fixture.CreateDbContext();
@@ -584,7 +585,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
 
             await using (var context = fixture.CreateDbContext())
             {
-                await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment, configuration: configuration);
+                await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment, NullLogger.Instance, configuration: configuration);
             }
 
             await using var verifyContext = fixture.CreateDbContext();
@@ -635,7 +636,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
 
             await using (var context = fixture.CreateDbContext())
             {
-                await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment);
+                await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment, NullLogger.Instance);
             }
 
             await using var verifyContext = fixture.CreateDbContext();

@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Options = Microsoft.Extensions.Options.Options;
+using Explore.Blazor.Services.Auth;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Explore.Blazor.IntegrationTests.Services;
 
@@ -35,29 +38,29 @@ public class CircuitAccessTokenServiceTests
         serviceB.SetToken(tokenB);
         accessor.HttpContext = contextA;
         await Assert.That(contextA.User.TryGetCircuitSubject(out var subject)).IsTrue();
-        await Assert.That(contextA.User.TryGetSessionId(out var session)).IsTrue();
+        await Assert.That(BffSessionIdentity.TryGetBinding(contextA.User, out var session)).IsTrue();
 
         accessor.HttpContext = contextB;
-        serviceA.RevokeSession(originalSubject: subject, originalSession: session);
+        serviceA.RevokeSession(session);
         accessor.HttpContext = contextA;
 
-        await Assert.That(_tokenStore.Resolve(subject.PartitionKey, session.PartitionKey).Found).IsFalse();
+        await Assert.That(_tokenStore.Resolve(subject.PartitionKey, session.Handle).Found).IsFalse();
         await Assert.That(_tokenStore.ResolveByUserId(subject.PartitionKey).Token == tokenB).IsTrue();
         await Assert.That(serviceA.AccessToken is null).IsTrue();
 
         await Assert.That(contextB.User.TryGetCircuitSubject(out var subjectB)).IsTrue();
-        await Assert.That(contextB.User.TryGetSessionId(out var resolvedSessionB)).IsTrue();
-        serviceA.RevokeSession(originalSubject: subjectB, originalSession: resolvedSessionB);
-        await Assert.That(_tokenStore.Resolve(subjectB.PartitionKey, resolvedSessionB.PartitionKey).Token == tokenB).IsTrue();
+        await Assert.That(BffSessionIdentity.TryGetBinding(contextB.User, out var resolvedSessionB)).IsTrue();
+        serviceA.RevokeSession(resolvedSessionB);
+        await Assert.That(_tokenStore.Resolve(subjectB.PartitionKey, resolvedSessionB.Handle).Token == tokenB).IsTrue();
 
         serviceA.SetToken(tokenA);
         await Assert.That(serviceA.AccessToken is null).IsTrue();
-        await Assert.That(_tokenStore.Resolve(subject.PartitionKey, session.PartitionKey).Found).IsFalse();
+        await Assert.That(_tokenStore.Resolve(subject.PartitionKey, session.Handle).Found).IsFalse();
         serviceA.ClearToken();
         serviceA.SetToken(tokenB);
 
         await Assert.That(serviceA.AccessToken is null).IsTrue();
-        await Assert.That(_tokenStore.Resolve(subject.PartitionKey, session.PartitionKey).Found).IsFalse();
+        await Assert.That(_tokenStore.Resolve(subject.PartitionKey, session.Handle).Found).IsFalse();
         await Assert.That(_tokenStore.Resolve(CircuitKey(contextB), SessionKey(contextB)).Token == tokenB).IsTrue();
         accessor.HttpContext = contextB;
         ICircuitAccessTokenService freshScopeB = new CircuitAccessTokenService(
@@ -67,11 +70,9 @@ public class CircuitAccessTokenServiceTests
     }
 
     [Test]
-    [Arguments(true, true)]
-    [Arguments(true, false)]
-    [Arguments(false, true)]
-    public async Task RevocationWithoutCompleteOriginalIdentityCannotClearAnotherSession(
-        bool missingSubject, bool missingSession)
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task RevocationWithMissingOrDifferentBindingCannotClearAnotherSession(bool differentBinding)
     {
         string userId = Guid.NewGuid().ToString("D");
         string sessionA = Guid.NewGuid().ToString("D");
@@ -85,13 +86,10 @@ public class CircuitAccessTokenServiceTests
             _tokenStore, accessor, NullLogger<CircuitAccessTokenService>.Instance);
         revokedScope.SetToken(tokenA);
         await Assert.That(_tokenStore.Store(CircuitKey(contextB), SessionKey(contextB), tokenB).Accepted).IsTrue();
-        await Assert.That(contextA.User.TryGetCircuitSubject(out var subject)).IsTrue();
-        await Assert.That(contextA.User.TryGetSessionId(out var session)).IsTrue();
+        await Assert.That(BffSessionIdentity.TryGetBinding(contextB.User, out var otherBinding)).IsTrue();
         accessor.HttpContext = contextB;
 
-        revokedScope.RevokeSession(
-            originalSubject: missingSubject ? null : subject,
-            originalSession: missingSession ? null : session);
+        revokedScope.RevokeSession(differentBinding ? otherBinding : null);
         revokedScope.ClearToken();
         revokedScope.SetToken(tokenB);
 
@@ -242,6 +240,8 @@ public class CircuitAccessTokenServiceTests
         var accessor = new HttpContextAccessor { HttpContext = null };
         var circuitUserContext = Substitute.For<ICircuitUserContext>();
         circuitUserContext.UserId.Returns(CircuitKey(storeContext));
+        BffSessionIdentity.TryGetBinding(storeContext.User, out var binding);
+        circuitUserContext.SessionBinding.Returns(binding);
 
         var handler = new TestableAccessTokenForwardingHandler(
             accessor,
@@ -260,7 +260,7 @@ public class CircuitAccessTokenServiceTests
     }
 
     [Test]
-    public async Task AccessTokenForwardingHandler_WithHttpContextUserSession_FallsBackToUserStoredToken()
+    public async Task AccessTokenForwardingHandler_WithDifferentBrowserSession_DoesNotBorrowUserStoredToken()
     {
         var userId = Guid.NewGuid().ToString();
         var sessionA = Guid.NewGuid().ToString();
@@ -286,7 +286,7 @@ public class CircuitAccessTokenServiceTests
         var response = await handler.InvokeAsync(new HttpRequestMessage(HttpMethod.Get, "https://localhost/api/protected"));
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(terminal.Request?.Headers.Authorization?.Parameter).IsEqualTo(tokenA);
+        await Assert.That(terminal.Request?.Headers.Authorization is null).IsTrue();
     }
 
     [Test]
@@ -332,8 +332,9 @@ public class CircuitAccessTokenServiceTests
             NullLogger<CircuitAccessTokenService>.Instance);
         service.SetToken(tokenA);
 
-        var forA = _tokenStore.Resolve(CircuitKey(context), null);
-        var forB = _tokenStore.Resolve(CircuitKey(CreateHttpContext(userB)), null);
+        var forA = _tokenStore.Resolve(CircuitKey(context), SessionKey(context));
+        var other = CreateHttpContext(userB);
+        var forB = _tokenStore.Resolve(CircuitKey(other), SessionKey(other));
 
         await Assert.That(forA.Token).IsEqualTo(tokenA);
         await Assert.That(forB.Found).IsFalse();
@@ -434,7 +435,7 @@ public class CircuitAccessTokenServiceTests
     }
 
     [Test]
-    public async Task CircuitAccessTokenService_AccessToken_FallsBackToUserTokenFromDifferentSession()
+    public async Task CircuitAccessTokenService_AccessToken_DoesNotBorrowTokenFromDifferentBrowserSession()
     {
         var userId = Guid.NewGuid().ToString();
         var sessionA = Guid.NewGuid().ToString();
@@ -452,7 +453,7 @@ public class CircuitAccessTokenServiceTests
             new HttpContextAccessor { HttpContext = CreateHttpContextWithSession(userId, sessionB) },
             NullLogger<CircuitAccessTokenService>.Instance);
 
-        await Assert.That(requesterService.AccessToken).IsEqualTo(tokenA);
+        await Assert.That(requesterService.AccessToken is null).IsTrue();
     }
 
     [Test]
@@ -561,13 +562,14 @@ public class CircuitAccessTokenServiceTests
 
     private static DefaultHttpContext CreateHttpContext(Claim userIdClaim, string? authToken = null)
     {
-        var claims = new[] { userIdClaim };
+        var claims = new[] { userIdClaim, new Claim(BffSessionIdentity.HandleClaim, Handle(userIdClaim.Value)) };
         var identity = new ClaimsIdentity(claims, "Cookies");
         var principal = new ClaimsPrincipal(identity);
 
         var context = new DefaultHttpContext { User = principal };
 
         var services = new ServiceCollection();
+        services.AddSingleton<IBffSessionAuthority>(new FixedSessionAuthority());
 
         if (!string.IsNullOrEmpty(authToken))
         {
@@ -606,14 +608,24 @@ public class CircuitAccessTokenServiceTests
     }
 
     private static string? SessionKey(DefaultHttpContext context) =>
-        context.User.TryGetSessionId(out var identity) ? identity.PartitionKey : null;
+        BffSessionIdentity.TryGetBinding(context.User, out var binding) ? binding.Handle : null;
 
 
     private static DefaultHttpContext CreateHttpContextWithSession(string userId, string sessionId, string? authToken = null)
     {
         var context = CreateHttpContext(new Claim("sub", userId), authToken);
-        ((ClaimsIdentity)context.User.Identity!).AddClaim(new Claim("sid", sessionId));
+        var identity = (ClaimsIdentity)context.User.Identity!;
+        identity.AddClaim(new Claim("sid", sessionId));
+        identity.RemoveClaim(identity.FindFirst(BffSessionIdentity.HandleClaim)!);
+        identity.AddClaim(new Claim(BffSessionIdentity.HandleClaim, Handle(string.Concat(userId, "/", sessionId))));
         return context;
+    }
+
+    private static string Handle(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+
+    private sealed class FixedSessionAuthority : IBffSessionAuthority
+    {
+        public Task<bool> IsActiveAsync(BffSessionBinding binding, CancellationToken cancellationToken) => Task.FromResult(true);
     }
 
     private static string CreateJwtWithSid(string sid, DateTime? expires = null)
@@ -630,7 +642,8 @@ public class CircuitAccessTokenServiceTests
             ICircuitUserContext circuitUserContext,
             ICircuitTokenStore tokenStore,
             ILogger<AccessTokenForwardingHandler> logger)
-            : base(httpContextAccessor, circuitAccessTokenService, circuitUserContext, tokenStore, logger)
+            : base(httpContextAccessor, circuitAccessTokenService, circuitUserContext, tokenStore, logger,
+                sessionAuthority: new FixedSessionAuthority())
         {
         }
 

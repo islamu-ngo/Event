@@ -173,6 +173,14 @@ public static class PostgresLocalizationSecretStatusReadPermissions
         finally { connection.StateChange -= Changed; }
     }
 
+    internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        var source = Mapping(context);
+        return $"({NoObsoleteInstallation(source)}) AND ({Manifest(source, enrollment, complete: true)})";
+    }
+
+    internal static IReadOnlyList<string> GlobalCatalogueRelations(ExploreDbContext context) => [Mapping(context).Table];
+
     private static string Manifest(Source source, PostgresNativeQueueEnrollment enrollment, bool complete,
         bool includeRuntimeId = true)
     {
@@ -208,7 +216,8 @@ public static class PostgresLocalizationSecretStatusReadPermissions
                     WHERE r.rolsuper OR r.rolbypassrls OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication
                         OR pg_catalog.has_schema_privilege(r.oid,{Text(source.Schema)},'CREATE')
                         OR r.oid={RoleOid(enrollment.MigratorLogin)}
-                        OR pg_catalog.has_table_privilege(r.oid,pg_catalog.to_regclass({Text(source.Table)}),'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                        OR (pg_catalog.has_table_privilege(r.oid,pg_catalog.to_regclass({Text(source.Table)}),'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                            OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", $"pg_catalog.to_regclass({Text(source.Table)})", false)})
                         OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                             CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                             WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)}) AND a.attnum<>0 AND NOT a.attisdropped

@@ -1,6 +1,5 @@
 namespace ISLAMU.Wire.Contracts.UnitTests.ConfigurationPortability;
 
-using System.Collections;
 using System.Reflection;
 
 internal static class ConfigurationPortabilityInvariantVerifier
@@ -45,12 +44,6 @@ internal static class ConfigurationPortabilityInvariantVerifier
 
         return failures.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
     }
-
-    internal static IEnumerable<object> PublicEnumerable(object target, string propertyName) =>
-        (ConfigurationPortabilityContractRuntime.Property(target, propertyName) as IEnumerable
-            ?? throw new InvalidOperationException(
-                $"Public member '{target.GetType().FullName}.{propertyName}' is not enumerable."))
-        .Cast<object>();
 
     private static void Visit(
         Type type,

@@ -43,9 +43,24 @@ public static class Program
             return SecurityChangeSelection.Run(args, output);
         }
 
+        if (string.Equals(args[0], "select-build-test-changes", StringComparison.Ordinal))
+        {
+            return SecurityChangeSelection.RunBuildTest(args, output);
+        }
+
         if (string.Equals(args[0], "verify-security-register", StringComparison.Ordinal))
         {
             return SecurityControlRegister.Run(args, output);
+        }
+
+        if (string.Equals(args[0], SecurityExecutionEvidence.ExecutionCommandName, StringComparison.Ordinal))
+        {
+            return SecurityExecutionEvidence.Execute(args, output, Environment.CurrentDirectory);
+        }
+
+        if (string.Equals(args[0], "execute-api-benchmarks", StringComparison.Ordinal))
+        {
+            return SecurityExecutionEvidence.ExecuteApiBenchmarks(args, output, Environment.CurrentDirectory);
         }
 
         if (string.Equals(args[0], "produce-security-execution", StringComparison.Ordinal))
@@ -320,7 +335,8 @@ public static class Program
     {
         output.WriteLine("usage: release-engine allocate-change-id --target <ref> | create-change --type <type> --scope <scope> --title <title> --summary <summary> [--group <group>] [--target <ref>] | preflight-commit <message-file> [--target <ref>] | preflight-staged [--target <ref>] | preflight-range --target <ref> [--head <ref>] | rename-change --commit <oid> --from <id> [--to <id>] --reason <reason> | install-change-hooks [--target <ref>] | verify-tools | prepare <release-directory> | verify-candidate <release-directory> <candidate-oid> | tag-message <release-directory> | verify-tag <release-directory> <tag-name> | verify-main <release-directory> <expected-old-origin-main-oid> <tag-object-oid> | verify-baseline <baseline-ref> <target-oid> <tag-object-oid> | open-maintenance-line <release-directory> <tag-object-oid> | sync-public-changelog --inventory <signed-inventory> --retained-evidence <directory> --publication-base <https-url> [--check] | activate-trust --release-principal <name> --release-key <public-key> --promotion-principal <name> --promotion-key <public-key> --valid-from <yyyy-MM-dd> --valid-until <yyyy-MM-dd> --output <trust-directory> [--replace]");
         output.WriteLine("trusted launcher: run-promoted <sync-public-changelog|prepare-publication-inventory> <command-arguments>");
-        output.WriteLine("security execution: produce-security-execution <output-directory> <candidate-oid> <run-id> <run-attempt> <event-name>");
+        output.WriteLine("security execution: execute-security-execution <new-output-directory> <candidate-oid> <run-id> <run-attempt> <event-name>");
+        output.WriteLine("benchmark execution: execute-api-benchmarks <new-output-directory> <candidate-oid> <run-id> <run-attempt> <event-name> <smoke|baseline>");
         output.WriteLine("publication preparation: prepare-publication-inventory --inventory <existing-inventory> --retained-evidence <directory> --release-evidence <relative-path> --release-directory <repository-relative-path> --disclosure-approved <version> --output-directory <new-directory>");
         return UsageError;
     }

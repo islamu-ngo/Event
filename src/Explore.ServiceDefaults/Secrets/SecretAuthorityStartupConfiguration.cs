@@ -34,8 +34,7 @@ public sealed partial class SecretAuthorityAcquisition
                 foreach (var pair in _local.RuntimeValues)
                 {
                     linked.Token.ThrowIfCancellationRequested();
-                    if (pair.Value is null
-                        || !SecretStartupConfigurationProjection.TryMapLocal(_selection.Consumer, pair.Key, out string folder)
+                    if (!SecretStartupConfigurationProjection.TryMapLocal(_selection.Consumer, pair.Key, out string folder)
                         || !requestedRoots.Contains(folder, StringComparer.Ordinal))
                         continue;
                     staged.Add(pair.Key.Replace("__", ":", StringComparison.Ordinal), pair.Value);

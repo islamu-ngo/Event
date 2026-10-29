@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Event.Persistence.IntegrationTests.Seed;
 
@@ -46,7 +47,7 @@ public sealed class DatabaseSeederSecurityGateTests
             await using (var original = Open(path, firstProbe))
             {
                 firstProbe.ExpectedContext = original;
-                await DatabaseSeeder.SeedAsync(original, new DevelopmentEnvironment(), cancellationToken: token);
+                await DatabaseSeeder.SeedAsync(original, new DevelopmentEnvironment(), NullLogger.Instance, cancellationToken: token);
                 await Assert.That(firstProbe.Observed).IsTrue();
                 await Assert.That(HumanSecuritySourceGate.TryRequireCurrent(original)).IsFalse();
                 await Assert.That(EventDiscoveryEnrollmentGate.TryRequireCurrent(original)).IsFalse();
@@ -66,7 +67,7 @@ public sealed class DatabaseSeederSecurityGateTests
             await using (var original = Open(path, secondProbe))
             {
                 secondProbe.ExpectedContext = original;
-                await DatabaseSeeder.SeedAsync(original, new DevelopmentEnvironment(), cancellationToken: token);
+                await DatabaseSeeder.SeedAsync(original, new DevelopmentEnvironment(), NullLogger.Instance, cancellationToken: token);
                 await Assert.That(secondProbe.Observed).IsTrue();
                 await Assert.That(HumanSecuritySourceGate.TryRequireCurrent(original)).IsFalse();
                 await Assert.That(EventDiscoveryEnrollmentGate.TryRequireCurrent(original)).IsFalse();

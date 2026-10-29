@@ -2,6 +2,7 @@ namespace ISLAMU.Wire.Contracts.UnitTests.ConfigurationPortability;
 
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json.Serialization;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 
@@ -10,38 +11,28 @@ public sealed class ConfigurationManifestV1Alpha2ContractTests
     private const string ContractNamespace =
         "ISLAMU.Wire.Contracts.ConfigurationPortability.";
 
-    private static readonly Assembly WireAssembly =
-        typeof(ConfigurationManifestV1Alpha2).Assembly;
-
     [Test]
     public async Task ContractMetadata_UsesDistinctV1Alpha2ArtifactIdentities()
     {
-        Type? manifestMetadata = ContractType("ConfigurationManifestContractMetadata");
-        Type? tenantPackageMetadata =
-            ContractType("TenantConfigurationPackageContractMetadata");
-
-        await Assert.That(manifestMetadata).IsNotNull();
-        await Assert.That(tenantPackageMetadata).IsNotNull();
-
-        await Assert.That(ReadConstant(manifestMetadata!, "SchemaId"))
+        await Assert.That(ConfigurationManifestContractMetadata.SchemaId)
             .IsEqualTo(
                 "https://schemas.islamu.org/event/configuration-manifest/v1alpha2/schema.json");
-        await Assert.That(ReadConstant(manifestMetadata, "ApiVersion"))
+        await Assert.That(ConfigurationManifestContractMetadata.ApiVersion)
             .IsEqualTo("configuration.islamu.org/v1alpha2");
-        await Assert.That(ReadConstant(manifestMetadata, "Kind"))
+        await Assert.That(ConfigurationManifestContractMetadata.Kind)
             .IsEqualTo("ConfigurationManifest");
-        await Assert.That(ReadConstant(manifestMetadata, "MediaType"))
+        await Assert.That(ConfigurationManifestContractMetadata.MediaType)
             .IsEqualTo(
                 "application/vnd.islamu.configuration-manifest.v1alpha2+json");
 
-        await Assert.That(ReadConstant(tenantPackageMetadata!, "SchemaId"))
+        await Assert.That(TenantConfigurationPackageContractMetadata.SchemaId)
             .IsEqualTo(
                 "https://schemas.islamu.org/event/tenant-configuration-package/v1alpha2/schema.json");
-        await Assert.That(ReadConstant(tenantPackageMetadata, "ApiVersion"))
+        await Assert.That(TenantConfigurationPackageContractMetadata.ApiVersion)
             .IsEqualTo("configuration.islamu.org/v1alpha2");
-        await Assert.That(ReadConstant(tenantPackageMetadata, "Kind"))
+        await Assert.That(TenantConfigurationPackageContractMetadata.Kind)
             .IsEqualTo("TenantConfigurationPackage");
-        await Assert.That(ReadConstant(tenantPackageMetadata, "MediaType"))
+        await Assert.That(TenantConfigurationPackageContractMetadata.MediaType)
             .IsEqualTo(
                 "application/vnd.islamu.tenant-configuration-package.v1alpha2+json");
     }
@@ -49,22 +40,15 @@ public sealed class ConfigurationManifestV1Alpha2ContractTests
     [Test]
     public async Task ArtifactRoots_AreDistinctClosedRequiredContracts()
     {
-        Type? manifest = ContractType("ConfigurationManifestV1Alpha2");
-        Type? tenantPackage = ContractType("TenantConfigurationPackageV1Alpha2");
-
-        await Assert.That(manifest).IsNotNull();
-        await Assert.That(tenantPackage).IsNotNull();
-        await Assert.That(manifest).IsNotEqualTo(tenantPackage);
-
         await AssertClosedRequiredProperties(
-            manifest!,
+            typeof(ConfigurationManifestV1Alpha2),
             "Schema",
             "ApiVersion",
             "Kind",
             "Metadata",
             "Spec");
         await AssertClosedRequiredProperties(
-            tenantPackage!,
+            typeof(TenantConfigurationPackageV1Alpha2),
             "Schema",
             "ApiVersion",
             "Kind",
@@ -75,11 +59,7 @@ public sealed class ConfigurationManifestV1Alpha2ContractTests
     [Test]
     public async Task TenantPackageMetadata_CannotSelectTargetAuthority()
     {
-        Type? tenantPackage = ContractType("TenantConfigurationPackageV1Alpha2");
-        await Assert.That(tenantPackage).IsNotNull();
-
-        Type metadataType = RequiredProperty(tenantPackage!, "Metadata").PropertyType;
-        string[] propertyPaths = PublicContractPropertyPaths(metadataType)
+        string[] propertyPaths = PublicContractPropertyPaths(typeof(TenantConfigurationPackageMetadataV1Alpha2))
             .Order(StringComparer.Ordinal)
             .ToArray();
         string[] forbiddenAuthorityMembers =
@@ -108,11 +88,7 @@ public sealed class ConfigurationManifestV1Alpha2ContractTests
     [Test]
     public async Task ApplyMode_UsesOnlyNamedNonImplicitSemantics()
     {
-        Type? applyMode = ContractType("ConfigurationImportApplyMode");
-
-        await Assert.That(applyMode).IsNotNull();
-        await Assert.That(applyMode!.IsEnum).IsTrue();
-        await Assert.That(Enum.GetNames(applyMode)).IsEquivalentTo(
+        await Assert.That(Enum.GetNames<ConfigurationImportApplyMode>()).IsEquivalentTo(
         [
             "PreviewOnly",
             "CreateNew",
@@ -126,67 +102,40 @@ public sealed class ConfigurationManifestV1Alpha2ContractTests
     [Test]
     public async Task LegalContentLimits_AreBoundedByTheArtifactContract()
     {
-        Type? limits = ContractType("ConfigurationPortabilityContentLimits");
-        await Assert.That(limits).IsNotNull();
-
-        int artifactBytes = ReadIntConstant(limits!, "MaximumArtifactUtf8Bytes");
-        int legalDocuments = ReadIntConstant(limits, "MaximumLegalDocumentsPerScope");
-        int locales = ReadIntConstant(limits, "MaximumLegalLocalesPerDocument");
-        int markdownBytes = ReadIntConstant(
-            limits,
-            "MaximumLegalMarkdownUtf8BytesPerLocale");
-        int links = ReadIntConstant(limits, "MaximumLegalLinksPerLocale");
-        int placeholders = ReadIntConstant(
-            limits,
-            "MaximumLegalPlaceholdersPerLocale");
-
-        await Assert.That(artifactBytes).IsBetween(1_048_576, 16_777_216);
-        await Assert.That(legalDocuments).IsBetween(1, 64);
-        await Assert.That(locales).IsBetween(1, 64);
-        await Assert.That(markdownBytes).IsBetween(1_024, artifactBytes);
-        await Assert.That(links).IsBetween(1, 256);
-        await Assert.That(placeholders).IsBetween(1, 128);
+        await Assert.That(ConfigurationPortabilityContentLimits.MaximumArtifactUtf8Bytes).IsBetween(1_048_576, 16_777_216);
+        await Assert.That(ConfigurationPortabilityContentLimits.MaximumLegalDocumentsPerScope).IsBetween(1, 64);
+        await Assert.That(ConfigurationPortabilityContentLimits.MaximumLegalLocalesPerDocument).IsBetween(1, 64);
+        await Assert.That(ConfigurationPortabilityContentLimits.MaximumLegalMarkdownUtf8BytesPerLocale)
+            .IsBetween(1_024, ConfigurationPortabilityContentLimits.MaximumArtifactUtf8Bytes);
+        await Assert.That(ConfigurationPortabilityContentLimits.MaximumLegalLinksPerLocale).IsBetween(1, 256);
+        await Assert.That(ConfigurationPortabilityContentLimits.MaximumLegalPlaceholdersPerLocale).IsBetween(1, 128);
     }
 
     [Test]
-    public async Task V1Alpha1ContractTypes_AreRemovedWithoutAliases()
+    public async Task V1Alpha1Artifacts_AreRejectedWithoutAliases()
     {
-        string[] obsoleteTypes =
-        [
-            "ConfigurationManifestV1Alpha1",
-            "ConfigurationManifestMetadataV1Alpha1",
-            "ConfigurationManifestSpecV1Alpha1",
-            "ConfigurationManifestInstanceV1Alpha1",
-            "ConfigurationManifestTenantV1Alpha1",
-            "ConfigurationManifestDocumentV1Alpha1"
-        ];
+        byte[] manifest = Encoding.UTF8.GetBytes(ConfigurationPortabilityExpectedVectors.ManifestJson.Replace(
+            ConfigurationPortabilityExpectedVectors.ApiVersion, "configuration.islamu.org/v1alpha1", StringComparison.Ordinal));
+        byte[] package = Encoding.UTF8.GetBytes(ConfigurationPortabilityExpectedVectors.PackageJson.Replace(
+            ConfigurationPortabilityExpectedVectors.ApiVersion, "configuration.islamu.org/v1alpha1", StringComparison.Ordinal));
 
-        foreach (string obsoleteType in obsoleteTypes)
-            await Assert.That(ContractType(obsoleteType)).IsNull();
+        await Assert.That(() => ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(manifest))
+            .Throws<ConfigurationPortabilityContractException>();
+        await Assert.That(() => ConfigurationPortabilityJsonCodec.ParseTenantConfigurationPackage(package))
+            .Throws<ConfigurationPortabilityContractException>();
     }
 
     [Test]
     public async Task LegalDocumentContract_IsSourceOnlyAndAcceptanceFree()
     {
-        Type? legalDocument = ContractType("ConfigurationManifestLegalDocumentV1Alpha2");
-        Type? localizedSource =
-            ContractType("ConfigurationManifestLegalDocumentLocalizedSourceV1Alpha2");
-        Type? templateProvenance =
-            ContractType("ConfigurationManifestLegalTemplateProvenanceV1Alpha2");
-
-        await Assert.That(legalDocument).IsNotNull();
-        await Assert.That(localizedSource).IsNotNull();
-        await Assert.That(templateProvenance).IsNotNull();
-
-        foreach (string ownerTypeName in new[]
+        foreach (Type owner in new[]
                  {
-                     "ConfigurationManifestInstanceV1Alpha2",
-                     "ConfigurationManifestTenantSpecV1Alpha2",
-                     "TenantConfigurationPackageSpecV1Alpha2"
+                     typeof(ConfigurationManifestInstanceV1Alpha2),
+                     typeof(ConfigurationManifestTenantSpecV1Alpha2),
+                     typeof(TenantConfigurationPackageSpecV1Alpha2)
                  })
         {
-            Type owner = ContractType(ownerTypeName)!;
-            await Assert.That(owner.GetProperty("LegalDocuments")).IsNotNull();
+            await Assert.That(owner.GetProperty(nameof(ConfigurationManifestInstanceV1Alpha2.LegalDocuments))).IsNotNull();
         }
 
         string[] forbidden =
@@ -202,9 +151,9 @@ public sealed class ConfigurationManifestV1Alpha2ContractTests
         ];
         foreach (Type type in new[]
                  {
-                     legalDocument!,
-                     localizedSource!,
-                     templateProvenance!
+                     typeof(ConfigurationManifestLegalDocumentV1Alpha2),
+                     typeof(ConfigurationManifestLegalDocumentLocalizedSourceV1Alpha2),
+                     typeof(ConfigurationManifestLegalTemplateProvenanceV1Alpha2)
                  })
         {
             await Assert.That(type.GetProperties()
@@ -213,19 +162,6 @@ public sealed class ConfigurationManifestV1Alpha2ContractTests
                 .IsEmpty();
         }
     }
-
-    private static Type? ContractType(string name) =>
-        WireAssembly.GetType(ContractNamespace + name);
-
-    private static string ReadConstant(Type type, string name) =>
-        type.GetField(name, BindingFlags.Public | BindingFlags.Static)?
-            .GetRawConstantValue() as string
-        ?? throw new InvalidOperationException($"Missing contract constant '{name}'.");
-
-    private static int ReadIntConstant(Type type, string name) =>
-        type.GetField(name, BindingFlags.Public | BindingFlags.Static)?
-            .GetRawConstantValue() as int?
-        ?? throw new InvalidOperationException($"Missing contract constant '{name}'.");
 
     private static PropertyInfo RequiredProperty(Type type, string name) =>
         type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance)

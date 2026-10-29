@@ -12,6 +12,7 @@ public sealed record SecretAuthoritySelection(
     string EnvironmentName,
     SecretConsumerRole Consumer)
 {
+    /// <summary>Null means absent; an empty value preserves an invalid declaration for fail-closed observation.</summary>
     public Guid? AuthenticationProfileRevision { get; init; }
 
     public static SecretAuthoritySelection Select(
@@ -34,9 +35,9 @@ public sealed record SecretAuthoritySelection(
             throw new InvalidOperationException("secret_authority_selection_invalid");
         var selection = new SecretAuthoritySelection(provider, environmentName, consumer)
         {
-            AuthenticationProfileRevision = Guid.TryParse(
-                bootstrap["AUTHENTICATION_CREDENTIAL_PROFILE_REVISION"], out Guid revision)
-                && revision != Guid.Empty ? revision : null
+            AuthenticationProfileRevision = bootstrap["AUTHENTICATION_CREDENTIAL_PROFILE_REVISION"] is not { } configuredRevision
+                ? null
+                : Guid.TryParse(configuredRevision, out Guid revision) ? revision : Guid.Empty
         };
         selection.Validate();
         return selection;

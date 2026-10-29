@@ -52,7 +52,7 @@ public class LocationConfiguration : IEntityTypeConfiguration<Location>
             .HasForeignKey<LocationPii>(e => e.LocationId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.Navigation(e => e.Pii).AutoInclude();
+        builder.Navigation(e => e.Pii).UsePropertyAccessMode(PropertyAccessMode.Property).AutoInclude();
 
         builder.HasOne(e => e.LocationKind)
             .WithMany()

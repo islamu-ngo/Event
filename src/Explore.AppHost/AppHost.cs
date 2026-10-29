@@ -6,6 +6,7 @@ using Aspire.Hosting.ApplicationModel;
 using DotNetEnv;
 using Explore.Application.Configuration;
 using Explore.Domain.Secrets;
+using Explore.AppHost;
 using Explore.Infrastructure.Configuration;
 using Explore.Infrastructure.Webhooks;
 using Explore.Persistence.Database;
@@ -16,11 +17,16 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 const string DefaultInstanceAdminHost = "admin.localhost";
 const int DefaultInstanceAdminPort = 7002;
+var testingInputs = new ConfigurationBuilder().AddEnvironmentVariables().AddCommandLine(args).Build();
+var testingIsolation = TestingResourceIsolation.Admit(testingInputs);
+using var testingClaim = testingIsolation?.Claim();
 var repositoryRoot = FindRepositoryRoot(Directory.GetCurrentDirectory());
 var dotenvPath = Path.Combine(repositoryRoot, ".env");
-if (File.Exists(dotenvPath))
+if (testingIsolation is null && File.Exists(dotenvPath))
     Env.NoClobber().Load(dotenvPath);
 var builder = DistributedApplication.CreateBuilder(args);
+if (testingIsolation is not null)
+    TestingResourceIsolation.ConfigureOwnedInputs(builder.Configuration, args);
 var runMode = AspireRunModeExtensions.Parse(builder.Configuration["ISLAMU_ASPIRE_MODE"]);
 var agentBrowserProfile = runMode == AspireRunMode.AgentBrowser
     ? AgentBrowserProfileSettings.Create()
@@ -62,7 +68,13 @@ SecretAuthorityKind configuredSecretProvider = SecretAuthoritySelection.Select(
     builder.Configuration, builder.Environment.EnvironmentName, SecretConsumerRole.Api).Provider;
 // AppHost never authenticates to a runtime vault. Operators provision provider
 // infrastructure outside the application identity, then inject resource inputs.
-var operatorInputBuilder = new ConfigurationBuilder().AddEnvironmentVariables();
+var operatorInputBuilder = new ConfigurationBuilder();
+if (testingIsolation is null)
+    operatorInputBuilder.AddEnvironmentVariables();
+else
+    operatorInputBuilder.AddInMemoryCollection(builder.Configuration
+        .GetRequiredSection("TestingEnvironment").AsEnumerable(makePathsRelative: true)
+        .Where(pair => pair.Value is not null));
 if (configuredSecretProvider == SecretAuthorityKind.UserSecrets)
 {
     operatorInputBuilder.Sources.Clear();
@@ -70,6 +82,12 @@ if (configuredSecretProvider == SecretAuthorityKind.UserSecrets)
 }
 IConfiguration operatorInputs = operatorInputBuilder.Build();
 builder.Configuration.AddConfiguration(operatorInputs);
+if (testingIsolation is not null)
+{
+    builder.Configuration.AddCommandLine(args);
+    if (TestingResourceIsolation.ValidateProfile(builder.Configuration) != testingIsolation.Profile)
+        throw new InvalidOperationException("test_resource_profile_changed");
+}
 builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 {
     ["SecretProvider:Provider"] = configuredSecretProvider.ToString()
@@ -142,9 +160,11 @@ var cerbosPolicyPackagePath = Path.Combine(repositoryRoot, "cerbos", "policies")
 var cerbosConfigPath = Path.Combine(repositoryRoot, "cerbos", "config", ".cerbos.yaml");
 var cerbosSchemaPath = Path.Combine(repositoryRoot, "cerbos", "init", "cerbos-schema.sql");
 var coopNginxConfigPath = Path.Combine(appHostConfigRoot, "coop", "nginx.conf");
-var localStorageRootPath = Path.Combine(repositoryRoot, agentBrowserProfile?.LocalStorageRelativePath ?? "storage-data/aspire-local");
+var localStorageRootPath = testingIsolation is null
+    ? Path.Combine(repositoryRoot, agentBrowserProfile?.LocalStorageRelativePath ?? "storage-data/aspire-local")
+    : Path.Combine(testingIsolation.Root, "storage");
 var embeddedPrivacyErasureAuthorityPath = Path.Combine(
-    repositoryRoot,
+    testingIsolation?.Root ?? repositoryRoot,
     agentBrowserProfile?.PrivacyErasureRelativePath
         ?? "privacy-erasure-authority-data/aspire-local/privacy_erasure_authority.db");
 var embeddedPrivacyErasureAuthorityDirectory = Path.GetDirectoryName(embeddedPrivacyErasureAuthorityPath)!;
@@ -167,7 +187,8 @@ var publicBaseUrl = agentBrowserProfile?.DefaultTenantOrigin
 Directory.CreateDirectory(localStorageRootPath);
 if (usesEmbeddedPrivacyErasureAuthority)
     Directory.CreateDirectory(embeddedPrivacyErasureAuthorityDirectory);
-Directory.CreateDirectory(grafanaDashboardPath);
+if (testingIsolation is null)
+    Directory.CreateDirectory(grafanaDashboardPath);
 
 Console.WriteLine("===========================================");
 Console.WriteLine("Explore AppHost - Local Development Orchestrator");
@@ -177,7 +198,7 @@ Console.WriteLine("local-agent: isolated browser authentication; local-full: ful
 Console.WriteLine("===========================================");
 
 // Ordinary profiles retain the compatibility delay; agent readiness follows real dependencies.
-if (runMode != AspireRunMode.AgentBrowser)
+if (runMode != AspireRunMode.AgentBrowser && testingIsolation is null)
 {
     var startAfter = DateTime.Now.AddSeconds(30);
     builder.Services.AddHealthChecks().AddCheck("startup-delay", () =>
@@ -187,6 +208,13 @@ if (runMode != AspireRunMode.AgentBrowser)
 IResourceBuilder<PostgresDatabaseResource>? database = null;
 IResourceBuilder<PostgresDatabaseResource>? privacyErasureDatabase = null;
 IResourceBuilder<RedisResource>? cache = null;
+IResourceBuilder<RedisResource>? bffSessionAuthority = null;
+string? bffSessionPassword = operatorInputs["BFF_SESSION_REDIS_PASSWORD"];
+var bffSessionPasswordParameter = string.IsNullOrWhiteSpace(bffSessionPassword)
+    ? null : builder.AddParameter("bff-session-password", () => bffSessionPassword,
+        publishValueAsDefault: false, secret: true);
+string bffSessionNamespace = builder.Configuration["BFF_SESSION_NAMESPACE"]
+    ?? builder.Configuration["Bff:SessionAuthority:Namespace"] ?? string.Empty;
 IResourceBuilder<RabbitMQServerResource>? messaging = null;
 LocalPlatformResources? localPlatformResources = null;
 var mailpit = AddMailpit(builder, agentBrowserProfile);
@@ -273,7 +301,19 @@ if (runMode.UsesLocalData())
             ? builder.AddRedis("cache")
             : builder.AddRedis("cache", password: agentRedisPassword!)
                 .WithContainerRuntimeArgs("--pids-limit", agentBrowserProfile.ContainerPidsLimit))
+        .WithImageTag("7.2.16-alpine@sha256:f8548b29a1f1cb358b5fcfec1e0126beab57ad15776c1e87623f865579f16c5a")
         .WithDataVolume(agentBrowserProfile?.RedisVolumeName ?? "islamu-event-redis-data");
+
+    if (bffSessionPasswordParameter is not null)
+    {
+        bffSessionAuthority = builder.AddRedis("bff-session-authority", password: bffSessionPasswordParameter)
+            .WithImageRegistry("docker.io")
+            .WithImage("library/redis")
+            .WithImageTag("7.2.16-alpine@sha256:"
+                + "f8548b29a1f1cb358b5fcfec1e0126beab57ad15776c1e87623f865579f16c5a")
+            .WithDataVolume("islamu-event-bff-session-authority-data")
+            .WithArgs("--appendonly", "yes", "--maxmemory-policy", "noeviction");
+    }
 }
 
 if (runMode is AspireRunMode.FullLocal or AspireRunMode.DefaultLocal)
@@ -302,7 +342,7 @@ if (runMode is AspireRunMode.FullLocal or AspireRunMode.DefaultLocal)
 
 if (runMode == AspireRunMode.FullLocal)
 {
-    AddLocalFormbricks(builder);
+    AddLocalFormbricks(builder, operatorInputs);
 }
 
 var migrations = WithProfileSecretMode(
@@ -444,7 +484,7 @@ if (hostingTopology == HostingTopology.Split)
         exploreAPI = WithExternalPrimaryDatabase(builder, exploreAPI, PrimaryDatabaseRole.Runtime);
         exploreAPI = WithExternalPrimaryDatabase(builder, exploreAPI, PrimaryDatabaseRole.Global);
     }
-    exploreAPI = WithInstanceApiKeyCapabilities(builder, exploreAPI);
+    exploreAPI = WithApplicationDatabaseCapabilities(builder, exploreAPI);
 
     if (privacyErasureDatabase is not null)
     {
@@ -496,64 +536,42 @@ if (hostingTopology == HostingTopology.Split)
 
     // Service discovery (via WithReference) automatically resolves the API URL at runtime.
     // Do NOT hardcode ExploreAPI__BaseUrl here — Aspire assigns dynamic ports.
-    var exploreBlazor = WithProfileSecretMode(
-            WithBffEndpoints(
-                builder.AddProject<Projects.Explore_Blazor>(
-                    "explore-blazor",
-                    ExcludeProjectLaunchProfile),
-                agentBrowserProfile),
-            runMode,
-            configuredSecretProvider,
-            allowAgentRuntimeSecrets: false)
-        .WithReference(exploreAPI)
-        .WaitFor(exploreAPI)
-        .WithEnvironment("Bff__AdminHosts__0", instanceAdminPublicOrigin)
-        .WithEnvironment("ForwardedHeadersTrust__ForwardLimit", ConfiguredValue(
-            builder.Configuration,
-            "BFF_FORWARDED_HEADERS_FORWARD_LIMIT",
-            "1"))
-        .WithEnvironment("ForwardedHeadersTrust__TrustLoopbackProxy", ConfiguredValue(
-            builder.Configuration,
-            "BFF_FORWARDED_HEADERS_TRUST_LOOPBACK",
-            "true"))
-        .WithEnvironment("ForwardedHeadersTrust__KnownProxies__0", ConfiguredValue(
-            builder.Configuration,
-            "BFF_FORWARDED_HEADERS_KNOWN_PROXY",
-            "127.0.0.1"))
-        .WithEnvironment("ForwardedHeadersTrust__KnownNetworks__0", ConfiguredValue(
-            builder.Configuration,
-            "BFF_FORWARDED_HEADERS_KNOWN_NETWORK",
-            "::1/128"))
-        .WithEnvironment("Payments__Stripe__AllowedCheckoutHosts__0", ConfiguredValue(
-            builder.Configuration,
-            "PAYMENTS_STRIPE_ALLOWED_CHECKOUT_HOST",
-            "checkout.stripe.com"))
-        .WithEnvironment("RateLimiting__RegistrationPaymentCheckoutIssue__PermitLimit", ConfiguredValue(
-            builder.Configuration,
-            "BFF_PAYMENT_CHECKOUT_PERMIT_LIMIT",
-            "10"))
-        .WithEnvironment("RateLimiting__RegistrationPaymentCheckoutIssue__WindowSeconds", ConfiguredValue(
-            builder.Configuration,
-            "BFF_PAYMENT_CHECKOUT_WINDOW_SECONDS",
-            "60"))
-        .WithEnvironment("Storage__Local__RootPath", localStorageRootPath);
-
-    exploreBlazor = exploreBlazor
-        .WithReference(migrations)
-        .WaitForCompletion(migrations);
-
-    if (cache is not null)
+    IResourceBuilder<ProjectResource> AddBff(string name)
     {
-        exploreBlazor = exploreBlazor
-            .WithReference(cache)
-            .WaitFor(cache);
+        var bff = WithProfileSecretMode(
+                WithBffEndpoints(builder.AddProject<Projects.Explore_Blazor>(name, ExcludeProjectLaunchProfile), agentBrowserProfile),
+                runMode, configuredSecretProvider, allowAgentRuntimeSecrets: false)
+            .WithReference(exploreAPI)
+            .WaitFor(exploreAPI)
+            .WithEnvironment("Bff__AdminHosts__0", instanceAdminPublicOrigin)
+            .WithEnvironment("ForwardedHeadersTrust__ForwardLimit", ConfiguredValue(
+                builder.Configuration, "BFF_FORWARDED_HEADERS_FORWARD_LIMIT", "1"))
+            .WithEnvironment("ForwardedHeadersTrust__TrustLoopbackProxy", ConfiguredValue(
+                builder.Configuration, "BFF_FORWARDED_HEADERS_TRUST_LOOPBACK", "true"))
+            .WithEnvironment("ForwardedHeadersTrust__KnownProxies__0", ConfiguredValue(
+                builder.Configuration, "BFF_FORWARDED_HEADERS_KNOWN_PROXY", "127.0.0.1"))
+            .WithEnvironment("ForwardedHeadersTrust__KnownNetworks__0", ConfiguredValue(
+                builder.Configuration, "BFF_FORWARDED_HEADERS_KNOWN_NETWORK", "::1/128"))
+            .WithEnvironment("Payments__Stripe__AllowedCheckoutHosts__0", ConfiguredValue(
+                builder.Configuration, "PAYMENTS_STRIPE_ALLOWED_CHECKOUT_HOST", "checkout.stripe.com"))
+            .WithEnvironment("RateLimiting__RegistrationPaymentCheckoutIssue__PermitLimit", ConfiguredValue(
+                builder.Configuration, "BFF_PAYMENT_CHECKOUT_PERMIT_LIMIT", "10"))
+            .WithEnvironment("RateLimiting__RegistrationPaymentCheckoutIssue__WindowSeconds", ConfiguredValue(
+                builder.Configuration, "BFF_PAYMENT_CHECKOUT_WINDOW_SECONDS", "60"))
+            .WithEnvironment("Storage__Local__RootPath", localStorageRootPath)
+            .WithReference(migrations)
+            .WaitForCompletion(migrations);
+        if (cache is not null)
+            bff = bff.WithReference(cache).WaitFor(cache);
+        if (localPlatformResources is not null)
+            bff = ConfigureLocalPlatformBlazor(bff, localPlatformResources, builder.Configuration)
+                .WaitFor(localPlatformResources.Keycloak);
+        return bff;
     }
 
-    if (localPlatformResources is not null)
-    {
-        exploreBlazor = ConfigureLocalPlatformBlazor(exploreBlazor, localPlatformResources, builder.Configuration)
-            .WaitFor(localPlatformResources.Keycloak);
-    }
+    _ = AddBff("explore-blazor");
+    if (testingIsolation?.Profile == OwnedAppHostProfile.ExternalIdentitySharedBff)
+        _ = AddBff("explore-blazor-peer");
 }
 else
 {
@@ -650,7 +668,7 @@ else
         eventStandalone = WithExternalPrimaryDatabase(builder, eventStandalone, PrimaryDatabaseRole.Runtime);
         eventStandalone = WithExternalPrimaryDatabase(builder, eventStandalone, PrimaryDatabaseRole.Global);
     }
-    eventStandalone = WithInstanceApiKeyCapabilities(builder, eventStandalone);
+    eventStandalone = WithApplicationDatabaseCapabilities(builder, eventStandalone);
 
     if (privacyErasureDatabase is not null)
     {
@@ -705,6 +723,11 @@ else
     }
 }
 
+object bffSessionEndpoint = builder.Configuration["BFF_SESSION_REDIS_ENDPOINT"]
+    ?? builder.Configuration["Bff:SessionAuthority:Endpoint"] ?? string.Empty;
+if (bffSessionAuthority is not null)
+    bffSessionEndpoint = ReferenceExpression.Create($"redis://{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Host)}:{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Port)}");
+
 // Register last, after every explicit resource projection. Parent-process .env
 // inheritance must not reintroduce sibling or infrastructure authority.
 foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>())
@@ -735,6 +758,7 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
                 "AUTHENTICATION_PROVIDER", "AUTHENTICATION_CREDENTIAL_PROFILE_REVISION", "GOOGLE_CLIENT_ID",
                 "IDENTITYCORRELATION__TRUSTEDISSUERS__0", "ATPROTO_LOGIN_ENABLED",
                 "INSTANCE_BOOTSTRAP_ADMIN_PROVIDER", "INSTANCE_BOOTSTRAP_BINDING_GENERATION",
+                "INSTANCE_BOOTSTRAP_ADMIN_SUBJECT", "INSTANCE_BOOTSTRAP_ADMIN_EMAIL",
                 "AGENT_BROWSER_SEED_ENABLED", "AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD",
                 "AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES", "AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH",
                 "AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256", "AUTHENTICATION_LOCAL_PASSWORD_HASH_ITERATIONS",
@@ -848,13 +872,54 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
                 if (builder.Configuration[key] is { } value && !context.EnvironmentVariables.ContainsKey(key))
                     context.EnvironmentVariables[key] = value;
         }
+        SecretAuthorityKind runtimeSecretProvider = agentBrowserProfile is not null
+            && consumer == SecretConsumerRole.Bff ? SecretAuthorityKind.Environment : configuredSecretProvider;
         RuntimeSecretEnvironment.Apply(context.EnvironmentVariables, operatorInputs,
-            Environment.GetEnvironmentVariables().Keys.Cast<string>(), consumer, configuredSecretProvider,
+            Environment.GetEnvironmentVariables().Keys.Cast<string>(), consumer, runtimeSecretProvider,
             runtimeSecretEntries);
+        bool ownsBrowserSessions = consumer is SecretConsumerRole.Bff or SecretConsumerRole.Combined;
+        context.EnvironmentVariables["BFF_SESSION_REDIS_ENDPOINT"] = ownsBrowserSessions
+            ? bffSessionEndpoint : string.Empty;
+        context.EnvironmentVariables["BFF_SESSION_NAMESPACE"] = ownsBrowserSessions
+            ? bffSessionNamespace : string.Empty;
+        context.EnvironmentVariables["BFF_SESSION_REDIS_PASSWORD"] = ownsBrowserSessions
+            && runtimeSecretProvider == SecretAuthorityKind.Environment && bffSessionPasswordParameter is not null
+                ? bffSessionPasswordParameter.Resource : string.Empty;
+        context.EnvironmentVariables["Bff__SessionAuthority__Password"] = string.Empty;
+        if (testingIsolation is not null)
+        {
+            string? partition = consumer switch
+            {
+                SecretConsumerRole.Api => "API",
+                SecretConsumerRole.Bff => "BFF",
+                SecretConsumerRole.Combined => "COMBINED",
+                _ => null
+            };
+            if (partition is not null)
+                foreach (string suffix in new[] { "RING", "ADMISSION", "ADMISSION_SHA256", "MINIMUM_GENERATION" })
+                {
+                    string key = $"EVENT_DP_{partition}_{suffix}";
+                    context.EnvironmentVariables[key] = RequiredConfiguredValue(operatorInputs, key);
+                }
+        }
     });
 }
 
-await builder.Build().RunAsync();
+testingIsolation?.Apply(builder);
+var application = builder.Build();
+if (testingIsolation is not null)
+    await testingIsolation.DenyInspectionRunAsync(application);
+var testingExecution = testingIsolation is null
+    ? null : application.Services.GetService<TestingApplicationExecution>();
+Task execution = application.RunAsync();
+try { testingExecution?.Observe(execution); }
+catch (Exception observationFailure)
+{
+    try { await execution; }
+    catch (Exception executionFailure) { throw new AggregateException(observationFailure, executionFailure); }
+    throw;
+}
+await execution;
 
 static LocalPlatformResources AddLocalPlatform(
     IDistributedApplicationBuilder builder,
@@ -960,10 +1025,13 @@ static LocalPlatformResources AddLocalPlatform(
         .WithHttpEndpoint(targetPort: 9001, port: 9006, name: "console")
         .WithHttpHealthCheck("/minio/health/live", endpointName: "api");
     var minioBootstrap = builder.AddContainer("minio-bootstrap", "minio/mc", "latest")
+        .WithEnvironment("MINIO_ROOT_USER", configuration["STORAGE_S3_ACCESS_KEY_ID"] ?? string.Empty)
+        .WithEnvironment("MINIO_ROOT_PASSWORD", configuration["STORAGE_S3_SECRET_ACCESS_KEY"] ?? string.Empty)
+        .WithEnvironment("MINIO_BUCKET", configuration["STORAGE_S3_BUCKET_NAME"] ?? "explore")
         .WithEntrypoint("sh")
         .WithArgs(
             "-c",
-            $"mc alias set local {BuildHttpUri("minio", 9000)} {configuration["STORAGE_S3_ACCESS_KEY_ID"] ?? string.Empty} {configuration["STORAGE_S3_SECRET_ACCESS_KEY"] ?? string.Empty} && (mc mb -p local/{configuration["STORAGE_S3_BUCKET_NAME"] ?? "explore"} || mc ls local/{configuration["STORAGE_S3_BUCKET_NAME"] ?? "explore"} >/dev/null)")
+            $"mc alias set local {BuildHttpUri("minio", 9000)} \"$MINIO_ROOT_USER\" \"$MINIO_ROOT_PASSWORD\" && (mc mb -p \"local/$MINIO_BUCKET\" || mc ls \"local/$MINIO_BUCKET\" >/dev/null)")
         .WaitFor(minio);
 
     IResourceBuilder<ContainerResource>? svixDb = null;
@@ -1252,7 +1320,7 @@ static IResourceBuilder<ContainerResource> AddMailpit(
         : mailpit.WithContainerRuntimeArgs("--pids-limit", agentBrowserProfile.ContainerPidsLimit);
 }
 
-static void AddLocalFormbricks(IDistributedApplicationBuilder builder)
+static void AddLocalFormbricks(IDistributedApplicationBuilder builder, IConfiguration operatorInputs)
 {
     const string formbricksImage = "ghcr.io/formbricks/formbricks";
     const string formbricksTag = "5.2.2@sha256:d6f635714a9c29620203ba29762f4746f5def86c346d6ad95fefa66adc21fd5e";
@@ -1260,17 +1328,18 @@ static void AddLocalFormbricks(IDistributedApplicationBuilder builder)
     const string hubTag = "latest@sha256:4dc0c4f26cf999b3bf4a26d7b09634fc65ae23cbb30c9ad82042da019d231458";
 
     IResourceBuilder<ParameterResource> Secret(string name, string key) =>
-        builder.AddParameter(name, () => builder.Configuration[key] ?? string.Empty, publishValueAsDefault: false, secret: true);
+        builder.AddParameter(name, () => RequiredConfiguredValue(operatorInputs, key), publishValueAsDefault: false, secret: true);
 
     var nextAuthSecret = Secret("formbricks-nextauth-secret", "FORMBRICKS_NEXTAUTH_SECRET");
     var encryptionKey = Secret("formbricks-encryption-key", "FORMBRICKS_ENCRYPTION_KEY");
     var cronSecret = Secret("formbricks-cron-secret", "FORMBRICKS_CRON_SECRET");
     var hubApiKey = Secret("formbricks-hub-api-key", "FORMBRICKS_HUB_API_KEY");
     var cubeApiSecret = Secret("formbricks-cube-api-secret", "FORMBRICKS_CUBEJS_API_SECRET");
+    var databasePassword = Secret("formbricks-database-password", "FORMBRICKS_DATABASE_PASSWORD");
 
     var postgres = builder.AddContainer("formbricks-postgres", "pgvector/pgvector", "pg18")
         .WithEnvironment("POSTGRES_USER", "postgres")
-        .WithEnvironment("POSTGRES_PASSWORD", builder.Configuration["FORMBRICKS_DATABASE_PASSWORD"] ?? string.Empty)
+        .WithEnvironment("POSTGRES_PASSWORD", databasePassword)
         .WithEnvironment("POSTGRES_DB", "formbricks")
         .WithVolume("islamu-event-formbricks-postgres-data", "/var/lib/postgresql");
 
@@ -1280,21 +1349,10 @@ static void AddLocalFormbricks(IDistributedApplicationBuilder builder)
         .WithArgs("valkey-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction")
         .WithVolume("islamu-event-formbricks-redis-data", "/data");
 
-    var databaseUrl = BuildPostgresUrl(
-        "postgres",
-        "postgres",
-        "formbricks-postgres",
-        5432,
-        "formbricks",
-        "schema=public");
-
-    var hubDatabaseUrl = BuildPostgresUrl(
-        "postgres",
-        "postgres",
-        "formbricks-postgres",
-        5432,
-        "formbricks",
-        "sslmode=disable");
+    var databaseUrl = ReferenceExpression.Create(
+        $"postgresql://postgres:{databasePassword:uri}@formbricks-postgres:5432/formbricks?schema=public");
+    var hubDatabaseUrl = ReferenceExpression.Create(
+        $"postgresql://postgres:{databasePassword:uri}@formbricks-postgres:5432/formbricks?sslmode=disable");
 
     IResourceBuilder<ContainerResource> Environment(IResourceBuilder<ContainerResource> resource) => resource
         .WithEnvironment("WEBAPP_URL", builder.Configuration["FORMBRICKS_WEBAPP_URL"] ?? BuildHttpUri("localhost", 3005))
@@ -1335,7 +1393,7 @@ static void AddLocalFormbricks(IDistributedApplicationBuilder builder)
         .WithEnvironment("CUBEJS_DB_HOST", "formbricks-postgres")
         .WithEnvironment("CUBEJS_DB_NAME", "formbricks")
         .WithEnvironment("CUBEJS_DB_USER", "postgres")
-        .WithEnvironment("CUBEJS_DB_PASS", "postgres")
+        .WithEnvironment("CUBEJS_DB_PASS", databasePassword)
         .WithEnvironment("CUBEJS_DB_PORT", "5432")
         .WithEnvironment("CUBEJS_API_SECRET", cubeApiSecret)
         .WithEnvironment("CUBEJS_JWT_ISSUER", "formbricks-web")
@@ -1714,7 +1772,7 @@ static IResourceBuilder<ProjectResource> WithExternalPrimaryDatabase(
     return WithSelectedPrimaryDatabaseCredentials(builder, project, database);
 }
 
-static IResourceBuilder<ProjectResource> WithInstanceApiKeyCapabilities(
+static IResourceBuilder<ProjectResource> WithApplicationDatabaseCapabilities(
     IDistributedApplicationBuilder builder,
     IResourceBuilder<ProjectResource> project)
 {
@@ -1724,7 +1782,8 @@ static IResourceBuilder<ProjectResource> WithInstanceApiKeyCapabilities(
     PrimaryDatabaseRole[] roles =
     [
         PrimaryDatabaseRole.InstanceKeyRead, PrimaryDatabaseRole.InstanceKeyWrite,
-        PrimaryDatabaseRole.InstanceKeyIssuance, PrimaryDatabaseRole.PlatformKeyReport
+        PrimaryDatabaseRole.InstanceKeyIssuance, PrimaryDatabaseRole.PlatformKeyReport,
+        PrimaryDatabaseRole.EmailPolicyInstanceMutation, PrimaryDatabaseRole.EmailPolicyTenantMutation
     ];
     foreach (var role in roles)
         project = WithSelectedPrimaryDatabaseCredentials(
@@ -1835,16 +1894,12 @@ static IResourceBuilder<ProjectResource> WithEmbeddedPrivacyErasureAuthority(
     string busyTimeoutSeconds,
     string? volumeName = null)
 {
-    const string containerPath = "/app/data/privacy_erasure_authority.db";
-
     return project
         .WithReplicas(1)
         .WithEnvironment("PrivacyErasureAuthorityEmbedded__Path", localPath)
         .WithEnvironment("PrivacyErasureAuthorityEmbedded__WriterReplicaCount", "1")
         .WithEnvironment("PrivacyErasureAuthorityEmbedded__BusyTimeoutSeconds", busyTimeoutSeconds)
-        .PublishAsDockerFile(container => container
-            .WithEnvironment("PrivacyErasureAuthorityEmbedded__Path", containerPath)
-            .WithVolume(volumeName ?? "islamu-event-privacy-erasure-authority-data", "/app/data"));
+        .PublishAsDockerFile(EmbeddedPrivacyErasureDeployment.Configure(volumeName));
 }
 
 static PrivacyErasureAuthorityTopology ParsePrivacyErasureTopology(string value)
@@ -1901,7 +1956,7 @@ static HostingTopology ParseHostingTopology(string? rawValue)
 static SecretConsumerRole SecretConsumerFor(string resourceName) => resourceName switch
 {
     "explore-api" => SecretConsumerRole.Api,
-    "explore-blazor" => SecretConsumerRole.Bff,
+    "explore-blazor" or "explore-blazor-peer" => SecretConsumerRole.Bff,
     "event-standalone" => SecretConsumerRole.Combined,
     "event-migrationservice" => SecretConsumerRole.Migration,
     _ => throw new InvalidOperationException("secret_consumer_invalid")

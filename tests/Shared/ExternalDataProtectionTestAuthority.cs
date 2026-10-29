@@ -46,6 +46,41 @@ internal sealed class ExternalDataProtectionTestAuthority : IExternalDataProtect
         return ValueTask.FromResult(Input);
     }
 
+    public static ExternalDataProtectionInput RevokeActiveKey(ExternalDataProtectionInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        var ring = JsonSerializer.Deserialize<ExternalDataProtectionRing>(input.Ring)
+            ?? throw new InvalidOperationException("assurance_protection_input_invalid");
+        var admission = JsonSerializer.Deserialize<ExternalDataProtectionAdmission>(input.Admission)
+            ?? throw new InvalidOperationException("assurance_protection_input_invalid");
+        var repository = new Repository();
+        foreach (string document in ring.Documents)
+            repository.StoreElement(XElement.Parse(document), "owned-revocation");
+        var services = new ServiceCollection();
+        services.AddDataProtection().AddKeyManagementOptions(options =>
+        {
+            options.XmlRepository = repository;
+            options.AutoGenerateKeys = false;
+        });
+        using var provider = services.BuildServiceProvider();
+        provider.GetRequiredService<IKeyManager>().RevokeKey(admission.ActiveKeyId, "owned-assurance-revocation");
+        string revokedRing = JsonSerializer.Serialize(ring with
+        {
+            Documents = repository.GetAllElements().Select(element => element.ToString(SaveOptions.DisableFormatting)).ToArray()
+        });
+        string revokedAdmission = JsonSerializer.Serialize(admission with
+        {
+            RingSha256 = ExternalDataProtectionInput.Hash(revokedRing),
+            Keys = admission.Keys.Select(key => key.Id == admission.ActiveKeyId ? key with { Revoked = true } : key).ToArray()
+        });
+        return input with
+        {
+            Ring = revokedRing,
+            Admission = revokedAdmission,
+            AdmissionSha256 = ExternalDataProtectionInput.Hash(revokedAdmission)
+        };
+    }
+
     private sealed class Repository : IXmlRepository
     {
         private readonly List<XElement> documents = [];

@@ -106,7 +106,17 @@ public sealed class TenantStorageSettingService : ITenantStorageSettingService
         CancellationToken cancellationToken = default)
     {
         await using var scope = await _scopeFactory.CreateAsync(new(_tenantContext.TenantId), cancellationToken);
-        return await scope.Services.GetRequiredService<IStorageProbeOriginalAction>().ExecuteAsync(command, cancellationToken);
+        var result = await scope.Services.GetRequiredService<IStorageProbeOriginalAction>().ExecuteAsync(command, cancellationToken);
+        return new InstanceStorageProviderStatusDto
+        {
+            Provider = result.Provider,
+            IsAvailable = result.IsAvailable,
+            SupportsServerSideStreaming = result.SupportsServerSideStreaming,
+            SupportsBrowserDirectUpload = result.SupportsBrowserDirectUpload,
+            FailureCode = result.FailureCode,
+            Message = result.Message,
+            Preflight = result.Preflight
+        };
     }
 
     private async Task<Dictionary<string, ResolvedSetting>> ResolveSettingsAsync(

@@ -1,8 +1,12 @@
+using Event.Testing.DataProtection;
+using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -13,83 +17,66 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Event.Benchmarks.Api;
 
 internal sealed class ApiBenchmarkHostFactory : WebApplicationFactory<global::Program>
 {
     private readonly string _databaseName = $"BenchmarkApiHost_{Guid.NewGuid():N}";
+    private readonly ExternalDataProtectionTestAuthority _dataProtection = new("api");
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-
-        builder.ConfigureAppConfiguration((_, config) =>
+        builder.UseSolutionRelativeContentRoot("src/Explore.API", "Explore.slnx");
+        builder.UseSetting("SecretProvider:Provider", "Environment");
+        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            var benchmarkConfig = new Dictionary<string, string?>
-            {
-                ["Database:Provider"] = "PostgreSql",
-                ["Database:Host"] = "localhost",
-                ["Database:Port"] = "5432",
-                ["Database:Database"] = "explore_benchmark_placeholder",
-                ["Database:Runtime:Username"] = "benchmark",
-                ["Database:Runtime:Password"] = "benchmark",
-                ["Database:Runtime:TlsMode"] = "Prefer",
-                ["Database:Runtime:TrustServerCertificate"] = "false",
-                ["Keycloak:Authority"] = "https://auth.benchmark.invalid",
-                ["Keycloak:Realm"] = "ISLAMU",
-                ["Keycloak:Audience"] = "islamu-event-api",
-                ["Keycloak:RequireHttpsMetadata"] = "false",
-                ["Keycloak:MetadataAddress"] = "https://auth.benchmark.invalid/.well-known/openid-configuration",
-                ["Testing:SkipJwtAuthorityWarmup"] = "true",
-                ["SecretRefresh:Enabled"] = "false",
-                ["PdsSync:Enabled"] = "false",
-                ["OutboxProcessor:Enabled"] = "false",
-                ["EmailDispatchProcessor:Enabled"] = "false",
-                ["S3Settings:Region"] = "us-east-1",
-                ["S3Settings:BucketName"] = "benchmark-bucket",
-                ["S3Settings:AccessKeyId"] = "benchmark-key",
-                ["S3Settings:SecretAccessKey"] = "benchmark-secret",
-                ["S3Settings:Endpoint"] = "https://s3.benchmark.invalid",
-                ["Deployment:Mode"] = "SingleTenant",
-                ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),
-                ["PublicBaseUrl"] = "https://benchmark.event.local"
-            };
-
-            config.AddInMemoryCollection(benchmarkConfig);
-        });
+            ["SecretProvider:Provider"] = "Environment",
+            ["Authentication:Provider"] = "keycloak",
+            ["Keycloak:Authority"] = "https://auth.benchmark.invalid",
+            ["Keycloak:Realm"] = "benchmark",
+            ["Keycloak:Audience"] = "islamu-event-api",
+            ["Keycloak:RequireHttpsMetadata"] = "false",
+            ["Keycloak:MetadataAddress"] = "https://auth.benchmark.invalid/.well-known/openid-configuration",
+            ["Testing:SkipJwtAuthorityWarmup"] = "true",
+            ["SecretRefresh:Enabled"] = "false",
+            ["PdsSync:Enabled"] = "false",
+            ["OutboxProcessor:Enabled"] = "false",
+            ["EmailDispatchProcessor:Enabled"] = "false",
+            ["Deployment:Mode"] = "SingleTenant",
+            ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),
+            ["PublicBaseUrl"] = "https://benchmark.event.local"
+        }));
 
         builder.ConfigureServices(services =>
         {
             services.RemoveExploreDbContextRegistrations();
-
-            services.AddDbContext<ExploreDbContext>(options =>
+            services.AddDbContextFactory<ExploreDbContext>(options =>
             {
                 options.UseInMemoryDatabase(_databaseName);
-                options.ConfigureWarnings(warnings =>
-                    warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning));
+                options.ConfigureWarnings(warnings => warnings.Ignore(
+                    Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning));
             });
-
+            services.AddTestContextOwners();
             services.RemoveAll<IDistributedCache>();
             services.AddDistributedMemoryCache();
-            services.AddHostedService<BenchmarkSeedingHostedService>();
         });
 
         builder.ConfigureTestServices(services =>
         {
-            services.RemoveProductHostedServices();
-
+            services.RemoveAll<IHostedService>();
+            services.AddHostedService<BenchmarkSeedingHostedService>();
+            services.RemoveAll<IExternalDataProtectionSource>();
+            services.AddSingleton<IExternalDataProtectionSource>(_dataProtection);
             services.AddAuthentication(options =>
             {
                 options.DefaultScheme = ApiBenchmarkAuthHandler.SchemeName;
                 options.DefaultAuthenticateScheme = ApiBenchmarkAuthHandler.SchemeName;
                 options.DefaultChallengeScheme = ApiBenchmarkAuthHandler.SchemeName;
                 options.DefaultForbidScheme = ApiBenchmarkAuthHandler.SchemeName;
-            })
-            .AddScheme<AuthenticationSchemeOptions, ApiBenchmarkAuthHandler>(
-                ApiBenchmarkAuthHandler.SchemeName,
-                _ => { });
-
+            }).AddScheme<AuthenticationSchemeOptions, ApiBenchmarkAuthHandler>(ApiBenchmarkAuthHandler.SchemeName, _ => { });
             services.PostConfigure<AuthenticationOptions>(options =>
             {
                 options.DefaultScheme = ApiBenchmarkAuthHandler.SchemeName;
@@ -97,7 +84,6 @@ internal sealed class ApiBenchmarkHostFactory : WebApplicationFactory<global::Pr
                 options.DefaultChallengeScheme = ApiBenchmarkAuthHandler.SchemeName;
                 options.DefaultForbidScheme = ApiBenchmarkAuthHandler.SchemeName;
             });
-
             services.RemoveAll<IAuthorizationProvider>();
             services.AddSingleton<IAuthorizationProvider>(ApiBenchmarkAuthorizationProvider.AllowAll);
             services.RemoveAll<ISetupSecretProvider>();
@@ -105,23 +91,24 @@ internal sealed class ApiBenchmarkHostFactory : WebApplicationFactory<global::Pr
         });
     }
 
-    private sealed class BenchmarkSeedingHostedService(
-        IServiceProvider serviceProvider,
-        IHostEnvironment environment) : IHostedService
+    private sealed class BenchmarkSeedingHostedService(IServiceProvider serviceProvider, IHostEnvironment environment) : IHostedService
     {
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             using var scope = serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-
-            await DatabaseSeeder.SeedAsync(dbContext, environment, cancellationToken: cancellationToken);
-            await BenchmarkApiSeedData.SeedAsync(dbContext, cancellationToken);
-
+            var global = scope.ServiceProvider.GetRequiredService<IGlobalExploreDbContextFactory>();
+            var tenants = scope.ServiceProvider.GetRequiredService<ITenantExploreDbContextFactory>();
+            await using var dbContext = await global.CreateDbContextAsync(cancellationToken);
+            if (!dbContext.Database.IsInMemory())
+                throw new InvalidOperationException("benchmark_inmemory_request_provider_required");
+            await DatabaseSeeder.SeedAsync(dbContext, environment, NullLogger.Instance, cancellationToken: cancellationToken);
+            await BenchmarkApiSeedData.SeedAsync(dbContext, tenants, cancellationToken);
+            await using var tenant = await tenants.CreateDbContextAsync(SeedIds.DefaultTenantId, cancellationToken);
+            if (await tenant.Events.CountAsync(evt => evt.Slug != null && evt.Slug.StartsWith("benchmark-api-event-"), cancellationToken) != 24)
+                throw new InvalidOperationException("benchmark_inmemory_dataset_invalid");
             var lookupCache = scope.ServiceProvider.GetService<ILookupDataCache>();
             if (lookupCache is not null)
-            {
                 await lookupCache.RefreshAsync(cancellationToken);
-            }
         }
 
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

@@ -33,6 +33,9 @@ public sealed class AuthenticationCredentialProfileReaderTests
             var profile = new AuthenticationCredentialProfileReader(owner).ReadCurrent();
             await Assert.That(profile.Authority).IsEqualTo(expected);
             await Assert.That(profile.Revision).IsEqualTo(revision);
+            var observation = new AuthenticationCredentialProfileReader(owner).ObserveCurrent();
+            await Assert.That(observation.Authority).IsEqualTo(expected);
+            await Assert.That(observation.Revision).IsEqualTo(revision);
             await Assert.That(server.Logins).IsEqualTo(1);
             return;
         }
@@ -40,11 +43,15 @@ public sealed class AuthenticationCredentialProfileReaderTests
         var selected = new AuthenticationCredentialProfileReader(local).ReadCurrent();
         await Assert.That(selected.Authority).IsEqualTo(expected);
         await Assert.That(selected.Revision).IsEqualTo(revision);
+        var selectedObservation = new AuthenticationCredentialProfileReader(local).ObserveCurrent();
+        await Assert.That(selectedObservation.Authority).IsEqualTo(expected);
+        await Assert.That(selectedObservation.Revision).IsEqualTo(revision);
     }
 
     [Test]
     [Arguments(null)]
     [Arguments("")]
+    [Arguments(" ")]
     [Arguments("not-a-uuid")]
     [Arguments("00000000-0000-0000-0000-000000000000")]
     public async Task MissingOrInvalidRevisionCannotAuthorizeMaintenance(string? revision)
@@ -54,6 +61,66 @@ public sealed class AuthenticationCredentialProfileReaderTests
             SecretAuthoritySelection.Select(configuration, "Testing", SecretConsumerRole.Api), configuration);
         await Assert.That(() => new AuthenticationCredentialProfileReader(owner).ReadCurrent())
             .Throws<InvalidOperationException>();
+        var reader = new AuthenticationCredentialProfileReader(owner);
+        if (revision is null)
+            await Assert.That(reader.ObserveCurrent().Revision).IsNull();
+        else
+            await Assert.That(() => reader.ObserveCurrent()).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    [Arguments(SecretAuthorityKind.Environment, AuthenticationCredentialCutover.CredentialAuthority.Environment)]
+    [Arguments(SecretAuthorityKind.UserSecrets, AuthenticationCredentialCutover.CredentialAuthority.UserSecrets)]
+    public async Task AbsentLocalRevisionRetainsSelectedAuthorityWithoutAuthorizingMaintenance(
+        SecretAuthorityKind kind, AuthenticationCredentialCutover.CredentialAuthority expected)
+    {
+        using var configuration = Configuration(kind.ToString(), null);
+        await using var owner = SecretAuthorityAcquisition.OpenLocal(
+            SecretAuthoritySelection.Select(configuration, "Testing", SecretConsumerRole.Api), configuration);
+        var reader = new AuthenticationCredentialProfileReader(owner);
+        var observation = reader.ObserveCurrent();
+        await Assert.That(observation.Authority).IsEqualTo(expected);
+        await Assert.That(observation.Revision).IsNull();
+        await Assert.That(() => reader.ReadCurrent()).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task AbsentNativeRevisionRetainsSelectedAuthorityWithoutAuthorizingMaintenance()
+    {
+        using var configuration = Configuration("Infisical", null);
+        await using var server = await SecretKitHttpAuthority.StartAsync();
+        using var credential = SecretMaterial.FromText(Guid.NewGuid().ToString("N"));
+        var opened = await SecretAuthorityAcquisition.OpenInfisicalAsync(
+            SecretAuthoritySelection.Select(configuration, "Testing", SecretConsumerRole.Api),
+            [new("/api", "API_KEY", "api-key")],
+            new(server.Origin, "project", "testing", Guid.NewGuid().ToString("N"),
+                InfisicalTokenLifetime.Finite, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(5)),
+            credential, new());
+        await Assert.That(opened.IsSuccess).IsTrue();
+        await using var owner = opened.Value;
+        var reader = new AuthenticationCredentialProfileReader(owner);
+        var observation = reader.ObserveCurrent();
+        await Assert.That(observation.Authority).IsEqualTo(AuthenticationCredentialCutover.CredentialAuthority.Infisical);
+        await Assert.That(observation.Revision).IsNull();
+        await Assert.That(() => reader.ReadCurrent()).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task ReplacingTheSelectedOwnerChangesAGenuineAbsentObservation()
+    {
+        using var configuration = Configuration("Environment", null);
+        await using var original = SecretAuthorityAcquisition.OpenLocal(
+            SecretAuthoritySelection.Select(configuration, "Testing", SecretConsumerRole.Api), configuration);
+        Guid revision = Guid.CreateVersion7();
+        configuration["AUTHENTICATION_CREDENTIAL_PROFILE_REVISION"] = revision.ToString("D");
+        await using var replacement = SecretAuthorityAcquisition.OpenLocal(
+            SecretAuthoritySelection.Select(configuration, "Testing", SecretConsumerRole.Api), configuration);
+        var before = new AuthenticationCredentialProfileReader(original).ObserveCurrent();
+        var after = new AuthenticationCredentialProfileReader(replacement).ObserveCurrent();
+        await Assert.That(before.Revision).IsNull();
+        await Assert.That(after.Authority).IsEqualTo(before.Authority);
+        await Assert.That(after.Revision).IsEqualTo(revision);
+        await Assert.That(after).IsNotEqualTo(before);
     }
 
     [Test]
@@ -84,6 +151,7 @@ public sealed class AuthenticationCredentialProfileReaderTests
             .IsEqualTo(replacement);
         await owner.DisposeAsync();
         await Assert.That(() => reader.ReadCurrent()).Throws<ObjectDisposedException>();
+        await Assert.That(() => reader.ObserveCurrent()).Throws<ObjectDisposedException>();
     }
 
     private static ConfigurationRoot Configuration(string provider, string? revision) =>

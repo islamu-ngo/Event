@@ -24,7 +24,8 @@ public static class ConfigurationExtensions
              new("/runtime/bff/oidc/keycloak", "KEYCLOAK_BLAZOR_CLIENT_SECRET", "KEYCLOAK_BLAZOR_CLIENT_SECRET")],
             [new("/runtime/bff/oidc/google", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_ID"),
              new("/runtime/bff/oidc/google", "GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET")],
-            [new("/runtime/bff/atproto/oauth", "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS", "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS")]
+            [new("/runtime/bff/atproto/oauth", "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS", "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS")],
+            [new("/runtime/bff/session", "BFF_SESSION_REDIS_PASSWORD", "BFF_SESSION_REDIS_PASSWORD")]
         ];
         var staged = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (SecretAcquisitionEntry[] group in groups)
@@ -63,6 +64,7 @@ public static class ConfigurationExtensions
     ///   /runtime/bff/oidc/keycloak: Keycloak confidential-client configuration.
     ///   /runtime/bff/oidc/google: Google confidential-client configuration.
     ///   /runtime/bff/atproto/oauth: ATProto frontend signing key only.
+    ///   /runtime/bff/session: Dedicated shared browser-session authority credential.
     /// </remarks>
     private static void ApplyBlazorMapping(
         IConfigurationBuilder configBuilder,
@@ -87,6 +89,11 @@ public static class ConfigurationExtensions
         {
             ["Keycloak:ClientSecret"] = rawClientSecret,
             ["Google:ClientSecret"] = rawGoogleClientSecret,
+            ["Bff:SessionAuthority:Password"] = config["BFF_SESSION_REDIS_PASSWORD"],
+            ["Bff:SessionAuthority:Endpoint"] = ordinary["BFF_SESSION_REDIS_ENDPOINT"]
+                ?? ordinary["Bff:SessionAuthority:Endpoint"],
+            ["Bff:SessionAuthority:Namespace"] = ordinary["BFF_SESSION_NAMESPACE"]
+                ?? ordinary["Bff:SessionAuthority:Namespace"],
         };
 
         if (!string.IsNullOrWhiteSpace(rawAtprotoOAuthClientPrivateJwks))

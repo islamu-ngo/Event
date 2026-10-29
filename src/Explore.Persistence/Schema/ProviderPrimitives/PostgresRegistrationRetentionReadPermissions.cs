@@ -51,7 +51,7 @@ internal static class PostgresRegistrationRetentionReadPermissions
                 typeof(RegistrationOrderPii), typeof(RegistrationParticipantPii)];
             await using var command = context.Database.GetDbConnection().CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = """
+            command.CommandText = $"""
                 SELECT NOT EXISTS (
                     SELECT 1 FROM unnest(@relations::text[]) source(relation)
                     LEFT JOIN pg_catalog.pg_class t ON t.oid=pg_catalog.to_regclass(source.relation)
@@ -59,7 +59,8 @@ internal static class PostgresRegistrationRetentionReadPermissions
                         OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                             WHERE pg_catalog.pg_has_role((SELECT oid FROM pg_catalog.pg_roles WHERE rolname=@global),r.oid,'MEMBER')
                                 AND (r.oid=t.relowner
-                                    OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                                    OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                                        OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                                         CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                                         WHERE a.attrelid=t.oid AND a.attnum<>0 AND NOT a.attisdropped

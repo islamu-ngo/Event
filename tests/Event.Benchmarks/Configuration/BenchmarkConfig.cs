@@ -26,6 +26,7 @@ public sealed class ExploreBenchmarkConfig : ManualConfig
         AddJob(
             Job.Default
                 .WithRuntime(CoreRuntime.Core10_0)
-                .WithMaxRelativeError(0.01));
+                .WithMaxRelativeError(0.01)
+                .AsDefault());
     }
 }

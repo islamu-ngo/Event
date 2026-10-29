@@ -61,6 +61,7 @@
     <Project Path="tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj" />
     <Project Path="tests/Event.Benchmarks/Event.Benchmarks.csproj" />
     <Project Path="tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj" />
+    <Project Path="tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj" />
     <Project Path="tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj" />
     <Project Path="tests/Explore.GeneratedContracts.Tests/Explore.GeneratedContracts.Tests.csproj" />
     <Project Path="tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj" />

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Explore.Application.Authentication;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Operations;
@@ -67,6 +68,11 @@ public sealed class ResolverConfigurationMutationAuthority(
         private readonly PathString path = request.Request.Path;
         private readonly PathString pathBase = request.Request.PathBase;
         private readonly QueryString query = request.Request.QueryString;
+        private readonly ClaimsIdentity[] ticketIdentities = ticket.Principal.Identities.ToArray();
+        private readonly Claim[] ticketClaims = ticket.Principal.Claims.ToArray();
+        private readonly string scheme = ticket.AuthenticationScheme;
+        private readonly DateTimeOffset? issuedAt = ticket.Properties.IssuedUtc;
+        private readonly DateTimeOffset? expiresAt = ticket.Properties.ExpiresUtc;
         private readonly Dictionary<string, string> supportHeaders = request.Request.Headers
             .Where(header => SupportAccessHeaderNames.IsSupportAccessHeader(header.Key))
             .ToDictionary(header => header.Key, header => header.Value.ToString(), StringComparer.OrdinalIgnoreCase);
@@ -98,7 +104,10 @@ public sealed class ResolverConfigurationMutationAuthority(
             cancellationToken.ThrowIfCancellationRequested();
             RequireCustody();
             var current = await request.AuthenticateAsync();
-            if (!current.Succeeded || !ReferenceEquals(current.Ticket, ticket)
+            if (!current.Succeeded || current.Ticket?.AuthenticationScheme != scheme || current.Principal is null
+                || !ticketIdentities.SequenceEqual(current.Principal.Identities)
+                || !ticketClaims.SequenceEqual(current.Principal.Claims)
+                || current.Properties?.IssuedUtc != issuedAt || current.Properties?.ExpiresUtc != expiresAt
                 || !ReferenceEquals(await owner._lifetimes.ObserveAsync(principal, cancellationToken), lifetime))
                 throw new UnauthorizedAccessException("The original resolver ticket or lifetime changed.");
             RequireCustody();

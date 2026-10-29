@@ -16,21 +16,31 @@ namespace Explore.Blazor.IntegrationTests.Configuration;
 public sealed class InfisicalConfigurationProviderTests
 {
     [Test]
-    public async Task AcquiredOidcSettingsSurviveStartupProjection()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task AcquiredOidcSettingsSurviveStartupProjection(bool hasSessionCredential)
     {
         await using var host = new BffSecretPreparationTestHost();
         var roots = CompleteRoots(host);
+        string sessionPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        roots["/runtime/bff/session"] = hasSessionCredential
+            ? [new("BFF_SESSION_REDIS_PASSWORD", sessionPassword, "/runtime/bff/session")] : [];
+        host.Builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Bff:SessionAuthority:Password"] = Convert.ToHexString(RandomNumberGenerator.GetBytes(32))
+        });
         await using var authority = await NativeAuthority.StartAsync(path => roots.GetValueOrDefault(path) ?? []);
         await host.PrepareInfisicalAsync(authority.Url);
 
-        var expected = new Dictionary<string, string>
+        var expected = new Dictionary<string, string?>
         {
             ["Keycloak:Realm"] = "operators",
             ["Keycloak:ClientId"] = "replacement-keycloak-client",
             ["Keycloak:Authority"] = "https://identity.example.test/realms/operators",
             ["Keycloak:ClientSecret"] = roots["/runtime/bff/oidc/keycloak"][3].secretValue,
             ["Google:ClientId"] = "replacement-google-client",
-            ["Google:ClientSecret"] = roots["/runtime/bff/oidc/google"][1].secretValue
+            ["Google:ClientSecret"] = roots["/runtime/bff/oidc/google"][1].secretValue,
+            ["Bff:SessionAuthority:Password"] = hasSessionCredential ? sessionPassword : null
         };
         foreach (var setting in expected)
             await Assert.That(host.Builder.Configuration[setting.Key] == setting.Value).IsTrue()
@@ -42,14 +52,16 @@ public sealed class InfisicalConfigurationProviderTests
             && receipt.AuthorityProfileRevision == host.ProfileRevision
             && !receipt.Installed && receipt.Generation != Guid.Empty)).IsTrue();
         string serialized = System.Text.Json.JsonSerializer.Serialize(acquired);
-        await Assert.That(serialized.Contains(expected["Keycloak:ClientSecret"], StringComparison.Ordinal)
-            || serialized.Contains(expected["Google:ClientSecret"], StringComparison.Ordinal)
+        await Assert.That(serialized.Contains(expected["Keycloak:ClientSecret"]!, StringComparison.Ordinal)
+            || serialized.Contains(expected["Google:ClientSecret"]!, StringComparison.Ordinal)
+            || serialized.Contains(sessionPassword, StringComparison.Ordinal)
             || serialized.Contains(authority.AccessToken, StringComparison.Ordinal)).IsFalse();
         await Assert.That(host.LoginAttempt.Receipt).IsNotNull();
         await Assert.That(authority.Requests.Count(request => request.AbsolutePath ==
             "/api/v1/auth/universal-auth/login")).IsEqualTo(1);
         await Assert.That(host.Builder.Configuration["KEYCLOAK_BLAZOR_CLIENT_SECRET"]).IsNull();
         await Assert.That(host.Builder.Configuration["GOOGLE_CLIENT_SECRET"]).IsNull();
+        await Assert.That(host.Builder.Configuration["BFF_SESSION_REDIS_PASSWORD"]).IsNull();
         await Assert.That(host.Builder.Services.Single(descriptor =>
             descriptor.ServiceType == typeof(SecretAuthorityAcquisition)).ImplementationInstance)
             .IsSameReferenceAs(host.Owner);
@@ -69,6 +81,8 @@ public sealed class InfisicalConfigurationProviderTests
     [Arguments("/database")]
     [Arguments("/api")]
     [Arguments("/")]
+    [Arguments("/runtime/bff/session/nested")]
+    [Arguments("/runtime/api/session")]
     public async Task NonOidcRootIsRejectedBeforeAuthorityAuthentication(string path)
     {
         await using var host = new BffSecretPreparationTestHost();
@@ -103,6 +117,7 @@ public sealed class InfisicalConfigurationProviderTests
             ["GOOGLE_CLIENT_ID"] = "/runtime/bff/oidc/google",
             ["GOOGLE_CLIENT_SECRET"] = "/runtime/bff/oidc/google",
             ["ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS"] = "/runtime/bff/atproto/oauth",
+            ["BFF_SESSION_REDIS_PASSWORD"] = "/runtime/bff/session",
             ["EVENT_DP_BFF_RING"] = "/runtime/bff/data-protection",
             ["EVENT_DP_BFF_ADMISSION"] = "/admission/bff/data-protection"
         };
@@ -223,6 +238,45 @@ public sealed class InfisicalConfigurationProviderTests
         await Assert.That(authority.Requests.Any(request => request.AbsolutePath == "/api/v4/secrets")).IsFalse();
         await Assert.That(authority.Requests.Any(request => request.AbsolutePath.EndsWith(
             "/DATABASE_RUNTIME_PASSWORD", StringComparison.Ordinal))).IsFalse();
+    }
+
+    [Test]
+    [Arguments("/runtime/bff/session", "BFF_SESSION_REDIS_PASSWORD", true)]
+    [Arguments("/runtime/bff/session/nested", "BFF_SESSION_REDIS_PASSWORD", false)]
+    [Arguments("/runtime/bff/session", "GOOGLE_CLIENT_SECRET", false)]
+    [Arguments("/runtime/bff/session", "DATABASE_PASSWORD", false)]
+    public async Task SessionCredentialRequiresExactRootAndKey(string returnedPath, string key, bool admitted)
+    {
+        string canary = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        await using var host = new BffSecretPreparationTestHost();
+        var roots = CompleteRoots(host);
+        roots["/runtime/bff/session"] = [new(key, canary, returnedPath)];
+        await using var authority = await NativeAuthority.StartAsync(path => roots.GetValueOrDefault(path) ?? []);
+        InvalidOperationException? rejection = null;
+        try { await host.PrepareInfisicalAsync(authority.Url); }
+        catch (InvalidOperationException exception) { rejection = exception; }
+
+        await Assert.That(rejection is null).IsEqualTo(admitted);
+        string? value = host.Builder.Configuration["Bff:SessionAuthority:Password"];
+        await Assert.That(value == (admitted ? canary : null)).IsTrue();
+        await Assert.That(host.Builder.Configuration["BFF_SESSION_REDIS_PASSWORD"]).IsNull();
+        Uri acquisition = authority.Requests.Single(request =>
+            request.AbsolutePath == "/api/v4/secrets/BFF_SESSION_REDIS_PASSWORD");
+        var query = QueryHelpers.ParseQuery(acquisition.Query);
+        await Assert.That(query["secretPath"].ToString()).IsEqualTo("/runtime/bff/session");
+        await Assert.That(query.TryGetValue("recursive", out var recursive)
+            && recursive.ToString() == "true").IsFalse();
+        await Assert.That(query["expandSecretReferences"].ToString()).IsEqualTo("false");
+        await Assert.That(query.TryGetValue("include_imports", out var imports)
+            && imports.ToString() == "true").IsFalse();
+        await Assert.That(authority.Requests.Any(request =>
+            request.AbsolutePath is "/api/v4/secrets" or "/api/v3/secrets/raw")).IsFalse();
+        if (rejection is not null)
+        {
+            await Assert.That(rejection.InnerException).IsNull();
+            await Assert.That(rejection.Message.Contains(canary, StringComparison.Ordinal)).IsFalse();
+            await host.AssertNothingPublished();
+        }
     }
 
     [Test]

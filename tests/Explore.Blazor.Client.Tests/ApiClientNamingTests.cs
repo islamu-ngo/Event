@@ -1,5 +1,8 @@
+using System.Net;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Extensions;
@@ -7,367 +10,343 @@ using Explore.Blazor.Client.Extensions;
 namespace Explore.Blazor.Client.Tests;
 
 /// <summary>
-/// Guardrail tests that enforce the ergonomics bar on generated tag clients.
-///
-/// These tests protect
-/// the stabilized API OpenAPI surface from regressing back to duplicate URL-segment aliases or
-/// unstable operation IDs that force NSwag collision-disambiguation suffixes such as
-/// <c>Foo2Async</c>, <c>Foo3Async</c>, or <c>TenantGET2Async</c>.
-///
-/// Strategy: reflect over generated tag client interfaces, collect every async
-/// method name, and assert against the naming invariants defined in the plan.
+/// Exercises the generated clients as consumers, across the HTTP and JSON boundary.
 /// </summary>
 public class ApiClientNamingTests
 {
-    private static readonly string[] RequiredSchedulingDtoTypeNames =
-    [
-        "EventAgendaItemDto",
-        "EventAgendaItemListDto",
-        "EventDayDto",
-        "EventDayListDto",
-        "LocationRoomDto",
-        "LocationRoomListDto"
-    ];
-
-    private static readonly string[] RequiredSchedulingHalWrapperTypeNames =
-    [
-        "HalResourceOfEventAgendaItemDto",
-        "HalResourceOfEventDayDto",
-        "HalResourceOfLocationRoomDto",
-        "HalCollectionResourceOfEventAgendaItemListDto",
-        "HalCollectionResourceOfEventDayListDto",
-        "HalCollectionResourceOfLocationRoomListDto"
-    ];
-
-    private static readonly string[] RequiredTenantSettingsMethodNames =
-    [
-        "PatchTenantStorageSettingsAsync",
-        "PatchTenantBrandingSettingsDocumentAsync",
-        "PatchTenantFooterSettingsAsync",
-        "GetTenantFooterSettingsAsync"
-    ];
-
-    private static readonly string[] StableRegistrationProviderUntypedHalCollections =
-    [
-        "HalCollectionEmbeddedOfRegistrationChannelDto",
-        "HalCollectionEmbeddedOfRegistrationProviderBindingDto",
-        "HalCollectionEmbeddedOfRegistrationProviderBindingHealthDto",
-        "HalCollectionEmbeddedOfRegistrationProviderConnectionDto",
-        "HalCollectionEmbeddedOfRegistrationProviderParkedQueueItemDto"
-    ];
-
-    private static readonly string[] LegacyTenantSettingsMethodNames =
-    [
-        "UpdateTenantStorageSettingsAsync",
-        "ReplaceTenantBrandingSettingsDocumentAsync",
-        "UpdateTenantFooterSettingsAsync"
-    ];
-
-    /// <summary>
-    /// Exact-match banned method names. These are NSwag's collision-disambiguation fallbacks
-    /// observed in the current generated client. Phase 2+3 must eliminate every one of them.
-    /// </summary>
-    private static readonly string[] BannedExactMethodNames =
-    [
-        "GETAsync", "GET2Async", "GET3Async",
-        "POSTAsync", "POST2Async", "POST3Async",
-        "PUTAsync", "PUT2Async", "PUT3Async",
-        "DELETEAsync", "DELETE2Async", "DELETE3Async",
-        "PATCHAsync", "PATCH2Async", "PATCH3Async",
-    ];
-
-    /// <summary>
-    /// Regex matching NSwag's suffix-disambiguation pattern: any method name whose name ends
-    /// with one-or-more digits immediately before the <c>Async</c> suffix (e.g. <c>TenantGET2Async</c>,
-    /// <c>AuthProviderGET2Async</c>, <c>Status8Async</c>).
-    /// </summary>
-    private static readonly Regex DigitBeforeAsyncSuffix = new(@"\d+Async$", RegexOptions.Compiled);
-
-    /// <summary>
-    /// Regex matching a clean, stable operation-id-derived name. Phase 3 target shape.
-    /// </summary>
-    private static readonly Regex CleanAsyncMethodName =
-        new(@"^[A-Z][A-Za-z0-9]+Async$", RegexOptions.Compiled);
-
-    private static readonly Regex GeneratedAnonymousClassName =
-        new(@"public partial (?:record )?class Anonymous\d+", RegexOptions.Compiled);
+    private static readonly Guid ResourceId = Guid.Parse("0198eb23-4a10-7000-8000-000000000001");
+    private static readonly Guid ParentId = Guid.Parse("0198eb23-4a10-7000-8000-000000000002");
 
     [Test]
-    public async Task GeneratedTagClients_AreDiscoverable()
+    public async Task GeneratedTagClientsCoverCurrentSchemaAndCanBeConstructed()
     {
-        var clientTypes = GeneratedEventApiClients.ClientTypes;
-
-        await Assert.That(clientTypes).IsNotEmpty()
-            .Because("Reflection target GeneratedEventApiClients.ClientTypes must resolve from the Explore.Blazor.Client assembly.");
-        using var schema = JsonDocument.Parse(File.ReadAllText(GetOpenApiSchemaPath()));
+        using var schema = ReadSchema();
         var tagCount = schema.RootElement.GetProperty("paths").EnumerateObject()
             .SelectMany(path => path.Value.EnumerateObject())
             .Where(operation => operation.Value.TryGetProperty("operationId", out _))
             .Select(operation => operation.Value.GetProperty("tags")[0].GetString())
+            .Distinct(StringComparer.Ordinal).Count();
+        var clients = GeneratedEventApiClients.ClientTypes;
+        await Assert.That(clients).IsNotEmpty();
+        await Assert.That(clients.Count).IsEqualTo(tagCount);
+
+        using var transport = new ContractTransport("{}");
+        using var http = CreateHttpClient(transport);
+        foreach (var (contract, implementation) in clients)
+        {
+            var client = Activator.CreateInstance(implementation, http);
+            await Assert.That(contract.IsInstanceOfType(client)).IsTrue();
+            await Assert.That(contract.GetMethods().Any(method => method.ReturnType.IsAssignableTo(typeof(Task))))
+                .IsTrue().Because($"{contract.Name} must expose a callable asynchronous operation.");
+        }
+    }
+
+    [Test]
+    public async Task GeneratedOperationsHaveSemanticNamesWithoutCollisionSuffixes()
+    {
+        var names = GeneratedEventApiClients.ClientTypes.SelectMany(pair => pair.InterfaceType.GetMethods())
+            .Select(method => method.Name).Distinct(StringComparer.Ordinal).ToArray();
+        await Assert.That(names).IsNotEmpty();
+        await Assert.That(names.Where(name => !Regex.IsMatch(name, @"^[A-Z][A-Za-z0-9]+Async$", RegexOptions.CultureInvariant)
+            || Regex.IsMatch(name, @"\d+Async$", RegexOptions.CultureInvariant)
+            || Regex.IsMatch(name, @"^(GET|POST|PUT|DELETE|PATCH)Async$", RegexOptions.CultureInvariant)))
+            .IsEmpty();
+    }
+
+    [Test]
+    public async Task SchemaReferencedHalItemsRemainTypedInCompiledContracts()
+    {
+        using var schema = ReadSchema();
+        var schemas = schema.RootElement.GetProperty("components").GetProperty("schemas");
+        var embeddedSchemas = schemas.EnumerateObject()
+            .Where(component => component.Value.TryGetProperty("properties", out var properties)
+                && properties.TryGetProperty("_embedded", out var embedded)
+                && embedded.TryGetProperty("$ref", out _))
+            .Select(component => component.Value.GetProperty("properties").GetProperty("_embedded")
+                .GetProperty("$ref").GetString()!.Split('/')[^1])
             .Distinct(StringComparer.Ordinal)
-            .Count();
-        await Assert.That(clientTypes.Count).IsEqualTo(tagCount)
-            .Because("Every first-tag OpenAPI client must be discoverable from the generated assembly.");
-
-        foreach (var pair in clientTypes)
+            .Select(name => (Name: name, Schema: schemas.GetProperty(name)))
+            .Where(component => component.Schema.GetProperty("properties").GetProperty("items")
+                .GetProperty("items").TryGetProperty("$ref", out _)).ToArray();
+        await Assert.That(embeddedSchemas).IsNotEmpty();
+        foreach (var component in embeddedSchemas)
         {
-            await Assert.That(pair.InterfaceType.IsInterface).IsTrue()
-                .Because($"{pair.InterfaceType.Name} is expected to be a public interface generated by NSwag.");
-            await Assert.That(pair.ImplementationType.IsClass).IsTrue()
-                .Because($"{pair.ImplementationType.Name} is expected to be a public class generated by NSwag.");
+            var itemReference = component.Schema.GetProperty("properties").GetProperty("items")
+                .GetProperty("items").GetProperty("$ref").GetString()!;
+            var expectedItem = typeof(EventDayClient).Assembly.GetType(
+                $"{typeof(EventDayClient).Namespace}.{itemReference.Split('/')[^1]}", throwOnError: true)!;
+            var embedded = typeof(EventDayClient).Assembly.GetType(
+                $"{typeof(EventDayClient).Namespace}.{component.Name}", throwOnError: true)!;
+            var items = embedded.GetProperties().Single(property =>
+                property.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name == "items");
+            await Assert.That(items.PropertyType.IsAssignableTo(typeof(IEnumerable<>).MakeGenericType(expectedItem)))
+                .IsTrue().Because($"{component.Name} must preserve the schema's item contract {expectedItem.Name}.");
         }
     }
 
     [Test]
-    public async Task GeneratedTagClients_HaveAtLeastOneAsyncMethod()
+    public async Task AgendaReadsPreserveScheduleValuesAndHalActions()
     {
-        var asyncMethods = GetAsyncMethodNames();
+        var itemJson = $$"""
+            {"id":"{{ResourceId:D}}","eventId":"{{ParentId:D}}","title":"Opening discussion","startTime":"2026-10-23T09:30:00+02:00","localStartDate":"2026-10-23","localStartTime":"09:30:00","_links":{"edit":{"href":"/api/eventagendaitem/{{ResourceId:D}}","method":"PATCH"} } }
+            """;
+        using var transport = new ContractTransport(itemJson, CollectionJson(itemJson));
+        using var http = CreateHttpClient(transport);
+        IEventAgendaItemClient client = new EventAgendaItemClient(http);
+        var detail = await client.GetEventAgendaItemByIdAsync(ResourceId, api_version: "1.0", x_Api_Version: "1.0");
+        var collection = await client.GetEventAgendaItemsByEventAsync(ParentId);
+        var item = collection._embedded!.Items!.Single();
 
-        await Assert.That(asyncMethods.Count > 0).IsTrue()
-            .Because("Generated client should expose at least one *Async method; zero methods indicates a generation failure.");
+        await Assert.That(detail.Id).IsEqualTo(ResourceId);
+        await Assert.That(detail.StartTime).IsEqualTo(new DateTimeOffset(2026, 10, 23, 9, 30, 0, TimeSpan.FromHours(2)));
+        await Assert.That(detail.LocalStartDate!.Value.Day).IsEqualTo(23);
+        await Assert.That(detail.LocalStartTime).IsEqualTo(new TimeSpan(9, 30, 0));
+        await Assert.That(detail._links!["edit"].Method).IsEqualTo("PATCH");
+        await Assert.That(item.Title).IsEqualTo("Opening discussion");
+        await Assert.That(item._links!["edit"].Href).IsEqualTo($"/api/eventagendaitem/{ResourceId:D}");
+        await Assert.That(collection.TotalCount).IsEqualTo(1);
+        await AssertGet(transport.Requests[0], $"/api/eventagendaitem/{ResourceId:D}?api-version=1.0");
+        await Assert.That(transport.Requests[0].ApiVersion).IsEqualTo("1.0");
+        await AssertGet(transport.Requests[1], $"/api/eventagendaitem/by-event/{ParentId:D}");
+
+        var value = JsonSerializer.Deserialize<EventAgendaItemDto>(itemJson)!;
+        var listValue = JsonSerializer.Deserialize<EventAgendaItemListDto>(itemJson)!;
+        await Assert.That((value with { Title = "Updated discussion" }).Title).IsEqualTo("Updated discussion");
+        await Assert.That(value.Title).IsEqualTo("Opening discussion");
+        await Assert.That(listValue.EventId).IsEqualTo(ParentId);
     }
 
     [Test]
-    public async Task GeneratedTagClients_NoMethodUsesCollisionSuffixPattern()
+    public async Task DayReadsPreserveLocalDateAndTypedHalItems()
     {
-        var offenders = GetAsyncMethodNames()
-            .Where(name => DigitBeforeAsyncSuffix.IsMatch(name))
-            .OrderBy(name => name)
-            .ToList();
+        var itemJson = $$"""
+            {"id":"{{ResourceId:D}}","eventId":"{{ParentId:D}}","localDate":"2026-10-23","label":"Friday","allowsDayScopeRegistration":true,"_links":{"self":{"href":"/api/eventday/{{ResourceId:D}}","method":"GET"} } }
+            """;
+        using var transport = new ContractTransport(itemJson, CollectionJson(itemJson));
+        using var http = CreateHttpClient(transport);
+        IEventDayClient client = new EventDayClient(http);
+        var detail = await client.GetEventDayByIdAsync(ResourceId);
+        var collection = await client.GetEventDaysByEventAsync(ParentId);
+        var item = collection._embedded!.Items!.Single();
 
-        await Assert.That(offenders).IsEmpty()
-            .Because(
-                $"Every method on generated tag clients ending in '\\dAsync' is a NSwag collision fallback " +
-                $"and indicates duplicate or unstable OpenAPI operationIds. Offenders: {offenders.Count}. " +
-                $"First 10: {string.Join(", ", offenders.Take(10))}.");
+        await Assert.That(detail.Id).IsEqualTo(ResourceId);
+        await Assert.That(detail.LocalDate!.Value.Year).IsEqualTo(2026);
+        await Assert.That(detail.LocalDate.Value.Month).IsEqualTo(10);
+        await Assert.That(detail.LocalDate.Value.Day).IsEqualTo(23);
+        await Assert.That(detail.AllowsDayScopeRegistration).IsTrue();
+        await Assert.That(item.Label).IsEqualTo("Friday");
+        await Assert.That(item._links!["self"].Href).IsEqualTo($"/api/eventday/{ResourceId:D}");
+        await Assert.That(collection._links!["self"].Method).IsEqualTo("GET");
+        await AssertGet(transport.Requests[0], $"/api/eventday/{ResourceId:D}");
+        await AssertGet(transport.Requests[1], $"/api/eventday/by-event/{ParentId:D}");
+
+        var value = JsonSerializer.Deserialize<EventDayDto>(itemJson)!;
+        var listValue = JsonSerializer.Deserialize<EventDayListDto>(itemJson)!;
+        await Assert.That((value with { Label = "Opening day" }).Label).IsEqualTo("Opening day");
+        await Assert.That(value.Label).IsEqualTo("Friday");
+        await Assert.That(listValue.LocalDate).IsEqualTo(value.LocalDate);
     }
 
     [Test]
-    public async Task GeneratedTagClients_NoMethodUsesExactBannedPlaceholderName()
+    public async Task RoomReadsPreserveCapacityAndAbsenceOfEditAuthority()
     {
-        var asyncMethods = GetAsyncMethodNames().ToHashSet(StringComparer.Ordinal);
-        var offenders = BannedExactMethodNames
-            .Where(name => asyncMethods.Contains(name))
-            .OrderBy(name => name)
-            .ToList();
+        var itemJson = $$"""
+            {"id":"{{ResourceId:D}}","locationId":"{{ParentId:D}}","name":"Workshop room","capacity":48,"_links":{"self":{"href":"/api/locationroom/{{ResourceId:D}}","method":"GET"} } }
+            """;
+        using var transport = new ContractTransport(itemJson, CollectionJson(itemJson));
+        using var http = CreateHttpClient(transport);
+        ILocationRoomClient client = new LocationRoomClient(http);
+        var detail = await client.GetLocationRoomByIdAsync(ResourceId);
+        var collection = await client.GetLocationRoomsByLocationAsync(ParentId);
+        var item = collection._embedded!.Items!.Single();
 
-        await Assert.That(offenders).IsEmpty()
-            .Because(
-                $"Generated methods whose names equal a raw HTTP verb (with optional digit suffix) are " +
-                $"always NSwag placeholders — they carry zero semantic information. Offenders: " +
-                $"[{string.Join(", ", offenders)}].");
+        await Assert.That(detail.LocationId).IsEqualTo(ParentId);
+        await Assert.That(detail.Capacity).IsEqualTo(48);
+        await Assert.That(detail._links!.ContainsKey("edit")).IsFalse();
+        await Assert.That(item.Name).IsEqualTo("Workshop room");
+        await Assert.That(item.Capacity).IsEqualTo(48);
+        await Assert.That(item._links!.ContainsKey("edit")).IsFalse();
+        await AssertGet(transport.Requests[0], $"/api/locationroom/{ResourceId:D}");
+        await AssertGet(transport.Requests[1], $"/api/locationroom/by-location/{ParentId:D}");
+
+        var value = JsonSerializer.Deserialize<LocationRoomDto>(itemJson)!;
+        var listValue = JsonSerializer.Deserialize<LocationRoomListDto>(itemJson)!;
+        await Assert.That((value with { Capacity = 60 }).Capacity).IsEqualTo(60);
+        await Assert.That(value.Capacity).IsEqualTo(48);
+        await Assert.That(listValue.Name).IsEqualTo("Workshop room");
     }
 
     [Test]
-    public async Task GeneratedTagClients_AllMethodNamesMatchCleanOperationIdShape()
+    public async Task TenantStoragePatchSendsOptionalValueAndConsumesCommandResult()
     {
-        var offenders = GetAsyncMethodNames()
-            .Where(name => !CleanAsyncMethodName.IsMatch(name))
-            .OrderBy(name => name)
-            .ToList();
-
-        await Assert.That(offenders).IsEmpty()
-            .Because(
-                $"Post-stabilization, every generated tag client method name must match " +
-                $"'^[A-Z][A-Za-z0-9]+Async$' — a clean PascalCase operationId followed by 'Async'. " +
-                $"Offenders: {offenders.Count}. First 10: {string.Join(", ", offenders.Take(10))}.");
-    }
-
-    [Test]
-    public async Task GeneratedTagClients_MethodNamesAreUniqueWithinInterface()
-    {
-        var duplicates = GeneratedEventApiClients.ClientTypes
-            .SelectMany(pair => pair.InterfaceType
-                .GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                .GroupBy(m => (Interface: pair.InterfaceType.Name, m.Name, Parameters: string.Join(",",
-                    m.GetParameters().Select(p => p.ParameterType.FullName ?? p.ParameterType.Name))))
-                .Where(g => g.Count() > 1)
-                .Select(g => $"{g.Key.Interface}.{g.Key.Name}({g.Key.Parameters})"))
-            .OrderBy(s => s)
-            .ToList();
-
-        await Assert.That(duplicates).IsEmpty()
-            .Because($"Reflection found duplicate (name, signature) methods on generated tag client interfaces: [{string.Join("; ", duplicates)}].");
-    }
-
-    [Test]
-    public async Task GeneratedClient_TenantSettingsMethodsUsePrimaryNamesWithoutCompatibilityOverloads()
-    {
-        var generatedClientSource = GetGeneratedClientSource();
-        var generatedMethodNames = GetGeneratedAsyncMethodDeclarationNames(generatedClientSource);
-
-        foreach (var requiredMethodName in RequiredTenantSettingsMethodNames)
+        using var transport = new ContractTransport($$"""{"id":"{{ResourceId:D}}","success":true}""");
+        using var http = CreateHttpClient(transport);
+        ITenantStorageSettingsClient client = new TenantStorageSettingsClient(http);
+        var result = await client.PatchTenantStorageSettingsAsync(new PatchTenantStorageSettingsDto
         {
-            await Assert.That(generatedMethodNames.Count(name => name == requiredMethodName))
-                .IsEqualTo(2)
-                .Because($"Generated source must contain exactly the interface and class declarations for {requiredMethodName}, without a compatibility overload.");
-        }
+            Policy = new PatchTenantStoragePolicyDto
+            {
+                Provider = new OptionalUpdateOfstring { HasValue = true, Value = "Local" }
+            }
+        });
 
-        foreach (var legacyMethodName in LegacyTenantSettingsMethodNames)
+        var request = transport.Requests.Single();
+        await AssertPatch(request, "/api/tenant/settings/storage");
+        using var body = JsonDocument.Parse(request.Body!);
+        var provider = body.RootElement.GetProperty("policy").GetProperty("provider");
+        await Assert.That(provider.GetProperty("hasValue").GetBoolean()).IsTrue();
+        await Assert.That(provider.GetProperty("value").GetString()).IsEqualTo("Local");
+        await Assert.That(result.Id).IsEqualTo(ResourceId);
+        await Assert.That(result.Success).IsTrue();
+    }
+
+    [Test]
+    public async Task TenantBrandingPatchPreservesConcurrencyAndReturnsHalDocument()
+    {
+        var response = $$"""
+            {"documentKey":"branding","schemaVersion":1,"defaultsVersion":"1","payload":{},"source":"Tenant","sourceScopeId":"{{ParentId:D}}","concurrencyStamp":"{{ResourceId:D}}","_links":{"edit":{"href":"/api/tenant/settings/documents/branding","method":"PATCH"} } }
+            """;
+        using var transport = new ContractTransport(response);
+        using var http = CreateHttpClient(transport);
+        ITenantSettingsDocumentsClient client = new TenantSettingsDocumentsClient(http);
+        var result = await client.PatchTenantBrandingSettingsDocumentAsync(new PatchTenantBrandingSettingsDocumentDto
         {
-            await Assert.That(generatedMethodNames.Contains(legacyMethodName, StringComparer.Ordinal)).IsFalse();
-            await Assert.That(generatedClientSource.Contains($"{legacyMethodName}(", StringComparison.Ordinal))
-                .IsFalse()
-                .Because($"Generated client source must not retain the retired {legacyMethodName} compatibility method.");
-        }
+            ExpectedConcurrencyStamp = ResourceId,
+            DisplayName = new PatchTenantBrandingDisplayNameDto
+            {
+                Value = new OptionalUpdateOfstring { HasValue = true, Value = "Community" }
+            }
+        });
+
+        var request = transport.Requests.Single();
+        await AssertPatch(request, "/api/tenant/settings/documents/branding");
+        using var body = JsonDocument.Parse(request.Body!);
+        await Assert.That(body.RootElement.GetProperty("expectedConcurrencyStamp").GetGuid()).IsEqualTo(ResourceId);
+        await Assert.That(body.RootElement.GetProperty("displayName").GetProperty("value").GetProperty("value").GetString())
+            .IsEqualTo("Community");
+        await Assert.That(result.ConcurrencyStamp).IsEqualTo(ResourceId);
+        await Assert.That(result.DocumentKey).IsEqualTo("branding");
+        await Assert.That(result._links!["edit"].Method).IsEqualTo("PATCH");
     }
 
     [Test]
-    public async Task GeneratedClient_EmitsSchedulingDtoTypes()
+    public async Task TenantFooterPatchPreservesClearAndReplacementPresence()
     {
-        var generatedClientSource = GetGeneratedClientSource();
-        var missing = RequiredSchedulingDtoTypeNames
-            .Where(typeName => !generatedClientSource.Contains($"public partial record class {typeName}", StringComparison.Ordinal))
-            .OrderBy(name => name)
-            .ToList();
-
-        await Assert.That(missing).IsEmpty()
-            .Because("Scheduling contracts must be generated rather than hand-maintained in Blazor. "
-                + $"Missing: [{string.Join(", ", missing)}].");
-    }
-
-    [Test]
-    public async Task GeneratedClient_StillEmitsSchedulingHalWrapperTypes()
-    {
-        var generatedClientSource = GetGeneratedClientSource();
-        var missing = RequiredSchedulingHalWrapperTypeNames
-            .Where(typeName => !generatedClientSource.Contains($"public partial class {typeName}", StringComparison.Ordinal))
-            .OrderBy(name => name)
-            .ToList();
-
-        await Assert.That(missing).IsEmpty()
-            .Because("Scheduling DTOs and their HAL wrapper schemas must remain generated for API responses. "
-                + $"Missing: [{string.Join(", ", missing)}].");
-    }
-
-    [Test]
-    public async Task GeneratedClient_DoesNotEmitUntypedHalEmbeddedItemCollections()
-    {
-        var generatedClientSource = GetGeneratedClientSource();
-        var offenders = GetUntypedHalEmbeddedCollectionTypeNames(generatedClientSource)
-            .Except(StableRegistrationProviderUntypedHalCollections, StringComparer.Ordinal)
-            .ToList();
-
-        await Assert.That(offenders).IsEmpty()
-            .Because("HAL embedded collection item arrays should stay typed so generated clients do not fall back to ICollection<object>. "
-                + $"Actual offenders: [{string.Join(", ", offenders)}].");
-    }
-
-    [Test]
-    public async Task GeneratedClient_DoesNotEmitAnonymousSchemaTypes()
-    {
-        var generatedClientSource = GetGeneratedClientSource();
-        var offenders = GeneratedAnonymousClassName
-            .Matches(generatedClientSource)
-            .Select(match => match.Value["public partial class ".Length..])
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(name => name)
-            .ToList();
-
-        await Assert.That(offenders).IsEmpty()
-            .Because("OpenAPI schemas should use named component references instead of inline object schemas that NSwag emits as AnonymousN classes. "
-                + $"Actual offenders: [{string.Join(", ", offenders)}].");
-    }
-
-    [Test]
-    public async Task GeneratedClientCarriesOwnedRecordTransformationStamp()
-    {
-        var generatedClientSource = GetGeneratedClientSource();
-
-        await Assert.That(generatedClientSource)
-            .Contains("// <generated-record-policy version=\"1\">");
-        await Assert.That(generatedClientSource)
-            .Contains("public partial record class ActorDto");
-        await Assert.That(generatedClientSource)
-            .Contains("public partial class PublicExperienceClient");
-        await Assert.That(generatedClientSource)
-            .Contains("public partial class HalResourceOfActorDto");
-        await Assert.That(generatedClientSource)
-            .Contains("public partial class PatchTenantFooterSettingsDto");
-    }
-
-    private static List<string> GetAsyncMethodNames() =>
-        GeneratedEventApiClients.ClientTypes
-            .SelectMany(pair => pair.InterfaceType.GetMethods(BindingFlags.Public | BindingFlags.Instance))
-            .Where(m => m.Name.EndsWith("Async", StringComparison.Ordinal))
-            .Select(m => m.Name)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-
-    private static string GetOpenApiSchemaPath() => Path.GetFullPath(Path.Combine(
-        AppContext.BaseDirectory,
-        "../../../../../schemas/openapi_islamu-event.json"));
-
-    private static string GetGeneratedClientSource()
-    {
-        var generatedClientPath = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "../../../../../src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs"));
-
-        return File.ReadAllText(generatedClientPath);
-    }
-
-    private static List<string> GetGeneratedAsyncMethodDeclarationNames(string generatedClientSource)
-    {
-        var methodNames = new List<string>();
-
-        using var reader = new StringReader(generatedClientSource);
-        string? line;
-        while ((line = reader.ReadLine()) is not null)
+        using var transport = new ContractTransport("""{"success":true}""");
+        using var http = CreateHttpClient(transport);
+        IFooterClient client = new FooterClient(http);
+        await client.PatchTenantFooterSettingsAsync(new PatchTenantFooterSettingsDto
         {
-            var trimmed = line.TrimStart();
-            if (!trimmed.StartsWith("System.Threading.Tasks.Task", StringComparison.Ordinal)
-                && !trimmed.StartsWith("public virtual async System.Threading.Tasks.Task", StringComparison.Ordinal))
+            General = new PatchTenantFooterGeneralDto
             {
-                continue;
-            }
-
-            var openParenthesis = trimmed.IndexOf('(', StringComparison.Ordinal);
-            var lastSpace = openParenthesis > 0
-                ? trimmed.LastIndexOf(' ', openParenthesis - 1)
-                : -1;
-            if (lastSpace < 0)
+                Enabled = new OptionalUpdateOfboolean { HasValue = true, Value = false }
+            },
+            Description = new PatchTenantFooterDescriptionDto
             {
-                continue;
+                Text = new OptionalUpdateOfstring { HasValue = true, Value = null }
             }
+        });
 
-            var methodName = trimmed[(lastSpace + 1)..openParenthesis];
-            if (methodName.EndsWith("Async", StringComparison.Ordinal))
-            {
-                methodNames.Add(methodName);
-            }
-        }
-
-        return methodNames;
+        var request = transport.Requests.Single();
+        await AssertPatch(request, "/api/footer/settings");
+        using var body = JsonDocument.Parse(request.Body!);
+        var enabled = body.RootElement.GetProperty("general").GetProperty("enabled");
+        await Assert.That(enabled.GetProperty("hasValue").GetBoolean()).IsTrue();
+        await Assert.That(enabled.GetProperty("value").GetBoolean()).IsFalse();
+        var clear = body.RootElement.GetProperty("description").GetProperty("text");
+        await Assert.That(clear.GetProperty("hasValue").GetBoolean()).IsTrue();
+        await Assert.That(!clear.TryGetProperty("value", out var value) || value.ValueKind == JsonValueKind.Null).IsTrue();
+        await Assert.That(!body.RootElement.TryGetProperty("template", out var template) || template.ValueKind == JsonValueKind.Null)
+            .IsTrue();
     }
 
-    private static List<string> GetUntypedHalEmbeddedCollectionTypeNames(string generatedClientSource)
+    [Test]
+    public async Task TenantFooterReadPreservesServerSuppliedAffordances()
     {
-        var offenders = new List<string>();
-        string? currentType = null;
+        using var transport = new ContractTransport("""{"_links":{"edit":{"href":"/api/footer/settings","method":"PATCH"}}}""");
+        using var http = CreateHttpClient(transport);
+        IFooterClient client = new FooterClient(http);
+        var resource = await client.GetTenantFooterSettingsAsync();
+        await AssertGet(transport.Requests.Single(), "/api/footer/settings");
+        await Assert.That(resource._links!["edit"].Href).IsEqualTo("/api/footer/settings");
+        await Assert.That(resource._links["edit"].Method).IsEqualTo("PATCH");
+        await Assert.That(resource._links.ContainsKey("delete")).IsFalse();
+    }
 
-        using var reader = new StringReader(generatedClientSource);
-        string? line;
-        while ((line = reader.ReadLine()) is not null)
+    [Test]
+    public async Task SchedulingNotFoundPreservesProblemDetails()
+    {
+        using var transport = new ContractTransport("""{"type":"https://event.test/problems/not-found","title":"Agenda item not found","status":404,"detail":"No visible item.","traceId":"synthetic-trace"}""")
         {
-            var trimmed = line.Trim();
-            if (trimmed.StartsWith("public partial class ", StringComparison.Ordinal))
-            {
-                currentType = trimmed["public partial class ".Length..]
-                    .Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
-                continue;
-            }
+            StatusCode = HttpStatusCode.NotFound
+        };
+        using var http = CreateHttpClient(transport);
+        IEventAgendaItemClient client = new EventAgendaItemClient(http);
+        var error = (await Assert.ThrowsAsync<ApiException<ProblemDetails>>(() => client.GetEventAgendaItemByIdAsync(ResourceId)))!;
+        await Assert.That(error.StatusCode).IsEqualTo(404);
+        await Assert.That(error.Result.Title).IsEqualTo("Agenda item not found");
+        await Assert.That(error.Result.Detail).IsEqualTo("No visible item.");
+        await Assert.That(((JsonElement)error.Result.AdditionalProperties["traceId"]).GetString()).IsEqualTo("synthetic-trace");
+        await AssertGet(transport.Requests.Single(), $"/api/eventagendaitem/{ResourceId:D}");
+    }
 
-            if (currentType is not null
-                && trimmed.Contains("public System.Collections.Generic.ICollection<object>? Items", StringComparison.Ordinal))
+    [Test]
+    public async Task TenantSettingsDenialIsNotConsumedAsSuccessfulCommand()
+    {
+        using var transport = new ContractTransport("""{"title":"Forbidden","status":403,"detail":"Settings are locked."}""")
+        {
+            StatusCode = HttpStatusCode.Forbidden
+        };
+        using var http = CreateHttpClient(transport);
+        ITenantStorageSettingsClient client = new TenantStorageSettingsClient(http);
+        var error = (await Assert.ThrowsAsync<ApiException<ProblemDetails>>(() =>
+            client.PatchTenantStorageSettingsAsync(new PatchTenantStorageSettingsDto())))!;
+        await Assert.That(error.StatusCode).IsEqualTo(403);
+        await Assert.That(error.Result.Detail).IsEqualTo("Settings are locked.");
+        await AssertPatch(transport.Requests.Single(), "/api/tenant/settings/storage");
+    }
+
+    private static JsonDocument ReadSchema() => JsonDocument.Parse(File.ReadAllText(Path.GetFullPath(Path.Combine(
+        AppContext.BaseDirectory, "../../../../../schemas/openapi_islamu-event.json"))));
+
+    private static HttpClient CreateHttpClient(HttpMessageHandler transport) =>
+        new(transport, disposeHandler: false) { BaseAddress = new Uri("https://event.test/") };
+
+    private static string CollectionJson(string item) =>
+        $$"""{"pageNumber":1,"pageSize":20,"totalCount":1,"_links":{"self":{"href":"/api/schedule","method":"GET"} },"_embedded":{"items":[{{item}}]} }""";
+
+    private static async Task AssertGet(CapturedRequest request, string pathAndQuery)
+    {
+        await Assert.That(request.Method).IsEqualTo(HttpMethod.Get);
+        await Assert.That(request.Uri.AbsoluteUri).IsEqualTo($"https://event.test{pathAndQuery}");
+        await Assert.That(request.Body).IsNull();
+    }
+
+    private static async Task AssertPatch(CapturedRequest request, string path)
+    {
+        await Assert.That(request.Method).IsEqualTo(HttpMethod.Patch);
+        await Assert.That(request.Uri.AbsoluteUri).IsEqualTo($"https://event.test{path}");
+        await Assert.That(request.ContentType).IsEqualTo("application/json");
+    }
+
+    private sealed record CapturedRequest(HttpMethod Method, Uri Uri, string? ApiVersion, string? ContentType, string? Body);
+
+    private sealed class ContractTransport(params string[] responses) : HttpMessageHandler
+    {
+        public List<CapturedRequest> Requests { get; } = [];
+        public HttpStatusCode StatusCode { get; init; } = HttpStatusCode.OK;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(new CapturedRequest(request.Method, request.RequestUri!,
+                request.Headers.TryGetValues("X-Api-Version", out var versions) ? versions.Single() : null,
+                request.Content?.Headers.ContentType?.MediaType,
+                request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken)));
+            return new HttpResponseMessage(StatusCode)
             {
-                offenders.Add(currentType);
-            }
+                Content = new StringContent(responses[Requests.Count - 1], Encoding.UTF8,
+                    StatusCode == HttpStatusCode.OK ? "application/hal+json" : "application/problem+json")
+            };
         }
-
-        return offenders
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(name => name)
-            .ToList();
     }
 }

@@ -103,6 +103,7 @@ public sealed class TestDbContextOptionsTests
     {
         if (Environment.GetEnvironmentVariable(FreshEfProcessExecutor.ChildTestIdVariable) is not null)
         {
+            FreshEfProcessExecutor.WritePhaseBestEffort("fresh_ef_control phase=refusal_entered");
             throw new InvalidOperationException("EF_ISOLATION_FAILURE_PROBE");
         }
 
@@ -112,6 +113,7 @@ public sealed class TestDbContextOptionsTests
             .Throws<IsolatedEfTestException>();
         await Assert.That(failure!.ExitCode).IsEqualTo(2);
         await Assert.That(failure.Message).Contains("EF_ISOLATION_FAILURE_PROBE");
+        await Assert.That(failure.Message.Contains("\nfresh_ef_control phase=refusal_entered\n", StringComparison.Ordinal)).IsTrue();
     }
 
     [Test]

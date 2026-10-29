@@ -54,6 +54,8 @@ public static class RuntimeSecretEnvironment
             foreach (string name in new[]
             {
                 "DATABASE_RUNTIME_USERNAME", "DATABASE_GLOBAL_USERNAME", "DATABASE_MIGRATOR_USERNAME",
+                "DATABASE_INSTANCE_KEY_READ_USERNAME", "DATABASE_INSTANCE_KEY_WRITE_USERNAME",
+                "DATABASE_PLATFORM_KEY_REPORT_USERNAME",
                 "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME", "DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME",
                 "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME", "IDENTITY_DATABASE_RUNTIME_USERNAME",
                 "IDENTITY_DATABASE_MIGRATOR_USERNAME", "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"
@@ -61,6 +63,20 @@ public static class RuntimeSecretEnvironment
                 if (operatorInputs[name] is { } value
                     && (!target.TryGetValue(name, out object? existing) || existing is string { Length: 0 }))
                     target[name] = value;
+
+            foreach ((string canonical, string alias) in new[]
+            {
+                ("Database:InstanceKeyRead:Username", "DATABASE_INSTANCE_KEY_READ_USERNAME"),
+                ("Database:InstanceKeyWrite:Username", "DATABASE_INSTANCE_KEY_WRITE_USERNAME"),
+                ("Database:PlatformKeyReport:Username", "DATABASE_PLATFORM_KEY_REPORT_USERNAME")
+            })
+            {
+                if (operatorInputs[canonical] is not { } value)
+                    continue;
+
+                target[canonical.Replace(":", "__", StringComparison.Ordinal)] = value;
+                target[alias] = string.Empty;
+            }
 
             string? identityServerVersion = operatorInputs["IdentityDatabase:ServerVersion"]
                 ?? operatorInputs["IDENTITY_DATABASE_SERVER_VERSION"];

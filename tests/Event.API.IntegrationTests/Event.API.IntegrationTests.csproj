@@ -3,8 +3,11 @@
   <!-- The provider-neutral parity corpus is declared once and linked into every lane that evaluates it,
        so Local and Cerbos can never drift onto different scenario sets. -->
   <ItemGroup>
+    <Compile Include="..\Shared\AssuranceOwnershipContext.cs" Link="Fixtures\AssuranceOwnershipContext.cs" />
+    <Compile Include="..\Shared\ProviderContextOwners.cs" Link="Fixtures\ProviderContextOwners.cs" />
     <Compile Include="..\Shared\OperationalEndpointTestTransport.cs" Link="Fixtures\OperationalEndpointTestTransport.cs" />
     <Compile Include="..\Shared\ExternalDataProtectionTestAuthority.cs" Link="Fixtures\ExternalDataProtectionTestAuthority.cs" />
+    <Compile Include="..\Shared\PostgresTestRoleBootstrap.cs" Link="Fixtures\PostgresTestRoleBootstrap.cs" />
     <Compile Include="..\Shared\TransactionCleanupFault.cs" Link="Fixtures\TransactionCleanupFault.cs" />
     <Compile Include="..\Shared\Authorization\ProviderNeutralCorpus.cs" Link="Authorization\ProviderNeutralCorpus.cs" />
     <Compile Include="..\Shared\Moderation\ModerationMeasurementJournalAttribute.cs" Link="Moderation\ModerationMeasurementJournalAttribute.cs" />

@@ -1240,16 +1240,6 @@
           "SQLitePCLRaw.core": "2.1.12"
         }
       },
-      "StackExchange.Redis": {
-        "type": "Transitive",
-        "resolved": "2.13.1",
-        "contentHash": "jC5wkRe8K6HPoDENUws+fl2d7+GKz+ky8SWEDzYzPx6hHt2EwxWm01gmYPWLzlT49jfYYap0guB5bExtyX9aIQ==",
-        "dependencies": {
-          "Microsoft.Extensions.Logging.Abstractions": "8.0.0",
-          "Pipelines.Sockets.Unofficial": "2.2.16",
-          "System.IO.Hashing": "10.0.2"
-        }
-      },
       "Swashbuckle.AspNetCore.Swagger": {
         "type": "Transitive",
         "resolved": "10.2.3",
@@ -1500,6 +1490,7 @@
           "Serilog.Enrichers.Thread": "[4.0.0, )",
           "Serilog.Formatting.Compact": "[3.0.0, )",
           "Serilog.Settings.Configuration": "[10.0.1, )",
+          "StackExchange.Redis": "[2.13.1, )",
           "Yarp.ReverseProxy": "[2.3.0, )"
         }
       },
@@ -2780,6 +2771,17 @@
         "dependencies": {
           "SQLitePCLRaw.lib.e_sqlite3": "2.1.12",
           "SQLitePCLRaw.provider.e_sqlite3": "2.1.12"
+        }
+      },
+      "StackExchange.Redis": {
+        "type": "CentralTransitive",
+        "requested": "[2.13.1, )",
+        "resolved": "2.13.1",
+        "contentHash": "jC5wkRe8K6HPoDENUws+fl2d7+GKz+ky8SWEDzYzPx6hHt2EwxWm01gmYPWLzlT49jfYYap0guB5bExtyX9aIQ==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0",
+          "Pipelines.Sockets.Unofficial": "2.2.16",
+          "System.IO.Hashing": "10.0.2"
         }
       },
       "Stripe.net": {

@@ -1,4 +1,4 @@
-using Explore.Application.DTOs.Onboarding;
+using Explore.Application.Models.Storage;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Features.TenantStorageSettings.Requests.Commands;
 
@@ -7,9 +7,9 @@ namespace Explore.Application.Contracts.Persistence;
 /// <summary>Closed original actions, not a provider name, setup flag or transferable write permit.</summary>
 public interface IStorageProbeOriginalAction
 {
-    Task<InstanceStorageProviderStatusDto> ExecuteAsync(TestInstanceStorageProviderQuery query, CancellationToken token);
-    Task<InstanceStorageProviderStatusDto> ExecuteAsync(TestInstanceStorageProviderDuringSetupQuery query, CancellationToken token);
-    Task<InstanceStorageProviderStatusDto> ExecuteAsync(TestTenantStorageProviderCommand command, CancellationToken token);
+    Task<FileStorageProviderStatus> ExecuteAsync(TestInstanceStorageProviderQuery query, CancellationToken token);
+    Task<FileStorageProviderStatus> ExecuteAsync(TestInstanceStorageProviderDuringSetupQuery query, CancellationToken token);
+    Task<FileStorageProviderStatus> ExecuteAsync(TestTenantStorageProviderCommand command, CancellationToken token);
 }
 
 /// <summary>

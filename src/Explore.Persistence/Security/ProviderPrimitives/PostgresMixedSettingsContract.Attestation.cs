@@ -238,24 +238,38 @@ public static partial class PostgresMixedSettingsContract
                 AND NOT a.atthasdef AND a.attcollation = 0)
             THEN RAISE EXCEPTION 'mixed_settings_receipt_column_drift' USING ERRCODE = '55000'; END IF;
             """));
-        string scalarDenial = string.Join("\n", AllWriteTypes.Select(type =>
+        string writeTargets = string.Join(",", AllWriteTypes.Select(type =>
         {
-            string insertDenial = $"pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT')";
-            // Only the actual creator INSERT-source intersection may coexist.
-            // Its complete catalogue proof includes the restrictive document-key policy.
-            if (PostgresTenantCreationPermissions.TryGetGlobalColumns(context, type, out _, out var insertColumns)
-                && insertColumns.Count != 0)
-                insertDenial += $" AND ({PostgresTenantCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment)}) IS NOT TRUE";
-            if (PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, type, out _, out var workerInsert, out _)
-                && workerInsert.Count != 0)
-                insertDenial += $" AND ({PostgresManagedTenantWorkerCreationPermissions.CompleteGlobalCataloguePredicate(context, enrollment)}) IS NOT TRUE";
-            return $"""
-                IF pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                    OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'UPDATE,REFERENCES')
-                    OR ({insertDenial})
-                THEN RAISE EXCEPTION 'mixed_settings_ambient_scalar_authority' USING ERRCODE = '55000'; END IF;
-                """;
+            bool creator = PostgresTenantCreationPermissions.TryGetGlobalColumns(context, type, out _, out var creatorInsert)
+                && creatorInsert.Count != 0;
+            bool worker = PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, type, out _, out var workerInsert, out _)
+                && workerInsert.Count != 0;
+            return $"({Text(sql.Table(type))}::regclass,{creator.ToString().ToLowerInvariant()},{worker.ToString().ToLowerInvariant()})";
         }));
+        string scalarDenial = $"""
+            IF (WITH mixed_write_targets(relation,creator_source,worker_source) AS (VALUES {writeTargets}),
+            mixed_write_authority AS MATERIALIZED (
+                SELECT target.*,
+                    pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},target.relation,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') AS table_write,
+                    pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},target.relation,'UPDATE,REFERENCES') AS column_write,
+                    pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},target.relation,'INSERT') AS insert_write
+                FROM mixed_write_targets target),
+            mixed_catalogues AS MATERIALIZED (
+                SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM mixed_write_authority WHERE table_write OR column_write)
+                        AND EXISTS (SELECT 1 FROM mixed_write_authority WHERE creator_source AND insert_write)
+                    THEN ({PostgresTenantCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment)}) IS TRUE
+                    ELSE false END AS creator_current,
+                    CASE WHEN NOT EXISTS (SELECT 1 FROM mixed_write_authority WHERE table_write OR column_write)
+                        AND EXISTS (SELECT 1 FROM mixed_write_authority WHERE worker_source AND insert_write)
+                    THEN ({PostgresManagedTenantWorkerCreationPermissions.CompleteGlobalCataloguePredicate(context, enrollment)}) IS TRUE
+                    ELSE false END AS worker_current)
+            SELECT EXISTS (SELECT 1 FROM mixed_write_authority authority CROSS JOIN mixed_catalogues catalogue
+                WHERE authority.table_write OR authority.column_write
+                    OR (authority.insert_write AND NOT (
+                        (authority.creator_source AND catalogue.creator_current)
+                        OR (authority.worker_source AND catalogue.worker_current)))))
+            THEN RAISE EXCEPTION 'mixed_settings_ambient_scalar_authority' USING ERRCODE = '55000'; END IF;
+            """;
         return $"""
             {SourceGuard(context, enrollment)}
             {PostgresManagedProviderProvisioningContract.SharedWriterAssertionSql(context, enrollment)}

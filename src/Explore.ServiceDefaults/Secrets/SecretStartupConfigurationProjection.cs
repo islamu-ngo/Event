@@ -78,6 +78,7 @@ internal static class SecretStartupConfigurationProjection
             "KEYCLOAK_BLAZOR_CLIENT_SECRET" or "KEYCLOAK_CLIENT_SECRET"
                 or "KEYCLOAK:CLIENTSECRET" or "KEYCLOAK:BLAZORCLIENTSECRET" => "/runtime/bff/oidc/keycloak",
             "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS" or "ATPROTO:OAUTHCLIENTPRIVATEJWKS" => "/runtime/bff/atproto/oauth",
+            "BFF_SESSION_REDIS_PASSWORD" or "BFF:SESSIONAUTHORITY:PASSWORD" => "/runtime/bff/session",
             "SETUP_SECRET" => "/setup",
             "MODERATION:RECONCILIATION:APIKEY" => "/api",
             _ => null
@@ -160,6 +161,7 @@ internal static class SecretStartupConfigurationProjection
                 ("/runtime/bff/oidc/google", "GOOGLE_CLIENT_ID") => "Google:ClientId",
                 ("/runtime/bff/oidc/google", "GOOGLE_CLIENT_SECRET") => "Google:ClientSecret",
                 ("/runtime/bff/atproto/oauth", "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS") => "Atproto:OauthClientPrivateJwks",
+                ("/runtime/bff/session", "BFF_SESSION_REDIS_PASSWORD") => "Bff:SessionAuthority:Password",
                 _ => throw new InvalidOperationException("secret_authority_invalid")
             };
         var normalizedPath = path.Trim('/');

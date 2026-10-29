@@ -8,7 +8,10 @@ public sealed class SecretAuthorityLeastPrivilegeArchitectureTests
 {
     private static readonly string[] FrontendRoots =
     [
-        "/runtime/bff/oidc/keycloak", "/runtime/bff/oidc/google", "/runtime/bff/atproto/oauth"
+        "/runtime/bff/oidc/keycloak",
+        "/runtime/bff/oidc/google",
+        "/runtime/bff/atproto/oauth",
+        "/runtime/bff/session"
     ];
     private static readonly string[] BackendKeys =
     [
@@ -23,7 +26,7 @@ public sealed class SecretAuthorityLeastPrivilegeArchitectureTests
     ];
 
     [Test]
-    public async Task BffAdmissionAcceptsOnlyItsThreeRuntimePurposes()
+    public async Task BffAdmissionAcceptsOnlyItsFourRuntimePurposes()
     {
         await Assert.That(SecretAcquisitionPolicy.Roots(SecretConsumerRole.Bff)).IsEquivalentTo(FrontendRoots);
         var selection = new SecretAuthoritySelection(SecretAuthorityKind.Infisical, "Testing", SecretConsumerRole.Bff);

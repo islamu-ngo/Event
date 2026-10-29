@@ -18,14 +18,15 @@ namespace Event.Api.IntegrationTests.Authentication;
 public sealed partial class StorageProbeOriginalActionTests
 {
     [Test]
-    [Arguments("before-begin-revocation")]
+    [Arguments("before-begin-binding-rewire")]
+    [Arguments("before-begin-session-revocation")]
     [Arguments("terminal-provider-change")]
     [Arguments("terminal-expiry")]
     public async Task OriginalSourceTransactionsRejectAndRollBackBeforeRemoteWork(string change)
     {
         var gate = new ProbeTransactionGate();
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(interceptor: gate);
-        await using (var seed = fixture.Native.CreateDatabase())
+        await using (var seed = CreateProbeDatabase(fixture.Native))
         {
             await SeedProbeAdministratorAsync(seed, fixture.Binding.LocalSubjectId);
             await SeedProbeProviderAsync(seed);
@@ -38,9 +39,8 @@ public sealed partial class StorageProbeOriginalActionTests
         remote.Owner = gate.Owner = selected.Services.GetRequiredService<ExploreDbContext>();
         gate.BeforeBegin = async token =>
         {
-            if (change != "before-begin-revocation") return;
-            await using var independent = fixture.Native.CreateDatabase();
-            await independent.UserExternalLogins.Where(row => row.Id == fixture.Binding.ExternalLoginId).ExecuteDeleteAsync(token);
+            if (change == "before-begin-binding-rewire") await RewireProbeBindingAsync(fixture, token);
+            if (change == "before-begin-session-revocation") await RevokeProbeSessionAsync(fixture, token);
         };
         gate.OnSourceRead = () => selected.Services.GetRequiredService<IHumanActionCommitFinalizer>().Register(async token =>
         {
@@ -59,7 +59,7 @@ public sealed partial class StorageProbeOriginalActionTests
         await Assert.That(remote.Puts).IsEqualTo(0);
         await Assert.That(remote.Deletes).IsEqualTo(0);
         await Assert.That(gate.Starts).IsEqualTo(1);
-        await using var observer = fixture.Native.CreateDatabase();
+        await using var observer = CreateProbeDatabase(fixture.Native);
         await Assert.That((await observer.SystemSettings.SingleAsync(row =>
             row.SettingKey == GovernanceSettingKeys.Storage.BucketName)).Value).IsEqualTo("\"probe-bucket\"");
     }
@@ -68,7 +68,7 @@ public sealed partial class StorageProbeOriginalActionTests
     public async Task InstanceProbeCannotBorrowASelectedTenantOwner()
     {
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
-        await using (var seed = fixture.Native.CreateDatabase())
+        await using (var seed = CreateProbeDatabase(fixture.Native))
         {
             await SeedProbeAdministratorAsync(seed, fixture.Binding.LocalSubjectId);
             await SeedProbeProviderAsync(seed);
@@ -87,7 +87,7 @@ public sealed partial class StorageProbeOriginalActionTests
     public async Task IndependentLocalIdentityCannotInventOriginalNativeCustody()
     {
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(topology: IdentityDatabaseTopology.External);
-        await using (var seed = fixture.Native.CreateDatabase())
+        await using (var seed = CreateProbeDatabase(fixture.Native))
         {
             await SeedProbeAdministratorAsync(seed, fixture.Binding.LocalSubjectId);
             await SeedProbeProviderAsync(seed);

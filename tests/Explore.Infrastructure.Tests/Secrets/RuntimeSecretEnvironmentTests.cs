@@ -192,6 +192,8 @@ public sealed class RuntimeSecretEnvironmentTests
         string[] names =
         [
             "DATABASE_RUNTIME_USERNAME", "DATABASE_GLOBAL_USERNAME", "DATABASE_MIGRATOR_USERNAME",
+            "DATABASE_INSTANCE_KEY_READ_USERNAME", "DATABASE_INSTANCE_KEY_WRITE_USERNAME",
+            "DATABASE_PLATFORM_KEY_REPORT_USERNAME",
             "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME", "DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME",
             "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME", "IDENTITY_DATABASE_RUNTIME_USERNAME",
             "IDENTITY_DATABASE_MIGRATOR_USERNAME", "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"
@@ -211,6 +213,66 @@ public sealed class RuntimeSecretEnvironmentTests
         {
             await Assert.That(Equals(target["DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"], string.Empty)).IsTrue();
             await Assert.That(Equals(target["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"], string.Empty)).IsTrue();
+        }
+
+        (string Canonical, string Alias, string Value)[] enrollment =
+        [
+            ("Database:InstanceKeyRead:Username", "DATABASE_INSTANCE_KEY_READ_USERNAME",
+                "reader_" + Guid.CreateVersion7().ToString("N")),
+            ("Database:InstanceKeyWrite:Username", "DATABASE_INSTANCE_KEY_WRITE_USERNAME",
+                "writer_" + Guid.CreateVersion7().ToString("N")),
+            ("Database:PlatformKeyReport:Username", "DATABASE_PLATFORM_KEY_REPORT_USERNAME",
+                "reporter_" + Guid.CreateVersion7().ToString("N"))
+        ];
+        foreach (string form in new[] { "only", "both", "empty" })
+        {
+            var canonicalInputs = Inputs();
+            var discarded = new List<string>();
+            foreach (var coordinate in enrollment)
+            {
+                canonicalInputs[coordinate.Canonical] = form == "empty" ? string.Empty : coordinate.Value;
+                if (form != "only")
+                {
+                    string shadowed = "shadowed_" + Guid.CreateVersion7().ToString("N");
+                    canonicalInputs[coordinate.Alias] = shadowed;
+                    discarded.Add(shadowed);
+                }
+            }
+            string[] inherited = canonicalInputs.Keys
+                .Select(name => name.Replace(":", "__", StringComparison.Ordinal))
+                .Concat(enrollment.Select(coordinate => coordinate.Alias)).ToArray();
+            var canonicalTarget = new Dictionary<string, object>();
+
+            RuntimeSecretEnvironment.Apply(canonicalTarget, Configuration(canonicalInputs), inherited, consumer, provider, Entries);
+
+            foreach (var coordinate in enrollment)
+            {
+                string projectedName = coordinate.Canonical.Replace(":", "__", StringComparison.Ordinal);
+                string expected = projectsNames && form != "empty" ? coordinate.Value : string.Empty;
+                await Assert.That(Equals(canonicalTarget[projectedName], expected)).IsTrue();
+                await Assert.That(Equals(canonicalTarget[coordinate.Alias], string.Empty)).IsTrue();
+            }
+            foreach (string shadowed in discarded)
+                await Assert.That(canonicalTarget.ContainsValue(shadowed)).IsFalse();
+        }
+
+        foreach (var coordinate in enrollment)
+        {
+            var explicitInputs = Inputs();
+            explicitInputs[coordinate.Alias] = "ambient_" + Guid.CreateVersion7().ToString("N");
+            string projectedName = coordinate.Canonical.Replace(":", "__", StringComparison.Ordinal);
+            string selected = "selected_" + Guid.CreateVersion7().ToString("N");
+            var explicitTarget = new Dictionary<string, object> { [projectedName] = selected };
+
+            RuntimeSecretEnvironment.Apply(explicitTarget, Configuration(explicitInputs), explicitInputs.Keys, consumer, provider, Entries);
+
+            await Assert.That(Equals(explicitTarget[projectedName], projectsNames ? selected : string.Empty)).IsTrue();
+
+            explicitInputs[coordinate.Canonical] = string.Empty;
+            RuntimeSecretEnvironment.Apply(explicitTarget, Configuration(explicitInputs), explicitInputs.Keys, consumer, provider, Entries);
+
+            await Assert.That(Equals(explicitTarget[projectedName], string.Empty)).IsTrue();
+            await Assert.That(Equals(explicitTarget[coordinate.Alias], string.Empty)).IsTrue();
         }
     }
 

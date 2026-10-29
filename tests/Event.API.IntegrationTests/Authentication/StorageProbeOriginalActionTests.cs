@@ -1,10 +1,12 @@
 using Event.Api.IntegrationTests.Fixtures;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Storage;
+using Explore.Persistence;
 using Explore.Persistence.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
@@ -24,32 +26,24 @@ public sealed partial class StorageProbeOriginalActionTests
     public async Task ActualProbeRejectsSubstitutedOriginalHuman(string change)
     {
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
-        if (change != "missing-administrator")
+        await using (var seed = CreateProbeDatabase(fixture.Native))
         {
-            await using var seed = fixture.Native.CreateDatabase();
-            int role = await seed.Roles.Where(row => row.MasterCode == "platform.admin"
-                && row.RoleScopeId == (int)RoleScopeEnum.Platform).Select(row => row.Id).SingleAsync();
-            seed.PlatformUserRoles.Add(new PlatformUserRole
-            {
-                Id = Guid.CreateVersion7(),
-                UserId = fixture.Binding.LocalSubjectId,
-                User = null!,
-                RoleId = role,
-                Role = null!,
-                GrantedAt = DateTime.UtcNow
-            });
-            await seed.SaveChangesAsync();
+            if (change != "missing-administrator")
+                await SeedProbeAdministratorAsync(seed, fixture.Binding.LocalSubjectId);
+            await SeedProbeProviderAsync(seed);
         }
-        await using var host = fixture.Host.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
-        {
-            services.AddStorageProbeOriginalAction();
-            services.AddStorageProbeSourceOwner();
-        }));
+        var remote = new ProbeRemote();
+        await using var host = fixture.Host.WithWebHostBuilder(builder => builder.ConfigureTestServices(remote.Register));
         await using var request = await ProbeRequest.CreateAsync(host.Services, await fixture.SignInAsync());
         await using var selected = await request.Services.GetRequiredService<IPolicyMutationExecutionScopeFactory>()
             .CreateAsync(PolicyMutationScope.Instance, CancellationToken.None);
-        if (change == "principal-replaced")
-            request.Context.User = new System.Security.Claims.ClaimsPrincipal(request.Context.User);
+        remote.Owner = selected.Services.GetRequiredService<ExploreDbContext>();
+        remote.AfterVersioning = () =>
+        {
+            if (change == "principal-replaced")
+                request.Context.User = new System.Security.Claims.ClaimsPrincipal(request.Context.User);
+            return Task.CompletedTask;
+        };
         var query = new TestInstanceStorageProviderQuery
         {
             UserId = change == "empty-actor" ? Guid.Empty
@@ -57,7 +51,20 @@ public sealed partial class StorageProbeOriginalActionTests
         };
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => selected.Services
             .GetRequiredService<IStorageProbeOriginalAction>().ExecuteAsync(query, CancellationToken.None));
+        await Assert.That(remote.Puts).IsEqualTo(0);
+        await Assert.That(remote.Deletes).IsEqualTo(0);
     }
+
+    private static ExploreDbContext CreateProbeDatabase(LocalAdmissionWebApplicationFactory native, Guid? tenantId = null)
+    {
+        var database = native.CreateDatabase();
+        if (tenantId is { } selectedTenant)
+            database.TenantContext = new ProbeTenant(selectedTenant);
+        database.BindTenantLease();
+        return database;
+    }
+
+    private sealed record ProbeTenant(Guid TenantId) : ITenantContext;
 
     private sealed class ProbeRequest(AsyncServiceScope scope, IHttpContextAccessor accessor, DefaultHttpContext context)
         : IAsyncDisposable
@@ -80,7 +87,8 @@ public sealed partial class StorageProbeOriginalActionTests
             {
                 accessor.HttpContext = null;
                 await scope.DisposeAsync();
-                throw new InvalidOperationException("The real storage probe request did not authenticate.");
+                throw new InvalidOperationException(
+                    $"The real storage probe request did not authenticate: {authentication.Failure?.GetType().Name ?? "NoResult"}.");
             }
             context.User = authentication.Principal!;
             return new(scope, accessor, context);

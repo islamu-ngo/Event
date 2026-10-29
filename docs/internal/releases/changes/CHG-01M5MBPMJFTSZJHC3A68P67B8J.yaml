@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5MBPMJFTSZJHC3A68P67B8J
+Title: "Reject foreign Location PII before tracked mutation"
+Type: fix
+Scope: privacy
+Summary: "Configured EF navigation writes validate Location ownership and privacy state before mutating the tracked aggregate."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: EF navigation writes now use the existing Location privacy and ownership guards before assignment. A rejected foreign PII attachment leaves both tracked aggregates unchanged; this does not change authorization or database access permissions.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

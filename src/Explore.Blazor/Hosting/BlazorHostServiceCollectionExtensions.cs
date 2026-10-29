@@ -6,6 +6,7 @@ using Explore.Blazor.Configuration;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.HealthChecks;
 using Explore.Blazor.Services;
+using Explore.Blazor.Services.Auth;
 using Explore.ServiceDefaults.Configuration;
 using Explore.ServiceDefaults.DataProtection;
 using Explore.ServiceDefaults.Secrets;
@@ -196,6 +197,7 @@ public static class BlazorHostServiceCollectionExtensions
             builder.Environment,
             EventBffHostProfile.PublicWeb);
         builder.Services.AddBffAuthentication(builder.Configuration, builder.Environment);
+        builder.Services.AddBffSessionAuthority(builder.Configuration, builder.Environment);
         builder.Services.AddAntiforgery(options => options.HeaderName = "X-CSRF-TOKEN");
         builder.Services.AddBffRateLimiting(builder.Configuration, builder.Environment);
         builder.Services.AddBffTrustedRequestEnrichment();

@@ -705,17 +705,50 @@ public sealed class BffRegistrationPaymentEndpointTests
         using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         BrowserSession session = await IssueBrowserSessionAsync(client);
 
-        using HttpResponseMessage firstClient = await IssueCheckoutAsync(
-            client, CheckoutIssuePath, session, forwardedFor: "198.51.100.10");
-        using HttpResponseMessage firstClientExhausted = await IssueCheckoutAsync(
-            client, CheckoutIssuePath, session, forwardedFor: "198.51.100.10");
-        using HttpResponseMessage secondClient = await IssueCheckoutAsync(
-            client, CheckoutIssuePath, session, forwardedFor: "198.51.100.11");
+        HttpContext firstClient = await IssueCheckoutFromProxyAsync(factory, session, IPAddress.Loopback, "198.51.100.10");
+        HttpContext firstClientExhausted = await IssueCheckoutFromProxyAsync(factory, session, IPAddress.Loopback, "198.51.100.10");
+        HttpContext secondClient = await IssueCheckoutFromProxyAsync(factory, session, IPAddress.Loopback, "198.51.100.11");
 
-        await Assert.That(firstClient.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(firstClientExhausted.StatusCode).IsEqualTo(HttpStatusCode.TooManyRequests);
-        await Assert.That(secondClient.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(Equals(firstClient.Connection.RemoteIpAddress, IPAddress.Parse("198.51.100.10"))).IsTrue();
+        await Assert.That(Equals(firstClientExhausted.Connection.RemoteIpAddress, IPAddress.Parse("198.51.100.10"))).IsTrue();
+        await Assert.That(Equals(secondClient.Connection.RemoteIpAddress, IPAddress.Parse("198.51.100.11"))).IsTrue();
+        await Assert.That((HttpStatusCode)firstClient.Response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That((HttpStatusCode)firstClientExhausted.Response.StatusCode).IsEqualTo(HttpStatusCode.TooManyRequests);
+        await Assert.That((HttpStatusCode)secondClient.Response.StatusCode).IsEqualTo(HttpStatusCode.OK);
     }
+
+    [Test]
+    public async Task CheckoutIssue_UntrustedForwardedClientIpsCannotEvadeRateBound()
+    {
+        ITestRegistrationPaymentClient apiClient = CheckoutTargetClient("https://checkout.stripe.com/c/pay/cs_forwarded_rate");
+        await using WebApplicationFactory<Program> factory = CreateFactory(apiClient, checkoutPermitLimit: 1);
+        using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        BrowserSession session = await IssueBrowserSessionAsync(client);
+        IPAddress peer = IPAddress.Parse("203.0.113.9");
+
+        HttpContext firstClient = await IssueCheckoutFromProxyAsync(factory, session, peer, "198.51.100.10");
+        HttpContext changedForwardedClient = await IssueCheckoutFromProxyAsync(factory, session, peer, "198.51.100.11");
+
+        await Assert.That(Equals(firstClient.Connection.RemoteIpAddress, peer)).IsTrue();
+        await Assert.That(Equals(changedForwardedClient.Connection.RemoteIpAddress, peer)).IsTrue();
+        await Assert.That((HttpStatusCode)firstClient.Response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That((HttpStatusCode)changedForwardedClient.Response.StatusCode).IsEqualTo(HttpStatusCode.TooManyRequests);
+    }
+
+    private static Task<HttpContext> IssueCheckoutFromProxyAsync(
+        WebApplicationFactory<Program> factory, BrowserSession session, IPAddress peer, string forwardedFor) =>
+        factory.Server.SendAsync(context =>
+        {
+            context.Connection.RemoteIpAddress = peer;
+            context.Request.Method = HttpMethods.Post;
+            context.Request.Scheme = "https";
+            context.Request.Host = new HostString("localhost");
+            context.Request.Path = CheckoutIssuePath;
+            context.Request.Headers.Cookie = session.CookieHeader;
+            context.Request.Headers["X-CSRF-TOKEN"] = session.AntiforgeryToken;
+            context.Request.Headers["X-Forwarded-For"] = forwardedFor;
+            context.Request.Headers["X-Forwarded-Proto"] = "https";
+        }, TestContext.Current!.Execution.CancellationToken);
 
     [Test]
     public async Task CheckoutIssue_AuthenticatedRateBoundUsesStableUserId()

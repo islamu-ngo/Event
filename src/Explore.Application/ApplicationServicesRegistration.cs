@@ -342,6 +342,8 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IEventLocationReviewQueueMonitor, EventLocationReviewQueueMonitor>();
         services.AddScoped<IFanoutAttendeeLocationAuthorizationService, FanoutAttendeeLocationAuthorizationService>();
         services.AddScoped<PrivacyErasureApplier>();
+        services.AddScoped<RetainedAuthorityPrivacyErasureWorkflow>();
+        services.AddScoped<IPrivacyErasureService, PrivacyErasureService>();
         services.AddScoped<Explore.Application.Contracts.Moderation.IModerationRecognitionErasure,
             Explore.Application.Services.Moderation.ModerationRecognitionErasure>();
         services.AddScoped<Explore.Application.Services.Moderation.ModerationRecognitionContinuity>();
@@ -356,7 +358,6 @@ public static class ApplicationServicesRegistration
         services.AddScoped<Explore.Application.Services.Moderation.ModerationRecognitionKeyLifecycleService>();
         services.AddScoped<Explore.Application.Contracts.Moderation.IModerationRecognitionRecoveryNotifications,
             Explore.Application.Services.Moderation.ModerationRecognitionRecoveryNotifications>();
-        services.AddScoped<IPrivacyErasureService, RetainedAuthorityPrivacyErasureWorkflow>();
         services.AddSingleton<EventLocationDisclosureEvaluator>();
         services.AddScoped<PublicEventLocationDisclosureEvaluator>();
         services.AddScoped<AtprotoEventPublicationSnapshotFactory>();

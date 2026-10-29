@@ -237,7 +237,9 @@ public sealed class EmailDispatchRepositoriesSqliteTests
             services.AddSingleton<NotificationDeliveryPolicyResolver>();
             services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
             services.AddScoped<ISettingMutationLock, RelationalSettingMutationLock>();
-            services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
+            services.AddScoped<ISystemSettingRepository>(scopedServices => SystemSettingRepository.CreateReadOnly(
+                scopedServices.GetRequiredService<ExploreDbContext>(),
+                scopedServices.GetRequiredService<ISettingMutationLock>()));
             services.AddScoped<IEmailDispatchEligibilityEvaluator, EmailDispatchEligibilityEvaluator>();
             await using ServiceProvider provider = services.BuildServiceProvider();
             using var drain = new EmailDispatchDrainService(
@@ -662,7 +664,9 @@ public sealed class EmailDispatchRepositoriesSqliteTests
                 SqliteNamedLockTransactionInterceptor.Instance,
                 SqliteProjectionLockTransactionInterceptor.Instance)
             .Options;
-        return new ExploreDbContext(options);
+        var context = new ExploreDbContext(options);
+        context.BindTenantLease();
+        return context;
     }
 
     private static async Task<SeededDispatch> SeedDispatchAsync(

@@ -4,6 +4,7 @@ using Event.Web.BffHosting.Authentication;
 using Event.Web.BffHosting.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Explore.Blazor.Services.Auth;
 
 namespace Explore.Blazor.Services;
 
@@ -15,20 +16,31 @@ public sealed class ExploreBffCookieSessionHandler(
     internal const string UserSynchronizationCompletedProperty =
         ".islamu.bff.user-synchronization-completed";
 
-    public Task<bool> ValidatePrincipalAsync(CookieValidatePrincipalContext context) =>
-        context.Principal is null
-            ? Task.FromResult(false)
-            : adminClaimsTransformation.ValidateLocalSessionAsync(
+    public async Task<bool> ValidatePrincipalAsync(CookieValidatePrincipalContext context)
+    {
+        if (context.Principal is null || !await IsSessionActiveAsync(context.HttpContext, context.Principal, context.Properties))
+        {
+            return false;
+        }
+
+        return await adminClaimsTransformation.ValidateLocalSessionAsync(
                 context.Principal,
                 context.Properties,
                 context.Properties.GetTokenValue("access_token"),
                 context.HttpContext.RequestAborted);
+    }
 
     public async Task OnSigningInAsync(CookieSigningInContext context)
     {
         if (context.Principal is null)
         {
             return;
+        }
+
+        if (context.Properties.Items.ContainsKey(BffSessionIdentity.HandleProperty)
+            && !await IsSessionActiveAsync(context.HttpContext, context.Principal, context.Properties))
+        {
+            throw new BffSessionAuthorityUnavailableException();
         }
 
         if (context.Properties.Items.Remove(UserSynchronizationCompletedProperty))
@@ -154,7 +166,7 @@ public sealed class ExploreBffCookieSessionHandler(
 
     private static void ClearCircuitTokenState(CookieValidatePrincipalContext context, bool requireSession)
     {
-        var hasSession = context.Principal.TryGetSessionId(out var resolvedSessionId);
+        var hasSession = context.Principal is not null && BffSessionIdentity.TryGetBinding(context.Principal, out _);
         var tokenService = context.HttpContext.RequestServices.GetService<ICircuitAccessTokenService>();
         if (!requireSession || hasSession)
         {
@@ -164,26 +176,29 @@ public sealed class ExploreBffCookieSessionHandler(
         context.HttpContext.RequestServices.GetService<ICircuitUserContext>()?.Clear();
         context.HttpContext.RequestServices.GetService<IBffAuthCookieStore>()?.Clear();
 
-        var userId = ResolveUserId(context.Principal);
-        if (string.IsNullOrWhiteSpace(userId) || requireSession && !hasSession)
+        if (context.Principal is null || !BffSessionIdentity.TryGetBinding(context.Principal, out var binding))
         {
             return;
         }
 
         var tokenStore = context.HttpContext.RequestServices.GetService<ICircuitTokenStore>();
-        var sessionId = hasSession ? resolvedSessionId.PartitionKey : null;
-        if (string.IsNullOrWhiteSpace(sessionId))
-        {
-            tokenStore?.ClearUser(userId);
-        }
-        else
-        {
-            tokenStore?.ClearSession(userId, sessionId);
-        }
+        tokenStore?.ClearSession(binding.OwnerPartitionKey, binding.Handle);
     }
 
-    private static string? ResolveUserId(ClaimsPrincipal? principal)
+    private static async Task<bool> IsSessionActiveAsync(
+        HttpContext httpContext, ClaimsPrincipal principal, AuthenticationProperties properties)
     {
-        return principal.TryGetCircuitSubject(out var subject) ? subject.PartitionKey : null;
+        if (!BffSessionIdentity.TryGetBinding(principal, out var binding)
+            || !properties.Items.TryGetValue(BffSessionIdentity.HandleProperty, out var handle)
+            || !string.Equals(handle, binding.Handle, StringComparison.Ordinal)
+            || !properties.Items.TryGetValue(BffSessionIdentity.RevisionProperty, out var revision)
+            || string.IsNullOrWhiteSpace(revision))
+        {
+            return false;
+        }
+
+        var authority = httpContext.RequestServices.GetService<IBffSessionAuthority>()
+            ?? throw new BffSessionAuthorityUnavailableException();
+        return await authority.IsActiveAsync(binding, httpContext.RequestAborted);
     }
 }

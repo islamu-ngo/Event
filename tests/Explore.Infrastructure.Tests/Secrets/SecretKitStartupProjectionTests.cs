@@ -7,6 +7,36 @@ namespace Explore.Infrastructure.Tests.Secrets;
 public sealed class SecretKitStartupProjectionTests
 {
     [Test]
+    public async Task SelectedAuthorityPreservesDeclaredNullEmptyAndWhitespaceWithoutBorrowingAliases()
+    {
+        string instancePassword = Guid.CreateVersion7().ToString("N");
+        string tenantPassword = Guid.CreateVersion7().ToString("N");
+        using var selected = (ConfigurationRoot)new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["Database:EmailPolicyInstanceMutation:Username"] = null,
+                ["Database:EmailPolicyInstanceMutation:Password"] = string.Empty,
+                ["DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD"] = instancePassword,
+                ["Database:EmailPolicyTenantMutation:Password"] = " ",
+                ["DATABASE_EMAIL_POLICY_TENANT_MUTATION_PASSWORD"] = tenantPassword
+            }).Build();
+        await using var owner = SecretAuthorityAcquisition.OpenLocal(
+            new(SecretAuthorityKind.UserSecrets, "Testing", SecretConsumerRole.Api), selected);
+        selected["SECRET_PROVIDER"] = "Infisical";
+        selected["SecretProvider:Provider"] = "Environment";
+        var result = await owner.PrepareConfigurationGroupAsync(["/database"]);
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(owner.Provider).IsEqualTo(SecretAuthorityKind.UserSecrets);
+        await Assert.That(result.Value.ContainsKey("SECRET_PROVIDER")).IsFalse();
+        await Assert.That(result.Value.ContainsKey("SecretProvider:Provider")).IsFalse();
+        await Assert.That(result.Value["Database:EmailPolicyInstanceMutation:Username"]).IsNull();
+        await Assert.That(result.Value["Database:EmailPolicyInstanceMutation:Password"]).IsEqualTo(string.Empty);
+        await Assert.That(result.Value["DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD"]).IsEqualTo(instancePassword);
+        await Assert.That(result.Value["Database:EmailPolicyTenantMutation:Password"]).IsEqualTo(" ");
+        await Assert.That(result.Value["DATABASE_EMAIL_POLICY_TENANT_MUTATION_PASSWORD"]).IsEqualTo(tenantPassword);
+    }
+
+    [Test]
     public async Task LocalRuntimeValuesRemainBoundToTheirAdmittedOwnerGeneration()
     {
         string first = Guid.NewGuid().ToString("N");

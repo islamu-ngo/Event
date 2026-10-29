@@ -370,6 +370,7 @@ public class BffNoKeycloakResilienceTests : IAsyncDisposable
 
         private readonly Dictionary<string, string?> _originalEnvironmentValues = new(StringComparer.Ordinal);
         private readonly ExternalDataProtectionTestAuthority _dataProtection = new("bff");
+        private int _environmentRestored;
 
         private readonly string _environmentName;
         private readonly Action<IServiceCollection>? _configureServices;
@@ -420,6 +421,8 @@ public class BffNoKeycloakResilienceTests : IAsyncDisposable
 
             builder.ConfigureTestServices(services =>
             {
+                services.AddTestBffSessionAuthority();
+
                 services.RemoveAll<IDistributedCache>();
                 services.AddDistributedMemoryCache();
 
@@ -470,12 +473,23 @@ public class BffNoKeycloakResilienceTests : IAsyncDisposable
 
         protected override void Dispose(bool disposing)
         {
+            try { base.Dispose(disposing); }
+            finally { RestoreEnvironment(); }
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            try { await base.DisposeAsync(); }
+            finally { RestoreEnvironment(); }
+        }
+
+        private void RestoreEnvironment()
+        {
+            if (Interlocked.Exchange(ref _environmentRestored, 1) != 0) return;
             foreach (var (key, value) in _originalEnvironmentValues)
             {
                 Environment.SetEnvironmentVariable(key, value);
             }
-
-            base.Dispose(disposing);
         }
     }
 }

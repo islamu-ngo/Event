@@ -3,7 +3,6 @@ using Explore.Domain.Settings;
 using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Event.Architecture.Tests;
 
@@ -23,13 +22,17 @@ public sealed class LegacyDecentralizationRetirementContractTests
     ];
 
     [Test]
-    public async Task CurrentSchema_MustRetireLegacyDecentralizationColumnsAndSettingRows()
+    public async Task CurrentModelAndRegistry_RetireLegacyDecentralization()
     {
-        var snapshotType = typeof(ExploreDbContext).Assembly.GetType(
-            "Explore.Persistence.Migrations.ExploreDbContextModelSnapshot", throwOnError: true)!;
-        var snapshot = (ModelSnapshot)Activator.CreateInstance(snapshotType, nonPublic: true)!;
-        var properties = snapshot.Model.GetEntityTypes()
-            .SelectMany(entityType => entityType.GetProperties())
+        await using var context = new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>()
+            .UseSqlite("DataSource=:memory:")
+            .UseSnakeCaseNamingConvention()
+            .Options);
+        var tables = context.Model.GetRelationalModel().Tables.ToArray();
+        var columnNames = tables.SelectMany(table => table.Columns).Select(column => column.Name).ToArray();
+        var propertyNames = context.Model.GetEntityTypes()
+            .SelectMany(entity => entity.GetFlattenedProperties())
+            .Select(property => property.Name)
             .ToArray();
         var actualAtprotoSettingKeys = AtprotoFederationSettingDefinitions.All
             .Select(definition => definition.Key)
@@ -42,11 +45,9 @@ public sealed class LegacyDecentralizationRetirementContractTests
         await Assert.That(SettingRegistry.Contains(LegacyKey)).IsFalse();
         await Assert.That(actualAtprotoSettingKeys.SequenceEqual(expectedAtprotoSettingKeys)).IsTrue();
 
-        await Assert.That(properties.Any(property =>
-            property.Name.Contains("DecentralizationEnabled", StringComparison.Ordinal))).IsFalse();
-        await Assert.That(properties.Select(property => property.GetColumnName()))
-            .DoesNotContain(LegacyLocalValueColumn);
-        await Assert.That(properties.Select(property => property.GetColumnName()))
-            .DoesNotContain(LegacyOverrideModeColumn);
+        await Assert.That(tables).IsNotEmpty();
+        await Assert.That(propertyNames.Where(name => name.Contains("DecentralizationEnabled", StringComparison.Ordinal))).IsEmpty();
+        await Assert.That(columnNames).DoesNotContain(LegacyLocalValueColumn);
+        await Assert.That(columnNames).DoesNotContain(LegacyOverrideModeColumn);
     }
 }

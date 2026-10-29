@@ -72,6 +72,10 @@ public static partial class PostgresStorageConfigurationContract
                     THEN RAISE EXCEPTION 'storage_configuration_key_drift' USING ERRCODE = '55000'; END IF;
                     """));
             var tenant = tenantTables.SingleOrDefault(candidate => candidate.TableName == entity.GetTableName());
+            string workerPolicies = PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, type,
+                out _, out var insert, out _) && insert.Count != 0
+                ? $"({PostgresManagedTenantWorkerCreationPermissions.SourcePolicyPredicate(context, type, enrollment.GlobalLogin)}) AND ({PostgresManagedTenantWorkerCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment)})"
+                : "false";
             string rls = tenant is null ? $"""
                 IF EXISTS (SELECT 1 FROM pg_catalog.pg_class t WHERE t.oid = pg_catalog.to_regclass({table})
                     AND NOT ({(type == typeof(Explore.Domain.SystemSetting)
@@ -90,8 +94,10 @@ public static partial class PostgresStorageConfigurationContract
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid = pg_catalog.to_regclass({table})
                         AND p.polname <> '{PostgresTenantRowLevelSecurityModel.PolicyName}'
                         AND (0::oid = ANY(p.polroles) OR EXISTS (SELECT 1 FROM unnest(p.polroles) role_id
-                            WHERE pg_catalog.pg_has_role({Text(enrollment.RuntimeLogin)},role_id,'USAGE')
-                                OR pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)},role_id,'USAGE'))))
+                            WHERE pg_catalog.pg_has_role({Text(enrollment.RuntimeLogin)},role_id,'USAGE'))
+                            OR (EXISTS (SELECT 1 FROM unnest(p.polroles) role_id
+                                WHERE pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)},role_id,'USAGE'))
+                                AND ({workerPolicies}) IS NOT TRUE)))
                 THEN RAISE EXCEPTION 'storage_configuration_rls_drift' USING ERRCODE = '55000'; END IF;
                 """;
             return $"""
@@ -144,6 +150,10 @@ public static partial class PostgresStorageConfigurationContract
             THEN RAISE EXCEPTION 'storage_configuration_exclusion_drift' USING ERRCODE = '55000'; END IF;
             """));
         string tenantTable = Text(sql.Table(typeof(TenantSetting)));
+        string workerInsert = PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, typeof(TenantSetting),
+            out _, out var insert, out _) && insert.Count != 0
+            ? PostgresManagedTenantWorkerCreationPermissions.CompleteGlobalCataloguePredicate(context, enrollment)
+            : "false";
         return $"""
             {SourceGuard(context, enrollment)}
             {PostgresPrivilegeGuard.BuildAssertSql(Privileges(context, enrollment))}
@@ -226,7 +236,9 @@ public static partial class PostgresStorageConfigurationContract
                         OR pg_catalog.has_table_privilege(r.oid,{Text(sql.Table(typeof(SystemSetting)))}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                         OR pg_catalog.has_any_column_privilege(r.oid,{Text(sql.Table(typeof(SystemSetting)))}::regclass,'INSERT,UPDATE,REFERENCES')
                         OR pg_catalog.has_table_privilege(r.oid,{tenantTable}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                        OR pg_catalog.has_any_column_privilege(r.oid,{tenantTable}::regclass,'INSERT,UPDATE,REFERENCES')))
+                        OR pg_catalog.has_any_column_privilege(r.oid,{tenantTable}::regclass,'UPDATE,REFERENCES')
+                        OR (pg_catalog.has_any_column_privilege(r.oid,{tenantTable}::regclass,'INSERT')
+                            AND NOT (r.rolname={Text(enrollment.GlobalLogin)} AND ({workerInsert}) IS TRUE))))
             THEN RAISE EXCEPTION 'storage_configuration_ambient_scalar_authority' USING ERRCODE = '55000'; END IF;
             """;
     }

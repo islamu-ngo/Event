@@ -22,6 +22,60 @@ public sealed class BffSessionRefreshServiceTests
     private static readonly Guid UserId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000002");
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task RefreshCannotRecreateRevokedOrUnavailableBrowserSession(bool unavailable)
+    {
+        var principal = CreatePrincipal("refresh-owner", "refresh-session");
+        BffSessionIdentity.TryGetBinding(principal, out var binding);
+        var handle = binding.Handle;
+        var ticket = CreateTicket(principal, CreateJwt("refresh-owner", DateTime.UtcNow.AddMinutes(30), "refresh-session"));
+        ticket.Properties.Items[BffSessionIdentity.HandleProperty] = handle;
+        var authentication = new TestAuthenticationService(AuthenticateResult.Success(ticket));
+        var context = CreateContext(authService: authentication, sessionAuthority: new RefreshSessionAuthority(unavailable));
+
+        var result = await CreateService().RefreshSessionAsync(context, CancellationToken.None);
+        await ExecuteAsync(result, context);
+
+        await Assert.That(context.Response.StatusCode).IsEqualTo(unavailable
+            ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status401Unauthorized);
+        await Assert.That(authentication.SignInProperties).IsNull();
+        context.Response.Body.Position = 0;
+        using var reader = new StreamReader(context.Response.Body);
+        var body = await reader.ReadToEndAsync();
+        await Assert.That(body.Contains(handle, StringComparison.Ordinal)).IsFalse();
+        await Assert.That(body.Contains(ticket.Properties.GetTokenValue("access_token")!, StringComparison.Ordinal)).IsFalse();
+    }
+
+    [Test]
+    public async Task RevocationDuringRefreshCannotIssueCookieOrPublishCircuitToken()
+    {
+        var principal = CreatePrincipal("refresh-race-owner", "refresh-race-session");
+        var ticket = CreateTicket(principal, CreateJwt("refresh-race-owner", DateTime.UtcNow.AddMinutes(30), "refresh-race-session"));
+        var authentication = new TestAuthenticationService(AuthenticateResult.Success(ticket));
+        var active = true;
+        var authority = Substitute.For<IBffSessionAuthority>();
+        authority.IsActiveAsync(Arg.Any<BffSessionBinding>(), Arg.Any<CancellationToken>()).Returns(_ => active);
+        var onboarding = Substitute.For<IBffOnboardingStatusProvider>();
+        onboarding.GetStatusAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            active = false;
+            return CompletedStatus();
+        });
+        var tokenStore = new CircuitTokenStore(NullLogger<CircuitTokenStore>.Instance);
+        var context = CreateContext(authService: authentication, tokenStore: tokenStore,
+            onboardingStatusProvider: onboarding, sessionAuthority: authority);
+
+        var result = await CreateService(onboarding).RefreshSessionAsync(context, CancellationToken.None);
+        await ExecuteAsync(result, context);
+
+        var (owner, handle) = PartitionKeys(principal);
+        await Assert.That(context.Response.StatusCode).IsEqualTo(StatusCodes.Status401Unauthorized);
+        await Assert.That(authentication.SignInProperties is null).IsTrue();
+        await Assert.That(tokenStore.Resolve(owner, handle).Found).IsFalse();
+    }
+
+    [Test]
     public async Task RefreshSessionAsync_WithMissingCookieAuthentication_ReturnsUnauthorized()
     {
         var authService = new TestAuthenticationService(AuthenticateResult.NoResult());
@@ -59,7 +113,9 @@ public sealed class BffSessionRefreshServiceTests
     {
         var accessToken = CreateJwt("user-1", DateTime.UtcNow.AddMinutes(30), "session-1");
         var principal = CreatePrincipal("user-1", "session-1");
-        var authService = new TestAuthenticationService(AuthenticateResult.Success(CreateTicket(principal, accessToken)));
+        var ticket = CreateTicket(principal, accessToken);
+        var originalRevision = ticket.Properties.Items[BffSessionIdentity.RevisionProperty];
+        var authService = new TestAuthenticationService(AuthenticateResult.Success(ticket));
         var tokenStore = Substitute.For<ICircuitTokenStore>();
         var (subjectKey, sessionKey) = PartitionKeys(principal);
         tokenStore.Store(subjectKey, sessionKey, accessToken)
@@ -79,6 +135,9 @@ public sealed class BffSessionRefreshServiceTests
         await Assert.That(context.Response.StatusCode).IsEqualTo(StatusCodes.Status200OK);
         tokenStore.Received(1).Store(subjectKey, sessionKey, accessToken);
         await Assert.That(authService.SignInCalled).IsTrue();
+        await Assert.That(authService.SignInProperties?.Items[BffSessionIdentity.HandleProperty]
+            == ticket.Properties.Items[BffSessionIdentity.HandleProperty]).IsTrue();
+        await Assert.That(authService.SignInProperties?.Items[BffSessionIdentity.RevisionProperty] == originalRevision).IsTrue();
 
         context.Response.Body.Position = 0;
         using var document = await JsonDocument.ParseAsync(context.Response.Body);
@@ -500,7 +559,8 @@ public sealed class BffSessionRefreshServiceTests
         ICircuitUserContext? userContext = null,
         IBffAuthCookieStore? cookieStore = null,
         ICircuitTokenStore? tokenStore = null,
-        IBffOnboardingStatusProvider? onboardingStatusProvider = null)
+        IBffOnboardingStatusProvider? onboardingStatusProvider = null,
+        IBffSessionAuthority? sessionAuthority = null)
     {
         authService ??= new TestAuthenticationService(AuthenticateResult.NoResult());
         tokenService ??= Substitute.For<ICircuitAccessTokenService>();
@@ -522,10 +582,10 @@ public sealed class BffSessionRefreshServiceTests
             .AddSingleton(cookieStore)
             .AddSingleton(tokenStore)
             .AddSingleton(onboardingStatusProvider)
-            .AddSingleton<IBffReturnUrlService, BffReturnUrlService>()
-            .BuildServiceProvider();
+            .AddSingleton<IBffReturnUrlService, BffReturnUrlService>();
+        services.AddSingleton<IBffSessionAuthority>(sessionAuthority ?? new ActiveSessionAuthority());
 
-        return new DefaultHttpContext { RequestServices = services, Response = { Body = new MemoryStream() } };
+        return new DefaultHttpContext { RequestServices = services.BuildServiceProvider(), Response = { Body = new MemoryStream() } };
     }
 
     private static async Task ExecuteAsync(IResult result, HttpContext context)
@@ -537,6 +597,11 @@ public sealed class BffSessionRefreshServiceTests
     private static AuthenticationTicket CreateTicket(ClaimsPrincipal principal, string? accessToken)
     {
         var properties = new AuthenticationProperties();
+        if (BffSessionIdentity.TryGetBinding(principal, out var binding))
+        {
+            properties.Items[BffSessionIdentity.HandleProperty] = binding.Handle;
+            properties.Items[BffSessionIdentity.RevisionProperty] = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        }
         if (!string.IsNullOrWhiteSpace(accessToken))
         {
             properties.StoreTokens([new AuthenticationToken { Name = "access_token", Value = accessToken }]);
@@ -548,8 +613,8 @@ public sealed class BffSessionRefreshServiceTests
     private static (string SubjectKey, string SessionKey) PartitionKeys(ClaimsPrincipal principal)
     {
         principal.TryGetCircuitSubject(out var subject);
-        principal.TryGetSessionId(out var session);
-        return (subject.PartitionKey, session.PartitionKey);
+        BffSessionIdentity.TryGetBinding(principal, out var binding);
+        return (subject.PartitionKey, binding.Handle);
     }
 
     private static BffOnboardingStatus CompletedStatus() => new(
@@ -574,9 +639,21 @@ public sealed class BffSessionRefreshServiceTests
         }
     }
 
+    private sealed class RefreshSessionAuthority(bool unavailable) : IBffSessionAuthority
+    {
+        public Task<bool> IsActiveAsync(BffSessionBinding binding, CancellationToken cancellationToken) =>
+            unavailable ? throw new BffSessionAuthorityUnavailableException() : Task.FromResult(false);
+    }
+
+    private sealed class ActiveSessionAuthority : IBffSessionAuthority
+    {
+        public Task<bool> IsActiveAsync(BffSessionBinding binding, CancellationToken cancellationToken) => Task.FromResult(true);
+    }
+
     private static ClaimsPrincipal CreatePrincipal(string userId, string sessionId) => new(new ClaimsIdentity([
         new Claim("sub", userId),
-        new Claim("sid", sessionId)
+        new Claim("sid", sessionId),
+        new Claim(BffSessionIdentity.HandleClaim, Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
     ], "Cookies"));
 
     private static ClaimsPrincipal CreateAtprotoPrincipal() => new(new ClaimsIdentity([
@@ -584,7 +661,8 @@ public sealed class BffSessionRefreshServiceTests
         new Claim("sid", Guid.CreateVersion7().ToString("D")),
         new Claim("did", "did:plc:alice"),
         new Claim("tenant_id", TenantId.ToString("D")),
-        new Claim("auth_provider", "atproto")
+        new Claim("auth_provider", "atproto"),
+        new Claim(BffSessionIdentity.HandleClaim, Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
     ], "Atproto"));
 
     private static AtprotoClientKeyProvider CreateKeyProvider()

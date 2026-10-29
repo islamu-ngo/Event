@@ -16,7 +16,9 @@ using Explore.Domain.Secrets;
 using Explore.Infrastructure.Storage;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Identity;
 using Explore.Persistence.Security;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,7 +31,8 @@ public sealed partial class StorageProbeOriginalActionTests
 {
     [Test]
     [Arguments("unchanged")]
-    [Arguments("binding-revoked")]
+    [Arguments("binding-rewired")]
+    [Arguments("session-revoked")]
     [Arguments("administrator-revoked")]
     [Arguments("provider-replaced")]
     [Arguments("endpoint-replaced")]
@@ -42,7 +45,7 @@ public sealed partial class StorageProbeOriginalActionTests
     {
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
         Guid grant;
-        await using (var seed = fixture.Native.CreateDatabase())
+        await using (var seed = CreateProbeDatabase(fixture.Native))
         {
             grant = await SeedProbeAdministratorAsync(seed, fixture.Binding.LocalSubjectId);
             await SeedProbeProviderAsync(seed);
@@ -64,9 +67,9 @@ public sealed partial class StorageProbeOriginalActionTests
                 var lifetime = selected.Services.GetRequiredService<ExploreDbContextExecutionLease>().HumanLifetime!;
                 fixture.Clock.Advance(lifetime.ExpiresAt.Add(lifetime.ClockSkew).AddTicks(1) - fixture.Clock.GetUtcNow());
             }
-            await using var independent = fixture.Native.CreateDatabase();
-            if (change == "binding-revoked")
-                await independent.UserExternalLogins.Where(row => row.Id == fixture.Binding.ExternalLoginId).ExecuteDeleteAsync();
+            await using var independent = CreateProbeDatabase(fixture.Native);
+            if (change == "binding-rewired") await RewireProbeBindingAsync(fixture);
+            if (change == "session-revoked") await RevokeProbeSessionAsync(fixture);
             if (change == "administrator-revoked")
                 await independent.PlatformUserRoles.Where(row => row.Id == grant).ExecuteDeleteAsync();
             if (change is "provider-replaced" or "endpoint-replaced")
@@ -109,7 +112,8 @@ public sealed partial class StorageProbeOriginalActionTests
     [Arguments("expired-before-cleanup")]
     [Arguments("binding-before-cleanup")]
     [Arguments("credential-before-cleanup")]
-    [Arguments("revoked-before-return")]
+    [Arguments("binding-rewired-before-return")]
+    [Arguments("session-revoked-before-return")]
     [Arguments("foreign-collision")]
     [Arguments("ambiguous-put")]
     [Arguments("cleanup-failed")]
@@ -118,7 +122,7 @@ public sealed partial class StorageProbeOriginalActionTests
     public async Task ActualProbeOnlyDeletesItsAcknowledgedVersionUnderOriginalAuthority(string change)
     {
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
-        await using (var seed = fixture.Native.CreateDatabase())
+        await using (var seed = CreateProbeDatabase(fixture.Native))
         {
             await SeedProbeAdministratorAsync(seed, fixture.Binding.LocalSubjectId);
             await SeedProbeProviderAsync(seed);
@@ -140,20 +144,20 @@ public sealed partial class StorageProbeOriginalActionTests
                 remote.Credential = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
             if (change == "binding-before-cleanup")
             {
-                await using var independent = fixture.Native.CreateDatabase();
+                await using var independent = CreateProbeDatabase(fixture.Native);
                 await independent.SystemSettings.Where(row => row.SettingKey == GovernanceSettingKeys.Storage.BucketName)
                     .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.Value, "\"foreign-bucket\""));
             }
         };
         remote.AfterDelete = async () =>
         {
-            if (change != "revoked-before-return") return;
-            await using var independent = fixture.Native.CreateDatabase();
-            await independent.UserExternalLogins.Where(row => row.Id == fixture.Binding.ExternalLoginId).ExecuteDeleteAsync();
+            if (change == "binding-rewired-before-return") await RewireProbeBindingAsync(fixture);
+            if (change == "session-revoked-before-return") await RevokeProbeSessionAsync(fixture);
         };
         var execution = ActivatorUtilities.CreateInstance<TestInstanceStorageProviderQueryHandler>(selected.Services)
             .QueryAsync(new TestInstanceStorageProviderQuery { UserId = fixture.Binding.LocalSubjectId }, CancellationToken.None);
-        if (change is "expired-before-cleanup" or "binding-before-cleanup" or "credential-before-cleanup" or "revoked-before-return")
+        if (change is "expired-before-cleanup" or "binding-before-cleanup" or "credential-before-cleanup"
+            or "binding-rewired-before-return" or "session-revoked-before-return")
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() => execution);
         else
         {
@@ -171,11 +175,39 @@ public sealed partial class StorageProbeOriginalActionTests
                 await Assert.That(result.Message!.Contains(remote.Credential, StringComparison.Ordinal)).IsFalse();
             }
         }
-        bool deleted = change is "unchanged" or "revoked-before-return";
+        bool deleted = change is "unchanged" or "binding-rewired-before-return" or "session-revoked-before-return";
         await Assert.That(remote.Deletes).IsEqualTo(deleted || change == "cleanup-failed" ? 1 : 0);
         await Assert.That(remote.Objects.Any(row => row.Version == "probe-version"))
             .IsEqualTo(!deleted && change is not ("unversioned" or "foreign-collision"));
         await Assert.That(remote.Objects.Any(row => row.Version == "foreign-version")).IsEqualTo(change != "unversioned");
+    }
+
+    private static async Task RewireProbeBindingAsync(LocalIdentityLifecycleHttpFixture fixture, CancellationToken token = default)
+    {
+        await using var independent = CreateProbeDatabase(fixture.Native);
+        string subject = Guid.CreateVersion7().ToString("D");
+        await Assert.That(await independent.UserExternalLogins.Where(row => row.Id == fixture.Binding.ExternalLoginId)
+            .ExecuteUpdateAsync(update => update.SetProperty(row => row.ProviderKey, subject), token)).IsEqualTo(1);
+    }
+
+    private static async Task RevokeProbeSessionAsync(LocalIdentityLifecycleHttpFixture fixture, CancellationToken token = default)
+    {
+        await using var observer = CreateProbeDatabase(fixture.Native);
+        var original = await observer.UserExternalLogins.AsNoTracking()
+            .SingleAsync(row => row.Id == fixture.Binding.ExternalLoginId, token);
+        await using var scope = fixture.Host.Services.CreateAsyncScope();
+        var manager = scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>();
+        var user = (await manager.FindByIdAsync(fixture.Binding.LocalSubjectId.ToString("D")))!;
+        string? originalStamp = user.SecurityStamp;
+        await Assert.That((await manager.UpdateSecurityStampAsync(user).WaitAsync(token)).Succeeded).IsTrue();
+        var persisted = await observer.Set<LocalIdentityUser>().AsNoTracking()
+            .SingleAsync(row => row.Id == fixture.Binding.LocalSubjectId, token);
+        await Assert.That(string.Equals(originalStamp, persisted.SecurityStamp, StringComparison.Ordinal)).IsFalse();
+        var retained = await observer.UserExternalLogins.AsNoTracking()
+            .SingleAsync(row => row.Id == fixture.Binding.ExternalLoginId, token);
+        await Assert.That(retained.Id == original.Id && retained.UserId == original.UserId
+            && retained.AuthenticationProviderId == original.AuthenticationProviderId
+            && retained.ProviderKey == original.ProviderKey).IsTrue();
     }
 
     private static async Task<Guid> SeedProbeAdministratorAsync(ExploreDbContext seed, Guid actor)

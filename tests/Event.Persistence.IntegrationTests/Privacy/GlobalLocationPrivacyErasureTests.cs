@@ -1,4 +1,9 @@
 using DotNet.Testcontainers.Containers;
+using System.Security.Cryptography;
+using System.Text.Json;
+using CarpaNet.OAuth;
+using CarpaNet.OAuth.Crypto;
+using CarpaNet.OAuth.Storage;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Infrastructure;
@@ -6,11 +11,15 @@ using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Secrets;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
 using Explore.Infrastructure.Services.Privacy;
+using Explore.Infrastructure.Services.Federation;
+using Explore.Domain.Secrets;
+using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
@@ -669,8 +678,6 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
         services.AddHybridCache();
         ServiceProvider cacheProvider = services.BuildIsolatedServiceProvider();
         var userRepository = new UserRepository(context);
-        var userPiiRepository = new GenericRepository<UserPii, Guid>(context);
-        var tokenRepository = new UserAuthenticationTokenRepository(context);
         var erasureRepository = new UserLocationPrivacyErasureRepository(context);
         var checkpointRepository = new PrivacyErasureReplayCheckpointRepository(context);
         var outboxRepository = new OutboxRepository(context);
@@ -697,8 +704,6 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
         var localEligibility = new LocalIdentityEligibilityRevocation(context, context, authority, time);
         var applier = new PrivacyErasureApplier(
             userRepository,
-            userPiiRepository,
-            tokenRepository,
             erasureRepository,
             erasureRepository,
             new AiConversationRepository(context),
@@ -820,10 +825,10 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             unrelatedIdentity);
         await context.SaveChangesAsync();
 
+        await StoreEncryptedAuthenticationTokenAsync(context, tenantA.Id, owner.Id, $"did:plc:owner-a{identitySuffix}");
+        await StoreEncryptedAuthenticationTokenAsync(context, tenantB.Id, owner.Id, $"did:plc:owner-b{identitySuffix}");
+        await StoreEncryptedAuthenticationTokenAsync(context, tenantA.Id, unrelated.Id, $"did:plc:unrelated{identitySuffix}");
         context.AddRange(
-            CreateAuthenticationToken(tenantA, owner, $"did:plc:owner-a{identitySuffix}"),
-            CreateAuthenticationToken(tenantB, owner, $"did:plc:owner-b{identitySuffix}"),
-            CreateAuthenticationToken(tenantA, unrelated, $"did:plc:unrelated{identitySuffix}"),
             CreateExternalLogin(tenantA, owner, $"owner-a{identitySuffix}"),
             CreateExternalLogin(tenantB, owner, $"owner-b{identitySuffix}"),
             CreateExternalLogin(tenantA, unrelated, $"unrelated{identitySuffix}"),
@@ -1044,24 +1049,60 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
         };
     }
 
-    private static UserAuthenticationToken CreateAuthenticationToken(
-        Tenant tenant,
-        User user,
-        string subjectDid) => new()
+    internal static async Task StoreEncryptedAuthenticationTokenAsync(ExploreDbContext context,
+        Guid tenantId, Guid userId, string subjectDid, CancellationToken cancellationToken = default)
+    {
+        using var dpop = DPoPKeyPair.Generate();
+        var session = new OAuthSessionData
         {
-            Id = Guid.CreateVersion7(),
-            TenantId = tenant.Id,
-            Tenant = tenant,
-            UserId = user.Id,
-            User = user,
-            Provider = "atproto",
-            SubjectDid = subjectDid,
-            SessionCiphertext = Enumerable.Repeat((byte)1, 29).ToArray(),
-            EncryptionKeyId = "active-key",
-            OAuthClientKeyId = "oauth-client-key",
-            EnvelopeVersion = 1,
-            PdsHost = "https://pds.example.invalid",
+            DPoPKey = dpop.ExportKeyPair(),
+            AuthMethod = "private_key_jwt",
+            ClientId = "https://privacy.example.test/oauth/client-metadata.json",
+            RedirectUri = "https://privacy.example.test/signin-atproto",
+            Scope = "atproto transition:generic",
+            TokenSet = new TokenSet
+            {
+                Issuer = "https://issuer.example.test/",
+                Sub = subjectDid,
+                Audience = "https://pds.example.invalid/",
+                Scope = "atproto transition:generic",
+                AccessToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+                RefreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+                ExpiresAt = DateTimeOffset.UtcNow.AddHours(1)
+            }
         };
+        var store = new RepositoryBackedOAuthSessionStore(new UserAuthenticationTokenRepository(context),
+            new AtprotoSessionEnvelopeProtector(new SyntheticSessionSecrets()),
+            new AtprotoOAuthSessionStoreContext(tenantId, userId, AtprotoDid.Parse(subjectDid),
+                new Uri("https://pds.example.invalid/"), "privacy-client-key"));
+        await store.StoreAsync(subjectDid, session, cancellationToken);
+        OAuthSessionData? restored = await store.GetAsync(subjectDid, cancellationToken);
+        await Assert.That(restored is not null && restored.TokenSet.AccessToken == session.TokenSet.AccessToken
+            && restored.TokenSet.RefreshToken == session.TokenSet.RefreshToken).IsTrue();
+    }
+
+    // Only the external encryption-key resolver is substituted; no host identity or erasure service is replaced.
+    private sealed class SyntheticSessionSecrets : ISecretResolver
+    {
+        private readonly string _ring = JsonSerializer.Serialize(new
+        {
+            keys = new[] { new { kid = Guid.CreateVersion7().ToString("N"),
+                k = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).TrimEnd('=').Replace('+', '-').Replace('/', '_'), status = "active" } }
+        });
+        public Task<SecretResolutionResult> ResolveAsync(string settingKey, Guid? tenantId, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(settingKey == SecretDefinitionRegistry.Keys.Atproto.SessionEncryptionKeyRing && tenantId is null
+                ? SecretResolutionResult.Resolved(new ResolvedSecret(settingKey, _ring, SecretSourceType.Infisical,
+                    SecretScope.Instance, null, DateTimeOffset.UtcNow)) : SecretResolutionResult.Unconfigured);
+        }
+        public Task<SecretResolutionResult> ResolveQualifiedAsync(string settingKey, SecretScope scope, Guid? scopeId,
+            string qualifier, CancellationToken cancellationToken = default) => Task.FromResult(SecretResolutionResult.Unconfigured);
+        public Task<SecretResolutionResult> ResolveTenantBindingAsync(Guid tenantId, Guid bindingId,
+            CancellationToken cancellationToken = default) => Task.FromResult(SecretResolutionResult.Unconfigured);
+        public Task InvalidateAsync(string settingKey, SecretScope scope, Guid? scopeId,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
 
     private static UserExternalLogin CreateExternalLogin(
         Tenant tenant,

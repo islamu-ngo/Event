@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Responses;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
@@ -56,7 +57,7 @@ internal sealed class ManagedTenantWorkerCreationOwnerFactory(
         private bool attempted;
         private bool disposed;
 
-        public Task<Explore.Application.Responses.BaseCommandResponse<ManagedTenantWorkerCreationOutcome>>
+        public Task<BaseCommandResponse<ManagedTenantWorkerCreationOutcome>>
             CreateAsync(CancellationToken cancellationToken = default)
         {
             if (disposed || attempted)

@@ -1,0 +1,31 @@
+Change-Id: CHG-01M5NY61XQ1AP288E9BKBY1XN1
+Title: "Require selected Formbricks credentials"
+Type: fix
+Scope: self-hosting
+Summary: "Require the selected operator secrets for local-full Formbricks, share its original database password across resources and escaped URLs, and verify native composition without starting application resources."
+Group: native-composition
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/infisical.md
+    Disposition: documented
+    Detail: Aspire local-full now requires all six existing Formbricks secret values from the explicitly selected operator authority. Supply all six existing Formbricks secret values through the explicitly selected operator authority before enabling that profile, and retain the matching original database password across restarts and restores. Other local profiles do not acquire these requirements.
+  Security:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Required Formbricks values are evaluated lazily through the selected authority without fallback or secret disclosure. The native composition checks inspect resource metadata and owned callback projections without starting services; they do not certify runtime authority, SDK publication or service readiness.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: The six existing FORMBRICKS secret inputs become required only for local-full. One selected database password parameter is shared by PostgreSQL, Cube and the application database URLs. URI formatting escapes reserved characters while the database receives the original value; missing inputs fail when the secret parameters are evaluated.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/infisical.md
+    Disposition: documented
+    Detail: Provision and keep the original selected Formbricks values stable before using local-full. Store the database password without pre-encoding it, and preserve its match to existing database data. No automatic regeneration, reset, data deletion or application schema migration is introduced.

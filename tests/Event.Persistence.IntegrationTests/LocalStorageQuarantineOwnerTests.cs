@@ -8,11 +8,16 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Identity;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -520,7 +525,7 @@ public sealed class LocalStorageQuarantineOwnerTests(EventResourceFileUploadTest
     }
 }
 
-[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerClass)]
 [NotInParallel("PersistenceDb")]
 public sealed class PostgresLocalStorageQuarantineOwnerTests(PostgreSqlContainerFixture fixture)
 {
@@ -530,7 +535,7 @@ public sealed class PostgresLocalStorageQuarantineOwnerTests(PostgreSqlContainer
         await using var rows = await Rows.CreateAsync(fixture);
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var owner = new StorageReconciliationOwner(
-            new SimultaneousQuarantineContexts(rows.Global.CreateDbContextAsync));
+            new SimultaneousQuarantineContexts(rows.Global.CreateDbContextAsync), rows.Enrollment);
         var attempts = await Task.WhenAll(
             owner.AdmitLocalQuarantineAsync(rows.Binding.Id, "objects/competing", 19,
                 LocalStorageQuarantineOwnerTests.Observed, LocalStorageQuarantineOwnerTests.Cutoff, "orphan", deadline.Token),
@@ -546,7 +551,7 @@ public sealed class PostgresLocalStorageQuarantineOwnerTests(PostgreSqlContainer
     public async Task NativeAdmissionDuplicatesAndExactTickRoundTripUseOnlyExecutionAuthority()
     {
         await using var rows = await Rows.CreateAsync(fixture);
-        var owner = new StorageReconciliationOwner(rows.Global);
+        var owner = new StorageReconciliationOwner(rows.Global, rows.Enrollment);
         await Assert.That(await owner.IsLocalOrphanAsync(rows.Binding.Id, "objects/orphan", default)).IsTrue();
         var work = (await LocalStorageQuarantineOwnerTests.AdmitAsync(owner, rows.Binding.Id, "objects/orphan"))!;
         var duplicate = (await LocalStorageQuarantineOwnerTests.AdmitAsync(owner, rows.Binding.Id, "objects\\orphan"))!;
@@ -600,7 +605,7 @@ public sealed class PostgresLocalStorageQuarantineOwnerTests(PostgreSqlContainer
             await seed.SaveChangesAsync();
             await LocalStorageQuarantineOwnerTests.SeedCustodyAsync(seed, rows.Authentication.B, nested, "owned", kind);
         }
-        var owner = new StorageReconciliationOwner(rows.Global);
+        var owner = new StorageReconciliationOwner(rows.Global, rows.Enrollment);
         await Assert.That(await owner.IsLocalOrphanAsync(rows.Binding.Id, "nested/owned", default)).IsFalse();
         await Assert.That(await LocalStorageQuarantineOwnerTests.AdmitAsync(owner, rows.Binding.Id, "nested/owned")).IsNull();
     }
@@ -613,7 +618,7 @@ public sealed class PostgresLocalStorageQuarantineOwnerTests(PostgreSqlContainer
     public async Task NativeExecutionRejectsCustodyAddedAfterOriginalClaim(string kind)
     {
         await using var rows = await Rows.CreateAsync(fixture);
-        var owner = new StorageReconciliationOwner(rows.Global);
+        var owner = new StorageReconciliationOwner(rows.Global, rows.Enrollment);
         var work = (await LocalStorageQuarantineOwnerTests.AdmitAsync(owner, rows.Binding.Id, "objects/late"))!;
         var claim = (await owner.ClaimLocalQuarantineAsync(500, TimeSpan.FromMinutes(5), default))
             .Single(row => row.Id == work.Id);
@@ -634,7 +639,7 @@ public sealed class PostgresLocalStorageQuarantineOwnerTests(PostgreSqlContainer
     public async Task NativeGraceCutoffAndHashCollisionFailClosed()
     {
         await using var rows = await Rows.CreateAsync(fixture);
-        var owner = new StorageReconciliationOwner(rows.Global);
+        var owner = new StorageReconciliationOwner(rows.Global, rows.Enrollment);
         await Assert.ThrowsAsync<PostgresException>(async () => await owner.AdmitLocalQuarantineAsync(
             rows.Binding.Id, "objects/young", 19, LocalStorageQuarantineOwnerTests.Cutoff.AddTicks(1),
             LocalStorageQuarantineOwnerTests.Cutoff, "orphan", default));
@@ -676,7 +681,7 @@ public sealed class PostgresLocalStorageQuarantineOwnerTests(PostgreSqlContainer
             await LocalStorageQuarantineOwnerTests.SeedCustodyAsync(seed, rows.Authentication.B, rows.Binding,
                 "dot/owned.", "metadata");
         }
-        var owner = new StorageReconciliationOwner(rows.Global);
+        var owner = new StorageReconciliationOwner(rows.Global, rows.Enrollment);
         await Assert.That(await owner.IsLocalOrphanAsync(lower.Id, "file", default)).IsEqualTo(OperatingSystem.IsLinux());
         await Assert.That(await owner.IsLocalOrphanAsync(rows.Binding.Id, "objects/\u00e9", default))
             .IsEqualTo(OperatingSystem.IsLinux());
@@ -699,7 +704,7 @@ public sealed class PostgresLocalStorageQuarantineOwnerTests(PostgreSqlContainer
             seed.Add(old);
             await seed.SaveChangesAsync();
         }
-        var owner = new StorageReconciliationOwner(rows.Global);
+        var owner = new StorageReconciliationOwner(rows.Global, rows.Enrollment);
         var claimed = (await owner.ClaimLocalQuarantineAsync(500, TimeSpan.FromMinutes(5), default)).Single(row => row.Id == old.Id);
         await Assert.That(await owner.IsLocalQuarantineClaimCurrentAsync(
             LocalStorageQuarantineOwnerTests.CaptureClaim(old), default)).IsFalse();
@@ -716,8 +721,12 @@ public sealed class PostgresLocalStorageQuarantineOwnerTests(PostgreSqlContainer
     public async Task NativeRuntimeAndUnentitledGlobalCannotEnterTheCapability()
     {
         await using var rows = await Rows.CreateAsync(fixture, grantCapability: false);
-        await Assert.ThrowsAsync<InvalidOperationException>(async () => await new StorageReconciliationOwner(rows.Global)
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await new StorageReconciliationOwner(rows.Global, rows.Enrollment)
             .IsLocalOrphanAsync(rows.Binding.Id, "objects/orphan", default));
+        await using var migration = fixture.CreateDbContext();
+        var deniedInstall = await Assert.That(async () =>
+            await PostgresLocalStorageQuarantineContract.ApplyAsync(migration, rows.Enrollment)).Throws<PostgresException>();
+        await Assert.That(deniedInstall!.MessageText).IsEqualTo("local_storage_quarantine_membership_invalid");
         await using var runtime = rows.Authentication.Context(rows.Authentication.A);
         await Assert.ThrowsAsync<PostgresException>(async () => await runtime.Database.ExecuteSqlRawAsync(
             $"SELECT {PostgresLocalStorageQuarantineContract.FunctionSql(runtime, "inspect")}({{0}},{{1}})",
@@ -781,11 +790,11 @@ public sealed class PostgresLocalStorageQuarantineOwnerTests(PostgreSqlContainer
                         $"GRANT pg_read_all_data TO {PostgresLocalStorageQuarantineContract.OwnerRole} WITH INHERIT FALSE, SET TRUE");
                     break;
             }
-            await Assert.ThrowsAsync<InvalidOperationException>(async () => await new StorageReconciliationOwner(rows.Global)
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await new StorageReconciliationOwner(rows.Global, rows.Enrollment)
                 .IsLocalOrphanAsync(rows.Binding.Id, "objects/orphan", default));
             if (change is "unsafe_role" or "inherited_authority")
                 await Assert.ThrowsAsync<PostgresException>(
-                    () => PostgresLocalStorageQuarantineContract.ApplyAsync(migration));
+                    () => PostgresLocalStorageQuarantineContract.ApplyAsync(migration, rows.Enrollment));
             if (change == "unsafe_role")
                 await Assert.That(await migration.Database.SqlQueryRaw<bool>(
                     $"""SELECT rolcanlogin AS "Value" FROM pg_catalog.pg_roles WHERE rolname = '{PostgresLocalStorageQuarantineContract.OwnerRole}'""")
@@ -808,7 +817,7 @@ public sealed class PostgresLocalStorageQuarantineOwnerTests(PostgreSqlContainer
             if (change == "inherited_authority")
                 await migration.Database.ExecuteSqlRawAsync(
                     $"REVOKE pg_read_all_data FROM {PostgresLocalStorageQuarantineContract.OwnerRole}");
-            await PostgresLocalStorageQuarantineContract.ApplyAsync(migration);
+            await PostgresLocalStorageQuarantineContract.ApplyAsync(migration, rows.Enrollment);
         }
     }
 
@@ -817,74 +826,127 @@ public sealed class PostgresLocalStorageQuarantineOwnerTests(PostgreSqlContainer
         internal PostgresAuthenticationLookupAuthorityTests.AuthenticationRows Authentication { get; private set; } = null!;
         internal GlobalExploreDbContextFactory Global { get; private set; } = null!;
         internal StorageProviderBinding Binding { get; private set; } = null!;
+        internal PostgresNativeQueueEnrollment Enrollment => fixture.NativeQueueEnrollment;
         internal string QuarantineTable { get; private set; } = null!;
         internal string StorageTable { get; private set; } = null!;
-        private readonly string _role = $"local_quarantine_global_{Guid.CreateVersion7():N}";
-        private string _connection = null!;
-        private string _schema = null!;
+        private string? _connection;
+        private bool _capabilityRevoked;
 
         internal static async Task<Rows> CreateAsync(PostgreSqlContainerFixture fixture, bool grantCapability = true)
         {
-            var rows = new Rows(fixture)
+            var rows = new Rows(fixture);
+            try
             {
-                Authentication = await PostgresAuthenticationLookupAuthorityTests.AuthenticationRows.CreateAsync(fixture),
-                Binding = StorageProviderBinding.Local(Path.GetFullPath($"native-quarantine-{Guid.CreateVersion7():N}"))
-            };
-            await using var seed = fixture.CreateDbContext();
-            seed.Add(rows.Binding);
-            await seed.SaveChangesAsync();
-            rows._schema = rows.Authentication.Schema;
-            string Table<T>() where T : class
-            {
-                var entity = seed.Model.FindEntityType(typeof(T))!;
-                return seed.GetService<ISqlGenerationHelper>().DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+                rows.Authentication = await PostgresAuthenticationLookupAuthorityTests.AuthenticationRows.CreateAsync(fixture);
+                rows.Binding = StorageProviderBinding.Local(Path.GetFullPath($"native-quarantine-{Guid.CreateVersion7():N}"));
+                await using (var seed = fixture.CreateDbContext())
+                {
+                    seed.Add(rows.Binding);
+                    await seed.SaveChangesAsync();
+                    string Table<T>() where T : class
+                    {
+                        var entity = seed.Model.FindEntityType(typeof(T))!;
+                        return seed.GetService<ISqlGenerationHelper>().DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+                    }
+                    rows.QuarantineTable = Table<LocalStorageQuarantine>();
+                    rows.StorageTable = Table<StorageObject>();
+                    await StorageNativeGlobalProfile.PrepareAsync(seed, rows.Enrollment);
+                    await PostgresLocalStorageQuarantineContract.ApplyAsync(seed, rows.Enrollment);
+                    if (!grantCapability)
+                    {
+                        string login = seed.GetService<ISqlGenerationHelper>().DelimitIdentifier(rows.Enrollment.GlobalLogin);
+                        rows._capabilityRevoked = true;
+                        await using var revoke = seed.Database.GetDbConnection().CreateCommand();
+                        revoke.Transaction = seed.Database.CurrentTransaction?.GetDbTransaction();
+                        revoke.CommandText = $"REVOKE {PostgresLocalStorageQuarantineContract.GlobalRole} FROM {login}";
+                        await revoke.ExecuteNonQueryAsync();
+                    }
+                }
+                var globalOptions = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global);
+                rows._connection = PrimaryDatabaseConfiguration.BuildConnectionString(globalOptions).ConnectionString;
+                rows.Global = new GlobalExploreDbContextFactory(globalOptions, poolSize: 1);
+                return rows;
             }
-            rows.QuarantineTable = Table<LocalStorageQuarantine>();
-            rows.StorageTable = Table<StorageObject>();
-            await PostgresLocalStorageQuarantineContract.ApplyAsync(seed);
-            string password = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-            await using var admin = new NpgsqlConnection(fixture.ConnectionString);
-            await admin.OpenAsync();
-            await using var grant = admin.CreateCommand();
-            grant.CommandText = $"""
-                CREATE ROLE "{rows._role}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '{password}';
-                GRANT USAGE ON SCHEMA "{rows._schema}" TO "{rows._role}";
-                """;
-            if (grantCapability)
-                grant.CommandText += $"\nGRANT {PostgresLocalStorageQuarantineContract.GlobalRole} TO \"{rows._role}\" WITH INHERIT TRUE, SET FALSE;";
-            await grant.ExecuteNonQueryAsync();
-            var connection = new NpgsqlConnectionStringBuilder(fixture.ConnectionString) { Username = rows._role, Password = password };
-            rows._connection = connection.ConnectionString;
-            rows.Global = new GlobalExploreDbContextFactory(new PrimaryDatabaseConnectionOptions
+            catch (Exception initializationFailure)
             {
-                Role = PrimaryDatabaseRole.Global,
-                Provider = PrimaryDatabaseProvider.PostgreSql,
-                Host = connection.Host,
-                Port = connection.Port,
-                Database = connection.Database,
-                Schema = rows._schema,
-                Username = rows._role,
-                Password = password,
-                TlsMode = PrimaryDatabaseTlsMode.Disabled
-            }, poolSize: 1);
-            return rows;
+                try { await rows.DisposeAsync(); }
+                catch (Exception cleanupFailure)
+                {
+                    throw new AggregateException("Native quarantine initialization and cleanup failed.",
+                        initializationFailure, cleanupFailure);
+                }
+                throw;
+            }
         }
 
         public async ValueTask DisposeAsync()
         {
-            using var pool = new NpgsqlConnection(_connection);
-            NpgsqlConnection.ClearPool(pool);
-            await using var admin = new NpgsqlConnection(fixture.ConnectionString);
-            await admin.OpenAsync();
-            await using var revoke = admin.CreateCommand();
-            revoke.CommandText = $"""
-                REVOKE {PostgresLocalStorageQuarantineContract.GlobalRole} FROM "{_role}";
-                REVOKE USAGE ON SCHEMA "{_schema}" FROM "{_role}";
-                DROP ROLE "{_role}";
-                """;
-            await revoke.ExecuteNonQueryAsync();
-            await Authentication.DisposeAsync();
+            var failures = new List<Exception>();
+            try
+            {
+                if (_connection is not null)
+                {
+                    using var pool = new NpgsqlConnection(_connection);
+                    NpgsqlConnection.ClearPool(pool);
+                }
+            }
+            catch (Exception failure) { failures.Add(failure); }
+            try
+            {
+                if (_capabilityRevoked)
+                {
+                    await using var migration = fixture.CreateDbContext();
+                    await migration.Database.OpenConnectionAsync();
+                    string login = migration.GetService<ISqlGenerationHelper>().DelimitIdentifier(Enrollment.GlobalLogin);
+                    await using var restore = migration.Database.GetDbConnection().CreateCommand();
+                    restore.Transaction = migration.Database.CurrentTransaction?.GetDbTransaction();
+                    restore.CommandText = $"GRANT {PostgresLocalStorageQuarantineContract.GlobalRole} TO {login} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE";
+                    await restore.ExecuteNonQueryAsync();
+                    _capabilityRevoked = false;
+                }
+            }
+            catch (Exception failure) { failures.Add(failure); }
+            try
+            {
+                if (Authentication is not null) await Authentication.DisposeAsync();
+            }
+            catch (Exception failure) { failures.Add(failure); }
+            if (failures.Count != 0)
+                throw new AggregateException("Native quarantine cleanup failed.", failures);
         }
+    }
+}
+
+/// <summary>Canonical Global profile confined to each native storage class's dedicated container.</summary>
+internal static class StorageNativeGlobalProfile
+{
+    internal static async Task PrepareAsync(ExploreDbContext migrator, PostgresNativeQueueEnrollment enrollment)
+    {
+        migrator.ClearTenantFilterBypass();
+        migrator.BindTenantLease();
+        await migrator.Database.OpenConnectionAsync();
+        var model = migrator.GetService<IDesignTimeModel>().Model;
+        var entity = model.FindEntityType(typeof(ManagedTenantProvisioningPolicySetting))!;
+        string table = entity.GetTableName()!;
+        string schema = entity.GetSchema()!;
+        string qualified = migrator.GetService<ISqlGenerationHelper>().DelimitIdentifier(table, schema);
+        bool exists = await migrator.Database.SqlQueryRaw<bool>(
+            """SELECT pg_catalog.to_regclass({0}) IS NOT NULL AS "Value" """, qualified).SingleAsync();
+        if (!exists)
+        {
+            MigrationOperation[] operations = migrator.GetService<IMigrationsModelDiffer>()
+                .GetDifferences(null, model.GetRelationalModel())
+                .Where(operation => operation is EnsureSchemaOperation ensure && ensure.Name == schema
+                    || operation is CreateTableOperation create && create.Name == table && create.Schema == schema
+                    || operation is CreateIndexOperation index && index.Table == table && index.Schema == schema).ToArray();
+            if (operations.OfType<CreateTableOperation>().Count() != 1)
+                throw new InvalidOperationException("The native storage policy projection must have one mapped table.");
+            foreach (var command in migrator.GetService<IMigrationsSqlGenerator>().Generate(operations, model))
+                await command.ExecuteNonQueryAsync(migrator.GetService<IRelationalConnection>());
+        }
+        await PostgresTenantCreationPermissions.ApplyAsync(migrator, enrollment, IdentityDatabaseTopology.Colocated);
+        await PostgresProvisioningPolicyPermissions.ApplyAsync(migrator, enrollment);
+        await PostgresManagedTenantWorkerCreationPermissions.ApplyAsync(migrator, enrollment, IdentityDatabaseTopology.Colocated);
     }
 }
 

@@ -222,7 +222,9 @@ internal static class PostgresLocalIdentityWriterPermissions
                     JOIN pg_catalog.pg_class t ON t.oid=pg_catalog.to_regclass(source.relation)
                     WHERE t.relowner=(SELECT oid FROM pg_catalog.pg_roles WHERE rolname={login})
                         OR EXISTS (SELECT 1 FROM (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')) permission(privilege)
-                            WHERE pg_catalog.has_table_privilege({loginOid},t.oid,permission.privilege)
+                            WHERE (CASE WHEN permission.privilege='MAINTAIN'
+                                THEN {PostgresPrivilegeGuard.MaintainPrivilegeSql(loginOid, "t.oid", false)}
+                                ELSE pg_catalog.has_table_privilege({loginOid},t.oid,permission.privilege) END)
                                 AND NOT (permission.privilege='DELETE' AND ({allowedDelete})
                                     AND NOT pg_catalog.has_table_privilege({loginOid},t.oid,'DELETE WITH GRANT OPTION')
                                     AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(t.relacl) acl
@@ -247,7 +249,8 @@ internal static class PostgresLocalIdentityWriterPermissions
 
     private static string Absent(Source[] sources, PostgresLocalIdentityWriterEnrollment enrollment) =>
         string.Join(" AND ", sources.Select(source => $"""
-            NOT pg_catalog.has_table_privilege({RoleOid(enrollment.WriterLogin)},{Text(source.Table)},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+            NOT (pg_catalog.has_table_privilege({RoleOid(enrollment.WriterLogin)},{Text(source.Table)},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                OR {PostgresPrivilegeGuard.MaintainPrivilegeSql(RoleOid(enrollment.WriterLogin), Text(source.Table), false)})
             AND NOT pg_catalog.has_any_column_privilege({RoleOid(enrollment.WriterLogin)},{Text(source.Table)},'SELECT,INSERT,UPDATE,REFERENCES')
             AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid=pg_catalog.to_regclass({Text(source.Table)})
                 AND p.polname IN ({Text(ReadPolicy)},{Text(ReadRestriction)}))
@@ -321,7 +324,8 @@ internal static class PostgresLocalIdentityWriterPermissions
         string loginOid = RoleOid(enrollment.ApplicationGlobalLogin!);
         if (!complete)
             return $"""
-                ((NOT pg_catalog.has_table_privilege({loginOid},{Text(source.Table)},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                ((NOT (pg_catalog.has_table_privilege({loginOid},{Text(source.Table)},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                    OR {PostgresPrivilegeGuard.MaintainPrivilegeSql(loginOid, Text(source.Table), false)})
                     AND NOT pg_catalog.has_any_column_privilege({loginOid},{Text(source.Table)},'SELECT,INSERT,UPDATE,REFERENCES'))
                     OR ({GlobalEligibilityPredicate(source, enrollment, true)}))
                 """;
@@ -332,7 +336,8 @@ internal static class PostgresLocalIdentityWriterPermissions
             (WITH expected(column_name,privilege) AS (VALUES {expectedSql}),
             members AS (SELECT oid,rolname FROM pg_catalog.pg_roles WHERE pg_catalog.pg_has_role({loginOid},oid,'MEMBER'))
             SELECT NOT EXISTS (SELECT 1 FROM members r WHERE
-                pg_catalog.has_table_privilege(r.oid,{Text(source.Table)},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                (pg_catalog.has_table_privilege(r.oid,{Text(source.Table)},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                    OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", Text(source.Table), false)})
                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                     CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                     WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)}) AND a.attnum<>0 AND NOT a.attisdropped

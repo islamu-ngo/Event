@@ -34,7 +34,6 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;

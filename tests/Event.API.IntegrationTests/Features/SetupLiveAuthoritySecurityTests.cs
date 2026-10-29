@@ -518,7 +518,7 @@ public sealed partial class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRe
         using HttpResponseMessage readinessResponse = await fixture.Client.SendAsync(readiness);
         string readinessBody = await readinessResponse.Content.ReadAsStringAsync();
         await Assert.That(readinessResponse.StatusCode).IsEqualTo(HttpStatusCode.OK)
-            .Because(fixture.Capture.FailureMetadata);
+            .Because($"safe readiness failure metadata: {fixture.Capture.FailureMetadata}");
         await Assert.That(readinessBody).DoesNotContain(canary);
         await Assert.That(readinessBody).DoesNotContain("provider", StringComparison.OrdinalIgnoreCase);
         await Assert.That(readinessBody).DoesNotContain("environment", StringComparison.OrdinalIgnoreCase);
@@ -1291,6 +1291,7 @@ public sealed partial class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRe
         using HttpRequestMessage write = SecretWriteRequest(
             enrollment, "setup.signing", secret, operationKey);
         using var cancellation = new CancellationTokenSource();
+        Task settled = fixture.Coordinator.Released;
         Task<HttpResponseMessage> writeTask =
             fixture.Client.SendAsync(write, cancellation.Token);
 
@@ -1308,6 +1309,7 @@ public sealed partial class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRe
         await Assert.That(async () =>
                 await writeTask.WaitAsync(TimeSpan.FromSeconds(10)))
             .Throws<OperationCanceledException>();
+        await settled.WaitAsync(TimeSpan.FromSeconds(10));
         await Assert.That(fixture.Writer.CallCount).IsEqualTo(0);
         await Assert.That(fixture.CommitBarrier.CallCount).IsEqualTo(1);
         await Assert.That(fixture.Coordinator.AcquireCount).IsEqualTo(1);
@@ -1319,6 +1321,55 @@ public sealed partial class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRe
         await Assert.That(operation.Outcome)
             .IsEqualTo(SetupSecretBindingOperationOutcome.Cancelled);
         await Assert.That(operation.SettledAt).IsNotNull();
+        await AssertStoredRowsDoNotContain([secret], OperationEntityName);
+        await AssertCapturedDoesNotContain([secret]);
+    }
+
+    [Test]
+    [Arguments(SecretMutationEvidence.PossiblyDispatched)]
+    [Arguments(SecretMutationEvidence.Applied)]
+    [Arguments(SecretMutationEvidence.Pending)]
+    [Arguments(SecretMutationEvidence.Rejected)]
+    [Arguments(SecretMutationEvidence.Conflict)]
+    public async Task CancellationAfterDispatchPersistsSourceEvidenceWithoutCancellationOrReplay(
+        SecretMutationEvidence evidence)
+    {
+        await fixture.ResetAsync();
+        await fixture.AddSetupBinding("setup.signing");
+        EnrollmentResponse enrollment = await CreateEnrollment(
+            fixture.Primary, Guid.CreateVersion7(), NewToken(), HttpStatusCode.Created);
+        string secret = NewLongToken();
+        Guid operationKey = Guid.CreateVersion7();
+        fixture.Writer.Evidence = evidence;
+        using ProviderWriteBarrier barrier = fixture.Writer.ArmBarrier();
+        Task entered = barrier.Started.WaitAsync(TimeSpan.FromSeconds(10));
+        Task settled = fixture.Coordinator.Released.WaitAsync(TimeSpan.FromSeconds(10));
+        using var cancellation = new CancellationTokenSource();
+        using HttpRequestMessage request = SecretWriteRequest(
+            enrollment, "setup.signing", secret, operationKey);
+        Task<HttpResponseMessage> response = fixture.Client.SendAsync(request, cancellation.Token);
+        try
+        {
+            await entered;
+            await cancellation.CancelAsync();
+        }
+        finally
+        {
+            barrier.Release();
+        }
+        await Assert.That(async () => await response.WaitAsync(TimeSpan.FromSeconds(10)))
+            .Throws<OperationCanceledException>();
+        await settled;
+        SetupSecretBindingOperation operation = await LoadOperation(operationKey);
+        await Assert.That(operation.State).IsEqualTo(SetupSecretBindingOperationState.Failed);
+        await Assert.That(operation.Outcome).IsEqualTo(SetupSecretBindingOperationOutcome.Unavailable);
+        await Assert.That(operation.MutationEvidence).IsEqualTo(evidence);
+        using HttpRequestMessage replay = SecretWriteRequest(
+            enrollment, "setup.signing", secret, operationKey);
+        using HttpResponseMessage replayResponse = await fixture.Client.SendAsync(replay);
+        await Assert.That(replayResponse.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+        await Assert.That(fixture.Writer.CallCount).IsEqualTo(1);
+        await AssertNoDispatchableOperation(enrollment.EnrollmentId);
         await AssertStoredRowsDoNotContain([secret], OperationEntityName);
         await AssertCapturedDoesNotContain([secret]);
     }
@@ -1420,7 +1471,7 @@ public sealed partial class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRe
         string body = await response.Content.ReadAsStringAsync();
 
         await Assert.That(response.StatusCode).IsEqualTo(expected)
-            .Because($"final route returned: {body}; {fixture.Capture.FailureMetadata}");
+            .Because($"final route returned: {body}; safe failure metadata: {fixture.Capture.FailureMetadata}");
         await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
         await Assert.That(response.Headers.CacheControl?.Private).IsTrue();
         await Assert.That(response.Content.Headers.ContentType?.MediaType)
@@ -2223,6 +2274,7 @@ public sealed class RecordingSetupSecretBindingWriter :
         SetupSecretBindingWriteOutcome.Ready;
     public SetupSecretBindingWriteOutcome ReadinessOutcome { get; set; } =
         SetupSecretBindingWriteOutcome.Ready;
+    public SecretMutationEvidence? Evidence { get; set; }
     public SetupSecretBindingWriteRequest? LastRequest { get; private set; }
     public string? LastSecretDigest { get; private set; }
     public ReadOnlyMemory<byte> LastBorrowedValue { get; private set; }
@@ -2245,7 +2297,11 @@ public sealed class RecordingSetupSecretBindingWriter :
         LastRequest = request;
         LastSecretDigest = Digest(request.SecretValue.Span);
         LastBorrowedValue = request.SecretValue;
+        SecretMutationEvidence observed = Evidence ?? (Outcome == SetupSecretBindingWriteOutcome.Ready
+            ? SecretMutationEvidence.Applied : SecretMutationEvidence.NotDispatched);
+        request.Attempt.AttachProjection(() => observed);
         Interlocked.Exchange(ref _barrier, null)?.SignalAndWait();
+        cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(Outcome);
     }
 
@@ -2263,6 +2319,7 @@ public sealed class RecordingSetupSecretBindingWriter :
         Interlocked.Exchange(ref _callCount, 0);
         Outcome = SetupSecretBindingWriteOutcome.Ready;
         ReadinessOutcome = SetupSecretBindingWriteOutcome.Ready;
+        Evidence = null;
         LastRequest = null;
         LastSecretDigest = null;
         LastBorrowedValue = default;
@@ -2367,6 +2424,8 @@ public sealed class RecordingSetupSecretBindingOperationCoordinator :
     private CoordinatorAcquireBarrier? _beforeAcquireBarrier;
     private int _acquireCount;
     private int _disposeCount;
+    private TaskCompletionSource _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public Task Released => _released.Task;
     private readonly ConcurrentQueue<SetupSecretBindingCoordinationRequest> _requests = new();
     // ponytail: fixture-wide lock; replace with keyed locks only if this test fixture needs parallel enrollments.
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -2408,6 +2467,7 @@ public sealed class RecordingSetupSecretBindingOperationCoordinator :
         Interlocked.Exchange(ref _beforeAcquireBarrier, null)?.Release();
         Interlocked.Exchange(ref _acquireCount, 0);
         Interlocked.Exchange(ref _disposeCount, 0);
+        _released = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         while (_requests.TryDequeue(out _))
         {
         }
@@ -2424,6 +2484,7 @@ public sealed class RecordingSetupSecretBindingOperationCoordinator :
             {
                 Interlocked.Increment(ref owner._disposeCount);
                 owner._gate.Release();
+                owner._released.TrySetResult();
             }
             return ValueTask.CompletedTask;
         }

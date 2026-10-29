@@ -7,7 +7,6 @@ using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;

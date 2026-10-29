@@ -26,7 +26,6 @@ using Explore.Domain;
 using Explore.Persistence.Database;
 using Explore.Persistence;
 using Explore.Persistence.Privacy.ErasureAuthority;
-using Explore.Secrets.Database;
 using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Features;

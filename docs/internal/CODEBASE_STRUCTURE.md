@@ -38,7 +38,7 @@ Explore.Application     (depends on Domain - CQRS handlers, DTOs, contracts)
     ↑
 Explore.Persistence     (depends on Application - EF Core, repositories)
 Explore.Infrastructure  (depends on Application - email, storage, identity)
-Explore.Secrets         (API-side secrets management)
+Explore.ServiceDefaults (shared host defaults, selected secret authority, Data Protection)
     ↑
 Explore.API             (API host composition root for Domain, Application, Persistence, Infrastructure)
 Event.Web.BffHosting    (shared BFF auth/proxy/header/admin-host primitives)
@@ -501,30 +501,42 @@ Explore.Infrastructure/
     └── TechEventStrategy.cs      — Tech module-specific event behavior
 ```
 
-### Explore.Secrets/ — Secrets Management Library
+### Native Secret Authority Owners
 
-API-side library for multi-provider secret management. The isolated Blazor BFF owns its minimal startup-only Infisical source under `Explore.Blazor/Configuration/`.
+SecretKit-backed acquisition is shared by composition roots without importing
+API implementation layers into the BFF. Runtime resolution and database
+acquisition remain in their native Infrastructure and Persistence layers.
 
 ```
-Explore.Secrets/
-├── Abstractions/                  — Core interfaces and types
-│   └── ISecretProvider.cs         — Secret retrieval interface
-├── Providers/                     — Secret provider implementations
-│   ├── EnvironmentSecretProvider.cs  — Environment variable secrets
-│   └── InfisicalSecretProvider.cs    — Infisical secret manager integration
-├── Services/                      — Secret services
-│   ├── SecretProviderFactory.cs   — Creates provider based on configuration
-│   └── SecretRefreshService.cs    — Background provider refresh
-├── Configuration/                 — Options and configuration models
-│   └── SecretProviderOptions.cs   — Provider selection configuration
-├── Extensions/                    — DI registration
-│   └── ServiceCollectionExtensions.cs — AddSecrets() extension method
-├── Validation/
-│   └── RequiredSecretsValidator.cs — Validates required secrets exist at startup
-└── Observability/
-    ├── SecretProviderHealthCheck.cs — Health check for secret providers
-    └── SecretRefreshMetrics.cs    — Metrics for secret refresh operations
+Explore.ServiceDefaults/
+├── Secrets/
+│   ├── SecretAuthorityBootstrap.cs   — Opens the selected authority
+│   ├── SecretAuthorityAcquisition.cs — Owns client/session and token-only maintenance
+│   └── SecretAuthorityOperation.cs   — Bounds borrowed work and drains on retirement
+└── DataProtection/
+    ├── ExternalDataProtectionSource.cs       — Async exact two-value ring/admission preparation
+    └── ExternalDataProtectionRegistration.cs — Registration and fresh-authority readiness
+
+Explore.Infrastructure/Secrets/
+├── EnvironmentSecretSource.cs, InfisicalSecretSource.cs — Selected runtime sources
+├── SecretResolver.cs, SecretResolverCacheState.cs        — Scoped resolution, shared cache
+├── ISecretRevisionOwner.cs, SecretBindingRevisionInventory.cs — Revision evidence
+├── AuthenticationRuntimeSecretWriter.cs, SetupSecretBindingWriter.cs — Native writers
+├── AuthenticationCredentialProfileReader.cs             — Authentication profiles
+├── PrivacyIdentityFenceKeyProvider.cs                    — Privacy key consumer
+├── SetupSecretBindingCommitmentAuthority.cs              — Binding commitments
+└── SecretAuthorityStatusReader.cs                        — Safe authority status
+
+Explore.Persistence/Database/
+├── PrimaryDatabaseConfiguration.cs       — Purpose-bound database configuration
+├── PrimaryDatabaseProviderComposition.cs — Provider composition/bootstrap
+└── MigrationDatabaseAcquisition.cs       — Migration-owned selected acquisition
 ```
+
+The selected Infisical session may explicitly run token-only authentication
+maintenance. There is no application-secret polling, relogin/replay, generic
+rotation factory, or compatibility shim. Data Protection synchronous reads use
+prepared memory; readiness explicitly reacquires the selected authority.
 
 ---
 
@@ -538,7 +550,7 @@ Event.Application.UnitTests/       — Application layer unit tests
 ├── Common/                        — Shared test utilities and mocks
 └── Hateoas/                       — HATEOAS assembly tests
 
-Event.Domain.UnitTests/            — Domain entity unit tests
+Event.Domain.UnitTests/            — Domain entity unit tests, including Secrets/ registry invariants
 
 Event.Architecture.Tests/          — Architecture fitness tests
 ├── CleanArchitectureTests.cs      — Validates dependency rules between layers
@@ -549,6 +561,7 @@ Event.Architecture.Tests/          — Architecture fitness tests
 
 Event.Persistence.IntegrationTests/— Database integration tests
 ├── Fixtures/                      — Test fixtures (in-memory or containerized DB)
+├── Database/                      — Database binding and selected acquisition tests
 └── Repositories/                  — Repository-level integration tests
 
 Event.API.IntegrationTests/        — API endpoint integration tests
@@ -562,13 +575,18 @@ Explore.Blazor.Client.Tests/       — Blazor UI component tests (bUnit)
 ├── Integration/                   — Integration-level UI tests
 └── Common/                        — Shared test helpers
 
-Explore.Secrets.UnitTests/         — Secrets library tests
-├── Providers/                     — Provider implementation tests
-├── Services/                      — Service tests
-├── Configuration/                 — Configuration tests
-├── Validation/                    — Validator tests
-└── Observability/                 — Health check and metrics tests
+Explore.Infrastructure.Tests/
+└── Secrets/                       — Acquisition/lifetime, native sources, resolver/cache,
+                                     revisions, writers, commitments, prepared Data Protection
+
+Explore.Blazor.IntegrationTests/
+└── Configuration/                 — BFF authority preparation and host admission
+
+Event.Standalone.IntegrationTests/  — Combined serving-host authority preparation
 ```
+
+API integration tests also cover composition; these native suites replace a
+standalone secrets test project. See [TESTING.md](TESTING.md) for lane selection.
 
 ---
 
@@ -640,7 +658,7 @@ _bmad-output/                      — BMAD workflow outputs
 | Add seed data | `Explore.Persistence/Seed/SeedData.cs` (runtime) or entity configuration `HasData()` (lookup) |
 | Multi-tenancy logic | `Explore.API/Middleware/ApiTenantResolutionMiddleware.cs` + `Explore.Infrastructure/Services/TenantContext.cs` + `Explore.Persistence/ExploreDbContext.cs` |
 | Authentication | `Explore.Blazor/Program.cs` (OIDC) + `Explore.Infrastructure/Services/CurrentUserService.cs` |
-| Secret management | `Explore.Secrets/` (API-side) or `Explore.Blazor/Configuration/` (BFF startup only) |
+| Secret management | `Explore.ServiceDefaults/Secrets/` (acquisition/lifetime), `Explore.Infrastructure/Secrets/` (runtime resolution), `Explore.Persistence/Database/` (database acquisition), `Explore.ServiceDefaults/DataProtection/` (prepared ring/admission) |
 | Database migrations | `dotnet ef` via `Event.MigrationService/` |
 | Architecture tests | `Event.Architecture.Tests/` |
 | Wrapper components | `Explore.Blazor.Client/Components/Common/App*.razor` |

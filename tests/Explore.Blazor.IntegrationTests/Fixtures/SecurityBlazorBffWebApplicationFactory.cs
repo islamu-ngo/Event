@@ -75,8 +75,10 @@ public class SecurityBlazorBffWebApplicationFactory : WebApplicationFactory<Prog
         builder.ConfigureTestServices(services =>
         {
             services.AddTestBffSessionAuthority();
-            services.Replace(ServiceDescriptor.Singleton<IExternalDataProtectionSource>(
-                new ExternalDataProtectionTestAuthority("bff")));
+            services.RemoveAll<IExternalDataProtectionSource>();
+            services.AddSingleton<IExternalDataProtectionSource>(provider =>
+                new ExternalDataProtectionTestAuthority("bff", provider.GetRequiredService<TimeProvider>()));
+            services.AddExternalDataProtection("bff");
 
             services.RemoveAll<IDistributedCache>();
             services.AddDistributedMemoryCache();

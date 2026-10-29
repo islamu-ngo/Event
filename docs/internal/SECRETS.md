@@ -3,6 +3,22 @@ ABOUTME: Covers bootstrap selection, safe diagnostics, health monitoring, and ro
 
 # Secrets Management
 
+## Moderation consumer ownership
+
+Reconciliation reads `MODERATION__RECONCILIATION__APIKEY` from the selected API
+owner at `/api`. Ordinary application configuration cannot supply a missing
+credential. Local Environment and User Secrets values remain bound to that
+owner's frozen generation; replacing local material requires a new owner or
+process restart. Infisical reads retain the selected session and native outcomes.
+
+The measurement launcher owns a separate `ModerationMeasurement` acquisition
+limited to `/database` and `/moderation`. API, BFF, Combined and Migration owners
+cannot acquire `/moderation`; the measurement owner cannot acquire `/api`.
+Its native authentication maintenance belongs to the launcher process and is
+disposed with its prepared configuration. Measurement signers and test-database
+credentials are not serving-host inputs. The launcher keeps the existing public
+signer and test-coordinate names documented in `eng/moderation/README.md`.
+
 ## Actor ownership reads
 
 Application workflows establish the original user and selected tenant before
@@ -19,11 +35,64 @@ the reader retains the caller's selected context, connection and transaction.
 
 ## Consumer-isolated acquisition and orchestration
 
+`SecretAuthorityBootstrap.OpenAsync` is the native entrypoint for a configured
+owner. It validates the explicit selector and compiled consumer's entries before
+opening any source. Local authorities receive no Infisical session. Injected
+authority roots are accepted only in Testing; other environments read universal
+authentication inputs from process environment, never application JSON or
+vault-returned configuration. User Secrets remains a separately selected local
+authority rather than an Infisical bootstrap fallback.
+
+Native entrypoints require `SecretProvider:Infisical:TokenLifetime` to be
+`Finite` or `Periodic`. Periodic additionally requires `TokenPeriodSeconds` equal
+to the login's reported expiration; finite rejects that field. The native owner
+checks the actual maximum TTL and login-bound timing. `RenewBeforeSeconds`
+defaults to 60 and `RequestTimeoutSeconds` to 15 (maximum 60). Invalid policy
+fails before login when locally detectable; mismatched provider evidence rejects
+the opened result without publishing an owner. This entrypoint starts no
+maintenance or automatic reauthentication. Serving-host lifecycle wiring remains
+a separate integration requirement.
+
+Long-lived serving owners may explicitly start the selected session's existing
+SecretKit authentication-maintenance helper before lengthy material preparation.
+The owner retains and disposes that single helper; it must not create a second
+instance through DI or rely on a later hosted-service start to cover bootstrap.
+The approved scheduling exception permits token renewal only. It excludes
+application-secret polling, business work, automatic login, identity switching
+and mutation replay. Migration/tooling and local authorities start no helper.
+Maintenance health describes authentication state, not required-secret delivery,
+downstream activation or fleet readiness.
+
+`PrepareConfigurationGroupAsync` provides the wider API startup projection:
+native inventory discovers at most 1000 value-free entries per exact admitted
+folder, requires completeness and validates coordinates and all destinations
+before exact material reads. Each source is read once; derived aliases reuse its
+admitted value. A listed-then-missing member fails the group rather than
+publishing a smaller generation. Inventory and the staged local result are not
+remote transactional snapshots or provisioning-approval evidence.
+
+API startup treats only `Absent` as an unconfigured optional `/smtp` or
+`/analytics` group. Inventory denial, provider unavailability, invalid material
+and a listed member disappearing before its exact read fail startup with
+`secret_api_configuration_unavailable`. Mappings remain staged until every group
+is admitted, so a later optional-group failure publishes no partial configuration.
+
+Selected Environment/User Secrets runtime values are frozen when their process
+owner opens. Their owner generation changes on replacement, not on cache expiry
+or token renewal. The specialized Data Protection reader remains fresh against
+the same selected local authority without replacing that frozen runtime
+generation. Local startup projection preserves ordinary empty fields but never
+exports bootstrap selectors, machine credentials, DP controls or another
+consumer's credentials.
+
 `SecretAcquisitionPolicy` admits the compiled consumer's exact roots before
 authentication. API composition selects `Api`; Standalone explicitly selects
 `Combined`; the migration service selects `Migration`. Combined admits the API
-and BFF union, not provider administration. The separate BFF loader retains its
-three exact frontend roots. Runtime source options preserve the consumer selected
+and BFF union, not provider administration. The separate BFF loader admits four
+exact frontend roots: Keycloak, Google, AT Protocol signing and `/runtime/bff/session`.
+The session root maps only `BFF_SESSION_REDIS_PASSWORD` to
+`Bff:SessionAuthority:Password`; it is unavailable to the API consumer.
+Runtime source options preserve the consumer selected
 by composition rather than a consumer supplied by vault content.
 
 The cached Infisical provider independently repeats exact-root admission before
@@ -42,6 +111,15 @@ same admission. Changing a registry default does not authorize an old persisted
 coordinate. `keycloak.db_password` is no longer a runtime secret definition.
 Canonical BFF authentication writes remain the separate bounded write-only
 capability; API read permission does not expand to BFF roots.
+
+The authentication writer admits only API and Combined owners and the exact
+instance binding for Google or Keycloak BFF credentials. Its two canonical
+write targets are separate from consumer read roots: API cannot acquire BFF
+credential material through startup or runtime reads. The selected backend
+identity still needs an explicitly provisioned provider write ACL and upstream
+application authorization; eligibility grants neither. BFF and migration
+owners cannot invoke this adapter, while local backend authorities return the
+operator-injection outcome without remote work.
 
 API Keycloak metadata lives at `/runtime/api/authentication/keycloak`, lifecycle
 authority at `/runtime/api/keycloak/lifecycle`, and Cerbos decision metadata at
@@ -75,7 +153,8 @@ child environments. An unavailable vault, missing identity or mismatched databas
 coordinate is a startup failure, not permission to use local generated values.
 See the [public cutover procedure](../public/documentation/readme/configuration-and-operations/infisical.md#consumer-isolation-cutover).
 
-`Explore.Secrets` resolves values from exactly one deployment-selected authority.
+`Explore.Infrastructure/Secrets` resolves values from exactly one deployment-selected
+authority acquired by `Explore.ServiceDefaults/Secrets`.
 `Environment` and `Infisical` are supported for deployments. `UserSecrets` is a
 local Development/Testing authority. A missing, unsupported, disallowed, or failed
 authority stops required startup work and never falls back to another source.
@@ -85,15 +164,33 @@ authority stops required startup work and never falls back to another source.
 `Explore.ServiceDefaults/DataProtection` owns the shared framework adapter because
 Split BFF must not reference backend Domain/Application/Secrets assemblies.
 `ExternalDataProtectionSource` bypasses general configuration aggregation and
-reads only the selected authority. `Environment` uses process variables directly;
-`UserSecrets` reads `event-shared-secrets` only in Development/Testing; Infisical
-uses Universal Auth and exact, nonrecursive, reference-unexpanded folder reads.
+uses the selected `SecretAuthorityAcquisition` owner. `Environment` reads process
+inputs; `UserSecrets` reads `event-shared-secrets` only in Development/Testing.
+Infisical reuses that owner's admitted session for exact raw, nonrecursive,
+reference-unexpanded reads instead of performing a separate login.
 Missing or failed authority never falls back to appsettings, DB, Redis or files.
 The API, BFF and Combined composition roots explicitly select `api`, `bff` and
 `combined`. API and Combined retain discriminator `islamu-event` because they own
 the same durable ciphertext contracts; Split BFF uses `islamu-event:bff:v1`.
 Rings are separately provisioned. Sharing backend material across API/Combined
 is an explicit stopped-host topology move, not automatic sharing with the BFF.
+
+The composition contract is asynchronous: await
+`PrepareExternalDataProtectionAsync` before building or resolving the framework
+provider. Preparation admits both values before registering the source and its
+dependent services. The synchronous `Read()` returns only prepared memory; it
+cannot authenticate, fetch or reload. Keep the selected authority owner alive
+through serving and drain, then dispose it explicitly. Container disposal does
+not retire this application-owned authority.
+
+Readiness separately awaits `ReadFreshAsync` through that same owner. Failure or
+material, pin or floor divergence calls `RejectUntilRestart`, which also rejects
+cached protectors' actual protect/unprotect operations. A cancellation already
+requested before the readiness attempt propagates without setting the latch;
+an uncertain attempted read fails closed. A fresh successful read does not install
+a different ring or clear permanent rejection. Host startup wiring must implement
+this preparation contract; constructor or hosted-service registration alone is
+not admission.
 
 For partition `api`, `bff` or `combined`, the exact selected-authority roots are:
 
@@ -238,6 +335,22 @@ only a value-free binding generation; it does not persist plaintext, provider
 coordinates, or a secret-derived hash. If that generation changes before
 apply, the plan is rejected before Keycloak administrator authentication or
 provider mutation.
+
+The comparison contract is always owner-bound: a restart, another replica or
+eviction from the bounded revision inventory requires fresh review. The native
+source retains qualified SDK revision equality and issues an opaque comparison
+token; it does not persist SDK formatting, a numeric version or material hashes.
+`KeycloakConnectionResolver` rejects missing or blank source revision evidence
+instead of inventing a process revision. Observation timestamps alone do not
+change an admitted revision. Cache integration must also check token ownership
+before returning a cached credential.
+
+Native reads capture owner-bound observation order before asynchronous provider
+work. An earlier read cannot replace a different qualified revision already
+admitted by a later read; equal qualified evidence reuses the existing token.
+Inventory compaction rejects pending observations whose per-slot ordering
+evidence may have been evicted. This is local admission ordering, not a claim
+that provider versions are globally monotonic or remote reads are atomic.
 
 The resolved secret may seed a proven-absent confidential BFF client exactly
 once. Bearer-only API client payloads omit `secret`. Existing-client secret
@@ -447,17 +560,14 @@ phase; never reuse the Photon configuration surface.
 
 Copy `.env.example` to the ignored repository-root `.env`. Select exactly one
 `SECRET_PROVIDER`: `Environment`, `Infisical`, or `UserSecrets`. Environment mode
-reads the documented process variables. Infisical mode uses `INFISICAL_*` process
-environment variables or, in Development and Testing environments, can read bootstrap
-Universal Auth credentials (`Infisical:Url`, `Infisical:ProjectId`, `Infisical:ClientId`,
-`Infisical:ClientSecret`, `Infisical:Environment`) directly from the shared User Secrets store
-owned by `src/Explore.Secrets/Explore.Secrets.csproj`. In Development/Testing, if `SECRET_PROVIDER`
-is omitted from process variables or `.env`, it also falls back to `SECRET_PROVIDER` configured in
-User Secrets. User Secrets mode reads all application secrets directly from the shared store
-through your IDE or the `dotnet user-secrets --project src/Explore.Secrets` CLI.
-Both User Secrets mode and Infisical bootstrap via User Secrets are rejected unless the
-host environment is Development or Testing. In Production, Infisical bootstrap credentials
-must strictly come from process environment variables.
+reads the documented process variables. Infisical Universal Auth credentials come
+only from process environment (`INFISICAL_*` or `SecretProvider__Infisical__*`),
+including Development; application JSON, vault-returned configuration and the
+User Secrets store cannot bootstrap that identity. Testing may inject its explicit
+fake authority root. UserSecrets is a separate, explicitly selected authority
+allowed only in Development/Testing, reading `event-shared-secrets`. All four
+hosts declare that ID; use `dotnet user-secrets --project src/Explore.API` or the
+IDE against that shared store. Missing or contradictory selection fails closed.
 
 AppHost loads the repository `.env`, so Aspire profiles honor
 `SECRET_PROVIDER=UserSecrets` directly. Direct project launches do not load that
@@ -555,6 +665,46 @@ Only bounded state, enabled intent, and ownership scope enter `EmailDeliveryCapa
 No extra SMTP credential cache sits above the selected secret authority. The shared
 resolver's documented freshness and coordinated-restart requirements below still apply.
 
+### Setup storage rights
+
+`PostgresSetupLiveStoragePermissions` installs ordinary SELECT/INSERT/UPDATE
+rights on the three EF-mapped enrollment, issuance-claim and operation tables
+for the declared Runtime login, plus SELECT-only access to the secret-binding
+reference metadata used by readiness and runtime resolution. No secret value is
+stored in that relation. Binding mutation rights are not granted. Both the production migrator and native test
+fixture install these rights after tenant RLS. The installer requires the
+declared Migrator session and never grants DELETE, bypass-RLS, an elevated role
+or a database workflow function. Application authorization, transaction ownership
+and effect settlement remain in C#; database permission is not enrollment authority.
+Compromise of the Runtime database credential can expose binding coordinates;
+it cannot by itself authenticate to the selected secret authority. Tenant and
+consumer admission remain application responsibilities, not claims of database
+workflow isolation.
+
+### Setup binding mutation evidence
+
+Native writers attach a target-bound receipt projection to the caller-owned
+`SetupSecretBindingWriteRequest.Attempt` before dispatch. Application retains
+that request across the await and settles after the actual native operation
+unwinds, including cancellation. `SetupSecretBindingOperation.MutationEvidence`
+persists only the value-free disposition. Null means unobserved;
+`NotDispatched` is an observed non-dispatch, not a default recovery assumption.
+`PossiblyDispatched`, `Applied`, `Pending`, `Rejected` and `Conflict` remain
+distinct from local delivery state.
+
+Success requires Applied evidence and completed cache invalidation. Interrupted
+work can become Cancelled only with proven NotDispatched evidence; other native
+states settle as Failed/Unavailable without erasing their effect. An Applied
+receipt survives later invalidation failure. Duplicate operation keys return
+the retained operation rather than dispatching again. A missing settlement after
+database failure remains uncertain; neither an Accepted row nor a fresh secret
+read establishes that the original request had no effect.
+
+The existing wire state/outcome stays bounded and does not expose SDK objects
+or native coordinates. Reconcile uncertain effects and pending approvals under
+explicit authority; do not replay to discover their result. A native receipt's
+local ID is not server idempotency or a durable provider recovery handle.
+
 ### Runtime resolution outcomes and bounded freshness
 
 Runtime bindings return one of five value-free outcomes. `Resolved` is the only
@@ -579,6 +729,29 @@ failures are never cached as successful absence. Each replica owns its cache, so
 deployment must allow the five-minute freshness bound or restart/drain replicas
 after an urgent authority change. Rotation activation and replica acknowledgement
 are documented separately with their owning runbook.
+
+The cache index and invalidation generations share the memory cache's lifetime;
+binding repositories and resolvers remain scoped. A read captures its generation
+before repository selection and checks it under the invalidation gate before
+using a cached value or publishing/returning a provider completion. Hierarchy
+reads depend on both tenant and instance selection. An invalidated late result
+returns value-free `Unavailable` and cannot overwrite a newer fill.
+
+Index entries and invalidation tombstones are each bounded to 4096. Index pressure
+evicts cached material; tombstone compaction raises a conservative generation
+floor, rejecting older in-flight observations rather than forgetting their
+invalidation. This can cause extra fresh reads during high churn, not stale
+authorization. The coordination remains process-local.
+
+The serving API registers `Explore.Infrastructure.Secrets` through
+`AddNativeSecretResolution`. The composition root supplies the selected owner;
+sources borrow its native client or frozen local generation. Repositories and
+writers are scoped, while cache state and revision evidence share the process
+owner. Cached returns also verify retained revision ownership, so retargeting,
+revision eviction or owner retirement forces a fresh admitted read rather than
+serving a comparison token that no longer has evidence. Status checks inspect
+that same owner's authentication health without constructing another provider,
+logging in again or claiming remote mutation permission.
 
 The `secret-resolver` readiness check reports `providerState=available` for the
 selected Environment/User Secrets authority after its environment gate passes, or
@@ -1579,19 +1752,21 @@ so local structured `DATABASE_*`, Keycloak, Cerbos, and storage values remain
 authoritative. Infisical loads primary database configuration directly from `/database`
 using `DATABASE_*` keys mapped to the structured `Database:*` configuration section.
 
-### SecretRefresh Section
+### Native Authentication Maintenance
 
-| Key | Default | Purpose |
-|---|---|---|
-| `Enabled` | `true` | Enable periodic secret refresh |
-| `RefreshInterval` | `00:05:00` | Polling interval |
-| `InitialDelay` | `00:00:10` | Delay before first refresh |
-| `BaseBackoffDelay` | `00:00:05` | Base delay for exponential backoff |
-| `MaxBackoffDelay` | `00:05:00` | Maximum backoff cap |
-| `JitterFactor` | `0.1` | Randomization factor to prevent thundering herd |
-| `UnhealthyThreshold` | `3` | Consecutive failures before unhealthy status |
-
-Backoff formula: `BaseBackoffDelay × 2^(failures - 1)`, capped at `MaxBackoffDelay`, plus jitter.
+Serving hosts explicitly start one token-renewal helper on their selected
+Infisical owner before slow startup preparation. Local authorities have none.
+`SecretProvider:Infisical:TokenLifetime`, `TokenPeriodSeconds`,
+`RenewBeforeSeconds` and `RequestTimeoutSeconds` describe that session only;
+the helper never polls application values, logs in again or replays a write.
+There is no `SecretRefresh` section or generic credential rotation factory.
+Restart with a newly reviewed owner when selected startup credentials change.
+Compose/Aspire project only `INFISICAL_<CONSUMER>_TOKEN_LIFETIME`,
+`TOKEN_PERIOD_SECONDS`, `RENEW_BEFORE_SECONDS` and `REQUEST_TIMEOUT_SECONDS`
+from the matching API/BFF/COMBINED/MIGRATION prefix into these native inputs;
+direct-process fields are not a deployment fallback. See the
+[configuration contract](CONFIGURATION.md#secret-provider-configuration) and
+[recovery runbook](TROUBLESHOOTING.md#selected-secret-authority-recovery).
 
 ### Encryption Section
 
@@ -1949,48 +2124,28 @@ Properties: `ProviderType`, `SupportsRefresh`.
 
 ## Health Check
 
-Registered as `secret_provider` with tag `secrets`.
-
-| Status | Condition |
-|---|---|
-| Healthy | Fewer than `UnhealthyThreshold` consecutive failures |
-| Degraded | 1–2 consecutive failures |
-| Unhealthy | ≥ `UnhealthyThreshold` consecutive failures |
-
-Health data includes: provider type, supports refresh, consecutive failure count, last successful refresh timestamp.
+`SecretResolverHealthCheck` validates the database configuration and reads the
+selected `ISecretAuthorityStatusReader`. A configured local authority or usable
+native authentication session is healthy; unavailable authority is unhealthy.
+Results expose bounded provider state and database-provider metadata, never
+exception details, coordinates or credential values. Authentication availability
+is not proof of a particular secret ACL, write permission or provider effect.
 
 ## Metrics
 
-Meter name: `Explore.Secrets`
+Meter name: `Event.Secrets`, owned by Infrastructure `SecretResolverMetrics`.
 
 | Instrument | Type | Purpose |
 |---|---|---|
-| `secrets_refresh_total` | Counter | Total refresh attempts |
-| `secrets_refresh_failures_total` | Counter | Failed refresh attempts |
-| `secrets_refresh_duration_seconds` | Histogram | Refresh operation duration |
-| `secrets_consecutive_failures` | UpDownCounter | Current consecutive failure count |
-| `secrets_last_refresh_timestamp_seconds` | Gauge | Unix timestamp of last successful refresh |
+| `secrets.resolve.success` | Counter | Resolved values |
+| `secrets.resolve.miss` | Counter | Unconfigured values |
+| `secrets.resolve.error` | Counter | Bounded resolution failures |
+| `secrets.cache.hit`, `secrets.cache.miss` | Counters | Process-local cache behavior |
+| `secrets.resolve.duration_ms` | Histogram | Resolution duration |
 
-## Refresh Service
-
-A `BackgroundService` using `PeriodicTimer` that:
-
-1. Waits `InitialDelay` before first poll.
-2. Calls `ISecretProvider.RefreshAsync()` at each `RefreshInterval`.
-3. On success, calls `IConfigurationRoot.Reload()` to propagate changes.
-4. On failure, applies exponential backoff with jitter.
-5. Logs structured warnings with correlation IDs.
-
-## Audit Decorator
-
-Wraps `ISecretProvider` for value-free provider lifecycle mutations only. Secret reads do not create a persistent audit trail.
-
-The in-process audit entry can carry lifecycle context, but the default structured
-sink exports only bounded operation, provider, status, failure reason and validated
-correlation identifiers. It does not export key paths, user identities or raw
-provider error messages, including at Debug level. The decorator accepts
-server-issued GUID correlation from request items or the trace identifier,
-not caller-supplied correlation headers.
+Only bounded status tags are recorded. Values, binding keys, tenant/user IDs
+and provider coordinates are absent. Native operation receipts retain effect
+evidence at the owning request; they are not a generic secret-read audit log.
 
 ## DI Registration
 
@@ -2018,17 +2173,15 @@ reuse metadata normalization for credentials.
 
 | Method | Purpose |
 |---|---|
-| `AddSecretProvider` | Core provider registration |
-| `AddSecretManagement` | Full setup (provider + refresh + health + metrics) |
-| `AddSecretObservability` | Health checks + metrics |
-| `AddSecretMetrics` | Prometheus metrics only |
-| `AddSecretHealthCheck` | Health check only |
-| `AddSecretRefreshService` | Background refresh service |
-| `AddRotationAwareHttpClientFactory` | HttpClient with rotating credentials |
-| `AddRotationAwareDbContextFactory<T>` | DbContext with rotating connection strings |
-| `AddConnectionRotation<T>` | Generic connection rotation |
+| `SecretAuthorityBootstrap.OpenAsync` | Opens exactly one selected consumer owner |
+| `PrepareApiHostSecretsAsync`, `PrepareBlazorHostSecretsAsync` | Await startup groups and Data Protection before dependent registration |
+| `AddNativeSecretResolution` | Borrows the registered owner; scoped resolver/writers, singleton cache/metrics |
+| `MigrationDatabaseAcquisition.OpenAsync` | Owns one database-purpose acquisition for tooling/migration lifetime |
 
-Typical startup: `services.AddSecretManagement(configuration)` registers everything.
+Composition roots retain the owner through startup failure and host disposal.
+Combined passes one Combined owner to API and BFF preparation; neither opens a
+second session. Shutdown cancels and drains accepted operations before disposing
+maintenance, client and session. Borrowed dependencies remain caller-owned.
 
 ## Configuration Manifest Is Not A Secret Store
 

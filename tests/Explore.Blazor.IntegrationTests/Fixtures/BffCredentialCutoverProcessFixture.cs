@@ -113,7 +113,7 @@ internal sealed class BffCredentialCutoverProcessFixture : IAsyncDisposable
             RedirectStandardError = true,
             UseShellExecute = false
         };
-        start.ArgumentList.Add(Path.Combine(project, "bin", "Release", "net10.0", "Explore.Blazor.dll"));
+        start.ArgumentList.Add(typeof(Program).Assembly.Location);
         var hostVariables = new[] { "PATH", "DOTNET_ROOT", "TMPDIR", "LD_LIBRARY_PATH" }
             .ToDictionary(key => key, Environment.GetEnvironmentVariable);
         start.Environment.Clear();
@@ -122,8 +122,8 @@ internal sealed class BffCredentialCutoverProcessFixture : IAsyncDisposable
         string home = Path.Combine(_scratch, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(home);
         start.Environment["HOME"] = home;
-        start.Environment["DOTNET_ENVIRONMENT"] = "Testing";
-        start.Environment["ASPNETCORE_ENVIRONMENT"] = "Testing";
+        start.Environment["DOTNET_ENVIRONMENT"] = "Development";
+        start.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
         start.Environment["SECRET_PROVIDER"] = "Environment";
         var sessionOptions = _sessionAuthority.Options();
         var protection = _sessionAuthority.Source.Read();
@@ -181,6 +181,7 @@ internal sealed class BffCredentialCutoverProcessFixture : IAsyncDisposable
         private readonly Uri _origin;
         private readonly byte[] _certificatePin;
         private int _disposed;
+        public TaskCompletionSource<Uri> Listening { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Stopping { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource<int> Exited { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Uri Address => _origin;
@@ -221,6 +222,12 @@ internal sealed class BffCredentialCutoverProcessFixture : IAsyncDisposable
                 {
                     using var document = JsonDocument.Parse(line);
                     var root = document.RootElement;
+                    if (root.TryGetProperty("SourceContext", out var source)
+                        && source.GetString() == "Explore.Blazor.Hosting.Lifecycle"
+                        && root.TryGetProperty("Phase", out var phase)
+                        && phase.GetString() == "started"
+                        && root.TryGetProperty("ListenerPort", out var port))
+                        Listening.TrySetResult(new Uri($"https://127.0.0.1:{port.GetInt32()}"));
                     if (root.TryGetProperty("Seconds", out var seconds) && seconds.GetInt32() == 25)
                         Stopping.TrySetResult();
                 }
@@ -234,54 +241,32 @@ internal sealed class BffCredentialCutoverProcessFixture : IAsyncDisposable
             StartProcess();
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             deadline.CancelAfter(TimeSpan.FromSeconds(30));
+            Task readiness = await Task.WhenAny(Listening.Task, Exited.Task).WaitAsync(deadline.Token);
+            if (readiness == Exited.Task || Exited.Task.IsCompleted)
+                throw new InvalidOperationException($"bff_process_exited_before_readiness:{await Exited.Task}");
+            if (await Listening.Task != _origin)
+                throw new InvalidOperationException("bff_process_listener_origin_mismatch");
             using HttpClient probe = CreateClient(_origin, _certificatePin);
             probe.MaxResponseContentBufferSize = 4096;
-            string observation = "no_response";
-            while (true)
+            Task<HttpResponseMessage> request = probe.GetAsync("/auth/status", deadline.Token);
+            if (await Task.WhenAny(request, Exited.Task).WaitAsync(deadline.Token) == Exited.Task)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (Exited.Task.IsCompleted)
-                    throw new InvalidOperationException($"bff_process_exited_before_readiness:{await Exited.Task}");
-                if (deadline.IsCancellationRequested)
-                    throw new InvalidOperationException($"bff_process_readiness_deadline:{observation}");
-                using var attempt = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token);
-                attempt.CancelAfter(TimeSpan.FromSeconds(1));
-                try
-                {
-                    Task<HttpResponseMessage> request = probe.GetAsync("/auth/status", attempt.Token);
-                    if (await Task.WhenAny(request, Exited.Task) == Exited.Task)
-                    {
-                        await attempt.CancelAsync();
-                        try { using HttpResponseMessage abandoned = await request; }
-                        catch (HttpRequestException) { }
-                        catch (OperationCanceledException) { }
-                        throw new InvalidOperationException($"bff_process_exited_before_readiness:{await Exited.Task}");
-                    }
-                    using HttpResponseMessage response = await request;
-                    observation = "unexpected_status";
-                    if (response.StatusCode == HttpStatusCode.OK)
-                    {
-                        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(attempt.Token));
-                        if (body.RootElement.ValueKind == JsonValueKind.Object
-                            && body.RootElement.TryGetProperty("isAuthenticated", out var authenticated)
-                            && authenticated.ValueKind == JsonValueKind.False)
-                        {
-                            if (Exited.Task.IsCompleted)
-                                throw new InvalidOperationException($"bff_process_exited_before_readiness:{await Exited.Task}");
-                            return;
-                        }
-                        observation = "unexpected_anonymous_shape";
-                    }
-                }
-                catch (HttpRequestException) { observation = "HttpRequestException"; }
-                catch (JsonException) { observation = "JsonException"; }
-                catch (OperationCanceledException)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (!deadline.IsCancellationRequested) observation = "attempt_cancelled";
-                }
-                await Task.WhenAny(Exited.Task, Task.Delay(TimeSpan.FromMilliseconds(100), deadline.Token));
+                await deadline.CancelAsync();
+                try { using HttpResponseMessage abandoned = await request; }
+                catch (HttpRequestException) { }
+                catch (OperationCanceledException) { }
+                throw new InvalidOperationException($"bff_process_exited_before_readiness:{await Exited.Task}");
             }
+            using HttpResponseMessage response = await request;
+            if (response.StatusCode != HttpStatusCode.OK)
+                throw new InvalidOperationException("bff_process_readiness_unexpected_status");
+            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(deadline.Token));
+            if (body.RootElement.ValueKind != JsonValueKind.Object
+                || !body.RootElement.TryGetProperty("isAuthenticated", out var authenticated)
+                || authenticated.ValueKind != JsonValueKind.False)
+                throw new InvalidOperationException("bff_process_readiness_unexpected_anonymous_shape");
+            if (Exited.Task.IsCompleted)
+                throw new InvalidOperationException($"bff_process_exited_before_readiness:{await Exited.Task}");
         }
 
         public HttpClient CreateBrowser() => CreateClient(Address, _certificatePin);

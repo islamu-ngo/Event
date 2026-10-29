@@ -11,7 +11,6 @@ using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using TUnit.Assertions;

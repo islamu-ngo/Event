@@ -14,7 +14,7 @@ public sealed class ModerationMeasurementRuntimeArtifacts : IModerationMeasureme
     private static readonly ImmutableArray<string> ProductAssemblies =
     [
         "Explore.API", "Explore.Application", "Explore.Domain", "Explore.Persistence",
-        "Explore.Infrastructure", "Explore.Secrets", "ISLAMU.Moderation.Application", "ISLAMU.Moderation.Domain"
+        "Explore.Infrastructure", "Explore.ServiceDefaults", "ISLAMU.Moderation.Application", "ISLAMU.Moderation.Domain"
     ];
 
     public async Task<ModerationMeasurementRuntimeArtifactObservation?> ReadAsync(

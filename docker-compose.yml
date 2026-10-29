@@ -394,6 +394,10 @@ services:
       <<: [*secrets-env, *database-env, *database-migrator-env, *privacy-erasure-migrator-env, *local-identity-migrator-env]
       SecretProvider__Infisical__ClientId: ${INFISICAL_MIGRATION_CLIENT_ID:-}
       SecretProvider__Infisical__ClientSecret: ${INFISICAL_MIGRATION_CLIENT_SECRET:-}
+      SecretProvider__Infisical__TokenLifetime: ${INFISICAL_MIGRATION_TOKEN_LIFETIME:-}
+      SecretProvider__Infisical__TokenPeriodSeconds: ${INFISICAL_MIGRATION_TOKEN_PERIOD_SECONDS:-}
+      SecretProvider__Infisical__RenewBeforeSeconds: ${INFISICAL_MIGRATION_RENEW_BEFORE_SECONDS:-60}
+      SecretProvider__Infisical__RequestTimeoutSeconds: ${INFISICAL_MIGRATION_REQUEST_TIMEOUT_SECONDS:-15}
     volumes:
       - privacy_erasure_authority_data:/app/data
     depends_on:
@@ -510,6 +514,10 @@ services:
       EVENT_DP_API_MINIMUM_GENERATION: ${EVENT_DP_API_MINIMUM_GENERATION:-}
       SecretProvider__Infisical__ClientId: ${INFISICAL_API_CLIENT_ID:-}
       SecretProvider__Infisical__ClientSecret: ${INFISICAL_API_CLIENT_SECRET:-}
+      SecretProvider__Infisical__TokenLifetime: ${INFISICAL_API_TOKEN_LIFETIME:-}
+      SecretProvider__Infisical__TokenPeriodSeconds: ${INFISICAL_API_TOKEN_PERIOD_SECONDS:-}
+      SecretProvider__Infisical__RenewBeforeSeconds: ${INFISICAL_API_RENEW_BEFORE_SECONDS:-60}
+      SecretProvider__Infisical__RequestTimeoutSeconds: ${INFISICAL_API_REQUEST_TIMEOUT_SECONDS:-15}
       CONFIGURATION_MANIFEST_MODE: ${CONFIGURATION_MANIFEST_MODE:-Off}
       CONFIGURATION_MANIFEST_PATH: ${CONFIGURATION_MANIFEST_PATH:-/etc/islamu-event/bootstrap/configuration-manifest.json}
       KEYCLOAK__AUDIENCE: ${KEYCLOAK__AUDIENCE:-islamu-event-api}
@@ -599,6 +607,10 @@ services:
       EVENT_DP_BFF_MINIMUM_GENERATION: ${EVENT_DP_BFF_MINIMUM_GENERATION:-}
       SecretProvider__Infisical__ClientId: ${INFISICAL_BFF_CLIENT_ID:-}
       SecretProvider__Infisical__ClientSecret: ${INFISICAL_BFF_CLIENT_SECRET:-}
+      SecretProvider__Infisical__TokenLifetime: ${INFISICAL_BFF_TOKEN_LIFETIME:-}
+      SecretProvider__Infisical__TokenPeriodSeconds: ${INFISICAL_BFF_TOKEN_PERIOD_SECONDS:-}
+      SecretProvider__Infisical__RenewBeforeSeconds: ${INFISICAL_BFF_RENEW_BEFORE_SECONDS:-60}
+      SecretProvider__Infisical__RequestTimeoutSeconds: ${INFISICAL_BFF_REQUEST_TIMEOUT_SECONDS:-15}
       KEYCLOAK_BLAZOR_CLIENT_SECRET: ${KEYCLOAK_BLAZOR_CLIENT_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}

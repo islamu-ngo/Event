@@ -24,7 +24,6 @@ using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Seed;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;

@@ -1,10 +1,9 @@
 using System.Text.Json;
+using Event.Testing.DataProtection;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.HealthChecks;
 using Explore.Blazor.IntegrationTests.Fixtures;
 using Explore.Blazor.Services;
-using Event.Testing.DataProtection;
-using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -359,10 +358,19 @@ public class BffNoKeycloakResilienceTests : IAsyncDisposable
                 ["Keycloak__Realm"] = string.Empty,
                 ["Keycloak__ClientId"] = string.Empty,
                 ["Keycloak__ClientSecret"] = string.Empty,
+                ["KEYCLOAK_ENDPOINT"] = null,
+                ["KEYCLOAK_REALM"] = null,
+                ["KEYCLOAK_CLIENT_ID"] = null,
+                ["KEYCLOAK_BLAZOR_CLIENT_SECRET"] = null,
+                ["GOOGLE_CLIENT_ID"] = null,
+                ["GOOGLE_CLIENT_SECRET"] = null,
+                ["ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS"] = null,
                 ["ConnectionStrings__cache"] = "localhost:6379,abortConnect=false,connectTimeout=100"
             };
 
         private readonly Dictionary<string, string?> _originalEnvironmentValues = new(StringComparer.Ordinal);
+        private readonly ExternalDataProtectionTestAuthority _dataProtection = new("bff");
+        private int _environmentRestored;
 
         private readonly string _environmentName;
         private readonly Action<IServiceCollection>? _configureServices;
@@ -374,7 +382,14 @@ public class BffNoKeycloakResilienceTests : IAsyncDisposable
             _environmentName = environmentName;
             _configureServices = configureServices;
 
-            foreach (var (key, value) in BootstrapEnvironmentOverrides)
+            var overrides = BootstrapEnvironmentOverrides.Concat(new Dictionary<string, string?>
+            {
+                ["EVENT_DP_BFF_RING"] = _dataProtection.Input.Ring,
+                ["EVENT_DP_BFF_ADMISSION"] = _dataProtection.Input.Admission,
+                ["EVENT_DP_BFF_ADMISSION_SHA256"] = _dataProtection.Input.AdmissionSha256,
+                ["EVENT_DP_BFF_MINIMUM_GENERATION"] = "1"
+            });
+            foreach (var (key, value) in overrides)
             {
                 _originalEnvironmentValues[key] = Environment.GetEnvironmentVariable(key);
                 Environment.SetEnvironmentVariable(key, value);
@@ -407,8 +422,6 @@ public class BffNoKeycloakResilienceTests : IAsyncDisposable
             builder.ConfigureTestServices(services =>
             {
                 services.AddTestBffSessionAuthority();
-                services.Replace(ServiceDescriptor.Singleton<IExternalDataProtectionSource>(provider =>
-                    new ExternalDataProtectionTestAuthority("bff", provider.GetRequiredService<TimeProvider>())));
 
                 services.RemoveAll<IDistributedCache>();
                 services.AddDistributedMemoryCache();
@@ -460,12 +473,23 @@ public class BffNoKeycloakResilienceTests : IAsyncDisposable
 
         protected override void Dispose(bool disposing)
         {
+            try { base.Dispose(disposing); }
+            finally { RestoreEnvironment(); }
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            try { await base.DisposeAsync(); }
+            finally { RestoreEnvironment(); }
+        }
+
+        private void RestoreEnvironment()
+        {
+            if (Interlocked.Exchange(ref _environmentRestored, 1) != 0) return;
             foreach (var (key, value) in _originalEnvironmentValues)
             {
                 Environment.SetEnvironmentVariable(key, value);
             }
-
-            base.Dispose(disposing);
         }
     }
 }

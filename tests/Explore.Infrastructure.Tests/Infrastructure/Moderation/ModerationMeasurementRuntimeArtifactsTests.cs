@@ -114,12 +114,12 @@ public sealed class ModerationMeasurementRuntimeArtifactsTests
             new("Explore.Domain", Guid.Empty, new string('c', 64)),
             new("Explore.Persistence", Guid.Empty, new string('d', 64)),
             new("Explore.Infrastructure", Guid.Empty, new string('e', 64)),
-            new("Explore.Secrets", Guid.Empty, new string('f', 64)),
+            new("Explore.ServiceDefaults", Guid.Empty, new string('f', 64)),
             new("ISLAMU.Moderation.Application", Guid.Empty, new string('0', 64)),
             new("ISLAMU.Moderation.Domain", Guid.Empty, new string('1', 64))
         ];
         await Assert.That(ModerationMeasurementRuntimeArtifacts.ProductDigest(modules)).IsEqualTo(
-            "3169f83cfbcf765834006249367035bf8aad0b9fe82963160d3dfeb48c3c337e");
+            "ee728c99d3bd5f8acfcc1b5cc2597904f2f73322e022f495c8fc483072db8548");
     }
 
     private sealed class Fixture : IDisposable

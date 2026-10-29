@@ -44,9 +44,9 @@
 ### Infrastructure & Persistence Layers
 | Project Path | Role & Responsibilities | Key Dependencies |
 |---|---|---|
-| `src/Explore.Persistence/Explore.Persistence.csproj` | EF Core `ExploreDbContext`, tenant global query filters, repository implementations, entity configurations, and PostgreSQL session interceptor. | `Explore.Domain`, `Explore.Application` |
-| `src/Explore.Infrastructure/Explore.Infrastructure.csproj` | Quartz.NET scheduled jobs, transactional outbox dispatch, external email/messaging adapters, and Redis caching. | `Explore.Application` |
-| `src/Explore.Secrets/Explore.Secrets.csproj` | Infisical and local secret resolution abstractions (`ISecretResolver`). | None |
+| `src/Explore.Persistence/Explore.Persistence.csproj` | EF Core `ExploreDbContext`, tenant global query filters, repositories, database bootstrap/role configuration, native migration acquisition, and PostgreSQL session isolation. | `Explore.Domain`, `Explore.Application`, `Explore.ServiceDefaults` |
+| `src/Explore.Infrastructure/Explore.Infrastructure.csproj` | Quartz.NET jobs, outbox dispatch, external adapters, Redis caching, selected-owner secret resolution, shared invalidation and native secret writes. Secret ports remain in Application. | `Explore.Application`, `Explore.ServiceDefaults`, `SecretKit.Core`, `SecretKit.Infisical` |
+| `src/Explore.ServiceDefaults/Explore.ServiceDefaults.csproj` | Shared host defaults, explicit selected SecretKit authority acquisition/lifetime and asynchronous external Data Protection admission. No Domain or Application dependency. | `SecretKit.Core`, `SecretKit.Infisical` |
 | `src/Explore.Diagnostic/Explore.Diagnostic.csproj` | OpenTelemetry tracing, Prometheus metrics, and structured logging. | `Explore.ServiceDefaults` |
 | `src/Explore.Atproto.Transport/Explore.Atproto.Transport.csproj` | ATProtocol / CarpaNet transport and lexicon models. | None |
 

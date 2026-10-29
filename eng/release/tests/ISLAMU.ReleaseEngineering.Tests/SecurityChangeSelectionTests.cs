@@ -13,14 +13,28 @@ public sealed class SecurityChangeSelectionTests
     [Arguments("tests/Event.API.IntegrationTests/Features/EventTests.cs", "app,architecture,setup,infrastructure")]
     [Arguments("src/Explore.Persistence/ExploreDbContext.cs", "architecture,setup,infrastructure")]
     [Arguments("src/Explore.Infrastructure/Services/EventService.cs", "architecture,setup,infrastructure")]
-    [Arguments("src/Explore.Secrets/Services/SecretResolver.cs", "architecture,setup,infrastructure,secrets")]
+    [Arguments("src/Explore.ServiceDefaults/Secrets/SecretAuthorityAcquisition.cs", "all")]
+    [Arguments("src/Explore.ServiceDefaults/DataProtection/SecretDataProtectionMaterial.cs", "all")]
+    [Arguments("src/Explore.Infrastructure/Secrets/InfisicalSecretProvider.cs", "all")]
+    [Arguments("src/Explore.Persistence/Database/DatabaseSecretAcquisition.cs", "all")]
+    [Arguments("src/Explore.API/Hosting/ApiHostServiceCollectionExtensions.cs", "all")]
+    [Arguments("src/Explore.API/Configuration/Settings.cs", "all")]
+    [Arguments("src/Explore.API/Program.cs", "all")]
+    [Arguments("src/Explore.Blazor/Hosting/BlazorHostServiceCollectionExtensions.cs", "all")]
+    [Arguments("src/Explore.Blazor/Extensions/ConfigurationExtension.cs", "all")]
+    [Arguments("src/Explore.Blazor/Program.cs", "all")]
+    [Arguments("eng/security/authority.json", "all")]
+    [Arguments("eng/tools/EmergencyAdminProvisioner.cs", "all")]
     [Arguments("src/Explore.Blazor.Client/Pages/Event.razor", "architecture,setup,blazor")]
-    [Arguments("src/Event.Web.BffHosting/Hosting.cs", "architecture,setup,blazor")]
+    [Arguments("src/Event.Web.BffHosting/Hosting.cs", "all")]
     [Arguments("src/Event.Wire.Contracts/SetupLive/SetupRequest.cs", "architecture,setup")]
     [Arguments("tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/settings.json", "architecture,setup")]
     [Arguments("tests/Explore.GeneratedContracts.Tests/ContractTests.cs", "architecture")]
     [Arguments("src/Explore.Diagnostic/Program.cs", "architecture")]
-    [Arguments("src/Event.Standalone/Program.cs", "architecture,setup,infrastructure,blazor")]
+    [Arguments("src/Event.Standalone/Program.cs", "all")]
+    [Arguments("tests/Event.Standalone.IntegrationTests/StartupTests.cs", "architecture,setup,infrastructure,blazor")]
+    [Arguments("tests/Explore.Blazor.IntegrationTests/Configuration/SecretKitBffPreparationTests.cs", "architecture,setup,infrastructure,blazor")]
+    [Arguments("tests/Explore.Infrastructure.Tests/Secrets/SecretKitAuthorityAcquisitionTests.cs", "architecture,setup,infrastructure")]
     [Arguments("tests/Event.Architecture.Tests/ConfigurationManifestSchemaArtifactTests.cs", "architecture")]
     [Arguments("src/Explore.AppHost/AppHost.cs", "all")]
     [Arguments("tests/Event.Benchmarks/Program.cs", "all")]
@@ -107,10 +121,10 @@ public sealed class SecurityChangeSelectionTests
         await Assert.That(code).IsEqualTo(Program.Success);
 
         string[] lines = output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-        await Assert.That(lines.Length).IsEqualTo(8);
+        await Assert.That(lines.Length).IsEqualTo(7);
         Dictionary<string, string> decisions = lines.Select(line => line.Split('=')).ToDictionary(parts => parts[0], parts => parts[1]);
         await Assert.That(decisions["run-tests"]).IsEqualTo(expectedLanes.Length > 0 ? "true" : "false");
-        foreach (string lane in new[] { "app", "domain", "architecture", "setup", "infrastructure", "blazor", "secrets" })
+        foreach (string lane in new[] { "app", "domain", "architecture", "setup", "infrastructure", "blazor" })
         {
             bool expected = expectedLanes == "all" || expectedLanes.Split(',').Contains(lane, StringComparer.Ordinal);
             await Assert.That(decisions[$"run-{lane}-tests"]).IsEqualTo(expected ? "true" : "false");

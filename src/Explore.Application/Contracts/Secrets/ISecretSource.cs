@@ -22,8 +22,9 @@ public interface ISecretSource
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Performs a live round-trip against the declared source to confirm the reference is valid and the
-    /// credential produces a non-empty value. Used by the admin "Validate" action.
+    /// Confirms the reference produces a non-empty value within the selected authority.
+    /// A source may validate its process-frozen generation rather than fresh ambient configuration
+    /// or a remote round-trip. Used by the admin "Validate" action.
     /// </summary>
     Task<bool> ValidateAsync(SecretBinding binding, CancellationToken cancellationToken = default);
 }

@@ -7,7 +7,6 @@ using Explore.Persistence.Caching;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;

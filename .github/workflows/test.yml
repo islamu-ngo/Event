@@ -28,7 +28,6 @@ jobs:
       run-setup-tests: ${{ steps.changes.outputs.run-setup-tests }}
       run-infrastructure-tests: ${{ steps.changes.outputs.run-infrastructure-tests }}
       run-blazor-tests: ${{ steps.changes.outputs.run-blazor-tests }}
-      run-secrets-tests: ${{ steps.changes.outputs.run-secrets-tests }}
 
     steps:
       - name: Checkout
@@ -77,7 +76,7 @@ jobs:
           any_lane=false
           while IFS='=' read -r key value; do
             case "$key" in
-              run-tests|run-app-tests|run-domain-tests|run-architecture-tests|run-setup-tests|run-infrastructure-tests|run-blazor-tests|run-secrets-tests) ;;
+              run-tests|run-app-tests|run-domain-tests|run-architecture-tests|run-setup-tests|run-infrastructure-tests|run-blazor-tests) ;;
               *) echo "Invalid native selection key" >&2; exit 1 ;;
             esac
             if [[ "$value" != true && "$value" != false ]] || [[ -v "decisions[$key]" ]]; then
@@ -87,7 +86,7 @@ jobs:
             decisions[$key]="$value"
             if [[ "$key" != run-tests && "$value" == true ]]; then any_lane=true; fi
           done <<< "$selection"
-          if [[ "${#decisions[@]}" != 8 || "${decisions[run-tests]}" != "$any_lane" ]]; then
+          if [[ "${#decisions[@]}" != 7 || "${decisions[run-tests]}" != "$any_lane" ]]; then
             echo "Incomplete or inconsistent native selection" >&2
             exit 1
           fi
@@ -115,6 +114,5 @@ jobs:
       run-setup-tests: ${{ needs.detect-build-test-changes.outputs.run-setup-tests == 'true' }}
       run-infrastructure-tests: ${{ needs.detect-build-test-changes.outputs.run-infrastructure-tests == 'true' }}
       run-blazor-tests: ${{ needs.detect-build-test-changes.outputs.run-blazor-tests == 'true' }}
-      run-secrets-tests: ${{ needs.detect-build-test-changes.outputs.run-secrets-tests == 'true' }}
       run-integration-tests: false
       configuration: Release

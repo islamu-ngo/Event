@@ -118,23 +118,12 @@ public sealed class KeycloakAdministratorCredentialResolution
         $"{nameof(KeycloakAdministratorCredentialResolution)} {{ Status = {Status} }}";
 }
 
-public sealed class KeycloakCredentialBindingRevision
-{
-    public string Value { get; } =
-        Guid.CreateVersion7().ToString("N");
-}
-
 public sealed class KeycloakConnectionResolver(
     ISecretResolver secretResolver,
-    IConfiguration? configuration = null,
-    KeycloakCredentialBindingRevision? bindingRevision = null)
+    IConfiguration? configuration = null)
 {
-    private static readonly KeycloakCredentialBindingRevision
-        ProcessBindingRevision = new();
     private readonly ISecretResolver _secretResolver = secretResolver;
     private readonly IConfiguration? _configuration = configuration;
-    private readonly KeycloakCredentialBindingRevision _bindingRevision =
-        bindingRevision ?? ProcessBindingRevision;
 
     public async Task<KeycloakConnectionResolution> ResolveRuntimeAsync(
         CancellationToken cancellationToken = default)
@@ -185,14 +174,12 @@ public sealed class KeycloakConnectionResolver(
         }
 
         ResolvedSecret resolvedClientSecret = clientSecret.Secret!;
-        string bindingRevision = string.IsNullOrWhiteSpace(
-            resolvedClientSecret.BindingRevision)
-            ? _bindingRevision.Value
-            : resolvedClientSecret.BindingRevision;
+        if (string.IsNullOrWhiteSpace(resolvedClientSecret.BindingRevision))
+            return KeycloakConnectionResolution.Failed(KeycloakConnectionStatus.Invalid);
         string credentialBindingRevision =
             $"{resolvedClientSecret.Source}|{resolvedClientSecret.Scope}|"
             + $"{resolvedClientSecret.ScopeId}|"
-            + bindingRevision;
+            + resolvedClientSecret.BindingRevision;
 
         return KeycloakConnectionResolution.Resolved(
             authority!,

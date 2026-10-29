@@ -48,6 +48,8 @@ public sealed class AuthenticationRuntimeSecretWriteRequest(
 {
     public AuthenticationRuntimeWriteSelection Selection { get; } = selection;
 
+    public SecretMutationAttempt Attempt { get; } = new();
+
     [JsonIgnore]
     public ReadOnlyMemory<byte> Credential { get; } = credential;
 

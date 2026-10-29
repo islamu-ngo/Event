@@ -1,5 +1,4 @@
 using Explore.Persistence.Database;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

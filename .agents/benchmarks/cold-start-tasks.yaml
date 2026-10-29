@@ -467,7 +467,6 @@ scenarios:
       - "dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --verbosity quiet"
-      - "dotnet test --project tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration Release --verbosity quiet"
     acceptance_criteria:
       - "The request classifies as `registration-data-collection`, not a collection of unrelated endpoint or migration intents."
       - "External completion remains evidence; ISLAMU alone confirms after pinned-version validation, capacity, approval, and deduplication."
@@ -530,7 +529,7 @@ scenarios:
       Replace ambiguous or database-held secret authority with explicit deployment-owned modes.
     prompt: |
       Implement the approved secrets authority workstream across Domain secret metadata,
-      Explore.Secrets, direct resolver consumers, persistence, supported deployment topologies,
+      ServiceDefaults acquisition, Infrastructure resolution/writes, Persistence database ownership, supported deployment topologies,
       safe operator visibility, and recovery documentation. Environment and Infisical must be
       explicit authority modes with no fallback. Remove database-held secret values and obsolete
       compatibility paths, emit no sensitive values or provider details, generate all provider
@@ -559,7 +558,10 @@ scenarios:
       - "src/Explore.Application/Features/Integrations/Listmonk/**"
       - "src/Explore.Application/Features/Settings/**"
       - "src/Explore.Application/Features/ControlPlane/**"
-      - "src/Explore.Secrets/**"
+      - "src/Explore.Infrastructure/Secrets/**"
+      - "src/Explore.ServiceDefaults/Secrets/**"
+      - "src/Explore.ServiceDefaults/DataProtection/**"
+      - "src/Explore.Persistence/Database/**"
       - "src/Explore.Persistence/Configurations/Entities/SecretBindingConfiguration.cs"
       - "src/Explore.Persistence/ExploreDbContext*.cs"
       - "src/Explore.Persistence/PersistenceServicesRegistration.cs"
@@ -594,7 +596,6 @@ scenarios:
       - "src/Explore.Blazor.Client/Pages/Admin/Instance/**"
       - "src/Explore.Blazor.Client/Services/**"
       - "src/Explore.Blazor.Client/Clients/EventApiClient.g.cs"
-      - "tests/Explore.Secrets.UnitTests/**"
       - "tests/Event.Domain.UnitTests/**/*Secret*.cs"
       - "tests/Event.Application.UnitTests/**/*Secret*.cs"
       - "tests/Event.Persistence.IntegrationTests/**/*Secret*.cs"
@@ -638,7 +639,6 @@ scenarios:
       - "dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet"
-      - "dotnet test --project tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj --configuration Release --verbosity quiet"
@@ -689,7 +689,6 @@ scenarios:
       - "src/Explore.Blazor.Client/**/*.cs"
       - "src/Explore.Blazor.Client/**/*.razor"
       - "src/Explore.Blazor.Client/**/*.razor.cs"
-      - "src/Explore.Secrets/**/*.cs"
       - "src/Explore.ServiceDefaults/**/*.cs"
       - "eng/tools/Explore.AssuranceAudit/**"
       - "eng/tools/Explore.ApiContractInventory/**"

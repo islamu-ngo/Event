@@ -9,7 +9,6 @@ using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;

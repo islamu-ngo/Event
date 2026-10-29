@@ -1,5 +1,5 @@
 using Explore.API.Scheduling;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using TUnit.Core;
 
 namespace ApiIntegrationTests.Features;

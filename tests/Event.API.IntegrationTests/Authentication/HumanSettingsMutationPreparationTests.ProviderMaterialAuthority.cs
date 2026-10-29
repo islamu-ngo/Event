@@ -13,15 +13,14 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Persistence;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Services;
+using Explore.Infrastructure.Secrets;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
 
 namespace Event.Api.IntegrationTests.Authentication;
 
@@ -36,11 +35,17 @@ public sealed partial class HumanSettingsMutationPreparationTests
         WithProviderProfileAsync(change == "profile-installed" ? null : Guid.CreateVersion7().ToString("D"), async () =>
         {
             var observer = new NativeProviderObserver();
+            Guid replacementRevision = Guid.CreateVersion7();
+            using var replacementConfiguration = (ConfigurationRoot)new ConfigurationBuilder().Build();
+            await using var replacementAuthority = SecretAuthorityAcquisition.OpenLocal(
+                new(SecretAuthorityKind.Environment, "Testing", SecretConsumerRole.Api)
+                { AuthenticationProfileRevision = replacementRevision }, replacementConfiguration);
             await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(
                 configureServices: services => RegisterProviderMaterialObservation(services, observer));
             await SeedPlatformAdministratorAsync(fixture);
             await using var request = await ProviderRequestAsync(fixture.Host.Services, await fixture.SignInAsync(), null);
             await RequireApiCredentialBoundaryAsync(request.Services);
+            var currentAuthority = request.Services.GetRequiredService<SecretAuthorityAcquisition>();
             var service = request.Services.GetRequiredService<IAuthProviderConfigurationService>();
             var before = await service.ReadConfigurationAsync();
             await using var original = await service.ObserveConfigurationAsync(NativeProviderCommand(fixture), default);
@@ -80,12 +85,14 @@ public sealed partial class HumanSettingsMutationPreparationTests
                 }
                 else if (change is "profile" or "profile-installed")
                 {
-                    string? previous = Environment.GetEnvironmentVariable(AuthenticationCredentialProfileReader.RevisionEnvironmentVariable);
-                    string replacement = Guid.CreateVersion7().ToString("D");
-                    Environment.SetEnvironmentVariable(AuthenticationCredentialProfileReader.RevisionEnvironmentVariable, replacement);
-                    await Assert.That(Environment.GetEnvironmentVariable(AuthenticationCredentialProfileReader.RevisionEnvironmentVariable))
-                        .IsEqualTo(replacement);
-                    await Assert.That(replacement == previous).IsFalse();
+                    var previous = new AuthenticationCredentialProfileReader(currentAuthority).ObserveCurrent();
+                    Guid originalGeneration = currentAuthority.GenerationId;
+                    await Assert.That(previous.Revision is null).IsEqualTo(change == "profile-installed");
+                    await currentAuthority.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+                    var replacement = new AuthenticationCredentialProfileReader(replacementAuthority).ObserveCurrent();
+                    await Assert.That(replacement.Revision).IsEqualTo(replacementRevision);
+                    await Assert.That(replacement).IsNotEqualTo(previous);
+                    await Assert.That(replacementAuthority.GenerationId).IsNotEqualTo(originalGeneration);
                     changed = true;
                 }
                 await Assert.That(database.Database.CurrentTransaction?.GetDbTransaction()).IsSameReferenceAs(writtenTransaction);
@@ -169,11 +176,11 @@ public sealed partial class HumanSettingsMutationPreparationTests
 
     private static async Task RequireApiCredentialBoundaryAsync(IServiceProvider services)
     {
-        var options = services.GetRequiredService<IOptions<SecretProviderOptions>>().Value;
-        await Assert.That(options.Consumer).IsEqualTo(SecretConsumer.Api);
+        var authority = services.GetRequiredService<SecretAuthorityAcquisition>();
+        await Assert.That(authority.Selection.Consumer).IsEqualTo(SecretConsumerRole.Api);
         foreach (string key in new[]
             { SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret, SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret })
-            await Assert.That(SecretAcquisitionPolicy.AllowsPath(options.Consumer,
+            await Assert.That(SecretAcquisitionPolicy.AllowsRoot(authority.Selection.Consumer,
                 SecretDefinitionRegistry.GetRequired(key).DefaultInfisicalPath)).IsFalse();
     }
 
@@ -188,7 +195,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
 
     private static async Task WithProviderProfileAsync(string? revision, Func<Task> test)
     {
-        string variable = AuthenticationCredentialProfileReader.RevisionEnvironmentVariable;
+        const string variable = "AUTHENTICATION_CREDENTIAL_PROFILE_REVISION";
         string? previous = Environment.GetEnvironmentVariable(variable);
         try
         {

@@ -346,6 +346,7 @@ public static class PostgresTenantApiKeyStoragePermissions
             nameof(SetupSecretBindingOperation.OperationKey), nameof(SetupSecretBindingOperation.BindingKey),
             nameof(SetupSecretBindingOperation.RequestFingerprint), nameof(SetupSecretBindingOperation.CommitmentKeyVersion),
             nameof(SetupSecretBindingOperation.SecretValueCommitment), nameof(SetupSecretBindingOperation.State),
+            nameof(SetupSecretBindingOperation.MutationEvidence),
             nameof(SetupSecretBindingOperation.Outcome), nameof(SetupSecretBindingOperation.CreatedAt), nameof(SetupSecretBindingOperation.CreatedBy),
             nameof(SetupSecretBindingOperation.UpdatedAt), nameof(SetupSecretBindingOperation.UpdatedBy),
             nameof(SetupSecretBindingOperation.SettledAt), nameof(SetupSecretBindingOperation.ConcurrencyStamp)
@@ -360,6 +361,7 @@ public static class PostgresTenantApiKeyStoragePermissions
             Map(context, typeof(SetupEnrollmentIssuanceClaim), claims, claims, claims, []),
             Map(context, typeof(SetupSecretBindingOperation), operations, operations, operations,
                 [nameof(SetupSecretBindingOperation.State), nameof(SetupSecretBindingOperation.Outcome),
+                    nameof(SetupSecretBindingOperation.MutationEvidence),
                     nameof(SetupSecretBindingOperation.SettledAt), nameof(SetupSecretBindingOperation.ConcurrencyStamp),
                     nameof(SetupSecretBindingOperation.UpdatedAt), nameof(SetupSecretBindingOperation.UpdatedBy)])
         ];

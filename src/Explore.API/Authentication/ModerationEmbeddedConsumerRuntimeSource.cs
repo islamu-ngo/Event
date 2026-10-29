@@ -153,7 +153,7 @@ public sealed class ModerationEmbeddedConsumerRuntimeSource : IModerationConsume
             typeof(EventResourceFileResult).Assembly, typeof(EventResourceContentService).Assembly,
             typeof(Explore.Domain.ModerationEffectIntent).Assembly, typeof(EventResourceModerationSnapshotReader).Assembly,
             typeof(Explore.Infrastructure.Services.Moderation.ModerationMeasurementReceiptVerifier).Assembly,
-            typeof(Explore.Secrets.Database.PrimaryDatabasePublicIdentity).Assembly,
+            typeof(Explore.ServiceDefaults.Secrets.SecretAuthorityAcquisition).Assembly,
             typeof(ISLAMU.Moderation.Application.IModerationEffectPlanner).Assembly,
             typeof(ISLAMU.Moderation.Domain.ModerationDecision).Assembly
         };

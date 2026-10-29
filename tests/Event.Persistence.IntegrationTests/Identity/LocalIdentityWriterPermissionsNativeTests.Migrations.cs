@@ -1,7 +1,7 @@
 using Explore.Application.Configuration;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Schema;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;

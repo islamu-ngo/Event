@@ -3,7 +3,7 @@ using Explore.Domain.Constants;
 using Explore.Persistence;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.AspNetCore.Http;
 
 namespace Event.Persistence.IntegrationTests;

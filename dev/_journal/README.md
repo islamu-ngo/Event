@@ -23,6 +23,7 @@ Findings are organized by domain under `dev/_journal/domains/` to minimize agent
 | **Application** | [`domains/application-and-messaging.md`](domains/application-and-messaging.md) | MediatR/CQRS handlers, Outbox dispatch, RabbitMQ/MQContract, EAV. |
 | **Testing** | [`domains/testing-and-environment.md`](domains/testing-and-environment.md) | TUnit runner, WebApplicationFactory, Podman/Docker, SDK workloads. |
 | **Email-Optional Self-Hosting** | [`domains/email-optional-self-hosting.md`](domains/email-optional-self-hosting.md) | Global Local credentials, delivery fences, anonymous recovery/cancellation, and purpose retention. |
+| **SecretKit Adoption** | [`domains/secretkit-adoption.md`](domains/secretkit-adoption.md) | Selected authority lifetime, tenant cache/revision fences, retained mutation evidence and process projection. |
 | **Index & Recent** | [`journal.md`](journal.md) | Central index and recent cross-cutting stream (last 30 days). |
 
 ---

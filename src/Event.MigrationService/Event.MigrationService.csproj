@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>event-shared-secrets</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,7 +32,6 @@
     <ProjectReference Include="..\Explore.Persistence.Migrations.SqlServer\Explore.Persistence.Migrations.SqlServer.csproj" />
     <ProjectReference Include="..\Explore.Infrastructure\Explore.Infrastructure.csproj" />
     <ProjectReference Include="..\Explore.Persistence\Explore.Persistence.csproj" />
-    <ProjectReference Include="..\Explore.Secrets\Explore.Secrets.csproj" />
     <ProjectReference Include="..\Explore.ServiceDefaults\Explore.ServiceDefaults.csproj" />
   </ItemGroup>
   <Target Name="DeclareAssuranceOwningBuild" BeforeTargets="GetAssemblyAttributes">

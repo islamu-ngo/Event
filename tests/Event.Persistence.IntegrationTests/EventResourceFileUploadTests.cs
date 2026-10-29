@@ -1295,7 +1295,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
                     throw new InvalidOperationException("Upload measurement requires the launcher-selected testing environment.");
                 var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
                 using var configurationOwner = (IDisposable)configuration;
-                var selected = Explore.Secrets.Database.PrimaryDatabaseConfiguration.BindRuntime(configuration);
+                var selected = Explore.Persistence.Database.PrimaryDatabaseConfiguration.BindRuntime(configuration);
                 var measured = TestDbContextOptions.Create<ExploreDbContext>();
                 PrimaryDatabaseProviderComposition.ConfigureApplication(measured, selected);
                 _options = measured.Options;

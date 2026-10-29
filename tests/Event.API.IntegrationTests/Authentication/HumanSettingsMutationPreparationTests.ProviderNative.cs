@@ -21,7 +21,7 @@ using Explore.Domain.Secrets;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Services;
-using Explore.Secrets.Services;
+using Explore.Infrastructure.Secrets;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;

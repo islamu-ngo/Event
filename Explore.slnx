@@ -19,7 +19,6 @@
     <Project Path="src/Explore.Atproto.Transport/Explore.Atproto.Transport.csproj" />
     <Project Path="src/Explore.Infrastructure/Explore.Infrastructure.csproj" />
     <Project Path="src/Explore.Persistence/Explore.Persistence.csproj" />
-    <Project Path="src/Explore.Secrets/Explore.Secrets.csproj" />
   </Folder>
   <Folder Name="/Infrastructure/Migrations/">
     <Project Path="src/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite.csproj" />
@@ -67,7 +66,6 @@
     <Project Path="tests/Explore.GeneratedContracts.Tests/Explore.GeneratedContracts.Tests.csproj" />
     <Project Path="tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj" />
     <Project Path="tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj" />
-    <Project Path="tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj" />
   </Folder>
   <Folder Name="/UI/">
     <Project Path="src/Explore.Blazor.Client/Explore.Blazor.Client.csproj" />

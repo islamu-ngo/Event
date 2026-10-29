@@ -18,7 +18,6 @@ using Explore.Domain.Constants;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;

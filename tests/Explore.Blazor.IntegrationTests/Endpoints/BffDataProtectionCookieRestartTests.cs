@@ -127,6 +127,10 @@ public sealed class BffDataProtectionCookieRestartTests
 
     private sealed class MissingAuthority : IExternalDataProtectionSource
     {
+        public ValueTask PrepareAsync(CancellationToken cancellationToken = default) =>
+            ValueTask.FromException(new InvalidOperationException("authority_missing"));
         public ExternalDataProtectionInput Read() => throw new InvalidOperationException("authority_missing");
+        public ValueTask<ExternalDataProtectionInput> ReadFreshAsync(CancellationToken cancellationToken = default) =>
+            ValueTask.FromException<ExternalDataProtectionInput>(new InvalidOperationException("authority_missing"));
     }
 }

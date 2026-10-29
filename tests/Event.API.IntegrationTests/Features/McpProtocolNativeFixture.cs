@@ -26,7 +26,6 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;

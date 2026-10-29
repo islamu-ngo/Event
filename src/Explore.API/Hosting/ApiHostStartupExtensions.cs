@@ -6,7 +6,7 @@ using Explore.Application.Operations;
 using Explore.Persistence;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Seed;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Infrastructure.Services;
 using Explore.ServiceDefaults;

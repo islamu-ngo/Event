@@ -14,7 +14,6 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;

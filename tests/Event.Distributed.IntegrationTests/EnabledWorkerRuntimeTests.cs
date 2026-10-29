@@ -11,7 +11,6 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace Event.Distributed.IntegrationTests;

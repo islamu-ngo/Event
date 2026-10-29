@@ -6,7 +6,6 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;

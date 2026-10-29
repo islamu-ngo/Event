@@ -92,10 +92,10 @@ public sealed partial class ModerationPolicyPublicationTests
         public ExploreDbContext Context(params IInterceptor[] interceptors)
         {
             var builder = TestDbContextOptions.Create<ExploreDbContext>();
-            PrimaryDatabaseProviderComposition.ConfigureApplication(builder, new Explore.Secrets.Database.PrimaryDatabaseConnectionOptions
+            PrimaryDatabaseProviderComposition.ConfigureApplication(builder, new Explore.Persistence.Database.PrimaryDatabaseConnectionOptions
             {
-                Role = Explore.Secrets.Database.PrimaryDatabaseRole.Runtime,
-                Provider = Explore.Secrets.Database.PrimaryDatabaseProvider.Sqlite,
+                Role = Explore.Persistence.Database.PrimaryDatabaseRole.Runtime,
+                Provider = Explore.Persistence.Database.PrimaryDatabaseProvider.Sqlite,
                 Database = _connection.DataSource
             });
             builder.UseSqlite(_connection)

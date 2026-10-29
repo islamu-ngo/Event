@@ -14,11 +14,11 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Infrastructure;
+using Explore.Infrastructure.Secrets;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
-using Explore.Secrets.Database;
-using Explore.Secrets.Extensions;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -49,7 +49,7 @@ public sealed class CreateEventDraftGraphTests
         await NativeDraftGraphAuthentication.PrepareDatabaseAsync();
         var tenant = new GraphTenant(Guid.CreateVersion7());
         var userId = Guid.CreateVersion7();
-        await using var services = BuildServices(tenant);
+        await using var services = await BuildServicesAsync(tenant);
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var publisher = await SeedAuthenticatedOwnerAsync(scope.ServiceProvider, tenant, userId);
@@ -139,7 +139,7 @@ public sealed class CreateEventDraftGraphTests
         var tenant = new GraphTenant(Guid.CreateVersion7());
         var userId = Guid.CreateVersion7();
         var writes = new GraphWriteWitness();
-        await using var services = BuildServices(tenant, writes);
+        await using var services = await BuildServicesAsync(tenant, writes);
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var publisher = await SeedAuthenticatedOwnerAsync(scope.ServiceProvider, tenant, userId);
@@ -168,7 +168,7 @@ public sealed class CreateEventDraftGraphTests
         var tenant = new GraphTenant(Guid.CreateVersion7());
         var userId = Guid.CreateVersion7();
         var failure = new PublicationWriteFailure(tenant.TenantId);
-        await using var services = BuildServices(tenant, failure);
+        await using var services = await BuildServicesAsync(tenant, failure);
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var publisher = await SeedAuthenticatedOwnerAsync(scope.ServiceProvider, tenant, userId);
@@ -210,7 +210,7 @@ public sealed class CreateEventDraftGraphTests
         var tenant = new GraphTenant(Guid.CreateVersion7());
         var userId = Guid.CreateVersion7();
         var failure = new ChildWriteFailure();
-        await using var services = BuildServices(tenant, failure);
+        await using var services = await BuildServicesAsync(tenant, failure);
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var publisher = await SeedAuthenticatedOwnerAsync(scope.ServiceProvider, tenant, userId);
@@ -302,59 +302,70 @@ public sealed class CreateEventDraftGraphTests
         return JsonSerializer.Deserialize<CreateEventDto>(JsonSerializer.Serialize(request, JsonOptions), JsonOptions)!;
     }
 
-    private static ServiceProvider BuildServices(
+    private static async Task<ServiceProvider> BuildServicesAsync(
         GraphTenant tenant, IInterceptor? interceptor = null,
         PrimaryDatabaseRole role = PrimaryDatabaseRole.Runtime)
     {
-        var configuration = NativeDraftGraphAuthentication.CreateConfiguration();
-        var services = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+        var owner = await NativeDraftGraphAuthentication.OpenSecretAuthorityAsync();
+        try
         {
-            DisableDefaults = true,
-            EnvironmentName = Environments.Production
-        }).Services;
-        services.AddSingleton<IConfiguration>(configuration);
-        services.AddLogging();
-        services.AddHybridCache();
-        services.AddMetrics();
-        services.AddSingleton<ProjectionMetrics>();
-        services.AddSingleton<BusinessMetrics>();
-        services.Configure<InstanceOperatorIdentityOptions>(options =>
+            var configuration = await NativeDraftGraphAuthentication.CreateConfigurationAsync(owner);
+            var services = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+            {
+                DisableDefaults = true,
+                EnvironmentName = Environments.Production
+            }).Services;
+            services.AddSingleton<IConfiguration>(configuration);
+            services.AddLogging();
+            services.AddHybridCache();
+            services.AddMetrics();
+            services.AddSingleton<ProjectionMetrics>();
+            services.AddSingleton<BusinessMetrics>();
+            services.Configure<InstanceOperatorIdentityOptions>(options =>
+            {
+                options.OperatorId = Guid.CreateVersion7();
+                options.PublicName = "Native graph fixture operator";
+                options.LegalName = "Native graph fixture ASBL";
+                options.OfficialOrigin = "https://example.test";
+                options.OperatorKindCode = "registered_organization";
+                options.JurisdictionCountryCode = "BE";
+                options.RegistrationIdentifier = "BE 0123.456.789";
+                options.PublicContactEmail = "contact@example.test";
+                options.WebsiteUrl = "https://example.test";
+                options.LegalNoticeUrl = "https://example.test/legal";
+                options.TermsUrl = "https://example.test/terms";
+                options.PrivacyUrl = "https://example.test/privacy";
+            });
+            services.ConfigureApplicationServices(configuration);
+            services.ConfigureInfrastructureServices(configuration);
+            services.AddSingleton(_ => owner);
+            services.AddNativeSecretResolution();
+            services.ConfigurePersistenceServices(configuration, skipLookupCacheInitializer: true);
+            services.AddSingleton<ITenantContext>(tenant);
+            NativeDraftGraphAuthentication.AddAuthentication(services, configuration);
+            services.AddScoped(provider =>
+            {
+                if (provider.GetRequiredService<ExploreDbContextExecutionLease>().Context is { } selected)
+                    return selected;
+                var context = NativeDraftGraphAuthentication.CreateContext(configuration, tenant, role, interceptor);
+                context.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
+                return context;
+            });
+            var provider = services.BuildIsolatedServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+            _ = provider.GetRequiredService<SecretAuthorityAcquisition>();
+            return provider;
+        }
+        catch
         {
-            options.OperatorId = Guid.CreateVersion7();
-            options.PublicName = "Native graph fixture operator";
-            options.LegalName = "Native graph fixture ASBL";
-            options.OfficialOrigin = "https://example.test";
-            options.OperatorKindCode = "registered_organization";
-            options.JurisdictionCountryCode = "BE";
-            options.RegistrationIdentifier = "BE 0123.456.789";
-            options.PublicContactEmail = "contact@example.test";
-            options.WebsiteUrl = "https://example.test";
-            options.LegalNoticeUrl = "https://example.test/legal";
-            options.TermsUrl = "https://example.test/terms";
-            options.PrivacyUrl = "https://example.test/privacy";
-        });
-        services.ConfigureApplicationServices(configuration);
-        services.ConfigureInfrastructureServices(configuration);
-        services.AddSecretProvider(configuration);
-        services.AddSecretResolution();
-        services.ConfigurePersistenceServices(configuration, skipLookupCacheInitializer: true);
-        services.AddSingleton<ITenantContext>(tenant);
-        NativeDraftGraphAuthentication.AddAuthentication(services, configuration);
-        services.AddScoped(provider =>
-        {
-            if (provider.GetRequiredService<ExploreDbContextExecutionLease>().Context is { } selected)
-                return selected;
-            var context = NativeDraftGraphAuthentication.CreateContext(configuration, tenant, role, interceptor);
-            context.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
-            return context;
-        });
-        return services.BuildIsolatedServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+            await owner.DisposeAsync();
+            throw;
+        }
     }
 
     private static async Task<(Guid LocationId, Guid OrganizationId)> SeedAuthenticatedOwnerAsync(
         IServiceProvider requestServices, GraphTenant tenant, Guid userId)
     {
-        await using var setupServices = BuildServices(tenant, role: PrimaryDatabaseRole.Migrator);
+        await using var setupServices = await BuildServicesAsync(tenant, role: PrimaryDatabaseRole.Migrator);
         await using var setup = setupServices.CreateAsyncScope();
         var receipt = await NativeDraftGraphAuthentication.CreatePendingAsync(setup.ServiceProvider, userId);
         var publisher = await SeedOwnerAsync(setup.ServiceProvider.GetRequiredService<ExploreDbContext>(),

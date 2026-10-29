@@ -132,7 +132,8 @@ Run ONLY the test project that directly protects the modified layer:
 | `src/Explore.Domain/**` | `Event.Domain.UnitTests`<br/>`Event.Application.UnitTests` | Blazor UI tests, BFF tests, Quartz integration tests |
 | `src/Explore.Persistence/**` | `Event.Persistence.IntegrationTests`<br/>`Event.Architecture.Tests` | Blazor UI tests, BFF tests, Secrets unit tests |
 | `src/Explore.API/**` | `Event.API.IntegrationTests`<br/>`Event.Architecture.Tests` | Blazor Client UI tests, Secrets unit tests |
-| `src/Explore.Secrets/**` | `Explore.Secrets.UnitTests` | All other test suites |
+| `src/Explore.Infrastructure/Secrets/**` | `Explore.Infrastructure.Tests`<br/>`Event.Architecture.Tests` | Unrelated UI or database-provider suites |
+| `src/Explore.ServiceDefaults/Secrets/**`, `src/Explore.ServiceDefaults/DataProtection/**` | Native secret/host slices in `Explore.Infrastructure.Tests`, `Explore.Blazor.IntegrationTests`, `Event.API.IntegrationTests`, `Event.Standalone.IntegrationTests`; architecture boundaries | Unrelated business or provider-matrix suites |
 
 ### 4. Fast-Loop TUnit Slicing (`--treenode-filter`)
 During active development of a task or handler, agents must NEVER run the entire test project. Use TUnit's `--treenode-filter` to run ONLY the target test class:

@@ -8,8 +8,8 @@ public static class SecurityChangeSelection
     private enum BuildLanes
     {
         None = 0, App = 1, Domain = 2, Architecture = 4, Setup = 8,
-        Infrastructure = 16, Blazor = 32, Secrets = 64,
-        All = App | Domain | Architecture | Setup | Infrastructure | Blazor | Secrets
+        Infrastructure = 16, Blazor = 32,
+        All = App | Domain | Architecture | Setup | Infrastructure | Blazor
     }
 
     private static bool IsValidPath(string path) => !string.IsNullOrWhiteSpace(path)
@@ -59,6 +59,24 @@ public static class SecurityChangeSelection
                 continue;
             }
 
+            if (In(path, "src/Explore.ServiceDefaults/Secrets", "src/Explore.ServiceDefaults/DataProtection",
+                    "src/Explore.Infrastructure/Secrets", "src/Explore.Persistence/Database",
+                    "src/Explore.API/Hosting", "src/Explore.API/Configuration", "src/Explore.Blazor/Hosting",
+                    "src/Event.Web.BffHosting", "src/Event.Standalone", "eng/security")
+                || path is "src/Explore.API/Program.cs" or "src/Explore.Blazor/Program.cs"
+                    or "src/Explore.Blazor/Extensions/ConfigurationExtension.cs"
+                    or "eng/tools/EmergencyAdminProvisioner.cs")
+            {
+                lanes = BuildLanes.All;
+                continue;
+            }
+
+            if (In(path, "tests/Explore.Blazor.IntegrationTests/Configuration",
+                    "tests/Explore.Blazor.IntegrationTests/Hosting")
+                || path.StartsWith("tests/Explore.Blazor.IntegrationTests/", StringComparison.Ordinal)
+                    && path.Contains("Security", StringComparison.Ordinal))
+                lanes |= BuildLanes.Architecture | BuildLanes.Setup | BuildLanes.Infrastructure;
+
             lanes |= path switch
             {
                 _ when path.EndsWith(".csproj", StringComparison.Ordinal)
@@ -75,8 +93,6 @@ public static class SecurityChangeSelection
                 _ when In(path, "src/Explore.Application", "tests/Event.Application.UnitTests",
                     "src/Explore.API", "tests/Event.API.IntegrationTests") =>
                     BuildLanes.App | BuildLanes.Architecture | BuildLanes.Setup | BuildLanes.Infrastructure,
-                _ when In(path, "src/Explore.Secrets", "tests/Explore.Secrets.UnitTests") =>
-                    BuildLanes.Secrets | BuildLanes.Architecture | BuildLanes.Setup | BuildLanes.Infrastructure,
                 _ when In(path, "src/Explore.Infrastructure", "src/Explore.Persistence", "src/Explore.Atproto.Transport",
                     "src/Event.MigrationService", "tests/Explore.Infrastructure.Tests", "tests/Event.Persistence.IntegrationTests") =>
                     BuildLanes.Architecture | BuildLanes.Setup | BuildLanes.Infrastructure,
@@ -96,7 +112,7 @@ public static class SecurityChangeSelection
         {
             ("app", BuildLanes.App), ("domain", BuildLanes.Domain), ("architecture", BuildLanes.Architecture),
             ("setup", BuildLanes.Setup), ("infrastructure", BuildLanes.Infrastructure),
-            ("blazor", BuildLanes.Blazor), ("secrets", BuildLanes.Secrets)
+            ("blazor", BuildLanes.Blazor)
         })
         {
             output.WriteLine($"run-{name}-tests={(lanes.HasFlag(flag) ? "true" : "false")}");

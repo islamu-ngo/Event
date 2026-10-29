@@ -14,7 +14,6 @@ using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;

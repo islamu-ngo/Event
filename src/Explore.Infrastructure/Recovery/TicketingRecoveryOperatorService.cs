@@ -6,7 +6,6 @@ using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Secrets;
 using Explore.Domain;
 using Explore.Domain.Secrets;
-using Explore.Secrets.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Recovery;

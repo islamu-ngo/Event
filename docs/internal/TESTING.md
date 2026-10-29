@@ -134,7 +134,6 @@ Each project has a specific role. Run individually — never use solution-level 
 | `Event.Application.UnitTests` | Application | Handler logic, validation, mapping | No |
 | `Event.Architecture.Tests` | Cross-cutting | Convention enforcement via reflection | No |
 | `Explore.GeneratedContracts.Tests` | Tooling | Roslyn transformer classification, reversibility, privacy, and deterministic output | No |
-| `Explore.Secrets.UnitTests` | Infrastructure | Secret provider logic, encryption, restart-based credential rotation | No |
 | `Explore.Infrastructure.Tests` | Infrastructure | Provider adapters, configuration resolvers, authorization fallback behavior, and focused provider runtime checks | No for `Category!=Runtime`; Docker/Mailpit/RabbitMQ for runtime lanes |
 | `Event.Persistence.IntegrationTests` | Persistence | EF Core queries, repository behavior, provider migrations | PostgreSQL plus the real-engine provider matrix |
 | `Event.API.IntegrationTests` | API | HTTP endpoints, middleware, auth flows | Full stack |
@@ -234,7 +233,6 @@ dotnet test --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj
 dotnet test --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release --verbosity quiet
 dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet
 dotnet test --project tests/Explore.GeneratedContracts.Tests/Explore.GeneratedContracts.Tests.csproj --configuration Release --verbosity quiet
-dotnet test --project tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration Release --verbosity quiet
 dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*/*[Category!=Runtime]" --minimum-expected-tests 1
 dotnet test --project tests/Event.Wire.Contracts.UnitTests/Event.Wire.Contracts.UnitTests.csproj --configuration Release --verbosity quiet
 dotnet test --project tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj --configuration Release --verbosity quiet
@@ -436,7 +434,7 @@ Use TUnit metadata to route tests into the smallest lane that proves the behavio
 
 | Lane | TUnit Metadata | Projects | Purpose | Default Frequency |
 |------|----------------|----------|---------|-------------------|
-| Unit | `[Category("Unit")]` or project-level unit suite excluding `[Category("Runtime")]` | `Event.Domain.UnitTests`, `Event.Application.UnitTests`, `Explore.Secrets.UnitTests`, `Explore.Infrastructure.Tests` | Fast domain, handler, validator, mapping, service, provider, configuration, and fallback behavior | Every PR |
+| Unit | `[Category("Unit")]` or project-level unit suite excluding `[Category("Runtime")]` | `Event.Domain.UnitTests`, `Event.Application.UnitTests`, `Explore.Infrastructure.Tests` | Fast domain, handler, validator, mapping, service, provider, configuration, and fallback behavior | Every PR |
 | Architecture | project-level architecture suite | `Event.Architecture.Tests` | Clean Architecture, naming, accessibility structure, authorization parity, and test-suite governance | Every PR |
 | Component | `[Category("Component")]` or project-level UI suite | `Explore.Blazor.Client.Tests` | bUnit component, service, accessibility, wrapper, and design-system behavior | Every PR |
 | API Contract | `[Category(TestCategories.Fast)]`, `[Category(TestCategories.Security)]`, `[Category(TestCategories.PolicyContract)]` | `Event.API.IntegrationTests` | HTTP serialization, HAL, ProblemDetails, auth matrix, Cerbos contract, and API surface rules | Every PR where possible |
@@ -602,7 +600,29 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 
 `Explore.Infrastructure.Tests` intentionally has both fast no-infrastructure tests and Docker-backed runtime tests. Docker-backed classes are `[Explicit]`, so an unfiltered developer run stays fast; a positive `Runtime`, `Email`, or `RabbitMQ` category filter opts into the matching container lane. Use `Category!=Runtime` for the fast local/PR lane. Use the `Email` category when changing SMTP or EmailDispatch behavior; it includes no-container configuration failure tests, Mailpit-backed SMTP/drain tests, and RabbitMQ consumer tests that deliver to Mailpit. Use the `RabbitMQ` category when changing optional broker transport, topology, publish-confirm, consumer settlement, DLQ replay, or parking behavior.
 
-Credential rotation coverage is restart-based today: the owning service reloads on restart or redeploy, not through live in-process refresh.
+### Native Secret Authority Coverage
+
+Secret authority tests run in the projects that own the behavior:
+
+| Native suite | Coverage |
+|---|---|
+| `Explore.Infrastructure.Tests/Secrets/` | Selected authority acquisition, borrowed operation lifetime, session-local token maintenance, runtime sources, resolver/shared cache and revision evidence, writers, commitments/status, and prepared Data Protection |
+| `Event.Domain.UnitTests/Secrets/` | Secret definition registry and consumer-specific rotation policy invariants |
+| `Event.Persistence.IntegrationTests/Database/` | Database binding, bootstrap, migration acquisition, and provider contracts |
+| `Event.API.IntegrationTests/`, `Explore.Blazor.IntegrationTests/`, `Event.Standalone.IntegrationTests/` | API, isolated BFF, and Combined serving-host composition/admission |
+
+Use the corresponding project commands in this guide, selecting the affected
+classes for bounded work. `SecretKitAuthenticationLifetimeTests` and
+`SecretKitBorrowedOperationTests` cover the selected owner's lifetime;
+`SharedSecretResolverCacheTests` covers shared cache behavior across scopes;
+`SecretKitDataProtectionAdmissionTests` covers asynchronous exact two-value
+preparation and fresh-authority readiness. Synchronous Data Protection consumers
+read prepared memory, not the network.
+
+Infisical authentication maintenance renews only the selected session's token.
+It does not poll application secrets, relogin, or replay operations. Credential
+activation follows consumer-specific rollout/restart policy, not generic
+rotation factories or compatibility shims.
 
 ### Disabled Test Governance
 

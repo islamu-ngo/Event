@@ -10,7 +10,6 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.Repositories;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.Data.Sqlite;

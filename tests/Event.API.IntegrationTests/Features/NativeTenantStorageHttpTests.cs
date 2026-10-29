@@ -36,6 +36,7 @@ using Explore.Infrastructure.Storage;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -502,7 +503,7 @@ public sealed partial class NativeTenantStorageHttpTests
             services.RemoveAll<ISecretSource>();
             services.AddSingleton<ISecretSource>(new StorageSecrets(AccessKey, SecretKey, AuthorityControls));
             services.RemoveAll<IRetainedSecretResolver>();
-            services.AddScoped<IRetainedSecretResolver, Explore.Secrets.Services.SecretResolver>();
+            services.AddScoped<IRetainedSecretResolver, Explore.Infrastructure.Secrets.SecretResolver>();
             var clients = Substitute.For<IStorageProbeClientFactory>();
             clients.Create(Arg.Any<S3Configuration>()).Returns(call =>
             {

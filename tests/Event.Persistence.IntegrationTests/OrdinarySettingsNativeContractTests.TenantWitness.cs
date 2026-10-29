@@ -4,7 +4,7 @@ using Explore.Domain;
 using Explore.Domain.Settings;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 

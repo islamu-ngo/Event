@@ -3,6 +3,8 @@ using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Services.Http;
 using Explore.Blazor.Services;
+using Event.Testing.DataProtection;
+using Explore.ServiceDefaults.DataProtection;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
@@ -919,6 +921,8 @@ public sealed class BffRegistrationPaymentEndpointTests
                 {
                     services.RemoveAll<TimeProvider>();
                     services.AddSingleton(timeProvider);
+                    services.Replace(ServiceDescriptor.Singleton<IExternalDataProtectionSource>(
+                        new ExternalDataProtectionTestAuthority("bff", timeProvider)));
                 }
             });
         });

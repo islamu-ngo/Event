@@ -347,7 +347,6 @@ intents:
       - Explore.Blazor.Client.Tests
       - Explore.Blazor.IntegrationTests
       - Explore.Infrastructure.Tests
-      - Explore.Secrets.UnitTests
       - Event.Wire.Contracts.UnitTests
       - Explore.GeneratedContracts.Tests
       - Explore.Diagnostic.UnitTests
@@ -1306,7 +1305,6 @@ intents:
       - "tests/Event.API.IntegrationTests/**/*.cs"
       - "tests/Explore.Blazor.Client.Tests/**/*.cs"
       - "tests/Explore.Blazor.IntegrationTests/**/*.cs"
-      - "tests/Explore.Secrets.UnitTests/**/*.cs"
       - "tests/Event.Architecture.Tests/**/*.cs"
       - "schemas/openapi_islamu-event.json"
       - "schemas/islamu-event.md"
@@ -1343,7 +1341,6 @@ intents:
       - Event.API.IntegrationTests
       - Explore.Blazor.Client.Tests
       - Explore.Blazor.IntegrationTests
-      - Explore.Secrets.UnitTests
       - Event.Architecture.Tests
     docs_to_update:
       - docs/internal/MULTI_TENANCY.md
@@ -1429,7 +1426,6 @@ intents:
       - "dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration Release --verbosity quiet"
-      - "dotnet test --project tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet"
 
   - id: registration-data-collection
@@ -1686,7 +1682,6 @@ intents:
       - Event.API.IntegrationTests
       - Explore.Blazor.IntegrationTests
       - Explore.Blazor.Client.Tests
-      - Explore.Secrets.UnitTests
     docs_to_update:
       - docs/internal/DOMAIN.md
       - docs/internal/API.md
@@ -1788,7 +1783,6 @@ intents:
       - "dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --verbosity quiet"
-      - "dotnet test --project tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration Release --verbosity quiet"
       - "dotnet ef migrations has-pending-model-changes --context ExploreDbContext --project src/Explore.Persistence --startup-project src/Explore.API --configuration Release"
 
   - id: webhook-delivery-redesign
@@ -1917,7 +1911,6 @@ intents:
       - Event.API.IntegrationTests
       - Explore.Blazor.IntegrationTests
       - Explore.Blazor.Client.Tests
-      - Explore.Secrets.UnitTests
     docs_to_update:
       - docs/internal/DOMAIN.md
       - docs/internal/API.md
@@ -1999,7 +1992,6 @@ intents:
       - "dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --verbosity quiet"
-      - "dotnet test --project tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration Release --verbosity quiet"
       - "dotnet ef migrations has-pending-model-changes --project src/Explore.Persistence/Explore.Persistence.csproj --startup-project src/Explore.API/Explore.API.csproj --configuration Release --context ExploreDbContext"
 
   - id: secrets-authority
@@ -2054,7 +2046,10 @@ intents:
       - "src/Explore.Application/Features/Integrations/Listmonk/**"
       - "src/Explore.Application/Features/Settings/**"
       - "src/Explore.Application/Features/ControlPlane/**"
-      - "src/Explore.Secrets/**"
+      - "src/Explore.Infrastructure/Secrets/**"
+      - "src/Explore.ServiceDefaults/Secrets/**"
+      - "src/Explore.ServiceDefaults/DataProtection/**"
+      - "src/Explore.Persistence/Database/**"
       - "src/Explore.Persistence/Configurations/Entities/SecretBindingConfiguration.cs"
       - "src/Explore.Persistence/ExploreDbContext*.cs"
       - "src/Explore.Persistence/PersistenceServicesRegistration.cs"
@@ -2089,7 +2084,6 @@ intents:
       - "src/Explore.Blazor.Client/Pages/Admin/Instance/**"
       - "src/Explore.Blazor.Client/Services/**"
       - "src/Explore.Blazor.Client/Clients/EventApiClient.g.cs"
-      - "tests/Explore.Secrets.UnitTests/**"
       - "tests/Event.Domain.UnitTests/**/*Secret*.cs"
       - "tests/Event.Application.UnitTests/**/*Secret*.cs"
       - "tests/Event.Persistence.IntegrationTests/**/*Secret*.cs"
@@ -2131,7 +2125,6 @@ intents:
       - Event.Persistence.IntegrationTests
       - Explore.Infrastructure.Tests
       - Event.API.IntegrationTests
-      - Explore.Secrets.UnitTests
       - Explore.Blazor.IntegrationTests
       - Explore.Blazor.Client.Tests
       - Explore.Diagnostic.UnitTests
@@ -2266,7 +2259,6 @@ intents:
       - "dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet"
-      - "dotnet test --project tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --verbosity quiet"
       - "dotnet test --project tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj --configuration Release --verbosity quiet"
@@ -2437,7 +2429,6 @@ intents:
       - "src/Explore.Blazor.Client/**/*.cs"
       - "src/Explore.Blazor.Client/**/*.razor"
       - "src/Explore.Blazor.Client/**/*.razor.cs"
-      - "src/Explore.Secrets/**/*.cs"
       - "src/Explore.ServiceDefaults/**/*.cs"
       - "eng/tools/Explore.AssuranceAudit/**"
       - "eng/tools/Explore.ApiContractInventory/**"
@@ -2463,7 +2454,6 @@ intents:
       - Explore.Blazor.Client.Tests
       - Explore.Blazor.IntegrationTests
       - Explore.Infrastructure.Tests
-      - Explore.Secrets.UnitTests
       - Explore.GeneratedContracts.Tests
     docs_to_update:
       - docs/internal/TESTING.md

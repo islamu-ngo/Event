@@ -1,7 +1,5 @@
 using Explore.Persistence;
 using Explore.Persistence.Database;
-using Explore.Secrets.Bootstrap;
-using Explore.Secrets.Database;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -748,49 +746,38 @@ public sealed class PrimaryDatabaseConfigurationTests
     }
 
     [Test]
-    [NotInParallel]
     public async Task ConfigurePersistenceServices_WithProjectedDiscretePostgres_UsesSharedStructuredBinder()
     {
         string password = $"password-{Guid.CreateVersion7():N}";
         var values = new Dictionary<string, string?>
         {
-            [BootstrapSecretLoader.EnvHost] = "pg.example.test",
-            [BootstrapSecretLoader.EnvPort] = "5432",
-            [BootstrapSecretLoader.EnvDatabase] = "event_db",
-            [BootstrapSecretLoader.EnvUsername] = $"user_{Guid.CreateVersion7():N}",
-            [BootstrapSecretLoader.EnvPassword] = password,
+            ["DATABASE_PROVIDER"] = "PostgreSql",
+            ["DATABASE_HOST"] = "pg.example.test",
+            ["DATABASE_PORT"] = "5432",
+            ["DATABASE_NAME"] = "event_db",
+            ["DATABASE_RUNTIME_USERNAME"] = $"user_{Guid.CreateVersion7():N}",
+            ["DATABASE_RUNTIME_PASSWORD"] = password,
         };
-        var previous = values.Keys.ToDictionary(
-            key => key,
-            Environment.GetEnvironmentVariable,
-            StringComparer.Ordinal);
-        try
+        foreach (PrimaryDatabaseRole role in Enum.GetValues<PrimaryDatabaseRole>())
         {
-            foreach (var pair in values)
-                Environment.SetEnvironmentVariable(pair.Key, pair.Value);
-
-            var builder = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["SecretProvider:Provider"] = "Environment",
-            });
-            BootstrapSecretLoader.ProjectPostgresConfiguration(
-                builder,
-                PrimaryDatabaseRole.Runtime);
-            var services = new ServiceCollection();
-
-            Action act = () => services.ConfigurePersistenceServices(
-                builder.Build(),
-                skipDbContextRegistration: false,
-                skipLookupCacheInitializer: true,
-                environmentName: "Production");
-
-            await Assert.That(act).ThrowsNothing();
+            if (role == PrimaryDatabaseRole.Runtime)
+                continue;
+            values[$"Database:{role}:Username"] = $"user_{Guid.CreateVersion7():N}";
+            values[$"Database:{role}:Password"] = SecretsTestValues.CreateSecret();
         }
-        finally
+        using var selected = (ConfigurationRoot)new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        using var bootstrap = (ConfigurationRoot)new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            foreach (var pair in previous)
-                Environment.SetEnvironmentVariable(pair.Key, pair.Value);
-        }
+            ["SecretProvider:Provider"] = "Environment"
+        }).Build();
+        await using var acquisition = await MigrationDatabaseAcquisition.OpenAsync(bootstrap, "Testing",
+            ["/database"], selected);
+        var runtime = PrimaryDatabaseConfiguration.BindRuntime(acquisition.Configuration);
+        await Assert.That(runtime.Password).IsEqualTo(password);
+        var services = new ServiceCollection();
+        Action act = () => services.ConfigurePersistenceServices(acquisition.Configuration,
+            skipDbContextRegistration: false, skipLookupCacheInitializer: true, environmentName: "Testing");
+        await Assert.That(act).ThrowsNothing();
     }
 
     [Test]

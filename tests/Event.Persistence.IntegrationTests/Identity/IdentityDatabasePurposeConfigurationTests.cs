@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using Explore.Persistence.Identity;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Npgsql;

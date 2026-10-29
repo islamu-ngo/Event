@@ -103,7 +103,7 @@ public sealed class TicketingDeploymentCapabilityMatrixTests
             "Explore.API",
             "Explore.Blazor",
             "Explore.Blazor.Client",
-            "Explore.Secrets",
+            "Explore.ServiceDefaults",
         ];
         string[] files = productionRoots
             .SelectMany(root => Directory.EnumerateFiles(

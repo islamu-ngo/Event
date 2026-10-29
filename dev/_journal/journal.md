@@ -3390,6 +3390,77 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 
 ---
 
+[2026-10-25 Europe/Brussels] — Reserve secret preparation before caller enumeration
+
+**Context**: During `secrets-authority` foundation adoption, the native client drained its own reads, but Event also owned preparation work that could run before the first SDK call. The shared module must keep accepted preparations alive through cancellation and retirement.
+
+**Symptom / Observation**: A barrier-controlled entry enumerable entered `SecretAuthorityAcquisition.PrepareGroupAsync`, then blocked before yielding. `DisposeAsync` completed and disposed the lifetime cancellation source. Releasing enumeration produced `ObjectDisposedException` instead of retirement cancellation. Independent review also found that protected underscore namespaces admitted their colon-delimited configuration destinations.
+
+**Root Cause**: A disposed check before caller-controlled enumeration is not an operation reservation. Native IO drainage does not cover Event's enumeration, publication, or cleanup. Configuration admission also must cover the hierarchical spelling consumed by .NET, not only environment-variable prefixes.
+
+**Resolution**: Reserve the preparation and capture its lifetime token under the admission gate before enumeration. Retirement closes admission, cancels, awaits outstanding preparations, then disposes native resources outside the gate. Publication rechecks the gate; reservation release signals outside it. Reject `APPHOST:`, `DATA_PROTECTION:`, and `EVENT_DP:` alongside their underscore forms. The expanded 25-case authority slice first failed on these four exploit cases, then passed all 25 in 635 ms. Command: `dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet --no-build --no-restore -- --treenode-filter "/*/*/*SecretKitAuthorityAcquisitionTests/*" --minimum-expected-tests 1`.
+
+**Why This Matters for Future Work**: Put the linearization point before callbacks or enumeration, not merely before awaited network work. Keep native resource ownership distinct from application preparation ownership. Use event barriers to prove the race; no sleeps, internal call-count mirrors, or compatibility paths are needed.
+
+**References**:
+- `src/Explore.ServiceDefaults/Secrets/SecretAuthorityAcquisition.cs`
+- `src/Explore.ServiceDefaults/Secrets/SecretAcquisitionPolicy.cs`
+- `tests/Explore.Infrastructure.Tests/Secrets/SecretKitAuthorityAcquisitionTests.cs`
+- `docs/internal/adr/ADR-secretkit-event-ownership.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; concrete admission/retirement integration lesson. The ownership decision lives in the ADR.
+
+---
+
+[2026-10-26 Europe/Brussels] — Skipping secret projection does not remove existing authority
+
+**Context**: During `secrets-authority` retirement, AppHost retained explicit resource settings while applying the selected consumer's secret catalogue. The BFF must receive only frontend purposes even when a caller has already populated the target environment.
+
+**Symptom / Observation**: `BffProcessProjectionMasksInheritedAndExplicitBackendCredentials` failed because a backend canary survived in the BFF target. Parsed Compose policy checks passed; correct declared service wiring did not prove exclusion of previously assigned values.
+
+**Root Cause**: `RuntimeSecretEnvironment.Apply` skipped catalogue entries outside the consumer's admitted roots but left matching target keys untouched. Its initial inherited-variable pass intentionally preserved explicit resource values. Together, those two reasonable local behaviors retained explicit credentials from a forbidden purpose.
+
+**Resolution**: Mask every purpose-disallowed or forbidden catalogue key with an empty value before continuing. Removing the key would expose inherited process environment again. Preserve public frontend intent through its separate existing mapping path. The nine-case admission slice passed after its intended failure; the complete 414-case native Secrets slice then passed. Commands: `dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet --no-restore -p:BuildInParallel=false -p:UseSharedCompilation=false -- --treenode-filter "/*/*/*SecretAuthorityLeastPrivilegeArchitectureTests/*" --minimum-expected-tests 9` and `dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet --no-restore -p:BuildInParallel=false -p:UseSharedCompilation=false -- --treenode-filter "/*/Explore.Infrastructure.Tests.Secrets/*/*" --minimum-expected-tests 414`.
+
+**Why This Matters for Future Work**: Projection admission and target-state exclusion are different obligations. Test both inherited and explicitly assigned secret inputs through the final process projection, not only the list of values the projector adds.
+
+**References**:
+- `src/Explore.ServiceDefaults/Secrets/RuntimeSecretEnvironment.cs`
+- `tests/Event.Architecture.Tests/SecretAuthorityLeastPrivilegeArchitectureTests.cs`
+- `docs/internal/SECRETS.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the consumer ownership contract remains in the SecretKit ADR.
+
+---
+
+[2026-10-27 Europe/Brussels] — Locked restore includes evaluated build inputs
+
+**Context**: Actual SecretKit container qualification exercised the API, BFF, migration service and self-contained Standalone recipes with locked NuGet restore.
+
+**Symptom / Observation**: A moving SDK tag failed the repository SDK selection. Matching SDK manifests still produced `NU1004` when the restore context omitted Razor content or enabled the single-file profile. The nested contract generator also failed with `CS8012` when it inherited the application's deployment properties.
+
+**Root Cause**: Project evaluation is part of the dependency contract. The SDK infers `Microsoft.AspNetCore.App.Internal.Assets` from Razor items, while single-file publication adds `Microsoft.NET.ILLink.Tasks`. Ordinary and container publication therefore do not have identical graphs. A build-time compiler tool belongs to the SDK host, not the application's target architecture or output directory.
+
+**Resolution**: Align all four SDK pins with `global.json`, copy complete restore inputs including real Razor files, generate Linux runtime locks through NuGet, and give Standalone its own `container/packages.lock.json`. The standard basename keeps that graph visible to dependency-submission tooling. Remove inherited deployment and output properties from the nested tool build while preserving the selected artifacts root. All four final Linux x64 image recipes completed. The final Standalone command was `podman build --pull=never --layers --cpu-period=100000 --cpu-quota=200000 --memory=4g --build-arg TARGETARCH=amd64 --build-arg BUILDPLATFORM=linux/amd64 -f src/Event.Standalone/Dockerfile -t localhost/islamu-secretkit-standalone:qualification-20261027 .`. The 469-pair license gate passed after the additional lock was generated.
+
+**Why This Matters for Future Work**: Copying project and lock files alone does not prove equivalent restore evaluation. Qualify each actual publish profile with locked restore; do not disable the lock, pin an incidental implicit package, or let target-specific application properties leak into host tooling. Image construction does not certify credentialed startup, another architecture or trim/AOT.
+
+**References**:
+- `src/Event.Standalone/Event.Standalone.csproj:12`
+- `src/Event.Standalone/container/packages.lock.json`
+- `src/Explore.Blazor/Dockerfile`
+- `src/Directory.Build.props`
+- `eng/tools/Explore.GeneratedContracts/GeneratedContractTool.targets:10`
+- `eng/dependency-submission/src/ISLAMU.DependencySubmission/RepositoryLocks.cs:11`
+- `docs/internal/SECRETKIT_LOCAL_PACKAGES.md`
+
+**Promotion Consideration**:
+- [x] Keep the build lesson in the journal; the current operator and engineering procedures are in the paired package guides.
+
+---
+
 [2026-10-27 Europe/Brussels] — Grant ownership includes recovery and first-save coordinates
 
 **Context**: While reviewing two exact moderation read-grant authorization classifications for PR80, independent source reviews disagreed about settlement safety. An anonymized cross-evaluation distinguished real native authorization checks from the additional guarantees needed across saving and final admission.

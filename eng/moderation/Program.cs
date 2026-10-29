@@ -33,7 +33,7 @@ try
     Require.That(File.Exists(Path.Combine(root, "eng/moderation/MeasurementLauncher.csproj"))
         && Path.GetFullPath(AppContext.BaseDirectory).TrimEnd(Path.DirectorySeparatorChar)
             == Path.Combine(root, "eng/moderation/bin/Release/net10.0"), "launcher-location-invalid");
-    using var configuration = MeasurementConfiguration.Load();
+    await using var configuration = await MeasurementConfiguration.LoadAsync(token);
     var before = await NativeAuthority.ReadAsync(configuration.Primary, tenant, challenge, issuer, token);
     var (catalogue, catalogueDigest) = await PinnedCatalogue.LoadAsync(root, before.Issuer.CatalogueDigest, token);
     Require.That(catalogue.ConsumerId == before.Challenge.ConsumerId, "catalogue-consumer-mismatch");
@@ -65,7 +65,7 @@ try
     var afterArtifacts = await Artifacts.MeasureAsync(root, before.Challenge.ConsumerId, before.Binding.Mode, token);
     Require.That(afterArtifacts == artifacts, "artifacts-changed");
     _ = await PinnedCatalogue.LoadAsync(root, catalogueDigest, token);
-    using var currentConfiguration = MeasurementConfiguration.Load();
+    await using var currentConfiguration = await MeasurementConfiguration.LoadAsync(token);
     Require.That(currentConfiguration.PublicDigest == configuration.PublicDigest
         && await NativeAuthority.ProviderVersionAsync(currentConfiguration.Test, tenant, token) == providerVersion,
         "configuration-changed");
@@ -88,7 +88,7 @@ try
         evidence = evidence.ToImmutable()
     });
     await OwnedExecution.WritePrivateAsync(Path.Combine(directory, "evidence.json"), manifest, token);
-    // The key is acquired only after children have exited and their pipes have drained.
+    // Signing starts only after children have exited and their pipes have drained.
     // No standalone method accepts external reports, booleans or a preconstructed receipt.
     using var signer = ECDsa.Create();
     signer.ImportFromPem(currentConfiguration.SigningKey());

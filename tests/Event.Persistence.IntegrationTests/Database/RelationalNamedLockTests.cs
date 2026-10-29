@@ -2,7 +2,6 @@ using System.Data.Common;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Persistence;
 using Explore.Persistence.Database;
-using Explore.Secrets.Database;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;

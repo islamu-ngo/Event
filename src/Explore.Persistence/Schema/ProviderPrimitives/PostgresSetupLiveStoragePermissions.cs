@@ -78,6 +78,7 @@ public static class PostgresSetupLiveStoragePermissions
                     (typeof(SetupSecretBindingOperation),
                     [
                         nameof(SetupSecretBindingOperation.State), nameof(SetupSecretBindingOperation.Outcome),
+                        nameof(SetupSecretBindingOperation.MutationEvidence),
                         nameof(SetupSecretBindingOperation.SettledAt), nameof(SetupSecretBindingOperation.ConcurrencyStamp),
                         nameof(SetupSecretBindingOperation.UpdatedAt), nameof(SetupSecretBindingOperation.UpdatedBy)
                     ])

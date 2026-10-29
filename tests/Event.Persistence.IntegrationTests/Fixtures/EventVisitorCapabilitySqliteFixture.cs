@@ -18,13 +18,14 @@ using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Infrastructure;
+using Explore.Infrastructure.Secrets;
 using Explore.Persistence;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Application.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Explore.Secrets.Extensions;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
@@ -149,8 +150,10 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
         services.ConfigureInfrastructureServices(configuration);
         services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(fixture._path + "-keys"))
             .SetApplicationName("islamu-event");
-        services.AddSecretProvider(configuration);
-        services.AddSecretResolution();
+        services.AddSingleton(_ => SecretAuthorityAcquisition.OpenLocal(
+            SecretAuthoritySelection.Select(configuration, "Testing", SecretConsumerRole.Api),
+            testingAuthority: configuration));
+        services.AddNativeSecretResolution();
         services.ConfigurePersistenceServices(configuration, skipLookupCacheInitializer: true);
         services.AddSingleton<ITenantContext>(fixture);
         services.AddSingleton<IHttpContextAccessor>(new FixtureHttpContextAccessor

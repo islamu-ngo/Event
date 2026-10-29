@@ -7,6 +7,8 @@
     <Compile Include="..\Shared\Authorization\ProviderNeutralCorpus.cs" Link="Authorization\ProviderNeutralCorpus.cs" />
     <Compile Include="..\Shared\Settings\SmtpSettingsDatabase.cs" Link="Settings\SmtpSettingsDatabase.cs" />
     <Compile Include="..\Shared\ExternalDataProtectionTestAuthority.cs" Link="Fixtures\ExternalDataProtectionTestAuthority.cs" />
+    <Compile Include="..\Shared\SecretKitHttpAuthority.cs" Link="Fixtures\SecretKitHttpAuthority.cs" />
+    <Using Include="Event.Testing.Secrets" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\AuthenticatedSettingsFixture.cs" Link="Fixtures\AuthenticatedSettingsFixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\InstanceSettingsCommandFixture.cs" Link="Fixtures\InstanceSettingsCommandFixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\TestDbContextOptions.cs" Link="Fixtures\NativeTestDbContextOptions.cs" />
@@ -14,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Explore.ServiceDefaults\Explore.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\src\Explore.Atproto.Transport\Explore.Atproto.Transport.csproj" />
     <ProjectReference Include="..\..\src\Event.MigrationService\Event.MigrationService.csproj"
                       Aliases="migrationservice" />

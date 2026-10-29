@@ -1,5 +1,5 @@
 using Explore.Persistence.Schema;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -119,6 +119,20 @@ public static class PrimaryDatabaseProviderComposition
         DbContextOptionsBuilder optionsBuilder,
         PrimaryDatabaseConnectionOptions options) =>
         ConfigureProvider(optionsBuilder, options, PrimaryDatabaseMigrationTarget.Application, null);
+
+    internal static void ConfigureDataProtectionModel(
+        DbContextOptionsBuilder optionsBuilder,
+        PrimaryDatabaseConnectionOptions options) =>
+        ConfigureProvider(optionsBuilder, options, PrimaryDatabaseMigrationTarget.DataProtection, null);
+
+    internal static void ConfigureCoLocatedPrivacyErasureAuthorityModel(
+        DbContextOptionsBuilder optionsBuilder,
+        PrimaryDatabaseConnectionOptions options)
+    {
+        if (options.Provider != PrimaryDatabaseProvider.PostgreSql)
+            throw new InvalidOperationException(UnsupportedCoLocatedPrivacyErasureAuthorityMessage);
+        ConfigureProvider(optionsBuilder, options, PrimaryDatabaseMigrationTarget.CoLocatedPrivacyErasureAuthority, null);
+    }
 
     private static void ConfigureProvider(
         DbContextOptionsBuilder optionsBuilder,

@@ -9,7 +9,6 @@ using Explore.Application.Services.Moderation;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
-using Explore.Secrets.Database;
 using ISLAMU.Moderation.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;

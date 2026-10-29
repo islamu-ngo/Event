@@ -29,7 +29,7 @@ public sealed class NotificationOutboxAdmissionTests(PostgreSqlContainerFixture 
         await fixture.ResetAsync();
         var (tenant, seeded) = await SeedAsync("publication");
         var admission = new NotificationOutboxAdmission(
-            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(Explore.Secrets.Database.PrimaryDatabaseRole.Global)),
+            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(Explore.Persistence.Database.PrimaryDatabaseRole.Global)),
             TimeProvider.System);
         var claim = (await admission.ClaimDueAsync(10, DateTime.UtcNow, default)).Single();
         await using var runtime = fixture.CreateEnrolledTenantDbContext(new SelectedTenant(tenant));
@@ -570,7 +570,7 @@ public sealed class NotificationOutboxAdmissionTests(PostgreSqlContainerFixture 
         : INotificationOutboxAdmissionDbContextFactory
     {
         private readonly GlobalExploreDbContextFactory _global = new(
-            fixture.GetNativeQueueOptions(Explore.Secrets.Database.PrimaryDatabaseRole.Global));
+            fixture.GetNativeQueueOptions(Explore.Persistence.Database.PrimaryDatabaseRole.Global));
 
         public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
             _global.CreateDbContextAsync(cancellationToken);

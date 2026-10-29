@@ -13,7 +13,7 @@ using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;

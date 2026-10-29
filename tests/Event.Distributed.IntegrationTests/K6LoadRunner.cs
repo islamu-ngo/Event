@@ -19,7 +19,6 @@ using Explore.Domain.Enums;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Repositories;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

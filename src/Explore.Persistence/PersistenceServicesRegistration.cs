@@ -25,7 +25,6 @@ using Explore.Persistence.Schema;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
 using ISLAMU.Moderation.Application;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;

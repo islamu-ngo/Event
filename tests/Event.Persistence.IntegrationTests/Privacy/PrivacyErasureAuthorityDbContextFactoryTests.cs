@@ -1,6 +1,6 @@
 using System.Data;
 using Explore.Persistence.Privacy.ErasureAuthority;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;

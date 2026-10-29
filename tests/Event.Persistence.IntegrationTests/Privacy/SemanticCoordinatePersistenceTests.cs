@@ -6,7 +6,6 @@ using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Metadata;

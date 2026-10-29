@@ -31,7 +31,6 @@ using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;

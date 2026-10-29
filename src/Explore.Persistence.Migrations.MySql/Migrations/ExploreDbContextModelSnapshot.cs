@@ -42288,6 +42288,10 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnType("char(36)")
                         .HasColumnName("enrollment_id");
 
+                    b.Property<int?>("MutationEvidence")
+                        .HasColumnType("int")
+                        .HasColumnName("mutation_evidence");
+
                     b.Property<Guid>("OperationKey")
                         .HasColumnType("char(36)")
                         .HasColumnName("operation_key");

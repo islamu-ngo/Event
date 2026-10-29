@@ -3,6 +3,8 @@ using System.Reflection;
 using System.Text.Json.Nodes;
 using Event.Testing.DataProtection;
 using Explore.ServiceDefaults.DataProtection;
+using Explore.ServiceDefaults.Secrets;
+using Explore.Blazor.Configuration;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.HealthChecks;
 using Explore.Blazor.Hosting;
@@ -23,6 +25,33 @@ namespace Explore.Blazor.IntegrationTests.Hosting;
 
 public sealed class BlazorHostCompositionTests
 {
+    [Test]
+    public async Task ProductionCompositionRequiresCompletedSecretPreparation()
+    {
+        var builder = CreateBuilder();
+        builder.Environment.EnvironmentName = "Production";
+        builder.Configuration["SecretProvider:Provider"] = "Environment";
+        builder.Services.AddSingleton(new AuthenticationCredentialAcquisitionReceipts());
+        Action compose = () => builder.AddBlazorHostServices(
+            BlazorHostProfile.Split, new GracefulShutdownState());
+        var failure = await Assert.That(compose).Throws<InvalidOperationException>();
+        await Assert.That(failure!.Message).IsEqualTo("bff_secret_preparation_required");
+    }
+
+    [Test]
+    public async Task FrontendPreparationRejectsAnApiOwnerBeforeReading()
+    {
+        var builder = CreateBuilder();
+        using var authority = (ConfigurationRoot)new ConfigurationBuilder().Build();
+        await using var owner = SecretAuthorityAcquisition.OpenLocal(
+            new(SecretAuthorityKind.Environment, "Testing", SecretConsumerRole.Api), authority);
+        Func<Task> prepare = () => builder.PrepareBlazorHostSecretsAsync(
+            BlazorHostProfile.Split, owner).AsTask();
+        await Assert.That(prepare).Throws<InvalidOperationException>();
+        await Assert.That(builder.Services).DoesNotContain(descriptor =>
+            descriptor.ServiceType == typeof(AuthenticationCredentialAcquisitionReceipts));
+    }
+
     [Test]
     public async Task SplitHost_ServesExistingCssStaticAsset()
     {

@@ -17,7 +17,6 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Explore.Persistence.Seed;
-using Explore.Secrets.Database;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;

@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
+using Explore.Blazor.Configuration;
 using Explore.Blazor.Extensions;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.Extensions.Configuration;
 
 namespace Explore.Blazor.IntegrationTests.Configuration;
@@ -28,7 +30,9 @@ public sealed class BffSessionAuthorityConfigurationTests
                 ["BFF_SESSION_NAMESPACE"] = "stable-deployment",
             });
 
-            builder.AddSecretAuthorityConfiguration("Testing");
+            await using var owner = SecretAuthorityAcquisition.OpenLocal(
+                new(SecretAuthorityKind.Environment, "Testing", SecretConsumerRole.Bff));
+            await builder.AddPreparedBffConfigurationAsync(owner, new AuthenticationCredentialAcquisitionReceipts());
             IConfiguration configuration = builder.Build();
 
             await Assert.That(configuration["Bff:SessionAuthority:Password"] == (injected ? selected : null))

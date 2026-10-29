@@ -4,7 +4,7 @@ using Explore.API.Hosting;
 using Explore.API.Scheduling;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Scheduling;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection.Extensions;

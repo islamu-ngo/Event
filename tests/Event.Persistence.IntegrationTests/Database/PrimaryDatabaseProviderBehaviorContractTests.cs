@@ -14,7 +14,6 @@ using Explore.Persistence.Projections;
 using Explore.Persistence.Queries;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;

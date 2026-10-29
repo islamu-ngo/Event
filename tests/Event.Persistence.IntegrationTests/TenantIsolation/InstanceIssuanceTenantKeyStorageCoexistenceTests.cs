@@ -7,7 +7,6 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;

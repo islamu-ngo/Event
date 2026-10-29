@@ -1,0 +1,32 @@
+Change-Id: CHG-01M5X3KEZEHCGBTHF4HACHFQVS
+Title: "Grant runtime access to setup enrollment storage"
+Type: fix
+Scope: self-hosting
+Summary: "Have the declared PostgreSQL Migrator grant Runtime the fixed setup-table rights required by application-owned EF workflows without granting DELETE, delegation or bypass-RLS."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+    Detail: Restores fixed rights required by the existing setup workflow without removing an endpoint or persisted field.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: The declared Migrator grants Runtime SELECT, INSERT and UPDATE on three setup tables and SELECT on SecretBinding metadata; no DELETE, delegation, administrator substitution or bypass-RLS is added.
+  Migration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: Apply the fixed storage permission installation through the declared Migrator path; this permission change does not alter table schema.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+    Detail: Uses existing declared Migrator and Runtime identities; no shared credential, new authority selector or fallback is introduced.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: The setup API retains its public contracts; the change enables its authorized storage operations.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/secrets.md
+    Disposition: documented
+    Detail: Run the documented declared-Migrator installation before serving setup enrollment; do not substitute a superuser or widen the Runtime role beyond the workflow's fixed permissions.

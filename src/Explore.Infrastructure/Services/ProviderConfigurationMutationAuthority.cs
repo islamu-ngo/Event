@@ -14,7 +14,7 @@ using Explore.Application.Services;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.SupportAccess;
-using Explore.Secrets.Configuration;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -222,20 +222,30 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
                 || Declarations() != declarations || JsonSerializer.Serialize(deploymentOptions) != providerOption
                 || !ReferenceEquals(bootstrap.Read(), bootstrapSnapshot)
                 || publicationOptions is not null && PublicationDeclarations() != publicationDeclarations) throw Denied();
-            if (credentialProfiles is not null
-                && (credentialProfiles.ObserveCurrent() != originalProfile || ReadMaterialCoordinates() != materialCoordinates))
+            try
+            {
+                if (credentialProfiles is not null
+                    && (credentialProfiles.ObserveCurrent() != originalProfile || ReadMaterialCoordinates() != materialCoordinates))
+                    throw Denied();
+            }
+            catch (ObjectDisposedException)
+            {
                 throw Denied();
+            }
         }
 
-        private sealed record MaterialSourceCoordinates(SecretConsumer Consumer, Explore.Secrets.Abstractions.SecretProviderType Provider,
-            string? Url, string? ProjectId, string Environment, string Paths);
+        private sealed record MaterialSourceCoordinates(SecretConsumerRole Consumer, SecretAuthorityKind Provider,
+            Guid GenerationId, string? Url, string? ProjectId, string Environment, string Paths);
 
         private MaterialSourceCoordinates ReadMaterialCoordinates()
         {
-            var options = Owner._services.GetRequiredService<IOptions<SecretProviderOptions>>().Value;
-            if (!Enum.IsDefined(options.Consumer)) throw Denied();
-            return new(options.Consumer, options.Provider, options.Infisical.Url, options.Infisical.ProjectId,
-                options.Infisical.Environment, JsonSerializer.Serialize(options.Infisical.Paths.Order(StringComparer.Ordinal)));
+            var authority = Owner._services.GetRequiredService<SecretAuthorityAcquisition>();
+            _ = authority.NativeClient;
+            InfisicalAuthorityOptions? options = authority.InfisicalOptions;
+            return new(authority.Selection.Consumer, authority.Provider, authority.GenerationId,
+                options?.Origin.AbsoluteUri, options?.ProjectId,
+                options?.VaultEnvironment ?? authority.Selection.EnvironmentName,
+                JsonSerializer.Serialize(SecretAcquisitionPolicy.Roots(authority.Selection.Consumer).Order(StringComparer.Ordinal)));
         }
 
         public async Task RequireSourcesAsync(CancellationToken token)
@@ -278,7 +288,7 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
                         ? requirements.GoogleRelevant : requirements.KeycloakRelevant))
                 {
                     RequireCustody();
-                    if (!SecretAcquisitionPolicy.AllowsPath(materialCoordinates!.Consumer,
+                    if (!SecretAcquisitionPolicy.AllowsRoot(materialCoordinates!.Consumer,
                         SecretDefinitionRegistry.GetRequired(key).DefaultInfisicalPath))
                     {
                         unacquired.Add(key, SecretResolutionResult.Invalid);
@@ -333,8 +343,8 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
             }
             materials = MaterialSnapshot(results);
             var keycloak = requirements?.KeycloakRelevant != true ? KeycloakConnectionResolution.Failed(KeycloakConnectionStatus.Unconfigured)
-                : await new KeycloakConnectionResolver(new OriginalSecrets(results), Deployment,
-                    Owner._services.GetRequiredService<KeycloakCredentialBindingRevision>()).ResolveRuntimeAsync(token);
+                : await new KeycloakConnectionResolver(new OriginalSecrets(results), Deployment)
+                    .ResolveRuntimeAsync(token);
             await RequireSourcesAsync(token);
             RequireTime();
             return new(new(keycloak.Status, keycloak.Authority, keycloak.BlazorClientId),

@@ -7,6 +7,12 @@ ABOUTME: Defines semantic audit boundaries and blocks generic HTTP body capture.
 - **Date:** 2026-05
 - **Deciders:** Core team
 
+Maintenance note, October 26, 2026: the context below records the original
+proposal, not a delivered unified audit trail. SecretKit adoption retires the
+old Secrets lifecycle logger and polling decorators. Current resolver/health
+diagnostics are value-free operational output; they do not provide a durable
+secret-read audit trail or satisfy this ADR's proposed semantic audit model.
+
 ## Context
 
 The platform already has several audit-adjacent mechanisms, but they serve different purposes and are not yet a unified durable security/admin audit trail:
@@ -199,5 +205,5 @@ Revisit this ADR if:
 - `Explore.API/Middleware/RequestLoggingMiddleware.cs` — metadata-only request logging boundary.
 - `Explore.Domain/AuditLog.cs` — existing entity-level audit record.
 - `Explore.Infrastructure/Services/ConfigurationChangeLogService.cs` — existing configuration-change audit service.
-- `Explore.Secrets/Abstractions/ISecretAuditLogger.cs` — existing secret-operation audit contract.
+- Historical `Explore.Secrets/Abstractions/ISecretAuditLogger.cs` — retired during SecretKit adoption, not a current audit contract.
 - `dev/active/mvp-launch/` — MVP audit hardening and launch gating notes.

@@ -10,7 +10,7 @@ using Explore.Domain.Enums;
 using Explore.Domain.Settings;
 using Explore.Persistence;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;

@@ -486,8 +486,8 @@
       },
       "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": {
         "type": "Transitive",
-        "resolved": "10.0.10",
-        "contentHash": "6euxgVR7NS83y0a2wLRAxfYXusLQJ2e1ah0MpQgYTYMs5lYrmdNP79C6T8uvRZdP87n5mcCcp6+w0EyWAidKZw=="
+        "resolved": "10.0.12",
+        "contentHash": "oN4AYFq+50m7a65GgRxRqjdynWS6kVQAH6gHKRTfsrLP/aH7RvxIQ7139fjbnrxBwzfZQtZRhlcjvEIiRzihrg=="
       },
       "Microsoft.Extensions.Features": {
         "type": "Transitive",
@@ -933,32 +933,24 @@
       },
       "ReactiveUI.Disposables": {
         "type": "Transitive",
-        "resolved": "7.0.0",
-        "contentHash": "bl3hwVjnuNP40UedJADZ3+842qu39iMkdS/kq86mKrGubnBZA75TSSmTpOwQFvo4JLIR+8Qm3yY/MOnm+uAh7g=="
+        "resolved": "8.2.0",
+        "contentHash": "vpNi3q3oyIyQYLHcUfnmYeV4dBlrCoWFgaFuJXvI+yaKOq/sFcN+cZiuUzV+8Pl6cVnOYPoWPIx2WNzVI/WzcQ=="
       },
       "ReactiveUI.Primitives": {
         "type": "Transitive",
-        "resolved": "7.0.0",
-        "contentHash": "B5WlTZhtHE2gRyX/W0kfW8CwKe9A58KmZsWuIxjyxjAUcVbUP2QDutxT908KCkz/K9H11oS6/85XmIm20tYogw==",
+        "resolved": "8.2.0",
+        "contentHash": "Hlog9ANgfh7tcHX0XXhojZPBXStCgqF7XCzcH+niN8eRLi+RE8CAUEf2ufrgLOOwQMTCKlUTy8wU2fvP5YjMqA==",
         "dependencies": {
-          "ReactiveUI.Disposables": "7.0.0",
-          "ReactiveUI.Primitives.Core": "7.0.0"
+          "ReactiveUI.Disposables": "8.2.0",
+          "ReactiveUI.Primitives.Core": "8.2.0"
         }
       },
       "ReactiveUI.Primitives.Core": {
         "type": "Transitive",
-        "resolved": "7.0.0",
-        "contentHash": "0Bndf1vnhZOWIcVVH+mNvML8jIw9oRes8tgU25OoEJEuFLdMAOUAlMgOnvt4TYkeqtL/vSck8qCF9GmtAN/5BQ==",
+        "resolved": "8.2.0",
+        "contentHash": "PNBtwHrBFoR8IE8aMMQMZZSH/pH4l8gFqs2fwRERObBlapQf82vT833BYlW28oT1aJKm7sXamEWgf7TR25DPiQ==",
         "dependencies": {
-          "ReactiveUI.Disposables": "7.0.0"
-        }
-      },
-      "Refit": {
-        "type": "Transitive",
-        "resolved": "14.0.1",
-        "contentHash": "8e1Y0LnkSc91kDZJ1dasL59LDssJE0JsrV8hiV6kd4LjSBR9DbX6zzGJCqxaBsm+aW7/mv6bsqI1vPtiYjqZfg==",
-        "dependencies": {
-          "ReactiveUI.Primitives": "7.0.0"
+          "ReactiveUI.Disposables": "8.2.0"
         }
       },
       "runtime.native.System.Data.SqlClient.sni": {
@@ -1221,7 +1213,6 @@
           "Explore.Application": "[1.0.0, )",
           "Explore.Infrastructure": "[1.0.0, )",
           "Explore.Persistence": "[1.0.0, )",
-          "Explore.Secrets": "[1.0.0, )",
           "Explore.ServiceDefaults": "[1.0.0, )",
           "HarfBuzzSharp": "[14.2.1.1, )",
           "HarfBuzzSharp.NativeAssets.Linux": "[14.2.1.1, )",
@@ -1275,7 +1266,7 @@
           "Microsoft.Extensions.Caching.Hybrid": "[10.8.0, )",
           "Microsoft.Extensions.Configuration.Abstractions": "[10.0.13, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.13, )",
-          "Microsoft.Extensions.Options.ConfigurationExtensions": "[10.0.10, )",
+          "Microsoft.Extensions.Options.ConfigurationExtensions": "[10.0.12, )",
           "OpenFeature": "[2.14.0, )"
         }
       },
@@ -1320,9 +1311,9 @@
           "FluentValidation": "[12.1.1, )",
           "Microsoft.AspNetCore.Components.WebAssembly": "[10.0.13, )",
           "Microsoft.AspNetCore.Components.WebAssembly.Authentication": "[10.0.10, )",
-          "Microsoft.Extensions.Http": "[10.0.10, )",
+          "Microsoft.Extensions.Http": "[10.0.12, )",
           "MudBlazor": "[9.7.0, )",
-          "Refit.HttpClientFactory": "[14.0.1, )"
+          "Refit.HttpClientFactory": "[16.3.0, )"
         }
       },
       "explore.domain": {
@@ -1345,7 +1336,7 @@
           "Cerbos.Sdk": "[1.10.2, )",
           "Explore.Application": "[1.0.0, )",
           "Explore.Atproto.Transport": "[1.0.0, )",
-          "Explore.Secrets": "[1.0.0, )",
+          "Explore.ServiceDefaults": "[1.0.0, )",
           "Google.Protobuf": "[3.35.1, )",
           "Grpc.Net.Client": "[2.80.0, )",
           "MailKit": "[4.17.0, )",
@@ -1359,10 +1350,13 @@
           "OpenTelemetry": "[1.17.0, )",
           "Polly": "[8.7.0, )",
           "RabbitMQ.Client": "[7.2.1, )",
-          "Refit.HttpClientFactory": "[14.0.1, )",
+          "Refit.HttpClientFactory": "[16.3.0, )",
+          "SecretKit.Core": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+          "SecretKit.Infisical": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
           "Stripe.net": "[52.3.0, )",
           "Svix": "[1.99.1, )",
           "System.IdentityModel.Tokens.Jwt": "[8.22.0, )",
+          "System.Security.Cryptography.Pkcs": "[10.0.13, )",
           "WebPush": "[1.0.13, )",
           "YamlDotNet": "[18.1.0, )"
         }
@@ -1372,7 +1366,7 @@
         "dependencies": {
           "EFCore.NamingConventions": "[10.0.1, )",
           "Explore.Application": "[1.0.0, )",
-          "Explore.Secrets": "[1.0.0, )",
+          "Explore.ServiceDefaults": "[1.0.0, )",
           "ISLAMU.Moderation.Application": "[1.0.0, )",
           "ISLAMU.Moderation.Domain": "[1.0.0, )",
           "Microsoft.AspNetCore.DataProtection.EntityFrameworkCore": "[10.0.10, )",
@@ -1382,7 +1376,7 @@
           "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.10, )",
           "Microsoft.EntityFrameworkCore.Sqlite": "[10.0.10, )",
           "Microsoft.Extensions.Configuration.EnvironmentVariables": "[10.0.10, )",
-          "Microsoft.Extensions.Options.ConfigurationExtensions": "[10.0.10, )",
+          "Microsoft.Extensions.Options.ConfigurationExtensions": "[10.0.12, )",
           "Microting.EntityFrameworkCore.MySql": "[10.0.10, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[2.1.12, )",
@@ -1438,20 +1432,6 @@
           "Microsoft.EntityFrameworkCore.Sqlite": "[10.0.10, )"
         }
       },
-      "explore.secrets": {
-        "type": "Project",
-        "dependencies": {
-          "Explore.Application": "[1.0.0, )",
-          "Infisical.Sdk": "[3.0.4, )",
-          "Microsoft.Data.SqlClient": "[6.1.0, )",
-          "Microsoft.Data.Sqlite": "[10.0.10, )",
-          "MySqlConnector": "[2.6.1, )",
-          "Npgsql": "[10.0.3, )",
-          "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
-          "SQLitePCLRaw.bundle_e_sqlite3": "[2.1.12, )",
-          "System.Security.Cryptography.Pkcs": "[10.0.13, )"
-        }
-      },
       "explore.servicedefaults": {
         "type": "Project",
         "dependencies": {
@@ -1465,7 +1445,11 @@
           "OpenTelemetry.Extensions.Hosting": "[1.17.0, )",
           "OpenTelemetry.Instrumentation.AspNetCore": "[1.17.0, )",
           "OpenTelemetry.Instrumentation.Http": "[1.17.0, )",
-          "OpenTelemetry.Instrumentation.Runtime": "[1.17.0, )"
+          "OpenTelemetry.Instrumentation.Runtime": "[1.17.0, )",
+          "SecretKit.Core": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+          "SecretKit.Extensions.Configuration": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+          "SecretKit.Extensions.Hosting": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+          "SecretKit.Infisical": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]"
         }
       },
       "islamu.moderation.application": {
@@ -1727,15 +1711,6 @@
           "NodaTime": "3.2.2"
         }
       },
-      "Infisical.Sdk": {
-        "type": "CentralTransitive",
-        "requested": "[3.0.4, )",
-        "resolved": "3.0.4",
-        "contentHash": "6D5l4cOcJdG36cw7KULyhC1YuxVAPuSizHdyjXJv2CSJz31vPxj8vplxPy2FElButJd4JFaadwSNqAb61jA4IA==",
-        "dependencies": {
-          "Polly.Extensions.Http": "3.0.0"
-        }
-      },
       "MailKit": {
         "type": "CentralTransitive",
         "requested": "[4.17.0, )",
@@ -1873,17 +1848,6 @@
           "Microsoft.SqlServer.Server": "1.0.0",
           "System.Configuration.ConfigurationManager": "9.0.4",
           "System.Security.Cryptography.Pkcs": "9.0.4"
-        }
-      },
-      "Microsoft.Data.Sqlite": {
-        "type": "CentralTransitive",
-        "requested": "[10.0.10, )",
-        "resolved": "10.0.10",
-        "contentHash": "58JwZ39lCvRXHfV5O6RQfbHEDu8ZsXI7weRoVRR4jrGRxxkS+qyeuGrN2xD+9VYEICApYr0iTSL6PuU+DdsvPg==",
-        "dependencies": {
-          "Microsoft.Data.Sqlite.Core": "10.0.10",
-          "SQLitePCLRaw.bundle_e_sqlite3": "2.1.11",
-          "SQLitePCLRaw.core": "2.1.11"
         }
       },
       "Microsoft.EntityFrameworkCore": {
@@ -2100,16 +2064,16 @@
       },
       "Microsoft.Extensions.Http": {
         "type": "CentralTransitive",
-        "requested": "[10.0.10, )",
-        "resolved": "10.0.10",
-        "contentHash": "DuEBLw2y7ZBfilnaJtlge8f2M49932v43t7j1InceXVjcZzxNrSEkobYXdgZkXuPFnFbKcbWpAS+fZgYEW1BhA==",
+        "requested": "[10.0.12, )",
+        "resolved": "10.0.12",
+        "contentHash": "x/fnoUGgmIUjSgLR1p6Mpi/vXc1Xe0xDPJnggPp23I6vwM/kY4nxyOjo8i6G5KPVw+esJM+rJsqnHbdjasvCBw==",
         "dependencies": {
-          "Microsoft.Extensions.Configuration.Abstractions": "10.0.10",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.10",
-          "Microsoft.Extensions.Diagnostics": "10.0.10",
-          "Microsoft.Extensions.Logging": "10.0.10",
-          "Microsoft.Extensions.Logging.Abstractions": "10.0.10",
-          "Microsoft.Extensions.Options": "10.0.10"
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.12",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.12",
+          "Microsoft.Extensions.Diagnostics": "10.0.12",
+          "Microsoft.Extensions.Logging": "10.0.12",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.12",
+          "Microsoft.Extensions.Options": "10.0.12"
         }
       },
       "Microsoft.Extensions.Http.Polly": {
@@ -2145,7 +2109,7 @@
       },
       "Microsoft.Extensions.Options.ConfigurationExtensions": {
         "type": "CentralTransitive",
-        "requested": "[10.0.10, )",
+        "requested": "[10.0.12, )",
         "resolved": "10.0.13",
         "contentHash": "xVO5HhATc09WXuS/RaDmx8ZeWS0mTpT1L0tkEDMSBHtAnNpNsDr0ge0wIO2jinCWWqpq5dL1tRTzpYNVlvyqLw==",
         "dependencies": {
@@ -2467,15 +2431,24 @@
           "System.Threading.RateLimiting": "8.0.0"
         }
       },
+      "Refit": {
+        "type": "CentralTransitive",
+        "requested": "[16.3.0, )",
+        "resolved": "16.3.0",
+        "contentHash": "tQS8KnCqSrQPFIjYNglhU1heHSo0NOR82fLSqa4btzrtsvNs3JR8/VETFil2wFB+vncJ/vUpULhR4T0YxfZzTQ==",
+        "dependencies": {
+          "ReactiveUI.Primitives": "8.2.0"
+        }
+      },
       "Refit.HttpClientFactory": {
         "type": "CentralTransitive",
-        "requested": "[14.0.1, )",
-        "resolved": "14.0.1",
-        "contentHash": "03RFmYVHA4CLZ9+951gxhka6PtVLsaEnI67RRSa3cj/4RCtqiBWsPDMNbm6Z8Cw5pYZEQ+Jr6lMTbBQdrCz0lA==",
+        "requested": "[16.3.0, )",
+        "resolved": "16.3.0",
+        "contentHash": "K43qHN+iXSm3rgShKsZfPre/8BvJqI9Xh/tO9ehoX0gE7IZXvzZ+y+ypsjmBdjYPKTwJpX0irAvc/XKtPmLucQ==",
         "dependencies": {
-          "Microsoft.Extensions.Http": "10.0.10",
-          "ReactiveUI.Primitives": "7.0.0",
-          "Refit": "14.0.1"
+          "Microsoft.Extensions.Http": "10.0.12",
+          "ReactiveUI.Primitives": "8.2.0",
+          "Refit": "16.3.0"
         }
       },
       "Scalar.AspNetCore": {
@@ -2483,6 +2456,44 @@
         "requested": "[2.16.17, )",
         "resolved": "2.16.17",
         "contentHash": "J5FyUxdZE/QbS/s3NSE6XWoBIJwta1eOUBuDbieHm2HSfFELH8hOnxSsoEBreckoekfZ7STsMCMGmmUNPVVosg=="
+      },
+      "SecretKit.Core": {
+        "type": "CentralTransitive",
+        "requested": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+        "resolved": "0.1.0-local.20261024.1",
+        "contentHash": "OmWuzSqaRzIveyzqq0KZyXJhBWGIhfe5gSsatGjTAC0PwyWa2Xnqvjzlz3dzVZ/dNzHw5UkCdZzXhCD2NKnqgw=="
+      },
+      "SecretKit.Extensions.Configuration": {
+        "type": "CentralTransitive",
+        "requested": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+        "resolved": "0.1.0-local.20261024.1",
+        "contentHash": "nrZrduL2eCDTrlWfBeN502VK2gwMb5tuUveU2urqOPLgim69W0EjLabQQF1Cl1dve5D1CJt5uNajdVFvNRZwsQ==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration": "10.0.12",
+          "SecretKit.Core": "0.1.0-local.20261024.1"
+        }
+      },
+      "SecretKit.Extensions.Hosting": {
+        "type": "CentralTransitive",
+        "requested": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+        "resolved": "0.1.0-local.20261024.1",
+        "contentHash": "V6MhXUgOvK/xhvO6C5Z/doLV/kNSTjXsRuSpr/yzp7jpLlm/3Xw8HYKkDrKGLKPW+rfSJYkJJVzeUXzC4LpaBw==",
+        "dependencies": {
+          "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": "10.0.12",
+          "Microsoft.Extensions.Hosting.Abstractions": "10.0.12",
+          "SecretKit.Core": "0.1.0-local.20261024.1",
+          "SecretKit.Infisical": "0.1.0-local.20261024.1"
+        }
+      },
+      "SecretKit.Infisical": {
+        "type": "CentralTransitive",
+        "requested": "[0.1.0-local.20261024.1, 0.1.0-local.20261024.1]",
+        "resolved": "0.1.0-local.20261024.1",
+        "contentHash": "2JKcVrs+yVSsSip2e7Vfln8qHNeoa9H5DG3DFSnwA6Cq9Av4m7XI0mnjKgy6f5qvYcAVLhRwureDywcKsnWkjg==",
+        "dependencies": {
+          "Refit": "16.3.0",
+          "SecretKit.Core": "0.1.0-local.20261024.1"
+        }
       },
       "Serilog.AspNetCore": {
         "type": "CentralTransitive",

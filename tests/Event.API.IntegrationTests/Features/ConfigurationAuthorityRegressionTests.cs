@@ -1,11 +1,10 @@
 extern alias bff;
 
 using System.Collections.Concurrent;
+using Event.Testing.DataProtection;
 using Explore.API.Extensions;
 using Explore.Application.Configuration;
-using Explore.Secrets.Abstractions;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Extensions;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -13,7 +12,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using BffSource = bff::Explore.Blazor.Configuration.InfisicalConfigurationSource;
+using BffHosting = bff::Explore.Blazor.Hosting.BlazorHostServiceCollectionExtensions;
+using BffProfile = bff::Explore.Blazor.Hosting.BlazorHostProfile;
 
 namespace Event.Api.IntegrationTests.Features;
 
@@ -41,7 +41,6 @@ public sealed class ConfigurationAuthorityRegressionTests
                     ? [new(prefix + "USERNAME", username, path), new(prefix + "PASSWORD", password, path)]
                     : []
                 : []);
-            using var environment = BootstrapEnvironment(server.Url, Guid.CreateVersion7().ToString("N"), structured: false);
             var lowerAuthority = new Dictionary<string, string?>
             {
                 [prefix + "USERNAME"] = Guid.CreateVersion7().ToString("N"),
@@ -49,10 +48,11 @@ public sealed class ConfigurationAuthorityRegressionTests
                 [canonical + "Username"] = Guid.CreateVersion7().ToString("N"),
                 [canonical + "Password"] = Guid.CreateVersion7().ToString("N"),
             };
-            var builder = Bootstrap("Infisical");
+            var builder = BootstrapInfisical(server.Url, Guid.CreateVersion7().ToString("N"), structured: false);
             builder.AddInMemoryCollection(lowerAuthority);
 
-            builder.AddSecretAuthorityConfiguration("Testing");
+            await using var owner = await OpenAuthorityAsync(builder.Build());
+            await builder.AddPreparedApiConfigurationAsync(owner);
             var configuration = builder.Build();
             using var configurationOwner = (IDisposable)configuration;
 
@@ -76,7 +76,8 @@ public sealed class ConfigurationAuthorityRegressionTests
                 });
                 var selectedBuilder = Bootstrap("Environment");
                 selectedBuilder.AddInMemoryCollection(lowerAuthority);
-                selectedBuilder.AddSecretAuthorityConfiguration("Testing");
+                await using var selectedOwner = await OpenAuthorityAsync(selectedBuilder.Build());
+                await selectedBuilder.AddPreparedApiConfigurationAsync(selectedOwner);
                 var selectedConfiguration = selectedBuilder.Build();
                 using var selectedConfigurationOwner = (IDisposable)selectedConfiguration;
                 await Assert.That(selectedConfiguration[canonical + "Username"] == username
@@ -89,69 +90,85 @@ public sealed class ConfigurationAuthorityRegressionTests
     }
 
     [Test]
-    public async Task Api_RemovedDurabilityInputCannotSilentlySelectEmbeddedAuthority()
+    [Arguments("Environment")]
+    [Arguments("UserSecrets")]
+    public async Task Api_RemovedDurabilityInputCannotSilentlySelectEmbeddedAuthority(string provider)
     {
-        using var environment = new EnvironmentScope(new()
+        var builder = Bootstrap(provider);
+        builder.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["PrivacyErasure__Durability__Mode"] = "ExternalDatabase",
         });
-        var builder = Bootstrap("Environment");
+        using var authority = (ConfigurationRoot)new ConfigurationBuilder().Build();
+        await using var owner = SecretAuthorityAcquisition.OpenLocal(
+            SecretAuthoritySelection.Select(builder.Build(), "Testing", SecretConsumerRole.Api), authority);
 
-        Action configure = () => builder.AddSecretAuthorityConfiguration("Testing");
+        Func<Task> configure = async () => await builder.AddPreparedApiConfigurationAsync(owner);
 
         await Assert.That(configure).Throws<OptionsValidationException>();
     }
 
     [Test]
-    [Arguments("ERASURE_DATABASE_TOPOLOGY", "ExternalDatabase", PrivacyErasureAuthorityTopology.ExternalDatabase)]
-    [Arguments("ERASURE_DATABASE_TOPOLOGY", "CoLocated", PrivacyErasureAuthorityTopology.CoLocated)]
-    public async Task Api_PreservesExplicitSupportedTopology(string key, string value, PrivacyErasureAuthorityTopology expected)
+    [Arguments("Environment", "ERASURE_DATABASE_TOPOLOGY", "ExternalDatabase", PrivacyErasureAuthorityTopology.ExternalDatabase)]
+    [Arguments("Environment", "ERASURE_DATABASE_TOPOLOGY", "CoLocated", PrivacyErasureAuthorityTopology.CoLocated)]
+    [Arguments("UserSecrets", "ERASURE_DATABASE_TOPOLOGY", "ExternalDatabase", PrivacyErasureAuthorityTopology.ExternalDatabase)]
+    [Arguments("UserSecrets", "ERASURE_DATABASE_TOPOLOGY", "CoLocated", PrivacyErasureAuthorityTopology.CoLocated)]
+    public async Task Api_PreservesExplicitSupportedTopology(string provider, string key, string value, PrivacyErasureAuthorityTopology expected)
     {
-        using var environment = new EnvironmentScope(new() { [key] = value });
-        var builder = Bootstrap("Environment");
-        builder.AddSecretAuthorityConfiguration("Testing");
+        using var authority = (ConfigurationRoot)new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [key] = value }).Build();
+        var builder = Bootstrap(provider);
+        await using var owner = SecretAuthorityAcquisition.OpenLocal(
+            SecretAuthoritySelection.Select(builder.Build(), "Testing", SecretConsumerRole.Api), authority);
+        await builder.AddPreparedApiConfigurationAsync(owner);
 
         await Assert.That(PrivacyErasureDurabilityOptions.FromConfiguration(builder.Build()).Topology).IsEqualTo(expected);
     }
 
     [Test]
-    public async Task Api_FlatProviderSelectionReachesValidatedRuntimeOptions()
+    [Arguments("Environment")]
+    [Arguments("UserSecrets")]
+    public async Task Api_FlatProviderSelectionReachesSelectedRuntimeOwner(string provider)
     {
-        using var environment = new EnvironmentScope(new() { ["SECRET_PROVIDER"] = "Environment" });
         var builder = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["SECRET_PROVIDER"] = "Environment",
+            ["SECRET_PROVIDER"] = provider,
         });
-        IConfiguration providerConfiguration = builder.AddSecretAuthorityConfiguration("Testing");
-        await using var host = RuntimeHost(builder.Build(), providerConfiguration);
+        using var authority = (ConfigurationRoot)new ConfigurationBuilder().Build();
+        await using var owner = SecretAuthorityAcquisition.OpenLocal(
+            SecretAuthoritySelection.Select(builder.Build(), "Testing", SecretConsumerRole.Api), authority);
+        await builder.AddPreparedApiConfigurationAsync(owner);
+        await using var host = RuntimeHost(owner);
 
-        await Assert.That(host.Services.GetRequiredService<IOptions<SecretProviderOptions>>().Value.Provider)
-            .IsEqualTo(SecretProviderType.Environment);
+        await Assert.That(ReferenceEquals(host.Services.GetRequiredService<SecretAuthorityAcquisition>(), owner)).IsTrue();
+        await Assert.That(owner.Provider.ToString()).IsEqualTo(provider);
+        await Assert.That(owner.Selection.Consumer).IsEqualTo(SecretConsumerRole.Api);
     }
 
     [Test]
     [Arguments(false)]
     [Arguments(true)]
-    public async Task Api_InfisicalBootstrapAndPathsReachValidatedRuntimeOptions(bool structured)
+    public async Task Api_InfisicalBootstrapAndPathsReachSelectedRuntimeOwner(bool structured)
     {
-        await using var server = await SecretServer.StartAsync(_ => []);
+        await using var server = await SecretServer.StartAsync(path => path == "/database"
+            ? [new("DATABASE_PROVIDER", "Sqlite", path)] : []);
         string credential = Guid.CreateVersion7().ToString("N");
-        using var environment = BootstrapEnvironment(server.Url, credential, structured);
-        var builder = Bootstrap("Infisical");
+        var builder = BootstrapInfisical(server.Url, credential, structured);
         builder.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["SecretProvider:Infisical:Paths:12"] = "/stale",
         });
-        IConfiguration providerConfiguration = builder.AddSecretAuthorityConfiguration("Testing");
-        await using var host = RuntimeHost(builder.Build(), providerConfiguration);
-        SecretProviderOptions options = host.Services.GetRequiredService<IOptions<SecretProviderOptions>>().Value;
+        await using var owner = await OpenAuthorityAsync(builder.Build());
+        await builder.AddPreparedApiConfigurationAsync(owner);
+        await using var host = RuntimeHost(owner);
+        InfisicalAuthorityOptions options = host.Services.GetRequiredService<SecretAuthorityAcquisition>().InfisicalOptions!;
 
-        await Assert.That(options.Provider).IsEqualTo(SecretProviderType.Infisical);
-        await Assert.That(options.Infisical.Url).IsEqualTo(server.Url);
-        await Assert.That(options.Infisical.ProjectId).IsEqualTo("project-id");
-        await Assert.That(options.Infisical.ClientId).IsEqualTo("client-id");
-        await Assert.That(options.Infisical.ClientSecret).IsEqualTo(credential);
-        await Assert.That(options.Infisical.Environment).IsEqualTo("testing");
+        await Assert.That(owner.Provider).IsEqualTo(SecretAuthorityKind.Infisical);
+        await Assert.That(options.Origin).IsEqualTo(new Uri(server.Url));
+        await Assert.That(options.ProjectId).IsEqualTo("project-id");
+        await Assert.That(options.ClientId).IsEqualTo("client-id");
+        await Assert.That(server.LoginClientSecret).IsEqualTo(credential);
+        await Assert.That(options.VaultEnvironment).IsEqualTo("testing");
         string[] expectedPaths =
         [
             "/runtime/api/authentication/keycloak", "/runtime/api/keycloak/lifecycle",
@@ -166,12 +183,16 @@ public sealed class ConfigurationAuthorityRegressionTests
             "/atproto", "/webhook", "/messaging", "/reporting",
             "/registration-providers", "/analytics", "/localization"
         ];
-        await Assert.That(options.Infisical.Paths.SequenceEqual(expectedPaths)).IsTrue();
+        await Assert.That(SecretAcquisitionPolicy.Roots(owner.Selection.Consumer).SequenceEqual(expectedPaths)).IsTrue();
+        string[] stagedPaths = [.. expectedPaths.Where(path => path is not ("/smtp" or "/analytics")), "/smtp", "/analytics"];
+        await Assert.That(server.Paths.SequenceEqual(stagedPaths)).IsTrue();
 
         server.Paths.Clear();
         await host.StartAsync().WaitAsync(TimeSpan.FromSeconds(15));
-        var provider = host.Services.GetRequiredService<ISecretProvider>();
-        await Assert.That((await provider.GetHealthAsync()).IsHealthy).IsTrue();
+        var runtimeOwner = host.Services.GetRequiredService<SecretAuthorityAcquisition>();
+        var prepared = await runtimeOwner.PrepareConfigurationGroupAsync(expectedPaths);
+        await Assert.That(prepared.IsSuccess).IsTrue();
+        await Assert.That(prepared.Value["Database:Provider"]).IsEqualTo("Sqlite");
         await Assert.That(server.Paths.SequenceEqual(expectedPaths)).IsTrue();
         await host.StopAsync().WaitAsync(TimeSpan.FromSeconds(15));
     }
@@ -193,9 +214,9 @@ public sealed class ConfigurationAuthorityRegressionTests
             "/api/rate-limiting" => [new("RATE_LIMITING__ANONYMOUSREGISTRATION_IPPERMITLIMIT", "13", path)],
             _ => []
         });
-        using var environment = BootstrapEnvironment(server.Url, Guid.CreateVersion7().ToString("N"), false);
-        var builder = Bootstrap("Infisical");
-        builder.AddSecretAuthorityConfiguration("Testing");
+        var builder = BootstrapInfisical(server.Url, Guid.CreateVersion7().ToString("N"), false);
+        await using var owner = await OpenAuthorityAsync(builder.Build());
+        await builder.AddPreparedApiConfigurationAsync(owner);
         var configuration = builder.Build();
 
         await Assert.That(configuration["Instance:OperatorIdentity:PublicName"]).IsEqualTo("Community Operator");
@@ -215,20 +236,15 @@ public sealed class ConfigurationAuthorityRegressionTests
             new("TOKEN", "first-value", "/database/one"),
             new("TOKEN", "second-value", "/database/two"),
         ]);
-        using var source = new InfisicalConfigurationProvider(new()
-        {
-            Url = server.Url,
-            ProjectId = "project-id",
-            ClientId = "client-id",
-            ClientSecret = Guid.CreateVersion7().ToString("N"),
-            Environment = "testing",
-            Paths = ["/database"],
-        });
-        await Assert.That(() => source.Load()).Throws<InvalidOperationException>();
-        source.TryGet("Database:Host", out string? primary);
-        source.TryGet("Database:One:Token", out string? first);
-        source.TryGet("Database:Two:Token", out string? second);
-        source.TryGet("DATABASE_HOST", out string? flatPrimary);
+        var builder = BootstrapInfisical(server.Url, Guid.CreateVersion7().ToString("N"), false);
+        await using var owner = await OpenAuthorityAsync(builder.Build());
+        Func<Task> configure = async () => await builder.AddPreparedApiConfigurationAsync(owner);
+        await Assert.That(configure).Throws<InvalidOperationException>();
+        using var configuration = (ConfigurationRoot)builder.Build();
+        string? primary = configuration["Database:Host"];
+        string? first = configuration["Database:One:Token"];
+        string? second = configuration["Database:Two:Token"];
+        string? flatPrimary = configuration["DATABASE_HOST"];
 
         await Assert.That(primary).IsNull();
         await Assert.That(flatPrimary).IsNull();
@@ -244,24 +260,47 @@ public sealed class ConfigurationAuthorityRegressionTests
             new("KEYCLOAK_BLAZOR_CLIENT_SECRET", Guid.CreateVersion7().ToString("N"),
                 "/runtime/bff/oidc/keycloak/one"),
         ]);
-        var source = FrontendSource(server.Url, "/runtime/bff/oidc/keycloak");
-        var builder = new ConfigurationBuilder().Add(source);
-        var exception = await Assert.That(() => builder.Build()).Throws<InvalidOperationException>();
-        await Assert.That(exception!.Message).Contains("secret_authority_invalid");
+        await using var owner = await OpenAuthorityAsync(
+            BootstrapInfisical(server.Url, Guid.CreateVersion7().ToString("N"), false).Build(), SecretConsumerRole.Bff);
+        var builder = FrontendHost();
+        Func<Task> prepare = async () => await BffHosting.PrepareBlazorHostSecretsAsync(builder, BffProfile.Split, owner);
+        var exception = await Assert.That(prepare).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message).Contains("bff_secret_authority_unavailable");
+        await Assert.That(builder.Configuration["Keycloak:ClientSecret"]).IsNull();
     }
 
     [Test]
     public async Task Bff_ExactPurposeResponseProjectsOnlyApprovedCredentialKeys()
     {
         string secret = Guid.CreateVersion7().ToString("N");
-        await using var server = await SecretServer.StartAsync(_ =>
-        [
-            new("KEYCLOAK_BLAZOR_CLIENT_SECRET", secret, "/runtime/bff/oidc/keycloak")
-        ]);
-        var source = FrontendSource(server.Url, "/runtime/bff/oidc/keycloak");
-        using var configuration = (ConfigurationRoot)new ConfigurationBuilder().Add(source).Build();
-        await Assert.That(configuration["Keycloak:BlazorClientSecret"]).IsEqualTo(secret);
+        var ring = new ExternalDataProtectionTestAuthority("bff").Input;
+        using var environment = new EnvironmentScope(new()
+        {
+            ["EVENT_DP_BFF_ADMISSION_SHA256"] = ring.AdmissionSha256,
+            ["EVENT_DP_BFF_MINIMUM_GENERATION"] = "1"
+        });
+        await using var server = await SecretServer.StartAsync(path => path switch
+        {
+            "/runtime/bff/oidc/keycloak" =>
+            [
+                new("KEYCLOAK_ENDPOINT", "https://identity.example.test", path),
+                new("KEYCLOAK_REALM", "event", path),
+                new("KEYCLOAK_CLIENT_ID", "event-bff", path),
+                new("KEYCLOAK_BLAZOR_CLIENT_SECRET", secret, path)
+            ],
+            "/runtime/bff/data-protection" => [new("EVENT_DP_BFF_RING", ring.Ring, path)],
+            "/admission/bff/data-protection" => [new("EVENT_DP_BFF_ADMISSION", ring.Admission, path)],
+            _ => []
+        });
+        await using var owner = await OpenAuthorityAsync(
+            BootstrapInfisical(server.Url, Guid.CreateVersion7().ToString("N"), false).Build(), SecretConsumerRole.Bff);
+        var builder = FrontendHost();
+        await BffHosting.PrepareBlazorHostSecretsAsync(builder, BffProfile.Split, owner);
+        var configuration = builder.Configuration;
+        await Assert.That(configuration["Keycloak:ClientSecret"]).IsEqualTo(secret);
         await Assert.That(configuration["KEYCLOAK_BLAZOR_CLIENT_SECRET"]).IsNull();
+        await Assert.That(ReferenceEquals(builder.Services.Single(descriptor =>
+            descriptor.ServiceType == typeof(SecretAuthorityAcquisition)).ImplementationInstance, owner)).IsTrue();
     }
 
     [Test]
@@ -272,9 +311,15 @@ public sealed class ConfigurationAuthorityRegressionTests
     public async Task Bff_BackendSecretRootsAreRejectedBeforeFetching(string path)
     {
         await using var server = await SecretServer.StartAsync(_ => []);
-        var builder = new ConfigurationBuilder().Add(FrontendSource(server.Url, path));
+        Func<Task> prepare = async () =>
+        {
+            await using var owner = await OpenAuthorityAsync(
+                BootstrapInfisical(server.Url, Guid.CreateVersion7().ToString("N"), false).Build(),
+                SecretConsumerRole.Bff, path);
+            await BffHosting.PrepareBlazorHostSecretsAsync(FrontendHost(), BffProfile.Split, owner);
+        };
 
-        await Assert.That(() => builder.Build()).Throws<InvalidOperationException>();
+        await Assert.That(prepare).Throws<InvalidOperationException>();
         await Assert.That(server.Paths).IsEmpty();
     }
 
@@ -288,11 +333,16 @@ public sealed class ConfigurationAuthorityRegressionTests
         string secret = Guid.CreateVersion7().ToString("N");
         await using var server = await SecretServer.StartAsync(_ =>
             [new(key, secret, "/runtime/bff/oidc/keycloak")]);
-        var builder = new ConfigurationBuilder().Add(FrontendSource(server.Url, "/runtime/bff/oidc/keycloak"));
+        await using var owner = await OpenAuthorityAsync(
+            BootstrapInfisical(server.Url, Guid.CreateVersion7().ToString("N"), false).Build(), SecretConsumerRole.Bff);
+        var builder = FrontendHost();
 
-        var exception = await Assert.That(() => builder.Build()).Throws<InvalidOperationException>();
-        await Assert.That(exception!.Message).Contains("bff_database_configuration_forbidden");
+        Func<Task> prepare = async () => await BffHosting.PrepareBlazorHostSecretsAsync(builder, BffProfile.Split, owner);
+        var exception = await Assert.That(prepare).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message).Contains("bff_secret_authority_unavailable");
         await Assert.That(exception!.Message).DoesNotContain(secret);
+        await Assert.That(builder.Configuration[key]).IsNull();
+        await Assert.That(builder.Configuration["Keycloak:BlazorClientSecret"]).IsNull();
     }
 
     private static ConfigurationBuilder Bootstrap(string provider) =>
@@ -301,34 +351,35 @@ public sealed class ConfigurationAuthorityRegressionTests
             ["SecretProvider:Provider"] = provider,
         });
 
-    private static WebApplication RuntimeHost(IConfiguration configuration, IConfiguration providerConfiguration)
+    private static WebApplication RuntimeHost(SecretAuthorityAcquisition owner)
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
-        builder.Services.AddSecretManagement(configuration, providerConfiguration,
-            enableAuditing: true, enableRefreshService: false, enableSecretResolution: false);
+        builder.Configuration.Sources.Clear();
+        builder.Services.AddSingleton(owner);
         return builder.Build();
     }
 
-    private static BffSource FrontendSource(string url, string path)
+    private static WebApplicationBuilder FrontendHost()
     {
-        var source = new BffSource
-        {
-            Url = url,
-            ProjectId = "project-id",
-            ClientId = "client-id",
-            ClientSecret = Guid.CreateVersion7().ToString("N"),
-            Environment = "testing",
-        };
-        source.Paths.Clear();
-        source.Paths.Add(path);
-        return source;
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
+        builder.Logging.ClearProviders();
+        builder.Configuration.Sources.Clear();
+        return builder;
     }
 
-    private static EnvironmentScope BootstrapEnvironment(string url, string credential, bool structured)
+    private static ValueTask<SecretAuthorityAcquisition> OpenAuthorityAsync(
+        IConfiguration bootstrap, SecretConsumerRole consumer = SecretConsumerRole.Api, string? folder = null) =>
+        SecretAuthorityBootstrap.OpenAsync(bootstrap, "Testing", consumer,
+            [new(folder ?? SecretAcquisitionPolicy.Roots(consumer)[0], "ADMITTED", "Admitted")], new());
+
+    private static ConfigurationBuilder BootstrapInfisical(string url, string credential, bool structured)
     {
-        var values = new Dictionary<string, string?>();
+        var values = new Dictionary<string, string?>
+        {
+            ["SecretProvider:Infisical:TokenLifetime"] = "Finite"
+        };
         foreach (var (name, flat, value) in new[]
         {
             ("Url", "INFISICAL_URL", url), ("ProjectId", "INFISICAL_PROJECT_ID", "project-id"),
@@ -336,10 +387,12 @@ public sealed class ConfigurationAuthorityRegressionTests
             ("Environment", "INFISICAL_ENV", "testing"),
         })
         {
-            values[$"SecretProvider__Infisical__{name}"] = structured ? value : null;
+            values[$"SecretProvider:Infisical:{name}"] = structured ? value : null;
             values[flat] = structured ? null : value;
         }
-        return new(values);
+        var builder = Bootstrap("Infisical");
+        builder.AddInMemoryCollection(values);
+        return builder;
     }
 
     private sealed class EnvironmentScope : IDisposable
@@ -362,20 +415,56 @@ public sealed class ConfigurationAuthorityRegressionTests
     {
         public string Url => app.Urls.Single();
         public ConcurrentQueue<string> Paths { get; } = new();
+        public string? LoginClientSecret { get; private set; }
         public static async Task<SecretServer> StartAsync(Func<string, RawSecret[]> response)
         {
-            var builder = WebApplication.CreateSlimBuilder();
+            var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
             builder.Logging.ClearProviders();
             builder.WebHost.UseUrls("http://127.0.0.1:0");
             var app = builder.Build();
             var server = new SecretServer(app);
             string token = Guid.CreateVersion7().ToString("N");
-            app.MapPost("/api/v1/auth/universal-auth/login", () => Results.Json(new { accessToken = token }));
-            app.MapGet("/api/v3/secrets/raw", (HttpContext context) =>
+            var identities = new ConcurrentDictionary<(string Path, string Key), string>();
+            app.MapPost("/api/v1/auth/universal-auth/login", async (HttpContext context) =>
+            {
+                using var body = await System.Text.Json.JsonDocument.ParseAsync(
+                    context.Request.Body, cancellationToken: context.RequestAborted);
+                server.LoginClientSecret = body.RootElement.GetProperty("clientSecret").GetString();
+                return Results.Json(new { accessToken = token, accessTokenMaxTTL = 3600, expiresIn = 600, tokenType = "Bearer" });
+            });
+            object Observation(RawSecret secret, HttpContext context, bool hidden)
+            {
+                string id = identities.GetOrAdd((secret.secretPath, secret.secretKey), _ => Guid.CreateVersion7().ToString("N"));
+                string workspace = context.Request.Query["projectId"].ToString();
+                string environment = context.Request.Query["environment"].ToString();
+                if (hidden)
+                    return new
+                    {
+                        id, workspace, environment, secret.secretPath, secret.secretKey,
+                        secretValueHidden = true, type = "shared", version = 1
+                    };
+                return new
+                {
+                    id, workspace, environment, secret.secretPath, secret.secretKey, secret.secretValue,
+                    secretValueHidden = false, type = "shared", version = 1
+                };
+            }
+            app.MapGet("/api/v4/secrets", (HttpContext context) =>
             {
                 string path = context.Request.Query["secretPath"].ToString();
                 server.Paths.Enqueue(path);
-                return Results.Json(new { secrets = response(path) });
+                return Results.Json(new { secrets = response(path).Select(secret => Observation(secret, context, hidden: true)).ToArray() });
+            });
+            app.MapGet("/api/v4/secrets/{key}", (HttpContext context) =>
+            {
+                string path = context.Request.Query["secretPath"].ToString();
+                string key = (string)context.Request.RouteValues["key"]!;
+                RawSecret[] secrets = response(path);
+                // Hostile test responses retain their wrong path/key instead of being
+                // repaired by the fake before native response validation can see them.
+                RawSecret? secret = secrets.FirstOrDefault(item => item.secretKey == key) ?? secrets.FirstOrDefault();
+                return secret is null ? Results.NotFound()
+                    : Results.Json(new { secret = Observation(secret, context, hidden: false) });
             });
             await app.StartAsync().WaitAsync(TimeSpan.FromSeconds(15));
             return server;

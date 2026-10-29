@@ -3,7 +3,6 @@ using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;

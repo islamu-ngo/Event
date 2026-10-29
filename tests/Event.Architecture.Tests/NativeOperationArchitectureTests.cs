@@ -3,7 +3,7 @@ using Explore.Application;
 using Explore.Application.Operations;
 using Explore.API.Hosting;
 using Explore.Persistence;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

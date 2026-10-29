@@ -8,6 +8,19 @@ This guide describes the folder-and-key layout ISLAMU Event expects inside Infis
 
 Infisical is one of three approved authorities. See [Secrets Management](secrets.md) for how authority selection fails closed, and [Environment Variables](environment-variables.md) for the meaning and defaults of every key named below.
 
+## Moderation process identities
+
+The reconciliation credential belongs to the API identity at `/api`, using
+`MODERATION__RECONCILIATION__APIKEY`. It is optional until reconciliation is
+invoked, and cannot fall back to ordinary configuration. After changing a local
+Environment or User Secrets value, restart its API process to select the new
+generation. An Infisical-backed process retains its selected session.
+
+The measurement launcher uses the `ModerationMeasurement` consumer with its own
+authority inputs. Grant that identity only `/database` and
+`/moderation`; do not give its signer or test-database credentials to serving
+hosts or test processes. Its authority lifetime ends with the launcher.
+
 ---
 
 ## 1. Create the Project
@@ -27,7 +40,7 @@ ISLAMU Event authenticates with **Universal Auth** only.
 
 1. Create independent Machine Identities for API, BFF and migration processes, or Combined and migration for Aspire Standalone.
 2. Attach a **Universal Auth** authentication method and generate a Client ID and Client Secret.
-3. Grant each service identity **read** access only to its required folders. The browser-facing BFF identity reads the exact `/runtime/bff/oidc/keycloak` and `/runtime/bff/oidc/google` roots, plus the separate `/runtime/bff/atproto/oauth` signing-key root. Do not grant it `/`, legacy `/keycloak`, `/blazor`, `/atproto`, `/database` or `/api` access. Use separate backend/provisioning identities for database and container credentials. Write access belongs only to the backend identity that performs an enabled Setup secret-write capability.
+3. Grant each service identity **read** access only to its required folders. The browser-facing BFF identity reads the exact `/runtime/bff/oidc/keycloak` and `/runtime/bff/oidc/google` roots, the separate `/runtime/bff/atproto/oauth` signing-key root, and `/runtime/bff/session` for its shared session authority. Store `BFF_SESSION_REDIS_PASSWORD` only in the session root; it maps to `Bff:SessionAuthority:Password`, and the API identity must not receive read access. Do not grant the BFF `/`, legacy `/keycloak`, `/blazor`, `/atproto`, `/database` or `/api` access. Use separate backend/provisioning identities for database and container credentials. Write access belongs only to the backend identity that performs an enabled Setup secret-write capability.
 4. Copy the project UUID from the project settings page.
 
 The bootstrap pairs are *secret zero*: inject each pair only into its consumer.
@@ -55,6 +68,15 @@ INFISICAL_MIGRATION_CLIENT_ID=<migration identity>
 INFISICAL_MIGRATION_CLIENT_SECRET=<migration credential>
 INFISICAL_ENV=prod
 ```
+
+Also set `INFISICAL_API_TOKEN_LIFETIME`, `INFISICAL_BFF_TOKEN_LIFETIME`, and
+`INFISICAL_MIGRATION_TOKEN_LIFETIME` to each identity's actual `Finite` or
+`Periodic` policy. Standalone uses `INFISICAL_COMBINED_TOKEN_LIFETIME` instead
+of the API/BFF pair. For periodic identities, supply the matching
+`INFISICAL_<CONSUMER>_TOKEN_PERIOD_SECONDS`; for finite identities, leave it
+unset or blank. Optional per-consumer renewal and request bounds are described
+in [secret lifecycle and recovery](secrets.md#fail-closed-authority-status).
+There is no implicit lifetime selection or shared deployment-policy fallback.
 
 When `SECRET_PROVIDER=Infisical`, only Infisical results are authoritative. The platform never silently falls back to environment variables or User Secrets for a value the authority failed to supply; startup fails closed instead.
 

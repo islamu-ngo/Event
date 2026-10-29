@@ -1,5 +1,4 @@
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -15,12 +14,8 @@ public sealed class ExternalIdentityDbContextFactory
             .AddEnvironmentVariables()
             .AddCommandLine(args)
             .Build();
-        if (new ConfigurationBuilder().AddCommandLine(args).Build()
-            .GetValue<bool>("DesignTime:ModelOnly"))
+        if (DesignTimeModelConfiguration.IsRequested(args, bootstrap))
         {
-            if (!SecretAuthorityConfiguration.IsDevelopmentOrTesting(
-                    SecretAuthorityConfiguration.GetEnvironmentName(bootstrap)))
-                throw new InvalidOperationException("Model-only scaffolding requires Development or Testing.");
             string? selected = bootstrap["IdentityDatabase:Provider"] ?? bootstrap["IDENTITY_DATABASE_PROVIDER"];
             if (!Enum.TryParse(selected, true, out PrimaryDatabaseProvider provider) || !Enum.IsDefined(provider))
                 throw new InvalidOperationException("Model-only scaffolding requires an explicit supported Identity provider.");
@@ -38,13 +33,9 @@ public sealed class ExternalIdentityDbContextFactory
             IdentityDatabaseProviderComposition.ConfigureModel(modelBuilder, provider, schema, version);
             return new ExternalIdentityDbContext(modelBuilder.Options);
         }
-        var configurationBuilder = new ConfigurationBuilder().AddConfiguration(
-            SecretAuthorityConfiguration.Build(
-                bootstrap,
-                SecretAuthorityConfiguration.GetEnvironmentName(bootstrap),
-                "/database/identity"));
-
-        return CreateDbContext(configurationBuilder);
+        return MigrationDatabaseAcquisition.CreateDesignTimeContext(
+            bootstrap, ["/database/identity"],
+            configuration => CreateDbContext(new ConfigurationBuilder().AddConfiguration(configuration)));
     }
 
     public ExternalIdentityDbContext CreateDbContext(

@@ -49,7 +49,9 @@ on:
       - "tests/Event.Architecture.Tests/**"
       - "tests/Event.Persistence.IntegrationTests/**"
       - "tests/Event.API.IntegrationTests/**"
-      - "tests/Explore.Secrets.UnitTests/**"
+      - "tests/Explore.Infrastructure.Tests/**"
+      - "tests/Event.Standalone.IntegrationTests/**"
+      - "tests/Shared/**"
       - "tests/Explore.Blazor.Client.Tests/**"
       - "tests/Explore.Blazor.IntegrationTests/**"
       # Markdown & root meta files
@@ -101,7 +103,9 @@ jobs:
             ui:
               - 'src/Explore.Blazor/**'
               - 'src/Explore.Blazor.Client/**'
+              - 'src/Event.Web.BffHosting/**'
               - 'src/Explore.ServiceDefaults/**'
+              - 'src/Directory.Build.props'
               - 'Directory.Build.props'
               - 'Directory.Packages.props'
               - 'global.json'
@@ -114,9 +118,9 @@ jobs:
               - 'src/Explore.Infrastructure/**'
               - 'src/Explore.Persistence*/**'
               - 'src/Explore.Diagnostic/**'
-              - 'src/Explore.Secrets/**'
               - 'src/Event.MigrationService/**'
               - 'src/Explore.ServiceDefaults/**'
+              - 'src/Directory.Build.props'
               - 'Directory.Build.props'
               - 'Directory.Packages.props'
               - 'global.json'

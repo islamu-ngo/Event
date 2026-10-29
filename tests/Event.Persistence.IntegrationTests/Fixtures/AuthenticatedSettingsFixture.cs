@@ -28,7 +28,6 @@ using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Seed;
-using Explore.Secrets.Database;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Diagnostics;
@@ -91,8 +90,8 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
             fixture.SetEnvironment("Authentication__Provider", "local");
             fixture.SetEnvironment("Authorization__Provider", "local");
             fixture.SetEnvironment("Authentication__Local__JwtKey", null);
-            fixture.SetEnvironment("AUTHENTICATION_LOCAL_JWT_KEY",
-                Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)));
+            string jwtKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+            fixture.SetEnvironment("AUTHENTICATION_LOCAL_JWT_KEY", jwtKey);
             fixture.SetEnvironment("PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID", Guid.CreateVersion7().ToString("N"));
             fixture.SetEnvironment("PRIVACY_ERASURE_IDENTITY_FENCE_KEY",
                 Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
@@ -101,6 +100,7 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
             {
                 ["Authentication:Provider"] = "local",
                 ["Authorization:Provider"] = "local",
+                ["Authentication:Local:JwtKey"] = jwtKey,
                 ["SecretProvider:Provider"] = "Environment",
                 ["PrivacyErasure:Authority:Topology"] = "CoLocated",
                 ["IdentityDatabase:Topology"] = "Colocated",

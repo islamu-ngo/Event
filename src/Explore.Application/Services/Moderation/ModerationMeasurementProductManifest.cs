@@ -11,7 +11,7 @@ public static class ModerationMeasurementProductManifest
     public static ImmutableArray<string> AssemblyNames { get; } =
     [
         "Explore.API", "Explore.Application", "Explore.Domain", "Explore.Persistence",
-        "Explore.Infrastructure", "Explore.Secrets", "ISLAMU.Moderation.Application", "ISLAMU.Moderation.Domain"
+        "Explore.Infrastructure", "Explore.ServiceDefaults", "ISLAMU.Moderation.Application", "ISLAMU.Moderation.Domain"
     ];
 
     public static string Digest(ImmutableArray<ModerationMeasurementProductArtifact> products)

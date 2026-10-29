@@ -2,7 +2,7 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting;
 using Aspire.Hosting.Testing;
 using Explore.AppHost;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Extensions.Configuration;
 
 namespace Event.Distributed.IntegrationTests;

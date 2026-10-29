@@ -22,7 +22,6 @@ using Explore.Domain.Constants;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Privacy.ErasureAuthority;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

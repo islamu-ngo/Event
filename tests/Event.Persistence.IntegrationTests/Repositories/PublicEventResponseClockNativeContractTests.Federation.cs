@@ -8,7 +8,7 @@ using Explore.Domain.Enums;
 using Explore.Domain.Federation;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence.Database.ProviderPrimitives;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 

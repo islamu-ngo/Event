@@ -7,7 +7,7 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;

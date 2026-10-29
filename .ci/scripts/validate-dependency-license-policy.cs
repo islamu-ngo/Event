@@ -392,7 +392,6 @@ static class LicensePolicy
         ["CommandLineParser"] = new("MIT", "package uses license file metadata", false),
         ["DotNetEnv"] = new("MIT", "package uses license file metadata", false),
         ["Fractions"] = new("BSD-3-Clause", "package uses license file metadata", false),
-        ["Infisical.Sdk"] = new("MIT", "package uses license file metadata", false),
         ["Microsoft.DotNet.PlatformAbstractions"] = new("Microsoft-.NET-Library", "Microsoft .NET library package uses license file metadata", false),
         ["Microsoft.Testing.Extensions.CodeCoverage"] = new("Microsoft-.NET-Library", "Microsoft .NET testing package uses license file metadata", false),
         ["Microsoft.Data.SqlClient.SNI.runtime"] = new(

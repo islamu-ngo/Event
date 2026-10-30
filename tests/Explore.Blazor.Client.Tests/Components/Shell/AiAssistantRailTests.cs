@@ -1,4 +1,5 @@
 using Explore.Blazor.Client.Components.Shell;
+using Explore.Blazor.Client.Components.Shell.AiAssistant;
 using Explore.Blazor.Client.Contracts.Services.Ai;
 using Explore.Blazor.Client.Services.Ai;
 using Explore.Blazor.Client.Services.Shell;
@@ -32,6 +33,48 @@ public sealed class AiAssistantRailTests : IDisposable
     public void Dispose()
     {
         _ctx.Dispose();
+    }
+
+    [Test]
+    public async Task LiveResult_ActualTimelineUsesHostDestinationAndNavigatesToRealEvent()
+    {
+        var conversationId = Guid.CreateVersion7();
+        var resultId = Guid.CreateVersion7();
+        var action = new ProposedActions2
+        {
+            Id = Guid.CreateVersion7(), Kind = "CreateEventDraft", Status = "Executed",
+            ResultResourceId = resultId, PayloadJson = """{"title":"Community Iftar"}"""
+        };
+        var conversation = new HalResourceOfAiConversationDto
+        {
+            Id = conversationId, ProposedActions = [action]
+        };
+        _conversationState.SelectConversation(conversation);
+        _clientService.GetConversationCollectionAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<HalCollectionResourceOfAiConversationSummaryDto?>(
+                CreateConversationCollection([])));
+        _shellState.SetPolicy(tenantEnabled: true, tenantAvailable: true,
+            allowAnonymousAccess: false, isAuthenticated: true);
+        _shellState.Open();
+        var navigation = _ctx.Services.GetRequiredService<NavigationManager>();
+        var cut = _ctx.RenderMudComponent<AiAssistantRail>();
+        var timeline = cut.FindComponent<AiConversationTimeline>();
+        var proposal = cut.FindComponent<AiProposedActionCard>();
+        var result = cut.FindComponent<AiActionResultCard>();
+
+        await Assert.That(timeline.Instance.Mode).IsEqualTo(AiPresentationMode.Live);
+        await Assert.That(cut.FindComponent<AiConversationComposer>().Instance.Mode)
+            .IsEqualTo(AiPresentationMode.Live);
+        await Assert.That(timeline.Instance.Conversation).IsSameReferenceAs(conversation);
+        await Assert.That(proposal.Instance.Action).IsSameReferenceAs(action);
+        await Assert.That(result.Instance.Action).IsSameReferenceAs(action);
+        await Assert.That(result.Instance.Presentation!.Destination).IsEqualTo($"/events/{resultId}");
+        var link = result.Find("[data-testid='ai-result-event-link']");
+        await Assert.That(link.GetAttribute("href")).IsEqualTo($"/events/{resultId}");
+
+        await link.ClickAsync(new MouseEventArgs());
+
+        await Assert.That(navigation.Uri).EndsWith($"/events/{resultId}");
     }
 
     [Test]

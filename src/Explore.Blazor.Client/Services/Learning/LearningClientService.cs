@@ -75,7 +75,7 @@ public sealed class LearningClientService : ILearningClientService
 
     public static bool IsSupportedRecipe(string recipeKey) =>
         recipeKey is "event-details" or "sessions-program" or "ticket-capacity"
-            or "attendees-team" or "publication-lifecycle";
+            or "attendees-team" or "publication-lifecycle" or "ai-example-review";
 
     public bool HasContextAction(string relation) =>
         Context?._links?.ContainsKey(relation) == true;

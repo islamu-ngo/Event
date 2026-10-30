@@ -6,15 +6,16 @@ description: Private authored learning storage, simulation boundaries, and opera
 
 The private learning hub at `/learning` offers available exercises under your
 current membership and tenant guidance policy. It stores learning preferences
-and practice separately from real event work. Tour overlays and simulated
-presentation in the shared AI interface remain separate delivery steps.
+and practice separately from real event work. Tour overlays remain a separate
+delivery step.
 
-## Five Private Exercises
+## Six Private Exercises
 
 Explore event details, sessions/program, ticket capacity, attendees/team and
 publication lifecycle through fictional choices and explicit confirmation.
 Their results do not create, publish, sell, invite or change a real event.
-The sixth AI example is not offered as a working presentation yet.
+The sixth exercise reviews a prewritten AI-style suggestion in the shared chat
+interface, without contacting an AI provider.
 
 An existing exercise opens at `/learning/demo/{practiceId}`. Opening its address
 does not start new practice or recreate a removed shared source. Reset returns
@@ -32,6 +33,20 @@ Real work starts separately through your workspace's available creation options;
 example data is never copied into it. Targeted component and static-rendering
 checks cover these boundaries. Full hosted visual and accessibility assurance
 remains a programme release gate.
+
+## Review An Authored AI Example
+
+The AI exercise shows a fixed fictional welcome-session suggestion. Choose
+Accept example or Reject example, then confirm the simulation to record only
+your private exercise result. The result link returns to private learning, not
+an event draft. Reset and clear work as they do for the other exercises.
+
+You can also enter `accept-example` or `reject-example` in the composer.
+Other text is temporary: it is not sent to a model, stored as conversation
+history or copied into real work. Unsupported text leaves the authored choices
+available. There are no uploads, reference searches, model tools or live actor
+switches in this exercise. Starting a real conversation is a separate workspace
+action and does not import this example.
 
 ## Learning Does Not Grant Production Authority
 

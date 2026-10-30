@@ -1,16 +1,16 @@
 # Private Learning State And Authored Practice
 
 > **Audience:** Developers and operators
-> **Status:** Private backend and five-exercise UI integration with targeted checks; full programme/host assurance remains open
+> **Status:** Private backend and six-exercise UI integration; full programme/host assurance remains open
 > **Contract Updated:** 2026-10-30; historical verification receipts retained below
 > **Source Anchors:** `src/Explore.Domain/Learning/`, `ILearningRepository`, `ILearningPrivacyErasureStore`, `PrivacyErasureApplier`
 
 ## Delivery Boundary
 
 The workstream includes the private learning backend, an authenticated learning
-hub and five isolated authored exercises. It does not yet deliver rendered tours
-or simulated shared-chat presentation. Those ordered successors retain their
-accessibility, comprehension and renderer package-admission release gates.
+hub and six isolated authored exercises, including shared-chat simulation.
+Rendered tours remain an ordered successor with accessibility, comprehension
+and renderer package-admission release gates.
 
 Learning is optional. An authenticated, active tenant member may learn in self
 context without publishing, organization administration or event-creation
@@ -22,9 +22,8 @@ readiness or completes tenant provisioning.
 
 `/learning` lists owned practice and the currently available server-authored
 recipes; `/learning/demo/{practiceId}` opens an existing private exercise.
-The five rendered recipes are event details, sessions/program, ticket capacity,
-attendees/team and publication lifecycle. The sixth AI recipe is not advertised
-as a functional presentation before its separate shared-chat packet.
+The rendered recipes are event details, sessions/program, ticket capacity,
+attendees/team, publication lifecycle and AI example review.
 
 Pages defer transport until authenticated interactive rendering. A scoped
 generated-client facade retains canonical tenant/account/context identity,
@@ -44,6 +43,44 @@ No production-creation relation is currently advertised by learning HAL, so the
 UI does not invent one or convert example state into production data. Existing
 workspace creation remains a separate action. Frontend route/lifecycle details
 belong in [BLAZOR.md](BLAZOR.md#private-authored-learning).
+
+## Shared Chat Simulation Boundary
+
+`DemoAiConversation` composes the actual `AiConversationComposer`,
+`AiConversationTimeline`, `AiProposedActionCard` and `AiActionResultCard`.
+It does not mount `AiAssistantRail` or initialize its live bootstrap, history,
+provider requests or conversation creation. Its presentation DTOs contain no
+production identifiers, AI HAL grants or provider payload.
+
+The shared components require an explicit `AiPresentationMode` to enable
+interaction. An unspecified mode retains readable content but exposes neither
+live controls nor action/navigation callbacks. Hosts supply typed
+`AiActionPresentation` and `AiActionResultPresentation` values; result cards no
+longer infer an event address from `ResultResourceId`. The live rail derives
+action affordances from normal AI HAL and explicitly supplies its real event
+destination. Confirmation still uses the displayed action version and a fresh
+idempotency key.
+
+The simulation derives affordances from current private learning HAL and the
+authored recipe transitions. Acceptance or rejection first submits a closed
+Choose action; explicit confirmation submits Confirm. A fresh private receipt
+and resource read supplies the result, without a production resource ID.
+Result navigation remains within private learning. Reset and clearing remain
+owned by the surrounding practice surface.
+
+The composer accepts temporary text only to recognize an authored choice.
+Unsupported input offers the fixed examples instead of invoking a model. Raw
+text is neither submitted in learning requests nor added to normal conversation
+history. Uploads, actor selection, references and capability controls are
+available only in explicit live mode. Scope/practice replacement and disposal
+clear temporary input; awaited callbacks recheck the current facade and practice
+before publishing local state or following a result.
+
+Component outbound tripwires establish the browser-client boundary, not server
+side-effect absence. The existing closed catalogue, compiled dependency guards,
+native learning save inventory and HTTP database effect-count witnesses provide
+separate backend evidence. Full programme/provider and hosted accessibility
+acceptance remain open.
 
 ## Single Announcement Bar Browser Scope
 

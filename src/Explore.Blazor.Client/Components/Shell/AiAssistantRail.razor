@@ -117,6 +117,9 @@
             else if (ConversationState.SelectedConversation is not null)
             {
                 <AiConversationTimeline Conversation="ConversationState.SelectedConversation"
+                                        Mode="AiPresentationMode.Live"
+                                        ActionPresentation="PresentLiveAction"
+                                        OnOpenResult="OpenLiveResult"
                                         IsActionBusy="IsActionBusy"
                                         ActionsEnabled="@IsBuildCapabilitySelected"
                                         OnConfirm="ConfirmActionAsync"
@@ -154,6 +157,7 @@
         @if (ConversationState.SelectedConversation is not null)
         {
             <AiConversationComposer @ref="_conversationComposer"
+                                    Mode="AiPresentationMode.Live"
                                     IdPrefix="ai-rail"
                                     ActorOptions="_actorOptions"
                                     SelectedActorId="_selectedActorId"
@@ -315,6 +319,7 @@
     private bool _hasProcessedNewConversationRequest;
     private bool _isSynchronizingWorkspaceRequest;
     private bool _workspaceSynchronizationPending;
+    private bool _disposed;
 
     private bool IsBuildCapabilitySelected =>
         string.Equals(_selectedCapability, "Build", StringComparison.OrdinalIgnoreCase);
@@ -1174,8 +1179,47 @@
         }
     }
 
+    private bool IsCurrentAction(ProposedActions2 action) => !_disposed && AiAssistantState.IsAvailable
+        && ConversationState.SelectedConversation?.ProposedActions?.Any(current => ReferenceEquals(current, action)) == true;
+
+    private AiActionPresentation? PresentLiveAction(ProposedActions2 action)
+    {
+        if (!IsCurrentAction(action))
+            return null;
+        bool completed = action.ResultResourceId is not null;
+        bool rejected = string.Equals(action.Status, "Rejected", StringComparison.OrdinalIgnoreCase)
+            || action.RejectedAt is not null;
+        bool failed = !string.IsNullOrWhiteSpace(action.FailureCode) || !string.IsNullOrWhiteSpace(action.FailureMessage);
+        bool eventDraft = string.Equals(action.Kind, "CreateEventDraft", StringComparison.OrdinalIgnoreCase);
+        return new(
+            eventDraft ? completed ? "Event draft created" : rejected ? "Event draft proposal rejected" : "Review event draft proposal"
+                : action.Kind ?? "AI proposed action",
+            completed ? "The draft was created and is ready to open."
+                : rejected ? "You rejected this proposal. No event draft was created."
+                : failed ? "The assistant could not complete this action."
+                : "Review the draft details before confirming or rejecting the action.",
+            CanConfirm: AiAssistantConversationState.CanConfirm(action),
+            CanReject: AiAssistantConversationState.CanReject(action),
+            Result: action.ResultResourceId is Guid resultId
+                ? new AiActionResultPresentation(
+                    eventDraft ? "Event Draft Created" : "Action completed",
+                    eventDraft ? "The event draft is ready to open." : $"Created result {resultId}",
+                    eventDraft ? $"/events/{resultId:D}" : null,
+                    eventDraft ? "Open event draft" : null)
+                : null);
+    }
+
+    private void OpenLiveResult(AiActionResultPresentation result)
+    {
+        if (!_disposed && ConversationState.SelectedConversation?.ProposedActions?.Any(action =>
+                PresentLiveAction(action)?.Result == result) == true && result.Destination is { } destination)
+            Navigation.NavigateTo(destination);
+    }
+
     private async Task ConfirmActionAsync(ProposedActions2 action)
     {
+        if (!IsCurrentAction(action) || !AiAssistantConversationState.CanConfirm(action))
+            return;
         if (!IsBuildCapabilitySelected)
         {
             ConversationState.SetError("Switch to Build mode to confirm proposed AI actions.");
@@ -1193,6 +1237,9 @@
             ConversationState.SetError("Reload the conversation and review the action before confirming.");
             return;
         }
+        var conversation = ConversationState.SelectedConversation;
+        var actorId = _selectedActorId;
+        var shellActorId = ShellState.ActiveActorId;
         await RunActionAsync(actionId, async () =>
         {
             var result = await ClientService.ConfirmProposedActionAsync(
@@ -1201,6 +1248,9 @@
                 expectedVersion,
                 $"blazor-ai-confirm-{Guid.CreateVersion7()}");
 
+            if (_disposed || !ReferenceEquals(conversation, ConversationState.SelectedConversation)
+                || actorId != _selectedActorId || shellActorId != ShellState.ActiveActorId)
+                return;
             if (!result.Success)
             {
                 ConversationState.SetError(result.Message ?? "The AI proposed action could not be confirmed.");
@@ -1213,6 +1263,8 @@
 
     private async Task RejectActionAsync(ProposedActions2 action)
     {
+        if (!IsCurrentAction(action) || !AiAssistantConversationState.CanReject(action))
+            return;
         if (!IsBuildCapabilitySelected)
         {
             ConversationState.SetError("Switch to Build mode to reject proposed AI actions.");
@@ -1224,9 +1276,15 @@
             return;
         }
 
+        var conversation = ConversationState.SelectedConversation;
+        var actorId = _selectedActorId;
+        var shellActorId = ShellState.ActiveActorId;
         await RunActionAsync(actionId, async () =>
         {
             var result = await ClientService.RejectProposedActionAsync(conversationId, actionId);
+            if (_disposed || !ReferenceEquals(conversation, ConversationState.SelectedConversation)
+                || actorId != _selectedActorId || shellActorId != ShellState.ActiveActorId)
+                return;
             if (!result.Success)
             {
                 ConversationState.SetError(result.Message ?? "The AI proposed action could not be rejected.");
@@ -1881,6 +1939,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
         AiAssistantState.OnChange -= OnAiAssistantStateChanged;
         ConversationState.OnChange -= StateHasChanged;
 

@@ -1,0 +1,37 @@
+Change-Id: CHG-01M67H6B9A21FFCC40KJGWVQ0B
+Title: "teach AI interaction without invoking a live provider"
+Type: feat
+Scope: onboarding
+Summary: "Review an authored AI-style suggestion through shared chat presentation, with explicit private learning actions and no production conversation or event creation."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Detail: >-
+      Explicit typed host mode and result presentation replace implicit live
+      controls and inferred event navigation. Private learning HAL and closed
+      authored transitions govern simulation. Scope replacement and disposal
+      invalidate pending display and navigation callbacks.
+  Migration:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      The sixth private exercise accepts or rejects a fixed suggestion through
+      an explicit confirmation. Temporary text selects authored choices only;
+      it is not sent to a model or saved as normal chat history. Result links
+      remain private. No package, provider credential, configuration, migration
+      or generated API is added. Hosted accessibility acceptance remains open.

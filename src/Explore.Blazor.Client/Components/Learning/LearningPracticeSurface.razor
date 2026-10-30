@@ -39,7 +39,7 @@
             <p class="learning-practice__muted">@Display(lesson.CapabilityExplanation)</p>
         </aside>
 
-        @if (Learning.HasPracticeAction("simulate-choice"))
+        @if (Practice.RecipeKey != "ai-example-review" && Learning.HasPracticeAction("simulate-choice"))
         {
             <fieldset class="learning-practice__fieldset" disabled="@(!Learning.CanSubmit)">
                 <legend>@T("ui.learning.practice.choose", "Choose an example")</legend>
@@ -62,7 +62,12 @@
         }
     }
 
-    @if (Practice.Simulation.Presentation.Facts is { Count: > 0 } facts)
+    @if (Practice.RecipeKey == "ai-example-review")
+    {
+        <DemoAiConversation Practice="Practice" Lesson="Lesson" />
+    }
+
+    @if (Practice.RecipeKey != "ai-example-review" && Practice.Simulation.Presentation.Facts is { Count: > 0 } facts)
     {
         <dl class="learning-practice__facts" aria-label="@T("ui.learning.practice.facts", "Synthetic example details")">
             @foreach (var fact in facts)
@@ -75,7 +80,7 @@
         </dl>
     }
 
-    @if (Practice.Simulation.Receipt is { } receipt)
+    @if (Practice.RecipeKey != "ai-example-review" && Practice.Simulation.Receipt is { } receipt)
     {
         <div class="learning-practice__result" data-simulation-result="@receipt.ResultKey">
             <h3>@T("ui.learning.practice.result", "Simulation result")</h3>
@@ -84,7 +89,7 @@
     }
 
     <div class="learning-practice__actions">
-        @if (Learning.HasPracticeAction("simulate-confirm"))
+        @if (Practice.RecipeKey != "ai-example-review" && Learning.HasPracticeAction("simulate-confirm"))
         {
             <AppButton OnClick="@(() => ApplyAsync(LearningPracticeAction.Confirm))"
                        Disabled="@(!Learning.CanSubmit)"
@@ -165,8 +170,13 @@
 
     private async Task ApplyAsync(LearningPracticeAction action, string? choiceKey = null)
     {
+        if (_disposed || !ReferenceEquals(Practice, Learning.Practice))
+            return;
+        var scope = Learning.Scope;
+        var practice = Practice;
         bool applied = await Learning.ApplyPracticeActionAsync(action, choiceKey, _lifetime.Token);
-        if (_disposed)
+        if (_disposed || !ReferenceEquals(scope, Learning.Scope)
+            || !ReferenceEquals(Practice, Learning.Practice) || Practice.Id != practice.Id)
             return;
         _actionRefused = !applied && Learning.Failure == LearningClientFailure.None;
         _focusStep = applied;
@@ -174,9 +184,14 @@
 
     private async Task ClearAsync()
     {
+        if (_disposed || !ReferenceEquals(Practice, Learning.Practice))
+            return;
+        var scope = Learning.Scope;
+        var practice = Practice;
         bool applied = await Learning.ApplyPracticeActionAsync(
             LearningPracticeAction.Clear, cancellationToken: _lifetime.Token);
-        if (!_disposed)
+        if (!_disposed && ReferenceEquals(scope, Learning.Scope)
+            && ReferenceEquals(practice, Learning.Practice))
             _actionRefused = !applied && Learning.Failure == LearningClientFailure.None;
     }
 

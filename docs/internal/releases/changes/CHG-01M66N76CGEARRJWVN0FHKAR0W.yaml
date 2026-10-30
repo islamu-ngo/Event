@@ -1,0 +1,26 @@
+Change-Id: CHG-01M66N76CGEARRJWVN0FHKAR0W
+Title: "permit required login continuity reads"
+Type: fix
+Scope: access
+Summary: "Let the selected Local identity writer verify settled moderation continuity using explicit read-only columns while keeping recognition mutations and private birth data unavailable."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented

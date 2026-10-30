@@ -1,3 +1,4 @@
+using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Security.Cryptography;
@@ -6,8 +7,10 @@ using Explore.Application.Authentication;
 using Explore.Application.Configuration;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Moderation;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
+using Explore.Application.Services.Moderation;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
@@ -15,10 +18,15 @@ using Explore.Domain.Services.Identity;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Privacy.ErasureAuthority;
+using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
+using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
+using ISLAMU.Moderation.Domain;
+using ISLAMU.Moderation.Domain.Policies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -532,6 +540,277 @@ public sealed class LocalIdentitySigningAuthorityNativeTests(LocalIdentitySignin
             });
             await Assert.That(denied!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
         }
+    }
+
+    [Test]
+    [Arguments("settled")]
+    [Arguments("unsettled")]
+    [Arguments("missing-transaction")]
+    [Arguments("foreign-transaction")]
+    [Arguments("read-committed")]
+    [Arguments("missing-authority-gate")]
+    [Arguments("authority-bound")]
+    [Arguments("tampered-material")]
+    public async Task ExistingSubjectContinuityRequiresSettledStateAndOriginalRestrictedWriterTransaction(string scenario)
+    {
+        CancellationToken token = TestContext.Current!.Execution.CancellationToken;
+        await fixture.ResetAsync();
+        await fixture.PrepareLocalIdentityWriterAsync();
+        Guid subject = Guid.CreateVersion7();
+        var now = new DateTimeOffset(2026, 10, 30, 12, 0, 0, TimeSpan.Zero);
+        await using (var seed = OpenInstanceMigrator())
+        {
+            await using var human = new HumanSecuritySourceGate(seed);
+            await using var humanLease = await human.AcquireAsync(token);
+            await using var discovery = new EventDiscoveryEnrollmentGate(seed);
+            await using var discoveryLease = await discovery.AcquireAsync(token);
+            seed.Users.Add(new User
+            {
+                Id = subject,
+                Pii = new UserPii
+                {
+                    Email = $"continuity-{subject:N}@example.test",
+                    FirstName = "Continuity",
+                    LastName = "Subject"
+                }
+            });
+            ModerationRecognitionPending? pending = null;
+            ModerationRecognitionCaptureItem? captured = null;
+            if (scenario is "unsettled" or "authority-bound" or "tampered-material")
+            {
+                pending = ModerationRecognitionPending.Receive(
+                    Guid.CreateVersion7(), subject, 1, PrivacyErasureReasonCode.AccountDeletion,
+                    Guid.CreateVersion7(), Guid.CreateVersion7(), now, now.AddHours(1),
+                    now.AddMinutes(5), RandomNumberGenerator.GetBytes(32), now.AddDays(1));
+                if (scenario != "unsettled")
+                {
+                    var instance = AuthorityScope.Instance(AuthorityScope.Solution(
+                        AuthorityScope.TrustDomain(Guid.CreateVersion7()), Guid.CreateVersion7()), Guid.CreateVersion7());
+                    var scope = AuthorityScope.Tenant(instance, Guid.CreateVersion7());
+                    var decision = ModerationDecision.Propose(Guid.CreateVersion7(), Guid.CreateVersion7(),
+                        SubjectReference.Create(ModerationSubjectKind.Human, subject, instance),
+                        SubjectReference.Create(ModerationSubjectKind.Human, pending.PrivacyOwnerHumanId, instance),
+                        instance, scope, ModerationRuleReference.Create(scope.Id, "recognition.capture", 1),
+                        [ModerationCapability.Publish], now, now.AddDays(2), null, 1, now);
+                    decision.RecordResponse(1, now);
+                    decision.AcceptFinding(Guid.CreateVersion7(), 2, now);
+                    decision.Approve(SubjectReference.Create(ModerationSubjectKind.Human,
+                        pending.RecoveryOwnerHumanId, instance), instance, 3, now);
+                    var sanction = decision.Activate(Guid.CreateVersion7(), 4, now);
+                    var purpose = ModerationReferenceRecognition.SeparatelyQualifiedFinalAction;
+                    var material = new ModerationRecognitionCapturedMaterial(
+                        new ModerationRecognitionToken(scope.TrustDomainId, AuthenticationProviderKind.Keycloak,
+                            purpose, "original", 1, 1, Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32))),
+                        Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32)),
+                        ModerationRecognitionContribution.Capture(decision, sanction, purpose, now, now.AddDays(3)));
+                    captured = ModerationRecognitionCaptureItem.Capture(Guid.CreateVersion7(), pending.IntentId,
+                        decision, material, Guid.CreateVersion7(), 1, 7, Guid.CreateVersion7(), 1, 8, 1);
+                    pending.Capture([captured], now);
+                    // Arrange the receipt branch independently of retained-subject fencing.
+                    // The real retained authority below stays unfenced in both material cases.
+                    pending.BindAuthority(PrivacyErasureIntent.Record(pending.IntentId, 1,
+                        PrivacyErasureSubjectKind.User, subject, pending.ReasonCode, pending.PolicyVersion,
+                        now.UtcDateTime, now.UtcDateTime, now.AddDays(30).UtcDateTime), now);
+                }
+                seed.Set<ModerationRecognitionPending>().Add(pending);
+            }
+            await seed.SaveChangesAsync(token);
+            if (captured is not null)
+            {
+                if (scenario == "tampered-material")
+                {
+                    // Only the setup owner changes storage; the recorded material receipt
+                    // remains the original one and no private Domain setter is invoked.
+                    int changed = await seed.Set<ModerationRecognitionCaptureItem>()
+                        .IgnoreAllFilters("Continuity immutable-material corruption setup")
+                        .Where(row => row.Id == captured.Id)
+                        .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.RuleRevision, 2L), token);
+                    await Assert.That(changed).IsEqualTo(1);
+                }
+                var stored = await seed.Set<ModerationRecognitionPending>()
+                    .IgnoreAllFilters("Continuity material receipt setup witness").AsNoTracking()
+                    .Include(row => row.Material).SingleAsync(row => row.IntentId == pending!.IntentId, token);
+                await Assert.That(stored.State).IsEqualTo(ModerationRecognitionPendingState.AuthorityBound);
+                await Assert.That(stored.Material.Count).IsEqualTo(1);
+                await Assert.That(stored.MaterialReceipt).IsEqualTo(pending!.MaterialReceipt);
+                await Assert.That(stored.Material.Single().RuleRevision)
+                    .IsEqualTo(scenario == "tampered-material" ? 2L : 1L);
+                await Assert.That(stored.HasCompleteMaterial).IsEqualTo(scenario == "authority-bound");
+            }
+        }
+
+        var options = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.LocalIdentityWriter);
+        var enrollment = new PostgresLocalIdentityWriterEnrollment(fixture.NativeQueueEnrollment.MigratorLogin,
+            fixture.NativeQueueEnrollment.RuntimeLogin, options.Username!, fixture.NativeQueueEnrollment.GlobalLogin);
+        var factory = new LocalIdentityWriterDbContextFactory(options, poolSize: 1, applicationEnrollment: enrollment);
+        await using var selected = await factory.CreateAsync(null, token);
+        var application = selected.Application;
+        var execution = new LocalIdentityExecutionLease();
+        execution.Bind(application, selected.Identity);
+        await using (var command = application.Database.GetDbConnection().CreateCommand())
+        {
+            command.CommandText = "SELECT session_user";
+            await Assert.That(await command.ExecuteScalarAsync(token)).IsEqualTo(options.Username);
+        }
+        foreach (Type type in new[] { typeof(ModerationRecognitionPending), typeof(ModerationRecognitionCaptureItem) })
+        {
+            var entity = application.Model.FindEntityType(type)!;
+            string relation = application.GetService<ISqlGenerationHelper>()
+                .DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+            foreach (string privilege in new[] { "INSERT", "UPDATE", "DELETE" })
+            {
+                await using var command = application.Database.GetDbConnection().CreateCommand();
+                command.CommandText = privilege == "DELETE"
+                    ? "SELECT pg_catalog.has_table_privilege(session_user, @relation, @privilege)"
+                    : "SELECT pg_catalog.has_table_privilege(session_user, @relation, @privilege)"
+                        + " OR pg_catalog.has_any_column_privilege(session_user, @relation, @privilege)";
+                command.Parameters.Add(new NpgsqlParameter("relation", relation));
+                command.Parameters.Add(new NpgsqlParameter("privilege", privilege));
+                await Assert.That(await command.ExecuteScalarAsync(token)).IsEqualTo(false);
+            }
+        }
+        await using var retainedSchema = await ContinuityAuthoritySchema.CreateAsync(fixture, token);
+        var retained = new CoLocatedPostgresPrivacyErasureAuthorityRepository(retainedSchema.Context, TimeProvider.System,
+            Options.Create(new PrivacyErasureOptions()));
+        using var replica = new ModerationRecognitionKeyLifecycleReplicaOwner();
+        var repository = new ModerationRecognitionErasureRepository(application, new UnexpectedContinuityKeys(),
+            TimeProvider.System, retained, retained,
+            new ModerationRecognitionKeyLifecycleRepository(application, retained, retained, replica, TimeProvider.System));
+        var continuity = new ModerationRecognitionContinuity(repository,
+            new RelationalSettingMutationLock(application, new EfCoreUnitOfWork(application)));
+
+        async Task<ModerationRecognitionContinuityFailure> ObserveAsync(CancellationToken ct)
+        {
+            execution.RequireCurrent(application, selected.Identity);
+            if (scenario == "missing-transaction")
+                return await continuity.GuardExistingSubjectAsync(subject, ct);
+            if (scenario == "foreign-transaction")
+            {
+                await using var foreign = await factory.CreateAsync(null, ct);
+                return await foreign.Application.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+                {
+                    await using var transaction = await foreign.Application.Database.BeginTransactionAsync(
+                        IsolationLevel.Serializable, ct);
+                    await Assert.That(application.Database.CurrentTransaction).IsNull();
+                    await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                    {
+                        execution.RequireCurrent(foreign.Application, foreign.Identity);
+                        return Task.CompletedTask;
+                    });
+                    // Another selected writer's transaction cannot satisfy this guard's owner.
+                    var failure = await continuity.GuardExistingSubjectAsync(subject, ct);
+                    await Assert.That(foreign.Application.Database.CurrentTransaction).IsSameReferenceAs(transaction);
+                    await transaction.RollbackAsync(ct);
+                    return failure;
+                });
+            }
+            return await application.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+                await using var transaction = await application.Database.BeginTransactionAsync(
+                    scenario == "read-committed" ? IsolationLevel.ReadCommitted : IsolationLevel.Serializable, ct);
+                var connection = application.Database.GetDbConnection();
+                var contextId = application.ContextId;
+                var failure = await continuity.GuardExistingSubjectAsync(subject, ct);
+                execution.RequireCurrent(application, selected.Identity);
+                await Assert.That(application.ContextId).IsEqualTo(contextId);
+                await Assert.That(application.Database.GetDbConnection()).IsSameReferenceAs(connection);
+                await Assert.That(application.Database.CurrentTransaction).IsSameReferenceAs(transaction);
+                await transaction.RollbackAsync(ct);
+                return failure;
+            });
+        }
+
+        // Use the real retained gate, not an always-unfenced substitute. Without it even
+        // an otherwise valid primary Serializable transaction must fail closed.
+        var observed = scenario == "missing-authority-gate"
+            ? await ObserveAsync(token)
+            : await retained.ExecuteSerializedAsync(ObserveAsync, token);
+        await Assert.That(application.Database.CurrentTransaction).IsNull();
+        foreach (string property in new[] { "_dateOfBirth", "_birthDateCollectionReceiptId", "_birthDateRevision" })
+        {
+            var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
+            {
+                _ = await application.UserPii.Where(pii => pii.UserId == subject)
+                    .Select(pii => EF.Property<object>(pii, property)).SingleAsync(token);
+            });
+            await Assert.That(denied!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+        }
+        await Assert.That(observed).IsEqualTo(scenario switch
+        {
+            "settled" => ModerationRecognitionContinuityFailure.None,
+            "unsettled" => ModerationRecognitionContinuityFailure.SettlementRequired,
+            "authority-bound" => ModerationRecognitionContinuityFailure.None,
+            "tampered-material" => ModerationRecognitionContinuityFailure.SettlementRequired,
+            _ => ModerationRecognitionContinuityFailure.NativeBoundaryRequired
+        });
+    }
+
+    private sealed class ContinuityAuthoritySchema(
+        CoLocatedPrivacyErasureAuthorityDbContext context, string schema) : IAsyncDisposable
+    {
+        internal CoLocatedPrivacyErasureAuthorityDbContext Context { get; } = context;
+
+        internal static async Task<ContinuityAuthoritySchema> CreateAsync(
+            PostgreSqlContainerFixture fixture, CancellationToken token)
+        {
+            var connection = new NpgsqlConnectionStringBuilder(fixture.ConnectionString);
+            string schema = $"identity_continuity_{Guid.CreateVersion7():N}";
+            var configuration = new PrimaryDatabaseConnectionOptions
+            {
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.PostgreSql,
+                Host = connection.Host,
+                Port = connection.Port,
+                Database = connection.Database,
+                Username = connection.Username,
+                Password = connection.Password,
+                Schema = schema,
+                TlsMode = PrimaryDatabaseTlsMode.Disabled
+            };
+            var owned = new ContinuityAuthoritySchema(
+                new CoLocatedPrivacyErasureAuthorityDbContext(OptionsFor(PrimaryDatabaseRole.Runtime)), schema);
+            try
+            {
+                // This disposable schema exercises the current authority model and real
+                // retained gate; migration parity is a separate verification concern.
+                await using var setup = new CoLocatedPrivacyErasureAuthorityDbContext(
+                    OptionsFor(PrimaryDatabaseRole.Migrator));
+                await setup.Database.ExecuteSqlRawAsync(setup.Database.GenerateCreateScript(), token);
+                return owned;
+            }
+            catch
+            {
+                await owned.DisposeAsync();
+                throw;
+            }
+
+            DbContextOptions<CoLocatedPrivacyErasureAuthorityDbContext> OptionsFor(PrimaryDatabaseRole role)
+            {
+                var options = TestDbContextOptions.Create<CoLocatedPrivacyErasureAuthorityDbContext>();
+                PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
+                    options, configuration with { Role = role });
+                return options.Options;
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                string identifier = Context.GetService<ISqlGenerationHelper>().DelimitIdentifier(schema);
+                await Context.Database.ExecuteSqlRawAsync($"DROP SCHEMA IF EXISTS {identifier} CASCADE");
+            }
+            finally
+            {
+                await Context.DisposeAsync();
+            }
+        }
+    }
+
+    private sealed class UnexpectedContinuityKeys : IModerationRecognitionKeyRingProvider
+    {
+        public Task<ModerationRecognitionKeyRing> ResolveAsync(Guid trustDomainId, CancellationToken token) =>
+            throw new InvalidOperationException("An existing-subject guard must not resolve recognition key material.");
     }
 
     private sealed class IdentityEmailWriteFault(Exception failure) : DbCommandInterceptor

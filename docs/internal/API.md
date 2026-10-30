@@ -5,17 +5,18 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Private Contextual Learning
 
-`LearningController` defines eight named `/api/learning` operations:
+`LearningController` defines nine named `/api/learning` operations:
 `GET context`, `GET tours/{family}/plan`, `GET practice/{id}`,
 `POST tours/claim`, `POST tours/outcome`,
-`PATCH preferences`, `POST practice/actions`, and `POST space/actions`.
+`PATCH preferences`, `POST practice/actions`, `POST space/actions`, and
+`POST requirements/{requirementKey}/acknowledge`.
 The three GET actions retain `[AllowAnonymous]` metadata but their original-human
 query boundary requires a resolved authenticated account, active selected tenant
 membership and current contextual authority. Anonymous access is not a public
 progress reader. Writes are `[Authorize]` and use the standard selected-tenant
 human owner, not the instance preference or mixed-settings executor.
 
-The five body records are closed JSON objects. Learning enums use exact named
+The six body records are closed JSON objects. Learning enums use exact named
 strings; numeric and unknown tokens are invalid. `ExpectedScopeStamp` detects
 late account/tenant responses but supplies no authority. `ExpectedRevision`
 protects the learner or shared-space revision; practice also carries its own
@@ -75,6 +76,76 @@ custody. Owned skip/interrupt/snooze cleanup may release a removed-source claim
 using its accepted bindings without restoring source availability. Normal-AI
 capability is observed outside the transaction and provides no credential-validity
 lease. There is no automatic replay or lesson-based production gate.
+
+### Tenant Guidance Policy Document
+
+`GET /api/tenant/settings/documents/learning-guidance` reads the original
+authenticated member's captured tenant policy. Absence returns immutable defaults
+without creating a document, learning space or learner. Its HAL detail contains
+`SchemaVersion` **1**, `DefaultsVersion` **learning-guidance:1**,
+nullable Guid `ConcurrencyStamp` (explicit JSON null when absent), and `Policy`.
+Only the server-derived `edit` link advertises current administrator editing;
+the internal HAL observation `CanEdit` is never serialized.
+
+`PATCH` on the same route replaces the typed policy using
+`ExpectedConcurrencyStamp` and `Policy`. First creation requires an explicit
+null expected stamp; existing documents require their current Guid stamp.
+The six policy fields are `Enabled`, `AutomaticInvitations`,
+`InvitationAudience`, `ManualAccessAudience`, `RequirementPolicy` and
+`FamilyOverrides`. Audiences use exact `ActiveMembers` or
+`TenantAdministrators`; requirements use `Optional` or
+`TenantAdminOrientationAcknowledgement`. At most four distinct family overrides
+are allowed, using the existing closed tour family names. Unknown members,
+unsupported enums and disabled-plus-required policy are rejected.
+
+The instance-only Boolean `learning.guidance.allow_tenant_edits` defaults true.
+Tenant settings cannot override it. PATCH retains its original instance
+value/lock/absence witness and document observation through the accepted
+Serializable write and final admission. A conflict requires a fresh read, not
+automatic mutation replay. Targeted Application and HTTP checks cover effective
+tour/practice gates. Plan `CanInvite`, tour-progress
+`CanInvite` and context capability `CanInviteTours` describe automatic offers,
+not grants. An invitation-eligible member may explicitly Start even if the
+manual audience is narrower. Non-replay Start and Progress/Complete require
+current invitation or manual eligibility; explicit Replay requires manual
+eligibility. Workspace, source, owner and claim checks still apply. Frequency
+suppression governs offers and non-replay starts, not an owned claim's accepted
+completion.
+
+Practice has no family identity and follows global Enabled/manual audience
+rules. Disabled or excluded practice exposes no interactive lessons or preview
+affordance; owned summaries retain a truthful unavailable reason and clearing
+remains available. Policy denial precedes learner/shared-space creation.
+
+### Explicit Administrator Acknowledgement
+
+The source-defined acknowledgement route accepts only
+`tenant-admin-orientation`, material version **1**. Its closed
+`LearningAcknowledgeRequirementRequest` contains `IntentId`, `ExpectedScopeStamp`,
+`ExpectedRevision`, `ExpectedPolicySourceStamp` and `MaterialVersion`. The server
+selects the original human, tenant, self context, evidence identifier and time;
+there is no caller-supplied owner, actor, event or policy.
+
+The closed native learning owner requires current tenant administrator authority
+before checking requirement applicability. Default optional policy rejects the
+action without creating a learner. Current policy/source and authority checks
+also precede retained exact replay. A stale policy stamp or revision conflicts;
+an accepted retry retains the child identifier and acknowledgement time.
+
+`LearningContextDto.Requirement` exposes `RequirementKey`, `MaterialVersion`,
+string `Status` (`NotApplicable`, `Pending` or `Satisfied`),
+`PolicySourceStamp` and nullable `AcknowledgedAtUtc` only to that learner.
+Pending applicable evidence advertises `acknowledge-requirement` through HAL.
+Hidden learning and invitation suppression do not conceal a pending requirement.
+Satisfaction follows authored key/material: changing invitation settings alone
+does not require acknowledging unchanged material again.
+
+This explicit self-acknowledgement is not tour completion, competence or
+production authority. It neither creates/recreates the shared learning space
+nor changes claims, preferences, tours or practice. Targeted Application and
+HTTP admission checks passed, and native API/client regeneration plus all seven
+learning generated-contract checks passed. This is not hosted UI or complete
+provider-matrix acceptance.
 
 ### Private Responses And Delivery Limits
 

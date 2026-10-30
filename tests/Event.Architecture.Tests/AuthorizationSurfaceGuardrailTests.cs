@@ -21,6 +21,14 @@ public sealed class AuthorizationSurfaceGuardrailTests
     private static readonly InventoryEntry[] NamedOperationExceptions =
     [
         new(
+            "Explore.Application.Features.Learning.Requests.Commands.UpdateLearningGuidancePolicyCommand",
+            "original-human-learning-policy-owner",
+            "IHumanLearningPolicyMutationPreparation binds this exact command to the original human, credential, request, tenant, support and TenantSetting/update route for tenant.learning_guidance. HumanLearningPolicyMutationStore retains original document absence/presence and instance edit-control sources, reacquires current tenant administration, applies Guid CAS on one Serializable owner and admits the exact accepted image before consuming its settlement receipt. LearningPolicyAdmissionTests includes OrdinaryMemberPolicyPatchIsForbiddenWithoutCreatingPolicyRow, PolicyCreationUsesObservedAbsenceAndRejectsStaleConcurrencyStamp, PolicyMutationRejectsOriginalSourceChangesAfterObservation and FinalAdmissionAcceptsJsonFormattingButRejectsChangedPolicyMeaning."),
+        new(
+            "Explore.Application.Features.Learning.Requests.Commands.AcknowledgeLearningRequirementCommand",
+            "original-human-private-learning-owner",
+            "IHumanLearningMutationPreparation accepts this exact acknowledgement intent under the original active human and selected tenant. HumanLearningMutationStore retains current policy sources, tenant administrator placement and original identity custody through the final acknowledgement image before committing private evidence. LearningRequirementAdmissionTests covers retained source, administrator, identity and final-image admission fences."),
+        new(
             "Explore.Application.Features.Learning.Requests.Commands.ClaimLearningTourCommand",
             "original-human-private-learning-owner",
             "IHumanLearningMutationPreparation accepts this exact intent under the original active human, selected tenant, retained-erasure exclusion and current contextual sources. HumanLearningMutationStore validates the original physical owner, completion image and terminal claim/credential clocks before committing. LearningFinalAdmissionTests and LearningRaceTests cover rejection and rollback."),

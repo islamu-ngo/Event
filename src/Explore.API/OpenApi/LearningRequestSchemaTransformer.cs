@@ -24,6 +24,10 @@ public sealed class LearningRequestSchemaTransformer : IOpenApiSchemaTransformer
     private static void Apply(OpenApiSchema schema, Type type)
     {
         if (type == typeof(LearningClaimTourRequest)
+            || type == typeof(LearningAcknowledgeRequirementRequest)
+            || type == typeof(UpdateLearningGuidancePolicyRequest)
+            || type == typeof(LearningGuidancePolicyPayload)
+            || type == typeof(LearningGuidanceFamilyOverrideDto)
             || type == typeof(LearningRecordTourOutcomeRequest)
             || type == typeof(LearningUpdatePreferencesRequest)
             || type == typeof(LearningApplyPracticeActionRequest)

@@ -53,6 +53,8 @@ internal static class PolicyMutationCommandScope
 
     internal static bool HandlesLearning(Type request) =>
         request == typeof(ClaimLearningTourCommand)
+        || request == typeof(UpdateLearningGuidancePolicyCommand)
+        || request == typeof(AcknowledgeLearningRequirementCommand)
         || request == typeof(RecordLearningTourOutcomeCommand)
         || request == typeof(UpdateLearningPreferencesCommand)
         || request == typeof(ApplyLearningPracticeActionCommand)

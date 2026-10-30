@@ -15,6 +15,11 @@ internal static class LearningLifecyclePersistence
         if (context.Database.IsSqlServer())
         {
             // ExecuteDelete bypasses client cascades; SQL Server retains NO ACTION FKs.
+            await context.LearningRequirementAcknowledgements
+                .IgnoreTenantFilter(TenantFilterBypassReasons.UserPrivacyErasure)
+                .Where(child => states.Any(state => state.TenantId == child.TenantId
+                    && state.Id == child.UserLearningStateId))
+                .ExecuteDeleteAsync(cancellationToken);
             var tours = context.LearningTourProgress
                 .IgnoreTenantFilter(TenantFilterBypassReasons.UserPrivacyErasure)
                 .Where(tour => states.Any(state => state.TenantId == tour.TenantId
@@ -47,6 +52,9 @@ internal static class LearningLifecyclePersistence
         await context.LearningPracticeStates
             .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
             .Where(row => row.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken);
+        await context.LearningRequirementAcknowledgements
+            .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
+            .Where(row => row.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken);
         await context.LearningTourProgress
             .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
             .Where(row => row.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken);
@@ -59,6 +67,7 @@ internal static class LearningLifecyclePersistence
         foreach (var entry in context.ChangeTracker.Entries()
                      .Where(entry => entry.Entity is ITenantEntity owned && owned.TenantId == tenantId
                          && entry.Entity is LearningPracticeState or LearningTourProgress or LearningTourStepProgress
+                             or LearningRequirementAcknowledgement
                              or UserLearningState or TenantLearningSpace)
                      .ToArray())
             entry.State = EntityState.Detached;

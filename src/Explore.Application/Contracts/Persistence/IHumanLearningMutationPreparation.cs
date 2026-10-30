@@ -15,6 +15,7 @@ public interface IHumanLearningMutationPreparation
     Task<LearningOperationState> ExecuteAsync(UpdateLearningPreferencesCommand command, CancellationToken cancellationToken);
     Task<LearningOperationState> ExecuteAsync(ApplyLearningPracticeActionCommand command, CancellationToken cancellationToken);
     Task<LearningOperationState> ExecuteAsync(ManageTenantLearningSpaceCommand command, CancellationToken cancellationToken);
+    Task<LearningOperationState> ExecuteAsync(AcknowledgeLearningRequirementCommand command, CancellationToken cancellationToken);
 }
 
 /// <summary>The store accepts only its registered preparation's current reference, never an implemented grant.</summary>
@@ -50,6 +51,10 @@ public interface IHumanLearningMutationStore
 }
 
 public abstract record LearningMutationIntent(long ExpectedRevision);
+
+public sealed record LearningRequirementAcknowledgementIntent(
+    long ExpectedRevision, Guid IntentId, string RequirementKey, int MaterialVersion,
+    string ExpectedPolicySourceStamp) : LearningMutationIntent(ExpectedRevision);
 
 public sealed record LearningTourClaimIntent(
     long ExpectedRevision, Guid IntentId, LearningTourFamily Family, int MaterialVersion,

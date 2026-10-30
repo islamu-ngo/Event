@@ -17,6 +17,8 @@ public sealed class LearningPrivacyErasureStore(ExploreDbContext context) : ILea
     public async Task RequireAbsentAsync(PrivacyErasureIntent intent, CancellationToken cancellationToken)
     {
         RequireProtectedTransaction(intent);
+        // Tenant-qualified required FKs make root absence prove acknowledgement and
+        // other child absence without granting Global authority child-table reads.
         if (await context.UserLearningStates.IgnoreTenantFilter(TenantFilterBypassReasons.UserPrivacyErasure)
             .AsNoTracking().AnyAsync(value => value.UserId == intent.SubjectId, cancellationToken))
             throw new InvalidOperationException("learning_erasure_incomplete");

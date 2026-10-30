@@ -378,7 +378,12 @@ public sealed class LearningSimulationContractTests
         UserId = Guid.Parse("00000000-0000-0000-0000-000000000005"),
         ScopeStamp = "scope", ResourceRevision = 0, LearnerRevision = 0,
         SpaceStatus = LearningSpaceStatus.Absent,
-        Preferences = new(), Capabilities = new() { CanLearn = true }
+        Preferences = new(), Capabilities = new() { CanLearn = true },
+        Requirement = new()
+        {
+            RequirementKey = "tenant-admin-orientation", MaterialVersion = 1,
+            Status = LearningRequirementStatus.NotApplicable, PolicySourceStamp = "scope"
+        }
     };
 
     private static LearningSimulationStateDto Apply(

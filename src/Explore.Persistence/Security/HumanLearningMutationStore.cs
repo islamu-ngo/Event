@@ -31,6 +31,12 @@ internal sealed class HumanLearningMutationStore(
     private int _used;
     private IHumanLearningMutation? _completed;
     private string? _expectedImage;
+    private string? _expectedAcknowledgements;
+    private string? _expectedAcknowledgementTransition;
+    private Dictionary<Guid, string>? _removedAcknowledgements;
+    private Guid _acknowledgementId;
+    private EntityState _acknowledgementState;
+    private EntityState _acknowledgementRootState;
     private Dictionary<object, string>? _expectedTracked;
     private DateTime? _claimDeadline;
     private RelationalConnectionIdentity? _connection;
@@ -70,6 +76,8 @@ internal sealed class HumanLearningMutationStore(
                         {
                             await RequireCompleteAsync(mutation, finalToken);
                             await mutation.RequireCurrentAsync(finalToken);
+                            LearningAccessPolicy.RequireInteractiveAccess(
+                                mutation.Intent, mutation.CanManageSpace, mutation.Sources);
                             await identity.EnsureSubjectMayEnrollAsync(mutation.SubjectId, finalToken);
                             await guard.ValidateAsync(finalToken);
                             RequirePhysicalOwner(mutation);
@@ -85,8 +93,8 @@ internal sealed class HumanLearningMutationStore(
                         RequirePhysicalOwner(mutation);
                         await identity.EnsureSubjectMayEnrollAsync(mutation.SubjectId, ownerToken);
                         var result = await ApplyAsync(mutation, ownerToken);
-                        _expectedImage = Image(result.Space, result.State);
                         RequirePermittedChanges(mutation, result);
+                        _expectedImage = _expectedAcknowledgementTransition ?? Image(result.Space, result.State);
                         _expectedTracked = context.ChangeTracker.Entries()
                             .Where(entry => entry.State != EntityState.Deleted)
                             .ToDictionary(entry => entry.Entity, entry => ScalarImage(entry.Entity),
@@ -118,11 +126,60 @@ internal sealed class HumanLearningMutationStore(
     private async Task<LearningOperationState> ApplyAsync(
         IHumanLearningMutation mutation, CancellationToken token)
     {
+        LearningAccessPolicy.RequireInteractiveAccess(
+            mutation.Intent, mutation.CanManageSpace, mutation.Sources);
         var repository = services.GetRequiredService<ILearningRepository>();
         var space = await repository.GetSpaceAsync(mutation.TenantId, tracked: true, token);
+        var baseline = await repository.GetStateAsync(mutation.TenantId, mutation.SubjectId, tracked: false, token);
+        _expectedAcknowledgements = AcknowledgementImage(baseline);
         var state = await repository.GetStateAsync(mutation.TenantId, mutation.SubjectId, tracked: true, token);
+        if (_expectedAcknowledgements != AcknowledgementImage(state))
+            throw new UnauthorizedAccessException("Tracked requirement evidence differs from its persisted baseline.");
         LearningPracticeState? practice = null;
-        if (mutation.Intent is LearningSpaceIntent spaceIntent)
+        if (mutation.Intent is LearningRequirementAcknowledgementIntent acknowledgement)
+        {
+            if (mutation.ContextKey != "self" || mutation.EventContextId is not null)
+                throw new UnauthorizedAccessException("Requirement acknowledgement belongs only to the original self context.");
+            LearningAccessPolicy.RequireAcknowledgement(acknowledgement, mutation.CanManageSpace,
+                mutation.Sources, LearningGuidancePolicyCodec.Decode(mutation.Sources.GuidanceDocument));
+            if (Image(space, state) != Image(space, baseline))
+                throw new UnauthorizedAccessException("The tracked learner differs from its persisted baseline.");
+            if (baseline is null && acknowledgement.ExpectedRevision != 0)
+                throw Conflict("The learner revision is stale.");
+
+            LearningRequirementDefinition definition = LearningRequirementDefinition.Current;
+            var originalAcknowledgements = baseline?.RequirementAcknowledgements
+                .ToDictionary(value => value.Id, value => ScalarImage(value)) ?? [];
+            long originalRevision = baseline?.Revision ?? 0;
+            UserLearningState expected = baseline ?? UserLearningState.Create(mutation.CandidateStateId,
+                mutation.TenantId, mutation.SubjectId, mutation.UpdatedAtUtc);
+            Guid acknowledgementId = expected.RequirementAcknowledgements.SingleOrDefault(value =>
+                value.RequirementKey == definition.RequirementKey && value.MaterialVersion == definition.MaterialVersion)?.Id
+                ?? mutation.CandidateChildId;
+            expected.AcknowledgeRequirement(acknowledgementId, definition, mutation.Sources.PolicySourceStamp,
+                acknowledgement.IntentId, acknowledgement.ExpectedRevision, mutation.UpdatedAtUtc);
+            bool changed = expected.Revision != originalRevision;
+            _acknowledgementId = acknowledgementId;
+            _acknowledgementState = !changed ? EntityState.Unchanged
+                : originalAcknowledgements.ContainsKey(acknowledgementId) ? EntityState.Modified : EntityState.Added;
+            _acknowledgementRootState = !changed ? EntityState.Unchanged
+                : state is null ? EntityState.Added : EntityState.Modified;
+            _expectedAcknowledgements = AcknowledgementImage(expected);
+            _expectedAcknowledgementTransition = Image(space, expected);
+            _removedAcknowledgements = originalAcknowledgements.Where(value =>
+                    expected.RequirementAcknowledgements.All(row => row.Id != value.Key))
+                .ToDictionary(value => value.Key, value => value.Value);
+
+            if (state is null)
+            {
+                state = UserLearningState.Create(mutation.CandidateStateId, mutation.TenantId,
+                    mutation.SubjectId, mutation.UpdatedAtUtc);
+                await repository.AddStateAsync(state, token);
+            }
+            state.AcknowledgeRequirement(acknowledgementId, definition, mutation.Sources.PolicySourceStamp,
+                acknowledgement.IntentId, acknowledgement.ExpectedRevision, mutation.UpdatedAtUtc);
+        }
+        else if (mutation.Intent is LearningSpaceIntent spaceIntent)
         {
             if (!mutation.CanManageSpace)
                 throw new AuthorizationException("Current tenant administration is required.");
@@ -206,6 +263,8 @@ internal sealed class HumanLearningMutationStore(
                     var progress = state.Tours.SingleOrDefault(value =>
                         value.Family == claim.Family && value.MaterialVersion == claim.MaterialVersion);
                     bool duplicate = state.LastIntentId == claim.IntentId || progress?.LastIntentId == claim.IntentId;
+                    if (!duplicate && !claim.Replay && state.IsHidden)
+                        throw Conflict("Hidden guidance requires explicit manual replay.");
                     Guid claimId = duplicate
                         && state.ActiveTourId == progress?.Id && state.ActiveClaimId.HasValue
                         ? state.ActiveClaimId.Value : mutation.CandidateClaimId;
@@ -310,22 +369,42 @@ internal sealed class HumanLearningMutationStore(
     private void RequirePermittedChanges(IHumanLearningMutation mutation, LearningOperationState result)
     {
         context.ChangeTracker.DetectChanges();
+        bool acknowledgement = mutation.Intent is LearningRequirementAcknowledgementIntent;
+        if (_expectedAcknowledgements != AcknowledgementImage(result.State)
+            || acknowledgement && _expectedAcknowledgementTransition != Image(result.Space, result.State))
+            throw new UnauthorizedAccessException("Learning changed evidence outside its baseline-authorized transition.");
+        var acknowledgements = result.State?.RequirementAcknowledgements.ToArray() ?? [];
+        var trackedAcknowledgements = context.ChangeTracker.Entries<LearningRequirementAcknowledgement>()
+            .Where(entry => entry.State != EntityState.Deleted).ToArray();
+        if (trackedAcknowledgements.Length != acknowledgements.Length
+            || trackedAcknowledgements.Any(entry => !acknowledgements.Any(value => ReferenceEquals(value, entry.Entity))))
+            throw new UnauthorizedAccessException("The tracked acknowledgement inventory contains unowned evidence.");
         foreach (var entry in context.ChangeTracker.Entries()
                      .Where(value => value.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
         {
             bool permitted = entry.Entity switch
             {
-                TenantLearningSpace value => ReferenceEquals(value, result.Space) && value.TenantId == mutation.TenantId,
+                TenantLearningSpace value => !acknowledgement
+                    && ReferenceEquals(value, result.Space) && value.TenantId == mutation.TenantId,
                 UserLearningState value => ReferenceEquals(value, result.State)
-                    && value.TenantId == mutation.TenantId && value.UserId == mutation.SubjectId,
-                LearningTourProgress value => value.TenantId == mutation.TenantId
+                    && value.TenantId == mutation.TenantId && value.UserId == mutation.SubjectId
+                    && (!acknowledgement || entry.State == _acknowledgementRootState),
+                LearningTourProgress value => !acknowledgement && value.TenantId == mutation.TenantId
                     && value.UserLearningStateId == result.State?.Id,
-                LearningTourStepProgress value => value.TenantId == mutation.TenantId
+                LearningTourStepProgress value => !acknowledgement && value.TenantId == mutation.TenantId
                     && context.ChangeTracker.Entries<LearningTourProgress>().Any(tour =>
                         tour.Entity.Id == value.TourProgressId && tour.Entity.TenantId == mutation.TenantId
                         && tour.Entity.UserLearningStateId == result.State!.Id),
-                LearningPracticeState value => value.TenantId == mutation.TenantId
+                LearningPracticeState value => !acknowledgement && value.TenantId == mutation.TenantId
                     && value.UserLearningStateId == result.State?.Id,
+                LearningRequirementAcknowledgement value => acknowledgement && value.TenantId == mutation.TenantId
+                    && value.UserLearningStateId == result.State?.Id
+                    && (entry.State == EntityState.Deleted
+                        ? _removedAcknowledgements is not null
+                            && _removedAcknowledgements.TryGetValue(value.Id, out var original)
+                            && original == ScalarImage(value)
+                        : value.Id == _acknowledgementId && entry.State == _acknowledgementState
+                            && acknowledgements.Any(row => ReferenceEquals(row, value))),
                 _ => false
             };
             if (!permitted)
@@ -342,9 +421,14 @@ internal sealed class HumanLearningMutationStore(
             Tours = state?.Tours.OrderBy(value => value.Id).Select(value => ScalarImage(value)).ToArray(),
             Steps = state?.Tours.SelectMany(value => value.Steps)
                 .OrderBy(value => value.Id).Select(value => ScalarImage(value)).ToArray(),
-            Practices = state?.Practices.OrderBy(value => value.Id).Select(value => ScalarImage(value)).ToArray()
+            Practices = state?.Practices.OrderBy(value => value.Id).Select(value => ScalarImage(value)).ToArray(),
+            Acknowledgements = AcknowledgementImage(state)
         });
     }
+
+    private string AcknowledgementImage(UserLearningState? state) =>
+        JsonSerializer.Serialize(state?.RequirementAcknowledgements
+            .OrderBy(value => value.Id).Select(value => ScalarImage(value)).ToArray() ?? []);
 
     private string ScalarImage(object entity) => JsonSerializer.Serialize(context.Entry(entity).Properties
         .OrderBy(value => value.Metadata.Name, StringComparer.Ordinal)

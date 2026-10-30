@@ -41,6 +41,57 @@ This repair keeps the existing integer announcement revision. It does not add
 multiple publications, scheduling, acknowledgements or the later material-edition
 contract.
 
+## Tenant Guidance Choices
+
+The new policy source lets current tenant administrators choose whether
+interactive learning is enabled, whether automatic invitations appear, and who
+may receive invitations or open learning manually. These two audiences are
+independent: active tenant members or tenant administrators. Named tours may
+have family-specific restrictions, but those cannot re-enable globally disabled
+learning or automatic invitations. Practice follows the global manual audience
+rather than borrowing an unrelated tour family's rules.
+
+Default policy enables optional learning for active members and permits
+invitations. Reading absent policy uses code defaults without creating stored
+state. Administrative integrations read and conditionally replace the policy at
+`/api/tenant/settings/documents/learning-guidance`, following its returned
+`edit` link and current concurrency stamp. A stale save must refresh rather than
+silently overwrite another administrator's changes.
+
+Instance administrators may prevent tenant edits through the registered
+instance-only `learning.guidance.allow_tenant_edits` setting. Its default is
+true; a tenant cannot override a false instance choice. This uses existing
+settings administration, not a new environment variable or secret.
+
+Disabled learning must leave static Help, private history and self-data
+deletion/export available; it does not erase evidence or remove the shared
+source. Manual-only learning removes automatic invitations, not permitted
+manual access. Someone eligible for an invitation may explicitly Start even if
+the manual audience is narrower; Replay requires manual eligibility. Neither
+path bypasses current membership or workspace authority.
+Targeted backend checks cover these policy gates. Rendered learning surfaces
+and complete deployment assurance remain separate programme gates.
+
+## Administrator Orientation Acknowledgement
+
+The backend contract lets a tenant opt into an explicit administrator
+orientation acknowledgement. Targeted admission and protected-erasure checks
+cover its private evidence; the rendered administrator interface and complete
+deployment assurance remain separate. Default learning remains optional.
+
+When required, each current tenant administrator sees their own pending or
+satisfied status. Another administrator cannot read or acknowledge it for them.
+Hiding learning or suppressing invitations does not hide a pending requirement.
+Only an explicit acknowledgement records it; completing a tour does not.
+Changing invitation settings does not invalidate acknowledgement of the same
+orientation material.
+
+Acknowledgement is a personal statement that the material was reviewed, not a
+competence assessment or permission to publish, pay or administer another scope.
+It blocks no login, recovery, privacy or production action. It does not recreate
+a removed shared practice space. Evidence belongs to the learner's account and
+tenant and is removed with that account's protected learning erasure.
+
 ## What Practice Represents
 
 The backend-defined version-1 `learning-core` practice pack contains six deterministic exercises:

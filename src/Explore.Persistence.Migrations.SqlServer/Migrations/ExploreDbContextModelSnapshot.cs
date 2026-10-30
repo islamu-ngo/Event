@@ -17867,6 +17867,63 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                     b.ToTable("learning_practice_states", "islamu_event");
                 });
 
+            modelBuilder.Entity("Explore.Domain.Learning.LearningRequirementAcknowledgement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("AcknowledgedAtUtc")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("acknowledged_at_utc");
+
+                    b.Property<string>("LastIntentFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("last_intent_fingerprint");
+
+                    b.Property<Guid>("LastIntentId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("last_intent_id");
+
+                    b.Property<int>("MaterialVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("material_version");
+
+                    b.Property<string>("PolicySourceStamp")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("policy_source_stamp");
+
+                    b.Property<string>("RequirementKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(32)")
+                        .HasColumnName("requirement_key");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserLearningStateId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_learning_state_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_learning_requirement_acknowledgements");
+
+                    b.HasIndex("TenantId", "UserLearningStateId", "RequirementKey", "MaterialVersion")
+                        .IsUnique()
+                        .HasDatabaseName("ix_learning_requirement_acknowledgements_tenant_id_user_learning_state_id_requirement_key_material_version");
+
+                    b.ToTable("learning_requirement_acknowledgements", "islamu_event");
+                });
+
             modelBuilder.Entity("Explore.Domain.Learning.LearningTourProgress", b =>
                 {
                     b.Property<Guid>("Id")
@@ -57071,6 +57128,17 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasConstraintName("fk_learning_practice_states_user_learning_states_tenant_id_user_learning_state_id");
                 });
 
+            modelBuilder.Entity("Explore.Domain.Learning.LearningRequirementAcknowledgement", b =>
+                {
+                    b.HasOne("Explore.Domain.Learning.UserLearningState", null)
+                        .WithMany("RequirementAcknowledgements")
+                        .HasForeignKey("TenantId", "UserLearningStateId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.ClientCascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_learning_requirement_acknowledgements_user_learning_states_tenant_id_user_learning_state_id");
+                });
+
             modelBuilder.Entity("Explore.Domain.Learning.LearningTourProgress", b =>
                 {
                     b.HasOne("Explore.Domain.Learning.UserLearningState", null)
@@ -68312,6 +68380,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
             modelBuilder.Entity("Explore.Domain.Learning.UserLearningState", b =>
                 {
                     b.Navigation("Practices");
+
+                    b.Navigation("RequirementAcknowledgements");
 
                     b.Navigation("Tours");
                 });

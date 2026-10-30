@@ -17,6 +17,8 @@ public static class HumanSettingsMutationPreparationServicesRegistration
         services.TryAddScoped<IHumanSettingsMutationPreparation, HumanSettingsMutationPreparation>();
         services.TryAddScoped<IHumanTenantPreferencePreparation, HumanTenantPreferencePreparation>();
         services.TryAddScoped<IHumanLearningMutationPreparation, HumanLearningMutationPreparation>();
+        services.TryAddScoped<ILearningGuidancePolicyReader, LearningGuidancePolicyReader>();
+        services.TryAddScoped<IHumanLearningPolicyMutationPreparation, HumanLearningPolicyMutationPreparation>();
         services.TryAddScoped<IHumanLearningContextReader>(provider => new HumanLearningContextReader(
             provider.GetRequiredService<Explore.Application.Contracts.Operations.IHumanCommitScopePreparation>(),
             provider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),

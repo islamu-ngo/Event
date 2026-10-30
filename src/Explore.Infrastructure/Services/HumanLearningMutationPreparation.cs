@@ -35,6 +35,12 @@ public sealed class HumanLearningMutationPreparation(
     public IHumanLearningMutation? CurrentMutation => _current;
 
     public Task<LearningOperationState> ExecuteAsync(
+        AcknowledgeLearningRequirementCommand command, CancellationToken cancellationToken) =>
+        ExecuteAsync(new LearningRequirementAcknowledgementIntent(command.Input.ExpectedRevision,
+            command.Input.IntentId, command.RequirementKey, command.Input.MaterialVersion,
+            command.Input.ExpectedPolicySourceStamp), command.Input.ExpectedScopeStamp, cancellationToken);
+
+    public Task<LearningOperationState> ExecuteAsync(
         ClaimLearningTourCommand command, CancellationToken cancellationToken) =>
         ExecuteAsync(new LearningTourClaimIntent(command.Input.ExpectedRevision, command.Input.IntentId,
             Map(command.Input.Family), command.Input.MaterialVersion, command.Input.ContextKey,
@@ -264,8 +270,12 @@ public sealed class HumanLearningMutationPreparation(
             currentMutation.CanManageSpace = await services.GetRequiredService<ITenantAdministratorCommitAuthority>()
                 .IsTenantAdministratorForCommitAsync(userId, tenantId, token);
             currentMutation.CanManageEvent = HasEventAuthority(currentAssignments, clock.GetUtcNow());
-            if (intent is LearningSpaceIntent && !currentMutation.CanManageSpace)
+            if (intent is LearningSpaceIntent or LearningRequirementAcknowledgementIntent
+                && !currentMutation.CanManageSpace)
                 throw new AuthorizationException("Current tenant administrator authority is required.");
+            if (intent is LearningRequirementAcknowledgementIntent acknowledgement)
+                LearningAccessPolicy.RequireAcknowledgement(acknowledgement, currentMutation.CanManageSpace,
+                    currentMutation.Sources, LearningGuidancePolicyCodec.Decode(currentMutation.Sources.GuidanceDocument));
             if (intent is LearningTourClaimIntent { Family: LearningTourFamily.Studio }
                 && !workspaces.Studio(currentMutation.AvailableActors))
                 throw new AuthorizationException("The native Studio workspace is not available.");

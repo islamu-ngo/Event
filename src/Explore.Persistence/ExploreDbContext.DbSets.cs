@@ -25,6 +25,7 @@ public partial class ExploreDbContext
     public DbSet<LearningTourProgress> LearningTourProgress { get; set; }
     public DbSet<LearningTourStepProgress> LearningTourStepProgress { get; set; }
     public DbSet<LearningPracticeState> LearningPracticeStates { get; set; }
+    public DbSet<LearningRequirementAcknowledgement> LearningRequirementAcknowledgements { get; set; }
 
     public DbSet<SetupTargetEnrollment> SetupTargetEnrollments { get; set; }
     public DbSet<KeycloakOperation> KeycloakOperations { get; set; }

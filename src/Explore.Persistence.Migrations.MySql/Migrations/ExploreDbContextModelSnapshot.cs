@@ -17943,6 +17943,63 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.ToTable("ie_learning_practice_states", (string)null);
                 });
 
+            modelBuilder.Entity("Explore.Domain.Learning.LearningRequirementAcknowledgement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("AcknowledgedAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("acknowledged_at_utc");
+
+                    b.Property<string>("LastIntentFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("last_intent_fingerprint");
+
+                    b.Property<Guid>("LastIntentId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("last_intent_id");
+
+                    b.Property<int>("MaterialVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("material_version");
+
+                    b.Property<string>("PolicySourceStamp")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("policy_source_stamp");
+
+                    b.Property<string>("RequirementKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(32)")
+                        .HasColumnName("requirement_key");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserLearningStateId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("user_learning_state_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_learning_requirement_acknowledgements");
+
+                    b.HasIndex("TenantId", "UserLearningStateId", "RequirementKey", "MaterialVersion")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ie_learning_requirement_acknowledgements_tenant_id_u_56d61a79");
+
+                    b.ToTable("ie_learning_requirement_acknowledgements", (string)null);
+                });
+
             modelBuilder.Entity("Explore.Domain.Learning.LearningTourProgress", b =>
                 {
                     b.Property<Guid>("Id")
@@ -57224,6 +57281,17 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasConstraintName("fk_ie_learning_practice_states_ie_user_learning_states__4c499dd6");
                 });
 
+            modelBuilder.Entity("Explore.Domain.Learning.LearningRequirementAcknowledgement", b =>
+                {
+                    b.HasOne("Explore.Domain.Learning.UserLearningState", null)
+                        .WithMany("RequirementAcknowledgements")
+                        .HasForeignKey("TenantId", "UserLearningStateId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_learning_requirement_acknowledgements_ie_user_lea_43186a25");
+                });
+
             modelBuilder.Entity("Explore.Domain.Learning.LearningTourProgress", b =>
                 {
                     b.HasOne("Explore.Domain.Learning.UserLearningState", null)
@@ -68266,6 +68334,8 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
             modelBuilder.Entity("Explore.Domain.Learning.UserLearningState", b =>
                 {
                     b.Navigation("Practices");
+
+                    b.Navigation("RequirementAcknowledgements");
 
                     b.Navigation("Tours");
                 });

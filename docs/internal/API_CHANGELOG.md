@@ -5,6 +5,27 @@ Source: API routes and generated OpenAPI contracts.
 
 ## 2026-10-30
 
+- C05 policy source adds private read-only-default GET and Guid-CAS PATCH at
+  `/api/tenant/settings/documents/learning-guidance`. Schema1 and defaults
+  `learning-guidance:1` describe enabled/invitation/manual audiences,
+  optional administrator acknowledgement and at most four family overrides.
+  Only HAL advertises editing, constrained by current native administration and
+  the instance-only edit control. Original absence/value/lock sources and the
+  exact accepted semantic document image remain checked through settlement.
+  Effective-policy Application/HTTP checks and actual PostgreSQL Runtime
+  guidance/isolation checks passed. Hosted UI and full provider assurance remain.
+
+- C05 acknowledgement source adds
+  `POST /api/learning/requirements/{requirementKey}/acknowledge` and private
+  `LearningContextDto.Requirement`. Only current tenant administrators may
+  explicitly acknowledge current `tenant-admin-orientation` material under a
+  required policy. The strict request carries scope/revision/source bindings
+  and a stable intent, never a supplied owner. Pending-only HAL and private
+  evidence do not grant production authority or depend on tour completion.
+  Targeted Application/API admission and SQLite erasure checks passed. Native
+  schema/client regeneration and all seven learning generated-contract checks
+  passed; rendered acknowledgement and full programme assurance remain separate.
+
 - The semantic learning contract below now has fresh native API/client
   generation, Release client compilation and four passing generated-contract
   cases. Both dedicated external-authority original-human source cases passed.

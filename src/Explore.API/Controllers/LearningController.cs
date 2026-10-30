@@ -40,6 +40,7 @@ public sealed class LearningController(
     ICommandHandler<UpdateLearningPreferencesCommand, LearningMutationResult> preferencesCommand,
     ICommandHandler<ApplyLearningPracticeActionCommand, LearningMutationResult> practiceCommand,
     ICommandHandler<ManageTenantLearningSpaceCommand, LearningMutationResult> spaceCommand,
+    ICommandHandler<AcknowledgeLearningRequirementCommand, LearningMutationResult> acknowledgementCommand,
     IResourceAssembler<LearningContextDto, LearningContextDto> contextAssembler,
     IResourceAssembler<LearningTourPlanDto, LearningTourPlanDto> tourPlanAssembler,
     IResourceAssembler<LearningPracticeDto, LearningPracticeDto> practiceAssembler,
@@ -152,6 +153,21 @@ public sealed class LearningController(
     public async Task<ActionResult<HalResource<LearningMutationReceiptDto>>> ManageSpace(
         [FromBody] LearningManageSpaceRequest input, CancellationToken cancellationToken = default) =>
         await ToReceipt(await spaceCommand.ExecuteAsync(new ManageTenantLearningSpaceCommand(input), cancellationToken));
+
+    [HttpPost("requirements/{requirementKey}/acknowledge", Name = RouteNames.LearningAcknowledgeRequirement)]
+    [Authorize]
+    [SuppressIdempotencyResponseStorage]
+    [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
+    [RequestSizeLimit(65536)]
+    [Consumes(HateoasConstants.JsonMediaType)]
+    [EndpointSummary("Acknowledge the current private administrator orientation")]
+    [ProducesResponseType(typeof(HalResource<LearningMutationReceiptDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<HalResource<LearningMutationReceiptDto>>> AcknowledgeRequirement(
+        string requirementKey,
+        [FromBody] LearningAcknowledgeRequirementRequest input,
+        CancellationToken cancellationToken = default) =>
+        await ToReceipt(await acknowledgementCommand.ExecuteAsync(
+            new AcknowledgeLearningRequirementCommand(requirementKey, input), cancellationToken));
 
     private async Task<ActionResult<HalResource<LearningMutationReceiptDto>>> ToReceipt(LearningMutationResult result)
     {

@@ -17,6 +17,8 @@ public sealed record LearningTourPlanDto : LearningResourceDto
     public Guid? EventContextId { get; init; }
     public required bool IsAvailable { get; init; }
     public required bool CanClaim { get; init; }
+    /// <summary>Current automatic invitation observation, not permission to claim; clients use HAL actions.</summary>
+    public bool CanInvite { get; init; }
     public LearningDisplayTextDto? UnavailableReason { get; init; }
 
     /// <summary>Only currently applicable semantic steps, in presentation order.</summary>

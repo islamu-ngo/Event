@@ -74235,6 +74235,416 @@
         "x-rate-limit-policy": "Write"
       }
     },
+    "/api/learning/requirements/{requirementKey}/acknowledge": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Acknowledge the current private administrator orientation",
+        "operationId": "LearningAcknowledgeRequirement",
+        "parameters": [
+          {
+            "name": "requirementKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningAcknowledgeRequirementRequest"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningAcknowledgeRequirementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfLearningMutationReceiptDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfLearningMutationReceiptDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          },
+          {
+            "ApiKey": [ ]
+          }
+        ],
+        "x-endpoint-class": "Authenticated",
+        "x-rate-limit-policy": "Write"
+      }
+    },
+    "/api/tenant/settings/documents/learning-guidance": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Read private tenant learning guidance",
+        "operationId": "GetLearningGuidancePolicy",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfLearningGuidancePolicyDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfLearningGuidancePolicyDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Authenticated"
+      },
+      "patch": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Replace tenant learning guidance using the observed document stamp",
+        "operationId": "UpdateLearningGuidancePolicy",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLearningGuidancePolicyRequest"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLearningGuidancePolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfLearningGuidancePolicyDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfLearningGuidancePolicyDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          },
+          {
+            "ApiKey": [ ]
+          }
+        ],
+        "x-endpoint-class": "Authenticated",
+        "x-rate-limit-policy": "Write"
+      }
+    },
     "/api/legal-documents/{kindCode}": {
       "get": {
         "tags": [
@@ -175474,7 +175884,8 @@
           "learnerRevision",
           "spaceStatus",
           "preferences",
-          "capabilities"
+          "capabilities",
+          "requirement"
         ],
         "type": "object",
         "properties": {
@@ -175538,6 +175949,9 @@
           "capabilities": {
             "$ref": "#/components/schemas/LearningCapabilitiesDto"
           },
+          "requirement": {
+            "$ref": "#/components/schemas/LearningRequirementDto"
+          },
           "claim": {
             "oneOf": [
               {
@@ -175565,6 +175979,52 @@
             "items": {
               "$ref": "#/components/schemas/LearningPracticeSummaryDto"
             }
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfLearningGuidancePolicyDto": {
+        "required": [
+          "schemaVersion",
+          "defaultsVersion",
+          "concurrencyStamp",
+          "policy"
+        ],
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "defaultsVersion": {
+            "type": "string"
+          },
+          "concurrencyStamp": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/LearningGuidancePolicyPayload"
           },
           "_links": {
             "type": "object",
@@ -175811,6 +176271,9 @@
             "type": "boolean"
           },
           "canClaim": {
+            "type": "boolean"
+          },
+          "canInvite": {
             "type": "boolean"
           },
           "unavailableReason": {
@@ -191032,6 +191495,45 @@
           }
         }
       },
+      "LearningAcknowledgeRequirementRequest": {
+        "required": [
+          "intentId",
+          "expectedScopeStamp",
+          "expectedRevision",
+          "expectedPolicySourceStamp",
+          "materialVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "intentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedScopeStamp": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "expectedPolicySourceStamp": {
+            "type": "string"
+          },
+          "materialVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "LearningApplyPracticeActionRequest": {
         "required": [
           "expectedScopeStamp",
@@ -191108,6 +191610,9 @@
             "type": "boolean"
           },
           "canClaimTours": {
+            "type": "boolean"
+          },
+          "canInviteTours": {
             "type": "boolean"
           },
           "canSimulate": {
@@ -191242,7 +191747,8 @@
           "learnerRevision",
           "spaceStatus",
           "preferences",
-          "capabilities"
+          "capabilities",
+          "requirement"
         ],
         "type": "object",
         "properties": {
@@ -191306,6 +191812,9 @@
           "capabilities": {
             "$ref": "#/components/schemas/LearningCapabilitiesDto"
           },
+          "requirement": {
+            "$ref": "#/components/schemas/LearningRequirementDto"
+          },
           "claim": {
             "oneOf": [
               {
@@ -191350,6 +191859,120 @@
             "type": "string"
           }
         }
+      },
+      "LearningGuidanceAudience": {
+        "enum": [
+          "ActiveMembers",
+          "TenantAdministrators"
+        ],
+        "type": "string"
+      },
+      "LearningGuidanceFamilyOverrideDto": {
+        "required": [
+          "family",
+          "enabled",
+          "automaticInvitations"
+        ],
+        "type": "object",
+        "properties": {
+          "family": {
+            "$ref": "#/components/schemas/LearningTourFamily"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "automaticInvitations": {
+            "type": "boolean"
+          },
+          "invitationAudience": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LearningGuidanceAudience"
+              }
+            ]
+          },
+          "manualAccessAudience": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LearningGuidanceAudience"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "LearningGuidancePolicyDto": {
+        "required": [
+          "schemaVersion",
+          "defaultsVersion",
+          "concurrencyStamp",
+          "policy"
+        ],
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "defaultsVersion": {
+            "type": "string"
+          },
+          "concurrencyStamp": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/LearningGuidancePolicyPayload"
+          }
+        }
+      },
+      "LearningGuidancePolicyPayload": {
+        "required": [
+          "enabled",
+          "automaticInvitations",
+          "invitationAudience",
+          "manualAccessAudience",
+          "requirementPolicy",
+          "familyOverrides"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "automaticInvitations": {
+            "type": "boolean"
+          },
+          "invitationAudience": {
+            "$ref": "#/components/schemas/LearningGuidanceAudience"
+          },
+          "manualAccessAudience": {
+            "$ref": "#/components/schemas/LearningGuidanceAudience"
+          },
+          "requirementPolicy": {
+            "$ref": "#/components/schemas/LearningRequirementPolicy"
+          },
+          "familyOverrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningGuidanceFamilyOverrideDto"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "LearningLessonDto": {
         "required": [
@@ -191634,6 +192257,16 @@
           },
           "previewAvailable": {
             "type": "boolean"
+          },
+          "unavailableReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LearningDisplayTextDto"
+              }
+            ]
           }
         }
       },
@@ -191770,6 +192403,56 @@
           }
         },
         "additionalProperties": false
+      },
+      "LearningRequirementDto": {
+        "required": [
+          "requirementKey",
+          "materialVersion",
+          "status",
+          "policySourceStamp"
+        ],
+        "type": "object",
+        "properties": {
+          "requirementKey": {
+            "type": "string"
+          },
+          "materialVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LearningRequirementStatus"
+          },
+          "policySourceStamp": {
+            "type": "string"
+          },
+          "acknowledgedAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "LearningRequirementPolicy": {
+        "enum": [
+          "Optional",
+          "TenantAdminOrientationAcknowledgement"
+        ],
+        "type": "string"
+      },
+      "LearningRequirementStatus": {
+        "enum": [
+          "NotApplicable",
+          "Pending",
+          "Satisfied"
+        ],
+        "type": "string"
       },
       "LearningSimulationReceiptDto": {
         "required": [
@@ -192122,6 +192805,9 @@
           "canClaim": {
             "type": "boolean"
           },
+          "canInvite": {
+            "type": "boolean"
+          },
           "unavailableReason": {
             "oneOf": [
               {
@@ -192192,6 +192878,9 @@
             }
           },
           "isAvailable": {
+            "type": "boolean"
+          },
+          "canInvite": {
             "type": "boolean"
           },
           "unavailableReason": {
@@ -222029,6 +222718,26 @@
             "$ref": "#/components/schemas/OptionalUpdateOfGuid"
           }
         }
+      },
+      "UpdateLearningGuidancePolicyRequest": {
+        "required": [
+          "expectedConcurrencyStamp",
+          "policy"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedConcurrencyStamp": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/LearningGuidancePolicyPayload"
+          }
+        },
+        "additionalProperties": false
       },
       "UpdateListmonkIntegrationSettingsDto": {
         "type": "object",

@@ -10,6 +10,7 @@ public sealed class UserLearningState : ITenantEntity
     private Guid _tenantId;
     private readonly List<LearningTourProgress> _tours = [];
     private readonly List<LearningPracticeState> _practices = [];
+    private readonly List<LearningRequirementAcknowledgement> _requirementAcknowledgements = [];
     private UserLearningState() { }
 
     public Guid Id { get; private set; }
@@ -40,7 +41,38 @@ public sealed class UserLearningState : ITenantEntity
     public string? LastIntentFingerprint { get; private set; }
     public IReadOnlyCollection<LearningTourProgress> Tours => _tours.AsReadOnly();
     public IReadOnlyCollection<LearningPracticeState> Practices => _practices.AsReadOnly();
+    public IReadOnlyCollection<LearningRequirementAcknowledgement> RequirementAcknowledgements =>
+        _requirementAcknowledgements.AsReadOnly();
     public int TotalPracticePayloadBytes => _practices.Sum(p => p.PayloadBytes);
+
+    public LearningRequirementAcknowledgement AcknowledgeRequirement(Guid acknowledgementId,
+        LearningRequirementDefinition definition, string policySourceStamp, Guid intentId,
+        long expectedRevision, DateTime utcNow)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        LearningGuard.Identity(acknowledgementId, nameof(acknowledgementId));
+        RequirePlanStamp(policySourceStamp);
+        string fingerprint = LearningGuard.Fingerprint(
+            $"requirement-acknowledgement|{acknowledgementId:D}|{definition.RequirementKey}|{definition.MaterialVersion}|{policySourceStamp}|{intentId:D}|{expectedRevision}");
+        if (IsDuplicate(intentId, fingerprint, utcNow))
+            return _requirementAcknowledgements.Single(value => value.Id == acknowledgementId);
+        LearningGuard.Mutation(Revision, expectedRevision, UpdatedAtUtc, utcNow);
+        LearningRequirementAcknowledgement? existing = _requirementAcknowledgements.SingleOrDefault(value =>
+            value.RequirementKey == definition.RequirementKey && value.MaterialVersion == definition.MaterialVersion);
+        if (existing is not null && existing.Id != acknowledgementId
+            || _requirementAcknowledgements.Any(value => value.Id == acknowledgementId && value != existing))
+            throw new InvalidOperationException("Acknowledgement identity does not match its requirement and material.");
+        int newest = _requirementAcknowledgements.Select(value => value.MaterialVersion).DefaultIfEmpty().Max();
+        if (definition.MaterialVersion < newest)
+            throw new InvalidOperationException("Only current authored requirement material may be acknowledged.");
+        LearningRequirementAcknowledgement acknowledgement = existing
+            ?? LearningRequirementAcknowledgement.Create(acknowledgementId, this, definition);
+        acknowledgement.Acknowledge(policySourceStamp, intentId, fingerprint, utcNow);
+        _requirementAcknowledgements.RemoveAll(value => value.MaterialVersion < definition.MaterialVersion - 1);
+        if (existing is null) _requirementAcknowledgements.Add(acknowledgement);
+        Remember(intentId, fingerprint, utcNow);
+        return acknowledgement;
+    }
 
     public void ClaimSemanticTour(Guid progressId, LearningTourDefinition definition,
         Guid claimId, Guid intentId, long expectedRevision, DateTime utcNow,
@@ -262,7 +294,8 @@ public sealed class UserLearningState : ITenantEntity
         LearningGuard.Utc(utcNow);
         string? recorded = LastIntentId == intentId ? LastIntentFingerprint :
             _tours.FirstOrDefault(t => t.LastIntentId == intentId)?.LastIntentFingerprint ??
-            _practices.FirstOrDefault(p => p.LastIntentId == intentId)?.LastIntentFingerprint;
+            _practices.FirstOrDefault(p => p.LastIntentId == intentId)?.LastIntentFingerprint ??
+            _requirementAcknowledgements.FirstOrDefault(value => value.LastIntentId == intentId)?.LastIntentFingerprint;
         if (recorded is null) return false;
         if (!string.Equals(recorded, fingerprint, StringComparison.Ordinal))
             throw new InvalidOperationException("The learning intent was already used with a different payload.");

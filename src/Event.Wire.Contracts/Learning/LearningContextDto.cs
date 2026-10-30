@@ -24,6 +24,7 @@ public sealed record LearningContextDto : LearningResourceDto
     public required LearningSpaceStatus SpaceStatus { get; init; }
     public required LearningPreferencesDto Preferences { get; init; }
     public required LearningCapabilitiesDto Capabilities { get; init; }
+    public required LearningRequirementDto Requirement { get; init; }
     public LearningTourClaimDto? Claim { get; init; }
 
     /// <summary>At most the current and previous material version for each of four families.</summary>
@@ -55,6 +56,7 @@ public sealed record LearningPracticeSummaryDto
     public required int MaterialVersion { get; init; }
     public required long Revision { get; init; }
     public bool PreviewAvailable { get; init; }
+    public LearningDisplayTextDto? UnavailableReason { get; init; }
 }
 
 public sealed record LearningPreferencesDto
@@ -69,6 +71,8 @@ public sealed record LearningCapabilitiesDto
 {
     public bool CanLearn { get; init; }
     public bool CanClaimTours { get; init; }
+    /// <summary>At least one current tour may be offered automatically; this is not an action grant.</summary>
+    public bool CanInviteTours { get; init; }
     public bool CanSimulate { get; init; }
     public bool CanClearPractice { get; init; }
     public bool CanManageSpace { get; init; }
@@ -92,6 +96,8 @@ public sealed record LearningTourProgressDto
         init => _completedSteps = LearningWireSnapshot.List(value, 32);
     }
     public bool IsAvailable { get; init; }
+    /// <summary>Server-derived automatic invitation observation for this family and material.</summary>
+    public bool CanInvite { get; init; }
     public LearningDisplayTextDto? UnavailableReason { get; init; }
 }
 

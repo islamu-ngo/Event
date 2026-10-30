@@ -395,6 +395,11 @@ public static class GovernanceSettingKeys
         public const string LockMcpLegacySse = "governance.lock_tenant_mcp_legacy_sse";
     }
 
+    public static class LearningGuidance
+    {
+        public const string AllowTenantEdits = "learning.guidance.allow_tenant_edits";
+    }
+
     public static class Policies
     {
         public const string CommunityGuidelinesContent = "policies.community_guidelines_content";

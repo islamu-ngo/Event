@@ -21,18 +21,19 @@ public sealed class LearningDependencyBoundaryTests
     }
 
     [Test]
-    public async Task ClosedLearningPreparationAcceptsOnlyItsFiveNativeIntents()
+    public async Task ClosedLearningPreparationAcceptsOnlyItsSixNativeIntents()
     {
         var methods = typeof(IHumanLearningMutationPreparation).GetMethods()
             .Where(method => method.Name == nameof(IHumanLearningMutationPreparation.ExecuteAsync)).ToArray();
-        await Assert.That(methods.Length).IsEqualTo(5);
+        await Assert.That(methods.Length).IsEqualTo(6);
         await Assert.That(methods.SelectMany(method => method.GetParameters())
             .Any(parameter => typeof(Delegate).IsAssignableFrom(parameter.ParameterType))).IsFalse();
         await Assert.That(methods.Select(method => method.GetParameters()[0].ParameterType.Name))
             .IsEquivalentTo(new[]
             {
                 "ClaimLearningTourCommand", "RecordLearningTourOutcomeCommand", "UpdateLearningPreferencesCommand",
-                "ApplyLearningPracticeActionCommand", "ManageTenantLearningSpaceCommand"
+                "ApplyLearningPracticeActionCommand", "ManageTenantLearningSpaceCommand",
+                "AcknowledgeLearningRequirementCommand"
             });
     }
 
@@ -53,11 +54,34 @@ public sealed class LearningDependencyBoundaryTests
     {
         var handlers = typeof(LearningLessonCatalog).Assembly.GetTypes()
             .Where(type => type.IsClass && !type.IsAbstract && type.Namespace?.StartsWith(
-                "Explore.Application.Features.Learning.Handlers.", StringComparison.Ordinal) == true).ToArray();
-        await Assert.That(handlers.Length).IsEqualTo(7);
+                    "Explore.Application.Features.Learning.Handlers.", StringComparison.Ordinal) == true)
+            .Where(type => type.GetInterfaces().Any(handlerInterface => handlerInterface.IsGenericType
+                && (handlerInterface.GetGenericTypeDefinition()
+                    == typeof(Explore.Application.Contracts.Operations.ICommandHandler<,>)
+                    || handlerInterface.GetGenericTypeDefinition()
+                    == typeof(Explore.Application.Contracts.Operations.IQueryHandler<,>))))
+            .ToArray();
+        await Assert.That(handlers.Length).IsEqualTo(11);
+        await Assert.That(handlers.Select(type => type.FullName
+            ?? throw new InvalidOperationException("Native learning handler types must have a full name.")))
+            .IsEquivalentTo(new[]
+        {
+            "Explore.Application.Features.Learning.Handlers.Commands.AcknowledgeLearningRequirementCommandHandler",
+            "Explore.Application.Features.Learning.Handlers.Commands.ApplyLearningPracticeActionCommandHandler",
+            "Explore.Application.Features.Learning.Handlers.Commands.ClaimLearningTourCommandHandler",
+            "Explore.Application.Features.Learning.Handlers.Commands.ManageTenantLearningSpaceCommandHandler",
+            "Explore.Application.Features.Learning.Handlers.Commands.RecordLearningTourOutcomeCommandHandler",
+            "Explore.Application.Features.Learning.Handlers.Commands.UpdateLearningGuidancePolicyCommandHandler",
+            "Explore.Application.Features.Learning.Handlers.Commands.UpdateLearningPreferencesCommandHandler",
+            "Explore.Application.Features.Learning.Handlers.Queries.GetLearningContextQueryHandler",
+            "Explore.Application.Features.Learning.Handlers.Queries.GetLearningGuidancePolicyQueryHandler",
+            "Explore.Application.Features.Learning.Handlers.Queries.GetLearningPracticeQueryHandler",
+            "Explore.Application.Features.Learning.Handlers.Queries.GetLearningTourPlanQueryHandler"
+        });
         var allowed = new[]
         {
             typeof(IHumanLearningMutationPreparation), typeof(IHumanLearningContextReader),
+            typeof(ILearningGuidancePolicyReader), typeof(IHumanLearningPolicyMutationPreparation),
             typeof(Explore.Application.Contracts.Operations.IHumanCommitScopePreparation)
         };
         var forbidden = handlers.SelectMany(type => type.GetConstructors())

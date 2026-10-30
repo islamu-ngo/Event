@@ -1,7 +1,7 @@
 # Private Learning State And Authored Practice
 
 > **Audience:** Developers and operators
-> **Status:** Backend-only source integration; C04 semantic assurance incomplete
+> **Status:** Backend integration with targeted semantic, guidance and acknowledgement checks; full programme/host assurance remains open
 > **Contract Updated:** 2026-10-30; historical verification receipts retained below
 > **Source Anchors:** `src/Explore.Domain/Learning/`, `ILearningRepository`, `ILearningPrivacyErasureStore`, `PrivacyErasureApplier`
 
@@ -96,6 +96,86 @@ Suppression, snooze, skip and existing coverage require explicit `Replay` for a
 manual claim. Replay preserves historical completed/skipped outcomes and
 compatible evidence; nothing automatically replays a tour. Learning remains
 optional and is not a hard production gate.
+
+## Typed Tenant Policy Storage
+
+`LearningGuidancePolicyCodec` is the single strict schema1/
+`learning-guidance:1` serializer. It decodes already-acquired document sources
+without I/O or authority decisions. Absence returns the immutable Domain default;
+malformed or unsupported stored documents fail closed. Canonical serialization
+compares policy meaning independently of provider JSON property order or spaces.
+
+`LearningGuidancePolicyReader` resolves the captured document and instance-only
+edit-control facts for the private GET. A dedicated closed
+`HumanLearningPolicyMutationPreparation` retains the original command, human,
+credential, selected tenant, support and authorization route. Its persistence
+store compares original document absence/presence and instance control before
+Guid CAS, then verifies the accepted semantic/audit image through physical
+Serializable settlement and receipt consumption. It neither relaxes the
+read-only learning retention lease nor borrows branding provisioning authority.
+
+PostgreSQL guidance storage rights are limited to the selected tenant's
+`tenant.learning_guidance`: SELECT/INSERT and UPDATE of payload, stamp and update
+audit columns only. No DELETE or immutable identity/key update is granted.
+The actual Runtime positive read reached the intended42501 denial before these
+rights were authored. Private policy HTTP checks passed48/48 on their selected
+fixture. The post-change actual PostgreSQL Runtime permission/isolation witness
+passed, including three privilege-drift rejection/restoration cases.
+Credential-only access remains a storage boundary, not proof of original
+human authorization. C# preparation/store owns that authorization and workflow.
+
+Intersections with the existing tenant-creation catalog are explicitly
+recognized through source-owned guidance column and policy descriptors and an
+optional absent-or-complete catalog proof. This recognition adds no Global
+creation grant or bootstrap document key. The proof rejects partial rights,
+extra mutable columns, grant options, inherited/PUBLIC authority and policy
+drift. Fanout consumes the creation proof transitively, so checking only its
+direct source relations misses this dependency. A clean C04 fixture passed;
+the C05 mismatch was diagnosed before repairing this exact intersection.
+The new actual-role tamper/isolation gate passed; full provider and hosted
+acceptance are separate.
+
+The effective-policy resolver/store/representation extension passed targeted
+Application and HTTP checks. It distinguishes automatic invitation observations from
+action eligibility: non-replay Start and Progress/Complete accept current
+invitation or manual policy eligibility; explicit Replay requires manual
+eligibility. Accepted source stamps and current original-human facts remain
+mandatory. Practice uses global enabled/manual-audience rules, with no invented
+tour-family mapping. Denial precedes learning-row creation; cleanup remains
+available. These checks do not certify rendered learning surfaces.
+
+## Administrator Requirement Evidence
+
+The C05 acknowledgement source adds a separate closed intent to the existing
+original-human learning owner. It requires current tenant administration,
+required policy, current source/scope/revision and server-authored
+`tenant-admin-orientation` material1. It uses the existing learner root rather
+than creating a setup aggregate or borrowing a policy-write grant.
+Shared-space creation and tombstones do not govern this private evidence.
+
+`LearningRequirementAcknowledgement` retains tenant/root identity, requirement
+key/material, acknowledgement time, policy-source provenance and bounded latest
+intent/fingerprint. Reacknowledgement reuses the current child's identifier;
+current and previous authored material are retained, at most two rows.
+Current material stays satisfied after unrelated policy changes, but every
+submission and exact replay still requires current authority and source custody.
+
+`HumanLearningMutationStore` derives the permitted acknowledgement transition
+from an independently loaded persisted baseline before capturing its completion
+image. It compares all retained child scalars, rejects extra evidence or changes
+during unrelated intents, and checks the persisted image again after saving and
+at final admission. This extends the existing original physical transaction,
+identity-erasure exclusion and receipt-consumption mechanism.
+The eight Application cases passed. Eleven of fourteen API cases passed on the
+initial assembled run; the remaining fixture defects were repaired and four
+focused cases passed, including the affected parameter pair. SQLite erasure
+passed four cases. Native schema/client regeneration and seven parsed-contract
+checks passed. No unchanged suite rerun or hosted acceptance is implied.
+
+Four natively generated `AddLearningGuidancePolicy` cohorts add the child table,
+tenant-qualified parent FK and unique tenant/root/key/material index. SQL Server
+uses physical NoAction and ordered deletion; other providers use cascades.
+This generation receipt is not a database upgrade or full provider acceptance.
 
 ## Domain Ownership And Bounds
 

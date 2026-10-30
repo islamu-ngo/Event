@@ -34,6 +34,9 @@ public partial class ExploreDbContext
         modelBuilder.Entity<LearningPracticeState>()
             .HasQueryFilter(QueryFilterNames.Tenant, value =>
                 IsTenantFilterBypassed || value.TenantId == TenantFilterTenantId);
+        modelBuilder.Entity<LearningRequirementAcknowledgement>()
+            .HasQueryFilter(QueryFilterNames.Tenant, value =>
+                IsTenantFilterBypassed || value.TenantId == TenantFilterTenantId);
 
         modelBuilder.Entity<SetupTargetEnrollment>()
             .HasQueryFilter(QueryFilterNames.Tenant, value =>

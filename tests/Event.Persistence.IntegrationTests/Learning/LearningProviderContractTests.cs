@@ -12,9 +12,11 @@ using Explore.Domain.Settings.Documents;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
@@ -765,6 +767,236 @@ public sealed class LearningSourceRetentionExternalAuthorityPostgresTests(
 }
 
 /// <summary>
+/// Probes fixed document storage rights using enrolled credentials, not human mutation authority.
+/// Each invocation owns its database; rejected statements cannot poison another test's fixture.
+/// </summary>
+[Category("LearningProvider")]
+[NotInParallel("PersistenceDb")]
+public sealed class LearningGuidanceStoragePostgresTests
+{
+    [Test]
+    public async Task ActualEnrolledRuntimeCanWriteOnlySelectedTenantGuidanceWithoutDelete()
+    {
+        await using var owned = new PostgreSqlContainerFixture();
+        await owned.InitializeAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var token = timeout.Token;
+        Guid tenantId = Guid.CreateVersion7();
+        Guid foreignTenantId = Guid.CreateVersion7();
+        Guid brandingId = Guid.CreateVersion7();
+        Guid foreignGuidanceId = Guid.CreateVersion7();
+        Guid guidanceId = Guid.CreateVersion7();
+        Guid initialStamp = Guid.CreateVersion7();
+        Guid updatedStamp = Guid.CreateVersion7();
+        const string defaultsVersion = "learning-guidance:1";
+        const string initialPayload = """
+            {"enabled":true,"automaticInvitations":true,"invitationAudience":"ActiveMembers","manualAccessAudience":"ActiveMembers","requirementPolicy":"Optional","familyOverrides":[]}
+            """;
+        const string updatedPayload = """
+            {"enabled":true,"automaticInvitations":false,"invitationAudience":"ActiveMembers","manualAccessAudience":"ActiveMembers","requirementPolicy":"Optional","familyOverrides":[]}
+            """;
+
+        var migratorOptions = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(migratorOptions,
+            owned.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        await using var migrator = new ExploreDbContext(migratorOptions.Options);
+        migrator.EnableTenantFilterBypass(TenantFilterBypassReasons.DatabaseSeeding);
+        migrator.BindTenantLease();
+        await migrator.Database.OpenConnectionAsync(token);
+        await using (var identity = migrator.Database.GetDbConnection().CreateCommand())
+        {
+            identity.CommandText = "SELECT session_user = @migrator AND current_user = session_user";
+            identity.Parameters.Add(new NpgsqlParameter("migrator", owned.NativeQueueEnrollment.MigratorLogin));
+            await Assert.That(await identity.ExecuteScalarAsync(token)).IsEqualTo(true);
+        }
+        var tenants = new[] { tenantId, foreignTenantId }.Select(id => new Tenant
+        {
+            Id = id, Slug = $"guidance-permissions-{id:N}", FullName = "Guidance storage permission witness",
+            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+        }).ToArray();
+        migrator.Tenants.AddRange(tenants);
+        var branding = TenantSettingsDocument.Create(
+            tenantId, SettingsDocumentKeys.Tenant.Branding, 1, defaultsVersion, "{}");
+        branding.Id = brandingId;
+        branding.Tenant = tenants[0];
+        var foreignGuidance = TenantSettingsDocument.Create(
+            foreignTenantId, SettingsDocumentKeys.Tenant.LearningGuidance, 1, defaultsVersion, initialPayload);
+        foreignGuidance.Id = foreignGuidanceId;
+        foreignGuidance.Tenant = tenants[1];
+        migrator.TenantSettingsDocuments.AddRange(branding, foreignGuidance);
+        await using (var human = new HumanSecuritySourceGate(migrator))
+        await using (var heldHuman = await human.AcquireAsync(token))
+        await using (var discovery = new EventDiscoveryEnrollmentGate(migrator))
+        await using (var heldDiscovery = await discovery.AcquireAsync(token))
+            await migrator.SaveChangesAsync(token);
+
+        await using var runtime = await new TenantExploreDbContextFactory(
+            owned.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime)).CreateDbContextAsync(tenantId);
+        runtime.BindTenantLease();
+        await runtime.Database.OpenConnectionAsync(token);
+        await using (var identity = runtime.Database.GetDbConnection().CreateCommand())
+        {
+            identity.CommandText = """
+                SELECT session_user = @runtime AND current_user = session_user
+                    AND NOT rolsuper AND NOT rolbypassrls AND NOT rolcreatedb AND NOT rolcreaterole
+                    AND NULLIF(pg_catalog.current_setting('app.current_tenant_id', true), '')::uuid = @tenant
+                FROM pg_catalog.pg_roles WHERE rolname = session_user
+                """;
+            identity.Parameters.Add(new NpgsqlParameter("runtime", owned.NativeQueueEnrollment.RuntimeLogin));
+            identity.Parameters.Add(new NpgsqlParameter("tenant", tenantId));
+            await Assert.That(await identity.ExecuteScalarAsync(token)).IsEqualTo(true);
+        }
+
+        // Ignore only EF filters: the actual database must hide both seeded forbidden rows.
+        // Missing SELECT permission is an intended Red here, never a passing denial assertion.
+        await Assert.That(await runtime.TenantSettingsDocuments.IgnoreQueryFilters()
+            .AsNoTracking().ToArrayAsync(token)).IsEmpty();
+
+        var entity = runtime.Model.FindEntityType(typeof(TenantSettingsDocument))!;
+        var table = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+        var names = runtime.GetService<ISqlGenerationHelper>();
+        string tableName = names.DelimitIdentifier(table.Name, table.Schema);
+        string Column(string property) =>
+            names.DelimitIdentifier(entity.FindProperty(property)!.GetColumnName(table)!);
+        string idColumn = Column(nameof(TenantSettingsDocument.Id));
+        string tenantColumn = Column(nameof(TenantSettingsDocument.TenantId));
+        string keyColumn = Column(nameof(TenantSettingsDocument.DocumentKey));
+        string payloadColumn = Column(nameof(TenantSettingsDocument.PayloadJson));
+        string stampColumn = Column(nameof(TenantSettingsDocument.ConcurrencyStamp));
+
+        // Native parameterized DML reaches PostgreSQL privileges directly, without
+        // impersonating a prepared human or bypassing an EF mutation-owner guard.
+        async Task<int> InsertAsync(Guid targetTenant, string key, Guid documentId)
+        {
+            await using var command = runtime.Database.GetDbConnection().CreateCommand();
+            command.CommandText = $"""
+                INSERT INTO {tableName}
+                    ({idColumn}, {tenantColumn}, {keyColumn},
+                     {Column(nameof(TenantSettingsDocument.SchemaVersion))},
+                     {Column(nameof(TenantSettingsDocument.DefaultsVersion))},
+                     {payloadColumn}, {stampColumn}, {Column(nameof(TenantSettingsDocument.CreatedAt))})
+                VALUES (@id, @tenant, @key, @schema, @defaults, @payload, @stamp, @created)
+                """;
+            command.Parameters.Add(new NpgsqlParameter("id", documentId));
+            command.Parameters.Add(new NpgsqlParameter("tenant", targetTenant));
+            command.Parameters.Add(new NpgsqlParameter("key", key));
+            command.Parameters.Add(new NpgsqlParameter("schema", 1));
+            command.Parameters.Add(new NpgsqlParameter("defaults", defaultsVersion));
+            command.Parameters.Add(new NpgsqlParameter("payload", NpgsqlTypes.NpgsqlDbType.Jsonb)
+                { Value = initialPayload });
+            command.Parameters.Add(new NpgsqlParameter("stamp", initialStamp));
+            command.Parameters.Add(new NpgsqlParameter("created", LearningProviderDatabase.Now));
+            return await command.ExecuteNonQueryAsync(token);
+        }
+
+        async Task<int> UpdateAsync(Guid documentId)
+        {
+            await using var command = runtime.Database.GetDbConnection().CreateCommand();
+            command.CommandText = $"""
+                UPDATE {tableName} SET {payloadColumn} = @payload, {stampColumn} = @stamp
+                WHERE {idColumn} = @id
+                """;
+            command.Parameters.Add(new NpgsqlParameter("id", documentId));
+            command.Parameters.Add(new NpgsqlParameter("payload", NpgsqlTypes.NpgsqlDbType.Jsonb)
+                { Value = updatedPayload });
+            command.Parameters.Add(new NpgsqlParameter("stamp", updatedStamp));
+            return await command.ExecuteNonQueryAsync(token);
+        }
+
+        await Assert.That(await InsertAsync(
+            tenantId, SettingsDocumentKeys.Tenant.LearningGuidance, guidanceId)).IsEqualTo(1);
+        var visible = await runtime.TenantSettingsDocuments.IgnoreQueryFilters().AsNoTracking().ToArrayAsync(token);
+        await Assert.That(visible.Select(row => row.Id)).IsEquivalentTo([guidanceId]);
+        await Assert.That(visible.Single().TenantId).IsEqualTo(tenantId);
+        await Assert.That(visible.Single().DocumentKey).IsEqualTo(SettingsDocumentKeys.Tenant.LearningGuidance);
+        await Assert.That(visible.Single().ConcurrencyStamp).IsEqualTo(initialStamp);
+        await Assert.That(await UpdateAsync(guidanceId)).IsEqualTo(1);
+        var accepted = await runtime.TenantSettingsDocuments.IgnoreQueryFilters().AsNoTracking().SingleAsync(token);
+        await Assert.That(accepted.ConcurrencyStamp).IsEqualTo(updatedStamp);
+        using (var payload = System.Text.Json.JsonDocument.Parse(accepted.PayloadJson))
+            await Assert.That(payload.RootElement.GetProperty("automaticInvitations").GetBoolean()).IsFalse();
+
+        // Creation's full catalog includes this document table even when its caller's
+        // direct sources do not. Its optional guidance intersection must remain exact.
+        await PostgresTenantCreationPermissions.ApplyAsync(
+            migrator, owned.NativeQueueEnrollment, IdentityDatabaseTopology.Colocated, token);
+        string runtimeLogin = names.DelimitIdentifier(owned.NativeQueueEnrollment.RuntimeLogin);
+        foreach (var (change, restore) in new[]
+        {
+            ($"GRANT UPDATE ({keyColumn}) ON {tableName} TO {runtimeLogin}",
+                $"REVOKE UPDATE ({keyColumn}) ON {tableName} FROM {runtimeLogin}"),
+            ($"GRANT SELECT ({payloadColumn}) ON {tableName} TO {runtimeLogin} WITH GRANT OPTION",
+                $"REVOKE GRANT OPTION FOR SELECT ({payloadColumn}) ON {tableName} FROM {runtimeLogin}"),
+            ($"REVOKE UPDATE ({stampColumn}) ON {tableName} FROM {runtimeLogin}",
+                $"GRANT UPDATE ({stampColumn}) ON {tableName} TO {runtimeLogin}")
+        })
+        {
+            await migrator.Database.ExecuteSqlRawAsync(change, token);
+            try
+            {
+                var drift = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    PostgresTenantCreationPermissions.ApplyAsync(
+                        migrator, owned.NativeQueueEnrollment, IdentityDatabaseTopology.Colocated, token));
+                await Assert.That(drift!.Message).IsEqualTo("tenant_creation_permissions_drift");
+            }
+            finally
+            {
+                // Restore only this invocation's one privilege change, including when
+                // an assertion fails. Do not rerun the guidance installer to hide drift.
+                await migrator.Database.ExecuteSqlRawAsync(restore, CancellationToken.None);
+            }
+            await PostgresTenantCreationPermissions.ApplyAsync(
+                migrator, owned.NativeQueueEnrollment, IdentityDatabaseTopology.Colocated, token);
+        }
+
+        // Autocommit isolates each denied statement; no failed transaction is reused.
+        var otherKey = await Assert.ThrowsAsync<PostgresException>(() =>
+            InsertAsync(tenantId, SettingsDocumentKeys.Tenant.DirectoryOperatorIdentity, Guid.CreateVersion7()));
+        await Assert.That(otherKey!.SqlState).IsEqualTo("42501");
+        var foreignInsert = await Assert.ThrowsAsync<PostgresException>(() =>
+            InsertAsync(foreignTenantId, SettingsDocumentKeys.Tenant.LearningGuidance, Guid.CreateVersion7()));
+        await Assert.That(foreignInsert!.SqlState).IsEqualTo("42501");
+        await Assert.That(await UpdateAsync(brandingId)).IsEqualTo(0);
+        await Assert.That(await UpdateAsync(foreignGuidanceId)).IsEqualTo(0);
+        await using (var changeKey = runtime.Database.GetDbConnection().CreateCommand())
+        {
+            changeKey.CommandText = $"UPDATE {tableName} SET {keyColumn} = @key WHERE {idColumn} = @id";
+            changeKey.Parameters.Add(new NpgsqlParameter("key", SettingsDocumentKeys.Tenant.DirectoryOperatorIdentity));
+            changeKey.Parameters.Add(new NpgsqlParameter("id", guidanceId));
+            var denied = await Assert.ThrowsAsync<PostgresException>(() => changeKey.ExecuteNonQueryAsync(token));
+            await Assert.That(denied!.SqlState).IsEqualTo("42501");
+        }
+        await using (var changeTenant = runtime.Database.GetDbConnection().CreateCommand())
+        {
+            changeTenant.CommandText = $"UPDATE {tableName} SET {tenantColumn} = @tenant WHERE {idColumn} = @id";
+            changeTenant.Parameters.Add(new NpgsqlParameter("tenant", foreignTenantId));
+            changeTenant.Parameters.Add(new NpgsqlParameter("id", guidanceId));
+            var denied = await Assert.ThrowsAsync<PostgresException>(() => changeTenant.ExecuteNonQueryAsync(token));
+            await Assert.That(denied!.SqlState).IsEqualTo("42501");
+        }
+        await using (var delete = runtime.Database.GetDbConnection().CreateCommand())
+        {
+            delete.CommandText = $"DELETE FROM {tableName} WHERE {idColumn} = @id";
+            delete.Parameters.Add(new NpgsqlParameter("id", guidanceId));
+            var denied = await Assert.ThrowsAsync<PostgresException>(() => delete.ExecuteNonQueryAsync(token));
+            await Assert.That(denied!.SqlState).IsEqualTo("42501");
+        }
+        await Assert.That(await runtime.TenantSettingsDocuments.IgnoreQueryFilters().AsNoTracking()
+            .Select(row => row.Id).ToArrayAsync(token)).IsEquivalentTo([guidanceId]);
+        var stored = await migrator.TenantSettingsDocuments.AsNoTracking()
+            .Where(row => row.TenantId == tenantId || row.TenantId == foreignTenantId).ToArrayAsync(token);
+        await Assert.That(stored.Select(row => row.Id))
+            .IsEquivalentTo([brandingId, foreignGuidanceId, guidanceId]);
+        using var foreignPayload = System.Text.Json.JsonDocument.Parse(
+            stored.Single(row => row.Id == foreignGuidanceId).PayloadJson);
+        await Assert.That(foreignPayload.RootElement.GetProperty("automaticInvitations").GetBoolean()).IsTrue();
+        using var brandingPayload = System.Text.Json.JsonDocument.Parse(
+            stored.Single(row => row.Id == brandingId).PayloadJson);
+        await Assert.That(brandingPayload.RootElement.EnumerateObject().Count()).IsEqualTo(0);
+    }
+}
+
+/// <summary>
 /// Verifies fixed storage exclusions with the real Runtime login, independently
 /// of human authentication. These primitives do not issue learning authority.
 /// </summary>
@@ -854,10 +1086,9 @@ public sealed class LearningSourceStoragePostgresTests(PostgreSqlContainerFixtur
                 .IsEqualTo(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime).Username);
         }
 
-        var denied = await Assert.ThrowsAsync<PostgresException>(() =>
-            context.TenantSettingsDocuments.AsNoTracking().SingleOrDefaultAsync(
-                row => row.TenantId == tenant && row.DocumentKey == SettingsDocumentKeys.Tenant.LearningGuidance, token));
-        await Assert.That(denied!.SqlState).IsEqualTo("42501");
+        var direct = await context.TenantSettingsDocuments.AsNoTracking().SingleOrDefaultAsync(
+            row => row.TenantId == tenant && row.DocumentKey == SettingsDocumentKeys.Tenant.LearningGuidance, token);
+        await Assert.That(direct).IsNull();
         var document = await PostgresMixedSettingsContract.ReadLearningGuidanceAsync(
             context, fixture.NativeQueueEnrollment, tenant, token);
 

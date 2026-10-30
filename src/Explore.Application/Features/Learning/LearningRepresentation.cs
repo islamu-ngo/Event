@@ -19,8 +19,15 @@ internal static class LearningRepresentation
         bool currentPack = operation.Space is null
             || operation.Space is { IsRemoved: false, PackKey: LearningLessonCatalog.PackKey,
                 PackVersion: LearningLessonCatalog.MaterialVersion };
-        bool hasLiveClaim = state?.ActiveClaimId is not null
-            && (operation.ObservedAtUtc == default || state.ClaimExpiresAtUtc > operation.ObservedAtUtc);
+        LearningGuidancePolicy policy = LearningGuidancePolicyCodec.Decode(sources.GuidanceDocument);
+        bool canPractice = LearningAccessPolicy.CanPractice(policy, true, operation.CanManageSpace);
+        LearningDisplayTextDto? practiceUnavailableReason = !currentPack
+            ? Reason("source-unavailable", "The shared learning source is removed or its material is unavailable.")
+            : !policy.Enabled ? Reason("policy-disabled", "Interactive guidance is disabled by the tenant policy.")
+            : !canPractice ? Reason("manual-audience", "The tenant policy does not allow practice for the current member.")
+            : null;
+        bool canClaimTours = false;
+        bool canInviteTours = false;
         var tours = new List<LearningTourProgressDto>();
         foreach (WireFamily family in Enum.GetValues<WireFamily>())
         {
@@ -29,6 +36,8 @@ internal static class LearningRepresentation
                 .OrderByDescending(tour => tour.MaterialVersion).ToArray() ?? [];
             var currentPlan = LearningTourPlanResolver.Resolve(operation, sources, family);
             bool available = currentPlan.Plan.IsAvailable;
+            canClaimTours |= currentPlan.Plan.CanClaim;
+            canInviteTours |= currentPlan.Plan.CanInvite;
             bool covered = currentPlan.Definition is not null && state?.HasTourCoverage(currentPlan.Definition) == true;
             foreach (LearningTourProgress tour in history)
                 tours.Add(new()
@@ -47,9 +56,10 @@ internal static class LearningRepresentation
                         CompletedAtUtc = new DateTimeOffset(DateTime.SpecifyKind(step.CompletedAtUtc, DateTimeKind.Utc))
                     }).ToArray(),
                     IsAvailable = available && tour.MaterialVersion == LearningExperienceCatalog.MaterialVersion,
+                    CanInvite = currentPlan.Plan.CanInvite && tour.MaterialVersion == LearningExperienceCatalog.MaterialVersion,
                     UnavailableReason = tour.MaterialVersion != LearningExperienceCatalog.MaterialVersion
                         ? Reason("material-unavailable", "This historical tour material is not currently available.")
-                        : available ? null : TourUnavailableReason(family, currentPack)
+                        : currentPlan.Plan.UnavailableReason
                 });
             if (history.All(tour => tour.MaterialVersion != LearningExperienceCatalog.MaterialVersion))
                 tours.Add(new()
@@ -58,7 +68,8 @@ internal static class LearningRepresentation
                     MaterialVersion = LearningExperienceCatalog.MaterialVersion,
                     CurrentCoverage = covered,
                     IsAvailable = available,
-                    UnavailableReason = available ? null : TourUnavailableReason(family, currentPack)
+                    CanInvite = currentPlan.Plan.CanInvite,
+                    UnavailableReason = currentPlan.Plan.UnavailableReason
                 });
         }
 
@@ -74,6 +85,7 @@ internal static class LearningRepresentation
             LearnerRevision = state?.Revision ?? 0,
             SpaceId = operation.Space?.Id,
             SpaceStatus = SpaceStatus(operation.Space),
+            Requirement = LearningAccessPolicy.Requirement(operation, policy),
             Preferences = new()
             {
                 SuppressAutomaticTours = state?.SuppressAutomaticTours ?? false,
@@ -83,16 +95,16 @@ internal static class LearningRepresentation
             Capabilities = new()
             {
                 CanLearn = true,
-                CanClaimTours = currentPack && !hasLiveClaim,
-                CanSimulate = currentPack,
+                CanClaimTours = canClaimTours,
+                CanInviteTours = canInviteTours,
+                CanSimulate = currentPack && canPractice,
                 CanClearPractice = state?.Practices.Count > 0,
                 CanManageSpace = operation.CanManageSpace,
-                UnavailableReason = currentPack ? null
-                    : Reason("source-unavailable", "The shared learning source is removed or its material is unavailable.")
+                UnavailableReason = practiceUnavailableReason
             },
             Claim = Claim(operation),
             Tours = tours,
-            Lessons = currentPack ? LearningLessonCatalog.Lessons : [],
+            Lessons = currentPack && canPractice ? LearningLessonCatalog.Lessons : [],
             OwnedPractices = state?.Practices.Select(practice => new LearningPracticeSummaryDto
             {
                 Id = practice.Id,
@@ -100,11 +112,18 @@ internal static class LearningRepresentation
                 RecipeKey = practice.RecipeKey,
                 MaterialVersion = practice.RecipeVersion,
                 Revision = practice.Revision,
-                PreviewAvailable = currentPack
+                PreviewAvailable = currentPack && canPractice
                     && LearningLessonCatalog.TryGetLesson(practice.RecipeKey, practice.RecipeVersion, out _)
                     && (practice.ContextKey == "self" || practice.ContextKey == operation.ContextKey
                         || operation.AvailableActors.Any(actor =>
-                        !actor.IsDeleted && !actor.IsSuspended && practice.ContextKey == $"actor:{actor.Id:D}"))
+                        !actor.IsDeleted && !actor.IsSuspended && practice.ContextKey == $"actor:{actor.Id:D}")),
+                UnavailableReason = practiceUnavailableReason
+                    ?? (!LearningLessonCatalog.TryGetLesson(practice.RecipeKey, practice.RecipeVersion, out _)
+                        ? Reason("material-unavailable", "This practice material is not currently available.")
+                        : practice.ContextKey == "self" || practice.ContextKey == operation.ContextKey
+                            || operation.AvailableActors.Any(actor => !actor.IsDeleted && !actor.IsSuspended
+                                && practice.ContextKey == $"actor:{actor.Id:D}") ? null
+                        : Reason("context-unavailable", "The current context does not expose this practice."))
             }).ToArray() ?? []
         };
     }
@@ -113,6 +132,11 @@ internal static class LearningRepresentation
     {
         LearningPracticeState practice = operation.Practice
             ?? throw new NotFoundException("Learning practice", operation.ContextKey);
+        LearningSourceFacts sources = operation.Sources
+            ?? throw new InvalidOperationException("Practice projection requires its retained source image.");
+        if (!LearningAccessPolicy.CanPractice(LearningGuidancePolicyCodec.Decode(sources.GuidanceDocument),
+                true, operation.CanManageSpace))
+            throw new AuthorizationException("The current guidance policy does not allow this practice preview.");
         LearningPracticeChoiceSlot slot = practice.Choice switch
         {
             LearningPracticeChoice.None => LearningPracticeChoiceSlot.None,
@@ -209,13 +233,6 @@ internal static class LearningRepresentation
         Explore.Domain.Learning.LearningTourOutcome.Interrupted => WireOutcome.Interrupted,
         _ => throw new InvalidOperationException("The persisted learning tour outcome is not supported.")
     };
-
-    private static LearningDisplayTextDto TourUnavailableReason(WireFamily family, bool currentPack) =>
-        !currentPack
-            ? Reason("source-unavailable", "The shared learning source is removed or its material is unavailable.")
-            : family == WireFamily.NormalAi
-                ? Reason("normal-ai-unavailable", "Normal AI is unavailable in the current context.")
-                : Reason("context-unavailable", "The current context does not expose this tour capability.");
 
     private static LearningDisplayTextDto Reason(string key, string fallback) =>
         new($"Learning.Availability.{key}", fallback);

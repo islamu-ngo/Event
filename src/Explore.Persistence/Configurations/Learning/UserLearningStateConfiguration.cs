@@ -34,5 +34,11 @@ public sealed class UserLearningStateConfiguration : IEntityTypeConfiguration<Us
             .HasPrincipalKey(value => new { value.TenantId, value.Id })
             .OnDelete(childDeleteBehavior);
         builder.Navigation(value => value.Practices).HasField("_practices").UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.HasMany(value => value.RequirementAcknowledgements).WithOne()
+            .HasForeignKey(value => new { value.TenantId, value.UserLearningStateId })
+            .HasPrincipalKey(value => new { value.TenantId, value.Id })
+            .OnDelete(childDeleteBehavior);
+        builder.Navigation(value => value.RequirementAcknowledgements)
+            .HasField("_requirementAcknowledgements").UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

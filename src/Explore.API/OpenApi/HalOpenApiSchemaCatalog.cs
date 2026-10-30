@@ -6,6 +6,12 @@ internal static class HalOpenApiSchemaCatalog
     [
         // Private learning wire contracts, including named nested and strict input objects.
         typeof(ISLAMU.Wire.Contracts.Learning.LearningContextDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningGuidancePolicyDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningGuidancePolicyPayload),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningGuidanceFamilyOverrideDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.UpdateLearningGuidancePolicyRequest),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningRequirementDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningAcknowledgeRequirementRequest),
         typeof(ISLAMU.Wire.Contracts.Learning.LearningTourPlanDto),
         typeof(ISLAMU.Wire.Contracts.Learning.LearningTourStepDto),
         typeof(ISLAMU.Wire.Contracts.Learning.LearningTourStepCompletionDto),
@@ -405,6 +411,7 @@ internal static class HalOpenApiSchemaCatalog
     public static IReadOnlyDictionary<string, Type> DetailResourceMappings { get; } = new Dictionary<string, Type>
     {
         ["HalResourceOfLearningContextDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningContextDto),
+        ["HalResourceOfLearningGuidancePolicyDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningGuidancePolicyDto),
         ["HalResourceOfLearningTourPlanDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningTourPlanDto),
         ["HalResourceOfLearningPracticeDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningPracticeDto),
         ["HalResourceOfLearningMutationReceiptDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningMutationReceiptDto),

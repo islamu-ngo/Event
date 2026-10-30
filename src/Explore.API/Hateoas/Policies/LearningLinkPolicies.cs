@@ -12,6 +12,10 @@ public sealed class LearningContextLinkPolicy : ILinkPolicy<LearningContextDto>
     {
         yield return new(LinkRelations.Self, RouteNames.GetLearningContext,
             new { contextKey = dto.ContextKey, eventContextId = dto.EventContextId }, "GET", RequiresAuth: true);
+        if (dto.Requirement.Status == LearningRequirementStatus.Pending)
+            yield return new("acknowledge-requirement", RouteNames.LearningAcknowledgeRequirement,
+                new { requirementKey = dto.Requirement.RequirementKey }, "POST", RequiresAuth: true);
+
         if (!dto.Capabilities.CanLearn)
             yield break;
 

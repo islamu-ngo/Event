@@ -231,11 +231,20 @@ public static class PostgresTenantCreationPermissions
             PostgresActorOwnershipReadPermissions.TryGetRuntimeReadColumns(context, source.Type, out var columns);
             return columns.Select(column => $"({runtime},{Text(source.Table)},{Text(column)},'SELECT',false)");
         });
+        var guidanceGrants = sources.SelectMany(source =>
+        {
+            PostgresLearningPermissions.TryGetGuidanceRuntimeColumns(context, source.Type,
+                out var read, out var insert, out var update);
+            return read.Select(column => (column, Privilege: "SELECT"))
+                .Concat(insert.Select(column => (column, Privilege: "INSERT")))
+                .Concat(update.Select(column => (column, Privilege: "UPDATE")))
+                .Select(grant => $"({runtime},{Text(source.Table)},{Text(grant.column)},{Text(grant.Privilege)},false)");
+        });
         // Role already belongs to Runtime's fixed public catalogue. Recognize that direct
         // source intersection without installing it or admitting an inherited role union.
         var role = sources.Single(source => source.Type == typeof(Role));
         PostgresLookupCatalogueReadPermissions.TryGetRuntimeReadColumns(context, typeof(Role), out var runtimeRoleColumns);
-        string expected = "VALUES " + string.Join(',', globalGrants.Concat(workerGrants).Concat(membershipReads).Concat(membershipMutations).Concat(tenantKeyParents).Concat(actorOwnershipReads).Concat(runtimeRoleColumns.Select(column =>
+        string expected = "VALUES " + string.Join(',', globalGrants.Concat(workerGrants).Concat(membershipReads).Concat(membershipMutations).Concat(tenantKeyParents).Concat(actorOwnershipReads).Concat(guidanceGrants).Concat(runtimeRoleColumns.Select(column =>
             $"({runtime},{Text(role.Table)},{Text(column)},'SELECT',false)")));
         string tables = "ARRAY[" + string.Join(',', sources.Select(source => Text(source.Table))) + "]::text[]";
         string required = complete ? $"""
@@ -276,7 +285,8 @@ public static class PostgresTenantCreationPermissions
                                             AND acl.grantor=t.relowner AND acl.privilege_type=permission.privilege AND NOT acl.is_grantable)
                                         AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=0 AND acl.privilege_type=permission.privilege))))))
                 AND ({sourceProofs}) AND ({PostgresManagedTenantWorkerCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment)})
-                AND ({PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment)}) {required})
+                AND ({PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment)})
+                AND ({PostgresLearningPermissions.OptionalGuidanceRuntimeCataloguePredicate(context, enrollment)}) {required})
             """;
     }
 
@@ -301,6 +311,7 @@ public static class PostgresTenantCreationPermissions
         string recognizedPolicies = string.Join(" OR ", Policies(source)
             .Select(policy => PolicyPredicate(source, enrollment.GlobalLogin, policy))
             .Concat(PostgresUserTenantMembershipReadPermissions.GlobalSourcePolicies(context, source.Type, enrollment.GlobalLogin))
+            .Append(PostgresLearningPermissions.GuidanceRuntimePolicyException(context, source.Type, enrollment))
             .Select(predicate => "(" + predicate + ")"));
         string policies = $"NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid=pg_catalog.to_regclass({Text(source.Table)}) AND p.polname IN ({Text(ReadPolicy)},{Text(InsertPolicy)},{Text(DocumentInsertPolicy)}) AND NOT ({(ownedPolicies.Length == 0 ? "false" : ownedPolicies)}))";
         if (complete)

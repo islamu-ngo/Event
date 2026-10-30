@@ -17912,6 +17912,63 @@ namespace Explore.Persistence.Migrations
                     b.ToTable("learning_practice_states", "islamu_event");
                 });
 
+            modelBuilder.Entity("Explore.Domain.Learning.LearningRequirementAcknowledgement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("AcknowledgedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acknowledged_at_utc");
+
+                    b.Property<string>("LastIntentFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("last_intent_fingerprint");
+
+                    b.Property<Guid>("LastIntentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_intent_id");
+
+                    b.Property<int>("MaterialVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("material_version");
+
+                    b.Property<string>("PolicySourceStamp")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("policy_source_stamp");
+
+                    b.Property<string>("RequirementKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("requirement_key");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserLearningStateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_learning_state_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_learning_requirement_acknowledgements");
+
+                    b.HasIndex("TenantId", "UserLearningStateId", "RequirementKey", "MaterialVersion")
+                        .IsUnique()
+                        .HasDatabaseName("ix_learning_requirement_acknowledgements_tenant_id_27ecf8dd23ac");
+
+                    b.ToTable("learning_requirement_acknowledgements", "islamu_event");
+                });
+
             modelBuilder.Entity("Explore.Domain.Learning.LearningTourProgress", b =>
                 {
                     b.Property<Guid>("Id")
@@ -57148,6 +57205,17 @@ namespace Explore.Persistence.Migrations
                         .HasConstraintName("fk_learning_practice_states_user_learning_states_t_11ae634e416c");
                 });
 
+            modelBuilder.Entity("Explore.Domain.Learning.LearningRequirementAcknowledgement", b =>
+                {
+                    b.HasOne("Explore.Domain.Learning.UserLearningState", null)
+                        .WithMany("RequirementAcknowledgements")
+                        .HasForeignKey("TenantId", "UserLearningStateId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_learning_requirement_acknowledgements_user_lear_b86e31bfef9c");
+                });
+
             modelBuilder.Entity("Explore.Domain.Learning.LearningTourProgress", b =>
                 {
                     b.HasOne("Explore.Domain.Learning.UserLearningState", null)
@@ -68187,6 +68255,8 @@ namespace Explore.Persistence.Migrations
             modelBuilder.Entity("Explore.Domain.Learning.UserLearningState", b =>
                 {
                     b.Navigation("Practices");
+
+                    b.Navigation("RequirementAcknowledgements");
 
                     b.Navigation("Tours");
                 });

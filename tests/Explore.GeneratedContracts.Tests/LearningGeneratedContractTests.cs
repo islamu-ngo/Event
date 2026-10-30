@@ -31,6 +31,25 @@ public sealed class LearningGeneratedContractTests
     }
 
     [Test]
+    public async Task TenantLearningGuidanceOperationsKeepTheirNamedResponses()
+    {
+        using var document = await ReadAsync();
+        var paths = document.RootElement.GetProperty("paths");
+        foreach (var operation in new[]
+        {
+            (Path: "/api/tenant/settings/documents/learning-guidance", Method: "get", Id: "GetLearningGuidancePolicy"),
+            (Path: "/api/tenant/settings/documents/learning-guidance", Method: "patch", Id: "UpdateLearningGuidancePolicy"),
+            (Path: "/api/learning/requirements/{requirementKey}/acknowledge", Method: "post", Id: "LearningAcknowledgeRequirement")
+        })
+        {
+            var contract = paths.GetProperty(operation.Path).GetProperty(operation.Method);
+            await Assert.That(contract.GetProperty("operationId").GetString()).IsEqualTo(operation.Id);
+            foreach (string status in new[] { "200", "400", "401", "403", "409" })
+                await Assert.That(contract.GetProperty("responses").TryGetProperty(status, out _)).IsTrue();
+        }
+    }
+
+    [Test]
     public async Task PublishedLearningRequestsAreClosedAndTheirEnumsAreExactStrings()
     {
         using var document = await ReadAsync();
@@ -66,6 +85,146 @@ public sealed class LearningGeneratedContractTests
                     value.GetString() ?? throw new JsonException("An enum member must be a string.")))
                 .IsEquivalentTo(enumeration.Value);
         }
+    }
+
+    [Test]
+    public async Task LearningGuidancePolicyAndAcknowledgementRequestsAreClosedAndSourceBound()
+    {
+        using var document = await ReadAsync();
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+
+        var update = schemas.GetProperty("UpdateLearningGuidancePolicyRequest");
+        await Assert.That(update.GetProperty("additionalProperties").ValueKind).IsEqualTo(JsonValueKind.False);
+        await Assert.That(update.GetProperty("required").EnumerateArray().Select(value => value.GetString())
+                .Where(value => value is not null))
+            .IsEquivalentTo(new[] { "expectedConcurrencyStamp", "policy" });
+        var updateStamp = update.GetProperty("properties").GetProperty("expectedConcurrencyStamp");
+        await Assert.That(updateStamp.GetProperty("type").EnumerateArray().Select(value => value.GetString())
+                .Where(value => value is not null))
+            .IsEquivalentTo(new[] { "null", "string" });
+        await Assert.That(updateStamp.GetProperty("format").GetString()).IsEqualTo("uuid");
+
+        var policy = schemas.GetProperty("LearningGuidancePolicyDto");
+        var policyProperties = policy.GetProperty("properties");
+        await Assert.That(policy.GetProperty("required").EnumerateArray().Select(value => value.GetString())
+                .Where(value => value is not null))
+            .IsEquivalentTo(new[] { "schemaVersion", "defaultsVersion", "concurrencyStamp", "policy" });
+        foreach (string name in new[] { "schemaVersion", "defaultsVersion", "concurrencyStamp", "policy" })
+            await Assert.That(policyProperties.TryGetProperty(name, out _)).IsTrue();
+        await Assert.That(policyProperties.TryGetProperty("canEdit", out _)).IsFalse();
+        await Assert.That(policyProperties.TryGetProperty("CanEdit", out _)).IsFalse();
+        var policyStamp = policyProperties.GetProperty("concurrencyStamp");
+        await Assert.That(policyStamp.GetProperty("type").EnumerateArray().Select(value => value.GetString())
+                .Where(value => value is not null))
+            .IsEquivalentTo(new[] { "null", "string" });
+        await Assert.That(policyStamp.GetProperty("format").GetString()).IsEqualTo("uuid");
+
+        var payload = schemas.GetProperty("LearningGuidancePolicyPayload");
+        await Assert.That(payload.GetProperty("additionalProperties").ValueKind).IsEqualTo(JsonValueKind.False);
+        await Assert.That(payload.GetProperty("required").EnumerateArray().Select(value => value.GetString())
+                .Where(value => value is not null))
+            .IsEquivalentTo(new[]
+            {
+                "enabled", "automaticInvitations", "invitationAudience", "manualAccessAudience",
+                "requirementPolicy", "familyOverrides"
+            });
+        var payloadProperties = payload.GetProperty("properties");
+        await Assert.That(payloadProperties.EnumerateObject().Select(property => property.Name))
+            .IsEquivalentTo(new[]
+            {
+                "enabled", "automaticInvitations", "invitationAudience", "manualAccessAudience",
+                "requirementPolicy", "familyOverrides"
+            });
+
+        var familyOverride = schemas.GetProperty("LearningGuidanceFamilyOverrideDto");
+        await Assert.That(familyOverride.GetProperty("additionalProperties").ValueKind).IsEqualTo(JsonValueKind.False);
+        await Assert.That(familyOverride.GetProperty("required").EnumerateArray().Select(value => value.GetString())
+                .Where(value => value is not null))
+            .IsEquivalentTo(new[] { "family", "enabled", "automaticInvitations" });
+        await Assert.That(familyOverride.GetProperty("properties").EnumerateObject().Select(property => property.Name))
+            .IsEquivalentTo(new[]
+            {
+                "family", "enabled", "automaticInvitations", "invitationAudience", "manualAccessAudience"
+            });
+
+        var wrapper = schemas.GetProperty("HalResourceOfLearningGuidancePolicyDto");
+        if (!wrapper.TryGetProperty("properties", out var wrapperProperties))
+            throw new JsonException(
+                "HalResourceOfLearningGuidancePolicyDto must expose nonempty properties: schemaVersion, defaultsVersion, concurrencyStamp, policy, _links.");
+        await Assert.That(wrapperProperties.EnumerateObject().Any()).IsTrue();
+        foreach (string name in new[] { "schemaVersion", "defaultsVersion", "concurrencyStamp", "policy", "_links" })
+            await Assert.That(wrapperProperties.TryGetProperty(name, out _)).IsTrue();
+        await Assert.That(wrapperProperties.TryGetProperty("canEdit", out _)).IsFalse();
+    }
+
+    [Test]
+    public async Task LearningAcknowledgementRequirementContractsKeepExactWireShapes()
+    {
+        using var document = await ReadAsync();
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        var request = schemas.GetProperty("LearningAcknowledgeRequirementRequest");
+        await Assert.That(request.GetProperty("additionalProperties").ValueKind).IsEqualTo(JsonValueKind.False);
+        await Assert.That(request.GetProperty("required").EnumerateArray().Select(value => value.GetString())
+                .Where(value => value is not null))
+            .IsEquivalentTo(new[]
+            {
+                "intentId", "expectedScopeStamp", "expectedRevision", "expectedPolicySourceStamp", "materialVersion"
+            });
+        var requestProperties = request.GetProperty("properties");
+        await Assert.That(requestProperties.EnumerateObject().Select(property => property.Name))
+            .IsEquivalentTo(new[]
+            {
+                "intentId", "expectedScopeStamp", "expectedRevision", "expectedPolicySourceStamp", "materialVersion"
+            });
+        foreach (string name in new[] { "userId", "tenantId", "contextKey", "eventContextId", "ownerContext" })
+            await Assert.That(requestProperties.TryGetProperty(name, out _)).IsFalse();
+        await Assert.That(requestProperties.GetProperty("intentId").GetProperty("format").GetString()).IsEqualTo("uuid");
+
+        var contextRequirement = schemas.GetProperty("LearningContextDto").GetProperty("properties")
+            .GetProperty("requirement");
+        await Assert.That(contextRequirement.GetProperty("$ref").GetString())
+            .IsEqualTo("#/components/schemas/LearningRequirementDto");
+        var requirement = schemas.GetProperty("LearningRequirementDto");
+        var requirementProperties = requirement.GetProperty("properties");
+        await Assert.That(requirement.GetProperty("required").EnumerateArray().Select(value => value.GetString())
+                .Where(value => value is not null))
+            .IsEquivalentTo(new[] { "requirementKey", "materialVersion", "status", "policySourceStamp" });
+        foreach (string name in new[]
+        {
+            "requirementKey", "materialVersion", "status", "policySourceStamp", "acknowledgedAtUtc"
+        })
+            await Assert.That(requirementProperties.TryGetProperty(name, out _)).IsTrue();
+        await Assert.That(requirementProperties.GetProperty("acknowledgedAtUtc").GetProperty("type")
+                .EnumerateArray().Select(value => value.GetString()).Where(value => value is not null))
+            .IsEquivalentTo(new[] { "null", "string" });
+        await Assert.That(requirementProperties.GetProperty("acknowledgedAtUtc").GetProperty("format").GetString())
+            .IsEqualTo("date-time");
+
+        var expectedEnums = new Dictionary<string, string[]>
+        {
+            ["LearningGuidanceAudience"] = ["ActiveMembers", "TenantAdministrators"],
+            ["LearningRequirementPolicy"] = ["Optional", "TenantAdminOrientationAcknowledgement"],
+            ["LearningRequirementStatus"] = ["NotApplicable", "Pending", "Satisfied"]
+        };
+        foreach (var enumeration in expectedEnums)
+        {
+            var schema = schemas.GetProperty(enumeration.Key);
+            await Assert.That(schema.GetProperty("type").GetString()).IsEqualTo("string");
+            await Assert.That(schema.GetProperty("enum").EnumerateArray().Select(value => value.GetString())
+                    .Where(value => value is not null))
+                .IsEquivalentTo(enumeration.Value);
+        }
+
+        foreach (string name in new[]
+        {
+            "LearningTourPlanDto", "HalResourceOfLearningTourPlanDto", "LearningTourProgressDto"
+        })
+            await Assert.That(schemas.GetProperty(name).GetProperty("properties").TryGetProperty("canInvite", out _))
+                .IsTrue();
+        await Assert.That(schemas.GetProperty("LearningCapabilitiesDto").GetProperty("properties")
+            .TryGetProperty("canInviteTours", out _)).IsTrue();
+        var practiceSummary = schemas.GetProperty("LearningPracticeSummaryDto").GetProperty("properties");
+        await Assert.That(practiceSummary.TryGetProperty("unavailableReason", out _)).IsTrue();
     }
 
     [Test]

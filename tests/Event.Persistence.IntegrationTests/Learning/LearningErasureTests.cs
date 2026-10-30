@@ -31,6 +31,9 @@ public sealed class LearningErasureTests
         var first = await database.SeedLearningAsync(withChildren: true);
         var second = await database.SeedLearningAsync(database.OtherTenantId, withChildren: true);
         var other = await database.SeedLearningAsync(userId: database.OtherUserId, withChildren: true);
+        first = await AcknowledgeAsync(database, first);
+        second = await AcknowledgeAsync(database, second);
+        other = await AcknowledgeAsync(database, other);
         await using (var context = database.Open(null))
         {
             await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
@@ -50,6 +53,12 @@ public sealed class LearningErasureTests
             .IsEquivalentTo(other.Tours.Select(row => row.Id));
         await Assert.That(await observer.Set<LearningPracticeState>().Select(row => row.Id).ToArrayAsync())
             .IsEquivalentTo(other.Practices.Select(row => row.Id));
+        await Assert.That(await observer.LearningRequirementAcknowledgements.Select(row => row.Id).ToArrayAsync())
+            .IsEquivalentTo(other.RequirementAcknowledgements.Select(row => row.Id));
+        var retained = (await new LearningRepository(observer)
+            .GetStateAsync(other.TenantId, other.UserId, false, default))!;
+        await Assert.That(retained.RequirementAcknowledgements.Single().PolicySourceStamp)
+            .IsEqualTo(new string('A', 64));
         await Assert.That(await observer.TenantLearningSpaces.Select(row => row.TenantId).ToArrayAsync())
             .IsEquivalentTo([database.TenantId, database.OtherTenantId]);
         await Assert.That(await observer.UserLearningStates.AnyAsync(row => row.Id == first.Id || row.Id == second.Id)).IsFalse();
@@ -61,6 +70,7 @@ public sealed class LearningErasureTests
     {
         await using var database = await LearningProviderDatabase.CreateAsync();
         var original = await database.SeedLearningAsync(withChildren: true);
+        original = await AcknowledgeAsync(database, original);
         var intent = LearningProviderDatabase.Intent(database.UserId);
         await using (var context = database.Open(null))
         {
@@ -81,6 +91,11 @@ public sealed class LearningErasureTests
             await Assert.That(row.Revision).IsEqualTo(original.Revision);
             await Assert.That(row.Tours.Select(value => value.Id)).IsEquivalentTo(original.Tours.Select(value => value.Id));
             await Assert.That(row.Practices.Select(value => value.Id)).IsEquivalentTo(original.Practices.Select(value => value.Id));
+            await Assert.That(row.RequirementAcknowledgements.Select(value => value.Id))
+                .IsEquivalentTo(original.RequirementAcknowledgements.Select(value => value.Id));
+            await Assert.That(row.RequirementAcknowledgements.Single().AcknowledgedAtUtc)
+                .IsEqualTo(LearningProviderDatabase.Now);
+            await Assert.That(row.RequirementAcknowledgements.Single().MaterialVersion).IsEqualTo(1);
         }
         for (int pass = 0; pass < 2; pass++)
         {
@@ -98,6 +113,7 @@ public sealed class LearningErasureTests
         await Assert.That(await observer.UserLearningStates.CountAsync()).IsEqualTo(0);
         await Assert.That(await observer.Set<LearningTourProgress>().CountAsync()).IsEqualTo(0);
         await Assert.That(await observer.Set<LearningPracticeState>().CountAsync()).IsEqualTo(0);
+        await Assert.That(await observer.LearningRequirementAcknowledgements.CountAsync()).IsEqualTo(0);
         await Assert.That(await observer.TenantLearningSpaces.CountAsync()).IsEqualTo(1);
     }
 
@@ -130,5 +146,17 @@ public sealed class LearningErasureTests
         await Assert.That(await observer.UserLearningStates.AnyAsync(row =>
             row.UserId == database.UserId && row.TenantId == database.OtherTenantId)).IsTrue();
         await Assert.That(await observer.Set<LearningPracticeState>().CountAsync()).IsEqualTo(2);
+    }
+
+    private static async Task<UserLearningState> AcknowledgeAsync(
+        LearningProviderDatabase database, UserLearningState state)
+    {
+        await using var context = database.Open(state.TenantId);
+        var repository = new LearningRepository(context);
+        var tracked = (await repository.GetStateAsync(state.TenantId, state.UserId, true, default))!;
+        tracked.AcknowledgeRequirement(Guid.CreateVersion7(), LearningRequirementDefinition.Current,
+            new string('A', 64), Guid.CreateVersion7(), tracked.Revision, LearningProviderDatabase.Now);
+        await repository.SaveChangesAsync(default);
+        return tracked;
     }
 }

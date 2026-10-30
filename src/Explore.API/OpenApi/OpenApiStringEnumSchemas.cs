@@ -96,6 +96,9 @@ internal static class OpenApiStringEnumSchemaCatalog
 
     private static IReadOnlyCollection<Type> EagerNestedEnumTypes { get; } =
     [
+        typeof(LearningRequirementStatus),
+        typeof(LearningGuidanceAudience),
+        typeof(LearningRequirementPolicy),
         typeof(LearningTourFamily),
         typeof(LearningTourOutcome),
         typeof(LearningTourAction),
@@ -144,6 +147,9 @@ internal static class OpenApiStringEnumSchemaCatalog
 
     public static IReadOnlyCollection<Type> EnumTypes { get; } =
     [
+        typeof(LearningRequirementStatus),
+        typeof(LearningGuidanceAudience),
+        typeof(LearningRequirementPolicy),
         typeof(LearningTourFamily),
         typeof(LearningTourOutcome),
         typeof(LearningTourAction),

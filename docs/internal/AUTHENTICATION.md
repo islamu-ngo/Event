@@ -107,6 +107,24 @@ recovery/support outcome without identifying another account. The shipped
 recovery path is the original credential provider or operator support, not a
 self-service merge or an unimplemented Link action.
 
+Account resolution uses `GetLocalIdentityBindingAsync` to read the filtered
+account and personal Actor without materializing either private profile. The
+`LocalIdentityWriter` purpose does not receive birth-declaration, collection
+receipt or birth-revision read access merely because a login needs its account.
+The generic full-profile repository read is not the identity lookup contract.
+
+For an existing account, synchronization obtains a tracked account-only entity
+inside the original transaction and compares its concurrency stamp with the
+second resolution. `SaveIdentityProfileAsync` accepts email and verification
+observations separately; absent observations preserve the corresponding stored
+values. The normal account save retains audit preparation and optimistic
+concurrency. An email change then conditionally updates only the email mirror,
+matching its observed old value and requiring exactly one affected row. Both
+writes share the existing transaction, so a mirror failure rolls back the
+account change. No incomplete `UserPii` is attached, and private birth data and
+its revision remain under their existing owner. This changes neither correlation
+trust nor database-purpose permissions.
+
 ## Canonical Identity Email Ownership
 
 `UserIdentityEmailClaim` owns an instance-global normalized address.

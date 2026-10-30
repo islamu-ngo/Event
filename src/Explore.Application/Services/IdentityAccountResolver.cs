@@ -29,7 +29,7 @@ public sealed class IdentityAccountResolver(
         UserExternalLogin? binding = await logins.GetByProviderAndKey(accountKey);
         cancellationToken.ThrowIfCancellationRequested();
         bool conflictingEvidence = evidence is not null && evidence.AccountKey != accountKey;
-        User? user = binding is null ? null : await users.GetById(binding.UserId);
+        User? user = binding is null ? null : await users.GetLocalIdentityBindingAsync(binding.UserId, cancellationToken);
         bool bindingConflict = conflictingEvidence || (binding is not null && user is null);
         string? issuer = evidence?.Issuer;
         bool verifiedEmail = evidence is { EmailVerified: true }
@@ -49,7 +49,7 @@ public sealed class IdentityAccountResolver(
                 List<UserExternalLogin> candidateBindings = await logins.GetByUser(claim.UserId);
                 localOwned = candidateBindings.Any(login =>
                     login.AuthenticationProviderId == (int)AuthenticationProviderKind.Local);
-                user = await users.GetById(claim.UserId);
+                user = await users.GetLocalIdentityBindingAsync(claim.UserId, cancellationToken);
                 IReadOnlyList<UserIdentityEmailClaim> supported = await identityEmails.GetByUserAsync(
                     claim.UserId, cancellationToken);
                 bindingConflict = localOwned || user is null || !supported.Any(value => value.Id == claim.Id);

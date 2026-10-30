@@ -337,22 +337,16 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                 }
                 else
                 {
+                    User? account = await _userRepository.GetIdentityAccountForSynchronizationAsync(currentUser.Id, ct);
+                    if (account is null || account.ConcurrencyStamp != currentUser.ConcurrencyStamp)
+                        return ExplicitBindingRequired();
                     UserExternalLogin login = await EnsureExternalLoginLinkInTransactionAsync(
-                        currentUser, accountKey, loginId, ct);
+                        account, accountKey, loginId, ct);
                     IdentityEmailSynchronizationOutcome emailOutcome =
-                        await _identityEmailSynchronization.ExecuteAsync(currentUser, login, observation, ct);
-                    if (!string.IsNullOrWhiteSpace(email)
-                        && emailOutcome != IdentityEmailSynchronizationOutcome.ConflictingOwner)
-                    {
-                        currentUser.Email = email;
-                    }
-
-                    if (emailVerified.HasValue)
-                    {
-                        currentUser.EmailVerified = emailVerified;
-                    }
-
-                    await _userRepository.SaveIdentityProfileAsync(currentUser, ct);
+                        await _identityEmailSynchronization.ExecuteAsync(account, login, observation, ct);
+                    string? mirrorEmail = !string.IsNullOrWhiteSpace(email)
+                        && emailOutcome != IdentityEmailSynchronizationOutcome.ConflictingOwner ? email : null;
+                    await _userRepository.SaveIdentityProfileAsync(account, mirrorEmail, emailVerified, ct);
 
                     return BaseCommandResponse.Success(id: currentUser.Id,
                         message: emailOutcome == IdentityEmailSynchronizationOutcome.ConflictingOwner

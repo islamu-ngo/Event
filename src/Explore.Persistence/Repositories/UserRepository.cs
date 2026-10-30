@@ -23,7 +23,14 @@ public class UserRepository : GenericRepository<User, Guid>, IUserRepository
     public Task<User?> GetUserWithDetails(Guid id) =>
         GetUserWithDetails(id, CancellationToken.None);
 
-    public async Task SaveIdentityProfileAsync(User user, CancellationToken cancellationToken)
+    public Task<User?> GetIdentityAccountForSynchronizationAsync(Guid id, CancellationToken cancellationToken) =>
+        _dbContext.Users
+            .IgnoreAutoIncludes()
+            .AsTracking()
+            .FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
+
+    public async Task SaveIdentityProfileAsync(
+        User user, string? normalizedEmail, bool? emailVerified, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(user);
         cancellationToken.ThrowIfCancellationRequested();
@@ -33,18 +40,41 @@ public class UserRepository : GenericRepository<User, Guid>, IUserRepository
         _dbContext.ChangeTracker.DetectChanges();
         var entry = _dbContext.Entry(user);
         if (entry.State is not (EntityState.Unchanged or EntityState.Modified)
-            || entry.Property(row => row.Id).OriginalValue != user.Id
-            || user.Pii is null)
+            || entry.Property(row => row.Id).OriginalValue != user.Id)
             throw new InvalidOperationException("Identity profile synchronization requires its existing tracked user.");
-        var profile = _dbContext.Entry(user.Pii);
-        if (profile.State is not (EntityState.Unchanged or EntityState.Modified)
-            || profile.Property(row => row.UserId).OriginalValue != user.Id || user.Pii.UserId != user.Id
-            || entry.Properties.Any(property => property.IsModified && property.Metadata.Name != nameof(User.EmailVerified))
-            || profile.Properties.Any(property => property.IsModified && property.Metadata.Name != nameof(UserPii.Email)))
+        if (entry.Properties.Any(property => property.IsModified && property.Metadata.Name != nameof(User.EmailVerified))
+            || _dbContext.ChangeTracker.Entries<UserPii>().Any(profile =>
+                profile.Entity.UserId == user.Id && profile.State != EntityState.Unchanged))
             throw new InvalidOperationException("Identity profile synchronization may change only its email mirror.");
-        if (profile.Property(row => row.Email).IsModified && entry.State == EntityState.Unchanged)
+
+        string? originalEmail = null;
+        if (normalizedEmail is not null)
+        {
+            originalEmail = await _dbContext.UserPii.AsNoTracking()
+                .Where(profile => profile.UserId == user.Id)
+                .Select(profile => profile.Email)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (originalEmail is null)
+                throw new DbUpdateConcurrencyException("The identity email mirror is no longer available.");
+        }
+        bool emailChanged = normalizedEmail is not null && originalEmail != normalizedEmail;
+        if (emailVerified.HasValue)
+            user.EmailVerified = emailVerified;
+        _dbContext.ChangeTracker.DetectChanges();
+        if (emailChanged && entry.State == EntityState.Unchanged)
             entry.Property(row => row.ConcurrencyStamp).IsModified = true;
         await _dbContext.SaveChangesAsync(cancellationToken);
+        if (emailChanged)
+        {
+            // The account stamp above fences this write in the original transaction.
+            // A scalar update leaves private declarations and their revision entirely with their owner.
+            int updated = await _dbContext.UserPii
+                .Where(profile => profile.UserId == user.Id && profile.Email == originalEmail)
+                .ExecuteUpdateAsync(update => update.SetProperty(profile => profile.Email, normalizedEmail!),
+                    cancellationToken);
+            if (updated != 1)
+                throw new DbUpdateConcurrencyException("The identity email mirror changed during synchronization.");
+        }
     }
 
     public Task<User?> GetLocalIdentityBindingAsync(Guid id, CancellationToken cancellationToken) =>

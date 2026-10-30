@@ -747,7 +747,8 @@ public sealed class ActorFederationMapperTests
     {
         public override Task<bool> Exists(Guid id) => Task.FromResult(id == OwnerId);
         public Task<User?> GetLocalIdentityBindingAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task SaveIdentityProfileAsync(User user, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<User?> GetIdentityAccountForSynchronizationAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task SaveIdentityProfileAsync(User user, string? normalizedEmail, bool? emailVerified, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<User?> GetUserWithDetails(Guid id) => throw new NotSupportedException();
         public Task<User?> GetUserWithDetails(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<User?> GetUserByEmail(string email) => throw new NotSupportedException();

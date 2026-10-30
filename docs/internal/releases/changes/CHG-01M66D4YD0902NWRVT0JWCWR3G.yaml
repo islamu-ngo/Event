@@ -1,0 +1,26 @@
+Change-Id: CHG-01M66D4YD0902NWRVT0JWCWR3G
+Title: "preserve SQL Server owned deletion metadata"
+Type: fix
+Scope: database
+Summary: "Preserve existing SQL Server ownership delete behavior in generated models so later scaffolds do not repeat an unrelated moderation foreign-key alteration, without changing physical deletion policy or the private birth-receipt cascade."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

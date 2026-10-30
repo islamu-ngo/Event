@@ -1615,6 +1615,25 @@ env DOTNET_ENVIRONMENT=Development \
 ```
 
 Use `PostgreSql`, `Sqlite`, `SqlServer`, `MySql` or `MariaDb` for the provider.
+The SQL Server catalog owns a provider-scoped `SqlServerSnapshotGenerator`.
+It retains standard owned-type generation and explicitly preserves existing
+`NoAction` ownership metadata in snapshots and migration target models.
+Without that metadata, reconstructing an owned relationship can infer Cascade
+and produce another unrelated FK alteration at the next scaffold. Keep the
+catalog's design-time service reference with that target assembly; placing its
+implementation in the common startup assembly also activates startup discovery
+for other providers.
+
+`PreserveSqlServerOwnedDeletePolicies` is a generated model-metadata checkpoint,
+not a new physical delete policy. Existing committed SQL Server migrations
+already install the moderation evidence FK without database cascade. Its
+`Up` and `Down` are intentionally empty, so applying or reverting this checkpoint
+does not weaken that constraint, alter private birth-receipt cascading, or
+rewrite earlier migration history. Later migrations should contain only their
+own intended model changes. Always compile and stage the current catalog before
+scaffolding with `--no-build`, then inspect the generated operations and verify
+model agreement rather than hand-editing a snapshot or accepting recurring noise.
+
 MySQL/MariaDB must additionally specify the intended server version, for example
 `--Database:ServerVersion=8.4.0` for MySQL. The mode flag is command-line only;
 an environment variable cannot silently select it. The ordinary design-time

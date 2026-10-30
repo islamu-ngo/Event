@@ -56994,6 +56994,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .HasConstraintName("fk_keycloak_operation_receipts_keycloak_operation_receipts_id");
                         });
 
+                    b.Metadata.FindNavigation("Target")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                     b.Navigation("Target")
                         .IsRequired();
                 });
@@ -57004,7 +57006,7 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .WithMany("Practices")
                         .HasForeignKey("TenantId", "UserLearningStateId")
                         .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.ClientCascade)
                         .IsRequired()
                         .HasConstraintName("fk_learning_practice_states_user_learning_states_tenant_id_user_learning_state_id");
                 });
@@ -57015,7 +57017,7 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .WithMany("Tours")
                         .HasForeignKey("TenantId", "UserLearningStateId")
                         .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.ClientCascade)
                         .IsRequired()
                         .HasConstraintName("fk_learning_tour_progress_user_learning_states_tenant_id_user_learning_state_id");
                 });
@@ -60918,6 +60920,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .HasConstraintName("fk_payment_attempts_payment_attempts_id");
                         });
 
+                    b.Metadata.FindNavigation("RecipientSnapshot")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                     b.Navigation("AcceptanceSnapshot");
 
                     b.Navigation("PaymentAttemptStatus");
@@ -61091,6 +61095,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowTenantCustomDomains")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "InstanceBaseDomain", b2 =>
                                 {
                                     b2.Property<Guid>("DomainPolicyInstancePolicySetId")
@@ -61113,6 +61119,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("DomainPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("InstanceBaseDomain")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "LockTenantCustomDomain", b2 =>
                                 {
@@ -61137,6 +61145,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("LockTenantCustomDomain")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "LockTenantSubdomain", b2 =>
                                 {
                                     b2.Property<Guid>("DomainPolicyInstancePolicySetId")
@@ -61160,6 +61170,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("LockTenantSubdomain")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.Navigation("AllowTenantCustomDomains")
                                 .IsRequired();
 
@@ -61172,6 +61184,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                             b1.Navigation("LockTenantSubdomain")
                                 .IsRequired();
                         });
+
+                    b.Metadata.FindNavigation("Domains")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.OwnsOne("Explore.Domain.Policies.BrandingPolicy", "Branding", b1 =>
                         {
@@ -61210,6 +61224,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("CustomCssUrl")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("PolicySlot", "DisplayName", b2 =>
                                 {
                                     b2.Property<Guid>("BrandingPolicyInstancePolicySetId")
@@ -61232,6 +61248,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("BrandingPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("DisplayName")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "FaviconUrl", b2 =>
                                 {
@@ -61256,6 +61274,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("FaviconUrl")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "LogoUrl", b2 =>
                                 {
                                     b2.Property<Guid>("BrandingPolicyInstancePolicySetId")
@@ -61279,6 +61299,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("LogoUrl")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.Navigation("CustomCssUrl")
                                 .IsRequired();
 
@@ -61291,6 +61313,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                             b1.Navigation("LogoUrl")
                                 .IsRequired();
                         });
+
+                    b.Metadata.FindNavigation("Branding")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.OwnsOne("Explore.Domain.Policies.EventPolicy", "Events", b1 =>
                         {
@@ -61329,6 +61353,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowGroupSubmittedEvents")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "AllowOrganizationSubmittedEvents", b2 =>
                                 {
                                     b2.Property<Guid>("EventPolicyInstancePolicySetId")
@@ -61351,6 +61377,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("EventPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("AllowOrganizationSubmittedEvents")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "AllowUserSubmittedEvents", b2 =>
                                 {
@@ -61375,6 +61403,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowUserSubmittedEvents")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "EventCardClickOpensDetailPage", b2 =>
                                 {
                                     b2.Property<Guid>("EventPolicyInstancePolicySetId")
@@ -61398,6 +61428,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("EventCardClickOpensDetailPage")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.Navigation("AllowGroupSubmittedEvents")
                                 .IsRequired();
 
@@ -61410,6 +61442,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                             b1.Navigation("EventCardClickOpensDetailPage")
                                 .IsRequired();
                         });
+
+                    b.Metadata.FindNavigation("Events")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.OwnsOne("Explore.Domain.Policies.OrganizationPolicy", "Organizations", b1 =>
                         {
@@ -61448,6 +61482,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowGroupSelfRegistration")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "AllowSelfRegistration", b2 =>
                                 {
                                     b2.Property<Guid>("OrganizationPolicyInstancePolicySetId")
@@ -61470,6 +61506,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("OrganizationPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("AllowSelfRegistration")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "AllowTenantToOmitVerification", b2 =>
                                 {
@@ -61494,6 +61532,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowTenantToOmitVerification")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "RequireVerification", b2 =>
                                 {
                                     b2.Property<Guid>("OrganizationPolicyInstancePolicySetId")
@@ -61517,6 +61557,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("RequireVerification")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.Navigation("AllowGroupSelfRegistration")
                                 .IsRequired();
 
@@ -61529,6 +61571,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                             b1.Navigation("RequireVerification")
                                 .IsRequired();
                         });
+
+                    b.Metadata.FindNavigation("Organizations")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.OwnsOne("Explore.Domain.Policies.RenderPolicy", "RenderPolicy", b1 =>
                         {
@@ -61567,6 +61611,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AdminPrerenderEnabled")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "AdminRenderMode", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyInstancePolicySetId")
@@ -61589,6 +61635,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("AdminRenderMode")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "AllowTenantOverride", b2 =>
                                 {
@@ -61613,6 +61661,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowTenantOverride")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "DisallowInteractiveServerOnOnboarding", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyInstancePolicySetId")
@@ -61635,6 +61685,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("DisallowInteractiveServerOnOnboarding")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "EnableAdvancedOverrides", b2 =>
                                 {
@@ -61659,6 +61711,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("EnableAdvancedOverrides")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "GlobalPrerenderEnabled", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyInstancePolicySetId")
@@ -61681,6 +61735,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("GlobalPrerenderEnabled")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "GlobalRenderMode", b2 =>
                                 {
@@ -61705,6 +61761,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("GlobalRenderMode")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "LockTenantAdmin", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyInstancePolicySetId")
@@ -61727,6 +61785,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("LockTenantAdmin")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "LockTenantOperational", b2 =>
                                 {
@@ -61751,6 +61811,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("LockTenantOperational")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "LockTenantPublicSeo", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyInstancePolicySetId")
@@ -61773,6 +61835,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("LockTenantPublicSeo")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "OnboardingPrerenderEnabled", b2 =>
                                 {
@@ -61797,6 +61861,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("OnboardingPrerenderEnabled")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "OnboardingRenderMode", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyInstancePolicySetId")
@@ -61819,6 +61885,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("OnboardingRenderMode")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "OperationalPrerenderEnabled", b2 =>
                                 {
@@ -61843,6 +61911,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("OperationalPrerenderEnabled")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "OperationalRenderMode", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyInstancePolicySetId")
@@ -61865,6 +61935,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("OperationalRenderMode")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "Preset", b2 =>
                                 {
@@ -61889,6 +61961,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("Preset")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "PublicSeoPrerenderEnabled", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyInstancePolicySetId")
@@ -61911,6 +61985,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("PublicSeoPrerenderEnabled")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "PublicSeoRenderMode", b2 =>
                                 {
@@ -61935,6 +62011,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("PublicSeoRenderMode")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("PolicySlot", "Version", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyInstancePolicySetId")
@@ -61957,6 +62035,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("Version")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.Navigation("AdminPrerenderEnabled")
                                 .IsRequired();
@@ -62013,6 +62093,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .IsRequired();
                         });
 
+                    b.Metadata.FindNavigation("RenderPolicy")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                     b.OwnsOne("Explore.Domain.Policies.ModulePolicy", "Modules", b1 =>
                         {
                             b1.Property<Guid>("InstancePolicySetId")
@@ -62050,6 +62132,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("EnableIslamicModule")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "EnableTechModule", b2 =>
                                 {
                                     b2.Property<Guid>("ModulePolicyInstancePolicySetId")
@@ -62073,12 +62157,16 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("EnableTechModule")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.Navigation("EnableIslamicModule")
                                 .IsRequired();
 
                             b1.Navigation("EnableTechModule")
                                 .IsRequired();
                         });
+
+                    b.Metadata.FindNavigation("Modules")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.OwnsOne("Explore.Domain.Policies.TenantDelegationPolicy", "TenantDelegation", b1 =>
                         {
@@ -62117,6 +62205,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowSelfServiceRegistration")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "AllowWhiteLabeling", b2 =>
                                 {
                                     b2.Property<Guid>("TenantDelegationPolicyInstancePolicySetId")
@@ -62139,6 +62229,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("TenantDelegationPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("AllowWhiteLabeling")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "AuthorizationProvider", b2 =>
                                 {
@@ -62163,6 +62255,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AuthorizationProvider")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "DefaultPublicHomePage", b2 =>
                                 {
                                     b2.Property<Guid>("TenantDelegationPolicyInstancePolicySetId")
@@ -62185,6 +62279,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("TenantDelegationPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("DefaultPublicHomePage")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "LockTenantAnalytics", b2 =>
                                 {
@@ -62209,6 +62305,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("LockTenantAnalytics")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "LockTenantSmtp", b2 =>
                                 {
                                     b2.Property<Guid>("TenantDelegationPolicyInstancePolicySetId")
@@ -62231,6 +62329,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("TenantDelegationPolicyInstancePolicySetId")
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("LockTenantSmtp")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "LockTenantStorage", b2 =>
                                 {
@@ -62255,6 +62355,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_instance_policy_sets_instance_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("LockTenantStorage")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.Navigation("AllowSelfServiceRegistration")
                                 .IsRequired();
 
@@ -62276,6 +62378,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                             b1.Navigation("LockTenantStorage")
                                 .IsRequired();
                         });
+
+                    b.Metadata.FindNavigation("TenantDelegation")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.Navigation("Branding")
                         .IsRequired();
@@ -62338,6 +62442,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_organization_policy_sets_organization_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowGroupSubmittedEvents")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "AllowOrganizationSubmittedEvents", b2 =>
                                 {
                                     b2.Property<Guid>("EventPolicyOrganizationPolicySetId")
@@ -62360,6 +62466,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("EventPolicyOrganizationPolicySetId")
                                         .HasConstraintName("fk_organization_policy_sets_organization_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("AllowOrganizationSubmittedEvents")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "AllowUserSubmittedEvents", b2 =>
                                 {
@@ -62384,6 +62492,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_organization_policy_sets_organization_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowUserSubmittedEvents")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "EventCardClickOpensDetailPage", b2 =>
                                 {
                                     b2.Property<Guid>("EventPolicyOrganizationPolicySetId")
@@ -62407,6 +62517,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_organization_policy_sets_organization_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("EventCardClickOpensDetailPage")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.Navigation("AllowGroupSubmittedEvents")
                                 .IsRequired();
 
@@ -62419,6 +62531,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                             b1.Navigation("EventCardClickOpensDetailPage")
                                 .IsRequired();
                         });
+
+                    b.Metadata.FindNavigation("Events")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.Navigation("Events")
                         .IsRequired();
@@ -62463,6 +62577,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("CustomCssUrl")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "DisplayName", b2 =>
                                 {
                                     b2.Property<Guid>("BrandingPolicyTenantPolicySetId")
@@ -62485,6 +62601,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("BrandingPolicyTenantPolicySetId")
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("DisplayName")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "FaviconUrl", b2 =>
                                 {
@@ -62509,6 +62627,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("FaviconUrl")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "LogoUrl", b2 =>
                                 {
                                     b2.Property<Guid>("BrandingPolicyTenantPolicySetId")
@@ -62532,6 +62652,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("LogoUrl")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.Navigation("CustomCssUrl")
                                 .IsRequired();
 
@@ -62544,6 +62666,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                             b1.Navigation("LogoUrl")
                                 .IsRequired();
                         });
+
+                    b.Metadata.FindNavigation("Branding")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.OwnsOne("Explore.Domain.Policies.EventPolicy", "Events", b1 =>
                         {
@@ -62582,6 +62706,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowGroupSubmittedEvents")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "AllowOrganizationSubmittedEvents", b2 =>
                                 {
                                     b2.Property<Guid>("EventPolicyTenantPolicySetId")
@@ -62604,6 +62730,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("EventPolicyTenantPolicySetId")
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("AllowOrganizationSubmittedEvents")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "AllowUserSubmittedEvents", b2 =>
                                 {
@@ -62628,6 +62756,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowUserSubmittedEvents")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "EventCardClickOpensDetailPage", b2 =>
                                 {
                                     b2.Property<Guid>("EventPolicyTenantPolicySetId")
@@ -62651,6 +62781,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("EventCardClickOpensDetailPage")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.Navigation("AllowGroupSubmittedEvents")
                                 .IsRequired();
 
@@ -62663,6 +62795,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                             b1.Navigation("EventCardClickOpensDetailPage")
                                 .IsRequired();
                         });
+
+                    b.Metadata.FindNavigation("Events")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.OwnsOne("Explore.Domain.Policies.OrganizationPolicy", "Organizations", b1 =>
                         {
@@ -62701,6 +62835,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowGroupSelfRegistration")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "AllowSelfRegistration", b2 =>
                                 {
                                     b2.Property<Guid>("OrganizationPolicyTenantPolicySetId")
@@ -62723,6 +62859,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("OrganizationPolicyTenantPolicySetId")
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("AllowSelfRegistration")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "AllowTenantToOmitVerification", b2 =>
                                 {
@@ -62747,6 +62885,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowTenantToOmitVerification")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "RequireVerification", b2 =>
                                 {
                                     b2.Property<Guid>("OrganizationPolicyTenantPolicySetId")
@@ -62770,6 +62910,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("RequireVerification")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.Navigation("AllowGroupSelfRegistration")
                                 .IsRequired();
 
@@ -62782,6 +62924,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                             b1.Navigation("RequireVerification")
                                 .IsRequired();
                         });
+
+                    b.Metadata.FindNavigation("Organizations")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.OwnsOne("Explore.Domain.Policies.RenderPolicy", "RenderPolicy", b1 =>
                         {
@@ -62820,6 +62964,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AdminPrerenderEnabled")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "AdminRenderMode", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyTenantPolicySetId")
@@ -62842,6 +62988,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyTenantPolicySetId")
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("AdminRenderMode")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "AllowTenantOverride", b2 =>
                                 {
@@ -62866,6 +63014,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("AllowTenantOverride")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "DisallowInteractiveServerOnOnboarding", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyTenantPolicySetId")
@@ -62888,6 +63038,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyTenantPolicySetId")
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("DisallowInteractiveServerOnOnboarding")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "EnableAdvancedOverrides", b2 =>
                                 {
@@ -62912,6 +63064,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("EnableAdvancedOverrides")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "GlobalPrerenderEnabled", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyTenantPolicySetId")
@@ -62934,6 +63088,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyTenantPolicySetId")
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("GlobalPrerenderEnabled")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "GlobalRenderMode", b2 =>
                                 {
@@ -62958,6 +63114,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("GlobalRenderMode")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "LockTenantAdmin", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyTenantPolicySetId")
@@ -62980,6 +63138,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyTenantPolicySetId")
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("LockTenantAdmin")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "LockTenantOperational", b2 =>
                                 {
@@ -63004,6 +63164,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("LockTenantOperational")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "LockTenantPublicSeo", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyTenantPolicySetId")
@@ -63026,6 +63188,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyTenantPolicySetId")
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("LockTenantPublicSeo")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "OnboardingPrerenderEnabled", b2 =>
                                 {
@@ -63050,6 +63214,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("OnboardingPrerenderEnabled")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "OnboardingRenderMode", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyTenantPolicySetId")
@@ -63072,6 +63238,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyTenantPolicySetId")
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("OnboardingRenderMode")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "OperationalPrerenderEnabled", b2 =>
                                 {
@@ -63096,6 +63264,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("OperationalPrerenderEnabled")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "OperationalRenderMode", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyTenantPolicySetId")
@@ -63118,6 +63288,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyTenantPolicySetId")
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("OperationalRenderMode")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "Preset", b2 =>
                                 {
@@ -63142,6 +63314,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("Preset")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<bool>", "PublicSeoPrerenderEnabled", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyTenantPolicySetId")
@@ -63164,6 +63338,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyTenantPolicySetId")
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("PublicSeoPrerenderEnabled")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<string>", "PublicSeoRenderMode", b2 =>
                                 {
@@ -63188,6 +63364,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
 
+                            b1.OwnedEntityType.FindNavigation("PublicSeoRenderMode")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                             b1.OwnsOne("Explore.Domain.Policies.PolicySlot<int>", "Version", b2 =>
                                 {
                                     b2.Property<Guid>("RenderPolicyTenantPolicySetId")
@@ -63210,6 +63388,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                         .HasForeignKey("RenderPolicyTenantPolicySetId")
                                         .HasConstraintName("fk_tenant_policy_sets_tenant_policy_sets_id");
                                 });
+
+                            b1.OwnedEntityType.FindNavigation("Version")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                             b1.Navigation("AdminPrerenderEnabled")
                                 .IsRequired();
@@ -63265,6 +63445,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                             b1.Navigation("Version")
                                 .IsRequired();
                         });
+
+                    b.Metadata.FindNavigation("RenderPolicy")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.Navigation("Branding")
                         .IsRequired();
@@ -63444,6 +63626,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .HasForeignKey("RefundAttemptId")
                                 .HasConstraintName("fk_refund_attempts_refund_attempts_id");
                         });
+
+                    b.Metadata.FindNavigation("Allocation")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.Navigation("Allocation")
                         .IsRequired();
@@ -64214,6 +64398,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .HasForeignKey("RegistrationOrderId")
                                 .HasConstraintName("fk_registration_orders_registration_orders_id");
                         });
+
+                    b.Metadata.FindNavigation("ParticipationSnapshot")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.Navigation("BookingPartyType");
 
@@ -65139,6 +65325,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .HasConstraintName("fk_storage_provider_bindings_storage_provider_bindings_id");
                         });
 
+                    b.Metadata.FindNavigation("AccessKeyReference")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                     b.OwnsOne("Explore.Domain.Secrets.RetainedSecretReference", "SecretKeyReference", b1 =>
                         {
                             b1.Property<Guid>("StorageProviderBindingId")
@@ -65217,6 +65405,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .HasForeignKey("StorageProviderBindingId")
                                 .HasConstraintName("fk_storage_provider_bindings_storage_provider_bindings_id");
                         });
+
+                    b.Metadata.FindNavigation("SecretKeyReference")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.Navigation("AccessKeyReference");
 
@@ -66007,6 +66197,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .HasConstraintName("fk_ui_themes_ui_themes_id");
                         });
 
+                    b.Metadata.FindNavigation("DarkPalette")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                     b.OwnsOne("Explore.Domain.ValueObjects.UiThemePalette", "LightPalette", b1 =>
                         {
                             b1.Property<Guid>("UiThemeId")
@@ -66136,6 +66328,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .HasForeignKey("UiThemeId")
                                 .HasConstraintName("fk_ui_themes_ui_themes_id");
                         });
+
+                    b.Metadata.FindNavigation("LightPalette")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.Navigation("DarkPalette")
                         .IsRequired();
@@ -66284,6 +66478,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .HasConstraintName("fk_ui_theme_presets_ui_theme_presets_id");
                         });
 
+                    b.Metadata.FindNavigation("DarkPalette")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                     b.OwnsOne("Explore.Domain.ValueObjects.UiThemePalette", "LightPalette", b1 =>
                         {
                             b1.Property<Guid>("UiThemePresetId")
@@ -66413,6 +66609,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .HasForeignKey("UiThemePresetId")
                                 .HasConstraintName("fk_ui_theme_presets_ui_theme_presets_id");
                         });
+
+                    b.Metadata.FindNavigation("LightPalette")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.Navigation("DarkPalette")
                         .IsRequired();
@@ -66567,6 +66765,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .HasConstraintName("fk_user_appearance_profiles_user_appearance_profiles_id");
                         });
 
+                    b.Metadata.FindNavigation("DarkPaletteSnapshot")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
+
                     b.OwnsOne("Explore.Domain.ValueObjects.UiThemePalette", "LightPaletteSnapshot", b1 =>
                         {
                             b1.Property<Guid>("UserAppearanceProfileId")
@@ -66696,6 +66896,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .HasForeignKey("UserAppearanceProfileId")
                                 .HasConstraintName("fk_user_appearance_profiles_user_appearance_profiles_id");
                         });
+
+                    b.Metadata.FindNavigation("LightPaletteSnapshot")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.Navigation("DarkPaletteSnapshot")
                         .IsRequired();
@@ -67660,6 +67862,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                                 .HasForeignKey("CaseId")
                                 .HasConstraintName("fk_moderation_case_evidence_moderation_cases_case_id");
                         });
+
+                    b.Metadata.FindNavigation("Evidence")!.ForeignKey.DeleteBehavior = DeleteBehavior.NoAction;
 
                     b.Navigation("Evidence");
                 });

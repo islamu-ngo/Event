@@ -1941,6 +1941,58 @@ public sealed class SecurityExecutionEvidencePublicationTests
     }
 }
 
+public sealed class SecurityExecutionEvidenceRuntimeExporterTests
+{
+    [Test]
+    [Arguments("unscoped")]
+    [Arguments("scoped")]
+    [Arguments("different-scope")]
+    [Arguments("different-version")]
+    [Arguments("version-without-name")]
+    [Arguments("duplicate-scope-label")]
+    [Arguments("invalid-escape")]
+    [Arguments("duplicate-memory")]
+    public async Task RuntimeSeriesRequireOneConsistentUnambiguousScope(string variant)
+    {
+        string scope = variant == "unscoped" ? "" : ",otel_scope_name=\"System.Runtime\",otel_scope_version=\"10.0.0\"";
+        if (variant == "version-without-name") scope = ",otel_scope_version=\"10.0.0\"";
+        string systemScope = scope;
+        string memoryScope = scope;
+        switch (variant)
+        {
+            case "different-scope":
+                memoryScope = ",otel_scope_name=\"Foreign.Runtime\",otel_scope_version=\"10.0.0\"";
+                break;
+            case "different-version":
+                systemScope = ",otel_scope_name=\"System.Runtime\",otel_scope_version=\"11.0.0\"";
+                break;
+            case "duplicate-scope-label":
+                memoryScope += ",otel_scope_name=\"System.Runtime\"";
+                break;
+            case "invalid-escape":
+                memoryScope = ",otel_scope_name=\"System\\qRuntime\",otel_scope_version=\"10.0.0\"";
+                break;
+        }
+        string memoryLabels = memoryScope.Length == 0 ? "" : "{" + memoryScope[1..] + "}";
+        string memory = "dotnet_process_memory_working_set_bytes" + memoryLabels + " 9007199254740993\n";
+        string exporter = "# TYPE dotnet_process_cpu_time_seconds counter\n"
+            + "# UNIT dotnet_process_cpu_time_seconds seconds\n"
+            + "dotnet_process_cpu_time_seconds_total{cpu_mode=\"user\"" + scope + "} 1.25\n"
+            + "dotnet_process_cpu_time_seconds_total{cpu_mode=\"system\"" + systemScope + "} 0.5\n"
+            + "# TYPE dotnet_process_memory_working_set_bytes gauge\n"
+            + "# UNIT dotnet_process_memory_working_set_bytes bytes\n"
+            + memory + (variant == "duplicate-memory" ? memory : "") + "# EOF\n";
+
+        bool accepted = SecurityExecutionEvidence.TryReadRuntimeExporter(Encoding.UTF8.GetBytes(exporter), out var values);
+        bool valid = variant is "unscoped" or "scoped";
+        await Assert.That(accepted).IsEqualTo(valid);
+        if (valid)
+            await Assert.That(values).IsEqualTo(new SecurityExecutionEvidence.RuntimeExporterValues(1.25, 0.5, 9007199254740993L));
+        else
+            await Assert.That(values).IsNull();
+    }
+}
+
 public sealed class SecurityExecutionEvidenceResourceSnapshotTests
 {
     [Test]

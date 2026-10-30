@@ -1,6 +1,4 @@
 using Explore.Persistence.Database;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -15,14 +13,16 @@ public sealed class DataProtectionKeyContextFactory : IDesignTimeDbContextFactor
             .AddEnvironmentVariables()
             .AddCommandLine(args)
             .Build();
-        var configurationBuilder = new ConfigurationBuilder().AddConfiguration(
-            SecretAuthorityConfiguration.Build(
-                bootstrap,
-                SecretAuthorityConfiguration.GetEnvironmentName(bootstrap),
-                "/database",
-                "/database/erasure"));
-
-        return CreateDbContext(configurationBuilder);
+        if (DesignTimeModelConfiguration.IsRequested(args, bootstrap))
+        {
+            var modelBuilder = new DbContextOptionsBuilder<DataProtectionKeyContext>();
+            PrimaryDatabaseProviderComposition.ConfigureDataProtectionModel(
+                modelBuilder, DesignTimeModelConfiguration.ReadPrimary(bootstrap));
+            return new DataProtectionKeyContext(modelBuilder.Options);
+        }
+        return MigrationDatabaseAcquisition.CreateDesignTimeContext(
+            bootstrap, ["/database"],
+            configuration => CreateDbContext(new ConfigurationBuilder().AddConfiguration(configuration)));
     }
 
     public DataProtectionKeyContext CreateDbContext(IConfigurationBuilder configurationBuilder)

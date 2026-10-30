@@ -231,11 +231,19 @@ public static partial class PostgresEventResourceProviderContract
             {string.Join("\n", Sources.SelectMany(type => new[] { ("changed", 62), ("row", 29) }
                 .Select(trigger => TriggerGuard(context, sql.Table(type), trigger.Item1, trigger.Item2, false))))}
             {TriggerGuard(context, sql.Name(AttemptTable), "settlement", 21, true)}
-            {string.Join("\n", Sources.Select(type => $"""
-                IF pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                    OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT,UPDATE,REFERENCES')
-                THEN RAISE EXCEPTION 'resource_provider_ambient_write' USING ERRCODE = '55000'; END IF;
-                """))}
+            {string.Join("\n", Sources.Select(type =>
+            {
+                string insertDenial = $"pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT')";
+                if (PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, type, out _, out var insert, out _)
+                    && insert.Count != 0)
+                    insertDenial += $" AND ({PostgresManagedTenantWorkerCreationPermissions.CompleteGlobalCataloguePredicate(context, enrollment)}) IS NOT TRUE";
+                return $"""
+                    IF pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                        OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'UPDATE,REFERENCES')
+                        OR ({insertDenial})
+                    THEN RAISE EXCEPTION 'resource_provider_ambient_write' USING ERRCODE = '55000'; END IF;
+                    """;
+            }))}
             {string.Join("\n", new[] { enrollment.GlobalLogin, enrollment.RuntimeLogin }.SelectMany(login => new[] { SourceTable, AttemptTable }.Select(table => $"""
                 IF pg_catalog.has_table_privilege({Text(login)},{Text(sql.Name(table))}::regclass,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                     OR pg_catalog.has_any_column_privilege({Text(login)},{Text(sql.Name(table))}::regclass,'SELECT,INSERT,UPDATE,REFERENCES')

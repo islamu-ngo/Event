@@ -4,7 +4,7 @@ using Explore.Application.Contracts.Identity;
 using Explore.Domain;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;

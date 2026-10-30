@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Explore.Blazor.Services.Auth;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Explore.Blazor.IntegrationTests.Handlers;
 
@@ -181,7 +184,6 @@ public class AccessTokenForwardingHandlerTests
         await Assert.That(innerHandler.CapturedRequest!.Headers.Authorization).IsNotNull();
         await Assert.That(innerHandler.CapturedRequest.Headers.Authorization!.Scheme).IsEqualTo("Bearer");
         await Assert.That(innerHandler.CapturedRequest.Headers.Authorization.Parameter).IsEqualTo(freshRefreshedToken);
-        circuitTokenService.Received(1).SetToken(freshRefreshedToken);
     }
 
     [Test]
@@ -211,7 +213,6 @@ public class AccessTokenForwardingHandlerTests
         await Assert.That(innerHandler.CapturedRequest!.Headers.Authorization).IsNotNull();
         await Assert.That(innerHandler.CapturedRequest.Headers.Authorization!.Scheme).IsEqualTo("Bearer");
         await Assert.That(innerHandler.CapturedRequest.Headers.Authorization.Parameter).IsEqualTo(freshRefreshedToken);
-        circuitTokenService.Received(1).SetToken(freshRefreshedToken);
     }
 
     [Test]
@@ -247,7 +248,6 @@ public class AccessTokenForwardingHandlerTests
         await Assert.That(innerHandler.CapturedRequest!.Headers.Authorization).IsNotNull();
         await Assert.That(innerHandler.CapturedRequest.Headers.Authorization!.Scheme).IsEqualTo("Bearer");
         await Assert.That(innerHandler.CapturedRequest.Headers.Authorization.Parameter).IsEqualTo(freshStoredToken);
-        circuitTokenService.DidNotReceive().SetToken(Arg.Any<string>());
     }
 
     [Test]
@@ -262,7 +262,7 @@ public class AccessTokenForwardingHandlerTests
         httpContext.Request.Headers.Cookie = ".AspNetCore.Cookies=test-cookie";
         var httpContextAccessor = new HttpContextAccessor { HttpContext = httpContext };
 
-        var refreshHandler = new BffSelfRefreshHandler(() => _tokenStore.Store(CircuitKey(httpContext), sessionId: null, freshRefreshedToken));
+        var refreshHandler = new BffSelfRefreshHandler(() => _tokenStore.Store(CircuitKey(httpContext), SessionKey(httpContext), freshRefreshedToken));
         var selfClientFactory = new TestHttpClientFactory(refreshHandler);
         var innerHandler = new CapturingHandler();
         var circuitTokenService = Substitute.For<ICircuitAccessTokenService>();
@@ -286,11 +286,10 @@ public class AccessTokenForwardingHandlerTests
         await Assert.That(innerHandler.CapturedRequest!.Headers.Authorization).IsNotNull();
         await Assert.That(innerHandler.CapturedRequest.Headers.Authorization!.Scheme).IsEqualTo("Bearer");
         await Assert.That(innerHandler.CapturedRequest.Headers.Authorization.Parameter).IsEqualTo(freshRefreshedToken);
-        circuitTokenService.Received(1).SetToken(freshRefreshedToken);
     }
 
     [Test]
-    public async Task SendAsync_WithExpiredHttpContextToken_AndSelfRefreshStoresDifferentSession_UsesUserFallbackToken()
+    public async Task SendAsync_WithExpiredHttpContextToken_AndSelfRefreshStoresDifferentSession_DoesNotBorrowToken()
     {
         var userId = Guid.NewGuid().ToString();
         var expiredContextToken = CreateUnsignedJwt(userId, DateTime.UtcNow.AddMinutes(-5));
@@ -321,10 +320,7 @@ public class AccessTokenForwardingHandlerTests
 
         await Assert.That(refreshHandler.Called).IsTrue();
         await Assert.That(innerHandler.CapturedRequest).IsNotNull();
-        await Assert.That(innerHandler.CapturedRequest!.Headers.Authorization).IsNotNull();
-        await Assert.That(innerHandler.CapturedRequest.Headers.Authorization!.Scheme).IsEqualTo("Bearer");
-        await Assert.That(innerHandler.CapturedRequest.Headers.Authorization.Parameter).IsEqualTo(freshRefreshedToken);
-        circuitTokenService.Received(1).SetToken(freshRefreshedToken);
+        await Assert.That(innerHandler.CapturedRequest!.Headers.Authorization is null).IsTrue();
     }
 
     [Test]
@@ -367,7 +363,6 @@ public class AccessTokenForwardingHandlerTests
         await Assert.That(innerHandler.CapturedRequest!.Headers.Authorization).IsNotNull();
         await Assert.That(innerHandler.CapturedRequest.Headers.Authorization!.Scheme).IsEqualTo("Bearer");
         await Assert.That(innerHandler.CapturedRequest.Headers.Authorization.Parameter).IsEqualTo(freshRefreshedToken);
-        circuitTokenService.Received(1).SetToken(freshRefreshedToken);
     }
 
     [Test]
@@ -386,6 +381,8 @@ public class AccessTokenForwardingHandlerTests
 
         var circuitUserContext = new CircuitUserContext();
         circuitUserContext.SetUserId(CircuitKey(trustedContext));
+        BffSessionIdentity.TryGetBinding(trustedContext.User, out var binding);
+        circuitUserContext.SetSessionBinding(binding);
         httpContextAccessor.HttpContext = null;
 
         var innerHandler = new CapturingHandler();
@@ -397,7 +394,8 @@ public class AccessTokenForwardingHandlerTests
                 Substitute.For<ICircuitAccessTokenService>(),
                 new CircuitUserContext(),
                 _tokenStore,
-                NullLogger<AccessTokenForwardingHandler>.Instance)
+                NullLogger<AccessTokenForwardingHandler>.Instance,
+                sessionAuthority: new FixedSessionAuthority())
             {
                 InnerHandler = innerHandler
             };
@@ -420,7 +418,7 @@ public class AccessTokenForwardingHandlerTests
     }
 
     private static string? SessionKey(HttpContext context) =>
-        context.User.TryGetSessionId(out var identity) ? identity.PartitionKey : null;
+        BffSessionIdentity.TryGetBinding(context.User, out var binding) ? binding.Handle : null;
 
     private static string CreateUnsignedJwt(string userId, DateTime? expires = null)
     {
@@ -451,7 +449,8 @@ public class AccessTokenForwardingHandlerTests
         var claims = new List<Claim>
         {
             new("sub", userId),
-            new(ClaimTypes.NameIdentifier, userId)
+            new(ClaimTypes.NameIdentifier, userId),
+            new(BffSessionIdentity.HandleClaim, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Concat(userId, "/", sessionId)))))
         };
 
         if (!string.IsNullOrWhiteSpace(sessionId))
@@ -481,6 +480,7 @@ public class AccessTokenForwardingHandlerTests
 
         var services = new ServiceCollection();
         services.AddSingleton(authService);
+        services.AddSingleton<IBffSessionAuthority>(new FixedSessionAuthority());
 
         var httpContext = new DefaultHttpContext
         {
@@ -493,6 +493,11 @@ public class AccessTokenForwardingHandlerTests
     private sealed class TestHttpClientFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+    }
+
+    private sealed class FixedSessionAuthority : IBffSessionAuthority
+    {
+        public Task<bool> IsActiveAsync(BffSessionBinding binding, CancellationToken cancellationToken) => Task.FromResult(true);
     }
 
     private sealed class BffSelfRefreshHandler(Action onRefresh) : HttpMessageHandler

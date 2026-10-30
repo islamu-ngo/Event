@@ -13,7 +13,6 @@ using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;

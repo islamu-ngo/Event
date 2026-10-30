@@ -133,7 +133,7 @@ public sealed class DurableSideEffectBoundaryTests
     public async Task SchedulerPayloadScannerShouldIgnoreUsingDirectivesButFlagSensitiveDeclarations()
     {
         const string content = """
-            using Explore.Secrets.Database;
+            using Explore.Persistence.Database;
 
             public sealed class SchedulerState
             {

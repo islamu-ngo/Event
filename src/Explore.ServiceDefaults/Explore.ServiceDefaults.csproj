@@ -11,6 +11,10 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
 
+    <PackageReference Include="SecretKit.Core" />
+    <PackageReference Include="SecretKit.Infisical" />
+    <PackageReference Include="SecretKit.Extensions.Configuration" />
+    <PackageReference Include="SecretKit.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Compliance.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Compliance.Redaction" />
     <PackageReference Include="Microsoft.Extensions.Telemetry" />

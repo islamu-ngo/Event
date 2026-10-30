@@ -1,28 +1,23 @@
 namespace ISLAMU.Wire.Contracts.UnitTests.ConfigurationPortability;
 
-using System.Collections;
 using System.Globalization;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using ISLAMU.Wire.Contracts.ConfigurationPortability;
 
 public sealed class SetupContractExtractionTests
 {
-    private readonly ConfigurationPortabilityContractRuntime _runtime = new();
-
     [Test]
     public async Task FinalPackageFreeOwnersAndDeepCodecSurfaceExist()
     {
-        IReadOnlyList<string> missing = _runtime.MissingOwners();
-
-        await Assert.That(missing.Count).IsEqualTo(0).Because(
-            "SA-210 Red: final Event.Wire.Contracts owners are missing while old owners remain at "
-            + "ISLAMU.Wire.Contracts.ConfigurationPortability and "
-            + "Explore.Domain.ISLAMU.Wire.Contracts.ConfigurationPortability.LegalMarkdownCodec. Missing count="
-            + missing.Count.ToString(CultureInfo.InvariantCulture)
-            + "; first missing owners: "
-            + string.Join(", ", missing.Take(6)));
+        var wireAssembly = typeof(ConfigurationManifestV1Alpha2).Assembly;
+        await Assert.That(typeof(ConfigurationPortabilityJsonCodec).Assembly).IsEqualTo(wireAssembly);
+        await Assert.That(typeof(LegalMarkdownCodec).Assembly).IsEqualTo(wireAssembly);
+        await Assert.That(wireAssembly.GetReferencedAssemblies()
+                .Where(reference => reference.Name is not null
+                    && !reference.Name.StartsWith("System", StringComparison.Ordinal)))
+            .IsEmpty().Because("Portable codecs must run without an application host or third-party packages.");
     }
 
     [Test]
@@ -75,15 +70,12 @@ public sealed class SetupContractExtractionTests
     [Test]
     public async Task DeterministicJsonBytesDigestRecordsAndCollectionsAreStable()
     {
-        if (!_runtime.IsComplete)
-            return;
-
         byte[] manifestInput = ConfigurationPortabilityExpectedVectors.ManifestBytes;
         byte[] packageInput = ConfigurationPortabilityExpectedVectors.PackageBytes;
-        object manifest = _runtime.ParseManifest(manifestInput);
-        object package = _runtime.ParsePackage(packageInput);
-        byte[] manifestBytes = _runtime.SerializeManifest(manifest);
-        byte[] packageBytes = _runtime.SerializePackage(package);
+        ConfigurationManifestV1Alpha2 manifest = ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(manifestInput);
+        TenantConfigurationPackageV1Alpha2 package = ConfigurationPortabilityJsonCodec.ParseTenantConfigurationPackage(packageInput);
+        byte[] manifestBytes = ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(manifest);
+        byte[] packageBytes = ConfigurationPortabilityJsonCodec.SerializeTenantConfigurationPackage(package);
 
         await Assert.That(manifestBytes)
             .IsEquivalentTo(ConfigurationPortabilityExpectedVectors.ManifestBytes);
@@ -96,39 +88,34 @@ public sealed class SetupContractExtractionTests
 
         manifestInput.AsSpan().Fill((byte)'x');
         packageInput.AsSpan().Fill((byte)'x');
-        await Assert.That(_runtime.SerializeManifest(manifest))
+        await Assert.That(ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(manifest))
             .IsEquivalentTo(manifestBytes);
-        await Assert.That(_runtime.SerializePackage(package))
+        await Assert.That(ConfigurationPortabilityJsonCodec.SerializeTenantConfigurationPackage(package))
             .IsEquivalentTo(packageBytes);
 
-        object manifestClone = CloneRecord(manifest);
-        await Assert.That(manifestClone.Equals(manifest)).IsTrue();
-        PropertyInfo schema = manifestClone.GetType().GetProperty("Schema")!;
-        schema.SetValue(manifestClone, "different-schema");
-        await Assert.That(manifestClone.Equals(manifest)).IsFalse();
-
-        object spec = ConfigurationPortabilityContractRuntime.Property(manifest, "Spec")!;
-        object instance = ConfigurationPortabilityContractRuntime.Property(spec, "Instance")!;
-        object settings = ConfigurationPortabilityContractRuntime.Property(instance, "Settings")!;
-        object tenants = ConfigurationPortabilityContractRuntime.Property(spec, "Tenants")!;
-        await AssertCollectionRejectsMutation(settings);
-        await AssertCollectionRejectsMutation(tenants);
+        await Assert.That(manifest with { }).IsEqualTo(manifest);
+        await Assert.That(manifest with { Schema = "different-schema" }).IsNotEqualTo(manifest);
+        await Assert.That(package with { }).IsEqualTo(package);
+        await Assert.That(package with { Schema = "different-schema" }).IsNotEqualTo(package);
+        await AssertSettingsRejectMutation(manifest.Spec.Instance.Settings);
+        await Assert.That(() => ((IList<ConfigurationManifestTenantV1Alpha2>)manifest.Spec.Tenants).Clear())
+            .Throws<NotSupportedException>();
         await AssertCallerOwnedDictionaryIsSnapshotted();
 
-        object reconstructed = _runtime.ParseManifest(manifestBytes);
-        await Assert.That(_runtime.SerializeManifest(reconstructed))
+        ConfigurationManifestV1Alpha2 reconstructed = ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(manifestBytes);
+        await Assert.That(ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(reconstructed))
             .IsEquivalentTo(manifestBytes);
+        TenantConfigurationPackageV1Alpha2 reconstructedPackage = ConfigurationPortabilityJsonCodec.ParseTenantConfigurationPackage(packageBytes);
+        await Assert.That(ConfigurationPortabilityJsonCodec.SerializeTenantConfigurationPackage(reconstructedPackage))
+            .IsEquivalentTo(packageBytes);
     }
 
     [Test]
     public async Task StrictCodecRejectsMalformedBoundedSmuggledAndWrongScopeArtifactsSafely()
     {
-        if (!_runtime.IsComplete)
-            return;
-
         foreach (InvalidArtifactVector vector in ConfigurationPortabilityExpectedVectors.InvalidArtifacts)
         {
-            Exception failure = _runtime.ParseManifestFailure(Encoding.UTF8.GetBytes(vector.Json));
+            ConfigurationPortabilityContractException failure = ParseManifestFailure(Encoding.UTF8.GetBytes(vector.Json));
             await AssertPortableFailure(failure, vector.Code, vector.Path, vector.Name);
         }
 
@@ -139,7 +126,7 @@ public sealed class SetupContractExtractionTests
                 + new string(']', ConfigurationPortabilityExpectedVectors.MaximumJsonDepth + 1),
             StringComparison.Ordinal);
         await AssertPortableFailure(
-            _runtime.ParseManifestFailure(Encoding.UTF8.GetBytes(overDepth)),
+            ParseManifestFailure(Encoding.UTF8.GetBytes(overDepth)),
             ConfigurationPortabilityExpectedVectors.DepthExceeded,
             "$",
             "depth-limit");
@@ -147,7 +134,7 @@ public sealed class SetupContractExtractionTests
         byte[] overBytes = new byte[
             ConfigurationPortabilityExpectedVectors.MaximumArtifactUtf8Bytes + 1];
         await AssertPortableFailure(
-            _runtime.ParseManifestFailure(overBytes),
+            ParseManifestFailure(overBytes),
             ConfigurationPortabilityExpectedVectors.TooLarge,
             "$",
             "byte-limit");
@@ -159,7 +146,7 @@ public sealed class SetupContractExtractionTests
             "[" + string.Join(',', Enumerable.Repeat(tenant, ConfigurationPortabilityExpectedVectors.MaximumTenantCount + 1)) + "]",
             StringComparison.Ordinal);
         await AssertPortableFailure(
-            _runtime.ParseManifestFailure(Encoding.UTF8.GetBytes(tooManyTenants)),
+            ParseManifestFailure(Encoding.UTF8.GetBytes(tooManyTenants)),
             ConfigurationPortabilityExpectedVectors.CountExceeded,
             "$.spec.tenants",
             "tenant-count");
@@ -174,7 +161,7 @@ public sealed class SetupContractExtractionTests
                 "\"settings\":{},\"documents\":{},\"legalDocuments\":{}}}]",
                 replacement,
                 StringComparison.Ordinal);
-            Exception failure = _runtime.ParseManifestFailure(Encoding.UTF8.GetBytes(smuggled));
+            ConfigurationPortabilityContractException failure = ParseManifestFailure(Encoding.UTF8.GetBytes(smuggled));
             await AssertPortableFailure(
                 failure,
                 ConfigurationPortabilityExpectedVectors.ForbiddenMember,
@@ -187,54 +174,50 @@ public sealed class SetupContractExtractionTests
     [Test]
     public async Task PublicLimitsMetadataAndPortableClosureMatchCheckedSchemasWithoutAuthority()
     {
-        if (!_runtime.IsComplete)
-            return;
-
-        Type manifestMetadata = _runtime.RequireType("ConfigurationManifestContractMetadata");
-        Type packageMetadata = _runtime.RequireType("TenantConfigurationPackageContractMetadata");
-        Type limits = _runtime.RequireType("ConfigurationPortabilityContentLimits");
-        Type legalLimits = _runtime.RequireType("LegalMarkdownContentLimits");
-
-        await Assert.That(ConfigurationPortabilityContractRuntime.StringConstant(manifestMetadata, "SchemaId"))
+        await Assert.That(ConfigurationManifestContractMetadata.SchemaId)
             .IsEqualTo(ConfigurationPortabilityExpectedVectors.ManifestSchemaId);
-        await Assert.That(ConfigurationPortabilityContractRuntime.StringConstant(packageMetadata, "SchemaId"))
+        await Assert.That(TenantConfigurationPackageContractMetadata.SchemaId)
             .IsEqualTo(ConfigurationPortabilityExpectedVectors.PackageSchemaId);
-        await Assert.That(ConfigurationPortabilityContractRuntime.StringConstant(manifestMetadata, "ApiVersion"))
+        await Assert.That(ConfigurationManifestContractMetadata.ApiVersion)
             .IsEqualTo(ConfigurationPortabilityExpectedVectors.ApiVersion);
-        await Assert.That(ConfigurationPortabilityContractRuntime.StringConstant(manifestMetadata, "Kind"))
+        await Assert.That(ConfigurationManifestContractMetadata.Kind)
             .IsEqualTo("ConfigurationManifest");
-        await Assert.That(ConfigurationPortabilityContractRuntime.StringConstant(packageMetadata, "Kind"))
+        await Assert.That(TenantConfigurationPackageContractMetadata.Kind)
             .IsEqualTo("TenantConfigurationPackage");
-        await Assert.That(ConfigurationPortabilityContractRuntime.StringConstant(manifestMetadata, "MediaType"))
+        await Assert.That(ConfigurationManifestContractMetadata.MediaType)
             .IsEqualTo("application/vnd.islamu.configuration-manifest.v1alpha2+json");
-        await Assert.That(ConfigurationPortabilityContractRuntime.StringConstant(packageMetadata, "MediaType"))
+        await Assert.That(TenantConfigurationPackageContractMetadata.MediaType)
             .IsEqualTo("application/vnd.islamu.tenant-configuration-package.v1alpha2+json");
-        await Assert.That(Enum.GetNames(_runtime.RequireType("ConfigurationImportApplyMode")))
+        await Assert.That(Enum.GetNames<ConfigurationImportApplyMode>())
             .IsEquivalentTo(
             [
                 "PreviewOnly", "CreateNew", "MergeMissing", "ApplySelected",
                 "ReplacePortableConfiguration", "ReconcileManaged"
             ]);
 
-        await AssertLimit(limits, "MaximumArtifactUtf8Bytes", ConfigurationPortabilityExpectedVectors.MaximumArtifactUtf8Bytes);
-        await AssertLimit(limits, "MaximumJsonDepth", ConfigurationPortabilityExpectedVectors.MaximumJsonDepth);
-        await AssertLimit(limits, "MaximumTenantCount", ConfigurationPortabilityExpectedVectors.MaximumTenantCount);
-        await AssertLimit(legalLimits, "MaximumDocumentsPerScope", ConfigurationPortabilityExpectedVectors.MaximumLegalDocumentsPerScope);
-        await AssertLimit(legalLimits, "MaximumLocalesPerDocument", ConfigurationPortabilityExpectedVectors.MaximumLegalLocalesPerDocument);
-        await AssertLimit(legalLimits, "MaximumMarkdownUtf8BytesPerLocale", ConfigurationPortabilityExpectedVectors.MaximumLegalMarkdownUtf8BytesPerLocale);
-        await AssertLimit(legalLimits, "MaximumLinksPerLocale", ConfigurationPortabilityExpectedVectors.MaximumLegalLinksPerLocale);
-        await AssertLimit(legalLimits, "MaximumPlaceholdersPerLocale", ConfigurationPortabilityExpectedVectors.MaximumLegalPlaceholdersPerLocale);
-        await AssertLimit(legalLimits, "MaximumTitleLength", ConfigurationPortabilityExpectedVectors.MaximumLegalTitleLength);
-        await AssertLimit(legalLimits, "MaximumSummaryLength", ConfigurationPortabilityExpectedVectors.MaximumLegalSummaryLength);
-        await AssertLimit(legalLimits, "MaximumLanguageTagLength", ConfigurationPortabilityExpectedVectors.MaximumLanguageTagLength);
-        await AssertLimit(legalLimits, "MaximumLinkLength", ConfigurationPortabilityExpectedVectors.MaximumLegalLinkLength);
-        await AssertLimit(legalLimits, "MaximumIdentityValueLength", ConfigurationPortabilityExpectedVectors.MaximumLegalIdentityValueLength);
+        await Assert.That(ConfigurationPortabilityContentLimits.MaximumArtifactUtf8Bytes).IsEqualTo(ConfigurationPortabilityExpectedVectors.MaximumArtifactUtf8Bytes);
+        await Assert.That(ConfigurationPortabilityContentLimits.MaximumJsonDepth).IsEqualTo(ConfigurationPortabilityExpectedVectors.MaximumJsonDepth);
+        await Assert.That(ConfigurationPortabilityContentLimits.MaximumTenantCount).IsEqualTo(ConfigurationPortabilityExpectedVectors.MaximumTenantCount);
+        await Assert.That(LegalMarkdownContentLimits.MaximumDocumentsPerScope).IsEqualTo(ConfigurationPortabilityExpectedVectors.MaximumLegalDocumentsPerScope);
+        await Assert.That(LegalMarkdownContentLimits.MaximumLocalesPerDocument).IsEqualTo(ConfigurationPortabilityExpectedVectors.MaximumLegalLocalesPerDocument);
+        await Assert.That(LegalMarkdownContentLimits.MaximumMarkdownUtf8BytesPerLocale).IsEqualTo(ConfigurationPortabilityExpectedVectors.MaximumLegalMarkdownUtf8BytesPerLocale);
+        await Assert.That(LegalMarkdownContentLimits.MaximumLinksPerLocale).IsEqualTo(ConfigurationPortabilityExpectedVectors.MaximumLegalLinksPerLocale);
+        await Assert.That(LegalMarkdownContentLimits.MaximumPlaceholdersPerLocale).IsEqualTo(ConfigurationPortabilityExpectedVectors.MaximumLegalPlaceholdersPerLocale);
+        await Assert.That(LegalMarkdownContentLimits.MaximumTitleLength).IsEqualTo(ConfigurationPortabilityExpectedVectors.MaximumLegalTitleLength);
+        await Assert.That(LegalMarkdownContentLimits.MaximumSummaryLength).IsEqualTo(ConfigurationPortabilityExpectedVectors.MaximumLegalSummaryLength);
+        await Assert.That(LegalMarkdownContentLimits.MaximumLanguageTagLength).IsEqualTo(ConfigurationPortabilityExpectedVectors.MaximumLanguageTagLength);
+        await Assert.That(LegalMarkdownContentLimits.MaximumLinkLength).IsEqualTo(ConfigurationPortabilityExpectedVectors.MaximumLegalLinkLength);
+        await Assert.That(LegalMarkdownContentLimits.MaximumIdentityValueLength).IsEqualTo(ConfigurationPortabilityExpectedVectors.MaximumLegalIdentityValueLength);
 
-        Type[] portableRoots = ConfigurationPortabilityContractRuntime.RequiredRecordNames
-            .Select(_runtime.RequireType)
-            .Append(_runtime.RequireType("ConfigurationPortabilityDiagnostic"))
-            .Append(_runtime.RequireType("LegalMarkdownDiagnostic"))
-            .ToArray();
+        Type[] portableRoots =
+        [
+            typeof(ConfigurationManifestV1Alpha2),
+            typeof(TenantConfigurationPackageV1Alpha2),
+            typeof(ConfigurationManifestBrandingPayloadV1Alpha2),
+            typeof(ConfigurationManifestPaidEventPolicyPayloadV1Alpha2),
+            typeof(ConfigurationPortabilityDiagnostic),
+            typeof(LegalMarkdownDiagnostic)
+        ];
         IReadOnlyList<string> forbidden =
             ConfigurationPortabilityInvariantVerifier.FindForbiddenPublicMembers(portableRoots);
         await Assert.That(forbidden).IsEmpty().Because(
@@ -245,22 +228,19 @@ public sealed class SetupContractExtractionTests
     [Test]
     public async Task LegalMarkdownNormalizesAndRendersDeterministicallyWhileFailingClosed()
     {
-        if (!_runtime.IsComplete)
-            return;
-
-        string normalized = _runtime.NormalizeLegalMarkdown(
+        string normalized = LegalMarkdownCodec.Normalize(
             ConfigurationPortabilityExpectedVectors.LegalMarkdown.Replace("\n", "\r\n", StringComparison.Ordinal));
         await Assert.That(normalized).IsEqualTo(ConfigurationPortabilityExpectedVectors.LegalMarkdown);
-        await Assert.That(_runtime.NormalizeLegalMarkdown(normalized)).IsEqualTo(normalized);
+        await Assert.That(LegalMarkdownCodec.Normalize(normalized)).IsEqualTo(normalized);
 
         CultureInfo originalCulture = CultureInfo.CurrentCulture;
         CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
-        object rendered;
+        LegalMarkdownRenderResult rendered;
         try
         {
             CultureInfo.CurrentCulture = new CultureInfo("tr-TR");
             CultureInfo.CurrentUICulture = new CultureInfo("tr-TR");
-            rendered = _runtime.RenderLegalMarkdown(
+            rendered = LegalMarkdownCodec.Render(
                 normalized,
                 new Dictionary<string, string>(StringComparer.Ordinal));
         }
@@ -270,18 +250,21 @@ public sealed class SetupContractExtractionTests
             CultureInfo.CurrentUICulture = originalUiCulture;
         }
 
-        await Assert.That(ConfigurationPortabilityContractRuntime.Property(rendered, "IsReady") as bool?)
-            .IsTrue();
-        await Assert.That(ConfigurationPortabilityContractRuntime.StringProperty(rendered, "Html"))
+        await Assert.That(rendered.IsReady).IsTrue();
+        await Assert.That(rendered.Html)
             .IsEqualTo(ConfigurationPortabilityExpectedVectors.LegalHtml);
-        object inspection = _runtime.InspectLegalMarkdown(normalized);
-        object reparsed = _runtime.InspectLegalMarkdown(_runtime.NormalizeLegalMarkdown(normalized));
-        await Assert.That(ConfigurationPortabilityContractRuntime.Property(inspection, "LinkCount"))
-            .IsEqualTo(ConfigurationPortabilityContractRuntime.Property(reparsed, "LinkCount"));
+        LegalMarkdownInspection inspection = LegalMarkdownCodec.Inspect(normalized);
+        LegalMarkdownInspection reparsed = LegalMarkdownCodec.Inspect(LegalMarkdownCodec.Normalize(normalized));
+        await Assert.That(inspection.LinkCount).IsEqualTo(1);
+        await Assert.That(inspection.LinkCount).IsEqualTo(reparsed.LinkCount);
+        await Assert.That(inspection.PlaceholderCount).IsEqualTo(0);
+        await Assert.That(inspection.LinkTargets).IsEquivalentTo(["https://example.test/legal"]);
+        await Assert.That(rendered.LinkTargets).IsEquivalentTo(inspection.LinkTargets);
+        await Assert.That(rendered.Diagnostics).IsEmpty();
 
         foreach (LegalRejectionVector vector in ConfigurationPortabilityExpectedVectors.LegalRejections)
         {
-            Exception failure = _runtime.InspectLegalFailure(vector.Markdown);
+            LegalMarkdownContractException failure = InspectLegalFailure(vector.Markdown);
             await Assert.That(failure.ToString().Length).IsLessThanOrEqualTo(1024);
         }
 
@@ -295,121 +278,106 @@ public sealed class SetupContractExtractionTests
             .Select(index => $"{{{{identity_{index}}}}}"));
         string tooLarge = new('a', ConfigurationPortabilityExpectedVectors.MaximumLegalMarkdownUtf8BytesPerLocale + 1);
         foreach (string invalid in new[] { tooManyLinks, tooManyPlaceholders, tooLarge })
-            _ = _runtime.InspectLegalFailure(invalid);
+            await Assert.That(() => LegalMarkdownCodec.Inspect(invalid)).Throws<ArgumentOutOfRangeException>();
 
         const string unresolvedValue = "sentinel-identity-value";
-        object unresolved = _runtime.RenderLegalMarkdown(
-            "# Policy\n\nOperator: {{accountable_identity}}.",
-            new Dictionary<string, string>(StringComparer.Ordinal));
-        await Assert.That(ConfigurationPortabilityContractRuntime.Property(unresolved, "IsReady") as bool?)
-            .IsFalse();
-        await Assert.That(ConfigurationPortabilityContractRuntime.StringProperty(unresolved, "Html"))
-            .IsEmpty();
+        LegalMarkdownRenderResult unresolved = LegalMarkdownCodec.Render(
+            "# Policy\n\nOperator: {{accountable_identity}}. Contact: {{contact_identity}}.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["contact_identity"] = unresolvedValue
+            });
+        await Assert.That(unresolved.IsReady).IsFalse();
+        await Assert.That(unresolved.Html).IsEmpty();
+        LegalMarkdownDiagnostic unresolvedDiagnostic = unresolved.Diagnostics.Single();
+        await Assert.That(unresolvedDiagnostic.Code).IsEqualTo("legal_markdown_identity_unresolved");
+        await Assert.That(unresolvedDiagnostic.Subject).IsEqualTo("accountable_identity");
         IReadOnlyList<string> leaks = ConfigurationPortabilityInvariantVerifier.FindValueLeaks(
-            ConfigurationPortabilityInvariantVerifier.PublicEnumerable(unresolved, "Diagnostics"),
+            unresolved.Diagnostics,
             unresolvedValue);
         await Assert.That(leaks).IsEmpty();
 
-        object weakLink = _runtime.RenderLegalMarkdown(
+        LegalMarkdownRenderResult weakLink = LegalMarkdownCodec.Render(
             "# Policy\n\n[click here](https://example.test/legal)",
             new Dictionary<string, string>(StringComparer.Ordinal));
-        object weakDiagnostic = ConfigurationPortabilityInvariantVerifier
-            .PublicEnumerable(weakLink, "Diagnostics").Single();
-        await Assert.That(ConfigurationPortabilityContractRuntime.StringProperty(weakDiagnostic, "Code"))
+        LegalMarkdownDiagnostic weakDiagnostic = weakLink.Diagnostics.Single();
+        await Assert.That(weakDiagnostic.Code)
             .IsEqualTo("legal_markdown_link_text_weak");
-        await Assert.That(ConfigurationPortabilityContractRuntime.Property(weakDiagnostic, "Subject"))
-            .IsNull();
+        await Assert.That(weakDiagnostic.Subject).IsNull();
     }
 
     private static async Task AssertPortableFailure(
-        Exception failure,
+        ConfigurationPortabilityContractException failure,
         string code,
         string path,
         string vector,
         string? sentinel = null)
     {
-        await Assert.That(failure.GetType().Name)
-            .IsEqualTo("ConfigurationPortabilityContractException");
-        await Assert.That(ConfigurationPortabilityContractRuntime.StringProperty(failure, "Code"))
+        await Assert.That(failure.Code)
             .IsEqualTo(code).Because(vector);
-        await Assert.That(ConfigurationPortabilityContractRuntime.StringProperty(failure, "Path"))
+        await Assert.That(failure.Path)
             .IsEqualTo(path).Because(vector);
-        await Assert.That(code.Length).IsLessThanOrEqualTo(80);
-        await Assert.That(path.Length).IsLessThanOrEqualTo(256);
+        await Assert.That(failure.Code.Length).IsLessThanOrEqualTo(80);
+        await Assert.That(failure.Path.Length).IsLessThanOrEqualTo(256);
         await Assert.That(failure.ToString().Length).IsLessThanOrEqualTo(1024);
         if (sentinel is not null)
             await Assert.That(failure.ToString().Contains(sentinel, StringComparison.Ordinal)).IsFalse();
     }
 
-    private static async Task AssertLimit(Type owner, string name, int expected) =>
-        await Assert.That(ConfigurationPortabilityContractRuntime.IntConstant(owner, name))
-            .IsEqualTo(expected);
-
-    private static object CloneRecord(object value)
+    private static ConfigurationPortabilityContractException ParseManifestFailure(byte[] bytes)
     {
-        MethodInfo clone = value.GetType().GetMethods(
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            .SingleOrDefault(method => method.Name == "<Clone>$"
-                && method.GetParameters().Length == 0)
-            ?? throw new InvalidOperationException(
-                $"Final wire value '{value.GetType().FullName}' is not a record contract.");
-        return clone.Invoke(value, null)!;
-    }
-
-    private async Task AssertCallerOwnedDictionaryIsSnapshotted()
-    {
-        Type instanceType = _runtime.RequireType("ConfigurationManifestInstanceV1Alpha2");
-        Type documentType = _runtime.RequireType("ConfigurationManifestDocumentV1Alpha2");
-        object instance = Activator.CreateInstance(instanceType)
-            ?? throw new InvalidOperationException("Manifest instance record needs public JSON construction.");
-        var callerSettings = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
-        {
-            ["events.require_approval"] = JsonDocument.Parse("true").RootElement.Clone()
-        };
-        object callerDocuments = Activator.CreateInstance(
-            typeof(Dictionary<,>).MakeGenericType(typeof(string), documentType))!;
-        object callerLegalDocuments = Activator.CreateInstance(
-            typeof(Dictionary<,>).MakeGenericType(
-                typeof(string),
-                _runtime.RequireType("ConfigurationManifestLegalDocumentV1Alpha2")))!;
-
-        instanceType.GetProperty("Settings")!.SetValue(instance, callerSettings);
-        instanceType.GetProperty("Documents")!.SetValue(instance, callerDocuments);
-        instanceType.GetProperty("LegalDocuments")!.SetValue(instance, callerLegalDocuments);
-        callerSettings["events.user_submission_enabled"] =
-            JsonDocument.Parse("false").RootElement.Clone();
-
-        object snapshot = ConfigurationPortabilityContractRuntime.Property(instance, "Settings")!;
-        int snapshotCount = ((IEnumerable)snapshot).Cast<object>().Count();
-        await Assert.That(snapshotCount).IsEqualTo(1);
-        await AssertCollectionRejectsMutation(snapshot);
-    }
-
-    private static async Task AssertCollectionRejectsMutation(object collection)
-    {
-        bool rejected = false;
         try
         {
-            switch (collection)
-            {
-                case IDictionary dictionary:
-                    dictionary.Add("mutation", null);
-                    break;
-                case IList list:
-                    list.Add(null);
-                    break;
-                default:
-                    rejected = collection.GetType().Namespace == "System.Collections.Immutable";
-                    break;
-            }
+            _ = ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(bytes);
         }
-        catch (NotSupportedException)
+        catch (ConfigurationPortabilityContractException exception)
         {
-            rejected = true;
+            return exception;
         }
 
-        await Assert.That(rejected).IsTrue();
+        throw new InvalidOperationException("Invalid manifest vector was accepted.");
     }
+
+    private static LegalMarkdownContractException InspectLegalFailure(string markdown)
+    {
+        try
+        {
+            _ = LegalMarkdownCodec.Inspect(markdown);
+        }
+        catch (LegalMarkdownContractException exception)
+        {
+            return exception;
+        }
+
+        throw new InvalidOperationException("Invalid legal Markdown vector was accepted.");
+    }
+
+    private static async Task AssertCallerOwnedDictionaryIsSnapshotted()
+    {
+        using JsonDocument enabled = JsonDocument.Parse("true");
+        using JsonDocument disabled = JsonDocument.Parse("false");
+        var callerSettings = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
+        {
+            ["events.require_approval"] = enabled.RootElement.Clone()
+        };
+        var instance = new ConfigurationManifestInstanceV1Alpha2
+        {
+            Settings = callerSettings,
+            Documents = new Dictionary<string, ConfigurationManifestDocumentV1Alpha2>(),
+            LegalDocuments = new Dictionary<string, ConfigurationManifestLegalDocumentV1Alpha2>()
+        };
+        callerSettings["events.require_approval"] = disabled.RootElement.Clone();
+        callerSettings["events.user_submission_enabled"] =
+            disabled.RootElement.Clone();
+
+        await Assert.That(instance.Settings.Count).IsEqualTo(1);
+        await Assert.That(instance.Settings["events.require_approval"].GetBoolean()).IsTrue();
+        await AssertSettingsRejectMutation(instance.Settings);
+    }
+
+    private static async Task AssertSettingsRejectMutation(IReadOnlyDictionary<string, JsonElement> settings) =>
+        await Assert.That(() => ((IDictionary<string, JsonElement>)settings).Add("mutation", default))
+            .Throws<NotSupportedException>();
 
     private static string Sha256(byte[] bytes) =>
         Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();

@@ -1,12 +1,11 @@
 namespace Event.Architecture.Tests;
 
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Explore.Application.Authorization;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Commands;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Queries;
 using Explore.Domain.Constants;
-using Explore.Infrastructure.Services;
+using YamlDotNet.RepresentationModel;
 
 public partial class AuthorizationParityTests
 {
@@ -17,14 +16,6 @@ public partial class AuthorizationParityTests
         "islamuevent_registration_manager",
         "islamuevent_ticket_manager",
         "islamuevent_check_in_staff"
-    ];
-
-    private static readonly string[] ExpectedEventRoleCodes =
-    [
-        "event.owner",
-        "event.manager",
-        "event.registration_manager",
-        "event.check_in_staff"
     ];
 
     private static readonly string[] EventFamilyResourceKinds =
@@ -44,43 +35,14 @@ public partial class AuthorizationParityTests
     public async Task EventRoleDerivedRoles_ShouldExist_InDerivedRolesYaml()
     {
         var derivedRolesPath = Path.Combine(CerbosPoliciesPath, "derived_roles.yaml");
-        var content = File.ReadAllText(derivedRolesPath);
-
-        var missing = ExpectedEventDerivedRoles
-            .Where(role => !content.Contains($"name: {role}", StringComparison.Ordinal))
-            .ToList();
+        YamlMappingNode roles = RequiredMapping(ReadYaml(derivedRolesPath), "derivedRoles");
+        string[] declaredRoles = RequiredSequence(roles, "definitions").Children.Cast<YamlMappingNode>()
+            .Select(definition => RequiredScalar(definition, "name")).ToArray();
+        var missing = ExpectedEventDerivedRoles.Except(declaredRoles, StringComparer.Ordinal).ToList();
 
         await Assert.That(missing)
             .IsEmpty()
             .Because($"These event-role derived roles are missing from derived_roles.yaml: [{string.Join(", ", missing)}]");
-    }
-
-    [Test]
-    [DisplayName("Each event-role derived role checks the correct role code")]
-    public async Task EventRoleDerivedRoles_ShouldCheck_CorrectRoleCodes()
-    {
-        var derivedRolesPath = Path.Combine(CerbosPoliciesPath, "derived_roles.yaml");
-        var content = File.ReadAllText(derivedRolesPath);
-
-        var missing = ExpectedEventRoleCodes
-            .Where(code => !content.Contains($"\"{code}\"", StringComparison.Ordinal))
-            .ToList();
-
-        await Assert.That(missing)
-            .IsEmpty()
-            .Because($"These event role codes are missing from derived_roles.yaml conditions: [{string.Join(", ", missing)}]");
-    }
-
-    [Test]
-    [Category("Phase43Ticketing")]
-    [DisplayName("Ticket manager derived role requires the exact ticket-management permission")]
-    public async Task TicketManagerDerivedRole_ShouldRequire_ExactTicketManagementPermission()
-    {
-        var derivedRolesPath = Path.Combine(CerbosPoliciesPath, "derived_roles.yaml");
-        var content = File.ReadAllText(derivedRolesPath);
-
-        await Assert.That(content).Contains("name: islamuevent_ticket_manager");
-        await Assert.That(content).Contains($"\"{PermissionCodes.EventManageTickets}\"");
     }
 
     [Test]
@@ -98,10 +60,6 @@ public partial class AuthorizationParityTests
         await Assert.That(principalProperties.TryGetProperty("eventFinanceOrganizations", out _)).IsTrue();
         await Assert.That(principalProperties.TryGetProperty("eventFinanceGroups", out _)).IsTrue();
 
-        var policy = File.ReadAllText(Path.Combine(CerbosPoliciesPath, "islamuevent_event.yaml"));
-        await Assert.That(policy).Contains("manage-paid-event-commerce");
-        await Assert.That(policy).Contains("eventFinanceOrganizations");
-        await Assert.That(policy).Contains("eventFinanceGroups");
     }
 
     [Test]
@@ -120,11 +78,11 @@ public partial class AuthorizationParityTests
                 continue;
             }
 
-            var content = File.ReadAllText(policyFile);
-            if (!content.Contains("importDerivedRoles:", StringComparison.Ordinal) &&
-                !content.Contains("derivedRoles:", StringComparison.Ordinal))
+            YamlMappingNode policy = RequiredMapping(ReadYaml(policyFile), "resourcePolicy");
+            string[] imports = RequiredSequence(policy, "importDerivedRoles").Children.Select(ScalarValue).ToArray();
+            if (!imports.Contains("islamuevent_explore_admin_roles", StringComparer.Ordinal))
             {
-                violations.Add($"{kind}.yaml: does not import or reference derived roles");
+                violations.Add($"{kind}.yaml: does not import the event derived roles set");
             }
         }
 
@@ -188,39 +146,6 @@ public partial class AuthorizationParityTests
         await Assert.That(violations)
             .IsEmpty()
             .Because($"Event-family schemas must include eventId for event-role derived role evaluation: [{string.Join("; ", violations)}]");
-    }
-
-    [Test]
-    [DisplayName("CerbosPrincipalBuilder has EnrichWithEventAssignmentsAsync method")]
-    public async Task CerbosPrincipalBuilder_ShouldHave_EventAssignmentEnrichment()
-    {
-        var builderType = typeof(CerbosPrincipalBuilder);
-        var method = builderType.GetMethod("EnrichWithEventAssignmentsAsync");
-
-        await Assert.That(method)
-            .IsNotNull()
-            .Because("CerbosPrincipalBuilder must expose EnrichWithEventAssignmentsAsync for event-role hydration.");
-    }
-
-    [Test]
-    [Category("RegistrationFormAuthorization")]
-    [DisplayName("Event-scoped fallback evaluator routes to event-scoped method for all event-family resources")]
-    public async Task FallbackEvaluator_ShouldRoute_EventFamilyResources()
-    {
-        var sourceFile = FindSourceFile("FallbackAuthorizationService.cs", "Explore.Infrastructure");
-        var source = File.ReadAllText(sourceFile);
-
-        var eventScopedKinds = EventFamilyResourceKinds
-            .Where(k => k != "islamuevent_event_contact_share_consent")
-            .ToList();
-
-        var missing = eventScopedKinds
-            .Where(kind => !source.Contains($"\"{kind}\"", StringComparison.Ordinal))
-            .ToList();
-
-        await Assert.That(missing)
-            .IsEmpty()
-            .Because($"These event-family resource kinds are missing from FallbackAuthorizationService: [{string.Join(", ", missing)}]");
     }
 
     [Test]

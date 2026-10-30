@@ -112,8 +112,9 @@ change. The whole-programme no-test-execution override still applies.
 
 `SecretProvider:Provider` or `SECRET_PROVIDER` must explicitly select
 Environment, Infisical or UserSecrets. All configuration and private material
-come from `SecretAuthorityConfiguration.Build`, loading `/database` and
-`/moderation`. Shared UserSecrets remain Development/Testing-only and never act
+come from `SecretAuthorityBootstrap.OpenAsync` and the selected owner's
+`PrepareConfigurationGroupAsync`, loading `/database` and `/moderation` with the
+compiled `ModerationMeasurement` consumer. Shared UserSecrets remain Development/Testing-only and never act
 as fallback. The signer definition is
 `moderation.measurement_signing_private_key_pem`, with environment/vault alias
 `MODERATION_MEASUREMENT_SIGNING_PRIVATE_KEY_PEM`. The existing Infisical mapping
@@ -139,6 +140,12 @@ under `Moderation:MeasurementTestDatabase`. Its fields are the existing
 Infisical mapping accepts `MODERATION_MEASUREMENT_TEST_DATABASE__<FIELD>`.
 All required credentials must already be supplied by the selected authority.
 There is no database creation, migration, authority inference or provider fallback.
+
+The launcher uses the native `ModerationMeasurement` consumer, whose roots are
+only `/database` and `/moderation`. Its intake and final revalidation each own
+their prepared configuration and authority lifetime. Native token maintenance
+belongs to each selected session and ends when that selection is disposed.
+Serving and migration consumers cannot acquire the measurement root.
 SQLite files must already exist at distinct regular paths. Server database names
 must differ even across endpoints; DNS spelling or a default-port difference is
 not evidence of database isolation.

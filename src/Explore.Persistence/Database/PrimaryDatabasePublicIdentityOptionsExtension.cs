@@ -1,4 +1,3 @@
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 

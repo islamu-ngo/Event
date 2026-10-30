@@ -1,0 +1,42 @@
+Change-Id: CHG-01M5QWN2GKBJ9YJPDN5WE20M6R
+Title: "Retain owned observer faults and require seven profiles"
+Type: fix
+Scope: ci
+Summary: "Preserve bounded native observer custody and reject incomplete security execution registrations."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/contributing/tunit.md
+    Disposition: documented
+    Detail: >-
+      Execution registrations require all seven existing security profiles;
+      partial two-profile registrations are rejected. Regenerate exact-candidate
+      evidence after all required native joins and profiles pass.
+  Security:
+    Reference: docs/internal/CI_CD_GOVERNANCE.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: >-
+      Bounded observer settlement retains original independent cancellation and
+      cleanup faults; private hints remain strict leads only. Public admission
+      remains operator-trusted structural validation without authenticated CI
+      origin. The managed-input guard stays closed pending actual composite
+      live proof.
+  Migration:
+    Reference: docs/internal/CI_CD_GOVERNANCE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/contributing/tunit.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/CI_CD_GOVERNANCE.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/contributing/tunit.md
+    Disposition: documented
+    Detail: >-
+      The exact source passed 119 focused controls. Clean native API proof,
+      copied-real-report successor rejection, SDK/process/held-file/served-input/
+      tool/resource joins and final same-clean-committed seven-profile execution
+      remain required. These primitives do not activate remote CI or certify
+      origin.

@@ -15,7 +15,6 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
 using Explore.Persistence.Repositories;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;

@@ -3,7 +3,6 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;

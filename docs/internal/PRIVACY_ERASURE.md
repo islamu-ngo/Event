@@ -42,12 +42,48 @@ erasure request -> append authority fact (committed first)
 
 1. **Authority-First Ordering**: An immutable, policy-versioned authority fact is recorded and committed *before* local PII disposal or remote provider work begins.
 2. **User Fencing**: Establishing a fence prevents raced writes, background workers, or cache rematerializers from recreating PII for a pending or erased subject.
-3. **Atomic Local Settlement**: Local PII hard-deletes, anonymizations, actor tombstones, application mirror/checkpoint updates, protected provider outbox materialization, and receipt hash persistence execute within a single serializable application transaction.
+3. **Atomic Local Settlement**: Local PII hard-deletes, anonymizations, actor tombstones, application mirror/checkpoint updates, and protected provider outbox materialization execute within the original serializable erasure transaction. The retained authority fact, local fence, and fenced saga/receipt state can already be committed; a failed local settlement does not undo that durable recovery intent.
 4. **Truthful Asynchronous Contract**: Initial requests return `202 Accepted` alongside a short-lived `ErasureReceipt` authentication token. Status polling (`GET /api/privacy-erasure/status`) requires the receipt token and returns non-cacheable (`private, no-store`) bounded phase codes.
 5. **Startup & Restore Replay**: At application startup, the startup gate replays all authority facts missing from the local checkpoint before serving traffic.
 6. **Bounded Retention**: The authority publishes a PII-free high-water/floor state. Compaction deletes only an expired contiguous prefix, preserves and pseudonymizes held evidence, and advances the floor in the same transaction.
 
 ### Serialized Enrollment And Erased-Subject Fencing
+
+`PrivacyErasureService` establishes the sanctioned instance execution scope before
+constructing the mutation workflow. It acquires Human security custody before
+Discovery disclosure custody and holds both through settlement. An already
+selected matching Global owner can be borrowed; stale, mismatched, or reversed
+custody is rejected rather than replaced with a fresh context. Owned custody is
+released in reverse order, with the execution scope released last. This storage
+coordination grants no additional actor permission: the original CQS caller and
+authorization policy remain authoritative. Receipt authentication and status
+reads retain their existing scope and do not acquire mutation custody.
+
+Durable intent and local disposal have distinct commit boundaries. The retained
+authority fact, local fence, fenced saga/receipt metadata, and eligibility
+revocation may survive an interrupted disposal. Within the erasure transaction,
+private homes and profiles, authentication tokens, disclosure changes, local
+coverage/checkpoint updates, and protected provider work settle together. A
+failure after saving a checkpoint but before commit rolls those transaction
+changes back. Replay uses the retained intent and fence to retry that work;
+it must not interpret a saved but uncommitted checkpoint as completion.
+
+The portable repository removes the exact subject's authentication tokens across
+tenants, including rows hidden by ordinary business visibility, in that same
+transaction. It resolves profile PII through the original context's tracked
+identity before hard deletion, including residual PII belonging to an already
+deleted user. The subsequent user tombstone read is profile-free and does not
+require a Local identity provider. These purpose-specific operations do not
+weaken ordinary repository tenant filters. The PostgreSQL native settlement
+branch and its existing permission controls remain separate and unchanged.
+
+Private-home disclosure settlement retains an immutable observation of the
+original persisted subject, home IDs, tenants, and location kinds. That
+observation is bound to the original context, connection, serializable
+transaction, and native custody; it is storage evidence, not business
+authorization. Its lifetime encloses both native save capture passes and the
+held owner reread. Failure, cancellation, reset, or disposal invalidates it;
+ordinary writes and unrelated locations retain their normal tenant checks.
 
 Local disposal also retains HTTP/AI idempotency key rejection fences. Both
 `UserLocationPrivacyErasureRepository` and the PostgreSQL subject-disposal policy

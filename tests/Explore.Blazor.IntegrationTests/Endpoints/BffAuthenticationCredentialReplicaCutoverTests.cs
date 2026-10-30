@@ -68,7 +68,24 @@ public sealed class BffAuthenticationCredentialReplicaCutoverTests(BffKeycloakFi
         await using var fixture = new BffCredentialCutoverProcessFixture();
         await fixture.StartAsync(cancellationToken);
         string retiredCredential = keycloak.ClientSecret;
+        var failedBind = async () =>
+        {
+            await using var unexpected = await fixture.StartReplicaAsync(
+                keycloak, retiredCredential, cancellationToken, retainPortForBindFailure: true);
+        };
+        var bindFailure = await Assert.That(failedBind).Throws<InvalidOperationException>();
+        await Assert.That(bindFailure?.Message.StartsWith("bff_process_exited_before_readiness:", StringComparison.Ordinal) ?? false).IsTrue();
+        await Assert.That(fixture.FailedBindProcessId is > 0).IsTrue();
+        Console.WriteLine($"BFF_OWNED_BIND_FAILURE_PID {fixture.FailedBindProcessId}");
         await using var original = await fixture.StartReplicaAsync(keycloak, retiredCredential, cancellationToken);
+        using (HttpClient wrongPinBrowser = original.CreateBrowserWithMismatchedCertificatePin())
+        {
+            var wrongPinRequest = async () =>
+            {
+                using HttpResponseMessage rejected = await wrongPinBrowser.GetAsync("/auth/status", cancellationToken);
+            };
+            await Assert.That(wrongPinRequest).Throws<HttpRequestException>();
+        }
         using var originalBrowser = original.CreateBrowser();
         await Assert.That(await LoginAsync(originalBrowser, cancellationToken)).IsTrue();
         Task<HttpResponseMessage> draining = originalBrowser.GetAsync("/api/cutover-drain", cancellationToken);

@@ -317,7 +317,7 @@ is required. See the [operator procedure](../public/self-hosting/operator-identi
 > **Status:** Implemented
 > **Owner:** Platform/Ops
 > **Last Verified:** 2026-08-15
-> **Source Anchors:** `src/Explore.Secrets/Database/PrimaryDatabaseConfiguration.cs`, `src/Event.MigrationService/Extensions/ConfigurationExtensions.cs`, `src/Event.Standalone/Program.cs`, `src/Event.Standalone/appsettings.json`, `src/Event.Standalone/Dockerfile`, `Explore.API/Extensions/ConfigurationExtensions.cs`, `Explore.API/Controllers/ListmonkIntegrationSettingsController.cs`, `Explore.API/Controllers/PlatformMonetizationSettingsController.cs`, `Explore.Application/Configuration/PromotionCodeLookupOptions.cs`, `Explore.Application/DTOs/Integrations/ListmonkIntegrationSettingsDto.cs`, `Explore.Application/Features/PlatformMonetization/`, `Explore.Infrastructure/Integrations/Listmonk/ListmonkSyncService.cs`, `Explore.Infrastructure/Services/Registration/PromotionCodeDigestService.cs`, `Explore.Blazor/Extensions/ConfigurationExtension.cs`, `Explore.Blazor/Extensions/YarpProxyExtensions.cs`, `Event.Web.BffHosting/Authentication/EventBffKeycloakAuthenticationOptions.cs`, `Event.Web.BffHosting/Proxy/EventApiBaseAddressResolver.cs`, `Explore.Application/Features/EventReporting/EventReportSubmissionOptions.cs`, `Explore.Application/Services/AccountAuthorityLifecycleEmailOptions.cs`, `Explore.Application/Notifications/AccountAuthorityKind.cs`, `Explore.Application/Notifications/NotificationRoutingOptions.cs`, `Explore.Infrastructure/Configuration/ModerationProviderOptions.cs`, `Explore.Infrastructure/Configuration/OspreyProviderOptions.cs`, `Explore.Infrastructure/Configuration/CoopProviderOptions.cs`, `Explore.API/Services/CoopWebhookSignatureValidator.cs`, `Explore.Infrastructure/Services/HierarchicalSettingsResolver.cs`, `Explore.Infrastructure/Services/Keycloak/KeycloakLifecycleEmailOptions.cs`, `Explore.Infrastructure/Services/Keycloak/KeycloakAccountAuthorityLifecycleEmailService.cs`, `Explore.Infrastructure/Storage/LocalFileStorageProvider.cs`, `Explore.Infrastructure/Storage/S3ConfigResolver.cs`, `Explore.Infrastructure/StorageReconciliationSettings.cs`, `Explore.Infrastructure/Mail/SmtpConfigResolver.cs`, `Explore.Infrastructure/Services/SetupSecretProvider.cs`, `Explore.Domain/Constants/GovernanceSettingKeys.cs`, `Explore.Domain/Constants/InfrastructureSecretSettingKeys.cs`, `Explore.Domain/Secrets/SecretDefinitionRegistry.cs`, `docs/SECRETS.md`
+> **Source Anchors:** `src/Explore.Persistence/Database/PrimaryDatabaseConfiguration.cs`, `src/Event.MigrationService/Extensions/ConfigurationExtensions.cs`, `src/Event.Standalone/Program.cs`, `src/Event.Standalone/appsettings.json`, `src/Event.Standalone/Dockerfile`, `Explore.API/Extensions/ConfigurationExtensions.cs`, `Explore.API/Controllers/ListmonkIntegrationSettingsController.cs`, `Explore.API/Controllers/PlatformMonetizationSettingsController.cs`, `Explore.Application/Configuration/PromotionCodeLookupOptions.cs`, `Explore.Application/DTOs/Integrations/ListmonkIntegrationSettingsDto.cs`, `Explore.Application/Features/PlatformMonetization/`, `Explore.Infrastructure/Integrations/Listmonk/ListmonkSyncService.cs`, `Explore.Infrastructure/Services/Registration/PromotionCodeDigestService.cs`, `Explore.Blazor/Extensions/ConfigurationExtension.cs`, `Explore.Blazor/Extensions/YarpProxyExtensions.cs`, `Event.Web.BffHosting/Authentication/EventBffKeycloakAuthenticationOptions.cs`, `Event.Web.BffHosting/Proxy/EventApiBaseAddressResolver.cs`, `Explore.Application/Features/EventReporting/EventReportSubmissionOptions.cs`, `Explore.Application/Services/AccountAuthorityLifecycleEmailOptions.cs`, `Explore.Application/Notifications/AccountAuthorityKind.cs`, `Explore.Application/Notifications/NotificationRoutingOptions.cs`, `Explore.Infrastructure/Configuration/ModerationProviderOptions.cs`, `Explore.Infrastructure/Configuration/OspreyProviderOptions.cs`, `Explore.Infrastructure/Configuration/CoopProviderOptions.cs`, `Explore.API/Services/CoopWebhookSignatureValidator.cs`, `Explore.Infrastructure/Services/HierarchicalSettingsResolver.cs`, `Explore.Infrastructure/Services/Keycloak/KeycloakLifecycleEmailOptions.cs`, `Explore.Infrastructure/Services/Keycloak/KeycloakAccountAuthorityLifecycleEmailService.cs`, `Explore.Infrastructure/Storage/LocalFileStorageProvider.cs`, `Explore.Infrastructure/Storage/S3ConfigResolver.cs`, `Explore.Infrastructure/StorageReconciliationSettings.cs`, `Explore.Infrastructure/Mail/SmtpConfigResolver.cs`, `Explore.Infrastructure/Services/SetupSecretProvider.cs`, `Explore.Domain/Constants/GovernanceSettingKeys.cs`, `Explore.Domain/Constants/InfrastructureSecretSettingKeys.cs`, `Explore.Domain/Secrets/SecretDefinitionRegistry.cs`, `docs/SECRETS.md`
 
 ## Environment Variables & Secrets Authority
 
@@ -330,6 +330,52 @@ Runtime secret binding remains authoritative in `Explore.Domain/Secrets/SecretDe
 `.env.example` is a curated zero-email baseline, not an exhaustive catalogue or
 a replacement for persisted governance. Optional integrations and advanced
 deployment inputs remain in the separate public reference.
+
+### Shared BFF session authority inputs
+
+`Bff:SessionAuthority:Endpoint`, `Namespace` and `Password` are populated from
+`BFF_SESSION_REDIS_ENDPOINT`, `BFF_SESSION_NAMESPACE` and the selected
+`BFF_SESSION_REDIS_PASSWORD` authority. The endpoint is an absolute `redis://`
+or `rediss://` URI with an explicit host/port, no user information, query or
+fragment, and no non-root path. The namespace is required and contains 1–64 ASCII
+letters, digits, underscores or hyphens. Intended peers and restarts use the same
+namespace; unrelated deployments must use different namespaces.
+
+The password comes from explicit Environment injection, the explicitly selected
+shared User Secrets store in Development/Testing, or the exact Infisical
+`/runtime/bff/session` key `BFF_SESSION_REDIS_PASSWORD`. Missing selected authority
+clears merged configuration; appsettings and another provider never supply a
+fallback. Browser sign-in requires this backend even when persistence is SQLite.
+The API and the ordinary cache do not acquire the BFF session password.
+
+Aspire and Compose declare a dedicated optional `bff-session-authority` resource
+using the admitted pinned image. Persistence of this service and the compatible
+Data Protection authority is necessary for restart continuity. The Compose
+bootstrap wrapper removes the provisioner password from the .NET process for a
+non-Environment selection; it does not remove the value from Docker container
+metadata. The Docker daemon/operator remains a trusted provisioning boundary.
+
+Compose starts this optional service with `--profile bff-session`; omitting it
+requires an independently provisioned selected endpoint or browser sign-in fails
+closed. AppHost does not fetch runtime vault credentials: backend provisioning
+uses explicit environment or the selected local shared User Secrets authority,
+while BFF acquires its own selected runtime source. Infisical deployments must
+provision matching backend and vault passwords; there is no automatic vault-to-
+backend password projection. A stale or unknown-freshness session restore requires
+a new deployment namespace and fresh sign-in so a restored entry cannot undo an
+acknowledged revocation.
+
+The canonical ordinary cache uses the same admitted image pin but remains a
+separate resource. Pinning does not convert or downgrade existing Redis data.
+Existing newer-format stores require a fresh disposable development volume or a
+reviewed version-compatible export/restore; never silently delete or reuse them
+with an older server. Optional third-party cache consumers need their own
+compatibility evidence.
+
+The [public input reference](../public/documentation/readme/configuration-and-operations/environment-variables.md#shared-browser-session-authority)
+owns operator setup. The [authentication contract](AUTHENTICATION.md#shared-bff-browser-session-authority)
+owns revocation and failure semantics; the
+[dependency record](legal/dependencies/bff-session-redis.md) owns provenance.
 
 ## Runtime Configuration Sources
 
@@ -643,7 +689,9 @@ The optional Formbricks stack is deployment-owned infrastructure. Docker Compose
 | `FORMBRICKS_HUB_API_KEY` | Yes | Shared app-to-Hub API key. |
 | `FORMBRICKS_CUBEJS_API_SECRET` | Yes | Cube JWT/API authentication secret. |
 
-Leave required secrets blank in the checked-in example; the Compose migration validates and fails closed. Aspire `FullLocal` generates persistent secret parameters when values are absent. Provider API tokens and webhook secrets remain tenant-scoped ISLAMU secret bindings and are not any of the container-bootstrap values above.
+Leave required secrets blank in the checked-in example; the Compose migration validates and fails closed. Aspire `FullLocal` requires `FORMBRICKS_NEXTAUTH_SECRET`, `FORMBRICKS_ENCRYPTION_KEY`, `FORMBRICKS_CRON_SECRET`, `FORMBRICKS_HUB_API_KEY`, `FORMBRICKS_CUBEJS_API_SECRET`, and `FORMBRICKS_DATABASE_PASSWORD` from the explicitly selected operator secret authority. Required values are resolved lazily when the graph's secret parameters are evaluated; an absent value fails configuration instead of generating a replacement.
+
+AppHost wraps the selected database password in one secret parameter shared by the Formbricks PostgreSQL resource, Cube and the generated database URLs. URL expressions apply the `:uri` formatter so reserved characters are escaped while PostgreSQL receives the original password. Provider API tokens and webhook secrets remain tenant-scoped ISLAMU secret bindings, separate from these container-bootstrap values.
 
 AppHost assigns standalone HTTP dynamically through `WithHttpEndpoint(name: "http")`; HTTPS remains explicitly `https://localhost:7180` for the combined endpoint. Direct `Event.Standalone` launch profiles reserve `http://localhost:5180`.
 
@@ -724,7 +772,6 @@ Commonly consumed sections in code:
 - `StorageReconciliation:*` (dry-run-first storage drift sweep; runs as the `storage-reconciliation` Quartz job)
 - `s3.*` governance settings (non-secret S3 endpoint, bucket, region, and URL policy)
 - `SecretProvider:*`
-- `SecretRefresh:*`
 - `EmailDispatchProcessor:*` (Basic Dispatch Mode background worker)
 - `EmailDispatchRabbitMq:*` (optional RabbitMQ Dispatch Mode transport foundation)
 - `EmailDispatchRetention:*` (bounded email content redaction; `email-dispatch-retention-cleanup` Quartz job)
@@ -1896,13 +1943,28 @@ The per-tenant retention window still comes from the governance setting `ai_assi
 
 ## Secret Provider Configuration
 
-`Explore.Secrets` binds provider config from `SecretProvider`:
+ServiceDefaults `SecretAuthoritySelection` selects one authority for the
+declared host consumer before acquisition:
 
 - `SecretProvider:Provider` (required: `Environment`, `Infisical`, or `UserSecrets`; the latter is Development/Testing only)
-- `SecretProvider:FailFast`
-- `SecretProvider:Infisical:*` (project/client credentials, paths, environment)
+- `SecretProvider:Infisical:Url`, `ProjectId`, `Environment`, `ClientId`, `ClientSecret`: process-only Universal Auth inputs, not merged application values
+- `SecretProvider:Infisical:TokenLifetime`: explicit `Finite` or `Periodic`; periodic also requires `TokenPeriodSeconds` matching the observed session
+- `SecretProvider:Infisical:RenewBeforeSeconds`: default 60, shorter than returned token lifetime
+- `SecretProvider:Infisical:RequestTimeoutSeconds`: default 15, positive and at most 60
 
-Refresh behavior binds from `SecretRefresh` and runs via hosted `SecretRefreshService`.
+Compose/Aspire accept these policies under each consumer's deployment prefix:
+`INFISICAL_API_`, `INFISICAL_BFF_`, `INFISICAL_COMBINED_` or
+`INFISICAL_MIGRATION_`, followed by `TOKEN_LIFETIME`, `TOKEN_PERIOD_SECONDS`,
+`RENEW_BEFORE_SECONDS` or `REQUEST_TIMEOUT_SECONDS`. Only the selected consumer's
+fields become the native process inputs above. There is no shared deployment
+policy fallback. Set lifetime for every enabled Infisical consumer; omit/blank
+period for finite identities. A nonblank finite period is rejected. Periodic
+identities require a positive period matching the observed login lifetime.
+
+Consumer roots are fixed in code, not widened through configurable Paths.
+Native serving owners maintain only their selected authentication token; no
+secret polling, automatic relogin or mutation replay is registered. See
+[SECRETS.md](SECRETS.md#native-authentication-maintenance) for lifetime and recovery.
 
 ## Setup Secret And Managed Provisioning Bootstrap
 

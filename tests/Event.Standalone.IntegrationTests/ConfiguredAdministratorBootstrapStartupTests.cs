@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net;
+using Event.Testing.DataProtection;
 using Explore.API.Hosting;
 using Explore.API.Scheduling;
 using Explore.Application.Contracts.Infrastructure;
@@ -9,6 +10,7 @@ using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Domain;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
+using Explore.ServiceDefaults.Secrets;
 using Event.Standalone.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -36,9 +38,14 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         var timeline = new StartupTimeline();
         timeline.Record("migration-dependency");
 
+        var dataProtection = new ExternalDataProtectionTestAuthority("api").Input;
         using var environment = new EnvironmentVariableScope(new Dictionary<string, string?>
         {
             ["SecretProvider__Provider"] = "Environment",
+            ["EVENT_DP_API_RING"] = dataProtection.Ring,
+            ["EVENT_DP_API_ADMISSION"] = dataProtection.Admission,
+            ["EVENT_DP_API_ADMISSION_SHA256"] = dataProtection.AdmissionSha256,
+            ["EVENT_DP_API_MINIMUM_GENERATION"] = "1",
             ["Keycloak__Authority"] = "https://authority.example.test",
             ["Database__Provider"] = "PostgreSql",
             ["Database__Host"] = "postgres.example.test",
@@ -49,7 +56,12 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
             ["Database__Runtime__Password"] =
                 Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
         });
-        await using WebApplication app = BuildSplitHost(timeline);
+        await using var authority = await SecretAuthorityBootstrap.OpenAsync(
+            new ConfigurationBuilder().AddEnvironmentVariables().Build(), "Staging", SecretConsumerRole.Api,
+            [new("/runtime/api/authentication/keycloak", "KEYCLOAK_ENDPOINT", "KEYCLOAK_ENDPOINT")],
+            new SecretAuthorityLoginAttempt());
+        await authority.StartAuthenticationMaintenanceAsync();
+        await using WebApplication app = await BuildSplitHostAsync(timeline, authority);
         using var shutdown = new CancellationTokenSource();
         var state = new ApiHostCompositionState(
             IsOpenApiGeneration: false,
@@ -200,7 +212,8 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         await Assert.That(typeof(IConfigurationManifestPostMigrationSequence).IsAssignableFrom(preparation)).IsFalse();
     }
 
-    private static WebApplication BuildSplitHost(StartupTimeline timeline)
+    private static async Task<WebApplication> BuildSplitHostAsync(
+        StartupTimeline timeline, SecretAuthorityAcquisition authority)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -209,6 +222,7 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         builder.WebHost.UseTestServer();
         builder.AddServiceDefaults();
         builder.Configuration.AddInMemoryCollection(BaseValues(ConfiguredValues()));
+        await builder.PrepareApiHostSecretsAsync(authority, SecretConsumerRole.Api);
         builder.AddApiHostServices(static () => false);
         builder.Services.RemoveAll<IHostedService>();
         builder.Services.RemoveAll<IInstanceOperatorIdentity>();
@@ -293,24 +307,30 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         private readonly StartupTimeline _timeline;
         private readonly IReadOnlyDictionary<string, string?> _bootstrapValues;
         private readonly bool _includeOperatorIdentity;
-        private readonly EnvironmentVariableScope _environment = new(new Dictionary<string, string?>
-        {
-            ["SECRET_PROVIDER"] = "Environment",
-            ["Database__Provider"] = "PostgreSql",
-            ["Database__Host"] = "postgres.example.test",
-            ["Database__Database"] = "event_test",
-            ["Database__Runtime__Database"] = "event_test",
-            ["Database__Migrator__Database"] = "event_test",
-            ["Database__Runtime__Username"] = "event_test",
-            ["Database__Runtime__Password"] =
-                Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
-        });
+        private readonly EnvironmentVariableScope _environment;
 
         public StartupFactory(
             StartupTimeline timeline,
             IReadOnlyDictionary<string, string?> bootstrapValues,
             bool includeOperatorIdentity = true)
         {
+            var dataProtection = new ExternalDataProtectionTestAuthority("combined").Input;
+            _environment = new(new Dictionary<string, string?>
+            {
+                ["SECRET_PROVIDER"] = "Environment",
+                ["EVENT_DP_COMBINED_RING"] = dataProtection.Ring,
+                ["EVENT_DP_COMBINED_ADMISSION"] = dataProtection.Admission,
+                ["EVENT_DP_COMBINED_ADMISSION_SHA256"] = dataProtection.AdmissionSha256,
+                ["EVENT_DP_COMBINED_MINIMUM_GENERATION"] = "1",
+                ["Database__Provider"] = "PostgreSql",
+                ["Database__Host"] = "postgres.example.test",
+                ["Database__Database"] = "event_test",
+                ["Database__Runtime__Database"] = "event_test",
+                ["Database__Migrator__Database"] = "event_test",
+                ["Database__Runtime__Username"] = "event_test",
+                ["Database__Runtime__Password"] =
+                    Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
+            });
             _timeline = timeline;
             _bootstrapValues = bootstrapValues;
             _includeOperatorIdentity = includeOperatorIdentity;

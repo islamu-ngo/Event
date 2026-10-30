@@ -1,11 +1,11 @@
-#:project ../../src/Explore.Secrets/Explore.Secrets.csproj
-#:property RestorePackagesWithLockFile=false
+#:project ../../src/Explore.Persistence/Explore.Persistence.csproj
+#:property RestorePackagesWithLockFile=true
+#:property NuGetLockFilePath=ScaffoldPrimaryMigration.packages.lock.json
 #:property PublishAot=false
 
 using System.Diagnostics;
 using System.Globalization;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Extensions.Configuration;
 
 bool script = args.Length == 4 && args[2] == "--script-from";
@@ -35,9 +35,17 @@ if (!File.Exists(Path.Combine(root, project)))
 }
 
 var bootstrap = new ConfigurationBuilder().AddEnvironmentVariables().Build();
-var authority = SecretAuthorityConfiguration.Build(
-    bootstrap, SecretAuthorityConfiguration.GetEnvironmentName(bootstrap), "/database");
-var selected = PrimaryDatabaseConfiguration.BindMigrator(authority);
+using var bootstrapLifetime = (IDisposable)bootstrap;
+string? environment = bootstrap["DOTNET_ENVIRONMENT"] ?? bootstrap["ASPNETCORE_ENVIRONMENT"];
+if (!string.Equals(environment, "Development", StringComparison.OrdinalIgnoreCase)
+    && !string.Equals(environment, "Testing", StringComparison.OrdinalIgnoreCase))
+    throw new InvalidOperationException("Offline migration scaffolding requires explicit Development or Testing.");
+var selected = new PrimaryDatabaseConnectionOptions
+{
+    Provider = provider,
+    Role = PrimaryDatabaseRole.Migrator,
+    Schema = bootstrap["Database:Schema"] ?? PrimaryDatabaseConnectionOptions.DefaultSchema
+};
 var sqlite = provider == PrimaryDatabaseProvider.Sqlite;
 var mysql = provider is PrimaryDatabaseProvider.MySql or PrimaryDatabaseProvider.MariaDb;
 var options = selected with
@@ -66,10 +74,9 @@ var options = selected with
         _ => null
     }
 };
-PrimaryDatabaseConfiguration.Validate(options);
 Directory.CreateDirectory(Path.Combine(root, ".artifacts"));
 
-// Credentials originate in the selected authority and exist only in this child process.
+// Model-only scaffolding passes public coordinates and never acquires database credentials.
 // Build the selected product project with --no-restore first; scaffolding must not restore implicitly.
 // Scaffolding and bounded SQL generation never connect to or update a database.
 var start = new ProcessStartInfo("dotnet") { WorkingDirectory = root };
@@ -119,6 +126,8 @@ foreach (string[] command in commands)
 {
     start.ArgumentList.Clear();
     foreach (string argument in command) start.ArgumentList.Add(argument);
+    start.ArgumentList.Add("--");
+    start.ArgumentList.Add("--DesignTime:ModelOnly=true");
     using var child = Process.Start(start) ?? throw new InvalidOperationException("Unable to start native EF artifact generation.");
     await child.WaitForExitAsync();
     if (child.ExitCode != 0) return child.ExitCode;

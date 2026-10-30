@@ -160,7 +160,8 @@ public static class PostgresTenantPreferencePermissions
             AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE pg_catalog.pg_has_role({Role(enrollment.RuntimeLogin)},r.oid,'MEMBER')
                 AND (r.oid=(SELECT relowner FROM pg_catalog.pg_class WHERE oid={relation})
                     OR r.rolsuper OR r.rolbypassrls OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication
-                    OR pg_catalog.has_table_privilege(r.oid,{relation},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                    OR (pg_catalog.has_table_privilege(r.oid,{relation},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                        OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", relation, false)})
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN
                         (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                         WHERE a.attrelid={relation} AND a.attnum<>0 AND NOT a.attisdropped
@@ -215,7 +216,8 @@ public static class PostgresTenantPreferencePermissions
                         AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE pg_catalog.pg_has_role({Role(enrollment.GlobalLogin)},r.oid,'MEMBER')
                             AND (r.oid=t.relowner OR r.rolsuper OR r.rolbypassrls OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication
                                 OR pg_catalog.has_schema_privilege(r.oid,n.oid,'CREATE')
-                                OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                                OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                                    OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN
                                     (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                                     WHERE a.attrelid=t.oid AND a.attnum<>0 AND NOT a.attisdropped

@@ -1,18 +1,21 @@
 using System.Globalization;
 using System.Text.Json;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.Extensions.Configuration;
 
 namespace ISLAMU.Moderation.Measurement;
 
-internal sealed class MeasurementConfiguration : IDisposable
+internal sealed class MeasurementConfiguration : IAsyncDisposable
 {
     private readonly IConfigurationRoot authority;
+    private readonly SecretAuthorityAcquisition owner;
 
-    private MeasurementConfiguration(IConfigurationRoot authority, string environment)
+    private MeasurementConfiguration(
+        IConfigurationRoot authority, string environment, SecretAuthorityAcquisition owner)
     {
         this.authority = authority;
+        this.owner = owner;
         EnvironmentName = environment;
         Primary = PrimaryDatabaseConfiguration.BindRuntime(authority);
         // A separate approved test database is mandatory. Tests cannot inherit the primary
@@ -41,7 +44,7 @@ internal sealed class MeasurementConfiguration : IDisposable
         {
             format = "moderation-configuration-v1",
             environment,
-            authority = SecretAuthorityConfiguration.GetRequiredProvider(authority, environment).ToString(),
+            authority = owner.Provider.ToString(),
             primary = PublicCoordinates(Primary),
             test = PublicCoordinates(Test),
             childEnvironmentContract = "structured-primary-test-database-v1"
@@ -55,23 +58,36 @@ internal sealed class MeasurementConfiguration : IDisposable
     internal string PrimaryPublicDigest => PrimaryDatabasePublicIdentity.Digest(Primary);
     internal string TestPublicDigest => PrimaryDatabasePublicIdentity.Digest(Test);
 
-    internal static MeasurementConfiguration Load()
+    internal static async Task<MeasurementConfiguration> LoadAsync(CancellationToken cancellationToken)
     {
         var bootstrap = new ConfigurationBuilder().AddEnvironmentVariables().Build();
         using var bootstrapLifetime = (IDisposable)bootstrap;
-        var environment = SecretAuthorityConfiguration.GetEnvironmentName(bootstrap);
+        var environment = bootstrap["DOTNET_ENVIRONMENT"] ?? bootstrap["ASPNETCORE_ENVIRONMENT"] ?? "Production";
         // Unlike general bootstrap, the measurement host never infers Infisical from the
         // presence of a credential. The operator must select one authority explicitly.
         Require.That(!string.IsNullOrWhiteSpace(bootstrap["SecretProvider:Provider"] ?? bootstrap["SECRET_PROVIDER"]),
             "secret-authority-selection-required");
-        var authority = SecretAuthorityConfiguration.Build(bootstrap, environment, "/database", "/moderation");
+        var owner = await SecretAuthorityBootstrap.OpenAsync(
+            bootstrap, environment, SecretConsumerRole.ModerationMeasurement,
+            [new("/database", "DATABASE_PROVIDER", "Database:Provider"),
+             new("/moderation", "MODERATION_MEASUREMENT_SIGNING_PRIVATE_KEY_PEM", "signer")],
+            new SecretAuthorityLoginAttempt(), cancellationToken: cancellationToken);
+        IConfigurationRoot? authority = null;
         try
         {
-            return new((IConfigurationRoot)authority, environment);
+            await owner.StartAuthenticationMaintenanceAsync(cancellationToken);
+            var prepared = await owner.PrepareConfigurationGroupAsync(
+                ["/database", "/moderation"], cancellationToken);
+            if (!prepared.IsSuccess)
+                throw new MeasurementFailure("selected-authority-unavailable");
+            authority = new ConfigurationBuilder().AddInMemoryCollection(prepared.Value).Build();
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(authority, environment, owner);
         }
         catch
         {
-            ((IDisposable)authority).Dispose();
+            (authority as IDisposable)?.Dispose();
+            await owner.DisposeAsync();
             throw;
         }
     }
@@ -129,5 +145,9 @@ internal sealed class MeasurementConfiguration : IDisposable
         serverFlavor = options.ServerFlavor?.ToString(), serverVersion = options.ServerVersion?.ToString()
     };
 
-    public void Dispose() => ((IDisposable)authority).Dispose();
+    public async ValueTask DisposeAsync()
+    {
+        ((IDisposable)authority).Dispose();
+        await owner.DisposeAsync();
+    }
 }

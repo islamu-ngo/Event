@@ -2,7 +2,6 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence.Database;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;

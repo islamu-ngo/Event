@@ -2,6 +2,7 @@ using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;
+using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -66,14 +67,24 @@ public static class PostgresStorageReconciliationContract
         context.ValidateTenantLease();
         if (!context.Database.IsNpgsql() || context.TenantFilterTenantId is not null)
             throw new InvalidOperationException("storage_reconciliation_global_lease_required");
-        string exactBodies = string.Join(" AND ", Routines(context, enrollment).Select(routine =>
-            $"EXISTS (SELECT 1 FROM pg_catalog.pg_proc p WHERE p.oid = pg_catalog.to_regprocedure({Text(routine.Signature)})" +
-            $" AND p.prosrc = {Text(routine.Body)})"));
+        var routines = Routines(context, enrollment);
+        var readinessParameters = new object[routines.Length * 2];
+        string exactBodies = string.Join(" AND ", routines.Select((routine, index) =>
+        {
+            string signatureParameter = $"routine_signature_{index}";
+            string bodyParameter = $"routine_body_{index}";
+            readinessParameters[index * 2] = new NpgsqlParameter(signatureParameter, NpgsqlDbType.Text)
+            { Value = routine.Signature };
+            readinessParameters[index * 2 + 1] = new NpgsqlParameter(bodyParameter, NpgsqlDbType.Text)
+            { Value = routine.Body };
+            return $"EXISTS (SELECT 1 FROM pg_catalog.pg_proc p WHERE p.oid = pg_catalog.to_regprocedure(@{signatureParameter})" +
+                $" AND p.prosrc = @{bodyParameter})";
+        }));
         bool ready = await context.Database.SqlQueryRaw<bool>(
             $"""
             SELECT ({PostgresPrivilegeGuard.BuildReadySql(Privileges(context, enrollment))}
                 AND {AuthorityReadySql(context, enrollment)} AND {exactBodies}) AS "Value"
-            """).SingleAsync(ct);
+            """, readinessParameters).SingleAsync(ct);
         if (!ready)
             throw new InvalidOperationException("storage_reconciliation_authority_not_ready");
     }
@@ -314,13 +325,12 @@ public static class PostgresStorageReconciliationContract
                       AND e.member <> (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{MigratorRole}'))
             AND NOT ({ownerColumns})
             AND {requiredColumns}
+            AND {PostgresManagedTenantWorkerCreationPermissions.GlobalApplicationCataloguePredicate(context, enrollment)}
             AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class r
                 JOIN pg_catalog.pg_namespace n ON n.oid = r.relnamespace
                 WHERE n.nspname = {Text(Schema(context))} AND r.relkind IN ('r','p','v','m','f') AND (
                     pg_catalog.has_table_privilege('{GlobalRole}', r.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                     OR pg_catalog.has_any_column_privilege('{GlobalRole}', r.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
-                    OR pg_catalog.has_table_privilege(session_user, r.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                    OR pg_catalog.has_any_column_privilege(session_user, r.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
                     OR pg_catalog.has_table_privilege('{OwnerRole}', r.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                     OR r.oid NOT IN ({string.Join(", ", relations.Select(relation => Text(Table(context, relation.Type)) + "::regclass"))})
                        AND pg_catalog.has_any_column_privilege('{OwnerRole}', r.oid, 'SELECT,INSERT,UPDATE,REFERENCES')))

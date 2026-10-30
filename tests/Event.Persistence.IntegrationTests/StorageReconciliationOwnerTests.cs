@@ -12,7 +12,6 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using Explore.Infrastructure;
 using Explore.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
@@ -529,7 +528,7 @@ public sealed class StorageReconciliationOwnerTests(EventResourceFileUploadTests
             Task.FromResult(database.CreateContext());
     }
 }
-[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerClass)]
 [NotInParallel]
 public sealed class PostgresStorageReconciliationOwnerTests(PostgreSqlContainerFixture fixture)
 {
@@ -757,6 +756,7 @@ public sealed class PostgresStorageReconciliationOwnerTests(PostgreSqlContainerF
             await seed.SaveChangesAsync();
             var entity = seed.Model.FindEntityType(typeof(StorageObject))!;
             rows.StorageTable = seed.GetService<ISqlGenerationHelper>().DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+            await StorageNativeGlobalProfile.PrepareAsync(seed, fixture.NativeQueueEnrollment);
             await PostgresStorageReconciliationContract.ApplyAsync(seed, fixture.NativeQueueEnrollment);
             var options = fixture.GetNativeQueueOptions(
                 grantCapability ? PrimaryDatabaseRole.Global : PrimaryDatabaseRole.Runtime, rows.Authentication.Schema)

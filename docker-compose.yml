@@ -394,6 +394,10 @@ services:
       <<: [*secrets-env, *database-env, *database-migrator-env, *privacy-erasure-migrator-env, *local-identity-migrator-env]
       SecretProvider__Infisical__ClientId: ${INFISICAL_MIGRATION_CLIENT_ID:-}
       SecretProvider__Infisical__ClientSecret: ${INFISICAL_MIGRATION_CLIENT_SECRET:-}
+      SecretProvider__Infisical__TokenLifetime: ${INFISICAL_MIGRATION_TOKEN_LIFETIME:-}
+      SecretProvider__Infisical__TokenPeriodSeconds: ${INFISICAL_MIGRATION_TOKEN_PERIOD_SECONDS:-}
+      SecretProvider__Infisical__RenewBeforeSeconds: ${INFISICAL_MIGRATION_RENEW_BEFORE_SECONDS:-60}
+      SecretProvider__Infisical__RequestTimeoutSeconds: ${INFISICAL_MIGRATION_REQUEST_TIMEOUT_SECONDS:-15}
     volumes:
       - privacy_erasure_authority_data:/app/data
     depends_on:
@@ -406,13 +410,35 @@ services:
         required: false
 
   redis:
-    image: redis:7-alpine
+    image: docker.io/library/redis:7.2.16-alpine@sha256:f8548b29a1f1cb358b5fcfec1e0126beab57ad15776c1e87623f865579f16c5a
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Optional authentication authority; availability-cache clients keep using redis.
+  bff-session-authority:
+    profiles: ["bff-session"]
+    image: docker.io/library/redis:7.2.16-alpine@sha256:f8548b29a1f1cb358b5fcfec1e0126beab57ad15776c1e87623f865579f16c5a
+    restart: unless-stopped
+    environment:
+      BFF_SESSION_REDIS_PASSWORD: ${BFF_SESSION_REDIS_PASSWORD:-}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        test -n "$$BFF_SESSION_REDIS_PASSWORD"
+        exec docker-entrypoint.sh redis-server --appendonly yes --maxmemory-policy noeviction --requirepass "$$BFF_SESSION_REDIS_PASSWORD"
+    volumes:
+      - bff_session_authority_data:/data
+    networks:
+      - bff_session
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$BFF_SESSION_REDIS_PASSWORD\" redis-cli ping | grep -qx PONG"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -488,6 +514,10 @@ services:
       EVENT_DP_API_MINIMUM_GENERATION: ${EVENT_DP_API_MINIMUM_GENERATION:-}
       SecretProvider__Infisical__ClientId: ${INFISICAL_API_CLIENT_ID:-}
       SecretProvider__Infisical__ClientSecret: ${INFISICAL_API_CLIENT_SECRET:-}
+      SecretProvider__Infisical__TokenLifetime: ${INFISICAL_API_TOKEN_LIFETIME:-}
+      SecretProvider__Infisical__TokenPeriodSeconds: ${INFISICAL_API_TOKEN_PERIOD_SECONDS:-}
+      SecretProvider__Infisical__RenewBeforeSeconds: ${INFISICAL_API_RENEW_BEFORE_SECONDS:-60}
+      SecretProvider__Infisical__RequestTimeoutSeconds: ${INFISICAL_API_REQUEST_TIMEOUT_SECONDS:-15}
       CONFIGURATION_MANIFEST_MODE: ${CONFIGURATION_MANIFEST_MODE:-Off}
       CONFIGURATION_MANIFEST_PATH: ${CONFIGURATION_MANIFEST_PATH:-/etc/islamu-event/bootstrap/configuration-manifest.json}
       KEYCLOAK__AUDIENCE: ${KEYCLOAK__AUDIENCE:-islamu-event-api}
@@ -577,6 +607,10 @@ services:
       EVENT_DP_BFF_MINIMUM_GENERATION: ${EVENT_DP_BFF_MINIMUM_GENERATION:-}
       SecretProvider__Infisical__ClientId: ${INFISICAL_BFF_CLIENT_ID:-}
       SecretProvider__Infisical__ClientSecret: ${INFISICAL_BFF_CLIENT_SECRET:-}
+      SecretProvider__Infisical__TokenLifetime: ${INFISICAL_BFF_TOKEN_LIFETIME:-}
+      SecretProvider__Infisical__TokenPeriodSeconds: ${INFISICAL_BFF_TOKEN_PERIOD_SECONDS:-}
+      SecretProvider__Infisical__RenewBeforeSeconds: ${INFISICAL_BFF_RENEW_BEFORE_SECONDS:-60}
+      SecretProvider__Infisical__RequestTimeoutSeconds: ${INFISICAL_BFF_REQUEST_TIMEOUT_SECONDS:-15}
       KEYCLOAK_BLAZOR_CLIENT_SECRET: ${KEYCLOAK_BLAZOR_CLIENT_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -592,6 +626,21 @@ services:
       Keycloak__ClientSecret: ${KEYCLOAK_BLAZOR_CLIENT_SECRET:-}
       Bff__AdminHosts__0: ${INSTANCE_ADMIN_PUBLIC_ORIGIN:-http://admin.localhost:7002}
       ConnectionStrings__cache: ${REDIS_CONNECTION_STRING:-redis:6379}
+      BFF_SESSION_REDIS_ENDPOINT: ${BFF_SESSION_REDIS_ENDPOINT:-redis://bff-session-authority:6379}
+      BFF_SESSION_NAMESPACE: ${BFF_SESSION_NAMESPACE:-}
+      BFF_SESSION_REDIS_PASSWORD: ${BFF_SESSION_REDIS_PASSWORD:-}
+    # Minimize the launched process environment; privileged Docker metadata remains trusted.
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        case "$$SecretProvider__Provider" in
+          [Ee][Nn][Vv][Ii][Rr][Oo][Nn][Mm][Ee][Nn][Tt]) ;;
+          *) unset BFF_SESSION_REDIS_PASSWORD ;;
+        esac
+        exec dotnet Explore.Blazor.dll
+    networks:
+      - default
+      - bff_session
     ports:
       - "${UI_HTTP_PORT:-7002}:8080"
     extra_hosts:
@@ -1012,12 +1061,18 @@ services:
       - "${OSPREY_BIDI_STREAM_PORT:-19950}:19950"
       - "${OSPREY_SYNC_ACTION_PORT:-19951}:19951"
 
+networks:
+  default:
+  bff_session:
+    internal: true
+
 volumes:
   setup_data:
   postgres_data:
   privacy_erasure_authority_data:
   privacy_erasure_postgres_data:
   redis_data:
+  bff_session_authority_data:
   keycloak_data:
   mailpit_data:
   local_storage_data:

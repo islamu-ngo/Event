@@ -54,6 +54,16 @@ public static partial class PostgresPolicySourceSetContract
     internal static string OriginalSourceAssertionSql(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
         Guard(context, enrollment) + "\n" + ExactBodies(context, enrollment);
 
+    internal static string SourceTriggerPredicate(ExploreDbContext context, Type sourceType)
+    {
+        var triggers = Triggers.Where(trigger => trigger.Type == sourceType).ToArray();
+        return triggers.Length == 0 ? "false" : string.Join(" OR ", triggers.Select(trigger => $"""
+            (t.tgrelid=pg_catalog.to_regclass({Text(Table(context, sourceType))})
+                AND t.tgname={Text(trigger.Name)}
+                AND t.tgfoid=pg_catalog.to_regprocedure({Text(Name(context, trigger.Function) + "()")}))
+            """));
+    }
+
     private static string Schema(ExploreDbContext context) =>
         context.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>()?.TargetSchema
         ?? context.Model.FindEntityType(typeof(SystemSetting))!.GetSchema() ?? "public";

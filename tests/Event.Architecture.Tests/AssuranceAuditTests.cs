@@ -5,6 +5,363 @@ namespace Event.Architecture.Tests;
 public sealed class AssuranceAuditTests
 {
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task UnconditionalSkips_RequireNonemptyGovernanceFields(bool frameworkMetadata)
+    {
+        string[] annotations =
+        [
+            "Skip(\"temporary\")",
+            "global::TUnit.Core.SkipAttribute(\"Category: Native Removal: \")",
+            "Pause(\"Category: Removal: native contract restored\")"
+        ];
+        foreach (string annotation in annotations)
+        {
+            string source = $$"""
+                using TUnit.Core;
+                using Pause = TUnit.Core.SkipAttribute;
+                public class Cases
+                {
+                    [Test, {{annotation}}]
+                    public void Deferred() { }
+                }
+                """;
+            var diagnostics = await AnalyzeGovernanceAsync(source, frameworkMetadata);
+            await Assert.That(diagnostics.Select(diagnostic => diagnostic.Category).ToArray())
+                .IsEquivalentTo(["ungoverned-unconditional-skip"]);
+        }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task GovernedConstantSkips_AndConditionalProviderAttributesRemainPermitted(bool frameworkMetadata)
+    {
+        const string source = """
+            using System;
+            using System.Threading.Tasks;
+            using TUnit.Core;
+            using Pause = TUnit.Core.SkipAttribute;
+            public class Cases
+            {
+                private const string Reason = "Category: Native; " + "Removal: strict storage proof restored";
+                [Test, Pause(Reason)]
+                public void Deferred() { }
+                [Test, RequiresDatabase]
+                public void NativeCase() { }
+            }
+            public sealed class RequiresDatabaseAttribute() : SkipAttribute("Database runtime is not selected")
+            {
+                public override Task<bool> ShouldSkip(TestRegisteredContext context) =>
+                    Task.FromResult(string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("Database__Provider")));
+            }
+            """;
+        await Assert.That(await AnalyzeGovernanceAsync(source, frameworkMetadata)).IsEmpty();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task CommentedTestAttributes_AreParsedOnlyAtInactiveMethods(bool frameworkMetadata)
+    {
+        const string source = """
+            using TUnit.Core;
+            using Case = TUnit.Core.TestAttribute;
+            public class Cases
+            {
+                // [Test]
+                public void HiddenImplicit() { }
+                /* [global::TUnit.Core.TestAttribute] */
+                public void HiddenQualified() { }
+                // [Case]
+                public void HiddenAlias() { }
+            }
+            """;
+        var diagnostics = await AnalyzeGovernanceAsync(source, frameworkMetadata);
+        await Assert.That(diagnostics.Count).IsEqualTo(3);
+        await Assert.That(diagnostics.All(diagnostic => diagnostic.Category == "commented-out-test")).IsTrue();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task CommentedTestAttributes_AreRecognizedThroughoutDeclarationHeader(bool frameworkMetadata)
+    {
+        const string source = """
+            using TUnit.Core;
+            using Case = TUnit.Core.TestAttribute;
+            public class Cases
+            {
+                [Category("Native")]
+                // [Test]
+                public void HiddenAfterAttribute() { }
+                public
+                // [Case]
+                void HiddenAfterModifier() { }
+                public void BodyHelper()
+                {
+                    // [Test]
+                }
+                public string ExpressionHelper() => /* [Test] */ "example";
+            }
+            """;
+        var diagnostics = await AnalyzeGovernanceAsync(source, frameworkMetadata);
+        await Assert.That(diagnostics.Count).IsEqualTo(2);
+        await Assert.That(diagnostics.All(diagnostic => diagnostic.Category == "commented-out-test")).IsTrue();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task GovernanceParsing_AbstainsFromAmbiguousUnrelatedAttributes(bool frameworkMetadata)
+    {
+        const string source = """
+            using System;
+            using Left;
+            using Right;
+            public class Cases
+            {
+                // [Test]
+                public void UnrelatedHelper() { }
+                [Skip("temporary")]
+                public void UnrelatedCase() { }
+            }
+            namespace Left
+            {
+                public sealed class TestAttribute : Attribute { }
+                public sealed class SkipAttribute(string reason) : Attribute { }
+            }
+            namespace Right
+            {
+                public sealed class TestAttribute : Attribute { }
+                public sealed class SkipAttribute(string reason) : Attribute { }
+            }
+            """;
+        await Assert.That(await AnalyzeGovernanceAsync(source, frameworkMetadata)).IsEmpty();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task GovernanceParsing_IgnoresProseStringsLiveTestsAndUnrelatedAttributes(bool frameworkMetadata)
+    {
+        const string source = """"
+            using System;
+            using TUnit.Core;
+            using Foreign = Other.TestAttribute;
+            public class Cases
+            {
+                private const string Example = """// [Test]""";
+                // Example: [Test] is not a disabled declaration.
+                public void Helper() { }
+                // [Test]
+                [Test]
+                public void StillRegistered() { }
+                // [Foreign]
+                public void ForeignHelper() { }
+            }
+            namespace Other
+            {
+                public sealed class TestAttribute : Attribute { }
+                public sealed class SkipAttribute(string reason) : Attribute { }
+                public class Cases
+                {
+                    // [Test]
+                    public void ForeignHelper() { }
+                    [Test, Skip("unrelated attribute")]
+                    public void ForeignCase() { }
+                }
+            }
+            """";
+        await Assert.That(await AnalyzeGovernanceAsync(source, frameworkMetadata)).IsEmpty();
+    }
+
+    [Test]
+    public async Task ImplicitGlobalTestConventions_WorkWithoutFrameworkSymbols()
+    {
+        const string source = """
+            public class Cases
+            {
+                // [Test]
+                public void Hidden() { }
+                [Test, Skip("temporary")]
+                public void Deferred() { }
+            }
+            """;
+        var diagnostics = await AnalyzeGovernanceAsync(source, frameworkMetadata: false);
+        await Assert.That(diagnostics.Select(diagnostic => diagnostic.Category).ToArray())
+            .IsEquivalentTo(["commented-out-test", "ungoverned-unconditional-skip"]);
+    }
+
+    private static async Task<IReadOnlyList<AssuranceDiagnostic>> AnalyzeGovernanceAsync(
+        string source, bool frameworkMetadata)
+    {
+        string[] frameworkAssemblies =
+        [
+            typeof(TUnit.Core.TestAttribute).Assembly.Location,
+            typeof(TUnit.Core.SkipAttribute).Assembly.Location
+        ];
+        string[] paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? string.Empty)
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Where(path => !frameworkAssemblies.Contains(path, StringComparer.Ordinal))
+            .Concat(frameworkMetadata ? frameworkAssemblies : [])
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        await Assert.That(frameworkAssemblies.All(path => paths.Contains(path, StringComparer.Ordinal)))
+            .IsEqualTo(frameworkMetadata);
+        return AssuranceAudit.AnalyzeSource(source, "tests/Governed/Cases.cs", paths);
+    }
+
+    [Test]
+    public async Task PortfolioInventory_PreservesPartialOwnersAndDeclaredVariants()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"portfolio-{Guid.CreateVersion7():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "Fixture.cs"), """
+                namespace Example;
+                [Category("Runtime")]
+                public partial class Fixture : DatabaseFixture { }
+                """);
+            File.WriteAllText(Path.Combine(root, "Cases.cs"), """
+                namespace Example;
+                public partial class Fixture
+                {
+                    [Test, Arguments(false), Arguments(true)]
+                    public void RejectsMutation(bool locked) { }
+                    [Test, MethodDataSource(nameof(Providers))]
+                    public void ProviderBoundary(string provider) { }
+                }
+                """);
+            File.WriteAllText(Path.Combine(root, "vector.json"), "{}");
+            string metadata = """
+                {"Properties":{"MSBuildProjectFullPath":"Owner.csproj"},"Items":{
+                  "Compile":[{"FullPath":"Fixture.cs"},{"FullPath":"Cases.cs","Link":"Shared/Cases.cs"}],
+                  "None":[{"FullPath":"vector.json"}]}}
+                """;
+            string secondOwner = metadata.Replace("Owner.csproj", "Linked.csproj", StringComparison.Ordinal);
+
+            PortfolioInventory.Report report = PortfolioInventory.Create(root, [metadata, secondOwner]);
+
+            await Assert.That(report.Projects.Select(project => project.Path).ToArray())
+                .IsEquivalentTo(["Linked.csproj", "Owner.csproj"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
+            PortfolioInventory.Source cases = report.Sources.Single(source => source.Path == "Cases.cs");
+            await Assert.That(cases.Owners.Count).IsEqualTo(2);
+            await Assert.That(cases.Owners.All(owner => owner.Link == "Shared/Cases.cs")).IsTrue();
+            PortfolioInventory.Declaration declaration = cases.Declarations.Single();
+            await Assert.That(declaration.Type).IsEqualTo("Example.Fixture");
+            await Assert.That(declaration.Partial).IsTrue();
+            await Assert.That(declaration.Tests[0].Attributes.ToArray()).IsEquivalentTo(
+                ["Test", "Arguments(false)", "Arguments(true)"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
+            await Assert.That(declaration.Tests[1].Attributes).Contains("MethodDataSource(nameof(Providers))");
+            await Assert.That(report.Sources.Single(source => source.Path == "Fixture.cs").Declarations.Single().BaseTypes)
+                .Contains("DatabaseFixture");
+            await Assert.That(report.Projects.All(project => project.Assets.Single().Path == "vector.json")).IsTrue();
+            await Assert.That(cases.Sha256.Length).IsEqualTo(64);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task PortfolioInventory_RejectsMalformedMetadataAndEscapingPaths()
+    {
+        await Assert.That(() => PortfolioInventory.Create(Path.GetTempPath(), ["{}"])).Throws<InvalidDataException>();
+        const string escaping = """
+            {"Properties":{"MSBuildProjectFullPath":"Owner.csproj"},"Items":{
+              "Compile":[{"FullPath":"../outside.cs"}]}}
+            """;
+        await Assert.That(() => PortfolioInventory.Create(Path.GetTempPath(), [escaping])).Throws<InvalidDataException>();
+    }
+
+    [Test]
+    public async Task PortfolioInventory_IndexesExternalAssetReferencesWithoutReadingThem()
+    {
+        const string metadata = """
+            {"Properties":{"MSBuildProjectFullPath":"Owner.csproj"},"Items":{
+              "None":[{"FullPath":"../external-package/fixture.dll"}]}}
+            """;
+
+        PortfolioInventory.Report report = PortfolioInventory.Create(Path.GetTempPath(), [metadata]);
+
+        PortfolioInventory.Asset asset = report.Projects.Single().Assets.Single();
+        await Assert.That(asset.External).IsTrue();
+        await Assert.That(asset.Exists).IsNull();
+        await Assert.That(asset.Sha256).IsNull();
+    }
+
+    [Test]
+    public async Task PortfolioInventory_KeepsConditionalDeclarationsWithTheirActualCompiledOwner()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"portfolio-{Guid.CreateVersion7():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "Cases.cs"), """
+                public class Cases
+                {
+                #if REAL_PROVIDER
+                    [Test] public void ProviderBoundary() { }
+                #else
+                    [Test] public void PureBoundary() { }
+                #endif
+                }
+                """);
+            const string provider = """
+                {"Properties":{"MSBuildProjectFullPath":"Provider.csproj","DefineConstants":"REAL_PROVIDER"},
+                 "Items":{"Compile":[{"FullPath":"Cases.cs"}]}}
+                """;
+            const string pure = """
+                {"Properties":{"MSBuildProjectFullPath":"Pure.csproj","DefineConstants":""},
+                 "Items":{"Compile":[{"FullPath":"Cases.cs"}]}}
+                """;
+
+            PortfolioInventory.Report report = PortfolioInventory.Create(root, [provider, pure]);
+
+            PortfolioInventory.Declaration[] declarations = report.Sources.Single().Declarations.ToArray();
+            await Assert.That(declarations.Single(declaration => declaration.Tests.Single().Name == "ProviderBoundary")
+                .CompiledOwners.Single()).IsEqualTo("Provider.csproj");
+            await Assert.That(declarations.Single(declaration => declaration.Tests.Single().Name == "PureBoundary")
+                .CompiledOwners.Single()).IsEqualTo("Pure.csproj");
+
+            File.WriteAllText(Path.Combine(root, "Cases.cs"), "public class Cases {");
+            await Assert.That(() => PortfolioInventory.Create(root, [pure])).Throws<InvalidDataException>();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task PortfolioInventory_HashesExactInputBytesWhileParsingBomEncodedSource()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"portfolio-{Guid.CreateVersion7():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            File.WriteAllBytes(Path.Combine(root, "Cases.cs"),
+                [0xef, 0xbb, 0xbf, .. System.Text.Encoding.UTF8.GetBytes("class Cases { [Test] public void Runs() { } }")]);
+            const string metadata = """
+                {"Properties":{"MSBuildProjectFullPath":"Owner.csproj"},
+                 "Items":{"Compile":[{"FullPath":"Cases.cs"}]}}
+                """;
+
+            PortfolioInventory.Source source = PortfolioInventory.Create(root, [metadata]).Sources.Single();
+
+            await Assert.That(source.Sha256).IsEqualTo("4D2A5DA6EA010EA2483C74F752F68E4C9D8AB65EBA7A230D5145B955ABB73555");
+            await Assert.That(source.Declarations.Single().Tests.Single().Name).IsEqualTo("Runs");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
     [Arguments("var value = Activator.CreateInstance(typeof(Service));", AssuranceAudit.ReflectiveBehaviorDispatch)]
     [Arguments("var value = Activator.CreateInstance(\"Product.Assembly\", \"Product.Service\");", AssuranceAudit.ReflectiveBehaviorDispatch)]
     [Arguments("var proxy = DispatchProxy.Create<IService, Proxy>();", AssuranceAudit.ReflectiveBehaviorDispatch)]

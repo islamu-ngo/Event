@@ -4,6 +4,7 @@ using Explore.Domain;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -24,21 +25,25 @@ public static class PostgresLocalStorageQuarantineContract
     public static string FunctionSql(ExploreDbContext context, string operation) =>
         context.GetService<ISqlGenerationHelper>().DelimitIdentifier("local_storage_quarantine_" + operation, Schema(context));
 
-    public static async Task ApplyAsync(ExploreDbContext context, CancellationToken cancellationToken = default)
+    public static async Task ApplyAsync(
+        ExploreDbContext context, PostgresNativeQueueEnrollment enrollment, CancellationToken cancellationToken = default)
     {
         if (!context.Database.IsNpgsql()) return;
+        enrollment.Validate();
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         await using var command = context.Database.GetDbConnection().CreateCommand();
         command.Transaction = transaction.GetDbTransaction();
-        command.CommandText = BuildSql(context);
+        command.CommandText = BuildSql(context, enrollment);
         command.CommandTimeout = context.Database.GetCommandTimeout() ?? command.CommandTimeout;
         await command.ExecuteNonQueryAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public static async Task RequireReadyAsync(ExploreDbContext context, CancellationToken cancellationToken = default)
+    public static async Task RequireReadyAsync(
+        ExploreDbContext context, PostgresNativeQueueEnrollment enrollment, CancellationToken cancellationToken = default)
     {
         if (!context.Database.IsNpgsql()) return;
+        enrollment.Validate();
         context.ValidateTenantLease();
         if (context.TenantFilterTenantId is not null)
             throw new InvalidOperationException("local_storage_quarantine_global_lease_required");
@@ -54,7 +59,10 @@ public static class PostgresLocalStorageQuarantineContract
         var predicates = new List<string>
         {
             $"""
-            pg_has_role(current_user, '{GlobalRole}', 'USAGE')
+            session_user::text = {Text(enrollment.GlobalLogin)}
+            AND {GlobalMembershipReadySql(enrollment)}
+            AND {PostgresManagedTenantWorkerCreationPermissions.GlobalApplicationCataloguePredicate(context, enrollment)}
+            AND pg_has_role(current_user, '{GlobalRole}', 'USAGE')
             AND NOT pg_has_role(current_user, '{OwnerRole}', 'MEMBER')
             AND NOT pg_has_role(current_user, '{MigratorRole}', 'MEMBER')
             AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
@@ -82,9 +90,7 @@ public static class PostgresLocalStorageQuarantineContract
             AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class r
                 JOIN pg_catalog.pg_namespace n ON n.oid = r.relnamespace
                 WHERE n.nspname = {Text(Schema(context))} AND r.relkind IN ('r','p','v','m','f')
-                    AND (has_table_privilege(current_user, r.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                        OR has_any_column_privilege(current_user, r.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
-                        OR has_table_privilege('{GlobalRole}', r.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                    AND (has_table_privilege('{GlobalRole}', r.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                         OR has_any_column_privilege('{GlobalRole}', r.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
                         OR has_table_privilege('{OwnerRole}', r.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                         OR r.oid NOT IN ({string.Join(", ", reads.Select(read => Text(Table(context, read.Type)) + "::regclass").Append(Text(quarantine) + "::regclass"))})
@@ -189,8 +195,30 @@ public static class PostgresLocalStorageQuarantineContract
             throw new InvalidOperationException("local_storage_quarantine_authority_not_ready");
     }
 
-    public static string BuildSql(ExploreDbContext context)
+    private static string GlobalMembershipReadySql(PostgresNativeQueueEnrollment enrollment) => $"""
+        (EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members edge
+            WHERE edge.member = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = {Text(enrollment.GlobalLogin)})
+                AND edge.roleid = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{GlobalRole}')
+                AND edge.grantor = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = {Text(enrollment.MigratorLogin)})
+                AND edge.inherit_option AND NOT edge.set_option AND NOT edge.admin_option)
+        AND NOT EXISTS (
+            WITH RECURSIVE memberships(roleid, depth) AS (
+                SELECT edge.roleid, 1 FROM pg_catalog.pg_auth_members edge
+                WHERE edge.member = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = {Text(enrollment.GlobalLogin)})
+                UNION ALL SELECT edge.roleid, parent.depth + 1
+                FROM pg_catalog.pg_auth_members edge JOIN memberships parent ON edge.member = parent.roleid)
+            SELECT 1 FROM memberships
+            WHERE roleid = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{GlobalRole}') AND depth <> 1)
+        AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members edge
+            WHERE edge.roleid = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{GlobalRole}')
+                AND (edge.member <> (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = {Text(enrollment.GlobalLogin)})
+                    OR NOT edge.inherit_option OR edge.set_option OR edge.admin_option
+                    OR edge.grantor <> (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = {Text(enrollment.MigratorLogin)}))))
+        """;
+
+    public static string BuildSql(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
+        enrollment.Validate();
         var sql = context.GetService<ISqlGenerationHelper>();
         string schema = sql.DelimitIdentifier(Schema(context));
         string quarantine = Table(context, typeof(LocalStorageQuarantine));
@@ -222,10 +250,18 @@ public static class PostgresLocalStorageQuarantineContract
         string signatures = string.Join(", ", functions.Select(function => FunctionSql(context, function.Name) + "(" + function.Types + ")"));
         string exposed = string.Join(", ", functions.Where(function => function.Public)
             .Select(function => FunctionSql(context, function.Name) + "(" + function.Types + ")"));
+        string installed = string.Join(" OR ", functions.Select(function =>
+            $"pg_catalog.to_regprocedure({Text(FunctionSql(context, function.Name) + "(" + function.Types + ")")}) IS NOT NULL"));
         return $"""
             DO $roles$
             DECLARE v_role text;
+                v_installed boolean := {installed};
             BEGIN
+                IF EXISTS (SELECT 1 FROM unnest(ARRAY['{OwnerRole}','{MigratorRole}','{GlobalRole}']) expected(name)
+                    WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles actual WHERE actual.rolname=expected.name))
+                    AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname=current_user AND rolsuper) THEN
+                    RAISE EXCEPTION 'local_storage_quarantine_administrator_bootstrap_required' USING ERRCODE = '55000';
+                END IF;
                 FOREACH v_role IN ARRAY ARRAY['{OwnerRole}','{MigratorRole}','{GlobalRole}'] LOOP
                     IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = v_role) THEN
                         EXECUTE format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS',v_role);
@@ -256,6 +292,19 @@ public static class PostgresLocalStorageQuarantineContract
                         OR roleid = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{OwnerRole}')
                             AND (member <> (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{MigratorRole}')
                                 OR inherit_option OR NOT set_option OR admin_option)) THEN
+                    RAISE EXCEPTION 'local_storage_quarantine_membership_invalid';
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles
+                    WHERE rolname = {Text(enrollment.GlobalLogin)} AND rolcanlogin
+                        AND NOT rolsuper AND NOT rolbypassrls AND NOT rolcreatedb
+                        AND NOT rolcreaterole AND NOT rolreplication)
+                    OR current_user::text <> {Text(enrollment.MigratorLogin)} THEN
+                    RAISE EXCEPTION 'local_storage_quarantine_login_invalid';
+                END IF;
+                IF NOT v_installed AND NOT pg_has_role({Text(enrollment.GlobalLogin)}, '{GlobalRole}', 'MEMBER') THEN
+                    GRANT {GlobalRole} TO {sql.DelimitIdentifier(enrollment.GlobalLogin)} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE;
+                END IF;
+                IF NOT {GlobalMembershipReadySql(enrollment)} THEN
                     RAISE EXCEPTION 'local_storage_quarantine_membership_invalid';
                 END IF;
             END; $roles$;

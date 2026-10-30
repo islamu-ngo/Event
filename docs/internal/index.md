@@ -108,7 +108,7 @@ Start with [Repository README](../../README.md) or the [Documentation Hub](../RE
 ## Runtime And Operations
 - [CONFIGURATION_MANIFEST.md](CONFIGURATION_MANIFEST.md) - strict instance-and-tenant bootstrap contract, operator workflow, rerun semantics, export, recovery, and contributor extension guide.
 - [CONFIGURATION.md](CONFIGURATION.md) - environment/config settings and secret providers.
-- [SECRETS.md](SECRETS.md) - multi-provider secret management (Explore.Secrets library).
+- [SECRETS.md](SECRETS.md) - selected secret authority acquisition (ServiceDefaults), runtime resolution (Infrastructure), database acquisition (Persistence), and prepared Data Protection.
 - [STORAGE.md](STORAGE.md) - local-first object storage, optional S3-compatible configuration, reconciliation, API boundaries, and backup impact.
 - [EMAIL_NOTIFICATIONS.md](EMAIL_NOTIFICATIONS.md) - SMTP email delivery and its boundary from in-app notifications.
 - [NOTIFICATIONS.md](NOTIFICATIONS.md) - in-app notification lifecycle, inbox UI, and API boundaries.

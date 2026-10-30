@@ -11,7 +11,6 @@ using Explore.Infrastructure.Services.Moderation;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
-using Explore.Secrets.Database;
 using ISLAMU.Moderation.Application;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;

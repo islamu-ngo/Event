@@ -1,0 +1,33 @@
+Change-Id: CHG-01M5PR99FAKERVQ51JMK6EZQBH
+Title: "Keep category reads bound to their tenant"
+Type: fix
+Scope: discovery
+Summary: "Install the fixed tenant-bound Category read profile during fresh PostgreSQL bootstrap and preserve public and private event read boundaries."
+Group: category-read-boundary
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md#postgresql-settings-contract-development-bootstrap
+    Disposition: documented
+    Detail: Changed event-reader definitions require a fresh PostgreSQL development bootstrap. Existing installed bodies fail validation; preserve retained data and arrange a reviewed transition.
+  Security:
+    Reference: docs/internal/TESTING.md#fresh-postgresql-settings-contract-bootstrap
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Runtime receives only the six mapped Category columns under forced tenant row security, with fixed model, role, privilege and transaction-custody checks.
+  Migration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md#postgresql-settings-contract-development-bootstrap
+    Disposition: planned
+    Detail: The existing migration owner installs the fixed Category profile during fresh bootstrap. This change adds no generated EF migration or manual operator grant.
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md#postgresql-settings-contract-development-bootstrap
+    Disposition: not-applicable
+    Detail: No new environment variable or credential authority is introduced.
+  OpenAPI:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md#postgresql-settings-contract-development-bootstrap
+    Disposition: not-applicable
+    Detail: No HTTP endpoint or wire contract changes.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md#postgresql-settings-contract-development-bootstrap
+    Disposition: documented
+    Detail: Preserve retained data and use a reviewed transition. No automatic reset, volume deletion or readiness-bypass command is introduced.

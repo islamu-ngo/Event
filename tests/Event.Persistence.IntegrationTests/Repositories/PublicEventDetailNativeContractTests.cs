@@ -9,7 +9,6 @@ using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
@@ -327,6 +326,7 @@ public sealed partial class PublicEventDetailNativeContractTests(PostgreSqlConta
     private async Task<(Guid Tenant, Guid Event, Guid Hidden, string Code)> SeedAsync()
     {
         await using var writer = fixture.CreateDbContext();
+        writer.BindTenantLease();
         await PostgresPublicEventDetailContract.ApplyAsync(writer, fixture.NativeQueueEnrollment);
         var tenant = new Tenant
         {

@@ -162,6 +162,58 @@ public static class PostgresManagedTenantWorkerCreationPermissions
     internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
         CataloguePredicate(context, Sources(context), enrollment, true);
 
+    /// <summary>
+    /// Composes existing complete application catalogues for storage readiness. The worker leaf never calls this facade.
+    /// </summary>
+    internal static string GlobalApplicationCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        enrollment.Validate();
+        string schema = new HumanPrincipalSourceSql(context).Schema;
+        string[] relations = Sources(context).Select(source => source.Table)
+            .Concat(PostgresAtprotoFederationSettingPermissions.GlobalCatalogueRelations(context))
+            .Concat(PostgresIntegrationSyncReadPermissions.GlobalCatalogueRelations(context))
+            .Concat(PostgresEmailRetentionReadPermissions.GlobalCatalogueRelations(context))
+            .Concat(PostgresEventResourceAuditReadPermissions.GlobalCatalogueRelations(context))
+            .Concat(PostgresInventoryHoldExpiryReadPermissions.GlobalCatalogueRelations(context))
+            .Concat(PostgresLocalizationSecretStatusReadPermissions.GlobalCatalogueRelations(context))
+            .Concat(PostgresExternalApiKeyAuthenticationContract.GlobalCatalogueRelations(context))
+            .Concat(PostgresAdmissionScannerAuthenticationContract.GlobalCatalogueRelations(context))
+            .Distinct(StringComparer.Ordinal).ToArray();
+        string[] proofs =
+        [
+            CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresAtprotoFederationSettingPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresIntegrationSyncReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresEmailRetentionReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresEventResourceAuditReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresInventoryHoldExpiryReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresLocalizationSecretStatusReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresExternalApiKeyAuthenticationContract.CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresAdmissionScannerAuthenticationContract.CompleteGlobalCataloguePredicate(context, enrollment)
+        ];
+        return $"""
+            COALESCE((WITH application_global_members AS MATERIALIZED (
+                SELECT r.oid FROM pg_catalog.pg_roles r
+                WHERE r.rolname={Text(enrollment.GlobalLogin)}
+                    OR pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)},r.oid,'MEMBER')),
+            application_global_authority AS MATERIALIZED (
+                SELECT t.oid FROM pg_catalog.pg_class t
+                JOIN pg_catalog.pg_namespace n ON n.oid=t.relnamespace
+                CROSS JOIN application_global_members member
+                WHERE n.nspname={Text(schema)} AND t.relkind IN ('r','p','v','m','f')
+                    AND ((pg_catalog.has_table_privilege(member.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                        OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("member.oid", "t.oid", false)})
+                        OR pg_catalog.has_any_column_privilege(member.oid,t.oid,'SELECT,INSERT,UPDATE,REFERENCES')))
+            SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname={Text(enrollment.GlobalLogin)} AND rolcanlogin)
+                AND CASE WHEN NOT EXISTS (SELECT 1 FROM application_global_authority) THEN true
+                ELSE ({string.Join(" AND ", proofs.Select(proof => $"({proof}) IS TRUE"))})
+                    AND NOT EXISTS (SELECT 1 FROM application_global_authority authority
+                        WHERE NOT EXISTS (SELECT 1 FROM unnest(ARRAY[{string.Join(',', relations.Select(Text))}]::text[]) declared(relation)
+                            WHERE authority.oid=pg_catalog.to_regclass(declared.relation)))
+                END),false)
+            """;
+    }
+
     internal static string GlobalPolicyException(ExploreDbContext context, string login)
     {
         string policies = string.Join(" OR ", Sources(context).SelectMany(source => Policies(source)
@@ -206,7 +258,9 @@ public static class PostgresManagedTenantWorkerCreationPermissions
                     JOIN pg_catalog.pg_class t ON t.oid=pg_catalog.to_regclass(source.relation) CROSS JOIN members r
                     WHERE r.oid=t.relowner
                         OR EXISTS (SELECT 1 FROM (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')) permission(privilege)
-                            WHERE pg_catalog.has_table_privilege(r.oid,t.oid,permission.privilege)
+                            WHERE (CASE WHEN permission.privilege='MAINTAIN'
+                                THEN {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)}
+                                ELSE pg_catalog.has_table_privilege(r.oid,t.oid,permission.privilege) END)
                                 AND NOT (source.relation={federation} AND r.rolname={login} AND permission.privilege='DELETE'
                                     AND NOT pg_catalog.has_table_privilege(r.oid,t.oid,'DELETE WITH GRANT OPTION')
                                     AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(t.relacl) acl WHERE acl.grantee=r.oid AND acl.grantor=t.relowner AND acl.privilege_type='DELETE' AND NOT acl.is_grantable)
@@ -234,7 +288,8 @@ public static class PostgresManagedTenantWorkerCreationPermissions
                 NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class t CROSS JOIN pg_catalog.pg_roles r
                     WHERE t.oid=pg_catalog.to_regclass({Text(source.Table)})
                         AND pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)},r.oid,'MEMBER')
-                        AND (r.oid=t.relowner OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                        AND (r.oid=t.relowner OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,TRUNCATE,REFERENCES,TRIGGER')
+                            OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                             OR (pg_catalog.has_table_privilege(r.oid,t.oid,'DELETE') AND NOT (
                                 {(source.Type == typeof(AtprotoFederationTenantSetting) ? "true" : "false")}
                                 AND r.rolname={Text(enrollment.GlobalLogin)}
@@ -401,6 +456,10 @@ public static class PostgresManagedTenantWorkerCreationPermissions
         (ProvisioningSharedWriterAssertions.Writer[] Writers, string UndeclaredAssertion) mechanics,
         PostgresNativeQueueEnrollment enrollment, CancellationToken cancellationToken)
     {
+        await ExecuteAsync(context, PostgresPolicySourceSetContract.AdmissionSql(context, enrollment)
+            + PostgresStorageConfigurationContract.AdmissionSql(context, enrollment)
+            + PostgresOrdinarySettingsContract.AdmissionSql(context, enrollment), cancellationToken);
+        await PostgresEventResourceProviderContract.RequireReadyAsync(context, enrollment, cancellationToken);
         var names = new HumanPrincipalSourceSql(context);
         var predicates = sources.Select(source =>
         {
@@ -408,17 +467,23 @@ public static class PostgresManagedTenantWorkerCreationPermissions
                 .Where(writer => writer.Targets.Any(target => target.Type == source.Type))
                 .Select(writer => $"(t.tgname={Text(writer.Name)} AND t.tgfoid=pg_catalog.to_regprocedure({Text(names.Name(writer.Function) + "()")}))"));
             string emailCapture = PostgresEmailDeliveryPolicyContract.SettingCapturePredicate(context, enrollment, source.Type);
+            string policySourceSet = PostgresPolicySourceSetContract.SourceTriggerPredicate(context, source.Type);
+            string storageConfiguration = PostgresStorageConfigurationContract.SourceTriggerPredicate(context, source.Type);
+            string ordinarySettings = PostgresOrdinarySettingsContract.SourceTriggerPredicate(context, source.Type);
+            string resourceProvider = PostgresEventResourceProviderContract.SourceTriggerPredicate(context, source.Type);
             return (source.Type, Predicate: $"""
                 NOT EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class=pg_catalog.to_regclass({Text(source.Table)}))
                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_inherits
                     WHERE inhrelid=pg_catalog.to_regclass({Text(source.Table)}) OR inhparent=pg_catalog.to_regclass({Text(source.Table)}))
                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger t WHERE t.tgrelid=pg_catalog.to_regclass({Text(source.Table)})
-                    AND NOT t.tgisinternal AND NOT COALESCE((({(triggers.Length == 0 ? "false" : triggers)}) OR ({emailCapture})),false))
+                    AND NOT t.tgisinternal AND NOT COALESCE((({(triggers.Length == 0 ? "false" : triggers)}) OR ({emailCapture})
+                        OR ({policySourceSet}) OR ({storageConfiguration}) OR ({ordinarySettings}) OR ({resourceProvider})),false))
                 {(source.Type == typeof(TenantSetting) || source.Type == typeof(SystemSetting)
                     ? $"AND EXISTS (SELECT 1 FROM pg_catalog.pg_trigger t WHERE {emailCapture})" : "")}
                 AND ({PostgresTenantCreationPermissions.DeclaredForeignKeysPredicate(context, source.Type, source.Table)})
                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint f
-                    WHERE f.conrelid=pg_catalog.to_regclass({Text(source.Table)}) AND f.contype='f' AND NOT f.conenforced)
+                    WHERE f.conrelid=pg_catalog.to_regclass({Text(source.Table)}) AND f.contype='f'
+                        AND NOT COALESCE((pg_catalog.to_jsonb(f)->>'conenforced')::boolean,true))
                 AND ({InsertSurfacePredicate(context, source)})
                 """);
         }).ToArray();
@@ -466,7 +531,8 @@ public static class PostgresManagedTenantWorkerCreationPermissions
                 WHERE conrelid=pg_catalog.to_regclass({Text(source.Table)}) AND contype='c')
             {string.Concat(checks.Select(check => $"""
                 AND EXISTS (SELECT 1 FROM pg_catalog.pg_constraint c WHERE c.conrelid=pg_catalog.to_regclass({Text(source.Table)})
-                    AND c.contype='c' AND c.conname={Text(check.Name)} AND c.conenforced AND c.convalidated AND c.conislocal
+                    AND c.contype='c' AND c.conname={Text(check.Name)}
+                    AND COALESCE((pg_catalog.to_jsonb(c)->>'conenforced')::boolean,true) AND c.convalidated AND c.conislocal
                     AND c.coninhcount=0 AND NOT c.connoinherit AND NOT c.condeferrable AND NOT c.condeferred
                     AND pg_catalog.pg_get_expr(c.conbin,c.conrelid)=({check.CatalogueSql})
                     AND ({BuiltinDependencies("pg_constraint", "c.oid")}))

@@ -1,6 +1,6 @@
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Scheduling;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Quartz;

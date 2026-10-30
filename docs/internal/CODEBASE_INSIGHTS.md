@@ -7,7 +7,7 @@ ABOUTME: Captures what you cannot guess from reading ARCHITECTURE.md alone — i
 > **Status:** Implemented
 > **Owner:** Contributor Experience
 > **Last Verified:** 2026-09-03
-> **Source Anchors:** `src/Explore.API/`, `src/Explore.Application/`, `src/Explore.Domain/`, `src/Explore.Persistence/`, `src/Explore.Infrastructure/`, `src/Explore.Secrets/`
+> **Source Anchors:** `src/Explore.API/`, `src/Explore.Application/`, `src/Explore.Domain/`, `src/Explore.Persistence/`, `src/Explore.Infrastructure/`, `src/Explore.ServiceDefaults/Secrets/`
 
 Non-intuitive patterns, hidden knowledge, and implementation details requiring deep analysis. This document captures what you cannot guess from reading `ARCHITECTURE.md` alone.
 
@@ -447,7 +447,7 @@ Services are registered in multiple places — knowing where to add yours is cri
 | Riok.Mapperly mappers | Static compile-time source generators | No DI needed (static partial classes in `Explore.Application/Mappings/`) |
 | Blazor WASM services | `Explore.Blazor.Client/Program.cs` | Direct registration |
 | Blazor Server services | `Explore.Blazor/Program.cs` | Direct registration |
-| Secrets | `Explore.Secrets/Extensions/ServiceCollectionExtensions.cs` | `AddSecrets()` |
+| Runtime secrets | `Explore.Infrastructure/Secrets/SecretResolutionServiceCollectionExtensions.cs` | `AddNativeSecretResolution()` around the composition-root-selected authority |
 
 ---
 
@@ -872,11 +872,15 @@ Rather than relying on a single generic outbox table for all asynchronous effect
 
 ## 41. Secret Management, Sourcing, and Rotation Subsystem
 
-Platform secrets, encryption keys, and connection credentials are governed by a dedicated **`Explore.Secrets`** project (48 source files) and strict fail-closed policies:
+Platform secrets, encryption keys, and connection credentials have native layer
+owners and strict fail-closed policies:
 
-- **Authoritative Sourcing**: Secrets originate strictly from **Infisical**, explicit environment injection (`.env.example`), or shared .NET User Secrets in Development. Hard-coded credentials are strictly forbidden.
-- **Dynamic Rotation & Replica Convergence**: The rotation engine supports background credential rotation (e.g. database passwords, API tokens) and coordinates convergence across multiple application replicas.
-- **Rotation-Aware Factories**: `Explore.Secrets` provides rotation-aware `DbContextFactory` and `HttpClientFactory` implementations that transparently cycle connections with new credentials without requiring application restarts.
+- **Authoritative Sourcing**: Secrets originate strictly from the selected **Infisical**, explicit environment injection (`.env.example`), or shared .NET User Secrets authority in Development/Testing only. There is no fallback to another authority. Hard-coded credentials are strictly forbidden.
+- **Acquisition and Lifetime**: `Explore.ServiceDefaults/Secrets/SecretAuthorityAcquisition` owns the selected authority and borrowed operation leases. Retirement cancels and drains operations before disposing the native client. An explicitly started session-local helper maintains only the selected Infisical authentication token; it does not poll application secrets, relogin, or replay operations.
+- **Runtime Resolution**: `Explore.Infrastructure/Secrets` owns environment/Infisical sources, `SecretResolver`, shared `SecretResolverCacheState`, revision evidence, writers, authentication profiles, privacy keys, binding commitments, and safe status. The resolver is scoped while cache state is shared; revision evidence fences reuse rather than implying fleet convergence.
+- **Database Acquisition**: `Explore.Persistence/Database` owns database binding, provider composition/bootstrap, and `MigrationDatabaseAcquisition`. Database credentials are purpose-bound, not supplied by generic rotation-aware factories.
+- **Data Protection**: `Explore.ServiceDefaults/DataProtection` asynchronously prepares the exact two-value ring/admission group. Synchronous consumers read prepared memory; readiness reacquires fresh authority and rejects a changed or invalid admission until restart.
+- **Rotation Boundary**: Consumer-specific rollout/restart policy remains explicit. No generic rotation factory, secret-polling loop, or compatibility shim supplies live credential replacement or proves replica convergence.
 - **Fail-Closed Startup Validation**: Over **107 `ValidateOnStart` / `IValidateOptions`** registrations enforce that all mandatory settings and secrets are verified at boot time; the application immediately halts if any configuration is missing or malformed.
 
 ---

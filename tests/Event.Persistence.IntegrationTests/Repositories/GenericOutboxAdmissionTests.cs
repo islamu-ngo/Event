@@ -682,7 +682,7 @@ public sealed class GenericOutboxAdmissionTests(PostgreSqlContainerFixture fixtu
         : IGenericOutboxAdmissionDbContextFactory
     {
         private readonly GlobalExploreDbContextFactory _global = new(
-            database.GetNativeQueueOptions(Explore.Secrets.Database.PrimaryDatabaseRole.Global));
+            database.GetNativeQueueOptions(Explore.Persistence.Database.PrimaryDatabaseRole.Global));
 
         public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
             _global.CreateDbContextAsync(cancellationToken);

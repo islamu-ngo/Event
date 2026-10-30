@@ -2,309 +2,303 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Services.Registration;
 using Explore.Domain;
-using Explore.Domain.ValueObjects;
 using Explore.Domain.Enums;
+using Explore.Domain.ValueObjects;
 using NSubstitute;
 
 namespace Event.Application.UnitTests.Services.Registration;
 
+/// <summary>
+/// Specifies comparison of supplied acceptance facts. Persisted authority admission
+/// is covered separately by PaidOrderAcceptanceFreshnessNativeAuthenticationTests.
+/// </summary>
 public sealed class PaidOrderAcceptanceFreshnessServiceTests
 {
     private static readonly DateTime UtcNow = new(2026, 8, 24, 12, 0, 0, DateTimeKind.Utc);
+    private static readonly Guid TenantId = Guid.CreateVersion7();
+    private static readonly Guid OrderId = Guid.CreateVersion7();
+    private static readonly Guid EventId = Guid.CreateVersion7();
+    private static readonly Guid OrganizerId = Guid.CreateVersion7();
+    private static readonly Guid ConnectionId = Guid.CreateVersion7();
+    private static readonly Guid OperatorId = Guid.CreateVersion7();
+    private static readonly Guid DirectoryDocumentId = Guid.CreateVersion7();
+    private static readonly Guid DirectoryRevision = Guid.CreateVersion7();
+    private static readonly Guid InstancePolicyId = Guid.CreateVersion7();
+    private static readonly Guid TenantPolicyId = Guid.CreateVersion7();
+    private static readonly Guid LineId = Guid.CreateVersion7();
+    private static readonly Guid Composition = Guid.CreateVersion7();
 
     [Test]
     public async Task CopiedRevisionCannotAuthorizeFabricatedMerchantDisclosure()
     {
-        (PaidOrderAcceptanceSnapshot snapshot, PaymentAttempt attempt, PaidOrderAcceptanceFreshnessService service, _) =
-            CreateSubject();
-        Set(snapshot, nameof(PaidOrderAcceptanceSnapshot.MerchantDisclosureText), "Fabricated merchant");
-
-        bool current = await service.IsCurrentAsync(attempt, CancellationToken.None);
-
-        await Assert.That(current).IsFalse();
+        var disclosure = Disclosure();
+        var subject = CreateSubject(disclosure with
+        {
+            OrganizerMerchant = disclosure.OrganizerMerchant with { MerchantDisclosureText = "Fabricated merchant" }
+        });
+        await Assert.That(await subject.Service.IsCurrentAsync(subject.Attempt, CancellationToken.None)).IsFalse();
     }
 
     [Test]
     public async Task EveryServerAuthoredAcceptanceFactMustRemainCurrent()
     {
-        (PaidOrderAcceptanceSnapshot snapshot, PaymentAttempt attempt, PaidOrderAcceptanceFreshnessService service, _) =
-            CreateSubject();
-        (string PropertyName, object? ChangedValue)[] changes =
+        Func<PaidOrderAcceptanceDisclosureDto, PaidOrderAcceptanceDisclosureDto>[] changes =
         [
-            (nameof(PaidOrderAcceptanceSnapshot.OrganizerActorId), Guid.CreateVersion7()),
-            (nameof(PaidOrderAcceptanceSnapshot.OrganizerPaymentProviderConnectionId), Guid.CreateVersion7()),
-            (nameof(PaidOrderAcceptanceSnapshot.ConnectPlatformId), "platform-live-us"),
-            (nameof(PaidOrderAcceptanceSnapshot.ExternalAccountId), "acct_changed"),
-            (nameof(PaidOrderAcceptanceSnapshot.MerchantCountryCode), "FR"),
-            (nameof(PaidOrderAcceptanceSnapshot.AcceptanceTemplateIdentifier), "paid-order-acceptance.v2"),
-            (nameof(PaidOrderAcceptanceSnapshot.AcceptanceTemplateText), "Changed template"),
-            (nameof(PaidOrderAcceptanceSnapshot.TenantDirectoryOperatorDocumentId), Guid.CreateVersion7()),
-            (nameof(PaidOrderAcceptanceSnapshot.TenantDirectoryOperatorRevisionId), Guid.CreateVersion7()),
-            (nameof(PaidOrderAcceptanceSnapshot.TenantDirectoryOperatorPublicName), "Changed directory"),
-            (nameof(PaidOrderAcceptanceSnapshot.TenantDirectoryOperatorLegalName), "Changed Directory ASBL"),
-            (nameof(PaidOrderAcceptanceSnapshot.TenantDirectoryOperatorKindCode), "public_body"),
-            (nameof(PaidOrderAcceptanceSnapshot.TenantDirectoryOperatorCountryCode), "FR"),
-            (nameof(PaidOrderAcceptanceSnapshot.TenantDirectoryOperatorRegistrationIdentifier), "FR 123"),
-            (nameof(PaidOrderAcceptanceSnapshot.TenantDirectoryOperatorPublicContactEmail), "changed@example.test"),
-            (nameof(PaidOrderAcceptanceSnapshot.TenantDirectoryOperatorLegalNoticeUrl), "https://changed.example.test/legal"),
-            (nameof(PaidOrderAcceptanceSnapshot.TenantDirectoryOperatorTermsUrl), "https://changed.example.test/terms"),
-            (nameof(PaidOrderAcceptanceSnapshot.TenantDirectoryOperatorPrivacyUrl), "https://changed.example.test/privacy"),
-            (nameof(PaidOrderAcceptanceSnapshot.InstancePolicyVersionId), Guid.CreateVersion7()),
-            (nameof(PaidOrderAcceptanceSnapshot.TenantPolicyVersionId), Guid.CreateVersion7()),
-            (nameof(PaidOrderAcceptanceSnapshot.OperatorId), Guid.CreateVersion7()),
-            (nameof(PaidOrderAcceptanceSnapshot.OperatorLegalName), "Changed Operator ASBL"),
-            (nameof(PaidOrderAcceptanceSnapshot.OperatorKindCode), "public_body"),
-            (nameof(PaidOrderAcceptanceSnapshot.OperatorRegistrationIdentifier), "FR 123"),
-            (nameof(PaidOrderAcceptanceSnapshot.CurrencyCode), "USD"),
-            (nameof(PaidOrderAcceptanceSnapshot.OrganizerAmountMinor), 999L),
-            (nameof(PaidOrderAcceptanceSnapshot.PlatformFeeMinor), 74L),
-            (nameof(PaidOrderAcceptanceSnapshot.PlatformContributionMinor), 124L),
-            (nameof(PaidOrderAcceptanceSnapshot.TotalMinor), 1_124L),
-            (nameof(PaidOrderAcceptanceSnapshot.DisclosureRevision), "changed-disclosure"),
-            (nameof(PaidOrderAcceptanceSnapshot.CompositionRevision), Guid.CreateVersion7().ToString("N")),
-            (nameof(PaidOrderAcceptanceSnapshot.MerchantDisclosureText), "Changed merchant"),
-            (nameof(PaidOrderAcceptanceSnapshot.OperatorDisplayName), "Changed operator"),
-            (nameof(PaidOrderAcceptanceSnapshot.IsOfficialInstance), true),
-            (nameof(PaidOrderAcceptanceSnapshot.OfficialOrigin), "https://changed.example.test"),
-            (nameof(PaidOrderAcceptanceSnapshot.OperatorRegionCode), "FR"),
-            (nameof(PaidOrderAcceptanceSnapshot.OperatorWebsiteUrl), "https://changed.example.test"),
-            (nameof(PaidOrderAcceptanceSnapshot.OperatorLegalNoticeUrl), "https://changed.example.test/legal"),
-            (nameof(PaidOrderAcceptanceSnapshot.OperatorTermsUrl), "https://changed.example.test/terms"),
-            (nameof(PaidOrderAcceptanceSnapshot.OperatorPrivacyUrl), "https://changed.example.test/privacy"),
-            (nameof(PaidOrderAcceptanceSnapshot.ActivationStatus), "suspended"),
-            (nameof(PaidOrderAcceptanceSnapshot.DeliveryStartsAtUtc), new DateTimeOffset(UtcNow.AddDays(11))),
-            (nameof(PaidOrderAcceptanceSnapshot.DeliveryEndsAtUtc), new DateTimeOffset(UtcNow.AddDays(11).AddHours(3))),
-            (nameof(PaidOrderAcceptanceSnapshot.EventTimeZoneId), "Europe/Paris"),
-            (nameof(PaidOrderAcceptanceSnapshot.RefundPolicyVersion), 2),
-            (nameof(PaidOrderAcceptanceSnapshot.RefundPolicyText), "Changed refund policy"),
-            (nameof(PaidOrderAcceptanceSnapshot.RefundPolicyLanguageTag), "fr-FR"),
-            (nameof(PaidOrderAcceptanceSnapshot.SupportContact), "changed-support@example.test"),
-            (nameof(PaidOrderAcceptanceSnapshot.ComplaintContact), "changed-complaints@example.test"),
-            (nameof(PaidOrderAcceptanceSnapshot.ComplaintOwner), "Changed complaints owner"),
-            (nameof(PaidOrderAcceptanceSnapshot.RefundOwner), "Changed refund owner"),
-            (nameof(PaidOrderAcceptanceSnapshot.DisputeOwner), "Changed dispute owner"),
-            (nameof(PaidOrderAcceptanceSnapshot.ReconciliationOwner), "Changed reconciliation owner"),
-            (nameof(PaidOrderAcceptanceSnapshot.ProviderCode), "adyen"),
-            (nameof(PaidOrderAcceptanceSnapshot.ProviderProfileCode), "platform-live-eu"),
-            (nameof(PaidOrderAcceptanceSnapshot.ProviderEnvironment), "live"),
-            (nameof(PaidOrderAcceptanceSnapshot.ProviderCredentialOwner), "tenant"),
-            (nameof(PaidOrderAcceptanceSnapshot.ChargeType), "destination-charge"),
-            (nameof(PaidOrderAcceptanceSnapshot.StatementDescriptor), "CHANGED EVENT")
+            d => d with { OrganizerMerchant = d.OrganizerMerchant with { OrganizerActorId = Guid.CreateVersion7() } },
+            d => d with { OrganizerMerchant = d.OrganizerMerchant with { OrganizerPaymentProviderConnectionId = Guid.CreateVersion7() } },
+            d => d with { OrganizerMerchant = d.OrganizerMerchant with { ConnectPlatformId = "platform-live-us" } },
+            d => d with { OrganizerMerchant = d.OrganizerMerchant with { ExternalAccountId = "acct_changed" } },
+            d => d with { OrganizerMerchant = d.OrganizerMerchant with { MerchantCountryCode = "FR" } },
+            d => d with { AcceptanceTemplateIdentifier = "paid-order-acceptance.v2" },
+            d => d with { AcceptanceTemplateText = "Changed template" },
+            d => d with { TenantDirectoryOperator = d.TenantDirectoryOperator with { DocumentId = Guid.CreateVersion7() } },
+            d => d with { TenantDirectoryOperator = d.TenantDirectoryOperator with { RevisionId = Guid.CreateVersion7() } },
+            d => d with { TenantDirectoryOperator = d.TenantDirectoryOperator with { PublicName = "Changed directory" } },
+            d => d with { TenantDirectoryOperator = d.TenantDirectoryOperator with { LegalName = "Changed Directory ASBL" } },
+            d => d with { TenantDirectoryOperator = d.TenantDirectoryOperator with { OperatorKindCode = "public_body" } },
+            d => d with { TenantDirectoryOperator = d.TenantDirectoryOperator with { JurisdictionCountryCode = "FR" } },
+            d => d with { TenantDirectoryOperator = d.TenantDirectoryOperator with { RegistrationIdentifier = "FR 123" } },
+            d => d with { TenantDirectoryOperator = d.TenantDirectoryOperator with { PublicContactEmail = "changed@example.test" } },
+            d => d with { TenantDirectoryOperator = d.TenantDirectoryOperator with { LegalNoticeUrl = "https://changed.example.test/legal" } },
+            d => d with { TenantDirectoryOperator = d.TenantDirectoryOperator with { TermsUrl = "https://changed.example.test/terms" } },
+            d => d with { TenantDirectoryOperator = d.TenantDirectoryOperator with { PrivacyUrl = "https://changed.example.test/privacy" } },
+            d => d with { InstanceOperator = d.InstanceOperator with { LegalName = "Changed Operator ASBL" } },
+            d => d with { InstanceOperator = d.InstanceOperator with { OperatorKindCode = "public_body" } },
+            d => d with { InstanceOperator = d.InstanceOperator with { RegistrationIdentifier = "FR 123" } },
+            d => d with { CurrencyCode = "USD" },
+            d => d with { OrganizerAmountMinor = 999 },
+            d => d with { PlatformFeeMinor = 74 },
+            d => d with { PlatformContributionMinor = 124 },
+            d => d with { TotalMinor = 1_124 },
+            d => d with { DisclosureRevision = "changed-disclosure" },
+            d => d with { OrganizerMerchant = d.OrganizerMerchant with { MerchantDisclosureText = "Changed merchant" } },
+            d => d with { InstanceOperator = d.InstanceOperator with { PublicName = "Changed operator" } },
+            d => d with { InstanceOperator = d.InstanceOperator with { IsOfficialInstance = true } },
+            d => d with { InstanceOperator = d.InstanceOperator with { OfficialOrigin = "https://changed.example.test" } },
+            d => d with { InstanceOperator = d.InstanceOperator with { JurisdictionCountryCode = "FR" } },
+            d => d with { InstanceOperator = d.InstanceOperator with { WebsiteUrl = "https://changed.example.test" } },
+            d => d with { InstanceOperator = d.InstanceOperator with { LegalNoticeUrl = "https://changed.example.test/legal" } },
+            d => d with { InstanceOperator = d.InstanceOperator with { TermsUrl = "https://changed.example.test/terms" } },
+            d => d with { InstanceOperator = d.InstanceOperator with { PrivacyUrl = "https://changed.example.test/privacy" } },
+            d => d with { PaymentOperations = d.PaymentOperations with { ActivationStatus = "suspended" } },
+            d => d with { DeliveryStartsAtUtc = new DateTimeOffset(UtcNow.AddDays(11)) },
+            d => d with { DeliveryEndsAtUtc = new DateTimeOffset(UtcNow.AddDays(11).AddHours(3)) },
+            d => d with { EventTimeZoneId = "Europe/Paris" },
+            d => d with { RefundPolicyVersion = 2 },
+            d => d with { RefundPolicyText = "Changed refund policy" },
+            d => d with { RefundPolicyLanguageTag = "fr-FR" },
+            d => d with { SupportContact = "changed-support@example.test" },
+            d => d with { PaymentOperations = d.PaymentOperations with { ComplaintContact = "changed-complaints@example.test" } },
+            d => d with { PaymentOperations = d.PaymentOperations with { ComplaintOwner = "Changed complaints owner" } },
+            d => d with { PaymentOperations = d.PaymentOperations with { RefundOwner = "Changed refund owner" } },
+            d => d with { PaymentOperations = d.PaymentOperations with { DisputeOwner = "Changed dispute owner" } },
+            d => d with { PaymentOperations = d.PaymentOperations with { ReconciliationOwner = "Changed reconciliation owner" } },
+            d => d with { OrganizerMerchant = d.OrganizerMerchant with { ProviderCode = "adyen" } },
+            d => d with { OrganizerMerchant = d.OrganizerMerchant with { ProviderProfileCode = "platform-live-eu" } },
+            d => d with { OrganizerMerchant = d.OrganizerMerchant with { ProviderEnvironment = "live" } },
+            d => d with { OrganizerMerchant = d.OrganizerMerchant with { ProviderCredentialOwner = "tenant" } },
+            d => d with { OrganizerMerchant = d.OrganizerMerchant with { ChargeType = "destination-charge" } },
+            d => d with { OrganizerMerchant = d.OrganizerMerchant with { StatementDescriptor = "CHANGED EVENT" } }
         ];
-
-        foreach ((string propertyName, object? changedValue) in changes)
+        foreach (var change in changes)
         {
-            object? originalValue = Get(snapshot, propertyName);
-            Set(snapshot, propertyName, changedValue);
-
-            bool current = await service.IsCurrentAsync(attempt, CancellationToken.None);
-
-            await Assert.That(current).IsFalse();
-            Set(snapshot, propertyName, originalValue);
+            var subject = CreateSubject(change(Disclosure()));
+            await Assert.That(await subject.Service.IsCurrentAsync(subject.Attempt, CancellationToken.None)).IsFalse();
         }
+
+        PaidOrderAcceptanceAuthorityFacts authority = Authority();
+        PaidOrderAcceptanceAuthorityFacts[] authorities =
+        [
+            authority with { OrganizerActorId = Guid.CreateVersion7() },
+            authority with { OperatorId = Guid.CreateVersion7() },
+            authority with { TenantDirectoryOperatorDocumentId = Guid.CreateVersion7() },
+            authority with { TenantDirectoryOperatorRevisionId = Guid.CreateVersion7() },
+            authority with { InstancePolicyVersionId = Guid.CreateVersion7() },
+            authority with { TenantPolicyVersionId = Guid.CreateVersion7() }
+        ];
+        foreach (var changed in authorities)
+        {
+            var subject = CreateSubject(Disclosure(), changed);
+            await Assert.That(await subject.Service.IsCurrentAsync(subject.Attempt, CancellationToken.None)).IsFalse();
+        }
+        var changedComposition = CreateSubject(Disclosure());
+        changedComposition.Order.ConcurrencyStamp = Guid.CreateVersion7();
+        await Assert.That(await changedComposition.Service.IsCurrentAsync(changedComposition.Attempt, CancellationToken.None)).IsFalse();
     }
 
     [Test]
     public async Task ExactSnapshotAndLineFactsRemainCurrent()
     {
-        (_, PaymentAttempt attempt, PaidOrderAcceptanceFreshnessService service, _) = CreateSubject();
-
-        bool current = await service.IsCurrentAsync(attempt, CancellationToken.None);
-
-        await Assert.That(current).IsTrue();
+        var subject = CreateSubject(Disclosure());
+        await Assert.That(subject.Attempt.OrganizerAmountMinor).IsEqualTo(1_000L);
+        await Assert.That(subject.Attempt.PlatformFeeMinor).IsEqualTo(75L);
+        await Assert.That(subject.Attempt.PlatformContributionMinor).IsEqualTo(125L);
+        await Assert.That(subject.Attempt.TotalMinor).IsEqualTo(1_125L);
+        await Assert.That(subject.Order.ConcurrencyStamp).IsNotEqualTo(Guid.Empty);
+        await Assert.That(await subject.Service.IsCurrentAsync(subject.Attempt, CancellationToken.None)).IsTrue();
     }
 
     [Test]
     public async Task EveryAcceptedLineFactMustRemainCurrent()
     {
-        (_, PaymentAttempt attempt, PaidOrderAcceptanceFreshnessService service, var disclosure) = CreateSubject();
-        PaidOrderAcceptanceLineDto line = disclosure.Lines.Single();
-        Action[] changes =
+        PaidOrderAcceptanceLineDto line = Disclosure().Lines.Single();
+        PaidOrderAcceptanceLineDto[] changes =
         [
-            () => Set(line, nameof(PaidOrderAcceptanceLineDto.OrderLineId), Guid.CreateVersion7()),
-            () => Set(line, nameof(PaidOrderAcceptanceLineDto.Name), "Changed admission"),
-            () =>
-            {
-                Set(line, nameof(PaidOrderAcceptanceLineDto.Quantity), 2);
-                Set(line, nameof(PaidOrderAcceptanceLineDto.LineTotalMinor), 2_000L);
-            },
-            () =>
-            {
-                Set(line, nameof(PaidOrderAcceptanceLineDto.UnitAmountMinor), 999L);
-                Set(line, nameof(PaidOrderAcceptanceLineDto.LineTotalMinor), 999L);
-            },
-            () =>
-            {
-                Set(line, nameof(PaidOrderAcceptanceLineDto.DiscountAmountMinor), 1L);
-                Set(line, nameof(PaidOrderAcceptanceLineDto.LineTotalMinor), 999L);
-            },
-            () =>
-            {
-                Set(line, nameof(PaidOrderAcceptanceLineDto.UnitAmountMinor), 1_001L);
-                Set(line, nameof(PaidOrderAcceptanceLineDto.LineTotalMinor), 1_001L);
-            }
+            line with { OrderLineId = Guid.CreateVersion7() },
+            line with { Name = "Changed admission" },
+            line with { Quantity = 2, LineTotalMinor = 2_000 },
+            line with { UnitAmountMinor = 999, LineTotalMinor = 999 },
+            line with { DiscountAmountMinor = 1, LineTotalMinor = 999 },
+            line with { UnitAmountMinor = 1_001, LineTotalMinor = 1_001 }
         ];
-
-        foreach (Action change in changes)
+        foreach (var changed in changes)
         {
-            change();
-
-            bool current = await service.IsCurrentAsync(attempt, CancellationToken.None);
-
-            await Assert.That(current).IsFalse();
-            Set(line, nameof(PaidOrderAcceptanceLineDto.OrderLineId), attempt.AcceptanceSnapshot!.Lines.Single().OrderLineId);
-            Set(line, nameof(PaidOrderAcceptanceLineDto.Name), attempt.AcceptanceSnapshot.Lines.Single().Name);
-            Set(line, nameof(PaidOrderAcceptanceLineDto.Quantity), attempt.AcceptanceSnapshot.Lines.Single().Quantity);
-            Set(line, nameof(PaidOrderAcceptanceLineDto.UnitAmountMinor), attempt.AcceptanceSnapshot.Lines.Single().UnitAmountMinor);
-            Set(line, nameof(PaidOrderAcceptanceLineDto.DiscountAmountMinor), attempt.AcceptanceSnapshot.Lines.Single().DiscountAmountMinor);
-            Set(line, nameof(PaidOrderAcceptanceLineDto.LineTotalMinor), attempt.AcceptanceSnapshot.Lines.Single().LineTotalMinor);
+            var subject = CreateSubject(Disclosure() with { Lines = [changed] });
+            await Assert.That(await subject.Service.IsCurrentAsync(subject.Attempt, CancellationToken.None)).IsFalse();
         }
     }
 
     [Test]
     public async Task MalformedAcceptedLineMoneyFailsClosed()
     {
-        (_, PaymentAttempt attempt, PaidOrderAcceptanceFreshnessService service, var disclosure) = CreateSubject();
-        Set(disclosure.Lines.Single(), nameof(PaidOrderAcceptanceLineDto.Quantity), 2);
-
-        bool current = await service.IsCurrentAsync(attempt, CancellationToken.None);
-
-        await Assert.That(current).IsFalse();
+        var disclosure = Disclosure();
+        var subject = CreateSubject(disclosure with { Lines = [disclosure.Lines.Single() with { Quantity = 2 }] });
+        await Assert.That(await subject.Service.IsCurrentAsync(subject.Attempt, CancellationToken.None)).IsFalse();
     }
 
     [Test]
     public async Task MissingSnapshotOrderDisclosureOrAuthorityFailsClosed()
     {
-        (PaidOrderAcceptanceSnapshot snapshot, PaymentAttempt attempt, _, _) = CreateSubject();
-        PaymentAttempt missingSnapshotAttempt = PaymentAttempt.Create(
-            Guid.CreateVersion7(),
-            attempt.TenantId,
-            attempt.RegistrationOrderId,
-            attempt.RecipientSnapshot,
-            "OrganizerDirect",
-            "2026-08-24",
-            attempt.CompositionRevision,
-            Money.Create(attempt.OrganizerAmountMinor, attempt.CurrencyCode),
-            Money.Create(attempt.PlatformFeeMinor, attempt.CurrencyCode),
-            Money.Create(attempt.PlatformContributionMinor, attempt.CurrencyCode),
-            "checkout:missing-snapshot",
-            UtcNow,
-            UtcNow.AddMinutes(30));
-        var missingOrderRepository = Substitute.For<IRegistrationInventoryRepository>();
-        var acceptanceService = Substitute.For<IPaidOrderAcceptanceService>();
-        var missingOrderService = new PaidOrderAcceptanceFreshnessService(missingOrderRepository, acceptanceService);
-
-        bool missingSnapshot = await missingOrderService.IsCurrentAsync(missingSnapshotAttempt, CancellationToken.None);
-        bool missingOrder = await missingOrderService.IsCurrentAsync(attempt, CancellationToken.None);
-
-        await Assert.That(missingSnapshot).IsFalse();
-        await Assert.That(missingOrder).IsFalse();
-
-        (RegistrationOrder order, PaymentAttempt configuredAttempt) = CreateOrderAndAttempt(snapshot);
-        missingOrderRepository.GetOrderWithLinesAsync(
-            order.Id, order.TenantId, Arg.Any<CancellationToken>()).Returns(order);
-        acceptanceService.DescribeAsync(order, configuredAttempt.Id, Arg.Any<CancellationToken>())
-            .Returns(
-                new PaidOrderAcceptanceResult(null, null, null, null, null),
-                new PaidOrderAcceptanceResult(
-                    PaidAcceptanceTestFacts.ToDisclosure(snapshot), null, null, null, null));
-
-        bool missingDisclosure = await missingOrderService.IsCurrentAsync(configuredAttempt, CancellationToken.None);
-        bool missingAuthority = await missingOrderService.IsCurrentAsync(configuredAttempt, CancellationToken.None);
-
-        await Assert.That(missingDisclosure).IsFalse();
-        await Assert.That(missingAuthority).IsFalse();
+        var missingSnapshot = CreateSubject(Disclosure(), attachSnapshot: false);
+        await Assert.That(await missingSnapshot.Service.IsCurrentAsync(missingSnapshot.Attempt, CancellationToken.None)).IsFalse();
+        var missingOrder = CreateSubject(Disclosure(), includeOrder: false);
+        await Assert.That(await missingOrder.Service.IsCurrentAsync(missingOrder.Attempt, CancellationToken.None)).IsFalse();
+        var missingDisclosure = CreateSubject(null);
+        await Assert.That(await missingDisclosure.Service.IsCurrentAsync(missingDisclosure.Attempt, CancellationToken.None)).IsFalse();
+        var missingAuthority = CreateSubject(Disclosure(), includeAuthority: false);
+        await Assert.That(await missingAuthority.Service.IsCurrentAsync(missingAuthority.Attempt, CancellationToken.None)).IsFalse();
     }
 
-    private static (
-        PaidOrderAcceptanceSnapshot Snapshot,
-        PaymentAttempt Attempt,
-        PaidOrderAcceptanceFreshnessService Service,
-        PaidOrderAcceptanceDisclosureDto Disclosure) CreateSubject()
+    private static (RegistrationOrder Order, PaymentAttempt Attempt, PaidOrderAcceptanceFreshnessService Service) CreateSubject(
+        PaidOrderAcceptanceDisclosureDto? disclosure,
+        PaidOrderAcceptanceAuthorityFacts? authority = null,
+        bool attachSnapshot = true,
+        bool includeOrder = true,
+        bool includeAuthority = true)
     {
-        Guid tenantId = Guid.CreateVersion7();
-        Guid orderId = Guid.CreateVersion7();
-        Guid eventId = Guid.CreateVersion7();
-        Guid instancePolicyId = Guid.CreateVersion7();
-        PaidOrderAcceptanceSnapshot snapshot = PaidAcceptanceTestFacts.Create(
-            tenantId, orderId, eventId, Guid.Empty.ToString("N"), instancePolicyId, null, 1_000, 75, 125, UtcNow);
-        (RegistrationOrder order, PaymentAttempt attempt) = CreateOrderAndAttempt(snapshot);
-        typeof(RegistrationOrder).GetProperty(nameof(RegistrationOrder.ConcurrencyStamp))!
-            .SetValue(order, Guid.Empty);
-        var authoritativeDisclosure = PaidAcceptanceTestFacts.ToDisclosure(snapshot);
+        RegistrationOrder order = RegistrationOrder.Create(OrderId, TenantId, EventId, Guid.CreateVersion7(),
+            Guid.CreateVersion7(), BookingPartyTypeEnum.Individual, Guid.CreateVersion7(),
+            RegistrationParticipationSnapshot.Create(Guid.CreateVersion7(), 1, 1, 1, GuestRecoveryPolicyEnum.VerifiedEmailRequired),
+            null, null, "EUR", UtcNow, UtcNow.AddMinutes(30));
+        order.ConcurrencyStamp = Composition;
+        var recipient = OrganizerPaymentRecipientSnapshot.Create(TenantId, OrganizerId, ConnectionId, "stripe",
+            "platform-live-eu", "acct_123", "BE", "EUR", InstancePolicyId, TenantPolicyId, UtcNow);
+        PaymentAttempt attempt = PaymentAttempt.Create(Guid.CreateVersion7(), TenantId, OrderId, recipient,
+            "OrganizerDirect", "2026-08-24", Composition.ToString("N"), Money.Create(1_000, "EUR"),
+            Money.Create(75, "EUR"), Money.Create(125, "EUR"), "checkout:comparison", UtcNow, UtcNow.AddMinutes(30));
+        if (attachSnapshot)
+            attempt.AttachAcceptance(Snapshot());
         var orders = Substitute.For<IRegistrationInventoryRepository>();
-        orders.GetOrderWithLinesAsync(orderId, tenantId, Arg.Any<CancellationToken>()).Returns(order);
+        orders.GetOrderWithLinesAsync(OrderId, TenantId, Arg.Any<CancellationToken>()).Returns(includeOrder ? order : null);
         var acceptances = Substitute.For<IPaidOrderAcceptanceService>();
         acceptances.DescribeAsync(order, attempt.Id, Arg.Any<CancellationToken>()).Returns(
-            new PaidOrderAcceptanceResult(
-                authoritativeDisclosure,
-                null,
-                null,
-                null,
-                new PaidOrderAcceptanceAuthorityFacts(
-                    snapshot.OrganizerActorId,
-                    snapshot.OperatorId,
-                    snapshot.TenantDirectoryOperatorDocumentId,
-                    snapshot.TenantDirectoryOperatorRevisionId,
-                    instancePolicyId,
-                    null)));
-        return (snapshot, attempt, new PaidOrderAcceptanceFreshnessService(orders, acceptances), authoritativeDisclosure);
+            new PaidOrderAcceptanceResult(disclosure, null, null, null, includeAuthority ? authority ?? Authority() : null));
+        return (order, attempt, new PaidOrderAcceptanceFreshnessService(orders, acceptances));
     }
 
-    private static (RegistrationOrder Order, PaymentAttempt Attempt) CreateOrderAndAttempt(
-        PaidOrderAcceptanceSnapshot snapshot)
+    private static PaidOrderAcceptanceAuthorityFacts Authority() =>
+        new(OrganizerId, OperatorId, DirectoryDocumentId, DirectoryRevision, InstancePolicyId, TenantPolicyId);
+
+    private static PaidOrderAcceptanceSnapshot Snapshot() => PaidOrderAcceptanceSnapshot.Create(
+        Guid.CreateVersion7(), TenantId, TenantId, OrderId, EventId, Composition.ToString("N"), "disclosure",
+        PaidOrderAcceptanceSnapshot.CurrentAcceptanceTemplateIdentifier, PaidOrderAcceptanceSnapshot.CurrentAcceptanceTemplateText,
+        OrganizerId, "Example Organizer, legal merchant for this order",
+        PaidCheckoutTenantDirectoryOperatorDisclosure.Create(DirectoryDocumentId, DirectoryRevision,
+            "Community Events", "Community Events ASBL", "registered_organization", "BE", "BE 0123.456.789",
+            "contact@example.test", "https://example.test/legal", "https://example.test/terms", "https://example.test/privacy"),
+        PaidCheckoutOperatorDisclosure.Create(OperatorId, "Independent Operator", false,
+            "https://events.example.test", "BE", "https://events.example.test", "https://events.example.test/legal",
+            "https://events.example.test/terms", "https://events.example.test/privacy", "complaints@example.test",
+            "Trust and Safety", "Payments Operations", "Dispute Operations", "Payment Reconciliation", "approved",
+            "Independent Operator ASBL", "registered_organization", "BE 0987.654.321"),
+        PaidOrderDeliverySnapshot.Create(new DateTimeOffset(UtcNow.AddDays(10)),
+            new DateTimeOffset(UtcNow.AddDays(10).AddHours(3)), "Europe/Brussels"),
+        "EUR", 1_000, 75, 125, 1_125, InstancePolicyId, 1, "Refund policy", "en-GB", "support@example.test",
+        PaidCheckoutProviderDisclosure.Create("stripe", "OrganizerDirect", "direct-charge", "EXAMPLE EVENT", "test", "instance-operator"),
+        [PaidOrderAcceptanceLineFact.Create(LineId, "Admission", 1, 1_000, 0, 1_000)],
+        UtcNow, TenantPolicyId, ConnectionId, "platform-live-eu", "acct_123", "BE");
+
+    private static PaidOrderAcceptanceDisclosureDto Disclosure() => new()
     {
-        RegistrationOrder order = RegistrationOrder.Create(
-            snapshot.RegistrationOrderId,
-            snapshot.TenantId,
-            snapshot.EventId,
-            Guid.CreateVersion7(),
-            Guid.CreateVersion7(),
-            BookingPartyTypeEnum.Individual,
-            Guid.CreateVersion7(),
-            RegistrationParticipationSnapshot.Create(
-                Guid.CreateVersion7(),
-                1,
-                1,
-                1,
-                GuestRecoveryPolicyEnum.VerifiedEmailRequired),
-            null,
-            null,
-            snapshot.CurrencyCode,
-            UtcNow,
-            UtcNow.AddMinutes(30));
-        PaymentAttempt attempt = PaymentAttempt.Create(
-            Guid.CreateVersion7(),
-            snapshot.TenantId,
-            snapshot.RegistrationOrderId,
-            OrganizerPaymentRecipientSnapshot.Create(
-                snapshot.TenantId,
-                snapshot.OrganizerActorId,
-                snapshot.OrganizerPaymentProviderConnectionId,
-                "stripe",
-                snapshot.ConnectPlatformId,
-                snapshot.ExternalAccountId,
-                snapshot.MerchantCountryCode,
-                "EUR",
-                snapshot.InstancePolicyVersionId,
-                snapshot.TenantPolicyVersionId,
-                UtcNow),
-            "OrganizerDirect",
-            "2026-08-24",
-            snapshot.CompositionRevision,
-            Money.Create(snapshot.OrganizerAmountMinor, snapshot.CurrencyCode),
-            Money.Create(snapshot.PlatformFeeMinor, snapshot.CurrencyCode),
-            Money.Create(snapshot.PlatformContributionMinor, snapshot.CurrencyCode),
-            "checkout:fabricated",
-            UtcNow,
-            UtcNow.AddMinutes(30));
-        attempt.AttachAcceptance(snapshot);
-        return (order, attempt);
-    }
-
-    private static object? Get(object target, string propertyName) =>
-        target.GetType().GetProperty(propertyName)!.GetValue(target);
-
-    private static void Set(object target, string propertyName, object? value) =>
-        target.GetType().GetProperty(propertyName)!.SetValue(target, value);
+        DisclosureRevision = "disclosure",
+        AcceptanceTemplateIdentifier = PaidOrderAcceptanceSnapshot.CurrentAcceptanceTemplateIdentifier,
+        AcceptanceTemplateText = PaidOrderAcceptanceSnapshot.CurrentAcceptanceTemplateText,
+        OrganizerMerchant = new()
+        {
+            OrganizerActorId = OrganizerId,
+            MerchantDisclosureText = "Example Organizer, legal merchant for this order",
+            OrganizerPaymentProviderConnectionId = ConnectionId,
+            ConnectPlatformId = "platform-live-eu",
+            ExternalAccountId = "acct_123",
+            MerchantCountryCode = "BE",
+            ProviderCode = "stripe",
+            ProviderProfileCode = "OrganizerDirect",
+            ProviderEnvironment = "test",
+            ProviderCredentialOwner = "instance-operator",
+            ChargeType = "direct-charge",
+            StatementDescriptor = "EXAMPLE EVENT"
+        },
+        TenantDirectoryOperator = new()
+        {
+            DocumentId = DirectoryDocumentId,
+            RevisionId = DirectoryRevision,
+            PublicName = "Community Events",
+            LegalName = "Community Events ASBL",
+            OperatorKindCode = "registered_organization",
+            JurisdictionCountryCode = "BE",
+            RegistrationIdentifier = "BE 0123.456.789",
+            PublicContactEmail = "contact@example.test",
+            LegalNoticeUrl = "https://example.test/legal",
+            TermsUrl = "https://example.test/terms",
+            PrivacyUrl = "https://example.test/privacy"
+        },
+        InstanceOperator = new()
+        {
+            OperatorId = OperatorId,
+            PublicName = "Independent Operator",
+            LegalName = "Independent Operator ASBL",
+            OperatorKindCode = "registered_organization",
+            RegistrationIdentifier = "BE 0987.654.321",
+            IsOfficialInstance = false,
+            OfficialOrigin = "https://events.example.test",
+            JurisdictionCountryCode = "BE",
+            WebsiteUrl = "https://events.example.test/",
+            LegalNoticeUrl = "https://events.example.test/legal",
+            TermsUrl = "https://events.example.test/terms",
+            PrivacyUrl = "https://events.example.test/privacy"
+        },
+        PaymentOperations = new()
+        {
+            ComplaintContact = "complaints@example.test",
+            ComplaintOwner = "Trust and Safety",
+            RefundOwner = "Payments Operations",
+            DisputeOwner = "Dispute Operations",
+            ReconciliationOwner = "Payment Reconciliation",
+            ActivationStatus = "approved"
+        },
+        DeliveryStartsAtUtc = new DateTimeOffset(UtcNow.AddDays(10)),
+        DeliveryEndsAtUtc = new DateTimeOffset(UtcNow.AddDays(10).AddHours(3)),
+        EventTimeZoneId = "Europe/Brussels",
+        CurrencyCode = "EUR",
+        CurrencyMinorUnitDigits = 2,
+        OrganizerAmountMinor = 1_000,
+        PlatformFeeMinor = 75,
+        PlatformContributionMinor = 125,
+        TotalMinor = 1_125,
+        RefundPolicyVersion = 1,
+        RefundPolicyText = "Refund policy",
+        RefundPolicyLanguageTag = "en-GB",
+        SupportContact = "support@example.test",
+        Lines = [new() { OrderLineId = LineId, Name = "Admission", Quantity = 1, UnitAmountMinor = 1_000, DiscountAmountMinor = 0, LineTotalMinor = 1_000 }]
+    };
 }

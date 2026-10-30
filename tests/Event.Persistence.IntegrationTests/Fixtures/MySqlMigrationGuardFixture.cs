@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 
 namespace Event.Persistence.IntegrationTests.Fixtures;
 

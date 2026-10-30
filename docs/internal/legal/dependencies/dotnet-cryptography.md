@@ -5,10 +5,14 @@
 Select Microsoft's `System.Security.Cryptography.Pkcs` and
 `System.Security.Cryptography.Xml` packages at `10.0.13`. These are existing
 transitive runtime components, now explicitly referenced by their Event owners:
-PKCS in `Explore.Secrets` and XML cryptography in `Explore.Persistence`.
+PKCS in `Explore.Infrastructure` and XML cryptography in `Explore.Persistence`.
 Central version entries alone do not override every transitive dependency;
 the project references make the selected versions effective in those graphs.
 This decision does not certify unrelated application or browser packages.
+The SecretKit cutover removes the former Secrets project; its explicit PKCS
+reference moves to Infrastructure, which owns the remaining MailKit dependency.
+Without that reference a fresh restore selects MailKit's older minimum and
+NuGet correctly rejects the graph. The central version remains `10.0.13`.
 
 An isolated persistence restore selected older PKCS versions (`9.0.4`,
 `10.0.0`, `10.0.10`) and XML `10.0.10`. NuGet rejected them with `NU1902`

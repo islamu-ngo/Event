@@ -1,5 +1,4 @@
 using Explore.Application.Contracts.Recovery;
-using Explore.Secrets.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;

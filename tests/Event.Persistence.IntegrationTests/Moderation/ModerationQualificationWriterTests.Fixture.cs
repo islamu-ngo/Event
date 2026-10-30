@@ -39,10 +39,10 @@ public sealed partial class ModerationQualificationWriterTests
         {
             _connection = connection;
             var builder = TestDbContextOptions.Create<ExploreDbContext>();
-            PrimaryDatabaseProviderComposition.ConfigureApplicationModel(builder, new Explore.Secrets.Database.PrimaryDatabaseConnectionOptions
+            PrimaryDatabaseProviderComposition.ConfigureApplicationModel(builder, new Explore.Persistence.Database.PrimaryDatabaseConnectionOptions
             {
-                Role = Explore.Secrets.Database.PrimaryDatabaseRole.Runtime,
-                Provider = Explore.Secrets.Database.PrimaryDatabaseProvider.Sqlite
+                Role = Explore.Persistence.Database.PrimaryDatabaseRole.Runtime,
+                Provider = Explore.Persistence.Database.PrimaryDatabaseProvider.Sqlite
             });
             _options = builder.UseSqlite(connection)
                 .UseSnakeCaseNamingConvention().AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance,

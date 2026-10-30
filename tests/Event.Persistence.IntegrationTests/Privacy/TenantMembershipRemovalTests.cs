@@ -11,7 +11,6 @@ using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using TUnit.Assertions;
@@ -91,6 +90,35 @@ public sealed class TenantMembershipRemovalTests(TenantMembershipRemovalPostgreS
             cancellation.Cancel();
             ct.ThrowIfCancellationRequested();
         }, cancellation.Token));
+
+        await AssertScenarioAsync(scenario, tenantARemoved: false);
+    }
+
+    [Test]
+    public async Task RemovalWithAnotherActiveTenantFilter_FailsClosedWithoutChanges()
+    {
+        var scenario = await SeedTwoTenantScenarioAsync("wrong-filter");
+        await using var context = fixture.CreateTenantContext(scenario.TenantBId, scenario.UserId);
+        var repository = new TenantUserRepository(context, fixture.NativeQueueEnrollment);
+
+        var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => repository.TryRemoveMembershipAsync(
+            scenario.TenantAId, scenario.UserId, scenario.UserId, RemovedAt.UtcDateTime));
+        await Assert.That(rejected!.Message).IsEqualTo("Tenant membership removal requires the matching active tenant filter.");
+
+        await AssertScenarioAsync(scenario, tenantARemoved: false);
+    }
+
+    [Test]
+    public async Task RemovalWithTenantFilterAlreadyBypassed_FailsClosedWithoutChanges()
+    {
+        var scenario = await SeedTwoTenantScenarioAsync("bypassed-filter");
+        await using var context = fixture.CreateTenantContext(scenario.TenantAId, scenario.UserId);
+        context.EnableTenantFilterBypass("Tenant membership removal fail-closed integration scenario.");
+        var repository = new TenantUserRepository(context, fixture.NativeQueueEnrollment);
+
+        var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => repository.TryRemoveMembershipAsync(
+            scenario.TenantAId, scenario.UserId, scenario.UserId, RemovedAt.UtcDateTime));
+        await Assert.That(rejected!.Message).IsEqualTo("Tenant membership removal requires the matching active tenant filter.");
 
         await AssertScenarioAsync(scenario, tenantARemoved: false);
     }

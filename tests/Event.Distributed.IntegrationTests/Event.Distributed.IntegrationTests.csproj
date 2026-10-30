@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Shared/ExternalDataProtectionTestAuthority.cs" Link="ExternalDataProtectionTestAuthority.cs" />
+    <Compile Include="../Shared/AssuranceOwnershipContext.cs" Link="AssuranceOwnershipContext.cs" />
+    <Content Include="../../eng/performance/k6/owned-runtime.js" Link="Workloads/owned-runtime.js" CopyToOutputDirectory="PreserveNewest" />
+    <ProjectReference Include="../../src/Explore.AppHost/Explore.AppHost.csproj" />
+    <ProjectReference Include="../../src/Explore.Persistence/Explore.Persistence.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../src/Explore.ServiceDefaults/Explore.ServiceDefaults.csproj" IsAspireProjectResource="false" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="TUnit" />
+  </ItemGroup>
+</Project>

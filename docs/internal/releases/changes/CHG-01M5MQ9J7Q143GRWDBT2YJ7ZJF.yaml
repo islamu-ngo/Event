@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5MQ9J7Q143GRWDBT2YJ7ZJF
+Title: "Retain native administrator credentials across storage reauthentication"
+Type: fix
+Scope: storage
+Summary: "Storage configuration accepts new authentication wrappers only when its original validated credential, request tenant, identities, grants and deadline remain unchanged."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Native credential receipt and original request tenant custody remain mandatory when authentication returns new ticket or principal wrappers.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented
+    Detail: Valid administrator saves retain their signed deadline and fixed database tenant; no migration or configuration change is required.

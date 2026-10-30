@@ -17,7 +17,7 @@
 | `Explore.API` | `Explore.{Layer}` | Web API host |
 | `Explore.Blazor` | `Explore.Blazor` | Blazor Server host |
 | `Explore.Blazor.Client` | `Explore.Blazor.Client` | Blazor WASM client |
-| `Explore.Secrets` | `Explore.{Library}` | Standalone library |
+| `Explore.ServiceDefaults` | `Explore.{Library}` | Shared host defaults, selected secret authority acquisition, and Data Protection |
 | `Event.Application.UnitTests` | `Event.{Layer}.{TestType}` | Test projects (legacy "Event" prefix) |
 | `Event.Architecture.Tests` | `Event.Architecture.Tests` | Architecture fitness tests |
 
@@ -307,7 +307,11 @@ Table names are also snake_case plurals of the entity name.
 | `Event.Persistence.IntegrationTests` | Integration | TUnit |
 | `Event.API.IntegrationTests` | Integration | TUnit |
 | `Explore.Blazor.Client.Tests` | Component | bUnit + TUnit |
-| `Explore.Secrets.UnitTests` | Unit | TUnit |
+| `Explore.Infrastructure.Tests` | Unit / focused runtime | TUnit |
+
+Secret-specific tests retain their native layer names: `Secrets/` under
+Infrastructure and Domain (registry), `Database/` under Persistence, and startup
+composition tests under the API, BFF, and Standalone integration projects.
 
 ### Test Class Naming
 

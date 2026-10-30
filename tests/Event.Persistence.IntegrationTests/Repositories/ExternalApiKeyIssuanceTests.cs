@@ -3,6 +3,7 @@ using System.Data;
 using System.Security.Claims;
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;
+using Explore.API.Extensions;
 using Explore.Application;
 using Explore.Application.Authentication;
 using Explore.Application.Configuration;
@@ -20,10 +21,11 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Constants;
 using Explore.Infrastructure;
+using Explore.Infrastructure.Secrets;
 using Explore.Persistence;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
-using Explore.Secrets.Extensions;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -1096,25 +1098,41 @@ public sealed class ExternalApiKeyIssuanceTests
                 // containers, applies migrations, or falls back to the SQLite fast fixture.
                 var providerFixture = PrimaryDatabaseProviderBehaviorFixture.Create();
                 await providerFixture.PrepareAsync();
-                var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
-                var services = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+                var builder = new ConfigurationBuilder().AddEnvironmentVariables();
+                var bootstrap = builder.Build();
+                var owner = await SecretAuthorityBootstrap.OpenAsync(
+                    bootstrap, Environments.Production, SecretConsumerRole.Api,
+                    [new("/runtime/api/authentication/keycloak", "KEYCLOAK_ENDPOINT", "KEYCLOAK_ENDPOINT")],
+                    new SecretAuthorityLoginAttempt());
+                try
                 {
-                    DisableDefaults = true,
-                    EnvironmentName = Environments.Production
-                }).Services;
-                services.AddSingleton<IConfiguration>(configuration);
-                services.AddLogging();
-                services.AddHybridCache();
-                services.AddMetrics();
-                services.AddSingleton<BusinessMetrics>();
-                services.AddSingleton<ProjectionMetrics>();
-                services.ConfigureApplicationServices(configuration);
-                services.ConfigureInfrastructureServices(configuration);
-                services.AddSecretProvider(configuration);
-                services.AddSecretResolution();
-                services.ConfigurePersistenceServices(configuration, skipLookupCacheInitializer: true);
-                Configure(services, fixture.TenantId, Principal(fixture.UserId));
-                fixture._runtime = services.BuildIsolatedServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+                    await builder.AddPreparedApiConfigurationAsync(owner);
+                    var configuration = builder.Build();
+                    var services = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+                    {
+                        DisableDefaults = true,
+                        EnvironmentName = Environments.Production
+                    }).Services;
+                    services.AddSingleton<IConfiguration>(configuration);
+                    services.AddLogging();
+                    services.AddHybridCache();
+                    services.AddMetrics();
+                    services.AddSingleton<BusinessMetrics>();
+                    services.AddSingleton<ProjectionMetrics>();
+                    services.ConfigureApplicationServices(configuration);
+                    services.ConfigureInfrastructureServices(configuration);
+                    services.AddSingleton(_ => owner);
+                    services.AddNativeSecretResolution();
+                    services.ConfigurePersistenceServices(configuration, skipLookupCacheInitializer: true);
+                    Configure(services, fixture.TenantId, Principal(fixture.UserId));
+                    fixture._runtime = services.BuildIsolatedServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+                    _ = fixture._runtime.GetRequiredService<SecretAuthorityAcquisition>();
+                }
+                catch
+                {
+                    await owner.DisposeAsync();
+                    throw;
+                }
                 await using var seed = fixture.Open();
                 var tenant = NewTenant();
                 tenant.Id = fixture.TenantId;

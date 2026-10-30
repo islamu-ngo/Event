@@ -163,10 +163,10 @@ public sealed class AtprotoOAuthSecurityGatewayTests
                     new InstanceBootstrapStateRepository(visitorSettings.Context),
                     new Explore.Persistence.Services.TenantLookupSource(
                         new Explore.Persistence.Database.GlobalExploreDbContextFactory(
-                            new Explore.Secrets.Database.PrimaryDatabaseConnectionOptions
+                            new Explore.Persistence.Database.PrimaryDatabaseConnectionOptions
                             {
-                                Role = Explore.Secrets.Database.PrimaryDatabaseRole.Global,
-                                Provider = Explore.Secrets.Database.PrimaryDatabaseProvider.Sqlite,
+                                Role = Explore.Persistence.Database.PrimaryDatabaseRole.Global,
+                                Provider = Explore.Persistence.Database.PrimaryDatabaseProvider.Sqlite,
                                 Database = visitorSettings.Context.Database.GetDbConnection().DataSource
                             })))),
             tenantContext,

@@ -11,6 +11,7 @@ using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Persistence.Seed;
 
@@ -26,6 +27,7 @@ public static class DatabaseSeeder
     public static async Task SeedAsync(
         ExploreDbContext context,
         IHostEnvironment environment,
+        ILogger logger,
         bool seedDevelopmentData = true,
         IConfiguration? configuration = null,
         CancellationToken cancellationToken = default)
@@ -36,7 +38,9 @@ public static class DatabaseSeeder
         try
         {
             // Lookup tables are required in ALL environments
+            logger.LogInformation("Database migration operation {Operation} started.", "SeedLookups");
             await LookupTableSeeder.SeedAsync(context, cancellationToken);
+            logger.LogInformation("Database migration operation {Operation} completed.", "SeedLookups");
 
             // Business entities are seeded only in Development for testing
             if (environment.IsDevelopment() && seedDevelopmentData)
@@ -46,7 +50,9 @@ public static class DatabaseSeeder
                 await SeedDevelopmentWebhookSecretsAsync(context, configuration, cancellationToken);
             }
 
+            logger.LogInformation("Database migration operation {Operation} started.", "SeedTenantBranding");
             await EnsureTenantBrandingDocumentsAsync(context, cancellationToken);
+            logger.LogInformation("Database migration operation {Operation} completed.", "SeedTenantBranding");
         }
         finally
         {

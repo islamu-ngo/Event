@@ -29,8 +29,9 @@ internal sealed class FleetHealthInstallationSql(
             OR EXISTS (SELECT 1 FROM pg_catalog.pg_class relation
                 WHERE relation.oid IN ({tables}) AND (
                     NOT relation.relrowsecurity OR NOT relation.relforcerowsecurity
-                    OR pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)}, relation.oid,
-                        'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                    OR (pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)}, relation.oid,
+                        'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                        OR {PostgresPrivilegeGuard.MaintainPrivilegeSql(Text(enrollment.GlobalLogin), "relation.oid", false)})
                     OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)}, relation.oid,
                         'SELECT,INSERT,UPDATE,REFERENCES'))) THEN
             RAISE EXCEPTION '{diagnosticPrefix}_sources_not_ready' USING ERRCODE = '55000';

@@ -18,7 +18,6 @@ using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
 using Explore.Persistence.Schema;
-using Explore.Secrets.Database;
 using Explore.Persistence.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;

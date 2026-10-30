@@ -15,7 +15,19 @@ public sealed class CerbosContainerFixture : IAsyncInitializer, IAsyncDisposable
 
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(2);
 
-    private IContainer _container = null!;
+    private IContainer? _container;
+    private SecurityInfrastructureFixture.ContainerCreationObservation? _creationObservation;
+    private readonly object _disposalSync = new();
+    private Task? _disposal;
+
+    public CerbosContainerFixture() { }
+
+    internal CerbosContainerFixture(IContainer container,
+        SecurityInfrastructureFixture.ContainerCreationObservation observation)
+    {
+        _container = container;
+        _creationObservation = observation;
+    }
 
     /// <summary>
     /// The Cerbos gRPC endpoint (e.g., <c>http://localhost:{port}</c>).
@@ -39,8 +51,8 @@ public sealed class CerbosContainerFixture : IAsyncInitializer, IAsyncDisposable
                 "Ensure cerbos/policies/** is included as Content with CopyToOutputDirectory=PreserveNewest.");
         }
 
-        _container = new ContainerBuilder()
-            .WithImage(CerbosImage)
+        var ownership = await SecurityInfrastructureFixture.WithAssuranceOwnershipAsync(new ContainerBuilder(CerbosImage), "cerbos");
+        var container = ownership.Builder
             .WithPortBinding(3592, true) // HTTP
             .WithPortBinding(3593, true) // gRPC
             .WithResourceMapping(policiesPath, "/policies")
@@ -54,24 +66,40 @@ public sealed class CerbosContainerFixture : IAsyncInitializer, IAsyncDisposable
                         .ForStatusCode(System.Net.HttpStatusCode.OK),
                     wait => wait.WithTimeout(StartupTimeout)))
             .Build();
-
+        _container = container;
         using var startupCts = new CancellationTokenSource(StartupTimeout);
-        await _container.StartAsync(startupCts.Token);
+        try
+        {
+            _creationObservation = await SecurityInfrastructureFixture.BeginCreationObservationAsync(
+                ownership.Ownership, "cerbos", container, startupCts.Token);
+            await SecurityInfrastructureFixture.StartObservedContainerAsync(container, _creationObservation, startupCts.Token);
+            var host = container.Hostname;
+            var httpPort = container.GetMappedPublicPort(3592);
+            var grpcPort = container.GetMappedPublicPort(3593);
 
-        var host = _container.Hostname;
-        var httpPort = _container.GetMappedPublicPort(3592);
-        var grpcPort = _container.GetMappedPublicPort(3593);
-
-        HttpEndpoint = $"http://{host}:{httpPort}";
-        GrpcEndpoint = $"http://{host}:{grpcPort}";
+            HttpEndpoint = $"http://{host}:{httpPort}";
+            GrpcEndpoint = $"http://{host}:{grpcPort}";
+        }
+        catch (Exception primary)
+        {
+            try { await DisposeAsync(); }
+            catch (Exception cleanup) { throw new AggregateException(primary, cleanup); }
+            throw;
+        }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        if (_container is not null)
-        {
-            await _container.DisposeAsync();
-        }
+        lock (_disposalSync) return new ValueTask(_disposal ??= DisposeCoreAsync());
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        var container = _container;
+        var observation = _creationObservation;
+        _container = null;
+        _creationObservation = null;
+        await SecurityInfrastructureFixture.DisposeObservedContainerAsync(container, observation);
     }
 
     /// <summary>

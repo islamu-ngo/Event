@@ -43,7 +43,7 @@ while IFS= read -r line; do
         'Infisical:ClientId = '*) client_id=$value ;;
         'Infisical:ClientSecret = '*) client_secret=$value ;;
     esac
-done < <(dotnet user-secrets list --project src/Explore.Secrets/Explore.Secrets.csproj)
+done < <(dotnet user-secrets list --project src/Explore.API/Explore.API.csproj)
 
 for key in vault_url project_id vault_environment client_id client_secret; do
     [[ -n ${!key:-} ]] || {

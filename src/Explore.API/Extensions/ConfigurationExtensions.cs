@@ -3,44 +3,46 @@ namespace Explore.API.Extensions;
 using Explore.Application.Configuration;
 using Explore.Domain.Constants;
 using Explore.Domain.Secrets;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 
 public static class ConfigurationExtensions
 {
-    /// <summary>
-    /// Maps the selected secret authority to authoritative keys and returns isolated runtime provider configuration.
-    /// </summary>
-    public static IConfiguration AddSecretAuthorityConfiguration(
+    /// <summary>Awaits selected startup groups before publishing authoritative API mappings.</summary>
+    public static async ValueTask AddPreparedApiConfigurationAsync(
         this IConfigurationBuilder configBuilder,
-        string environmentName,
-        SecretConsumer consumer = SecretConsumer.Api)
+        Explore.ServiceDefaults.Secrets.SecretAuthorityAcquisition owner,
+        CancellationToken cancellationToken = default)
     {
-        var bootstrapConfig = configBuilder.Build();
-        _ = PrivacyErasureDurabilityOptions.FromConfiguration(bootstrapConfig);
-        IConfiguration authority = SecretAuthorityConfiguration.Build(
-            bootstrapConfig,
-            environmentName,
-            consumer,
-            SecretAcquisitionPolicy.Roots(consumer).ToArray());
+        ArgumentNullException.ThrowIfNull(configBuilder);
+        ArgumentNullException.ThrowIfNull(owner);
+        var bootstrapConfiguration = configBuilder.Build();
+        _ = PrivacyErasureDurabilityOptions.FromConfiguration(bootstrapConfiguration);
+        var staged = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        string[] requiredRoots = Explore.ServiceDefaults.Secrets.SecretAcquisitionPolicy
+            .Roots(Explore.ServiceDefaults.Secrets.SecretConsumerRole.Api)
+            .Where(root => root is not ("/smtp" or "/analytics")).ToArray();
+        IReadOnlyList<string>[] groups = [requiredRoots, ["/smtp"], ["/analytics"]];
+        for (int index = 0; index < groups.Length; index++)
+        {
+            var prepared = await owner.PrepareConfigurationGroupAsync(groups[index], cancellationToken).ConfigureAwait(false);
+            if (!prepared.IsSuccess)
+            {
+                if (prepared.Status == SecretKit.Core.SecretStatus.Absent)
+                    continue;
+                throw new InvalidOperationException("secret_api_configuration_unavailable");
+            }
+            foreach (var pair in prepared.Value)
+            {
+                if (!staged.TryAdd(pair.Key, pair.Value))
+                    throw new InvalidOperationException("secret_api_configuration_collision");
+            }
+        }
+        var authorityBuilder = new ConfigurationBuilder().AddInMemoryCollection(staged);
+        PrivacyErasureAuthorityDatabaseConfiguration.ProjectDiscreteConfiguration(authorityBuilder);
+        using var authority = (ConfigurationRoot)authorityBuilder.Build();
         _ = PrivacyErasureDurabilityOptions.FromConfiguration(authority);
-        var isolatedAuthority = new ConfigurationBuilder().AddConfiguration(authority);
-        PrivacyErasureAuthorityDatabaseConfiguration.ProjectDiscreteConfiguration(isolatedAuthority);
-        ApplyMapping(configBuilder, isolatedAuthority.Build(), bootstrapConfig);
-
-        // Runtime provider binding must use the authority and bootstrap source that loaded
-        // startup secrets, not lower-priority settings or a vault-supplied provider selector.
-        var runtimeProvider = bootstrapConfig.GetSection("SecretProvider:Infisical").AsEnumerable()
-            .ToDictionary(pair => pair.Key, _ => (string?)null, StringComparer.OrdinalIgnoreCase);
-        foreach (var pair in authority.GetSection(SecretProviderOptions.SectionName).AsEnumerable())
-            runtimeProvider[pair.Key] = pair.Value;
-        configBuilder.AddInMemoryCollection(runtimeProvider);
-
-        // Null overlays hide values, not collection children. Bind the provider from a
-        // separate root so suppressed paths cannot become null members at runtime.
-        return new ConfigurationBuilder()
-            .AddInMemoryCollection(runtimeProvider.Where(pair => pair.Value is not null))
-            .Build();
+        cancellationToken.ThrowIfCancellationRequested();
+        ApplyMapping(configBuilder, authority, bootstrapConfiguration);
     }
 
     /// <summary>
@@ -248,6 +250,10 @@ public static class ConfigurationExtensions
             ["DATABASE_PLATFORM_KEY_REPORT_PASSWORD"] = null,
             ["Database:PlatformKeyReport:Username"] = null,
             ["Database:PlatformKeyReport:Password"] = null,
+            ["DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME"] = null,
+            ["DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD"] = null,
+            ["DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME"] = null,
+            ["DATABASE_EMAIL_POLICY_TENANT_MUTATION_PASSWORD"] = null,
             ["Database:Migrator:Username"] = null,
             ["Database:Migrator:Password"] = null,
             ["Database:TlsMode"] = null,
@@ -287,7 +293,7 @@ public static class ConfigurationExtensions
 
         static void TrySet(IDictionary<string, string?> dict, IConfiguration root, string key, string? value)
         {
-            if (!string.IsNullOrWhiteSpace(root[key]))
+            if (root[key] is not null)
             {
                 dict[key] = root[key];
                 return;
@@ -379,6 +385,10 @@ public static class ConfigurationExtensions
         TrySet(mappedConfig, config, "Database:InstanceKeyIssuance:Password", config["DATABASE_INSTANCE_KEY_ISSUANCE_PASSWORD"] ?? config["Database:InstanceKeyIssuance:Password"]);
         TrySet(mappedConfig, config, "Database:PlatformKeyReport:Username", config["DATABASE_PLATFORM_KEY_REPORT_USERNAME"] ?? config["Database:PlatformKeyReport:Username"]);
         TrySet(mappedConfig, config, "Database:PlatformKeyReport:Password", config["DATABASE_PLATFORM_KEY_REPORT_PASSWORD"] ?? config["Database:PlatformKeyReport:Password"]);
+        mappedConfig["Database:EmailPolicyInstanceMutation:Username"] = config["Database:EmailPolicyInstanceMutation:Username"] ?? config["DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME"];
+        mappedConfig["Database:EmailPolicyInstanceMutation:Password"] = config["Database:EmailPolicyInstanceMutation:Password"] ?? config["DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD"];
+        mappedConfig["Database:EmailPolicyTenantMutation:Username"] = config["Database:EmailPolicyTenantMutation:Username"] ?? config["DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME"];
+        mappedConfig["Database:EmailPolicyTenantMutation:Password"] = config["Database:EmailPolicyTenantMutation:Password"] ?? config["DATABASE_EMAIL_POLICY_TENANT_MUTATION_PASSWORD"];
         TrySet(mappedConfig, config, "Database:Migrator:Username", ReadFirst(config, "DATABASE_MIGRATOR_USERNAME", "Database:Migrator:Username"));
         TrySet(mappedConfig, config, "Database:Migrator:Password", ReadFirst(config, "DATABASE_MIGRATOR_PASSWORD", "Database:Migrator:Password"));
         TrySet(mappedConfig, config, "Database:TlsMode", ReadFirst(config, "DATABASE_TLS_MODE", "Database:TlsMode"));

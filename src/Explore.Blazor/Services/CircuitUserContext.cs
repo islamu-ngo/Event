@@ -1,3 +1,5 @@
+using Explore.Blazor.Services.Auth;
+
 namespace Explore.Blazor.Services;
 
 /// <summary>
@@ -9,8 +11,10 @@ public interface ICircuitUserContext
 {
     string? UserId { get; }
     string? SessionId { get; }
+    BffSessionBinding? SessionBinding { get; }
     void SetUserId(string? userId);
     void SetSessionId(string? sessionId);
+    void SetSessionBinding(BffSessionBinding binding);
     void Clear();
     IDisposable BeginActivityScope();
 }
@@ -20,10 +24,15 @@ public sealed class CircuitUserContext : ICircuitUserContext
     private static readonly AsyncLocal<UserIdHolder?> _currentUserId = new();
     private string? _userId;
     private string? _sessionId;
+    private BffSessionBinding? _sessionBinding;
 
     public string? UserId => _currentUserId.Value?.UserId ?? _userId;
 
     public string? SessionId => _currentUserId.Value?.SessionId ?? _sessionId;
+
+    public BffSessionBinding? SessionBinding => _currentUserId.Value?.SessionBinding ?? _sessionBinding;
+
+    public void SetSessionBinding(BffSessionBinding binding) => _sessionBinding = binding;
 
     public void SetUserId(string? userId)
     {
@@ -39,13 +48,14 @@ public sealed class CircuitUserContext : ICircuitUserContext
     {
         _userId = null;
         _sessionId = null;
+        _sessionBinding = null;
         _currentUserId.Value = null;
     }
 
     public IDisposable BeginActivityScope()
     {
         var previous = _currentUserId.Value;
-        _currentUserId.Value = new UserIdHolder { UserId = _userId, SessionId = _sessionId };
+        _currentUserId.Value = new UserIdHolder { UserId = _userId, SessionId = _sessionId, SessionBinding = _sessionBinding };
         return new Scope(() => _currentUserId.Value = previous);
     }
 
@@ -54,6 +64,8 @@ public sealed class CircuitUserContext : ICircuitUserContext
         public string? UserId { get; set; }
 
         public string? SessionId { get; set; }
+
+        public BffSessionBinding? SessionBinding { get; set; }
     }
 
     private sealed class Scope : IDisposable

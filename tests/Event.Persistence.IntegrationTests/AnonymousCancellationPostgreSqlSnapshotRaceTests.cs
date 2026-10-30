@@ -17,7 +17,7 @@ using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Infrastructure.Services.Registration;
 using Explore.Persistence;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;

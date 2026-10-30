@@ -1,5 +1,5 @@
 using System.Text;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Extensions.Configuration;
 
 namespace Explore.Persistence.Security;

@@ -18,4 +18,8 @@ public static class PostgresAdmissionScannerAuthenticationContract
     public static Task RequireReadyAsync(ExploreDbContext context, PostgresNativeQueueEnrollment? enrollment,
         CancellationToken cancellationToken = default) => Profile.RequireReadyAsync(context, enrollment, cancellationToken);
     internal static string GlobalPolicyException(ExploreDbContext context, string globalLogin) => Profile.PolicyException(context, globalLogin);
+    internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        Profile.CompleteGlobalCataloguePredicate(context, enrollment);
+    internal static IReadOnlyList<string> GlobalCatalogueRelations(ExploreDbContext context) =>
+        Profile.GlobalCatalogueRelations(context);
 }

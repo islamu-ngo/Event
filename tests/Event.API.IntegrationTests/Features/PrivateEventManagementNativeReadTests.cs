@@ -571,6 +571,7 @@ public sealed class PrivateEventManagementNativeReadTests(PostgreSqlContainerFix
         Guid groupId = Guid.CreateVersion7();
         await using (var setup = postgres.CreateDbContext())
         {
+            setup.BindTenantLease();
             var action = new EventPublicAction
             {
                 Id = actionId,
@@ -727,6 +728,7 @@ public sealed class PrivateEventManagementNativeReadTests(PostgreSqlContainerFix
     private async Task<Guid> CreateTenantAsync()
     {
         await using var setup = postgres.CreateDbContext();
+        setup.BindTenantLease();
         var tenant = new Tenant
         {
             Id = Guid.CreateVersion7(),
@@ -750,6 +752,7 @@ public sealed class PrivateEventManagementNativeReadTests(PostgreSqlContainerFix
     private async Task<Guid> SeedEventAsync(Guid tenant, Guid user)
     {
         await using var setup = postgres.CreateDbContext();
+        setup.BindTenantLease();
         Guid actor = await setup.Actors.Where(row => row.UserId == user).Select(row => row.Id).SingleAsync();
         var target = new EventBuilder().WithActorId(actor).WithTenantId(tenant)
             .WithVisibility(VisibilityTypeEnum.Private).WithStatus(EventStatusEnum.Draft).Build();

@@ -17,7 +17,115 @@ Do not symlink `.github` to `.ci`. GitHub discovers workflows from `.github/work
 
 Workflow YAML defines what runs; repository settings define which checks are required, which environments require approval, and which organization security features are enabled.
 
+## Native build and test selection
+
+`Build & Test` consumes `select-build-test-changes` from the existing release
+engineering executable. The workflow accepts exactly eight unique boolean
+decisions and rejects malformed, missing or inconsistent output before exporting
+job outputs. The native selector independently chooses Architecture for both
+configuration schema artifacts and their generator; only root README and public
+Markdown qualify for a complete no-op. Unknown paths, shared fixtures, central
+build/CI inputs, AppHost, benchmarks and uncertain diff inputs select every lane.
+Known project changes retain their affected subsystem lanes and conservatively
+include the Setup gate when its shared application, persistence or UI contracts
+can change. The fast reusable workflow runs the distributed project's pure
+`Harness` category; real `Distributed` and browser execution require their
+separate runtime evidence and are never inferred from Harness results.
+
 ## Security integration fixture execution
+
+The existing `security-execution.v1.json` packet is governed by the embedded
+`executionRequirements` in `eng/security/security-control-register.json`.
+Producer and validator derive each registered lane's project, closed host
+profile, environment, selector and required identities from the same validated
+requirements. The owning verb is `execute-security-execution`. Admission requires
+every registered lane and its exact native result variants, with no
+missing/skipped results or reused report/execution identities. Candidate,
+run/attempt and retained artifact byte hashes must agree.
+Provider, database role and authentication remain `not-attested`.
+
+The API lanes require their registered key witnesses within the complete
+category report. Owned lanes require equality between registered and observed
+named variants, so adding an unregistered passing case also rejects admission
+until the registration is refreshed against its compiled candidate.
+
+The local integration registration declares the two dedicated API test-host
+lanes and the existing owned runtime, browser journeys, browser security vectors,
+native load control and load correctness lanes. Owned named variants are source
+expectations until the final compiled candidate's discovery independently
+confirms their exact names, uniqueness and counts. Partial or contradictory
+registration fails; missing, skipped, extra or stale owned results cannot be
+substituted. Synthetic parser fixtures and isolated browser-module controls
+never certify a healthy owned host.
+
+The owning producer has bounded compiler and helper verification, with remote
+workflow activation held. Clean committed-candidate API execution, its fresh
+successor against copied old reports, live managed-entry/served-input witnesses
+and final seven-profile source/evidence admission remain pending. The earlier
+owning-executor source commit retained two lanes; the local workflow/register
+integration does not turn authored scenarios into passing runtime evidence.
+Rebuilding must bind the actual committed candidate revision; any later candidate source,
+input, registration or workflow change invalidates the final execution proof.
+
+The always-present required security job uses the existing conservative native
+change router and accepts only its exact true/false result. Unknown routing
+output fails. Selected runs build the registered API and distributed hosts with
+the exact candidate SourceRevisionId, provision external prerequisites, and call
+the existing owning verb once for all registered lanes. It uploads only the
+newly admitted public directory after successful execution; raw reports, private
+run roots and provisioning diagnostics are excluded, including on failure.
+The workflow has no separate Bash test/harvesting path. Missing managed launch
+evidence still rejects execution; the local integration does not bypass it.
+
+The native runner's timeout covers its entire serial batch. API batches retain
+600 seconds; each isolated load UID retains 1500 seconds for its twenty-minute
+regime and lifecycle allowance. For N actual selected UIDs, runtime uses `720*N`
+seconds, journeys `1200*N`, and browser security `240*N+1020`. Each owned batch is
+capped at 19800 seconds (330 minutes), with the parent process deadline fifteen
+seconds later. The existing closed lane and matching registered host profile
+select this policy; opaque UID contents do not. Empty, more than 1024 identities,
+unknown lane/profile pairs and multi-UID load invocations reject before launch.
+These are finite operating hang allowances, including startup/cleanup margin,
+not guaranteed completion bounds for multiple owners or reserved case runtimes.
+The hosted job has a 360-minute cumulative cap, including builds and setup;
+several slow batches can exhaust it before their individual caps. Cancellation,
+missing results or unfinished cleanup cannot yield admitted evidence. A final
+same-candidate all-seven run must establish normal operating fit. The workflow
+canonicalizes its explicitly selected Unix socket once, verifies it is a socket,
+and exports that endpoint without fallback before child execution.
+
+The producer owns a fresh private run root, same-DLL discovery, typed opaque UID
+execution and fresh named TRX joins. It captures clean Git HEAD/tree, managed
+project revisions/dependencies, copied prerequisite content and tool/runtime
+bytes before and after execution. Each selected load UID has its own native
+invocation and temporary directory; other profiles batch. Public proof files
+contain only closed registered references, ordinals, counts, outcomes and whole
+artifact/record digests. UIDs, native GUIDs, display identities, paths, argv,
+TRX, configuration and process output remain private. Detached report harvesting
+through `produce-security-execution` rejects and invalidates its designated
+packet; a supplied or deserialized record cannot mint owning evidence.
+
+Instrumented API fixtures require an admitted explicit Unix `DOCKER_HOST` and
+caller-selected `TESTCONTAINERS_RYUK_DISABLED=true`, private owner context and
+cached images; their builders pin that endpoint and never pull. Ordinary fixture
+execution retains its existing behavior when ownership context is absent.
+Fixture credentials are generated at runtime; structured resource observations
+omit credential, realm, environment and configuration values. The observer
+records actual local image/full container identities and bounded point-in-time
+snapshots. Initially present and foreign IDs are never cleanup targets; known
+selected IDs require an identity recheck and final successful absence inventory.
+No foreign/named-volume deletion is admitted. Missing observations, failed
+cleanup or missing live managed-entry/served-input witnesses deny eligibility.
+Labels associate resources with the private run; they do not authenticate a
+creator, daemon incarnation or continuous lifecycle. Public uploads must include
+only the admitted public directory, never private logs, TRX or run roots.
+
+The public release consumer validates the operator-supplied execution packet
+within the existing trusted default-branch/operator release boundary. Workflow
+paths, provider run IDs and URLs are correlation metadata; they do not
+authenticate CI origin. Required GitHub checks must be verified separately
+against the final candidate. Packet validation does not replace those checks or
+add another signing/promotion authority.
 
 The security workflow runs the complete `Category=Security` selection with
 `--maximum-parallel-tests 1`. Each case may still exercise concurrent HTTP
@@ -451,6 +559,10 @@ Bash; without it, a successful run only establishes workflow/expression validity
 Keep related step outputs in one redirected block so the same shell checks pass
 locally and on GitHub-hosted runners.
 
+Assurance jobs derive private temporary, browser and tool paths from `RUNNER_TEMP`
+inside their preparation step and persist them through `GITHUB_ENV`. Do not use
+the `runner` expression context in job-level `env`, where GitHub disallows it.
+
 ### Workflow Cache Poisoning Policy
 
 Fork pull requests and untrusted contribution events must not write caches that are later consumed by trusted deployment, release, or publish workflows. `Workflow Security` enforces this with `.ci/scripts/validate-workflow-cache-policy.cs`.
@@ -690,9 +802,12 @@ Do not add Codecov, SonarCloud, or coverage-percentage badges until the correspo
 `Security Integration Tests` uses the native release-engine
 `select-security-changes` command instead of a second inline path predicate.
 Dedicated API hosting/authentication, Standalone and shared BFF ingress changes
-select actual execution. Existing security selections remain included. Missing
-or empty changed-file evidence selects execution fail-safe; unrelated changes
-retain an explicitly reported no-op.
+select actual execution. Selection defaults to execution for unknown paths,
+central build/package/lock inputs, shared fixtures, providers, generated
+contracts, AppHost resources and browser/load assets. Only normalized root
+`README.md` and `docs/public/**/*.md` changes may select the reported no-op.
+Mixed changes, malformed paths, invalid UTF-8 and missing, unreadable or empty
+changed-file evidence select execution fail-safe.
 
 The workflow sets up .NET and builds the classifier before making that decision.
 It also validates the complete source catalogue with the same native release
@@ -706,7 +821,20 @@ a passing security test run and does not establish candidate admission.
 After both selected lanes succeed, `produce-security-execution` validates their
 actual TRX, retains reports/logs and emits `security-execution.v1.json` for the
 exact tested GitHub SHA and invocation. No-op or failed execution emits no
-admissible packet. The upload retains diagnostic output on failure; human step
+admissible packet. The native tool embeds the existing security register's
+version-2 execution requirements: required fully qualified methods and exact
+variant names must join passing TRX definitions and execution results. Missing
+or renamed witnesses cannot be replaced by an unrelated nonzero passing total.
+Ambiguous summaries, duplicate identities and cross-lane report reuse are
+rejected independently of artifact-byte digests.
+
+These two lanes remain dedicated `Testing` API test hosts. Their database
+provider, database role and authentication scheme must remain `not-attested`;
+the packet cannot self-promote them into relational, distributed, browser or
+external-authority evidence. Source dispositions also remain distinct from
+execution requirements. A candidate-only consumer does not establish that an
+otherwise valid same-candidate packet is the latest invocation or authenticate
+its producer. The upload retains diagnostic output on failure; human step
 summaries are not evidence receipts. See [Security Verification](SECURITY_VERIFICATION.md)
 for sidecar admission and the separate final provider/operational/provenance gate.
 

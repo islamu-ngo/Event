@@ -1,8 +1,5 @@
-// ABOUTME: Enforces the CarpaNet package ownership and hermetic lexicon-generation boundary.
-// ABOUTME: Prevents protocol dependencies or network-resolved lexicons from leaking into core layers.
-
-using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Mono.Cecil;
 
 namespace Event.Architecture.Tests;
 
@@ -97,16 +94,10 @@ public sealed class AtprotoDependencyBoundaryTests
 
         foreach (var projectName in ForbiddenProjects)
         {
-            var projectRoot = ContextSystemHelpers.RepoPath(projectName);
-            foreach (var file in Directory.EnumerateFiles(projectRoot, "*.cs", SearchOption.AllDirectories)
-                         .Where(file => !IsBuildOutput(file)))
-            {
-                var source = await File.ReadAllTextAsync(file);
-                if (ContainsCarpaNetReference(source))
-                {
-                    violations.Add(Path.GetRelativePath(repoRoot, file).Replace('\\', '/'));
-                }
-            }
+            using var assembly = CompiledDependencyGraph.ReadProject(projectName);
+            violations.AddRange(assembly.MainModule.Types
+                .Where(HasCarpaNetDependency)
+                .Select(type => $"{projectName}:{type.FullName}"));
         }
 
         await Assert.That(violations).IsEmpty()
@@ -114,19 +105,18 @@ public sealed class AtprotoDependencyBoundaryTests
     }
 
     [Test]
-    public async Task CarpaNetReferenceScanner_IgnoresCommentsButDetectsCodeReferences()
+    public async Task CarpaNetBoundary_RejectsCompiledDeclarationAndBodyOnlyDependencies()
     {
-        const string commentOnly = """
-            // ABOUTME: Keeps CarpaNet credential types inside Infrastructure.
-            /* using CarpaNet.OAuth; */
-            namespace Explore.Application;
-            """;
-        const string usingReference = "using CarpaNet.OAuth;";
-        const string qualifiedReference = "// CarpaNet is contained below.\nglobal::CarpaNet.ATDid value = default;";
-
-        await Assert.That(ContainsCarpaNetReference(commentOnly)).IsFalse();
-        await Assert.That(ContainsCarpaNetReference(usingReference)).IsTrue();
-        await Assert.That(ContainsCarpaNetReference(qualifiedReference)).IsTrue();
+        using var assembly = CompiledDependencyGraph.ReadAssembly(typeof(AtprotoDependencyBoundaryTests).Assembly.Location);
+        var probes = CompiledDependencyGraph.Types(assembly.MainModule)
+            .Where(type => type.DeclaringType?.FullName == typeof(AtprotoDependencyBoundaryTests).FullName)
+            .ToDictionary(type => type.Name, StringComparer.Ordinal);
+        await Assert.That(HasCarpaNetDependency(probes[nameof(DeclarationProbe)])).IsTrue();
+        await Assert.That(HasCarpaNetDependency(probes[nameof(BodyOnlyProbe)])).IsTrue();
+        await Assert.That(HasCarpaNetDependency(probes[nameof(NestedBodyProbe)])).IsTrue();
+        await Assert.That(HasCarpaNetDependency(probes[nameof(UnrelatedProbe)])).IsFalse();
+        await Assert.That(CompiledDependencyGraph.Members(probes[nameof(NestedBodyProbe)])
+            .OfType<MethodReference>().Any(IsJetstreamConstructor)).IsTrue();
     }
 
     [Test]
@@ -189,46 +179,25 @@ public sealed class AtprotoDependencyBoundaryTests
     [Test]
     public async Task JetstreamSocketMustStayContainedBehindExactCollectionAdapter()
     {
-        string federationRoot = ContextSystemHelpers.RepoPath(
-            "Explore.Infrastructure",
-            "Services",
-            "Federation");
-        string[] sourceFiles = Directory.EnumerateFiles(federationRoot, "*.cs", SearchOption.AllDirectories).ToArray();
-        string[] jetstreamClientOwners = sourceFiles
-            .Where(path => File.ReadAllText(path).Contains("new JetstreamV2Client", StringComparison.Ordinal))
-            .Select(Path.GetFileName)
-            .ToArray()!;
-        string[] legacyClientOwners = sourceFiles
-            .Where(path => Regex.IsMatch(
-                File.ReadAllText(path),
-                @"new JetstreamClient\b|\bJetstreamSubscribeOptions\b|\bJetstreamOptionsUpdate\b",
-                RegexOptions.CultureInvariant))
-            .Select(Path.GetFileName)
-            .ToArray()!;
-        string source = await File.ReadAllTextAsync(Path.Combine(federationRoot, "AtprotoJetstreamEventSource.cs"));
-        string parser = await File.ReadAllTextAsync(Path.Combine(federationRoot, "AtprotoJetstreamEnvelopeParser.cs"));
-
-        // The live websocket adapter and the sealed-archive client are the only places allowed to build a
-        // client; everything else goes through their abstractions.
-        await Assert.That(jetstreamClientOwners)
-            .IsEquivalentTo(["AtprotoJetstreamEventSource.cs", "AtprotoJetstreamArchiveClient.cs"]);
-        await Assert.That(legacyClientOwners).IsEmpty();
-        await Assert.That(Regex.IsMatch(
-            source,
-            @"CreateSubscribeOptions\s*\(\s*AtprotoJetstreamSubscription subscription\s*\)\s*=>\s*new\s*\(\s*\)\s*\{\s*Kinds\s*=\s*\[\s*JetstreamV2EventKind\.Commit\s*,\s*JetstreamV2EventKind\.Account\s*\]\s*,\s*Collections\s*=\s*\[\s*AtprotoJetstreamConstants\.EventCollection\s*,\s*AtprotoJetstreamConstants\.RsvpCollection\s*\]",
-            RegexOptions.CultureInvariant)).IsTrue();
-        await Assert.That(source).DoesNotContain("new ClientWebSocket");
-        await Assert.That(parser).Contains("community.lexicon.calendar.event");
-        await Assert.That(parser).Contains("community.lexicon.calendar.rsvp");
-        await Assert.That(parser).DoesNotContain("community.lexicon.calendar.*");
-
-        // v2 splits the single v1 microsecond cursor into a resume token (seq) and an ordering key
-        // (time_us). SourceVersion is compared against PDS snapshot versions, which are unix
-        // microseconds, so binding it to seq would silently invert last-writer-wins.
-        await Assert.That(Regex.IsMatch(
-            parser,
-            @"SourceVersion\s*=\s*envelope\.TimeUs\s*,\s*SourceCursor\s*=\s*envelope\.Seq\s*,",
-            RegexOptions.CultureInvariant)).IsTrue();
+        using var assembly = CompiledDependencyGraph.ReadProject("Explore.Infrastructure");
+        var types = assembly.MainModule.Types;
+        var socketOwners = types.Where(type => CompiledDependencyGraph.Members(type)
+                .OfType<MethodReference>().Any(IsJetstreamConstructor))
+            .Select(type => type.FullName).ToArray();
+        await Assert.That(socketOwners).IsEquivalentTo([
+            "Explore.Infrastructure.Services.Federation.CarpaNetJetstreamEventSource",
+            "Explore.Infrastructure.Services.Federation.CarpaNetJetstreamArchiveClient"]);
+        var federation = types.Where(type => type.Namespace == "Explore.Infrastructure.Services.Federation").ToArray();
+        var legacyTypes = new[]
+        {
+            "CarpaNet.Jetstream.JetstreamClient",
+            "CarpaNet.Jetstream.JetstreamSubscribeOptions",
+            "CarpaNet.Jetstream.JetstreamOptionsUpdate",
+            "System.Net.WebSockets.ClientWebSocket"
+        };
+        await Assert.That(federation.SelectMany(CompiledDependencyGraph.Dependencies)
+            .Where(type => legacyTypes.Contains(type.FullName, StringComparer.Ordinal))
+            .Select(type => type.FullName).ToArray()).IsEmpty();
     }
 
     private static string[] ValidateProjectConfiguration(XDocument document, string projectName)
@@ -259,25 +228,35 @@ public sealed class AtprotoDependencyBoundaryTests
         return [.. violations];
     }
 
-    private static bool IsBuildOutput(string file) =>
-        file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-        || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
+    private static bool HasCarpaNetDependency(TypeDefinition type) =>
+        CompiledDependencyGraph.Dependencies(type).Any(dependency =>
+            dependency.Namespace == "CarpaNet" || dependency.Namespace.StartsWith("CarpaNet.", StringComparison.Ordinal));
 
-    private static bool ContainsCarpaNetReference(string source)
+    private static bool IsJetstreamConstructor(MethodReference method) =>
+        method.Name == ".ctor" && method.DeclaringType.FullName == "CarpaNet.Jetstream.JetstreamV2Client";
+
+    private sealed class DeclarationProbe
     {
-        string withoutBlockComments = Regex.Replace(
-            source,
-            @"/\*.*?\*/",
-            string.Empty,
-            RegexOptions.Singleline | RegexOptions.CultureInvariant);
-        string withoutComments = Regex.Replace(
-            withoutBlockComments,
-            @"//.*$",
-            string.Empty,
-            RegexOptions.Multiline | RegexOptions.CultureInvariant);
-        return Regex.IsMatch(
-            withoutComments,
-            @"\b(?:using\s+)?CarpaNet(?:\.|\b)",
-            RegexOptions.CultureInvariant);
+        public CarpaNet.Jetstream.JetstreamV2Client? Client { get; set; }
+    }
+
+    private static class BodyOnlyProbe
+    {
+        public static Type Dependency() => typeof(CarpaNet.Jetstream.JetstreamV2Client);
+    }
+
+    private static class NestedBodyProbe
+    {
+        public static async Task<object> Dependency()
+        {
+            await Task.Yield();
+            return new CarpaNet.Jetstream.JetstreamV2Client(
+                new Uri("https://jetstream.example.test"), new CarpaNet.Jetstream.JetstreamV2ClientOptions());
+        }
+    }
+
+    private static class UnrelatedProbe
+    {
+        public static Type Dependency() => typeof(string);
     }
 }

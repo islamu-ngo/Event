@@ -192,8 +192,9 @@ public static class PostgresLookupCatalogueReadPermissions
                         OR EXISTS (SELECT 1 FROM unnest({schemas}) schema_name
                             WHERE pg_catalog.has_schema_privilege(r.oid, schema_name, 'CREATE'))
                         OR EXISTS (SELECT 1 FROM ({values}) source(table_name, allowed_columns)
-                            WHERE pg_catalog.has_table_privilege(r.oid, source.table_name,
-                                    'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                            WHERE (pg_catalog.has_table_privilege(r.oid, source.table_name,
+                                    'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                                OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "source.table_name", false)})
                                 OR pg_catalog.has_any_column_privilege(r.oid, source.table_name, 'INSERT,UPDATE,REFERENCES')
                                 OR (r.rolname <> {runtime} AND pg_catalog.has_any_column_privilege(r.oid, source.table_name, 'SELECT'))
                                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
@@ -202,8 +203,9 @@ public static class PostgresLookupCatalogueReadPermissions
                                             OR (NOT (a.attname = ANY(source.allowed_columns))
                                                 AND pg_catalog.has_column_privilege(r.oid, a.attrelid, a.attnum, 'SELECT')))))
                         OR EXISTS (SELECT 1 FROM unnest({protectedTables}) table_name
-                            WHERE pg_catalog.has_table_privilege(r.oid, table_name,
-                                    'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                            WHERE (pg_catalog.has_table_privilege(r.oid, table_name,
+                                    'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                                OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "table_name", false)})
                                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                                     WHERE a.attrelid = pg_catalog.to_regclass(table_name) AND a.attnum <> 0 AND NOT a.attisdropped
                                         AND pg_catalog.has_column_privilege(r.oid, a.attrelid, a.attnum,
@@ -214,8 +216,9 @@ public static class PostgresLookupCatalogueReadPermissions
             AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                 WHERE pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)}, r.oid, 'MEMBER')
                     AND EXISTS (SELECT 1 FROM ({values}) source(table_name, allowed_columns)
-                        WHERE pg_catalog.has_table_privilege(r.oid, source.table_name,
-                                'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                        WHERE (pg_catalog.has_table_privilege(r.oid, source.table_name,
+                                'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                            OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "source.table_name", false)})
                             OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                                 WHERE a.attrelid = pg_catalog.to_regclass(source.table_name) AND a.attnum <> 0 AND NOT a.attisdropped
                                     AND (pg_catalog.has_column_privilege(r.oid, a.attrelid, a.attnum, 'INSERT,UPDATE,REFERENCES')

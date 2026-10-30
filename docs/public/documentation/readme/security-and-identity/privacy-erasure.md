@@ -33,9 +33,17 @@ sequenceDiagram
 
 1. **Anti-Resurrection Fence**: A retained old-subject fact and local fence prevent stale work from recreating the erased internal account. This does not prohibit new registration with the same external identity.
 2. **Authority Fact**: The erasure event is recorded in a dedicated, isolated authority store *before* local data disposal begins.
-3. **Serializable Settlement**: In one atomic transaction, the user’s personal data is scrubbed, registrations are anonymized, and foreign keys are safely unlinked.
+3. **Serializable Settlement**: In one atomic transaction, the user’s personal data is scrubbed, registrations are anonymized, and foreign keys are safely unlinked. This includes private home/profile data and the erased account's stored authentication tokens across tenants, while preserving other accounts' data.
 4. **Asynchronous External Cleanup**: Background outbox workers delete the user from Keycloak, purge media from S3/local storage, and notify external payment gateways.
 5. **Single-Use Receipt**: The user receives a `202 Accepted` response with an opaque `ErasureReceipt` capability token. The receipt can be used to query `/api/privacy-erasure/status` until completion, after which all trace of the receipt is destroyed.
+
+An interrupted local purge does not cancel the erasure request. The committed
+authority fact and local fence remain so stale work cannot recreate the old
+account. Changes inside the local purge transaction, including its completion
+checkpoint, roll back together if that transaction fails. Replay then completes
+the purge from the retained intent; it does not treat an uncommitted checkpoint
+as a completed deletion. Provider cleanup continues through the protected outbox
+after local settlement.
 
 ---
 
@@ -113,10 +121,16 @@ The Privacy Erasure Authority store must be configured in your environment via `
 ## The Golden Rule of Disaster Recovery
 
 > [!CAUTION]
-> **Never Restore the Primary Database Without the Erasure Store!**  
+> **Preserve the Retained Erasure Authority When Restoring the Primary Database!**
 > If you restore an older database snapshot (e.g., from 3 days ago) to recover from corruption, any user who requested account deletion yesterday would normally be restored ("resurrected") into the database.
 > 
 > When ISLAMU Event starts, the **`PrivacyErasureStartupGate`** automatically replays all facts from the Privacy Erasure Authority against the application database before HTTP traffic is allowed. If an erased user is found in the restored database, the gate immediately re-purges their records and re-establishes the anti-resurrection fence!
+>
+> Do not overwrite the independently retained authority with an older copy when
+> restoring the primary database. Preserve facts newer than the primary backup
+> and follow the supported authority backup and retention procedure. Startup
+> must remain unavailable while required replay is incomplete or the authority
+> cannot be validated; bypassing the gate can expose restored private data.
 
 ---
 

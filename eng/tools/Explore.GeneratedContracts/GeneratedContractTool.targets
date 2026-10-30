@@ -7,7 +7,7 @@
   <Target Name="BuildGeneratedContractTool" Condition="'$(GeneratedContractToolAssembly)' == ''">
     <MSBuild Projects="$(GeneratedContractToolProject)" Targets="Restore;Build"
              Properties="Configuration=Release"
-             RemoveProperties="GeneratedApiSchemaFile;OpenApiGenerateDocumentsOnBuild;ForceOpenApiGeneration;GeneratedRecordMutablePolicy;GeneratedRecordTransformerStamp;GeneratedContractCaptureDirectory;GeneratedApiClientFile">
+             RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;PlatformTarget;SelfContained;PublishAot;PublishTrimmed;PublishSingleFile;UseAppHost;OutputPath;BaseOutputPath;GeneratedApiSchemaFile;OpenApiGenerateDocumentsOnBuild;ForceOpenApiGeneration;GeneratedRecordMutablePolicy;GeneratedRecordTransformerStamp;GeneratedContractCaptureDirectory;GeneratedApiClientFile">
       <Output TaskParameter="TargetOutputs" PropertyName="GeneratedContractToolAssembly" />
     </MSBuild>
   </Target>

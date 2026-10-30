@@ -202,7 +202,9 @@ public static class PostgresUserTenantMembershipReadPermissions
                                 JOIN pg_catalog.pg_class t ON t.oid=pg_catalog.to_regclass(source.relation)
                                 WHERE t.relowner=r.oid OR EXISTS (
                                     SELECT 1 FROM (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')) permission(privilege)
-                                    WHERE pg_catalog.has_table_privilege(r.oid,t.oid,permission.privilege || ' WITH GRANT OPTION'))
+                                    WHERE (CASE WHEN permission.privilege='MAINTAIN'
+                                        THEN {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", true)}
+                                        ELSE pg_catalog.has_table_privilege(r.oid,t.oid,permission.privilege || ' WITH GRANT OPTION') END))
                                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                                         CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                                         WHERE a.attrelid=t.oid AND a.attnum<>0 AND NOT a.attisdropped
@@ -212,7 +214,8 @@ public static class PostgresUserTenantMembershipReadPermissions
                         WHERE pg_catalog.has_schema_privilege(r.oid,s.name,'CREATE')))
                 AND NOT EXISTS (SELECT 1 FROM unnest({tables}) source(relation)
                     JOIN pg_catalog.pg_class t ON t.oid=pg_catalog.to_regclass(source.relation) CROSS JOIN members r
-                    WHERE r.oid=t.relowner OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                    WHERE r.oid=t.relowner OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                        OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                         OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                             CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                             WHERE a.attrelid=t.oid AND a.attnum<>0 AND NOT a.attisdropped

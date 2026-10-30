@@ -32,6 +32,10 @@ public static class PostgresExternalApiKeyAuthenticationContract
     public static Task RequireReadyAsync(ExploreDbContext context, PostgresNativeQueueEnrollment? enrollment,
         CancellationToken cancellationToken = default) => Profile.RequireReadyAsync(context, enrollment, cancellationToken);
     internal static string GlobalPolicyException(ExploreDbContext context, string globalLogin) => Profile.PolicyException(context, globalLogin);
+    internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        Profile.CompleteGlobalCataloguePredicate(context, enrollment);
+    internal static IReadOnlyList<string> GlobalCatalogueRelations(ExploreDbContext context) =>
+        Profile.GlobalCatalogueRelations(context);
 }
 
 /// <summary>Fixed-column catalogue mechanics shared by the two authentication sources, never business queries.</summary>
@@ -153,6 +157,14 @@ internal sealed class PostgresAuthenticationSourceProfile(Type type, string role
         return $"n.nspname={Text(source.Schema)} AND c.relname={Text(source.Name)} AND ({string.Join(" OR ", Privileges.Select(privilege => PolicyPredicate(source, globalLogin, privilege)))})";
     }
 
+    internal string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        Validate(enrollment);
+        return Catalogue(context, Map(context), enrollment, complete: true);
+    }
+
+    internal IReadOnlyList<string> GlobalCatalogueRelations(ExploreDbContext context) => [Map(context).Table];
+
     private string[] Privileges => updateProperties.Length == 0 ? ["SELECT"] : ["SELECT", "UPDATE"];
     private string PolicyName(string privilege) => policyPrefix + (privilege == "SELECT" ? "_read" : "_usage");
     private string PolicyStamp(string login, string privilege) => policyPrefix + ":ef:v1:" + Convert.ToHexStringLower(
@@ -187,7 +199,8 @@ internal sealed class PostgresAuthenticationSourceProfile(Type type, string role
                 AND (r.rolsuper OR r.rolbypassrls OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication
                     OR pg_catalog.has_schema_privilege(r.oid,{Text(source.Schema)},'CREATE')
                     OR r.oid=(SELECT relowner FROM pg_catalog.pg_class WHERE oid=pg_catalog.to_regclass({Text(source.Table)}))
-                    OR pg_catalog.has_table_privilege(r.oid,{Text(source.Table)},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                    OR (pg_catalog.has_table_privilege(r.oid,{Text(source.Table)},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                        OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", Text(source.Table), false)})
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                         WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)}) AND a.attnum<>0 AND NOT a.attisdropped
                             AND (pg_catalog.has_column_privilege(r.oid,a.attrelid,a.attnum,permission.privilege || ' WITH GRANT OPTION')

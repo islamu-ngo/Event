@@ -355,15 +355,15 @@ public sealed partial class LocalBootstrapConvergenceTests
         internal SetupReceiptCustody(Fixture fixture, ExploreDbContext original)
         {
             using var descriptorScope = fixture.Provider.CreateScope();
-            var options = new Explore.Secrets.Database.PrimaryDatabaseConnectionOptions
+            var options = new Explore.Persistence.Database.PrimaryDatabaseConnectionOptions
             {
-                Role = Explore.Secrets.Database.PrimaryDatabaseRole.LocalIdentityWriter,
-                Provider = Explore.Secrets.Database.PrimaryDatabaseProvider.Sqlite,
+                Role = Explore.Persistence.Database.PrimaryDatabaseRole.LocalIdentityWriter,
+                Provider = Explore.Persistence.Database.PrimaryDatabaseProvider.Sqlite,
                 Database = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(original.Database.GetConnectionString()).DataSource
             };
             var identity = descriptorScope.ServiceProvider.GetService<ExternalIdentityDbContext>();
             var external = identity is not null
-                ? new ExternalIdentityDatabaseDescriptor(Explore.Secrets.Database.PrimaryDatabaseProvider.Sqlite,
+                ? new ExternalIdentityDatabaseDescriptor(Explore.Persistence.Database.PrimaryDatabaseProvider.Sqlite,
                     identity.Database.GetConnectionString()!,
                     IdentityDatabaseConfiguration.DefaultSchema, null, null) : null;
             Source = new ConfiguredLocalBootstrapReceiptSource(original, () => new LocalIdentityWriterDbContextFactory(options, external, poolSize: 1));

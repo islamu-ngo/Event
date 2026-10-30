@@ -3,7 +3,7 @@ Title: "Preserve user profile edits across sign-ins"
 Type: fix
 Scope: privacy
 Summary: "Sign-in providers initialize names only when creating an account; later sign-ins preserve edited first, last and Actor display names while identity proofs continue to synchronize."
-Group: identity-correlation-authority
+Group: identity-profile-edit-preservation
 Supersedes: []
 Impacts:
   Breaking:

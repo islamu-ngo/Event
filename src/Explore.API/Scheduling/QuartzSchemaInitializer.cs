@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Reflection;
 using Explore.API.Configuration;
 using Explore.Persistence;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 

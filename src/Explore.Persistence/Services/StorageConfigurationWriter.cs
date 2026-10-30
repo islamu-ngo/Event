@@ -145,7 +145,7 @@ public sealed class StorageConfigurationWriter(ExploreDbContext context, IUnitOf
         RequireOwner();
         var validation = await mutation.ValidateAsync(token);
         if (!validation.IsValid) throw new FluentValidation.ValidationException(validation.Errors);
-        await mutation.Source.RequireSourcesAsync(token);
+        await mutation.Source.RequireRequestAsync(token);
         foreach (var row in mutation.Effects)
         {
             await preparation.RequireCurrentOwnedAsync(row.TenantId.HasValue ? SettingScope.Tenant : SettingScope.Instance,
@@ -237,7 +237,7 @@ public sealed class StorageConfigurationWriter(ExploreDbContext context, IUnitOf
         async Task RequireFinal(CancellationToken ct)
         {
             RequireOwner();
-            await mutation.Source.RequireSourcesAsync(ct);
+            await mutation.Source.RequireRequestAsync(ct);
             if (!after.Same(await ReadAsync(ct)))
                 throw new UnauthorizedAccessException("Configuration effects, metadata, bindings or unpatched sources changed.");
             RequireOwner();

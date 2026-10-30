@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5MWDAV19MNCN23NH5VRNHDH
+Title: "Preserve original storage authority through transaction settlement"
+Type: fix
+Scope: storage
+Summary: "Allow valid storage settings updates to commit using their original transaction's current administrator authority, reject changed request or authority sources, and preserve acknowledged settings when an attempt rolls back."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Reuse the original Settings coordinator's transaction-bound principal and support leases for fresh source checks. Freeze original request identity and claim membership independently of native authentication result wrappers, and finish data validation before final authority and deadline admission. Verified runtime scope is native SQLite storage transaction and request-custody behavior.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented
+    Detail: Changed account bindings, administrator grants or support sources reject the complete save and retain the last acknowledged cached settings. Refresh current settings and start a new save after resolving the authority change; a failed observation cannot replay. This correction adds no schema, endpoint or environment configuration change.

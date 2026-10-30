@@ -622,7 +622,7 @@ Create an incoming webhook verifier and handler in `src/Explore.Infrastructure/P
 | `Payments:OrganizerDirect:ProviderCode` | `Payments__OrganizerDirect__ProviderCode` | `stripe` | Active commercial provider code. |
 | `Payments:OrganizerDirect:ConnectPlatformId` | `Payments__OrganizerDirect__ConnectPlatformId` | `""` | Non-secret Connect platform identifier. |
 
-### Secrets Resolution (`Explore.Secrets`)
+### Secrets Resolution (`Explore.Infrastructure/Secrets`)
 
 | Secret Key | Registry Binding Key | Scope | Description |
 |---|---|---|---|

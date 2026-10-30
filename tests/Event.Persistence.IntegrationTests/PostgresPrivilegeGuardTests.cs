@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Runtime.ExceptionServices;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence.Security;
 using Npgsql;
@@ -6,9 +7,47 @@ using Npgsql;
 namespace Event.Persistence.IntegrationTests;
 
 [NotInParallel]
-[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
-public sealed class PostgresPrivilegeGuardTests(PostgreSqlContainerFixture fixture)
+[ClassDataSource<RecipientDeliveryMigrationContainerFixture>(Shared = SharedType.PerAssembly)]
+public sealed class PostgresPrivilegeGuardTests(RecipientDeliveryMigrationContainerFixture fixture)
 {
+    [Test]
+    public async Task DeclaredMaintainRequiresEngineSupportAndRefusesGrantOptions()
+    {
+        await using (var baseline = await GuardDatabase.CreateAsync(fixture))
+        {
+            await Assert.That(await baseline.ReadyAsync()).IsTrue();
+            await Assert.That(await baseline.CallAsync()).IsEqualTo(7);
+        }
+
+        await using var database = await GuardDatabase.CreateAsync(fixture, maintain: true);
+        if (!database.SupportsMaintain)
+        {
+            await database.RequireClosedAsync();
+            return;
+        }
+
+        await Assert.That(await database.ReadyAsync()).IsTrue();
+        await Assert.That(await database.CallAsync()).IsEqualTo(7);
+        Exception? failure = null;
+        try
+        {
+            await database.ExecuteAsync($"GRANT MAINTAIN ON {database.Table} TO {database.Owner} WITH GRANT OPTION");
+            await database.RequireClosedAsync();
+            await Assert.That(await database.ScalarAsync<bool>(
+                $"SELECT pg_catalog.has_table_privilege('{database.Owner}', '{database.Table}', 'MAINTAIN WITH GRANT OPTION')"))
+                .IsTrue();
+        }
+        catch (Exception error) { failure = error; }
+        try
+        {
+            await database.ExecuteAsync($"REVOKE GRANT OPTION FOR MAINTAIN ON {database.Table} FROM {database.Owner}");
+        }
+        catch (Exception cleanup) when (failure is not null) { throw new AggregateException(failure, cleanup); }
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+        await Assert.That(await database.ReadyAsync()).IsTrue();
+        await Assert.That(await database.CallAsync()).IsEqualTo(7);
+    }
+
     [Test]
     public async Task InheritedColumnReadIsRequiredAndInheritedGrantOptionStillClosesExecution()
     {
@@ -174,9 +213,10 @@ public sealed class PostgresPrivilegeGuardTests(PostgreSqlContainerFixture fixtu
         private readonly string _login;
         private readonly string _connectionString;
         private readonly PostgresPrivilegeGuard.Contract _contract;
+        private readonly bool _maintain;
 
         private GuardDatabase(NpgsqlConnection admin, string connectionString, string prefix, string migrationLogin,
-            bool tableRead, bool inheritedRead)
+            bool tableRead, bool inheritedRead, bool maintain)
         {
             _admin = admin;
             Schema = prefix;
@@ -187,9 +227,13 @@ public sealed class PostgresPrivilegeGuardTests(PostgreSqlContainerFixture fixtu
             _login = prefix + "_login";
             _connectionString = connectionString;
             _readGrantee = inheritedRead ? Outsider : Owner;
+            _maintain = maintain;
+            string[] tablePrivileges = tableRead
+                ? maintain ? ["SELECT", "MAINTAIN"] : ["SELECT"]
+                : maintain ? ["MAINTAIN"] : [];
             _contract = new(Schema, [Owner, Migrator, Executor],
                 [new("take", "", Owner, [Executor])],
-                [new("queue", Owner, tableRead ? ["SELECT"] : [], tableRead ? [] : [new("id", ["SELECT"])])],
+                [new("queue", Owner, tablePrivileges, tableRead ? [] : [new("id", ["SELECT"])])],
                 [
                     new(Owner, Migrator, Inherit: false, Set: true, Admin: false),
                     new(Migrator, migrationLogin, Inherit: false, Set: true, Admin: false),
@@ -206,6 +250,7 @@ public sealed class PostgresPrivilegeGuardTests(PostgreSqlContainerFixture fixtu
         internal string Migrator { get; }
         internal string Executor { get; }
         internal string Outsider { get; }
+        internal bool SupportsMaintain => _admin.PostgreSqlVersion.Major >= 17;
         internal string Table => Schema + ".queue";
         internal string Function => Schema + ".take";
         internal string Role(string role) => role switch
@@ -217,7 +262,8 @@ public sealed class PostgresPrivilegeGuardTests(PostgreSqlContainerFixture fixtu
         };
 
         internal static async Task<GuardDatabase> CreateAsync(
-            PostgreSqlContainerFixture fixture, bool tableRead = false, bool inheritedRead = false)
+            RecipientDeliveryMigrationContainerFixture fixture, bool tableRead = false, bool inheritedRead = false,
+            bool maintain = false)
         {
             string prefix = "guard_" + Guid.CreateVersion7().ToString("N");
             string password = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
@@ -232,7 +278,7 @@ public sealed class PostgresPrivilegeGuardTests(PostgreSqlContainerFixture fixtu
             await admin.OpenAsync();
             await using var identity = new NpgsqlCommand("SELECT current_user::text", admin);
             string migrationLogin = (string)(await identity.ExecuteScalarAsync())!;
-            var database = new GuardDatabase(admin, restricted.ConnectionString, prefix, migrationLogin, tableRead, inheritedRead);
+            var database = new GuardDatabase(admin, restricted.ConnectionString, prefix, migrationLogin, tableRead, inheritedRead, maintain);
             await using (var transaction = await admin.BeginTransactionAsync())
             {
                 await database.ExecuteAsync($"""
@@ -267,6 +313,9 @@ public sealed class PostgresPrivilegeGuardTests(PostgreSqlContainerFixture fixtu
 
         internal async Task InstallAsync()
         {
+            string installReadyAssertion = _maintain && !SupportsMaintain
+                ? ""
+                : $"DO $ready$ BEGIN {PostgresPrivilegeGuard.BuildAssertSql(_contract)} END $ready$;";
             await using var transaction = await _admin.BeginTransactionAsync();
             await ExecuteAsync($"""
                 DO $graph$ BEGIN
@@ -276,7 +325,8 @@ public sealed class PostgresPrivilegeGuardTests(PostgreSqlContainerFixture fixtu
                 END $graph$;
                 REVOKE ALL ON TABLE {Table} FROM {Owner}, {Executor}, {Migrator};
                 REVOKE ALL (id, private_value) ON {Table} FROM {Owner}, {Executor}, {Migrator};
-                GRANT SELECT {(_contract.Relations.Single().Privileges.Count == 0 ? "(id)" : "")} ON {Table} TO {_readGrantee};
+                GRANT SELECT {(_contract.Relations.Single().Privileges.Contains("SELECT", StringComparer.Ordinal) ? "" : "(id)")} ON {Table} TO {_readGrantee};
+                {(_maintain && SupportsMaintain ? $"GRANT MAINTAIN ON {Table} TO {Owner};" : "")}
                 CREATE OR REPLACE FUNCTION {Function}() RETURNS integer
                     LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $body$
                     BEGIN
@@ -286,7 +336,7 @@ public sealed class PostgresPrivilegeGuardTests(PostgreSqlContainerFixture fixtu
                 ALTER FUNCTION {Function}() OWNER TO {Owner};
                 REVOKE ALL ON FUNCTION {Function}() FROM PUBLIC, {Executor};
                 GRANT EXECUTE ON FUNCTION {Function}() TO {Executor};
-                DO $ready$ BEGIN {PostgresPrivilegeGuard.BuildAssertSql(_contract)} END $ready$;
+                {installReadyAssertion}
                 """);
             await transaction.CommitAsync();
         }

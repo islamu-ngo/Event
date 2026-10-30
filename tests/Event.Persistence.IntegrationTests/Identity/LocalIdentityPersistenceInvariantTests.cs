@@ -3,7 +3,7 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Seed;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;

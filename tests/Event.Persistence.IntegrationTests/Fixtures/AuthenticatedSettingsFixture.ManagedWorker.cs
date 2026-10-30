@@ -8,6 +8,8 @@ using Explore.Application.Management;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Persistence;
+using Explore.Persistence.Identity;
+using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -16,10 +18,21 @@ namespace Event.Persistence.IntegrationTests.Fixtures;
 
 internal sealed partial class AuthenticatedSettingsFixture
 {
-    internal static Task<AuthenticatedSettingsFixture> CreateForManagedWorkerAsync(
+    internal static async Task<AuthenticatedSettingsFixture> CreateForManagedWorkerAsync(
         Func<ExploreDbContext> createDatabase, PostgreSqlContainerFixture postgres,
-        Guid managedInstance, IInterceptor? interceptor = null) =>
-        CreateAsync(createDatabase, postgres, interceptor, configure: configuration =>
+        Guid managedInstance, IInterceptor? interceptor = null)
+    {
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
+        await using (var migrator = createDatabase())
+        {
+            await PostgresTenantCreationPermissions.ApplyAsync(
+                migrator, postgres.NativeQueueEnrollment, IdentityDatabaseTopology.Colocated, cancellationToken);
+            await PostgresProvisioningPolicyPermissions.ApplyAsync(
+                migrator, postgres.NativeQueueEnrollment, cancellationToken);
+            await PostgresManagedTenantWorkerCreationPermissions.ApplyAsync(
+                migrator, postgres.NativeQueueEnrollment, IdentityDatabaseTopology.Colocated, cancellationToken);
+        }
+        return await CreateAsync(createDatabase, postgres, interceptor, configure: configuration =>
         {
             configuration["ManagedControlPlane:Enabled"] = "true";
             configuration["ManagedControlPlane:ManagedInstanceId"] = managedInstance.ToString("D");
@@ -27,15 +40,16 @@ internal sealed partial class AuthenticatedSettingsFixture
             configuration["ManagedControlPlane:MaximumTenantCount"] = "100";
         }, configureServices: services => services.AddSingleton<IConfigureOptions<ManagedControlPlaneOptions>>(
             new ManagedWorkerRegistrationTokenTestAuthority()));
+    }
 
     /// <summary>Command-level instance scheduling, without borrowing this fixture's human request or principal.</summary>
     internal async Task<BaseCommandResponse<ManagementTenantProvisioningOperationDto>> ScheduleManagedWorkerAsync(
         Guid managedInstance, ManagementTenantProvisioningRequestDto request, CancellationToken token)
     {
         await using var scope = host.Services.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<ICommandHandler<ScheduleManagedTenantProvisioningCommand,
-            BaseCommandResponse<ManagementTenantProvisioningOperationDto>>>()
-            .ExecuteAsync(new(managedInstance, request), token);
+        var handler = new Explore.Application.Features.Management.Handlers.Commands.ScheduleManagedTenantProvisioningCommandHandler(
+            scope.ServiceProvider.GetRequiredService<IManagedTenantProvisioningSchedulingPort>());
+        return await handler.ExecuteAsync(new(managedInstance, request), token);
     }
 
     internal async Task<GenericOutboxClaim> ClaimManagedWorkerAsync(Guid operation, CancellationToken token)

@@ -71,11 +71,12 @@ public class LocalizationResilienceTests
     [Test]
     [Arguments("TolgeeClient")]
     [Arguments("WeblateClient")]
-    public async Task TmsClientsHaveOneResiliencePipelineAndOneResponseBoundary(string clientName)
+    public async Task TmsClient_UsesOneResiliencePipelineAndResponseBoundary(string clientName)
     {
         var services = new ServiceCollection();
+        services.AddLogging();
         services.ConfigureInfrastructureServices(new ConfigurationBuilder().Build(), registerBackgroundWorkers: false);
-        using var provider = services.BuildServiceProvider();
+        await using var provider = services.BuildServiceProvider();
         var handler = provider.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler(clientName);
         var policyHandlers = new List<Type>();
         while (handler is DelegatingHandler delegating)
@@ -85,9 +86,8 @@ public class LocalizationResilienceTests
             handler = delegating.InnerHandler!;
         }
 
-        await Assert.That(policyHandlers).IsEquivalentTo([typeof(ResilienceHandler), typeof(TmsResponseBoundaryHandler)])
-            .Because("Each TMS client needs exactly one retry pipeline and one bounded response reader, not layered retries");
-        await Assert.That(policyHandlers[0]).IsEqualTo(typeof(ResilienceHandler))
-            .Because("The response boundary must run before retry metadata readers consume the response");
+        await Assert.That(policyHandlers.SequenceEqual([typeof(ResilienceHandler), typeof(TmsResponseBoundaryHandler)]))
+            .IsTrue()
+            .Because("Each TMS client needs exactly one retry pipeline followed by one bounded response reader, with no additional infrastructure handlers");
     }
 }

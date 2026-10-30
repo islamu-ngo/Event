@@ -630,36 +630,34 @@ public static class BffAuthEndpoints
         {
             cookieAuthResult = await ctx.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         }
-        catch (Exception ex)
+        catch (BffSessionAuthorityUnavailableException)
         {
-            logger.LogDebug(ex, "[AuthEndpoints] Could not authenticate cookie session during signout");
+            await WriteLogoutFailureAsync(ctx, StatusCodes.Status503ServiceUnavailable);
+            return;
+        }
+        catch (Exception)
+        {
+            logger.LogWarning("[AuthEndpoints] Signout admission failed");
+            await WriteLogoutFailureAsync(ctx, StatusCodes.Status500InternalServerError);
+            return;
         }
 
         try
         {
-            // Always clear the local BFF cookie session. Remote provider signout is best-effort,
-            // but local cookie clearing is the security boundary and must not be reported as success
-            // if it fails.
+            // A successful native signout must acknowledge shared revocation before reporting success.
             ctx.RequestServices.GetRequiredService<IBffSessionRefreshService>()
                 .ClearCircuitTokenState(ctx, cookieAuthResult.Principal, logger, "signout");
             await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         }
-        catch (Exception ex)
+        catch (BffSessionAuthorityUnavailableException)
         {
-            logger.LogWarning(ex, "[AuthEndpoints] Could not clear cookie session during signout");
-            if (!ctx.Response.HasStarted)
-            {
-                ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
-                ctx.Response.ContentType = "application/problem+json";
-                await ctx.Response.WriteAsJsonAsync(new
-                {
-                    type = "https://tools.ietf.org/html/rfc9110#section-15.6.1",
-                    title = "Logout Failed",
-                    status = StatusCodes.Status500InternalServerError,
-                    detail = "The local session could not be cleared. Please retry signout."
-                });
-            }
-
+            await WriteLogoutFailureAsync(ctx, StatusCodes.Status503ServiceUnavailable);
+            return;
+        }
+        catch (Exception)
+        {
+            logger.LogWarning("[AuthEndpoints] Signout revocation could not be confirmed");
+            await WriteLogoutFailureAsync(ctx, StatusCodes.Status500InternalServerError);
             return;
         }
 
@@ -710,6 +708,12 @@ public static class BffAuthEndpoints
             logger.LogInformation("[AuthEndpoints] Signout completed with local redirect");
         }
     }
+
+    private static Task WriteLogoutFailureAsync(HttpContext context, int statusCode) =>
+        context.Response.HasStarted ? Task.CompletedTask : Results.Problem(
+            title: "Logout could not be confirmed",
+            detail: "Please retry signout.",
+            statusCode: statusCode).ExecuteAsync(context);
 
     private static async Task<IResult> HandleRefreshSessionAsync(
         HttpContext ctx,
@@ -965,9 +969,10 @@ public static class BffAuthEndpoints
         ctx.Response.Headers.CacheControl = "no-store, no-cache";
         ctx.Response.Headers.Pragma = "no-cache";
 
-        if (ctx.User.Identity?.IsAuthenticated == true)
+        var authenticatedIdentity = ctx.User.Identities.FirstOrDefault(identity => identity.IsAuthenticated);
+        if (authenticatedIdentity is not null)
         {
-            return Results.Ok(new { isAuthenticated = true, name = ctx.User.Identity.Name });
+            return Results.Ok(new { isAuthenticated = true, name = authenticatedIdentity.Name });
         }
 
         return Results.Ok(new { isAuthenticated = false });

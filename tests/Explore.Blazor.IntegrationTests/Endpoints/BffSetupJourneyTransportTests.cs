@@ -173,7 +173,7 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
         var cookieOptions = factory.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get("Cookies");
         var cookieContext = new DefaultHttpContext();
         cookieContext.Request.Headers.Cookie = cookies.GetCookieHeader(browser.BaseAddress!);
-        var ticket = cookieOptions.TicketDataFormat.Unprotect(cookieOptions.CookieManager.GetRequestCookie(cookieContext, cookieOptions.Cookie.Name!)!);
+        var ticket = await cookieOptions.ReadStoredTicketAsync(cookieContext);
         await Assert.That(ticket).IsNotNull();
         var idToken = new JwtSecurityTokenHandler().ReadJwtToken(validatedIdToken);
         var accessToken = new JwtSecurityTokenHandler().ReadJwtToken(ticket!.Properties.GetTokenValue("access_token"));

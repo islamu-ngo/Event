@@ -31,7 +31,7 @@ ABOUTME: Captures key runtime patterns and boundaries that are not obvious from 
 | **Health Checks** | 26 health-check classes | Storage, database, Redis, Cerbos, recovery, Quartz readiness |
 | **Observability** | OpenTelemetry via Aspire Defaults | 6 named meters, 5 named trace sources, Prometheus scraping |
 | **Configuration Validation** | 107 `ValidateOnStart` registrations | Fail-closed startup options validation via `IValidateOptions` |
-| **Secrets Management** | Dedicated `Explore.Secrets` (48 files) | Infisical external provider, replica convergence, rotation-aware factories |
+| **Secrets Management** | Native ServiceDefaults, Infrastructure, and Persistence owners | Selected authority acquisition, runtime resolution with revision evidence, and purpose-bound database acquisition |
 | **Caching** | `HybridCache` (100 files) + Output Cache | L1 memory + L2 Redis with tag-based invalidation (96 endpoints) |
 | **Rate Limiting** | 69 ASP.NET rate-limit policies | Granular per-endpoint sliding/fixed/token window policies |
 | **Job Scheduling** | Quartz.NET clustered store | 15 scheduled recurring jobs, `QRTZ_` tables on all 5 providers |
@@ -61,7 +61,7 @@ transaction. Provider calls remain outside that transaction; in-flight work is
 `TicketingRecoveryOperatorService` coordinates the existing Quartz
 `ISchedulerOperations` port, while `TicketingRecoveryHealthCheck` exports only
 closed status/count/age dimensions. Typed configuration and its validator live
-in `Explore.Secrets`; key material comes only from Infisical or environment.
+in `Explore.Infrastructure/Recovery`; key material comes only from Infisical or environment.
 
 Deployment approval is a separate read model. The embedded
 `Deployment/ticketing-capabilities.json` artifact is the single machine source

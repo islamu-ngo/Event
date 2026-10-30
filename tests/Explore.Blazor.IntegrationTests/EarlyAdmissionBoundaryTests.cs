@@ -1,6 +1,7 @@
 using System.Net;
 using System.Security.Claims;
 using System.Threading.Channels;
+using Explore.Blazor.IntegrationTests.Fixtures;
 using Explore.Blazor.Services;
 using Explore.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication;
@@ -153,6 +154,7 @@ public sealed class EarlyAdmissionBoundaryTests
                 };
             });
             builder.Services.AddAuthorization();
+            builder.Services.AddTestBffSessionAuthority(new TestBffSessionAuthority(clock), Scheme);
             var app = builder.Build();
             host = new(app, clock);
             app.Use((context, next) =>
@@ -168,15 +170,15 @@ public sealed class EarlyAdmissionBoundaryTests
             await app.StartAsync();
             host.Client = app.GetTestClient();
             host.Client.BaseAddress = new Uri("https://localhost");
-            var cookieOptions = app.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(Scheme);
             var principal = new ClaimsPrincipal(new ClaimsIdentity(
-                [new Claim(ClaimTypes.NameIdentifier, Guid.CreateVersion7().ToString("N"))], Scheme));
+                [new Claim(ClaimTypes.NameIdentifier, Guid.CreateVersion7().ToString("N"))],
+                CookieAuthenticationDefaults.AuthenticationScheme));
             var ticket = new AuthenticationTicket(principal, new AuthenticationProperties
             {
                 IssuedUtc = clock.GetUtcNow(),
                 ExpiresUtc = clock.GetUtcNow().AddHours(1)
             }, Scheme);
-            host._cookie = $"{cookieOptions.Cookie.Name}={cookieOptions.TicketDataFormat.Protect(ticket)}";
+            host._cookie = await TestBffSessionAuthorityRegistration.IssueFreshCookieAsync(app.Services, ticket, Scheme);
             var native = new ApplicationBuilder(app.Services);
             native.UseAuthentication();
             native.Run(context =>

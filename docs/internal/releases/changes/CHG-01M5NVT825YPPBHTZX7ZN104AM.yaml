@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5NVT825YPPBHTZX7ZN104AM
+Title: "Preserve setup and Local provider authority"
+Type: fix
+Scope: onboarding
+Summary: "Keep provider changes bound to their original setup or human source and relevant Local material through settlement, with API-owned credentials and activation after acknowledged commit."
+Group: provider-material-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Setup and human provider changes retain their original authority, held source image and transaction through settlement. Local mode observes relevant material without requiring unrelated remote secrets; API consumers do not borrow BFF credentials. Changed or unavailable authority rejects the attempt instead of silently reacquiring it.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Activation follows acknowledged command-handler settlement. Denial before commit restores the previous image; an unknown commit outcome requires checking current state before a new observation rather than replaying an attempted one. These changes do not add a remote-provider switching authority or change endpoint, schema or deployment configuration.

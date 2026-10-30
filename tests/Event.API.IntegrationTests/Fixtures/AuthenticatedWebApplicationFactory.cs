@@ -7,7 +7,6 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
 using Explore.ServiceDefaults.DataProtection;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -18,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 
 namespace Event.Api.IntegrationTests.Fixtures;
@@ -195,7 +195,7 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
             // Register background seeder to ensure lookup data (roles, etc.) is available in tests
             services.AddHostedService(provider => new SeedingHostedService(
                 provider, provider.GetRequiredService<IHostEnvironment>(), SeedActiveDefaultTenant,
-                UsesPostgreSqlContainer ? _database : null));
+                UsesPostgreSqlContainer ? CreateMigratorContext : null));
         });
 
         // ConfigureTestServices runs AFTER the app's ConfigureServices,
@@ -279,16 +279,16 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
     }
 
     private sealed class SeedingHostedService(IServiceProvider serviceProvider, IHostEnvironment environment,
-        bool seedActiveDefaultTenant, PostgreSqlContainerFixture? nativeDatabase) : IHostedService
+        bool seedActiveDefaultTenant, Func<ExploreDbContext>? createNativeSeedingContext) : IHostedService
     {
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             using var scope = serviceProvider.CreateScope();
-            await using var db = nativeDatabase is null
+            await using var db = createNativeSeedingContext is null
                 ? scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
-                : nativeDatabase.CreateDbContext();
+                : createNativeSeedingContext();
             db.BindTenantLease();
-            await DatabaseSeeder.SeedAsync(db, environment, cancellationToken: cancellationToken);
+            await DatabaseSeeder.SeedAsync(db, environment, NullLogger.Instance, cancellationToken: cancellationToken);
             if (seedActiveDefaultTenant && await db.Tenants.FindAsync([PlatformDefaults.DefaultTenantId], cancellationToken) is null)
             {
                 db.Tenants.Add(new Event.Api.IntegrationTests.Builders.TenantBuilder()

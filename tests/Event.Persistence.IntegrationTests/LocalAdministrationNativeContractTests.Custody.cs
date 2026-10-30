@@ -2,7 +2,7 @@ using System.Data;
 using System.Text.Json.Nodes;
 using Explore.Application.Contracts.Identity;
 using Explore.Persistence.Identity;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;

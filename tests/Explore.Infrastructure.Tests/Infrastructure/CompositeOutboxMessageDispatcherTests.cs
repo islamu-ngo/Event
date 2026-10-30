@@ -26,7 +26,6 @@ using Explore.Infrastructure.Services.Moderation;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
-using Explore.Secrets.Database;
 using Explore.Persistence.Services;
 using Explore.Tests.Shared.Telemetry;
 using Microsoft.Data.Sqlite;

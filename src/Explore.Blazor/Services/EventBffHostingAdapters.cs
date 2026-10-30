@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Event.Web.BffHosting.Security;
 using Event.Web.BffHosting.Abstractions;
 using Microsoft.AspNetCore.Authentication;
+using Explore.Blazor.Services.Auth;
 
 namespace Explore.Blazor.Services;
 
@@ -11,33 +12,48 @@ internal sealed class ExploreBffAccessTokenProvider : IEventBffAccessTokenProvid
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        var cookieToken = await httpContext.GetTokenAsync("access_token");
-        if (!string.IsNullOrEmpty(cookieToken) && CircuitTokenStore.IsTokenForwardable(cookieToken))
-        {
-            return cookieToken;
-        }
-
-        return TryResolveFromCircuitStore(httpContext);
-    }
-
-    private static string? TryResolveFromCircuitStore(HttpContext httpContext)
-    {
-        var user = httpContext.User;
-        var userId = user.TryGetCircuitSubject(out var subject) ? subject.PartitionKey : null;
-
-        if (string.IsNullOrEmpty(userId))
+        if (!BffSessionIdentity.TryGetBinding(httpContext.User, out var binding)
+            || httpContext.RequestServices.GetService<IBffSessionAuthority>() is not { } authority)
         {
             return null;
         }
 
-        var sessionId = user.TryGetSessionId(out var resolvedSessionId) ? resolvedSessionId.PartitionKey : null;
+        try
+        {
+            if (!await authority.IsActiveAsync(binding, cancellationToken)) return null;
+        }
+        catch (BffSessionAuthorityUnavailableException)
+        {
+            return null;
+        }
+
+        var cookieToken = await httpContext.GetTokenAsync("access_token");
+        var token = !string.IsNullOrEmpty(cookieToken) && CircuitTokenStore.IsTokenForwardable(cookieToken)
+            ? cookieToken : TryResolveFromCircuitStore(httpContext, binding);
+        if (!BffSessionIdentity.TryGetBinding(httpContext.User, out var currentBinding) || currentBinding != binding)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await authority.IsActiveAsync(binding, cancellationToken) ? token : null;
+        }
+        catch (BffSessionAuthorityUnavailableException)
+        {
+            return null;
+        }
+    }
+
+    private static string? TryResolveFromCircuitStore(HttpContext httpContext, BffSessionBinding binding)
+    {
         var tokenStore = httpContext.RequestServices.GetService<ICircuitTokenStore>();
         if (tokenStore is null)
         {
             return null;
         }
 
-        var resolution = tokenStore.Resolve(userId, sessionId);
+        var resolution = tokenStore.Resolve(binding.OwnerPartitionKey, binding.Handle);
         if (!resolution.Found || string.IsNullOrEmpty(resolution.Token))
         {
             return null;

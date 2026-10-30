@@ -68,7 +68,7 @@ public sealed class ModerationMeasurementProductManifestTests
     [
         new("Explore.API", new string('a', 64)), new("Explore.Application", new string('a', 64)),
         new("Explore.Domain", new string('a', 64)), new("Explore.Persistence", new string('a', 64)),
-        new("Explore.Infrastructure", new string('a', 64)), new("Explore.Secrets", new string('a', 64)),
+        new("Explore.Infrastructure", new string('a', 64)), new("Explore.ServiceDefaults", new string('a', 64)),
         new("ISLAMU.Moderation.Application", new string('a', 64)), new("ISLAMU.Moderation.Domain", new string('a', 64))
     ];
 }

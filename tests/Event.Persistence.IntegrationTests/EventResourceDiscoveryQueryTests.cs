@@ -28,10 +28,10 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
         var connection = context.Database.GetDbConnection();
         var provider = identity.Provider switch
         {
-            Explore.Secrets.Database.PrimaryDatabaseProvider.PostgreSql => "Npgsql.EntityFrameworkCore.PostgreSQL",
-            Explore.Secrets.Database.PrimaryDatabaseProvider.Sqlite => "Microsoft.EntityFrameworkCore.Sqlite",
-            Explore.Secrets.Database.PrimaryDatabaseProvider.SqlServer => "Microsoft.EntityFrameworkCore.SqlServer",
-            Explore.Secrets.Database.PrimaryDatabaseProvider.MariaDb or Explore.Secrets.Database.PrimaryDatabaseProvider.MySql
+            Explore.Persistence.Database.PrimaryDatabaseProvider.PostgreSql => "Npgsql.EntityFrameworkCore.PostgreSQL",
+            Explore.Persistence.Database.PrimaryDatabaseProvider.Sqlite => "Microsoft.EntityFrameworkCore.Sqlite",
+            Explore.Persistence.Database.PrimaryDatabaseProvider.SqlServer => "Microsoft.EntityFrameworkCore.SqlServer",
+            Explore.Persistence.Database.PrimaryDatabaseProvider.MariaDb or Explore.Persistence.Database.PrimaryDatabaseProvider.MySql
                 => "Pomelo.EntityFrameworkCore.MySql",
             _ => null
         };

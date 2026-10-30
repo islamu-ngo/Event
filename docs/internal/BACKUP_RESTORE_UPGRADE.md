@@ -11,6 +11,31 @@ ABOUTME: Grounds release operations in provider-native database tools, authority
 
 This runbook covers self-hosted deployments using the repository Docker Compose topology. Treat every upgrade as a data operation first and an image rollout second.
 
+## SecretKit Lifecycle Cutover
+
+Before upgrading from the retired Secrets implementation, remove `SecretRefresh`
+polling/rotation configuration. Provision each enabled consumer's independent
+machine identity and exact ACLs, then supply its explicit finite or periodic
+token policy through the [deployment inputs](CONFIGURATION.md#secret-provider-configuration).
+There is no shared identity/policy fallback or automatic relogin. Stage the
+external Data Protection ring, independent admission pin and minimum generation
+before starting serving hosts; preserve the approved pin/floor during restore.
+
+Drain affected replicas before replacing startup-bound credentials. Start each
+replacement with its selected owner and verify that replica's capability
+readiness before returning traffic. A renewed process token is not credential
+activation or fleet convergence. The five-minute runtime cache is not a promise
+of immediate external credential revocation.
+
+Apply the generated `RetainSecretMutationEvidence` migration through the
+controlled migrator before running the new setup writer. Keep the nullable
+evidence on historical operations unknown rather than backfilling a fictitious
+non-dispatch result. Reconcile interrupted writes against their original
+external targets before any explicitly authorized retry; a lost response is
+not proof that no provider effect occurred. Restore operation/enrollment/binding
+metadata consistently, without placing external secret values in the database,
+manifest or recovery report. See [authority recovery](TROUBLESHOOTING.md#selected-secret-authority-recovery).
+
 ## Native Moderation Recovery Coordinates
 
 The canonical moderation save boundary now owns a UUIDv7

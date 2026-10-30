@@ -2,15 +2,13 @@
 #:project ../../src/Explore.Persistence.Migrations.Sqlite/Explore.Persistence.Migrations.Sqlite.csproj
 #:project ../../src/Explore.Persistence.Migrations.SqlServer/Explore.Persistence.Migrations.SqlServer.csproj
 #:project ../../src/Explore.Persistence.Migrations.MySql/Explore.Persistence.Migrations.MySql.csproj
-#:property RestorePackagesWithLockFile=false
+#:property NuGetLockFilePath=obj/EmergencyAdminProvisioner/packages.lock.json
 #:property PublishAot=false
 
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Operations;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
@@ -56,12 +54,14 @@ try
     IConfiguration bootstrap = new ConfigurationBuilder()
         .AddEnvironmentVariables()
         .Build();
-    IConfiguration configuration = new ConfigurationBuilder()
-        .AddConfiguration(SecretAuthorityConfiguration.Build(
-            bootstrap,
-            SecretAuthorityConfiguration.GetEnvironmentName(bootstrap),
-            "/database"))
-        .Build();
+    using var acquisitionDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
+    acquisitionDeadline.CancelAfter(TimeSpan.FromMinutes(2));
+    await using var authority = await MigrationDatabaseAcquisition.OpenAsync(
+        bootstrap,
+        bootstrap["DOTNET_ENVIRONMENT"] ?? bootstrap["ASPNETCORE_ENVIRONMENT"] ?? "Production",
+        ["/database"],
+        cancellationToken: acquisitionDeadline.Token);
+    IConfiguration configuration = authority.Configuration;
     PrimaryDatabaseConnectionOptions migratorOptions =
         PrimaryDatabaseConfiguration.BindMigrator(configuration);
 

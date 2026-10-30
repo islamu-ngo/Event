@@ -4,7 +4,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.Onboarding;
+using Explore.Application.Models.Storage;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Features.TenantStorageSettings.Requests.Commands;
 using Explore.Domain.Enums;
@@ -28,16 +28,16 @@ public sealed class StorageProbeOriginalAction(
     private int started;
     private object? action;
 
-    public Task<InstanceStorageProviderStatusDto> ExecuteAsync(TestInstanceStorageProviderQuery query, CancellationToken token) =>
+    public Task<FileStorageProviderStatus> ExecuteAsync(TestInstanceStorageProviderQuery query, CancellationToken token) =>
         ExecuteOriginalAsync(query, query.UserId, null, token);
 
-    public Task<InstanceStorageProviderStatusDto> ExecuteAsync(TestInstanceStorageProviderDuringSetupQuery query, CancellationToken token) =>
+    public Task<FileStorageProviderStatus> ExecuteAsync(TestInstanceStorageProviderDuringSetupQuery query, CancellationToken token) =>
         ExecuteOriginalAsync(query, null, null, token);
 
-    public Task<InstanceStorageProviderStatusDto> ExecuteAsync(TestTenantStorageProviderCommand command, CancellationToken token) =>
+    public Task<FileStorageProviderStatus> ExecuteAsync(TestTenantStorageProviderCommand command, CancellationToken token) =>
         ExecuteOriginalAsync(command, command.UserId, services.GetRequiredService<ITenantContext>().TenantId, token);
 
-    private async Task<InstanceStorageProviderStatusDto> ExecuteOriginalAsync(
+    private async Task<FileStorageProviderStatus> ExecuteOriginalAsync(
         object original, Guid? originalActor, Guid? tenant, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(original);

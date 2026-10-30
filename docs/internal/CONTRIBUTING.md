@@ -147,11 +147,16 @@ dotnet build --configuration Release --verbosity quiet
 
 Run each standard project individually — never use solution-level `dotnet test`:
 
+Secret authority coverage follows its native owners: `Explore.Infrastructure.Tests/Secrets`,
+`Event.Domain.UnitTests/Secrets` for the registry, and
+`Event.Persistence.IntegrationTests/Database` for database binding and acquisition.
+Host composition is covered by the API, BFF, and Standalone integration projects;
+select those projects when changing startup admission or authority lifetime.
+
 ```bash
 dotnet test --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --verbosity quiet
 dotnet test --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release --verbosity quiet
 dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet
-dotnet test --project tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration Release --verbosity quiet
 dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*/*[Category!=Runtime]" --minimum-expected-tests 1
 dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --verbosity quiet
 dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet

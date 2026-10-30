@@ -59,6 +59,10 @@ public static partial class PostgresStorageProbeSourceContract
                 THEN RAISE EXCEPTION 'storage_probe_source_key_drift' USING ERRCODE = '55000'; END IF;
                 """));
             var tenant = tenantTables.SingleOrDefault(candidate => candidate.TableName == entity.GetTableName());
+            string workerPolicies = PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, type,
+                out _, out var insert, out _) && insert.Count != 0
+                ? $"({PostgresManagedTenantWorkerCreationPermissions.SourcePolicyPredicate(context, type, enrollment.GlobalLogin)}) AND ({PostgresManagedTenantWorkerCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment)})"
+                : "false";
             string rls = tenant is null ? $"""
                 IF EXISTS (SELECT 1 FROM pg_catalog.pg_class t WHERE t.oid = pg_catalog.to_regclass({table})
                     AND NOT ({(type == typeof(Explore.Domain.SystemSetting)
@@ -77,8 +81,10 @@ public static partial class PostgresStorageProbeSourceContract
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid = pg_catalog.to_regclass({table})
                         AND p.polname <> '{PostgresTenantRowLevelSecurityModel.PolicyName}'
                         AND (0::oid = ANY(p.polroles) OR EXISTS (SELECT 1 FROM unnest(p.polroles) role_id
-                            WHERE pg_catalog.pg_has_role({Text(enrollment.RuntimeLogin)},role_id,'USAGE')
-                                OR pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)},role_id,'USAGE'))))
+                            WHERE pg_catalog.pg_has_role({Text(enrollment.RuntimeLogin)},role_id,'USAGE'))
+                            OR (EXISTS (SELECT 1 FROM unnest(p.polroles) role_id
+                                WHERE pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)},role_id,'USAGE'))
+                                AND ({workerPolicies}) IS NOT TRUE)))
                 THEN RAISE EXCEPTION 'storage_probe_source_rls_drift' USING ERRCODE = '55000'; END IF;
                 """;
             return $"""

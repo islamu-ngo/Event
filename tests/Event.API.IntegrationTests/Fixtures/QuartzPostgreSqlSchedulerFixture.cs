@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using Explore.API.Scheduling;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using TUnit.Core.Exceptions;

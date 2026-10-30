@@ -33,7 +33,7 @@ public class ProviderNeutralAuthorizationParityTests
     private const string ArtifactDirectory = ".omo/evidence/authorization-platform-redesign/phase2-task23-parity";
     private const string ReportFileName = "adapter-contract-report.json";
     private static readonly Guid UserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-    private static readonly Guid TenantId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private static readonly Guid TenantId = Guid.CreateVersion7();
     private static readonly Guid OtherTenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static readonly Guid EventId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     private static readonly Guid ActorId = Guid.Parse("44444444-4444-4444-4444-444444444444");

@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5SH5S1Z1GHNF366V40M25YY
+Title: "Bind serving inputs and retain startup failures"
+Type: fix
+Scope: self-hosting
+Summary: "Bind private assurance observations to owning projects and explicitly selected asset manifests while retaining original startup failures alongside independent host cleanup failures."
+Group: managed-serving-inputs
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Private assurance records bind owning projects and explicitly selected manifest pairs without granting authority. Independent live process, file and candidate checks remain required; no raw credentials, paths or sensitive diagnostic payloads are added to public output.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Startup and subsequent cleanup failures remain visible together. Diagnose the startup error as well as cleanup; no new configuration, restart, container recreation or data-reset action is introduced.

@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Controllers;
+using Explore.Application.Authentication;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
@@ -41,7 +43,7 @@ public sealed partial class StorageProbeOriginalActionTests
             AuthenticationProviderKind.Keycloak, incompleteSetup: true);
         Guid providerSubject = Guid.CreateVersion7();
         Guid actor;
-        await using (var seed = native.CreateDatabase())
+        await using (var seed = CreateProbeDatabase(native))
         {
             actor = await seed.Users.Select(row => row.Id).FirstAsync();
             seed.UserExternalLogins.Add(new UserExternalLogin
@@ -51,7 +53,8 @@ public sealed partial class StorageProbeOriginalActionTests
                 User = null!,
                 AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
                 AuthenticationProvider = null!,
-                ProviderKey = providerSubject.ToString("D"),
+                ProviderKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
+                    native.ExternalIssuer, providerSubject.ToString("D")).Value,
                 CreatedAt = DateTime.UtcNow
             });
             seed.InstanceBootstrapStates.Add(InstanceBootstrapState.CreateInteractivePending(
@@ -67,7 +70,15 @@ public sealed partial class StorageProbeOriginalActionTests
             services.AddSingleton<TimeProvider>(clock);
         }));
         await using var request = await ProbeRequest.CreateAsync(host.Services,
-            native.CreateExternalProviderToken(providerSubject, "probe-setup@example.test", true), native.SetupSecret);
+            native.CreateExternalProviderToken(
+            [
+                new Claim("sub", providerSubject.ToString("D")),
+                new Claim("typ", "Bearer"),
+                new Claim("azp", "islamu-event-blazor"),
+                new Claim("email", "probe-setup@example.test"),
+                new Claim("email_verified", "true", ClaimValueTypes.Boolean),
+                new Claim("auth_provider", "keycloak")
+            ], native.ExternalIssuer), native.SetupSecret);
         if (change == "wrong-route") request.Context.Request.Path = "/api/instance/settings/storage";
         if (change == "invented-setup-principal")
             request.Context.User = new(new System.Security.Claims.ClaimsIdentity(
@@ -97,7 +108,7 @@ public sealed partial class StorageProbeOriginalActionTests
             }
             if (change is "pending-replaced" or "completed")
             {
-                await using var independent = native.CreateDatabase();
+                await using var independent = CreateProbeDatabase(native);
                 var pending = await independent.InstanceBootstrapStates.SingleAsync();
                 if (change == "pending-replaced")
                 {
@@ -138,7 +149,7 @@ public sealed partial class StorageProbeOriginalActionTests
     {
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
         Guid grantId = Guid.Empty;
-        await using (var seed = fixture.Native.CreateDatabase())
+        await using (var seed = CreateProbeDatabase(fixture.Native))
         {
             if (authority == "instance-administrator")
                 await SeedProbeAdministratorAsync(seed, fixture.Binding.LocalSubjectId);
@@ -182,8 +193,9 @@ public sealed partial class StorageProbeOriginalActionTests
         remote.AfterVersioning = async () =>
         {
             if (authority != "tenant-grant-revoked") return;
-            await using var independent = fixture.Native.CreateDatabase();
-            await independent.TenantUserRoleGrants.Where(row => row.Id == grantId).ExecuteDeleteAsync();
+            await using var independent = CreateProbeDatabase(fixture.Native, PlatformDefaults.DefaultTenantId);
+            await Assert.That(await independent.TenantUserRoleGrants.Where(row => row.Id == grantId).ExecuteDeleteAsync())
+                .IsEqualTo(1);
         };
         var execution = ActivatorUtilities.CreateInstance<TestTenantStorageProviderCommandHandler>(selected.Services)
             .ExecuteAsync(new TestTenantStorageProviderCommand { UserId = fixture.Binding.LocalSubjectId }, CancellationToken.None);
@@ -201,7 +213,7 @@ public sealed partial class StorageProbeOriginalActionTests
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
         var expiry = fixture.Clock.GetUtcNow().AddMinutes(3);
         Guid sessionId;
-        await using (var seed = fixture.Native.CreateDatabase())
+        await using (var seed = CreateProbeDatabase(fixture.Native))
         {
             await SeedProbeAdministratorAsync(seed, fixture.Binding.LocalSubjectId);
             foreach (var key in new[] { GovernanceSettingKeys.SupportAccess.Enabled, GovernanceSettingKeys.SupportAccess.AllowWriteMode })
@@ -242,7 +254,7 @@ public sealed partial class StorageProbeOriginalActionTests
     public async Task ActualControllerCarriesOriginalHumanIntoTheClosedProbeHandler()
     {
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
-        await using (var seed = fixture.Native.CreateDatabase())
+        await using (var seed = CreateProbeDatabase(fixture.Native))
         {
             await SeedProbeAdministratorAsync(seed, fixture.Binding.LocalSubjectId);
             await SeedProbeProviderAsync(seed);

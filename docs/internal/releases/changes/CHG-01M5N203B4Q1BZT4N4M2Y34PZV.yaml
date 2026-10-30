@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5N203B4Q1BZT4N4M2Y34PZV
+Title: "Preserve original provider authority through transaction settlement"
+Type: fix
+Scope: onboarding
+Summary: "Allow human provider configuration writes to finish with their original transaction-bound authority, reject changed grants or account bindings, and activate acknowledged settings only after commit."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Reuse the original coordinator's transaction-bound source-set, principal and support leases for fresh authority checks. Keep native request and credential checks separate from idle-only database observation, and complete the fixed data-image check before the final authority cycle and deadline sample. Native SQLite verification covers three human authorization-provider settlement cases; it does not certify setup or other database providers.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Valid human provider updates retain their original transaction owner. Grant removal or changed account bindings reject the complete attempt before activation; denial before commit restores prior configuration. Reload current state and begin a new observation after authority changes. This correction adds no schema, endpoint or environment configuration change.

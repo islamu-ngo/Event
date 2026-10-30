@@ -10,7 +10,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Specifications.Events;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;

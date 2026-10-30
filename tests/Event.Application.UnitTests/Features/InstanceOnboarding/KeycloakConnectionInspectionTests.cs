@@ -10,6 +10,23 @@ namespace Event.Application.UnitTests.Features.InstanceOnboarding;
 public sealed class KeycloakConnectionInspectionTests
 {
     [Test]
+    public async Task RuntimeConnectionCannotInventRevisionEvidenceForAnUnownedCredential()
+    {
+        var resolver = new KeycloakConnectionResolver(new RuntimeSecretResolver(
+            new Dictionary<string, string>
+            {
+                [SecretDefinitionRegistry.Keys.Keycloak.Endpoint] = "https://identity.example.test",
+                [SecretDefinitionRegistry.Keys.Keycloak.Realm] = "operators",
+                [SecretDefinitionRegistry.Keys.Keycloak.ClientId] = "event-bff",
+                [SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret] = Guid.NewGuid().ToString("N")
+            }, bindingRevision: string.Empty));
+        KeycloakConnectionResolution result = await resolver.ResolveRuntimeAsync();
+        await Assert.That(result.Status).IsEqualTo(KeycloakConnectionStatus.Invalid);
+        await Assert.That(result.ClientSecret).IsNull();
+        await Assert.That(result.CredentialBindingRevision).IsNull();
+    }
+
+    [Test]
     public async Task RuntimeConnection_UsesOnlySelectedAuthorityValues()
     {
         string secretCanary = $"runtime-{Guid.CreateVersion7():N}";
@@ -117,7 +134,7 @@ public sealed class KeycloakConnectionInspectionTests
     }
 
     [Test]
-    public async Task RuntimeConnection_UsesStableProcessBindingRevision()
+    public async Task RuntimeConnection_PreservesOwnedRevisionAcrossObservationTimes()
     {
         string secretCanary = $"runtime-{Guid.CreateVersion7():N}";
         var resolver = new KeycloakConnectionResolver(
@@ -160,18 +177,14 @@ public sealed class KeycloakConnectionInspectionTests
             [SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret] =
                 $"runtime-{Guid.CreateVersion7():N}"
         };
-        var processRevision =
-            new KeycloakCredentialBindingRevision();
         var firstResolver = new KeycloakConnectionResolver(
             new RuntimeSecretResolver(
                 values,
-                bindingRevision: "provider-id:41"),
-            bindingRevision: processRevision);
+                bindingRevision: "provider-id:41"));
         var secondResolver = new KeycloakConnectionResolver(
             new RuntimeSecretResolver(
                 values,
-                bindingRevision: "provider-id:42"),
-            bindingRevision: processRevision);
+                bindingRevision: "provider-id:42"));
 
         KeycloakConnectionResolution first =
             await firstResolver.ResolveRuntimeAsync();
@@ -352,9 +365,10 @@ public sealed class KeycloakConnectionInspectionTests
     private sealed class RuntimeSecretResolver(
         IReadOnlyDictionary<string, string> values,
         SecretResolutionResult? missingResult = null,
-        string bindingRevision = "") : ISecretResolver
+        string? bindingRevision = null) : ISecretResolver
     {
         private long _resolutionSequence;
+        private readonly string _revision = bindingRevision ?? Guid.CreateVersion7().ToString("N");
 
         public Task<SecretResolutionResult> ResolveAsync(
             string settingKey,
@@ -376,7 +390,7 @@ public sealed class KeycloakConnectionInspectionTests
                     DateTimeOffset.UnixEpoch.AddTicks(
                         Interlocked.Increment(
                             ref _resolutionSequence)),
-                    bindingRevision)));
+                    _revision)));
         }
 
         public Task<SecretResolutionResult> ResolveQualifiedAsync(

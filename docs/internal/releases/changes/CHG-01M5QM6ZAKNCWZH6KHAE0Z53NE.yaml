@@ -1,0 +1,48 @@
+Change-Id: CHG-01M5QM6ZAKNCWZH6KHAE0Z53NE
+Title: "Wire seven owned security assurance profiles"
+Type: fix
+Scope: ci
+Summary: "Wire the existing owning executor to the complete security registration and upload only its admitted public proofs."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/contributing/tunit.md
+    Disposition: documented
+    Detail: >-
+      The default CI registration includes all seven API, owned runtime,
+      browser and load profiles. Provision their prerequisites and regenerate
+      evidence for the exact final clean committed candidate; source declarations
+      do not replace compiled discovery and physical passing results.
+  Security:
+    Reference: docs/internal/CI_CD_GOVERNANCE.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: >-
+      Use the existing owning executor, strict native routing and exact candidate
+      inputs; upload only admitted public proofs after success. Raw diagnostics
+      stay private. Public validation remains operator-trusted structural evidence,
+      without authenticated CI origin; required candidate checks remain separate.
+  Migration:
+    Reference: docs/internal/CI_CD_GOVERNANCE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/contributing/tunit.md
+    Disposition: documented
+    Detail: >-
+      Select and canonicalize an explicit Unix daemon socket, require the
+      instrumented caller's disabled reaper setting and cached images, and
+      provision the external headless browser and hash-verified standalone k6.
+      No credential authority or runtime authentication-provider switching is added.
+  OpenAPI:
+    Reference: docs/internal/CI_CD_GOVERNANCE.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/contributing/tunit.md
+    Disposition: documented
+    Detail: >-
+      Serial native batches have count-derived hang limits capped at 330 minutes,
+      a fifteen-second parent margin and a 360-minute cumulative hosted job cap;
+      canceled, missing or incompletely cleaned runs fail admission. Bounded
+      compiler and helper gates passed, but clean native API proof, copied-report
+      freshness, live managed-input joins and final same-candidate all-seven
+      execution remain pending. Remote activation is held.

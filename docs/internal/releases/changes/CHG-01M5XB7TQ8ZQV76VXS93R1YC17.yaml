@@ -1,0 +1,31 @@
+Change-Id: CHG-01M5XB7TQ8ZQV76VXS93R1YC17
+Title: "Restore locked container builds on the pinned SDK"
+Type: fix
+Scope: self-hosting
+Summary: "Build all serving and migration images with complete restore inputs, declared Linux runtime graphs and an independently locked Standalone single-file publish profile; compile contract tooling for the SDK host."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/SECRETKIT_LOCAL_PACKAGES.md
+    Disposition: not-applicable
+    Detail: The build correction preserves serving contracts and existing operator inputs; the separate native-authority activation change carries its own breaking migration guidance.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: not-applicable
+    Detail: Locked restores and frozen package provenance remain enforced; this change adds no credential, authorization or runtime trust boundary.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+    Detail: SDK alignment and generated runtime dependency locks require no persisted-data migration.
+  Configuration:
+    Reference: docs/internal/SECRETKIT_LOCAL_PACKAGES.md
+    Disposition: not-applicable
+    Detail: Linux restore targets and the Standalone container lock are build inputs, not additional deployed secret or application settings.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Container restore and host-tool compilation do not change public HTTP schemas.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/secretkit-local-packages.md
+    Disposition: documented
+    Detail: Build with the pinned SDK and complete checked-in restore inputs; keep the ordinary and single-file container graphs separately locked, preserve the bundled notices, and qualify each actual image rather than inferring execution from declared runtime targets.

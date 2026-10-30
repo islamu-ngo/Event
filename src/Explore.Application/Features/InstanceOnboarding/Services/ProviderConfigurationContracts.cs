@@ -6,6 +6,7 @@ using Explore.Application.Contracts.Secrets;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Constants;
+using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Microsoft.Extensions.Configuration;
 
@@ -31,15 +32,27 @@ public interface IProviderConfigurationHumanSource : IProviderConfigurationMutat
 {
     HumanCommitSubject Subject { get; }
     HumanAuthenticationLifetime Lifetime { get; }
+    /// <summary>Checks the original human request without observing idle-only database sources.</summary>
+    Task RequireRequestAsync(CancellationToken token);
+    /// <summary>Compares fresh facts supplied by the original Settings coordinator.</summary>
+    void RequireAcquiredFacts(HumanPrincipalSourceFacts principal, HumanSupportAccessSourceFacts support);
 }
 
 public interface IProviderConfigurationSetupSource : IProviderConfigurationMutationSource
 {
     ITrustedSetupSettingsAuthorityLease Setup { get; }
+    /// <summary>Retains existing cooperative gates on the original idle setup owner before keyed locks and BEGIN.</summary>
+    Task<IAsyncDisposable> AcquireCoordinationAsync(IUnitOfWork originalOwner, CancellationToken token);
 }
 
-public sealed record ProviderConfigurationMaterials(KeycloakConnectionResolution Keycloak, SecretResolutionResult Google,
-    bool? PublicationReady = null)
+public sealed record ProviderAuthenticationMaterialRequirements(AuthenticationProviderKind OriginalPrimary,
+    bool OriginalGoogleEnabled, bool KeycloakRelevant, bool GoogleRelevant);
+
+/// <summary>Public connection coordinates and resolution status carry no credential values.</summary>
+public sealed record ProviderKeycloakMaterial(KeycloakConnectionStatus Status, Uri? Authority = null, string? ClientId = null);
+
+public sealed record ProviderConfigurationMaterials(ProviderKeycloakMaterial Keycloak, SecretResolutionStatus Google,
+    bool? PublicationReady = null, ProviderAuthenticationMaterialRequirements? Authentication = null)
 {
     public override string ToString() => nameof(ProviderConfigurationMaterials);
 }

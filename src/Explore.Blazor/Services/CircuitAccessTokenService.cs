@@ -5,15 +5,18 @@ using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authentication;
 using Event.Web.BffHosting.Security;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Explore.Blazor.Services.Auth;
 
 namespace Explore.Blazor.Services;
 
 public interface ICircuitAccessTokenService
 {
     string? AccessToken { get; }
+    BffSessionBinding? SessionBinding { get; }
+    bool IsSessionOwned { get; }
     void SetToken(string? token);
     void ClearToken();
-    void RevokeSession(EventBffOpaqueIdentity? originalSubject, EventBffOpaqueIdentity? originalSession);
+    void RevokeSession(BffSessionBinding? originalBinding);
 }
 
 public interface ISetupSecretSessionService
@@ -167,6 +170,18 @@ public class CircuitAccessTokenService : ICircuitAccessTokenService
     private string? _sessionId;
     private readonly object _tokenSync = new();
     private bool _revoked;
+    private bool _sessionOwned;
+    private BffSessionBinding? _sessionBinding;
+
+    public BffSessionBinding? SessionBinding
+    {
+        get { lock (_tokenSync) return _sessionBinding; }
+    }
+
+    public bool IsSessionOwned
+    {
+        get { lock (_tokenSync) return _sessionOwned; }
+    }
 
     public CircuitAccessTokenService(
         ICircuitTokenStore tokenStore,
@@ -195,11 +210,6 @@ public class CircuitAccessTokenService : ICircuitAccessTokenService
                 if (!string.IsNullOrEmpty(userId))
                 {
                     var resolution = _tokenStore.Resolve(userId, sessionId);
-                    if (!resolution.Found)
-                    {
-                        resolution = _tokenStore.ResolveByUserId(userId);
-                    }
-
                     if (resolution.Found)
                     {
                         if (!string.IsNullOrEmpty(_localToken) && !string.Equals(_localToken, resolution.Token, StringComparison.Ordinal))
@@ -239,6 +249,20 @@ public class CircuitAccessTokenService : ICircuitAccessTokenService
                 return;
             }
 
+            var principal = _httpContextAccessor.HttpContext?.User;
+            if (principal?.Identities.Any(identity => identity.IsAuthenticated) == true)
+            {
+                _sessionOwned = true;
+                if (!BffSessionIdentity.TryGetBinding(principal, out var binding)
+                    || _sessionBinding is { } original && original != binding)
+                {
+                    _localToken = null;
+                    return;
+                }
+
+                _sessionBinding = binding;
+            }
+
             if (!CircuitTokenStore.IsTokenUsable(token))
             {
                 _localToken = null;
@@ -250,8 +274,8 @@ public class CircuitAccessTokenService : ICircuitAccessTokenService
 
             // The forwarding handler resolves by the authenticated BFF principal. That id can
             // differ from the JWT subject after local-user/admin enrichment.
-            var principalUserId = GetUserIdFromHttpContext();
-            var principalSessionId = GetSessionIdFromHttpContext();
+            var principalUserId = _sessionBinding?.OwnerPartitionKey;
+            var principalSessionId = _sessionBinding?.Handle;
 
             if (!string.IsNullOrEmpty(principalUserId))
             {
@@ -290,11 +314,7 @@ public class CircuitAccessTokenService : ICircuitAccessTokenService
 
             if (!string.IsNullOrWhiteSpace(userId))
             {
-                if (string.IsNullOrWhiteSpace(sessionId))
-                {
-                    _tokenStore.ClearUser(userId);
-                }
-                else
+                if (!string.IsNullOrWhiteSpace(sessionId))
                 {
                     _tokenStore.ClearSession(userId, sessionId);
                 }
@@ -302,7 +322,7 @@ public class CircuitAccessTokenService : ICircuitAccessTokenService
         }
     }
 
-    public void RevokeSession(EventBffOpaqueIdentity? originalSubject, EventBffOpaqueIdentity? originalSession)
+    public void RevokeSession(BffSessionBinding? originalBinding)
     {
         lock (_tokenSync)
         {
@@ -315,24 +335,9 @@ public class CircuitAccessTokenService : ICircuitAccessTokenService
             _localToken = null;
             _userId = null;
             _sessionId = null;
-            if (originalSubject is
-                {
-                    Purpose: EventBffOpaqueIdentityPurpose.CircuitSubject,
-                    Source: EventBffOpaqueIdentitySource.ProviderSubject
-                } subject
-                && originalSession is
-                {
-                    Purpose: EventBffOpaqueIdentityPurpose.SessionId,
-                    Source: EventBffOpaqueIdentitySource.SessionId
-                } session
-                && string.Equals(subject.AuthenticationScheme, session.AuthenticationScheme, StringComparison.Ordinal)
-                && !string.IsNullOrWhiteSpace(subject.AuthenticationScheme)
-                && !string.IsNullOrWhiteSpace(subject.Value)
-                && !string.IsNullOrWhiteSpace(session.Value)
-                && !subject.Value.Any(char.IsControl)
-                && !session.Value.Any(char.IsControl))
+            if (originalBinding is { } binding && _sessionBinding == binding)
             {
-                _tokenStore.ClearSession(subject.PartitionKey, session.PartitionKey);
+                _tokenStore.ClearSession(binding.OwnerPartitionKey, binding.Handle);
             }
         }
     }
@@ -340,13 +345,15 @@ public class CircuitAccessTokenService : ICircuitAccessTokenService
     private string? GetUserIdFromHttpContext()
     {
         var principal = _httpContextAccessor.HttpContext?.User;
-        return principal.TryGetCircuitSubject(out var subject) ? subject.PartitionKey : null;
+        return principal is not null && BffSessionIdentity.TryGetBinding(principal, out var binding)
+            ? binding.OwnerPartitionKey : null;
     }
 
     private string? GetSessionIdFromHttpContext()
     {
         var principal = _httpContextAccessor.HttpContext?.User;
-        return principal.TryGetSessionId(out var sessionId) ? sessionId.PartitionKey : null;
+        return principal is not null && BffSessionIdentity.TryGetBinding(principal, out var binding)
+            ? binding.Handle : null;
     }
 
     private static string? TryResolveUserId(ClaimsPrincipal? user)
@@ -370,6 +377,7 @@ public class AccessTokenForwardingHandler : DelegatingHandler
     private readonly ICircuitTokenStore _tokenStore;
     private readonly ILogger<AccessTokenForwardingHandler> _logger;
     private readonly IHttpClientFactory? _bffSelfClientFactory;
+    private readonly IBffSessionAuthority? _sessionAuthority;
 
     public AccessTokenForwardingHandler(
         IHttpContextAccessor httpContextAccessor,
@@ -377,7 +385,8 @@ public class AccessTokenForwardingHandler : DelegatingHandler
         ICircuitUserContext circuitUserContext,
         ICircuitTokenStore tokenStore,
         ILogger<AccessTokenForwardingHandler> logger,
-        IHttpClientFactory? bffSelfClientFactory = null)
+        IHttpClientFactory? bffSelfClientFactory = null,
+        IBffSessionAuthority? sessionAuthority = null)
     {
         _httpContextAccessor = httpContextAccessor;
         _circuitAccessTokenService = circuitAccessTokenService;
@@ -385,6 +394,7 @@ public class AccessTokenForwardingHandler : DelegatingHandler
         _tokenStore = tokenStore;
         _logger = logger;
         _bffSelfClientFactory = bffSelfClientFactory;
+        _sessionAuthority = sessionAuthority;
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(
@@ -401,7 +411,17 @@ public class AccessTokenForwardingHandler : DelegatingHandler
 
         // Strategy 1: Try to get token from HttpContext (works during initial HTTP request)
         var httpContext = _httpContextAccessor.HttpContext;
-        var isAuthenticated = httpContext?.User?.Identity?.IsAuthenticated == true;
+        var isAuthenticated = httpContext?.User.Identities.Any(identity => identity.IsAuthenticated) == true;
+        if (!TryResolveSessionBinding(httpContext, out var binding))
+        {
+            return RejectSession(request, System.Net.HttpStatusCode.Unauthorized);
+        }
+
+        var denial = await CheckSessionAsync(binding, httpContext, cancellationToken);
+        if (denial is { } deniedStatus)
+        {
+            return RejectSession(request, deniedStatus);
+        }
 
         if (isAuthenticated)
         {
@@ -453,7 +473,11 @@ public class AccessTokenForwardingHandler : DelegatingHandler
                     var refreshedToken = authResult.Properties.GetTokenValue("access_token");
                     if (!string.IsNullOrEmpty(refreshedToken) && CircuitTokenStore.IsTokenUsable(refreshedToken))
                     {
-                        _circuitAccessTokenService.SetToken(refreshedToken);
+                        if (binding is { } refreshedBinding)
+                        {
+                            // A pooled handler must not bind its scoped token service to this browser.
+                            _tokenStore.Store(refreshedBinding.OwnerPartitionKey, refreshedBinding.Handle, refreshedToken);
+                        }
                         token = refreshedToken;
                         source = "HttpContextRefreshed";
                         _logger.LogInformation(
@@ -477,28 +501,16 @@ public class AccessTokenForwardingHandler : DelegatingHandler
         // Strategy 2: Try to get token from bounded store by current user ID
         if (string.IsNullOrEmpty(token))
         {
-            var userId = TryResolveUserId(httpContext?.User);
+            var userId = binding?.OwnerPartitionKey;
 
             if (!string.IsNullOrEmpty(userId))
             {
-                var sessionId = httpContext?.User.TryGetSessionId(out var resolvedSessionId) == true ? resolvedSessionId.PartitionKey : null;
+                var sessionId = binding?.Handle;
                 var resolution = _tokenStore.Resolve(userId, sessionId);
                 if (resolution.Found)
                 {
                     token = resolution.Token;
                     source = "TokenStore(userId)";
-                }
-                else
-                {
-                    resolution = _tokenStore.ResolveByUserId(userId);
-                    if (resolution.Found)
-                    {
-                        token = resolution.Token;
-                        source = "TokenStore(userId-only)";
-                        _logger.LogInformation(
-                            "[AccessTokenForwardingHandler] Token lookup completed | Outcome={Outcome} Reason={Reason} Purpose={Purpose}",
-                            "resolved", "subject_fallback", "forwarding");
-                    }
                 }
             }
             else if (isAuthenticated)
@@ -512,7 +524,8 @@ public class AccessTokenForwardingHandler : DelegatingHandler
         // Strategy 3: Fall back to the scoped ICircuitAccessTokenService which retains the circuit's user
         // identity even when HttpContext is unavailable (e.g., Blazor Server click events dispatched via
         // SignalR where IHttpContextAccessor.HttpContext is null).
-        if (string.IsNullOrEmpty(token))
+        if (string.IsNullOrEmpty(token)
+            && (binding is null || _circuitAccessTokenService.SessionBinding == binding))
         {
             token = _circuitAccessTokenService.AccessToken;
             if (!string.IsNullOrEmpty(token))
@@ -529,27 +542,15 @@ public class AccessTokenForwardingHandler : DelegatingHandler
         // is null but the Blazor circuit async context still flows.
         if (string.IsNullOrEmpty(token))
         {
-            var userId = _circuitUserContext.UserId;
+            var userId = binding?.OwnerPartitionKey;
             if (!string.IsNullOrEmpty(userId))
             {
-                var resolution = _tokenStore.Resolve(userId, _circuitUserContext.SessionId);
+                var resolution = _tokenStore.Resolve(userId, binding?.Handle);
                 if (resolution.Found)
                 {
                     token = resolution.Token;
                     source = "CircuitUserContext";
                     _logger.LogDebug("[AccessTokenForwardingHandler] Got token from store via CircuitUserContext");
-                }
-                else
-                {
-                    resolution = _tokenStore.ResolveByUserId(userId);
-                    if (resolution.Found)
-                    {
-                        token = resolution.Token;
-                        source = "CircuitUserContext(userId-only)";
-                        _logger.LogInformation(
-                            "[AccessTokenForwardingHandler] Token lookup completed | Outcome={Outcome} Reason={Reason} Purpose={Purpose}",
-                            "resolved", "circuit_subject_fallback", "forwarding");
-                    }
                 }
             }
         }
@@ -574,7 +575,18 @@ public class AccessTokenForwardingHandler : DelegatingHandler
                 "selected", "near_expiry_fallback", routeClass);
         }
 
-        // Add Authorization header if we have a token
+        if (!TryResolveSessionBinding(httpContext, out var currentBinding) || currentBinding != binding)
+        {
+            return RejectSession(request, System.Net.HttpStatusCode.Unauthorized);
+        }
+
+        denial = await CheckSessionAsync(binding, httpContext, cancellationToken);
+        if (denial is { } finalDeniedStatus)
+        {
+            return RejectSession(request, finalDeniedStatus);
+        }
+
+        // Admission above also covers caller-supplied headers when the operation owns a BFF session.
         if (!string.IsNullOrEmpty(token) && !request.Headers.Contains("Authorization"))
         {
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
@@ -634,13 +646,15 @@ public class AccessTokenForwardingHandler : DelegatingHandler
                 return null;
             }
 
-            var userId = TryResolveUserId(httpContext.User) ?? _circuitUserContext.UserId;
-            var sessionId = httpContext.User.TryGetSessionId(out var resolvedSessionId)
-                ? resolvedSessionId.PartitionKey : _circuitUserContext.SessionId;
+            if (!BffSessionIdentity.TryGetBinding(httpContext.User, out var binding))
+            {
+                return null;
+            }
+            var userId = binding.OwnerPartitionKey;
+            var sessionId = binding.Handle;
             var refreshedToken = ResolveTokenFromStore(userId, sessionId);
             if (!string.IsNullOrEmpty(refreshedToken))
             {
-                _circuitAccessTokenService.SetToken(refreshedToken);
                 _logger.LogInformation(
                     "[AccessTokenForwardingHandler] Self refresh completed | Outcome={Outcome} RouteClass={RouteClass}",
                     "refreshed", BffLogRouteClassifier.Classify(outboundRequest.RequestUri));
@@ -669,12 +683,63 @@ public class AccessTokenForwardingHandler : DelegatingHandler
         }
 
         var resolution = _tokenStore.Resolve(userId, sessionId);
-        if (!resolution.Found)
+        return resolution.Found ? resolution.Token : null;
+    }
+
+    private bool TryResolveSessionBinding(HttpContext? httpContext, out BffSessionBinding? binding)
+    {
+        binding = _circuitUserContext.SessionBinding ?? _circuitAccessTokenService.SessionBinding;
+        if (_circuitUserContext.SessionBinding is { } circuitBinding
+            && _circuitAccessTokenService.SessionBinding is { } tokenBinding && circuitBinding != tokenBinding)
         {
-            resolution = _tokenStore.ResolveByUserId(userId);
+            return false;
         }
 
-        return resolution.Found ? resolution.Token : null;
+        var authenticated = httpContext?.User.Identities.Any(identity => identity.IsAuthenticated) == true;
+        if (authenticated)
+        {
+            if (!BffSessionIdentity.TryGetBinding(httpContext!.User, out var httpBinding)
+                || binding is { } captured && captured != httpBinding)
+            {
+                return false;
+            }
+
+            binding = httpBinding;
+        }
+
+        var owner = _circuitUserContext.UserId;
+        return binding is { } session
+            ? string.IsNullOrEmpty(owner) || string.Equals(owner, session.OwnerPartitionKey, StringComparison.Ordinal)
+            : !authenticated && !_circuitAccessTokenService.IsSessionOwned && string.IsNullOrEmpty(_circuitUserContext.UserId);
+    }
+
+    private async Task<System.Net.HttpStatusCode?> CheckSessionAsync(
+        BffSessionBinding? binding, HttpContext? httpContext, CancellationToken cancellationToken)
+    {
+        if (binding is null) return null;
+        var authority = _sessionAuthority ?? httpContext?.RequestServices.GetService<IBffSessionAuthority>();
+        if (authority is null) return System.Net.HttpStatusCode.ServiceUnavailable;
+        try
+        {
+            return await authority.IsActiveAsync(binding.Value, cancellationToken)
+                ? null : System.Net.HttpStatusCode.Unauthorized;
+        }
+        catch (BffSessionAuthorityUnavailableException)
+        {
+            return System.Net.HttpStatusCode.ServiceUnavailable;
+        }
+    }
+
+    private static HttpResponseMessage RejectSession(HttpRequestMessage request, System.Net.HttpStatusCode status)
+    {
+        request.Headers.Authorization = null;
+        return new HttpResponseMessage(status)
+        {
+            RequestMessage = request,
+            Content = System.Net.Http.Json.JsonContent.Create(
+                new { type = "about:blank", title = "Browser session unavailable", status = (int)status },
+                mediaType: new System.Net.Http.Headers.MediaTypeHeaderValue("application/problem+json"))
+        };
     }
 
     private static Uri BuildInternalRefreshUri(HttpContext httpContext)

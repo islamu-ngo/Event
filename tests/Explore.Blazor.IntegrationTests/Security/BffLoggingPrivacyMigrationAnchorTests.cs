@@ -108,16 +108,21 @@ public sealed class BffLoggingPrivacyMigrationAnchorTests
     }
 
     [Test]
-    [Arguments(true)]
-    [Arguments(false)]
+    [Arguments(true, false)]
+    [Arguments(false, false)]
+    [Arguments(true, true)]
+    [Arguments(false, true)]
     [NotInParallel]
-    public async Task TokenCircuitHandlerLogsNoRawOpaqueSubjectSessionTokenOrCookie(bool hasSession)
+    public async Task TokenCircuitHandlerLogsNoRawOpaqueSubjectSessionTokenOrCookie(bool hasSession, bool anonymousFirst)
     {
         using var capture = new DualLogCapture(typeof(TokenCircuitHandler).FullName!);
         var subject = Guid.CreateVersion7().ToString("D");
         var session = $"opaque-session-{Guid.CreateVersion7():N}";
         var token = Guid.CreateVersion7().ToString("N");
         var cookie = $"bff={Guid.CreateVersion7():N}";
+        var handle = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        var sessionAuthority = Substitute.For<IBffSessionAuthority>();
+        sessionAuthority.IsActiveAsync(Arg.Any<BffSessionBinding>(), Arg.Any<CancellationToken>()).Returns(true);
         var circuitCapture = new CircuitCaptureHandler();
         await using var baseFactory = new BlazorBffWebApplicationFactory();
         await using var factory = baseFactory.WithWebHostBuilder(builder =>
@@ -125,6 +130,7 @@ public sealed class BffLoggingPrivacyMigrationAnchorTests
             builder.ConfigureTestServices(services =>
             {
                 capture.AddProviders(services);
+                services.AddSingleton(sessionAuthority);
                 services.AddSingleton<CircuitHandler>(circuitCapture);
                 var readiness = Substitute.For<IBffOnboardingStatusProvider>();
                 readiness.GetStatusAsync(Arg.Any<CancellationToken>())
@@ -137,7 +143,7 @@ public sealed class BffLoggingPrivacyMigrationAnchorTests
                     NullLogger<BffAdminClaimsTransformation>.Instance));
             });
         });
-        var claims = new List<Claim> { new("sub", subject) };
+        var claims = new List<Claim> { new("sub", subject), new(BffSessionIdentity.HandleClaim, handle) };
         if (hasSession)
         {
             claims.Add(new Claim("sid", session));
@@ -148,10 +154,9 @@ public sealed class BffLoggingPrivacyMigrationAnchorTests
 
         await OpenRealCircuitAsync(factory, authHeader, cookie);
         Circuit circuit = await circuitCapture.Opened.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        var context = new DefaultHttpContext
-        {
-            User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Cookies"))
-        };
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "Cookies"));
+        if (anonymousFirst) principal = new ClaimsPrincipal(new[] { new ClaimsIdentity(), (ClaimsIdentity)principal.Identity! });
+        var context = new DefaultHttpContext { User = principal };
         context.Items["AccessToken"] = token;
         context.Request.Headers.Cookie = cookie;
         using var requestScope = factory.Services.CreateScope();
@@ -160,19 +165,22 @@ public sealed class BffLoggingPrivacyMigrationAnchorTests
         authenticationState.SetAuthenticationState(Task.FromResult(new AuthenticationState(context.User)));
         var store = new CircuitTokenStore(NullLogger<CircuitTokenStore>.Instance);
         var accessor = new HttpContextAccessor { HttpContext = context };
+        var circuitUserContext = new CircuitUserContext();
         using var handler = new TokenCircuitHandler(
             httpContextAccessor: accessor,
             circuitAccessTokenService: new CircuitAccessTokenService(
                 store, accessor, NullLogger<CircuitAccessTokenService>.Instance),
-            circuitUserContext: new CircuitUserContext(),
+            circuitUserContext: circuitUserContext,
             bffAuthCookieStore: new BffAuthCookieStore(),
             logger: capture.Factory.CreateLogger<TokenCircuitHandler>(),
             authenticationStateProvider: authenticationState,
-            adminClaimsTransformation: requestScope.ServiceProvider.GetRequiredService<BffAdminClaimsTransformation>());
+            adminClaimsTransformation: requestScope.ServiceProvider.GetRequiredService<BffAdminClaimsTransformation>(),
+            sessionAuthority: sessionAuthority);
 
         await handler.OnCircuitOpenedAsync(circuit, CancellationToken.None);
 
-        await AssertPrivateAndBoundedAsync(capture, [subject, session, token, cookie, circuit.Id]);
+        await Assert.That(circuitUserContext.SessionBinding.HasValue).IsTrue();
+        await AssertPrivateAndBoundedAsync(capture, [subject, session, token, cookie, circuit.Id, handle]);
         foreach (var entries in new[] { capture.MicrosoftEntries, capture.SerilogEntries })
         {
             var presenceValues = entries

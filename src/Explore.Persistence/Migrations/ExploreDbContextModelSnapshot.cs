@@ -42523,6 +42523,10 @@ namespace Explore.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("enrollment_id");
 
+                    b.Property<int?>("MutationEvidence")
+                        .HasColumnType("integer")
+                        .HasColumnName("mutation_evidence");
+
                     b.Property<Guid>("OperationKey")
                         .HasColumnType("uuid")
                         .HasColumnName("operation_key");

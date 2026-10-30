@@ -167,6 +167,7 @@ public static class ParityCorpus
 
     public static IReadOnlyList<ParityScenario> Scenarios { get; } =
     [
+        .. GenericResourceBoundaries(),
         // ---- normal allow / deny -------------------------------------------------------------------
         new(
             Id: "tenant-admin-views-own-tenant-event",
@@ -680,6 +681,106 @@ public static class ParityCorpus
             Rationale: "Covered by HateoasAuthorizationEvaluatorTests, which asserts link omission rather "
                 + "than a provider decision."),
     ];
+
+    private static IEnumerable<ParityScenario> GenericResourceBoundaries()
+    {
+        // These are Local policy questions. Native Cerbos execution owns its independently specified
+        // policy cases; a Local result is never reported as a PDP decision.
+        (string Kind, string Action, IAuthorizationFacts Facts, ParitySubject Allowed, ParitySubject Denied, string Rationale)[] boundaries =
+        [
+            (ResourceKinds.EventSession, AuthorizationActions.Update, new EventScopedAuthorizationFacts(TenantId, EventId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Changing a session requires authority over its parent event."),
+            (ResourceKinds.EventSessionGroup, AuthorizationActions.Update, new EventScopedAuthorizationFacts(TenantId, EventId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Changing a session group requires authority over its parent event."),
+            (ResourceKinds.EventSessionAgendaItem, AuthorizationActions.Update, new EventScopedAuthorizationFacts(TenantId, EventId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Changing a session agenda entry requires authority over its parent event."),
+            (ResourceKinds.EventDay, AuthorizationActions.Update, new EventScopedAuthorizationFacts(TenantId, EventId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Changing an event day requires authority over its parent event."),
+            (ResourceKinds.EventAgendaItem, AuthorizationActions.Update, new EventScopedAuthorizationFacts(TenantId, EventId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Changing an agenda item requires authority over its parent event."),
+            (ResourceKinds.RegistrationForm, AuthorizationActions.Update, UserOwnedEvent(UserId),
+                ParitySubject.StandardUser, ParitySubject.Anonymous, "Only an authenticated controller of the verified organizer may manage registration forms."),
+            (ResourceKinds.EventOrganizerClaim, AuthorizationActions.Events.ClaimOrganizer,
+                new EventOrganizerClaimAuthorizationFacts(TenantId, EventId, EventId, ActorId, UserId, null, null, "PENDING"),
+                ParitySubject.StandardUser, ParitySubject.Anonymous, "Submitting an organizer claim requires an authenticated subject and trusted event context."),
+            (ResourceKinds.OrganizationMember, AuthorizationActions.Update,
+                new OrganizationMemberAuthorizationFacts(TenantId, OrganizationId, null, OtherUserId),
+                ParitySubject.OrganizationAdmin, ParitySubject.StandardUser, "Changing organization membership requires authority over that organization."),
+            (ResourceKinds.OrganizationReview, AuthorizationActions.Update,
+                new OrganizationReviewAuthorizationFacts(TenantId, OrganizationId, OtherUserId),
+                ParitySubject.OrganizationAdmin, ParitySubject.StandardUser, "Updating an organization review requires organization authority; public review access does not grant editing."),
+            (ResourceKinds.Tenant, AuthorizationActions.Update, new TenantScopedAuthorizationFacts(TenantId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Tenant changes require administration of the selected tenant."),
+            (ResourceKinds.TenantSetting, AuthorizationActions.Update, new TenantSettingAuthorizationFacts(TenantId, IsLockedByInstance: false),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "An unlocked tenant setting is editable by its tenant administrator, never a bare authenticated subject."),
+            (ResourceKinds.TenantUserRoleGrant, AuthorizationActions.Create, new TenantScopedAuthorizationFacts(TenantId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Granting tenant authority requires an existing tenant administrator."),
+            (ResourceKinds.Category, AuthorizationActions.Update, new TenantScopedAuthorizationFacts(TenantId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Category changes require administration of their owning tenant."),
+            (ResourceKinds.Tag, AuthorizationActions.Update, new TenantScopedAuthorizationFacts(TenantId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Tag changes require administration of their owning tenant."),
+            (ResourceKinds.LocationRoom, AuthorizationActions.Update, new TenantScopedAuthorizationFacts(TenantId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Room changes require administration of their owning tenant."),
+            (ResourceKinds.User, AuthorizationActions.Update, new UserAuthorizationFacts(TenantId, OtherUserId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Updating another user's profile requires tenant authority; authentication alone is not self-service ownership."),
+            (ResourceKinds.AtprotoRecord, AuthorizationActions.Update, InstanceScopedAuthorizationFacts.Instance,
+                ParitySubject.InstanceAdmin, ParitySubject.StandardUser, "Federation record mutation is an instance operation."),
+            (ResourceKinds.IndexedDid, AuthorizationActions.Delete, InstanceScopedAuthorizationFacts.Instance,
+                ParitySubject.InstanceAdmin, ParitySubject.StandardUser, "Deleting an indexed federation identity is an instance operation."),
+            (ResourceKinds.InstanceSetting, AuthorizationActions.Update, InstanceScopedAuthorizationFacts.Instance,
+                ParitySubject.InstanceAdmin, ParitySubject.StandardUser, "Changing instance configuration requires instance authority."),
+            (ResourceKinds.CustomPropertyDefinition, AuthorizationActions.Update, new TenantScopedAuthorizationFacts(TenantId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Editing a custom property definition requires tenant administration."),
+            (ResourceKinds.CustomPropertyTemplate, AuthorizationActions.Update, new TenantScopedAuthorizationFacts(TenantId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Editing a custom property template requires tenant administration."),
+            (ResourceKinds.CustomPropertyValue, AuthorizationActions.Update, new OrganizationAuthorizationFacts(TenantId, OrganizationId),
+                ParitySubject.OrganizationAdmin, ParitySubject.StandardUser, "Editing an organization-scoped property value requires organization authority."),
+            (ResourceKinds.CustomPropertyProjection, AuthorizationActions.Update, new CustomPropertyProjectionAuthorizationFacts(TenantId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Updating custom property projections requires tenant administration."),
+            (ResourceKinds.CustomPropertyGovernance, AuthorizationActions.CustomPropertyGovernance.View, new TenantScopedAuthorizationFacts(TenantId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Viewing custom property governance reports requires tenant administration."),
+            (ResourceKinds.EmailDispatch, AuthorizationActions.EmailDispatches.ManageTenant, new TenantScopedAuthorizationFacts(TenantId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Tenant email administration requires tenant authority."),
+            (ResourceKinds.Webhook, AuthorizationActions.Update,
+                new WebhookOwnershipAuthorizationFacts(Explore.Domain.WebhookConsumerKind.Tenant, TenantId, TenantId, null, null, null, null),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Webhook mutation requires authority over its actual tenant owner."),
+            (ResourceKinds.PlatformNamespace, AuthorizationActions.Update, InstanceScopedAuthorizationFacts.Instance,
+                ParitySubject.InstanceAdmin, ParitySubject.StandardUser, "Editing the shared platform namespace is an instance operation."),
+            (ResourceKinds.Notification, AuthorizationActions.View, new PersonalResourceAuthorizationFacts(TenantId, UserId),
+                ParitySubject.StandardUser, ParitySubject.InstanceAdmin, "The Local provider permits ordinary notification operations but withholds the instance-admin shortcut; handlers separately enforce personal ownership."),
+            (ResourceKinds.ActorSubscription, AuthorizationActions.View, new PersonalResourceAuthorizationFacts(TenantId, UserId),
+                ParitySubject.StandardUser, ParitySubject.InstanceAdmin, "The Local provider permits ordinary subscription operations but withholds the instance-admin shortcut; handlers separately enforce personal ownership."),
+            (ResourceKinds.AiConversation, AuthorizationActions.View, new PersonalResourceAuthorizationFacts(TenantId, UserId),
+                ParitySubject.StandardUser, ParitySubject.InstanceAdmin, "The Local provider permits ordinary conversation operations but withholds the instance-admin shortcut; handlers separately enforce personal ownership."),
+            (ResourceKinds.Actor, AuthorizationActions.Update, new ActorAuthorizationFacts(TenantId, ActorId, OtherUserId),
+                ParitySubject.TenantAdmin, ParitySubject.StandardUser, "Editing another actor requires tenant authority."),
+            (ResourceKinds.Group, AuthorizationActions.Update, new GroupAuthorizationFacts(TenantId, EventId, OrganizationId),
+                ParitySubject.OrganizationAdmin, ParitySubject.StandardUser, "Editing an organization-owned group requires authority over the organization."),
+            (ResourceKinds.GroupMember, AuthorizationActions.Update, new GroupMemberAuthorizationFacts(TenantId, EventId, OrganizationId, OtherUserId),
+                ParitySubject.OrganizationAdmin, ParitySubject.StandardUser, "Editing group membership requires organization authority; public join access grants no editing authority.")
+        ];
+
+        foreach (var boundary in boundaries)
+        {
+            yield return new ParityScenario($"local-{boundary.Kind}-authorized", "normal-allow", boundary.Allowed,
+                boundary.Kind, boundary.Action, boundary.Facts, true, ParityLane.Local, boundary.Rationale);
+            yield return new ParityScenario($"local-{boundary.Kind}-unauthorized", "normal-deny", boundary.Denied,
+                boundary.Kind, boundary.Action, boundary.Facts, false, ParityLane.Local, boundary.Rationale);
+        }
+
+        yield return new ParityScenario("organization-controller-exports-shared-contacts", "consent-contact-sharing",
+            ParitySubject.OrganizationAdmin, ResourceKinds.EventContactShareConsent, AuthorizationActions.ExportSharedContacts,
+            new ContactShareAuthorizationFacts(TenantId, OrganizationId), true, ParityLane.Local,
+            "An organization administrator may export consent-bound contacts for their own organization.");
+        yield return new ParityScenario("account-holder-views-registration-order", "guest-capability",
+            ParitySubject.StandardUser, ResourceKinds.RegistrationOrder, AuthorizationActions.RegistrationOrders.View,
+            new RegistrationOrderAuthorizationFacts(TenantId, EventId, UserId), true, ParityLane.Local,
+            "The order's authenticated account holder may view their own order without organizer authority.");
+        yield return new ParityScenario("tenant-controller-downloads-own-tenant-object", "public-visibility",
+            ParitySubject.TenantAdmin, ResourceKinds.StorageObject, AuthorizationActions.StorageObjects.Download,
+            new PersistedStorageObjectAuthorizationFacts(TenantId, EventId, "Private", "Active", OtherUserId, null, null),
+            true, ParityLane.Local, "A tenant administrator may read stored content in the tenant they administer.");
+    }
 
     /// <summary>Scenarios a given lane is responsible for evaluating.</summary>
     public static IReadOnlyList<ParityScenario> For(ParityLane lane) =>

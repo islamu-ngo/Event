@@ -1,228 +1,161 @@
-using System.Text.RegularExpressions;
+using System.CodeDom.Compiler;
+using System.Text.Json;
 using System.Xml.Linq;
+using Mono.Cecil;
 
 namespace Event.Architecture.Tests;
 
 public sealed class BlazorIsolationArchitectureTests
 {
-    private static readonly Regex TypeDeclaration = new(
-        @"\b(?<modifiers>(?:(?:public|internal|private|protected|static|sealed|abstract|partial|readonly|file)\s+)*)(?:class|record(?:\s+(?:class|struct))?|struct|enum)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)",
-        RegexOptions.CultureInvariant);
-
-    private static readonly string[] PresentationTypeSuffixes =
-    [
-        "AdminModel",
-        "CommandResult",
-        "DialogResult",
-        "EditModel",
-        "EditorModel",
-        "EventArgs",
-        "FormModel",
-        "FormState",
-        "QueryState",
-        "Result",
-        "Snapshot",
-        "State",
-        "UpdateModel",
-        "ValueModel",
-        "ViewModel",
-        "ViewState"
-    ];
-
-    private static readonly string[] TransportTypeSuffixes =
-    [
-        "Collection",
-        "DefinitionModel",
-        "DetailModel",
-        "Dto",
-        "ListModel",
-        "Model",
-        "OptionModel",
-        "Request",
-        "Resource",
-        "Response"
-    ];
-
     private static readonly string[] BlazorProjects =
     [
-        "Explore.Blazor",
-        "Explore.Blazor.Client",
-        "Explore.Blazor.IntegrationTests",
-        "Explore.Blazor.Client.Tests"
+        "Explore.Blazor", "Explore.Blazor.Client", "Explore.Blazor.IntegrationTests", "Explore.Blazor.Client.Tests"
     ];
 
     private static readonly string[] ForbiddenProjects =
     [
-        "Explore.API",
-        "Explore.Application",
-        "Explore.Domain",
-        "Explore.Infrastructure",
-        "Explore.Persistence"
+        "Explore.API", "Explore.Application", "Explore.Domain", "Explore.Infrastructure", "Explore.Persistence"
     ];
 
     [Test]
     public async Task BlazorProjects_ShouldNotReferenceApiOwnedLayers()
     {
-        var repositoryRoot = ResolveRepositoryRoot();
-        var violations = new List<string>();
-
-        foreach (var projectName in BlazorProjects)
-        {
-            var projectFile = Path.Combine(ResolveProjectPath(repositoryRoot, projectName), $"{projectName}.csproj");
-            violations.AddRange(FindForbiddenProjectReferences(projectFile)
-                .Select(forbidden => $"{projectName} -> {forbidden}"));
-        }
-
+        var violations = BlazorProjects.SelectMany(project => FindForbiddenProjectReferences(
+                Path.Combine(ResolveProjectPath(project), $"{project}.csproj"))
+            .Select(forbidden => $"{project} -> {forbidden}")).ToArray();
         await Assert.That(violations).IsEmpty()
-            .Because($"Blazor projects communicate with the backend through generated API clients only. Violations: {string.Join(", ", violations)}");
+            .Because("Blazor projects communicate with the backend through generated API clients only");
     }
 
     [Test]
-    public async Task BlazorSource_ShouldNotUseApiOwnedNamespaces()
+    public async Task BlazorAssemblies_ShouldNotDependOnApiOwnedLayers()
     {
-        var repositoryRoot = ResolveRepositoryRoot();
-        var forbiddenNamespace = new Regex(
-            @"\bExplore\.(?:API|Application|Domain|Infrastructure|Persistence)\b",
-            RegexOptions.CultureInvariant);
         var violations = new List<string>();
-
-        foreach (var projectName in BlazorProjects)
+        foreach (var project in BlazorProjects)
         {
-            var projectRoot = ResolveProjectPath(repositoryRoot, projectName);
-            foreach (var file in Directory.EnumerateFiles(projectRoot, "*.*", SearchOption.AllDirectories)
-                         .Where(file => file.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
-                             || file.EndsWith(".razor", StringComparison.OrdinalIgnoreCase))
-                         .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                             && !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)))
-            {
-                var source = await File.ReadAllTextAsync(file);
-                if (forbiddenNamespace.IsMatch(RemoveComments(source)))
-                {
-                    violations.Add(Path.GetRelativePath(repositoryRoot, file).Replace('\\', '/'));
-                }
-            }
+            using var assembly = CompiledDependencyGraph.ReadProject(project);
+            violations.AddRange(assembly.MainModule.Types.Where(HasBackendDependency)
+                .Select(type => $"{project}:{type.FullName}"));
         }
-
-        await Assert.That(violations).IsEmpty()
-            .Because($"Blazor source must use generated API contracts or Blazor-owned types. Violations: {string.Join(", ", violations)}");
+        await Assert.That(violations).IsEmpty();
     }
 
     [Test]
     public async Task BlazorProductionBackendContracts_ShouldComeFromGeneratedApiClient()
     {
-        var repositoryRoot = ResolveRepositoryRoot();
-        var generatedContractNames = FindDeclaredTypeNames(GeneratedContractInputs.Client)
-            .Select(NormalizeContractName)
-            .ToHashSet(StringComparer.Ordinal);
-        var violations = new List<string>();
-
-        foreach (var projectName in new[] { "Explore.Blazor", "Explore.Blazor.Client" })
-        {
-            var projectRoot = ResolveProjectPath(repositoryRoot, projectName);
-            foreach (var file in Directory.EnumerateFiles(projectRoot, "*.cs", SearchOption.AllDirectories)
-                         .Where(file => !file.EndsWith("EventApiTagClients.g.cs", StringComparison.OrdinalIgnoreCase))
-                         .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                             && !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)))
-            {
-                var relativePath = Path.GetRelativePath(repositoryRoot, file).Replace('\\', '/');
-                var source = RemoveComments(await File.ReadAllTextAsync(file));
-
-                foreach (Match declaration in TypeDeclaration.Matches(source))
-                {
-                    var typeName = declaration.Groups["name"].Value;
-                    var modifiers = declaration.Groups["modifiers"].Value;
-                    if (IsStaticType(modifiers)
-                        || IsPermittedLocalProtocolShape(relativePath, typeName)
-                        || IsPresentationType(typeName))
-                    {
-                        continue;
-                    }
-
-                    if (IsBackendContractShape(relativePath, typeName, generatedContractNames))
-                    {
-                        violations.Add($"{relativePath}: {typeName}");
-                    }
-                }
-            }
-        }
-
+        using var assembly = CompiledDependencyGraph.ReadProject("Explore.Blazor.Client");
+        var interfaces = assembly.MainModule.Types.Where(type => type.IsInterface
+            && CompiledDependencyGraph.IsGeneratedContract(type)).ToArray();
+        await Assert.That(interfaces).IsNotEmpty();
+        var implementations = assembly.MainModule.Types.Where(type => !type.IsInterface
+            && CompiledDependencyGraph.IsGeneratedContract(type)
+            && type.Interfaces.Any(contract => interfaces.Any(@interface => @interface.FullName == contract.InterfaceType.FullName)))
+            .ToArray();
+        await Assert.That(implementations).IsNotEmpty();
+        var operations = implementations.SelectMany(type => WireOperations(type, interfaces)).ToArray();
+        await Assert.That(operations).IsNotEmpty();
+        var declaredPayloads = operations.SelectMany(method =>
+            method.Parameters.Select(parameter => parameter.ParameterType).Prepend(method.ReturnType));
+        var bodyPayloads = implementations.SelectMany(SerializationPayloads).ToArray();
+        await Assert.That(bodyPayloads).IsNotEmpty();
+        var violations = NonGeneratedPayloads(assembly.MainModule, declaredPayloads.Concat(bodyPayloads));
         await Assert.That(violations).IsEmpty()
-            .Because($"Backend/domain contracts must be generated by NSwag into per-tag clients; only presentation state and local protocol/provider shapes may be Blazor-owned. Violations: {string.Join(", ", violations)}");
+            .Because("canonical backend client signatures and actual serialization bodies use generated transport owners");
+        await Assert.That(implementations.SelectMany(UnsupportedSerializationCalls).ToArray()).IsEmpty()
+            .Because("canonical transport serialization must expose a compiled generic payload identity");
+        var guestClient = implementations.Single(type => type.FullName ==
+            typeof(Explore.Blazor.Client.Clients.GuestRegistrationOrderClient).FullName);
+        var convenience = guestClient.Methods.Single(method => method.Name ==
+            nameof(Explore.Blazor.Client.Clients.IGuestRegistrationOrderClient.StartGuestRegistrationOrderWithCapabilityAsync));
+        await Assert.That(operations.Any(method => method.FullName == convenience.FullName)).IsFalse();
+        await Assert.That(CompiledDependencyGraph.ReachableBodies(convenience)
+            .Where(method => method.HasBody).SelectMany(method => method.Body.Instructions)
+            .Select(instruction => instruction.Operand).OfType<MethodReference>()
+            .Any(method => method.DeclaringType.FullName == guestClient.FullName && method.Name ==
+                nameof(Explore.Blazor.Client.Clients.IGuestRegistrationOrderClient.StartGuestRegistrationOrderAsync))).IsTrue();
+        await Assert.That(bodyPayloads.SelectMany(CompiledDependencyGraph.Expand).Any(type => type.FullName ==
+            typeof(Explore.Blazor.Client.Clients.GuestRegistrationOrderStartResult).FullName)).IsFalse();
     }
 
-    private static bool IsBackendContractShape(
-        string relativePath,
-        string typeName,
-        HashSet<string> generatedContractNames)
+    [Test]
+    public async Task BlazorBoundary_RejectsBodyOnlyBackendDependenciesAndHandwrittenTransportPayloads()
     {
-        if (relativePath.Contains("/Contracts/InstanceAdmin/", StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        return TransportTypeSuffixes.Any(suffix => typeName.EndsWith(suffix, StringComparison.Ordinal))
-            || IsContractDataPath(relativePath)
-                && generatedContractNames.Contains(NormalizeContractName(typeName));
+        using var assembly = CompiledDependencyGraph.ReadAssembly(typeof(BlazorIsolationArchitectureTests).Assembly.Location);
+        var probes = CompiledDependencyGraph.Types(assembly.MainModule)
+            .Where(type => type.DeclaringType?.FullName == typeof(BlazorIsolationArchitectureTests).FullName)
+            .ToDictionary(type => type.Name, StringComparer.Ordinal);
+        await Assert.That(HasBackendDependency(probes[nameof(BackendBodyProbe)])).IsTrue();
+        await Assert.That(HasBackendDependency(probes[nameof(LocalPresentation)])).IsFalse();
+        await Assert.That(WireOperations(probes[nameof(GeneratedTransportProbe)], [probes[nameof(IGeneratedTransportProbe)]])
+            .Select(method => method.Name).ToArray()).IsEquivalentTo([nameof(GeneratedTransportProbe.Send)]);
+        var bodyPayloads = SerializationPayloads(probes[nameof(GeneratedTransportProbe)]).ToArray();
+        await Assert.That(bodyPayloads).IsNotEmpty();
+        await Assert.That(NonGeneratedPayloads(assembly.MainModule, bodyPayloads))
+            .Contains(probes[nameof(HandwrittenPayload)].FullName);
+        await Assert.That(UnsupportedSerializationCalls(probes[nameof(RuntimeTypeSerializationProbe)]).ToArray()).IsNotEmpty();
     }
 
-    private static bool IsPermittedLocalProtocolShape(string relativePath, string typeName)
-    {
-        if (relativePath.StartsWith("Explore.Blazor/", StringComparison.Ordinal) ||
-            relativePath.StartsWith("src/Explore.Blazor/", StringComparison.Ordinal))
-        {
-            return relativePath.Contains("/Configuration/Infisical", StringComparison.Ordinal)
-                || Path.GetFileName(relativePath).Contains("Bff", StringComparison.Ordinal)
-                || typeName.StartsWith("Bff", StringComparison.Ordinal);
-        }
+    private static bool HasBackendDependency(TypeDefinition type) =>
+        CompiledDependencyGraph.Dependencies(type).Any(dependency => ForbiddenProjects.Any(project =>
+            dependency.Namespace == project || dependency.Namespace.StartsWith($"{project}.", StringComparison.Ordinal)));
 
-        return relativePath.Contains("/Interop/", StringComparison.Ordinal)
-            || relativePath.Contains("/Models/Analytics/", StringComparison.Ordinal)
-            || Path.GetFileName(relativePath).Contains("Bff", StringComparison.Ordinal)
-            || typeName.StartsWith("Bff", StringComparison.Ordinal);
+    private static IEnumerable<MethodDefinition> WireOperations(
+        TypeDefinition implementation, IEnumerable<TypeDefinition> interfaces)
+    {
+        var contracts = interfaces.Where(contract => implementation.Interfaces.Any(@interface =>
+                @interface.InterfaceType.FullName == contract.FullName))
+            .SelectMany(contract => contract.Methods).ToArray();
+        var operations = implementation.Methods.Where(method => contracts.Any(contract =>
+            method.Name == contract.Name && method.ReturnType.FullName == contract.ReturnType.FullName
+            && method.Parameters.Select(parameter => parameter.ParameterType.FullName)
+                .SequenceEqual(contract.Parameters.Select(parameter => parameter.ParameterType.FullName))))
+            .ToArray();
+        var boundaries = operations.Where(method => method.IsPublic)
+            .Select(method => method.FullName).ToHashSet(StringComparer.Ordinal);
+        return operations.Where(operation => CompiledDependencyGraph.ReachableBodies(operation,
+                target => boundaries.Contains(target.FullName))
+            .Where(method => method.HasBody).SelectMany(method => method.Body.Instructions)
+            .Select(instruction => instruction.Operand).OfType<MethodReference>()
+            .Any(method => method.DeclaringType.FullName == typeof(HttpClient).FullName
+                && method.Name == nameof(HttpClient.SendAsync)));
     }
 
-    private static bool IsPresentationType(string typeName) =>
-        PresentationTypeSuffixes.Any(suffix => typeName.EndsWith(suffix, StringComparison.Ordinal));
+    private static IEnumerable<TypeReference> SerializationPayloads(TypeDefinition type) =>
+        CompiledDependencyGraph.Members(type).OfType<GenericInstanceMethod>()
+            .Where(method => method.DeclaringType.FullName == typeof(JsonSerializer).FullName
+                    && method.Name is nameof(JsonSerializer.Serialize) or nameof(JsonSerializer.SerializeToUtf8Bytes)
+                        or nameof(JsonSerializer.Deserialize) or nameof(JsonSerializer.DeserializeAsync)
+                || method.Name == "ReadObjectResponseAsync"
+                    && method.DeclaringType.FullName == type.FullName)
+            .SelectMany(method => method.GenericArguments);
 
-    private static bool IsContractDataPath(string relativePath) =>
-        relativePath.Contains("/Contracts/", StringComparison.Ordinal)
-        || relativePath.Contains("/Models/", StringComparison.Ordinal);
+    private static IEnumerable<string> UnsupportedSerializationCalls(TypeDefinition type) =>
+        CompiledDependencyGraph.Members(type).OfType<MethodReference>()
+            .Where(method => method.DeclaringType.FullName == typeof(JsonSerializer).FullName
+                && method.Name is nameof(JsonSerializer.Serialize) or nameof(JsonSerializer.SerializeToUtf8Bytes)
+                    or nameof(JsonSerializer.Deserialize) or nameof(JsonSerializer.DeserializeAsync)
+                && method is not GenericInstanceMethod)
+            .Select(method => method.FullName);
 
-    private static bool IsStaticType(string modifiers) =>
-        modifiers.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains("static", StringComparer.Ordinal);
-
-    private static IEnumerable<string> FindDeclaredTypeNames(string source) =>
-        TypeDeclaration.Matches(RemoveComments(source))
-            .Select(match => match.Groups["name"].Value);
-
-    private static string NormalizeContractName(string typeName)
+    private static string[] NonGeneratedPayloads(ModuleDefinition module, IEnumerable<TypeReference> payloads)
     {
-        foreach (var suffix in TransportTypeSuffixes)
+        var types = CompiledDependencyGraph.Types(module).ToDictionary(type => type.FullName, StringComparer.Ordinal);
+        var pending = new Queue<TypeReference>(payloads);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var violations = new List<string>();
+        while (pending.TryDequeue(out var payload))
         {
-            if (typeName.EndsWith(suffix, StringComparison.Ordinal))
+            foreach (var reference in CompiledDependencyGraph.Expand(payload))
             {
-                return typeName[..^suffix.Length];
+                if (!types.TryGetValue(reference.FullName, out var type) || !visited.Add(type.FullName)) continue;
+                if (!CompiledDependencyGraph.IsGeneratedContract(type)) violations.Add(type.FullName);
+                foreach (var member in type.Properties.Select(property => property.PropertyType)
+                    .Concat(type.Fields.Where(field => !field.IsStatic).Select(field => field.FieldType)))
+                    pending.Enqueue(member);
+                if (type.BaseType is not null) pending.Enqueue(type.BaseType);
             }
         }
-
-        return typeName;
-    }
-
-    private static string RemoveComments(string source)
-    {
-        var withoutBlocks = Regex.Replace(
-            source,
-            @"/\*.*?\*/|@\*.*?\*@",
-            string.Empty,
-            RegexOptions.Singleline | RegexOptions.CultureInvariant);
-
-        return string.Join(
-            '\n',
-            Regex.Replace(
-                withoutBlocks,
-                @"//.*$",
-                string.Empty,
-                RegexOptions.Multiline | RegexOptions.CultureInvariant).Split('\n'));
+        return [.. violations];
     }
 
     private static IEnumerable<string> FindForbiddenProjectReferences(string projectFile)
@@ -230,66 +163,83 @@ public sealed class BlazorIsolationArchitectureTests
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pending = new Stack<string>();
         pending.Push(Path.GetFullPath(projectFile));
-
         while (pending.TryPop(out var currentProject))
         {
-            if (!visited.Add(currentProject))
-            {
-                continue;
-            }
-
+            if (!visited.Add(currentProject)) continue;
             var projectDirectory = Path.GetDirectoryName(currentProject)!;
             var document = XDocument.Load(currentProject);
             foreach (var reference in document.Descendants()
-                         .Where(element => element.Name.LocalName is "ProjectReference" or "Reference"))
+                .Where(element => element.Name.LocalName is "ProjectReference" or "Reference"))
             {
                 var include = reference.Attribute("Include")?.Value;
-                if (string.IsNullOrWhiteSpace(include))
+                if (string.IsNullOrWhiteSpace(include)) continue;
+                var forbidden = ForbiddenProjects.FirstOrDefault(project => include.Contains(project, StringComparison.OrdinalIgnoreCase));
+                if (forbidden is not null)
                 {
+                    yield return forbidden;
                     continue;
                 }
-
-                var forbiddenReference = ForbiddenProjects.FirstOrDefault(
-                    project => include.Contains(project, StringComparison.OrdinalIgnoreCase));
-                if (forbiddenReference is not null)
-                {
-                    yield return forbiddenReference;
-                    continue;
-                }
-
-                if (reference.Name.LocalName == "Reference"
-                    || include.Contains("$(", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
+                if (reference.Name.LocalName == "Reference" || include.Contains("$(", StringComparison.Ordinal)) continue;
                 var referencedProject = Path.GetFullPath(Path.Combine(projectDirectory, include));
-                if (File.Exists(referencedProject))
-                {
-                    pending.Push(referencedProject);
-                }
+                if (File.Exists(referencedProject)) pending.Push(referencedProject);
             }
         }
     }
 
-    private static string ResolveProjectPath(string repoRoot, string projectName)
+    private static string ResolveProjectPath(string project)
     {
-        var srcPath = Path.Combine(repoRoot, "src", projectName);
-        if (Directory.Exists(srcPath)) return srcPath;
-        var testsPath = Path.Combine(repoRoot, "tests", projectName);
-        if (Directory.Exists(testsPath)) return testsPath;
-        return Path.Combine(repoRoot, projectName);
+        var source = ContextSystemHelpers.RepoPath(project);
+        return Directory.Exists(source) ? source : ContextSystemHelpers.RepoPath("tests", project);
     }
 
-    private static string ResolveRepositoryRoot()
+    private static class BackendBodyProbe
     {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null && !File.Exists(Path.Combine(current.FullName, "Explore.slnx")))
+        public static Func<Type> Dependency() => () => typeof(Explore.Application.Contracts.Persistence.IUserRepository);
+    }
+
+    [GeneratedCode("NSwag", "calibration")]
+    private interface IGeneratedTransportProbe
+    {
+        Task<HttpResponseMessage> Send(HttpClient client);
+        Task<HttpResponseMessage> Convenience(HttpClient client);
+    }
+
+    [GeneratedCode("NSwag", "calibration")]
+    private sealed class GeneratedTransportProbe : IGeneratedTransportProbe
+    {
+        public Task<HttpResponseMessage> Send(HttpClient client) => SendCore(client);
+
+        public Task<HttpResponseMessage> Convenience(HttpClient client) => Send(client);
+
+        private async Task<HttpResponseMessage> SendCore(HttpClient client)
         {
-            current = current.Parent;
+            await Task.Yield();
+            using var request = new HttpRequestMessage(HttpMethod.Post, "https://backend.example.test");
+            request.Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(new HandwrittenPayload()));
+            return await WireSender<int>.Send(client, request);
         }
 
-        return current?.FullName
-            ?? throw new DirectoryNotFoundException("Could not locate the repository root from the architecture test output directory.");
+        private static class WireSender<TMarker>
+        {
+            public static Task<HttpResponseMessage> Send(HttpClient client, HttpRequestMessage request) =>
+                client.SendAsync(request);
+        }
+    }
+
+    private sealed class HandwrittenPayload
+    {
+        public string? Value { get; init; }
+    }
+
+    [GeneratedCode("NSwag", "calibration")]
+    private static class RuntimeTypeSerializationProbe
+    {
+        public static string Serialize() => JsonSerializer.Serialize(
+            new HandwrittenPayload(), typeof(HandwrittenPayload), (JsonSerializerOptions?)null);
+    }
+
+    private sealed class LocalPresentation
+    {
+        public string? Value { get; init; }
     }
 }

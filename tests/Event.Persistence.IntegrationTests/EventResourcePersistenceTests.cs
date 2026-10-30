@@ -507,7 +507,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
                 var configuration = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
                     .AddEnvironmentVariables().Build();
                 using var configurationOwner = (IDisposable)configuration;
-                var selected = Explore.Secrets.Database.PrimaryDatabaseConfiguration.BindRuntime(configuration);
+                var selected = Explore.Persistence.Database.PrimaryDatabaseConfiguration.BindRuntime(configuration);
                 var measured = TestDbContextOptions.Create<ExploreDbContext>();
                 Explore.Persistence.Database.PrimaryDatabaseProviderComposition.ConfigureApplication(measured, selected);
                 var measuredOptions = measured.Options;
@@ -582,10 +582,10 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
                 throw new InvalidOperationException("Audience measurement requires the initialized SQLite owner.");
             var options = TestDbContextOptions.Create(_options);
             Explore.Persistence.Database.PrimaryDatabaseProviderComposition.ConfigureApplication(options,
-                new Explore.Secrets.Database.PrimaryDatabaseConnectionOptions
+                new Explore.Persistence.Database.PrimaryDatabaseConnectionOptions
                 {
-                    Role = Explore.Secrets.Database.PrimaryDatabaseRole.Runtime,
-                    Provider = Explore.Secrets.Database.PrimaryDatabaseProvider.Sqlite,
+                    Role = Explore.Persistence.Database.PrimaryDatabaseRole.Runtime,
+                    Provider = Explore.Persistence.Database.PrimaryDatabaseProvider.Sqlite,
                     Database = _connection.DataSource
                 });
             options.UseSqlite(_connection);

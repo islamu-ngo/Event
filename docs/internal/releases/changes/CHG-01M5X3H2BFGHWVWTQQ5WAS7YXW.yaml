@@ -1,0 +1,32 @@
+Change-Id: CHG-01M5X3H2BFGHWVWTQQ5WAS7YXW
+Title: "Acquire database tooling credentials through the selected authority"
+Type: feat
+Scope: database
+Summary: "Move database bootstrap ownership to Persistence and replace legacy secret loading with explicit selected-owner acquisition for migrations and credential-bearing tools."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/adr/ADR-secretkit-event-ownership.md
+    Disposition: documented
+    Detail: Database tooling now uses Persistence-owned contracts and explicit selected-authority acquisition with purpose-declared credentials; consumers migrate to that API rather than relying on legacy bootstrap contracts.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Database acquisition preserves authority and role isolation, masks unselected credential aliases and owns acquired resources through completion; offline model-only commands acquire no authority.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+    Detail: This ownership and tooling packet changes no persisted schema; retained mutation evidence has a separate generated migration packet.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: Select the migration authority explicitly and provide its declared role credentials and Infisical lifetime policy when that provider is selected; do not rely on ordinary configuration fallback.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Database ownership and tooling acquisition do not change public HTTP schemas.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/secrets.md
+    Disposition: documented
+    Detail: Use the documented migration and emergency-tool authority inputs; preserve credential-free model-only verification and treat failed authority acquisition as failure rather than switching providers.

@@ -1,6 +1,6 @@
 using Explore.Domain;
 using Explore.Persistence;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace Event.Persistence.IntegrationTests.Database;

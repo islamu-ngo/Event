@@ -13,7 +13,11 @@ namespace Explore.Application.Contracts.Secrets;
 /// <param name="Scope">Scope at which the binding was registered.</param>
 /// <param name="ScopeId">Tenant id when <paramref name="Scope"/> is <see cref="SecretScope.Tenant"/>, otherwise <c>null</c>.</param>
 /// <param name="ResolvedAt">UTC timestamp of resolution (useful for TTL accounting and audit correlation).</param>
-/// <param name="BindingRevision">Stable, value-free provider/binding version. It changes when the selected credential changes.</param>
+/// <param name="BindingRevision">
+/// Opaque, value-free comparison token owned by the selected process generation, not a portable provider version.
+/// Native revision or binding changes, owner replacement and evidence eviction invalidate it even when material is unchanged.
+/// An empty token supplies no revision evidence and cannot authorize a reviewed provisioning operation.
+/// </param>
 public sealed record ResolvedSecret(
     string SettingKey,
     string Value,

@@ -221,12 +221,20 @@ public static partial class PostgresOrdinarySettingsContract
                 THEN RAISE EXCEPTION 'ordinary_settings_tenant_policy_drift' USING ERRCODE = '55000'; END IF;
                 """;
         }));
-        string ambient = string.Join("\n", Sources.Select(type => $"""
-            IF pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,
-                    'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT,UPDATE,REFERENCES')
-            THEN RAISE EXCEPTION 'ordinary_settings_global_ambient_write' USING ERRCODE = '55000'; END IF;
-            """));
+        string ambient = string.Join("\n", Sources.Select(type =>
+        {
+            string insertDenial = $"pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT')";
+            if (PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, type, out _, out var insert, out _)
+                && insert.Count != 0)
+                insertDenial += $" AND ({PostgresManagedTenantWorkerCreationPermissions.CompleteGlobalCataloguePredicate(context, enrollment)}) IS NOT TRUE";
+            return $"""
+                IF pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,
+                        'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                    OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'UPDATE,REFERENCES')
+                    OR ({insertDenial})
+                THEN RAISE EXCEPTION 'ordinary_settings_global_ambient_write' USING ERRCODE = '55000'; END IF;
+                """;
+        }));
         string privateAccess = string.Join("\n", new[] { enrollment.RuntimeLogin, enrollment.GlobalLogin }
             .SelectMany(login => new[] { SourceTable, AttemptTable }.Select(table => $"""
                 IF pg_catalog.has_table_privilege({Text(login)},{Text(sql.Name(table))}::regclass,

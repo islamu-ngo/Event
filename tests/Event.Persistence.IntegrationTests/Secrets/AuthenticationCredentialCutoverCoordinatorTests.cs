@@ -1071,6 +1071,11 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
             AuthenticationCredentialCutover.CredentialAuthority.Infisical, Guid.CreateVersion7());
 
         public AuthenticationCredentialProfile ReadCurrent() => Current;
+        public AuthenticationCredentialProfileObservation ObserveCurrent()
+        {
+            var current = Current;
+            return new(current.Authority, current.Revision);
+        }
     }
 
     // The fixture supplies the already-authenticated request frame directly. Creating the

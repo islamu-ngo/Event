@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Reflection;
 using Explore.Application.Authorization;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
@@ -67,6 +68,28 @@ public sealed class LocalProviderParityLaneTests
         await WriteReportAsync(diagnostics);
 
         await Assert.That(mismatches).IsEmpty();
+    }
+
+    [Test]
+    public async Task CorpusExercisesEveryGenericResourceWithBothOutcomes()
+    {
+        string[] genericKinds = typeof(ResourceKinds)
+            .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(field => field.IsLiteral && field.FieldType == typeof(string))
+            .Select(field => (string)field.GetRawConstantValue()!)
+            // Event resources have a dedicated frozen authority path; the generic provider must deny
+            // even administrators. EventResourceAuthorizationParityTests exercises its actual ceiling.
+            .Where(kind => kind != ResourceKinds.EventResource)
+            .ToArray();
+        IReadOnlyList<ParityScenario> scenarios = ParityCorpus.For(ParityLane.Local);
+
+        foreach (string kind in genericKinds)
+        {
+            await Assert.That(scenarios.Any(scenario => scenario.ResourceKind == kind && scenario.ExpectedAllowed))
+                .IsTrue().Because($"{kind} needs a real authorized scenario; an all-deny evaluator is not an implementation.");
+            await Assert.That(scenarios.Any(scenario => scenario.ResourceKind == kind && !scenario.ExpectedAllowed))
+                .IsTrue().Because($"{kind} needs an unauthorized scenario to preserve its authority boundary.");
+        }
     }
 
     [Test]

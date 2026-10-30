@@ -1,7 +1,7 @@
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Security;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 

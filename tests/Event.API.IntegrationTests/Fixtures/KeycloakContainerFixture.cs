@@ -31,9 +31,21 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
 
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(2);
 
-    private IContainer _container = null!;
+    private IContainer? _container;
+    private SecurityInfrastructureFixture.ContainerCreationObservation? _creationObservation;
+    private readonly object _disposalSync = new();
+    private Task? _disposal;
     private readonly Dictionary<string, string> _userPasswords = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _clientSecrets = new(StringComparer.Ordinal);
+
+    public KeycloakContainerFixture() { }
+
+    internal KeycloakContainerFixture(IContainer container,
+        SecurityInfrastructureFixture.ContainerCreationObservation observation)
+    {
+        _container = container;
+        _creationObservation = observation;
+    }
 
     /// <summary>
     /// The OIDC authority URL (e.g., <c>http://localhost:{port}/realms/ISLAMU</c>).
@@ -90,8 +102,8 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
             });
         }
 
-        _container = new ContainerBuilder()
-            .WithImage(KeycloakImage)
+        var ownership = await SecurityInfrastructureFixture.WithAssuranceOwnershipAsync(new ContainerBuilder(KeycloakImage), "keycloak");
+        var container = ownership.Builder
             .WithPortBinding(8080, true)
             .WithResourceMapping(JsonSerializer.SerializeToUtf8Bytes(realm),
                 "/opt/keycloak/data/import/ISLAMU-realm.test.json")
@@ -108,18 +120,28 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
                         .ForStatusCode(System.Net.HttpStatusCode.OK),
                     wait => wait.WithTimeout(StartupTimeout)))
             .Build();
-
+        _container = container;
         using var startupCts = new CancellationTokenSource(StartupTimeout);
-        await _container.StartAsync(startupCts.Token);
+        try
+        {
+            _creationObservation = await SecurityInfrastructureFixture.BeginCreationObservationAsync(
+                ownership.Ownership, "keycloak", container, startupCts.Token);
+            await SecurityInfrastructureFixture.StartObservedContainerAsync(container, _creationObservation, startupCts.Token);
+            var host = container.Hostname;
+            var port = container.GetMappedPublicPort(8080);
 
-        var host = _container.Hostname;
-        var port = _container.GetMappedPublicPort(8080);
+            BaseUrl = $"http://{host}:{port}";
+            Authority = $"{BaseUrl}/realms/{RealmName}";
+            MetadataAddress = $"{Authority}/.well-known/openid-configuration";
 
-        BaseUrl = $"http://{host}:{port}";
-        Authority = $"{BaseUrl}/realms/{RealmName}";
-        MetadataAddress = $"{Authority}/.well-known/openid-configuration";
-
-        TokenClient = CreateTokenClient(ClientSecret);
+            TokenClient = CreateTokenClient(ClientSecret);
+        }
+        catch (Exception primary)
+        {
+            try { await DisposeAsync(); }
+            catch (Exception cleanup) { throw new AggregateException(primary, cleanup); }
+            throw;
+        }
     }
 
     public KeycloakTokenClient CreateTokenClient(string clientSecret) => new(
@@ -136,12 +158,31 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
         clientSecret: _clientSecrets[clientId],
         userPasswords: _userPasswords);
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        TokenClient?.Dispose();
-        if (_container is not null)
+        lock (_disposalSync) return new ValueTask(_disposal ??= DisposeCoreAsync());
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        var client = TokenClient;
+        TokenClient = null!;
+        Exception? primary = null;
+        try { client?.Dispose(); }
+        catch (Exception exception) { primary = exception; }
+        var container = _container;
+        var observation = _creationObservation;
+        _container = null;
+        _creationObservation = null;
+        try
         {
-            await _container.DisposeAsync();
+            await SecurityInfrastructureFixture.DisposeObservedContainerAsync(container, observation);
         }
+        catch (Exception cleanup)
+        {
+            if (primary is not null) throw new AggregateException(primary, cleanup);
+            throw;
+        }
+        if (primary is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(primary).Throw();
     }
 }

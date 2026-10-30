@@ -39,6 +39,19 @@ public static partial class PostgresStorageConfigurationContract
     internal static string FunctionSql(ExploreDbContext context, string operation) =>
         new HumanPrincipalSourceSql(context).Name(Prefix + operation);
 
+    internal static string AdmissionSql(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        $"DO $admission$ BEGIN {Guard(context, enrollment)} {ExactBodies(context, enrollment)} END $admission$;";
+
+    internal static string SourceTriggerPredicate(ExploreDbContext context, Type sourceType)
+    {
+        if (!Sources.Contains(sourceType)) return "false";
+        return $"""
+            (t.tgrelid=pg_catalog.to_regclass({Text(new HumanPrincipalSourceSql(context).Table(sourceType))})
+                AND t.tgname={Text(Prefix + "changed")}
+                AND t.tgfoid=pg_catalog.to_regprocedure({Text(FunctionSql(context, "changed") + "()")}))
+            """;
+    }
+
     public static async Task ApplyAsync(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
         CancellationToken cancellationToken = default)
     {

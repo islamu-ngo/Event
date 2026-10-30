@@ -1,4 +1,3 @@
-// Part of the Explore.Secrets system for database-backed dynamic configuration.
 // Different from SystemSetting/TenantSetting which handle cascading application settings.
 
 namespace Explore.Domain;

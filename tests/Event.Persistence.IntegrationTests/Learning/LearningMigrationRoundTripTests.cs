@@ -1,7 +1,7 @@
 using System.Data.Common;
 using Explore.Domain.Learning;
 using Explore.Persistence;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;

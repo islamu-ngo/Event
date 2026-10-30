@@ -325,10 +325,7 @@ dotnet test --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj
 # Application unit tests
 dotnet test --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release --verbosity quiet
 
-# Secrets authority unit tests
-dotnet test --project tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration Release --verbosity quiet
-
-# Infrastructure unit / category tests
+# Infrastructure unit / category tests (includes native Secrets tests)
 dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*/*[Category!=Runtime]" --minimum-expected-tests 1
 
 # Persistence integration tests

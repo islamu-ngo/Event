@@ -14,6 +14,36 @@ ISLAMU Event follows **Convention over Configuration**. The platform includes se
 
 ---
 
+## Shared browser session authority
+
+These inputs are required for browser sign-in in BFF and Standalone hosts,
+regardless of the primary authentication or database provider. The session backend
+is separate from the ordinary cache and Data Protection key authority.
+
+| Input | Authority and deployment rule |
+| --- | --- |
+| `BFF_SESSION_REDIS_ENDPOINT` | Nonsecret absolute `redis://host:port` or `rediss://host:port` URI. No embedded credentials, query, fragment or non-root path. |
+| `BFF_SESSION_NAMESPACE` | Stable deployment identifier: 1–64 ASCII letters, digits, `_` or `-`. Intended peers and restarts share it; unrelated deployments must differ. |
+| `BFF_SESSION_REDIS_PASSWORD` | Password from the explicitly selected Environment authority, shared User Secrets in Development/Testing only, or the exact Infisical `/runtime/bff/session` key. Missing selected authority never falls back to merged settings. |
+
+Provision the dedicated session service with the same intended password. Retain
+its data and compatible BFF encryption authority for restart continuity. The API
+and ordinary cache do not use this password. See
+[shared browser sessions and logout](authentication-providers.md#shared-browser-sessions-and-logout)
+for revocation, failure recovery and the required new sign-in after activation.
+
+The bundled Compose authority is opt-in through `--profile bff-session`. Its
+provisioner and the BFF runtime secret source are separate: explicitly provision
+matching values, including when BFF selects Infisical. A stale or unknown-freshness
+session restore requires a new namespace and fresh sign-in.
+
+Local/Compose cache and session resources use the admitted pinned Redis image.
+They remain separate services. An image pin is not a data downgrade procedure:
+do not attach an older server to existing newer-format data. Use an explicitly
+disposable fresh development store or a reviewed version-compatible export and
+restore. No automatic volume conversion or deletion is performed; optional
+third-party cache consumers still need separate compatibility checks.
+
 ## Runtime actor ownership access
 
 The existing Runtime database login can read only the Actor linkage identifiers
@@ -55,6 +85,16 @@ your topology launches. URL, project and environment remain shared nonsecret
 coordinates; the machine identities and their ACLs are independent. The generic
 `INFISICAL_CLIENT_ID/CLIENT_SECRET` fields are direct-process inputs, not an
 orchestrator fallback. All credentials require process/deployment restart.
+
+For each enabled Infisical consumer, use the same `INFISICAL_API_`,
+`INFISICAL_BFF_`, `INFISICAL_COMBINED_` or `INFISICAL_MIGRATION_` prefix with
+`TOKEN_LIFETIME` (`Finite` or `Periodic`), `TOKEN_PERIOD_SECONDS` (required only
+for periodic identities), `RENEW_BEFORE_SECONDS` (default 60), and
+`REQUEST_TIMEOUT_SECONDS` (default 15, maximum 60). A finite period is unset or
+blank; a nonblank value is rejected. These policies are independent, not a
+shared fallback. Direct process launches instead use
+`SecretProvider__Infisical__TokenLifetime/TokenPeriodSeconds/RenewBeforeSeconds/RequestTimeoutSeconds`.
+See [secret lifecycle and recovery](secrets.md#fail-closed-authority-status).
 
 `KEYCLOAK__AUDIENCE` is public configuration identifying the API resource
 (default `islamu-event-api`). `KEYCLOAK__PERMITTEDCLIENTS__0` is an optional,
@@ -246,6 +286,19 @@ is limited to Development/Testing; independent pins still use process environmen
 Renewal and changes require coordinated restart/drain, not live mutation.
 
 ## 2. Database & Relational Persistence
+
+Migration and credential-bearing EF tooling use the explicitly selected
+`SECRET_PROVIDER` and migration-purpose acquisition. Supply database variables
+to the actual command's process; launching Aspire does not inject a different
+terminal's environment. User Secrets is restricted to Development/Testing and
+uses the shared `event-shared-secrets` store, with `src/Explore.API` as its CLI
+owner. There is no fallback from an unavailable authority to application settings
+or a raw connection string.
+
+`DesignTime:ModelOnly` is deliberately **not an environment variable**. Pass
+`--DesignTime:ModelOnly=true` to EF after `--` for offline model scaffolding,
+together with the explicit provider and any required schema/server-version
+fields. It cannot apply migrations or prove database access.
 
 Before upgrading, configure credentials independently for every database role
 your deployment selects. Use that role's structured username/password fields or

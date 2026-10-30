@@ -23,6 +23,7 @@ using Explore.Persistence.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -33,7 +34,8 @@ namespace Explore.Infrastructure.Tests.Fixtures;
 
 internal sealed class PersistedEmailDispatchScenario(MailpitContainerFixture mailpit)
 {
-    internal static ServiceProvider CreateServiceProvider(DispatchDatabase database, IEmailService transport, string consumerId = "mailpit-drain-test")
+    internal static ServiceProvider CreateServiceProvider(DispatchDatabase database, IEmailService transport,
+        string consumerId = "mailpit-drain-test", Action<Task<EmailDispatchSingleDrainResult>>? observeNativeTask = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -64,14 +66,15 @@ internal sealed class PersistedEmailDispatchScenario(MailpitContainerFixture mai
             ConsumerId = consumerId
         }));
         services.AddSingleton<EmailDispatchDrainService>();
-        services.AddSingleton<IEmailDispatchDrainService>(provider =>
-            provider.GetRequiredService<EmailDispatchDrainService>());
+        services.AddSingleton<IEmailDispatchDrainService>(provider => observeNativeTask is null
+            ? provider.GetRequiredService<EmailDispatchDrainService>()
+            : new ObservedNativeDrain(provider.GetRequiredService<EmailDispatchDrainService>(), observeNativeTask));
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
     }
 
-    internal async Task<DispatchDatabase> CreateDatabaseAsync(string subject, string body)
+    internal async Task<DispatchDatabase> CreateDatabaseAsync(string subject, string body, IInterceptor? interceptor = null)
     {
-        var database = new DispatchDatabase();
+        var database = new DispatchDatabase(interceptor);
         try
         {
             await using var context = database.CreateContext();
@@ -122,7 +125,26 @@ internal sealed class PersistedEmailDispatchScenario(MailpitContainerFixture mai
         await Assert.That(delivery.StatusId).IsEqualTo((int)NotificationDeliveryStatusEnum.Delivered);
     }
 
-    internal sealed class DispatchDatabase : IAsyncDisposable,
+    // Return the original native tasks so teardown can await its real scope disposal.
+    private sealed class ObservedNativeDrain(EmailDispatchDrainService native,
+        Action<Task<EmailDispatchSingleDrainResult>> observe) : IEmailDispatchDrainService
+    {
+        public Task<EmailDispatchDrainResult> ProcessBatchAsync(CancellationToken cancellationToken) =>
+            native.ProcessBatchAsync(cancellationToken);
+
+        public Task<EmailDispatchRecoveryResult> RecoverStaleProcessingAsync(CancellationToken cancellationToken) =>
+            native.RecoverStaleProcessingAsync(cancellationToken);
+
+        public Task<EmailDispatchSingleDrainResult> ProcessSingleAsync(Guid tenantId, Guid publishEventId,
+            string consumerId, CancellationToken cancellationToken)
+        {
+            var task = native.ProcessSingleAsync(tenantId, publishEventId, consumerId, cancellationToken);
+            observe(task);
+            return task;
+        }
+    }
+
+    internal sealed class DispatchDatabase(IInterceptor? interceptor = null) : IAsyncDisposable,
         IEmailDispatchAdmissionDbContextFactory, ITenantExploreDbContextFactory
     {
         private readonly string _path = Path.Combine(Path.GetTempPath(), $"mailpit-dispatch-{Guid.CreateVersion7():N}.db");
@@ -141,12 +163,29 @@ internal sealed class PersistedEmailDispatchScenario(MailpitContainerFixture mai
                 .UseSqlite(connectionString)
                 .UseSnakeCaseNamingConvention()
                 .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance,
-                    SqliteProjectionLockTransactionInterceptor.Instance)
-                .Options;
-            return new ExploreDbContext(options)
+                    SqliteProjectionLockTransactionInterceptor.Instance);
+            if (interceptor is not null) options.AddInterceptors(interceptor);
+            var context = new ExploreDbContext(options.Options)
             {
                 TenantContext = tenantId is { } id ? new TenantIdentity(id) : null
             };
+            try
+            {
+                context.BindTenantLease();
+                return context;
+            }
+            catch (Exception acquisitionFailure)
+            {
+                try
+                {
+                    context.Dispose();
+                }
+                catch (Exception cleanupFailure)
+                {
+                    throw new AggregateException(acquisitionFailure, cleanupFailure);
+                }
+                throw;
+            }
         }
 
         public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)

@@ -1,0 +1,32 @@
+Change-Id: CHG-01M5X3MGPFR8XRCJ4PRY9XDJED
+Title: "Retain native mutation evidence after interrupted setup writes"
+Type: fix
+Scope: self-hosting
+Summary: "Persist nullable native dispatch evidence and preserve applied or uncertain setup outcomes after HTTP cancellation; only proven non-dispatch permits cancellation and replay cannot duplicate an uncertain remote write."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+    Detail: Adds nullable storage evidence without removing public contracts; historical null evidence remains unknown rather than proof of non-dispatch.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Native receipt projections survive waiter cancellation and distinguish non-dispatch, application and uncertainty; uncertain remote effects cannot be relabeled safe cancellation or silently replayed.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: Apply the generated RetainSecretMutationEvidence migration for the selected PostgreSQL, SQLite, SQL Server or MySQL-family provider before the new application writes mutation_evidence; MySQL and MariaDB share one generated assembly.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+    Detail: Settlement uses the existing selected authority and setup operation identity without adding a new environment variable or recovery provider.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Native evidence is an internal application and persistence contract, not a new public request field.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/secrets.md
+    Disposition: documented
+    Detail: Preserve retained operation evidence during recovery; schema rollback cannot undo an applied remote write and must not be used to manufacture a replayable non-dispatch outcome.

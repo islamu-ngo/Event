@@ -319,21 +319,38 @@ revoked grant, expired credential or newly restrictive policy rolls back the
 whole group. Tenant patches preserve existing locks; instance group writes keep
 their existing lock-clearing behavior.
 
+Storage authentication accepts a new ticket or principal wrapper containing the
+original validated identity. This does not renew the signed credential's deadline.
+Replacing the credential, changing the original request's identity or claim
+collections, changing current grants or replacing the resolved request tenant
+still rejects the operation; the selected database tenant stays fixed.
+
 Validation and writing now use the same retained first configuration snapshot,
 including settings and binding winners that were absent when validation began.
 A row inserted or replaced between validation and writing cannot silently become
 the new baseline. The server uses a dedicated writer, not a later dashboard
 read or a generic setting update; cache activation follows acknowledged commit.
 
-SQLite and PostgreSQL paths are authored. PostgreSQL requires its dedicated
-migration-installed configuration contract; missing or altered authority is
-rejected rather than repaired at runtime. Other database-provider custody
-paths remain unsupported and reject editing.
+External storage-credential resolution completes before transactional writing.
+Before committing, the server freshly checks the original account binding,
+administrator grants and support sources within the same database transaction.
+If those sources changed, the save is rejected and the selected policy and S3
+changes roll back together. Existing caches retain the last acknowledged
+settings. Refresh the current settings and start a new save after resolving the
+authority change; a failed save's previous approval cannot be replayed.
+
+SQLite administrative save controls have executed successfully for current
+authority, original-source changes, complete rollback, cache retention and a
+fresh attempt after failure. PostgreSQL requires its dedicated migration-installed
+configuration contract; missing or altered authority is rejected rather than
+repaired at runtime. Its database-provider runtime assurance remains separate
+and pending. Other database-provider custody paths remain unsupported and reject
+editing.
 
 Setup authority is not storage configuration authority. Provider probes and
-accounting recalculation have separate custody requirements. The security
-programme has authored configuration regression controls, but executable
-database-provider assurance remains pending. Instance S3 cache invalidation now
+accounting recalculation have separate custody requirements; the SQLite save
+controls do not certify live S3 probes or other configuration families.
+Instance S3 cache invalidation now
 refreshes all published scopes in the current process and prevents stale
 in-progress reads from republishing. Cross-server refresh is not added or
 certified by this source change.

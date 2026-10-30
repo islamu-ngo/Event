@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging.Abstractions;
 using TUnit.Assertions;
 using TUnit.Core;
 
@@ -156,6 +157,7 @@ public class EventListTemporalFilterTests : IAsyncDisposable
         await DatabaseSeeder.SeedAsync(
             dbContext,
             scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>(),
+            NullLogger.Instance,
             seedDevelopmentData: false);
         await EnsureTenantExistsAsync(dbContext);
 

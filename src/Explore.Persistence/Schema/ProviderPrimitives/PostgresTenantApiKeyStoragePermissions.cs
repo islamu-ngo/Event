@@ -234,7 +234,8 @@ public static class PostgresTenantApiKeyStoragePermissions
                         OR EXISTS (SELECT 1 FROM unnest({tables}) target(relation)
                             JOIN pg_catalog.pg_class c ON c.oid=pg_catalog.to_regclass(target.relation)
                             WHERE c.relowner=r.oid OR pg_catalog.has_schema_privilege(r.oid,c.relnamespace,'CREATE')
-                                OR pg_catalog.has_table_privilege(r.oid,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                                OR (pg_catalog.has_table_privilege(r.oid,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                                    OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "c.oid", false)})
                                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                                     CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                                     WHERE a.attrelid=c.oid AND a.attnum<>0 AND NOT a.attisdropped
@@ -345,6 +346,7 @@ public static class PostgresTenantApiKeyStoragePermissions
             nameof(SetupSecretBindingOperation.OperationKey), nameof(SetupSecretBindingOperation.BindingKey),
             nameof(SetupSecretBindingOperation.RequestFingerprint), nameof(SetupSecretBindingOperation.CommitmentKeyVersion),
             nameof(SetupSecretBindingOperation.SecretValueCommitment), nameof(SetupSecretBindingOperation.State),
+            nameof(SetupSecretBindingOperation.MutationEvidence),
             nameof(SetupSecretBindingOperation.Outcome), nameof(SetupSecretBindingOperation.CreatedAt), nameof(SetupSecretBindingOperation.CreatedBy),
             nameof(SetupSecretBindingOperation.UpdatedAt), nameof(SetupSecretBindingOperation.UpdatedBy),
             nameof(SetupSecretBindingOperation.SettledAt), nameof(SetupSecretBindingOperation.ConcurrencyStamp)
@@ -359,6 +361,7 @@ public static class PostgresTenantApiKeyStoragePermissions
             Map(context, typeof(SetupEnrollmentIssuanceClaim), claims, claims, claims, []),
             Map(context, typeof(SetupSecretBindingOperation), operations, operations, operations,
                 [nameof(SetupSecretBindingOperation.State), nameof(SetupSecretBindingOperation.Outcome),
+                    nameof(SetupSecretBindingOperation.MutationEvidence),
                     nameof(SetupSecretBindingOperation.SettledAt), nameof(SetupSecretBindingOperation.ConcurrencyStamp),
                     nameof(SetupSecretBindingOperation.UpdatedAt), nameof(SetupSecretBindingOperation.UpdatedBy)])
         ];

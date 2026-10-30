@@ -8,6 +8,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.SetupLive;
 using Explore.Domain.Enums;
+using Explore.Domain.Secrets;
 using Explore.Domain.SetupLive;
 using ISLAMU.Wire.Contracts.SetupLive;
 using Microsoft.Extensions.Logging;
@@ -196,6 +197,9 @@ public sealed partial class SetupLiveApplicationService(
         if (admission.Status != SetupLiveApplicationStatus.Created)
             return new(admission.Status);
 
+        var writeRequest = new SetupSecretBindingWriteRequest(
+            tenantId, enrollmentId, authorized.Enrollment.Generation, admission.Operation!.Id,
+            bindingId, bindingKey, secretValue);
         try
         {
             await LogMilestoneAsync(
@@ -221,6 +225,7 @@ public sealed partial class SetupLiveApplicationService(
                     {
                         if (operation.State == DomainOperationState.Accepted)
                         {
+                            operation.RecordMutationEvidence(SecretMutationEvidence.NotDispatched);
                             operation.Fail(
                                 DomainOperationOutcome.UnavailableEnrollment,
                                 UtcNow());
@@ -236,14 +241,7 @@ public sealed partial class SetupLiveApplicationService(
 
             SetupSecretBindingWriteOutcome outcome =
                 await secretBindingWriter.WriteAsync(
-                    new SetupSecretBindingWriteRequest(
-                        tenantId,
-                        enrollmentId,
-                        authorized.Enrollment.Generation,
-                        admission.Operation!.Id,
-                        bindingId,
-                        bindingKey,
-                        secretValue),
+                    writeRequest,
                     cancellationToken);
             SetupSecretBindingOperation settled =
                 await unitOfWork.ExecuteSerializableAsync(
@@ -257,7 +255,9 @@ public sealed partial class SetupLiveApplicationService(
                             ?? throw new InvalidOperationException(
                                 "Setup secret-binding operation is missing.");
                         DateTime settledAt = UtcNow();
-                        if (outcome == SetupSecretBindingWriteOutcome.Ready)
+                        operation.RecordMutationEvidence(writeRequest.Attempt.Evidence);
+                        if (outcome == SetupSecretBindingWriteOutcome.Ready
+                            && operation.MutationEvidence == SecretMutationEvidence.Applied)
                             operation.Succeed(settledAt);
                         else
                             operation.Fail(MapFailure(outcome), settledAt);
@@ -271,7 +271,7 @@ public sealed partial class SetupLiveApplicationService(
         }
         catch (OperationCanceledException)
         {
-            await CancelOperationAsync(tenantId, operationKey);
+            await SettleInterruptedOperationAsync(tenantId, operationKey, writeRequest.Attempt.Evidence);
             throw;
         }
     }
@@ -1014,7 +1014,8 @@ public sealed partial class SetupLiveApplicationService(
             : null
         };
 
-    private async Task CancelOperationAsync(Guid tenantId, Guid operationKey)
+    private async Task SettleInterruptedOperationAsync(
+        Guid tenantId, Guid operationKey, SecretMutationEvidence evidence)
     {
         await unitOfWork.ExecuteSerializableAsync(
             async token =>
@@ -1026,7 +1027,11 @@ public sealed partial class SetupLiveApplicationService(
                         token);
                 if (operation?.State == DomainOperationState.Accepted)
                 {
-                    operation.Cancel(UtcNow());
+                    operation.RecordMutationEvidence(evidence);
+                    if (evidence == SecretMutationEvidence.NotDispatched)
+                        operation.Cancel(UtcNow());
+                    else
+                        operation.Fail(DomainOperationOutcome.Unavailable, UtcNow());
                     await setupLiveRepository.SaveChangesAsync(token);
                 }
                 return true;

@@ -1,6 +1,6 @@
 using Explore.Persistence.Identity;
 using Explore.Persistence.Schema;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 
 namespace Event.MigrationService;
 

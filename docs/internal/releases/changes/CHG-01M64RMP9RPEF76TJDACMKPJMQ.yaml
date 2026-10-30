@@ -1,0 +1,32 @@
+Change-Id: CHG-01M64RMP9RPEF76TJDACMKPJMQ
+Title: "Reject provider failures during optional API configuration"
+Type: fix
+Scope: self-hosting
+Summary: "Fail API startup when SMTP or analytics configuration cannot be trusted, while allowing genuinely absent optional configuration and publishing no partial mappings."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/SECRETS.md
+    Disposition: not-applicable
+    Detail: Enforce the existing selected-authority fail-closed contract without changing supported configuration inputs or public APIs.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Provider denial, unavailability, invalid material and disappearing advertised members cannot be accepted as an unconfigured optional capability.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+    Detail: This startup admission correction changes no persisted schema or credential storage.
+  Configuration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: Only genuine Absent outcomes may omit SMTP or analytics; every other failure aborts preparation before publishing mappings.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Startup admission does not change HTTP routes or schemas.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/secrets.md
+    Disposition: documented
+    Detail: Restore the selected provider's availability, permissions or valid configuration before restarting; do not switch sources to mask a failed admission.

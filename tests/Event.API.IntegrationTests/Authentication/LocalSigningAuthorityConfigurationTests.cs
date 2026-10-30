@@ -5,6 +5,7 @@ using Explore.Application.Configuration;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Infrastructure.Authentication;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
@@ -48,7 +49,12 @@ public sealed class LocalSigningAuthorityConfigurationTests
                 ["SecretProvider:Provider"] = "Environment",
                 ["Authentication:Provider"] = "local"
             });
-            builder.Configuration.AddSecretAuthorityConfiguration("Testing");
+            var values = new Dictionary<string, string?> { [aliasName] = alias };
+            if (canonical is not null) values["Authentication:Local:JwtKey"] = canonical;
+            using var selected = (ConfigurationRoot)new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+            await using var owner = SecretAuthorityAcquisition.OpenLocal(
+                new(SecretAuthorityKind.Environment, "Testing", SecretConsumerRole.Api), selected);
+            await builder.Configuration.AddPreparedApiConfigurationAsync(owner);
             builder.Services.AddApiAuthentication(builder.Configuration, builder.Environment, skipAuthorityWarmup: true);
             await using var application = builder.Build();
             var configured = application.Services.GetRequiredService<IOptions<LocalIdentityOptions>>();

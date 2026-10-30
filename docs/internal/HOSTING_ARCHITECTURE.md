@@ -179,7 +179,9 @@ Application startup in `Explore.API` and `Event.Standalone` executes in determin
 ```
 
 1. **Phase 0 (Configuration & Options Binding)**:
-   * Load environment variables and optional Infisical secrets via `Explore.Secrets`.
+   * Select and acquire the declared authority through `Explore.ServiceDefaults/Secrets` before projecting startup configuration. Environment, Infisical, and Development/Testing-only User Secrets are explicit selections, not a fallback chain.
+   * The selected owner bounds borrowed operations and their disposal. Serving hosts may explicitly start its session-local Infisical token-maintenance helper; this renews authentication only, with no secret polling, relogin, or operation replay.
+   * `Explore.Persistence/Database` owns database binding/bootstrap and migration acquisition. `Explore.ServiceDefaults/DataProtection` asynchronously prepares the exact two-value ring/admission group before synchronous provider resolution; readiness reacquires fresh authority rather than trusting prepared memory.
    * Bind strongly typed options classes (`IOptions<TOptions>`) and execute `ValidateDataAnnotations()` and `ValidateOnStart()`.
 2. **Phase 1 (Storage & Infrastructure Readiness)**:
    * Perform TCP connection test to PostgreSQL or test file write permissions for SQLite.

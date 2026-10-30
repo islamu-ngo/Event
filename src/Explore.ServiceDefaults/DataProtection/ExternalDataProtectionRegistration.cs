@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
+using Explore.ServiceDefaults.Secrets;
 
 namespace Explore.ServiceDefaults.DataProtection;
 
@@ -11,6 +12,22 @@ public sealed record ExternalDataProtectionPartition(string Name);
 
 public static class ExternalDataProtectionRegistration
 {
+    public static async ValueTask PrepareExternalDataProtectionAsync(
+        this IServiceCollection services,
+        SecretAuthorityAcquisition owner,
+        string partition,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(owner);
+        _ = EnvironmentPrefix(partition);
+        var source = new ExternalDataProtectionSource(owner, new(partition));
+        await source.PrepareAsync(cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        services.Replace(ServiceDescriptor.Singleton<IExternalDataProtectionSource>(source));
+        services.AddExternalDataProtection(partition);
+    }
+
     public static string EnvironmentPrefix(string partition) => partition switch
     {
         "api" => "EVENT_DP_API",
@@ -74,16 +91,16 @@ internal sealed class ExternalDataProtectionStartup(ExternalDataProtectionProvid
 public sealed class ExternalDataProtectionReadiness(
     IExternalDataProtectionSource source, ExternalDataProtectionProvider provider, TimeProvider clock) : IHealthCheck
 {
-    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            var current = source.Read();
+            var current = await source.ReadFreshAsync(cancellationToken).ConfigureAwait(false);
             if (current.AdmissionSha256 != provider.AdmissionSha256
                 || ExternalDataProtectionInput.Hash(current.Admission) != provider.AdmissionSha256
                 || ExternalDataProtectionInput.Hash(current.Ring) != provider.Admission.RingSha256
-                || current.MinimumGeneration < provider.MinimumGeneration
+                || current.MinimumGeneration != provider.MinimumGeneration
                 || current.MinimumGeneration > provider.Admission.Generation)
                 throw ExternalDataProtectionRingAdmission.Invalid();
             provider.ProveActiveKey();
@@ -98,14 +115,14 @@ public sealed class ExternalDataProtectionReadiness(
             };
             bool expiring = provider.ActiveExpiresUtc - clock.GetUtcNow() < TimeSpan.FromDays(7)
                 || provider.Admission.NotAfterUtc - clock.GetUtcNow() < TimeSpan.FromHours(2);
-            return Task.FromResult(expiring
+            return expiring
                 ? HealthCheckResult.Degraded("data_protection_renewal_required", data: data)
-                : HealthCheckResult.Healthy("data_protection_admitted", data));
+                : HealthCheckResult.Healthy("data_protection_admitted", data);
         }
         catch
         {
             provider.RejectUntilRestart();
-            return Task.FromResult(HealthCheckResult.Unhealthy("data_protection_restart_required"));
+            return HealthCheckResult.Unhealthy("data_protection_restart_required");
         }
     }
 }

@@ -54,7 +54,8 @@ public sealed class SetupLiveApplicationContractTests
             Property("OperationId", typeof(Guid)),
             Property("BindingId", typeof(Guid)),
             Property("BindingKey", typeof(string)),
-            Property("SecretValue", typeof(ReadOnlyMemory<byte>)));
+            Property("SecretValue", typeof(ReadOnlyMemory<byte>)),
+            Property("Attempt", typeof(SecretMutationAttempt)));
         AssertExactConstructor(
             request,
             typeof(Guid),
@@ -1685,6 +1686,7 @@ internal sealed class SetupSecretBindingWriteRequestAttributeWitness
     public Guid BindingId { get; }
     public string BindingKey { get; }
     public ReadOnlyMemory<byte> SecretValue { get; }
+    public SecretMutationAttempt Attempt { get; } = new();
 }
 
 internal enum SetupSecretBindingWriteOutcomeAttributeWitness

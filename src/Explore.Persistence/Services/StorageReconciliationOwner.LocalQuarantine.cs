@@ -12,7 +12,7 @@ public sealed partial class StorageReconciliationOwner
     public async Task<bool> IsLocalOrphanAsync(Guid bindingId, string objectKey, CancellationToken cancellationToken)
     {
         await using var global = await globalFactory.CreateDbContextAsync(cancellationToken);
-        var native = LocalStorageQuarantineNativeOperations.TryBind(global);
+        var native = LocalStorageQuarantineNativeOperations.TryBind(global, enrollment);
         if (native is not null)
         {
             await native.RequireReadyAsync(cancellationToken);
@@ -30,7 +30,7 @@ public sealed partial class StorageReconciliationOwner
         string admissionReason, CancellationToken cancellationToken)
     {
         await using var global = await globalFactory.CreateDbContextAsync(cancellationToken);
-        var native = LocalStorageQuarantineNativeOperations.TryBind(global);
+        var native = LocalStorageQuarantineNativeOperations.TryBind(global, enrollment);
         if (native is not null)
             await native.RequireReadyAsync(cancellationToken);
         return await new EfCoreUnitOfWork(global).ExecuteSerializableAsync(async ct =>
@@ -66,7 +66,7 @@ public sealed partial class StorageReconciliationOwner
         if (batchSize is < 1 or > ILocalStorageQuarantineOwner.MaximumClaims || lease <= TimeSpan.Zero || lease > TimeSpan.FromHours(1))
             throw new ArgumentException("Claim requires a bounded page and a lease of at most one hour.");
         await using var global = await globalFactory.CreateDbContextAsync(cancellationToken);
-        var native = LocalStorageQuarantineNativeOperations.TryBind(global);
+        var native = LocalStorageQuarantineNativeOperations.TryBind(global, enrollment);
         if (native is not null)
             await native.RequireReadyAsync(cancellationToken);
         return await new EfCoreUnitOfWork(global).ExecuteSerializableAsync<IReadOnlyList<LocalStorageQuarantine>>(async ct =>
@@ -110,7 +110,7 @@ public sealed partial class StorageReconciliationOwner
             || claim.LeaseExpiresAtUtc <= DateTime.UtcNow)
             return false;
         await using var global = await globalFactory.CreateDbContextAsync(cancellationToken);
-        var native = LocalStorageQuarantineNativeOperations.TryBind(global);
+        var native = LocalStorageQuarantineNativeOperations.TryBind(global, enrollment);
         if (native is not null)
             await native.RequireReadyAsync(cancellationToken);
         return await new EfCoreUnitOfWork(global).ExecuteSerializableAsync(async ct =>
@@ -172,7 +172,7 @@ public sealed partial class StorageReconciliationOwner
     {
         if (id == Guid.Empty || claimStamp == Guid.Empty) throw new ArgumentException("Settlement requires exact custody and claim.");
         await using var global = await globalFactory.CreateDbContextAsync(cancellationToken);
-        var native = LocalStorageQuarantineNativeOperations.TryBind(global);
+        var native = LocalStorageQuarantineNativeOperations.TryBind(global, enrollment);
         if (native is not null)
             await native.RequireReadyAsync(cancellationToken);
         return await new EfCoreUnitOfWork(global).ExecuteSerializableAsync(async ct =>

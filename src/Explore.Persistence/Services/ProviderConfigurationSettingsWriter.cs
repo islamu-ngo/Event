@@ -170,7 +170,8 @@ public sealed class ProviderConfigurationSettingsWriter(ExploreDbContext context
         requireAttempt();
         var validation = await mutation.ValidateAsync(token);
         if (!validation.IsValid) throw new FluentValidation.ValidationException(validation.Errors);
-        await selected!.RequireSourcesAsync(token);
+        if (selected is IProviderConfigurationHumanSource person) await person.RequireRequestAsync(token);
+        else await selected!.RequireSourcesAsync(token);
         if (enrollment is not null)
             await PostgresProviderConfigurationContract.AcquireAsync(context, enrollment, mutation.Actor, observed!, token);
         if (!observed!.Same(await ReadAsync(token)))
@@ -213,7 +214,8 @@ public sealed class ProviderConfigurationSettingsWriter(ExploreDbContext context
     private async Task WriteFixedAsync(ProviderConfigurationMutation mutation, CancellationToken token)
     {
         requireAttempt!();
-        await selected!.RequireSourcesAsync(token);
+        if (selected is IProviderConfigurationHumanSource person) await person.RequireRequestAsync(token);
+        else await selected!.RequireSourcesAsync(token);
         if (!observed!.Same(await ReadAsync(token)))
             throw new UnauthorizedAccessException("The original source changed between validation and fixed writing.");
         if (enrollment is not null)
@@ -240,7 +242,8 @@ public sealed class ProviderConfigurationSettingsWriter(ExploreDbContext context
         async Task RequireFinal(CancellationToken cancellationToken)
         {
             requireAttempt();
-            await selected.RequireSourcesAsync(cancellationToken);
+            if (selected is IProviderConfigurationHumanSource person) await person.RequireRequestAsync(cancellationToken);
+            else await selected!.RequireSourcesAsync(cancellationToken);
             if (!expected.Same(await ReadAsync(cancellationToken)))
                 throw new UnauthorizedAccessException("Provider identity, metadata, audit, participation or absence changed.");
             requireAttempt();

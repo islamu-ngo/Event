@@ -16,7 +16,6 @@ using Explore.Persistence.Repositories;
 using Explore.Tests.Shared.Settings;
 using Microsoft.EntityFrameworkCore;
 using Explore.Persistence.Database;
-using Explore.Secrets.Database;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;

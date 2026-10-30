@@ -3,7 +3,6 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace Event.Persistence.IntegrationTests.Database;

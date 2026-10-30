@@ -40,6 +40,50 @@ You can start with Local Identity and deliberately switch later after linking
 the administrator to the target provider. The server prevents a switch that
 would remove every usable administrator sign-in path.
 
+## Shared browser sessions and logout
+
+All browser sign-in providers require a selected shared session backend, including
+Local Identity in Standalone deployments using SQLite. Provision the dedicated
+session service and its selected password before enabling sign-in. It is separate
+from the ordinary cache and the encryption-key authority. Configure the three
+[session authority inputs](environment-variables.md#shared-browser-session-authority)
+and use the same backend, namespace and compatible Data Protection authority on
+intended BFF peers and after restarts. Separate deployments need separate namespaces.
+
+For the bundled Compose service, opt in with `--profile bff-session`; otherwise
+provide your own selected endpoint. AppHost does not obtain the backend password
+from the BFF runtime vault. Provision the backend separately and ensure its
+password matches the selected runtime secret, including the Infisical value.
+
+The browser holds an opaque session reference; the server retains the encrypted
+authentication ticket. Successful logout removes that browser session across
+peers. Replaying its old cookie, completing a delayed refresh, or reopening a
+circuit cannot restore it. Other browser sessions, devices and independently
+issued API JWTs retain their own authority. Already admitted operations may
+finish; idle tabs discover revocation when they next perform an activity.
+
+If the session backend is unavailable, protected browser operations fail closed.
+Temporary failure returns HTTP503 without replacing or deleting the browser's
+cookie. Anonymous requests without a session cookie remain available. An
+unexpired, unrevoked cookie can work again after the same backend recovers.
+Do not treat a failed or interrupted logout as confirmed revocation; recover the
+backend and retry. Preserve the backend's session state and the compatible
+encryption keys together when planning restart or restore continuity. Losing
+either can require users to sign in again; session expiry is not permission to
+delete encryption keys needed by other retained data or backups.
+
+Do not restore an older session snapshot as though its revocation state were
+current. If restore freshness is stale or unknown, change the deployment session
+namespace and require fresh sign-in. Keeping the old namespace could restore a
+session whose logout had already succeeded.
+
+This activation rejects old self-contained development cookies. Require a new
+sign-in after deployment; no API or database schema migration is needed. Never
+place the backend password in source or application settings. In Compose, the
+bootstrap wrapper removes the provisioner password from the .NET process when
+another secret provider is selected, but Docker metadata remains visible to
+trusted daemon administrators.
+
 ## Configuration authority
 
 Authentication and authorization configuration keep setup and administrator
@@ -55,8 +99,36 @@ activation follow successful settlement; endpoint connectivity checks run before
 the database operation. Reload current state and sign in again when authority
 has changed rather than retrying with another configuration route.
 
+Native authentication may create new wrappers around the same validated
+identity during provider, resolver or operator-identity editing. Those wrappers
+do not require another sign-in or renew the signed credential's deadline.
+Administrator credentials and accepted setup-secret authority remain separate;
+changing either source still rejects the operation.
+
 These source controls have authored regression coverage; executable programme
 and database-provider assurance remains pending.
+
+### Provider configuration transaction settlement
+
+Administrator and setup changes remain tied to the configuration image and
+accepted authority that began the operation. Detected grant, identity binding or
+setup authority changes before commit reject settlement and prevent activation.
+Setup writes retain their original coordination through completion.
+
+Saving a Local configuration does not acquire unrelated Keycloak or Google
+credentials. Concurrent configuration and binding changes still invalidate the
+operation. In Split deployments the API never borrows browser-backend
+credentials: required credential ownership that cannot be established is refused,
+not treated as configured. An absent credential profile revision is not readiness
+evidence, and a malformed configured revision is rejected. Deployment-configured
+remote sign-in remains a separate path.
+
+The normal authentication write flow refreshes authentication only after
+settlement is acknowledged; observing or validating a configuration does not
+activate it. A denial before commit leaves the previous configuration in place.
+If a response or commit outcome is uncertain, read current configuration before
+another write instead of assuming rollback or retrying automatically. Begin a new
+observation when a change is still needed; an attempted observation cannot replay.
 
 ## Supported Provider States
 

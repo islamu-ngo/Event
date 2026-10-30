@@ -6,6 +6,7 @@ using Explore.Blazor.Components;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.HealthChecks;
 using Explore.Blazor.Services;
+using Explore.Blazor.Services.Auth;
 using Explore.ServiceDefaults;
 
 namespace Explore.Blazor.Hosting;
@@ -45,6 +46,15 @@ public static class BlazorHostApplicationExtensions
             }
 
             await app.InitializeDynamicAuthSchemesAsync();
+            var lifecycleLogger = app.Services.GetRequiredService<ILoggerFactory>()
+                .CreateLogger("Explore.Blazor.Hosting.Lifecycle");
+            app.Lifetime.ApplicationStarted.Register(() =>
+            {
+                foreach (string address in app.Urls)
+                    if (Uri.TryCreate(address, UriKind.Absolute, out var listener))
+                        lifecycleLogger.LogInformation(
+                            "BFF lifecycle {Phase} on listener port {ListenerPort}", "started", listener.Port);
+            });
         }
 
         return app;
@@ -125,6 +135,21 @@ public static class BlazorHostApplicationExtensions
             pipeline.UseHsts();
         }
 
+        pipeline.Use(async (context, next) =>
+        {
+            try
+            {
+                await next(context);
+            }
+            catch (BffSessionAuthorityUnavailableException) when (!context.Response.HasStarted)
+            {
+                context.Response.Headers.CacheControl = "no-store";
+                await Results.Problem(
+                    title: "Browser session unavailable",
+                    statusCode: StatusCodes.Status503ServiceUnavailable).ExecuteAsync(context);
+            }
+        });
+
         pipeline.UseWhen(
             context => !context.Request.Path.StartsWithSegments(
                 "/bff",
@@ -180,7 +205,7 @@ public static class BlazorHostApplicationExtensions
         BffAuthEndpoints.MapAuthEndpoints(app);
         BffEndpointExtensions.MapBffEndpoints(app);
         app.MapBffAuthenticationCredentialReceiptEndpoints();
-        app.MapStaticAssets();
+        app.MapSelectedStaticAssets();
 
         if (profile == BlazorHostProfile.Split)
         {

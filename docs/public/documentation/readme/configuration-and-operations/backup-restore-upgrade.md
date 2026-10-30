@@ -323,6 +323,70 @@ and security failures still fail closed.
 
 ## 4. Upgrade Runbook (Pre-1.0 Releases)
 
+### PostgreSQL settings contract development bootstrap
+
+The native guards keep PostgreSQL 16's existing privilege checks and evaluate
+the newer `MAINTAIN` capability only on PostgreSQL 17 and later. Older constraint
+catalogues use the existing enforcement-metadata fallback while retaining
+separate validation and trigger checks. Purpose permissions and tenant isolation
+remain unchanged. The changed native definitions retain the fresh-development
+bootstrap boundary below; this is not an in-place upgrade of older bodies.
+
+The declared-capability controls passed on PostgreSQL 16 and 18, and the
+existing unexpected-MAINTAIN refusal controls passed on PostgreSQL 18.
+End-to-end PostgreSQL 16 migration/idempotency and the final supported-engine
+matrix still require their own verification before release.
+
+The managed-worker settings contract changes the fingerprints of native
+PostgreSQL definitions used to validate its installed settings triggers and
+permissions. It supports a fresh, explicitly disposable development target.
+The boundary also covers fixed reference, ownership, membership and Global
+preference access used by application readers and publication processing,
+fixed worker/outbox delivery permissions, storage reconciliation/quarantine
+readiness, and existing API-key and scanner capability catalogues. These nine
+complete profiles compose existing registered purpose proofs and
+continue to reject unsupported access outside their mapped relations.
+Fresh development bootstrap also provisions the Runtime access needed for
+category browsing. Reads stay limited to the selected tenant and six modelled
+Category fields under forced row security, including parent category reads.
+Migration authority installs this fixed read profile; it grants no table-wide
+read, write permission, Global access or owner-role switching. Unexpected
+privilege, membership or tenant-policy changes fail validation. The updated
+event-reader definitions recognize this fixed Category purpose while retaining
+their other privilege boundaries. These changed reader bodies target a fresh,
+disposable development bootstrap; older installed bodies remain rejected.
+
+Bootstrap completes the configured Global database principal's membership in the
+existing quarantine capability role. This membership permits the fixed workflow
+through inheritance; it permits neither switching into that role nor managing
+its membership. The installer owns this binding; do not add manual grants to
+bypass readiness validation. Other purpose permissions remain unchanged.
+The outer Npgsql seeding context uses supported one-statement EF batches while
+retaining its transaction, retry policy, command timeout and guards. Other
+contexts retain their existing batching; no operator timeout increase or manual
+permission change is required for this selection. Native success and rollback
+checks remain pending and must pass before this revision is treated as verified.
+Previously installed bodies do not have a supported in-place upgrade in this
+change: validation continues to reject them rather than accepting stale
+definitions or silently rewriting them.
+
+There is no automatic database reset or data deletion. Keep any database whose
+data you intend to retain, take verified backups and arrange a reviewed
+transition before applying this revision. Do not relabel migration history or
+delete shared volumes to bypass a failed readiness check. The development tests
+use their own isolated targets and do not modify a user database.
+
+Running both public migration paths twice on a fresh target checks fresh
+installation and repeatability only. The focused runtime regression and Global
+reattestation gates are still pending; neither source review nor a successful
+build establishes compatibility with older installed bodies. Existing rejection
+of changed, disabled or unknown triggers and excessive write grants remains
+part of readiness validation.
+
+The change composes the existing fixed worker permissions and canonical policies
+across migration contracts. It does not authorize arbitrary Global policies or
+additional Runtime table/column reads as a workaround for failed validation.
+
 ### Application-owned storage development migrations
 
 The current development migration set uses `ApplicationOwnedProgrammeModel`

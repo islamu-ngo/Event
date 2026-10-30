@@ -5,7 +5,6 @@ using Explore.Domain;
 using Explore.Infrastructure.Recovery;
 using Explore.Persistence;
 using Explore.Persistence.Database;
-using Explore.Secrets.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;

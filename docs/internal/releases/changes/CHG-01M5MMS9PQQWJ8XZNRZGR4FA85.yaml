@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5MMS9PQQWJ8XZNRZGR4FA85
+Title: "Compose canonical migration contracts with fixed application permissions"
+Type: fix
+Scope: database
+Summary: "Fresh PostgreSQL migration composes canonical settings triggers and fixed application permissions with storage readiness, binds the existing quarantine executor capability, shares closed Mixed catalogue proofs within each guard invocation and limits native seed commands to one statement while retaining one atomic save."
+Group: managed-settings-trigger-admission
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/TESTING.md#fresh-postgresql-settings-contract-bootstrap
+    Disposition: documented
+    Detail: Previously installed native guard bodies require a clean development bootstrap because exact body fingerprints change; no in-place upgrade or compatibility hash allowance is provided.
+  Security:
+    Reference: docs/internal/MULTI_TENANCY.md
+    Disposition: documented
+    Detail: Managed worker admission recognizes exact mapped canonical trigger identities only after owner attestation. Source and read guards compose fixed Global and Runtime permissions using their complete native catalogues. Storage readiness admits either zero application data authority or all nine complete fixed Global profiles, including the existing API-key and scanner authentication capabilities, with no privileges outside their owner-mapped relations across reachable MEMBER roles and PUBLIC. Native storage role restrictions remain independent. Mixed guards share uncorrelated catalogue proofs within one invocation without caching across calls. The existing quarantine executor role is bound to the declared Global login with INHERIT enabled and SET and ADMIN disabled; installed missing or unsafe bindings fail closed without repair. Table-wide or undeclared authority, unknown triggers or policies and drifted bodies, owners or enabled states remain rejected. Seeding retains every guard, the original command timeout and one SaveChanges transaction and retry unit across its smaller statement batches.
+  Migration:
+    Reference: docs/internal/TESTING.md#fresh-postgresql-settings-contract-bootstrap
+    Disposition: documented
+    Detail: Fresh migration recognizes canonical source triggers installed earlier, composes existing fixed permission catalogues and installs the previously missing binding of the existing quarantine executor capability to the configured Global login. No other grants or generated migration history change. Only the cloned PostgreSQL seeding context uses one-statement EF modification batches; ordinary application and migration contexts retain their existing options and command budgets. Changed embedded guard SQL changes native routine body fingerprints; previously installed old bodies remain rejected. This contract supports fresh development bootstrap only, with no in-place upgrade, automatic reset or data deletion. Repeated fresh migration proves current-contract idempotency only.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md#postgresql-settings-contract-development-bootstrap
+    Disposition: documented
+    Detail: Use a fresh development database for the revised native guard contract. Existing old-body installations remain fail-closed; this change performs no reset or destructive cleanup.

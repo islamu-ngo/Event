@@ -1,3 +1,4 @@
+using Explore.Domain;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -13,8 +14,8 @@ namespace Explore.Persistence.Security;
 internal static class EventReadProjectionSql
 {
     /// <summary>
-    /// Rejects source authority beyond direct fixed Runtime reference reads. Reference grants may
-    /// be absent during installation; each projection retains its own complete private-source inventory.
+    /// Rejects source authority beyond direct fixed Runtime reads and declared membership permissions.
+    /// Profiles may be absent during installation; each projection retains its private-source inventory.
     /// </summary>
     internal static string RuntimeCallerPrivilegeGuard(ExploreDbContext context, HumanPrincipalSourceSql names,
         IReadOnlyCollection<Type> sources, PostgresNativeQueueEnrollment enrollment, string diagnosticPrefix,
@@ -39,6 +40,34 @@ internal static class EventReadProjectionSql
                 WHERE acl.grantee = 0 AND acl.privilege_type = 'SELECT')
             """;
         referenceRead = $"({referenceRead}) OR ({PostgresTenantApiKeyStoragePermissions.RuntimeParentReadPredicate(context, enrollment, "r.oid", "t.oid", "a.attname", "'SELECT'")})";
+        string ownershipReads = string.Join(" OR ", sources.Select(type =>
+            PostgresActorOwnershipReadPermissions.RuntimeReadPredicate(context, type, enrollment.RuntimeLogin,
+                "r.oid", "t.oid", "a.attname", "'SELECT'")));
+        if (ownershipReads.Length != 0) referenceRead = $"({referenceRead}) OR ({ownershipReads})";
+        if (sources.Contains(typeof(Category)))
+            referenceRead = $"({referenceRead}) OR ({PostgresCategoryReadPermissions.RuntimeReadPredicate(context,
+                typeof(Category), enrollment.RuntimeLogin, "r.oid", "t.oid", "a.attname", "'SELECT'")})";
+        string[] mutations = sources.SelectMany(type =>
+        {
+            PostgresTenantMembershipMutationPermissions.TryGetRuntimeColumns(context, type,
+                out var read, out var update, out _);
+            return read.Select(column => (column, Privilege: "SELECT"))
+                .Concat(update.Select(column => (column, Privilege: "UPDATE")))
+                .Select(grant => $"(t.oid={Text(names.Table(type))}::regclass AND a.attname={Text(grant.column)} AND permission.privilege={Text(grant.Privilege)})");
+        }).ToArray();
+        string mutationGrant = mutations.Length == 0 ? "false" : $"""
+            r.rolname={runtime} AND a.attnum>0 AND ({string.Join(" OR ", mutations)})
+            AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
+                WHERE acl.grantee=r.oid AND acl.grantor=t.relowner
+                    AND acl.privilege_type=permission.privilege AND NOT acl.is_grantable)
+            AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
+                WHERE acl.grantee=0 AND acl.privilege_type=permission.privilege)
+            """;
+        string mutationProof = mutations.Length == 0 ? "true"
+            : PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment);
+        string delete = sources.Contains(typeof(TenantUserProfile))
+            ? PostgresTenantMembershipMutationPermissions.RuntimeDeletePredicate(context, enrollment, "r.oid", "t.oid")
+            : "false";
         return $"""
             IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                 WHERE pg_catalog.pg_has_role({runtime},r.oid,'MEMBER')
@@ -47,12 +76,16 @@ internal static class EventReadProjectionSql
                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_class t CROSS JOIN pg_catalog.pg_roles r
                     WHERE t.oid IN ({relations}) AND pg_catalog.pg_has_role({runtime},r.oid,'MEMBER')
                         AND (r.oid = t.relowner
-                            OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                            OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,TRUNCATE,REFERENCES,TRIGGER')
+                                OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
+                            OR (pg_catalog.has_table_privilege(r.oid,t.oid,'DELETE') AND ({delete}) IS NOT TRUE)
                             OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
+                                CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                                 WHERE a.attrelid = t.oid AND a.attnum <> 0 AND NOT a.attisdropped
-                                    AND (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,'INSERT,UPDATE,REFERENCES,SELECT WITH GRANT OPTION')
-                                        OR (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,'SELECT')
-                                            AND NOT ({referenceRead}))))))
+                                    AND (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege || ' WITH GRANT OPTION')
+                                        OR (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege)
+                                            AND ((permission.privilege='SELECT' AND ({referenceRead})) OR ({mutationGrant})) IS NOT TRUE)))))
+                OR ({mutationProof}) IS NOT TRUE
             THEN RAISE EXCEPTION '{diagnosticPrefix}_runtime_source_privilege' USING ERRCODE = '42501'; END IF;
             """;
     }

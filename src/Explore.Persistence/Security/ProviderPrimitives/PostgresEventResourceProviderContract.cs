@@ -50,6 +50,16 @@ public static partial class PostgresEventResourceProviderContract
         if (owned is not null) await owned.CommitAsync(cancellationToken);
     }
 
+    internal static string SourceTriggerPredicate(ExploreDbContext context, Type sourceType)
+    {
+        if (!Sources.Contains(sourceType)) return "false";
+        return string.Join(" OR ", Routines.Where(routine => routine.Name is "changed" or "row").Select(routine => $"""
+            (t.tgrelid=pg_catalog.to_regclass({Text(new HumanPrincipalSourceSql(context).Table(sourceType))})
+                AND t.tgname={Text(Prefix + routine.Name)}
+                AND t.tgfoid=pg_catalog.to_regprocedure({Text(FunctionSql(context, routine.Name) + "()")}))
+            """));
+    }
+
     public static async Task RequireReadyAsync(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
         CancellationToken cancellationToken = default)
     {

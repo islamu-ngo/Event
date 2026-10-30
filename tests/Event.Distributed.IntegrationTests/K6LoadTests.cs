@@ -652,6 +652,64 @@ public sealed class K6RecoveryFinalizationTests
     }
 
     [Test]
+    public async Task PendingSamplerCannotPublishCompletedPressureEvidence()
+    {
+        var directory = Directory.CreateTempSubdirectory("islamu-pressure-pending-");
+        var sampler = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task? finalization = null;
+        try
+        {
+            string path = Path.Combine(directory.FullName, "pressure.json");
+            await K6LoadRunner.WritePressureSnapshotAsync(path, DateTimeOffset.UnixEpoch, [], false, false, CancellationToken.None);
+            string live = await File.ReadAllTextAsync(path);
+            finalization = K6LoadRunner.FinalizePressureAsync(sampler.Task, path,
+                DateTimeOffset.UnixEpoch, [], true, null, CancellationToken.None);
+
+            await Assert.That(finalization.IsCompleted).IsFalse();
+            await Assert.That(await File.ReadAllTextAsync(path)).IsEqualTo(live);
+
+            sampler.SetResult();
+            await finalization.WaitAsync(TimeSpan.FromSeconds(5));
+            using var snapshot = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+            await Assert.That(snapshot.RootElement.GetProperty("Final").GetBoolean()).IsTrue();
+            await Assert.That(snapshot.RootElement.GetProperty("Completed").GetBoolean()).IsTrue();
+        }
+        finally
+        {
+            sampler.TrySetResult();
+            if (finalization is not null) await finalization.WaitAsync(TimeSpan.FromSeconds(5));
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task WorkloadSamplerAndPublicationFailuresRetainTheirIndependentCauses()
+    {
+        var directory = Directory.CreateTempSubdirectory("islamu-pressure-combined-");
+        try
+        {
+            string path = Path.Combine(directory.FullName, "pressure.json");
+            await K6LoadRunner.WritePressureSnapshotAsync(path, DateTimeOffset.UnixEpoch, [], false, false, CancellationToken.None);
+            string live = await File.ReadAllTextAsync(path);
+            var workloadFailure = new InvalidOperationException("workload-failed");
+            var samplerFailure = new IOException("sampler-failed");
+            using var cancellation = new CancellationTokenSource();
+            await cancellation.CancelAsync();
+
+            var failure = await Assert.That(() => K6LoadRunner.FinalizePressureAsync(Task.FromException(samplerFailure), path,
+                DateTimeOffset.UnixEpoch, [], true, workloadFailure, cancellation.Token)).Throws<AggregateException>();
+            var causes = failure!.Flatten().InnerExceptions;
+            await Assert.That(causes.Count).IsEqualTo(3);
+            await Assert.That(causes.Any(error => ReferenceEquals(error, workloadFailure))).IsTrue();
+            await Assert.That(causes.Any(error => ReferenceEquals(error, samplerFailure))).IsTrue();
+            await Assert.That(causes.OfType<OperationCanceledException>()
+                .Any(error => error.CancellationToken == cancellation.Token)).IsTrue();
+            await Assert.That(await File.ReadAllTextAsync(path)).IsEqualTo(live);
+        }
+        finally { directory.Delete(recursive: true); }
+    }
+
+    [Test]
     public async Task FailedFinalPublicationPreservesIncompleteEvidenceAndTheOriginalFailure()
     {
         var directory = Directory.CreateTempSubdirectory("islamu-pressure-publication-");

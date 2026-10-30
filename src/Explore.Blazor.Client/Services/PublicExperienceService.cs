@@ -30,6 +30,9 @@ public class PublicExperienceService : IPublicExperienceService
     private readonly IPublicExperienceClient _apiClient;
     private readonly ILogger<PublicExperienceService> _logger;
     private readonly TimeProvider _clock;
+    private readonly object _settingsGate = new();
+    private long _settingsGeneration;
+    private PublicExperienceAvailability _settingsAvailability;
     private PublicExperienceSettingsDto? _cachedSettings;
     private DateTimeOffset _settingsCacheExpiresAt;
     private PublicExperienceShellDto? _cachedShell;
@@ -38,7 +41,14 @@ public class PublicExperienceService : IPublicExperienceService
 
     public event Action? SettingsChanged;
 
-    public PublicExperienceAvailability SettingsAvailability { get; private set; }
+    public PublicExperienceAvailability SettingsAvailability
+    {
+        get
+        {
+            lock (_settingsGate)
+                return _settingsAvailability;
+        }
+    }
     public PublicExperienceAvailability ShellAvailability { get; private set; }
 
     public PublicExperienceService(
@@ -51,32 +61,54 @@ public class PublicExperienceService : IPublicExperienceService
         _clock = clock ?? TimeProvider.System;
     }
 
-    public async Task<PublicExperienceSettingsDto?> GetSettingsAsync()
+    public Task<PublicExperienceSettingsDto?> GetSettingsAsync()
+    {
+        long generation;
+        lock (_settingsGate)
+            generation = ++_settingsGeneration;
+
+        return GetSettingsAsync(generation);
+    }
+
+    private async Task<PublicExperienceSettingsDto?> GetSettingsAsync(long generation)
     {
         try
         {
             var settings = await _apiClient.GetPublicExperienceSettingsAsync(cancellationToken: CancellationToken.None);
-            if (!HasRequiredIdentity(settings))
+            lock (_settingsGate)
             {
-                InvalidateSettings();
-                return settings;
-            }
+                if (generation != _settingsGeneration)
+                    return null;
 
-            CacheSettings(settings);
-            return settings;
+                if (!HasRequiredIdentity(settings))
+                    InvalidateSettings();
+                else
+                    CacheSettings(settings);
+
+                // A synchronous notification may itself start a refresh or reset.
+                return generation == _settingsGeneration ? settings : null;
+            }
         }
         catch (ApiException ex)
         {
             _logger.LogWarning(
                 "Failed to load public experience settings, falling back to event list. Status: {StatusCode}.",
                 ex.StatusCode);
-            InvalidateSettings();
+            lock (_settingsGate)
+            {
+                if (generation == _settingsGeneration)
+                    InvalidateSettings();
+            }
             return null;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to load public experience settings, falling back to event list.");
-            InvalidateSettings();
+            lock (_settingsGate)
+            {
+                if (generation == _settingsGeneration)
+                    InvalidateSettings();
+            }
             return null;
         }
     }
@@ -113,13 +145,19 @@ public class PublicExperienceService : IPublicExperienceService
 
     public async Task<PublicExperienceSettingsDto?> GetCachedSettingsAsync()
     {
-        if (_cachedSettings != null && _clock.GetUtcNow() <= _settingsCacheExpiresAt)
+        long generation;
+        lock (_settingsGate)
         {
-            return _cachedSettings;
+            if (_cachedSettings != null && _clock.GetUtcNow() <= _settingsCacheExpiresAt)
+                return _cachedSettings;
+
+            generation = ++_settingsGeneration;
         }
 
-        PublicExperienceSettingsDto? settings = await GetSettingsAsync();
-        return SettingsAvailability == PublicExperienceAvailability.Available ? settings : null;
+        PublicExperienceSettingsDto? settings = await GetSettingsAsync(generation);
+        lock (_settingsGate)
+            return generation == _settingsGeneration
+                && _settingsAvailability == PublicExperienceAvailability.Available ? settings : null;
     }
 
     public async Task<PublicExperienceShellDto?> GetCachedShellAsync()
@@ -135,13 +173,17 @@ public class PublicExperienceService : IPublicExperienceService
 
     public void ResetCache()
     {
-        _cachedSettings = null;
-        _settingsCacheExpiresAt = default;
-        SettingsAvailability = PublicExperienceAvailability.Unknown;
-        _cachedShell = null;
-        _shellCacheExpiresAt = default;
-        ShellAvailability = PublicExperienceAvailability.Unknown;
-        SettingsChanged?.Invoke();
+        lock (_settingsGate)
+        {
+            ++_settingsGeneration;
+            _cachedSettings = null;
+            _settingsCacheExpiresAt = default;
+            _settingsAvailability = PublicExperienceAvailability.Unknown;
+            _cachedShell = null;
+            _shellCacheExpiresAt = default;
+            ShellAvailability = PublicExperienceAvailability.Unknown;
+            SettingsChanged?.Invoke();
+        }
     }
 
     public string ResolveHomeRoute(PublicExperienceSettingsDto? settings)
@@ -167,11 +209,21 @@ public class PublicExperienceService : IPublicExperienceService
         return "/events";
     }
 
-    private void CacheSettings(PublicExperienceSettingsDto? settings)
+    private void CacheSettings(PublicExperienceSettingsDto settings)
     {
+        bool changed = _settingsAvailability != PublicExperienceAvailability.Available
+            || _cachedSettings is not { } previous
+            || previous.TenantId != settings.TenantId
+            || previous.AnnouncementBarEnabled != settings.AnnouncementBarEnabled
+            || previous.AnnouncementBarRevision != settings.AnnouncementBarRevision
+            || previous.AnnouncementBarMessage != settings.AnnouncementBarMessage
+            || previous.AnnouncementBarLinkText != settings.AnnouncementBarLinkText
+            || previous.AnnouncementBarLinkUrl != settings.AnnouncementBarLinkUrl;
         _cachedSettings = settings;
         _settingsCacheExpiresAt = _clock.GetUtcNow().Add(CacheDuration);
-        SettingsAvailability = PublicExperienceAvailability.Available;
+        _settingsAvailability = PublicExperienceAvailability.Available;
+        if (changed)
+            SettingsChanged?.Invoke();
     }
 
     private void CacheShell(PublicExperienceShellDto? shell)
@@ -183,9 +235,12 @@ public class PublicExperienceService : IPublicExperienceService
 
     private void InvalidateSettings()
     {
+        bool changed = _settingsAvailability != PublicExperienceAvailability.Unavailable;
         _cachedSettings = null;
         _settingsCacheExpiresAt = default;
-        SettingsAvailability = PublicExperienceAvailability.Unavailable;
+        _settingsAvailability = PublicExperienceAvailability.Unavailable;
+        if (changed)
+            SettingsChanged?.Invoke();
     }
 
     private void InvalidateShell()

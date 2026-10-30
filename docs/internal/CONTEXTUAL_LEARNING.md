@@ -19,6 +19,46 @@ authority. An actor context requires current membership in that actor's actual
 tenant placement. Learning never grants production authority, changes provider
 readiness or completes tenant provisioning.
 
+## Single Announcement Bar Browser Scope
+
+`UserSettingsService` obtains anonymous tenant identity from
+`IPublicExperienceService` and stores preferences through `user-settings.js` as
+`user_settings:<tenant-ID-N>:<canonical-setting-key>`. Missing or empty tenant
+identity refuses browser access. Closed category mappings select registered
+namespaces; category reset removes only that tenant's matching namespace.
+Ambiguous old unscoped markers are neither read nor migrated. Authenticated
+preferences use the existing API and never import anonymous markers.
+
+Authentication and public-settings notifications invalidate the service's
+generation and cache. Async reads and mutation results from an earlier
+generation are discarded, and a changed generation stops remaining batch
+writes. Cache epochs are separate from account/tenant context generations;
+mutations invalidate again on settlement so an overlapping precommit read
+cannot remain cached after a successful save. `PublicExperienceService`
+installs its verified settings and availability before notifying changes to
+tenant identity or announcement fields. Equivalent refreshes do not notify.
+Unavailable transitions notify once, and the bar does not recursively refetch
+while handling that transition.
+Settings refreshes and `ResetCache` advance a settings-specific generation.
+Only the current request may install or invalidate a snapshot and notify;
+older success, missing-identity or failure completions return no settings.
+The gate also rechecks ownership after synchronous notification callbacks, so a
+reentrant refresh or reset cannot expose the superseded identity to its caller.
+
+`AnnouncementBar` loads preferences after its first interactive render,
+subscribes to account/settings changes and invalidates pending work on disposal.
+A replacement settings load blocks dismissal of the previous revision.
+The preference service shares one module acquisition; disposal rejects later
+work and releases a pending import once it completes, exactly once.
+
+Dismissal hides the bar only when the batch succeeds and exactly one matching
+`public_experience_preferences.announcement_bar.dismissed_revision` result is
+applied. Missing, duplicate, null, failed or unapplied results leave the bar
+visible with a status message; another explicit close action can retry.
+This browser repair retains the integer revision contract. Server-issued
+material editions and coordinated inherited publication remain separate work;
+neither this source integration nor component mocks prove actual-host behavior.
+
 ## Domain Ownership And Bounds
 
 `TenantLearningSpace` is the tenant's single `learning-core` material-version-1

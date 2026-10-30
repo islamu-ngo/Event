@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -12,51 +13,81 @@ public sealed class UserSettingsService : IUserSettingsService, IAsyncDisposable
     private readonly AuthenticationStateProvider _authenticationStateProvider;
     private readonly IJSRuntime _jsRuntime;
     private readonly ILogger<UserSettingsService> _logger;
+    private readonly IPublicExperienceService _publicExperienceService;
 
-    private IJSObjectReference? _jsModule;
-    private readonly Dictionary<string, (SettingGroupResponseDto Response, DateTime ExpiresAt)> _cache = new();
+    private readonly object _jsModuleLock = new();
+    private Task<IJSObjectReference>? _jsModuleTask;
+    private Task? _disposeTask;
+    private bool _disposed;
+    private readonly ConcurrentDictionary<string,
+        (SettingGroupResponseDto Response, DateTime ExpiresAt, long Generation)> _cache = new();
+    private long _authenticationGeneration;
+    private long _cacheGeneration;
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
     public UserSettingsService(
         ISettingsClient apiClient,
         AuthenticationStateProvider authenticationStateProvider,
         IJSRuntime jsRuntime,
-        ILogger<UserSettingsService> logger)
+        ILogger<UserSettingsService> logger,
+        IPublicExperienceService publicExperienceService)
     {
         _apiClient = apiClient;
         _authenticationStateProvider = authenticationStateProvider;
         _jsRuntime = jsRuntime;
         _logger = logger;
+        _publicExperienceService = publicExperienceService;
+        _authenticationStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
+        _publicExperienceService.SettingsChanged += OnPublicExperienceSettingsChanged;
     }
 
     public async Task<SettingGroupResponseDto?> GetSettingsAsync(string category, CancellationToken ct = default)
     {
-        if (_cache.TryGetValue(category, out var cached) && cached.ExpiresAt > DateTime.UtcNow)
-            return cached.Response;
+        if (Volatile.Read(ref _disposed))
+            return null;
 
         try
         {
-            if (await IsAuthenticatedAsync())
+            long generation = Volatile.Read(ref _authenticationGeneration);
+            long cacheGeneration = Volatile.Read(ref _cacheGeneration);
+            bool authenticated = await IsAuthenticatedAsync();
+            if (generation != Volatile.Read(ref _authenticationGeneration)
+                || cacheGeneration != Volatile.Read(ref _cacheGeneration))
+                return null;
+
+            if (authenticated && _cache.TryGetValue(category, out var cached)
+                && cached.Generation == cacheGeneration && cached.ExpiresAt > DateTime.UtcNow)
+                return cached.Response;
+
+            if (authenticated)
             {
                 var result = await GetAuthenticatedSettingsAsync(category, ct);
-                if (result is null)
+                if (result is null || generation != Volatile.Read(ref _authenticationGeneration)
+                    || cacheGeneration != Volatile.Read(ref _cacheGeneration))
                 {
                     return null;
                 }
 
-                _cache[category] = (result, DateTime.UtcNow.Add(CacheDuration));
+                _cache[category] = (result, DateTime.UtcNow.Add(CacheDuration), cacheGeneration);
                 return result;
             }
 
-            // Anonymous: load from localStorage
-            if (!OperatingSystem.IsBrowser())
-                return null; // SSR prerender — no JS interop available
+            var keyPrefix = CategoryToKeyPrefix(category);
+            var tenant = await GetAnonymousTenantAsync();
+            if (tenant is null || generation != Volatile.Read(ref _authenticationGeneration)
+                || cacheGeneration != Volatile.Read(ref _cacheGeneration))
+                return null;
 
             var module = await GetJsModuleAsync();
-            var keyPrefix = CategoryToKeyPrefix(category);
-            var settings = await module.InvokeAsync<Dictionary<string, string>?>("getAll", ct, keyPrefix);
+            if (generation != Volatile.Read(ref _authenticationGeneration)
+                || cacheGeneration != Volatile.Read(ref _cacheGeneration))
+                return null;
 
-            if (settings is null || settings.Count == 0)
+            var settings = await module.InvokeAsync<Dictionary<string, string>?>("getAll", ct, tenant, keyPrefix);
+
+            if (settings is null || settings.Count == 0
+                || generation != Volatile.Read(ref _authenticationGeneration)
+                || cacheGeneration != Volatile.Read(ref _cacheGeneration))
                 return null;
 
             var dto = new SettingGroupResponseDto
@@ -66,13 +97,12 @@ public sealed class UserSettingsService : IUserSettingsService, IAsyncDisposable
                 {
                     Key = kvp.Key,
                     Value = kvp.Value,
-                    Source = (SettingSource)5, // User scope (local override)
+                    Source = SettingSource.UserPreference,
                     IsLocked = false,
                     CanEdit = true
                 }).ToList()
             };
 
-            _cache[category] = (dto, DateTime.UtcNow.Add(CacheDuration));
             return dto;
         }
         catch (Exception ex)
@@ -85,41 +115,57 @@ public sealed class UserSettingsService : IUserSettingsService, IAsyncDisposable
     public async Task<BatchUpdateResponseDto?> UpdateSettingsBatchAsync(
         string category, IDictionary<string, string> values, CancellationToken ct = default)
     {
+        if (Volatile.Read(ref _disposed))
+            return null;
+
         if (values.Count == 0)
             return new BatchUpdateResponseDto { Success = true, Results = [] };
 
         try
         {
             InvalidateCache(category);
+            long generation = Volatile.Read(ref _authenticationGeneration);
+            bool authenticated = await IsAuthenticatedAsync();
+            if (generation != Volatile.Read(ref _authenticationGeneration))
+                return null;
 
-            if (await IsAuthenticatedAsync())
+            if (authenticated)
             {
                 var batchDto = new UpdateSettingBatchDto
                 {
                     Values = new Dictionary<string, string>(values),
                     Mode = 0 // BestEffort — skip locked settings, apply the rest
                 };
-                return await _apiClient.UpdateUserSettingsBatchAsync(category, batchDto, cancellationToken: ct);
+                var result = await _apiClient.UpdateUserSettingsBatchAsync(category, batchDto, cancellationToken: ct);
+                return generation == Volatile.Read(ref _authenticationGeneration) ? result : null;
             }
 
-            // Anonymous: persist each value to localStorage
-            if (!OperatingSystem.IsBrowser())
+            var prefix = CategoryToKeyPrefix(category) + ".";
+            if (values.Keys.Any(key => !key.StartsWith(prefix, StringComparison.Ordinal)))
+                return null;
+
+            var tenant = await GetAnonymousTenantAsync();
+            if (tenant is null || generation != Volatile.Read(ref _authenticationGeneration))
                 return null;
 
             var module = await GetJsModuleAsync();
+            var results = new List<SettingUpdateResultDto>();
             foreach (var (key, value) in values)
             {
-                await module.InvokeVoidAsync("set", ct, key, value);
+                if (generation != Volatile.Read(ref _authenticationGeneration))
+                    return null;
+
+                bool applied = await module.InvokeAsync<bool>("set", ct, tenant, key, value);
+                results.Add(new SettingUpdateResultDto { Key = key, Applied = applied });
             }
+
+            if (generation != Volatile.Read(ref _authenticationGeneration))
+                return null;
 
             return new BatchUpdateResponseDto
             {
-                Success = true,
-                Results = values.Select(kvp => new SettingUpdateResultDto
-                {
-                    Key = kvp.Key,
-                    Applied = true
-                }).ToList()
+                Success = results.All(result => result.Applied == true),
+                Results = results
             };
         }
         catch (Exception ex)
@@ -127,100 +173,171 @@ public sealed class UserSettingsService : IUserSettingsService, IAsyncDisposable
             _logger.LogWarning(ex, "Failed to batch-update settings for category '{Category}'", category);
             return null;
         }
+        finally
+        {
+            InvalidateCache(category);
+        }
     }
 
     public async Task<bool> UpdateSettingAsync(string key, string value, CancellationToken ct = default)
     {
+        if (Volatile.Read(ref _disposed))
+            return false;
+
         try
         {
-            _cache.Clear(); // Key could belong to any cached category
+            InvalidateAllCaches();
+            long generation = Volatile.Read(ref _authenticationGeneration);
+            bool authenticated = await IsAuthenticatedAsync();
+            if (generation != Volatile.Read(ref _authenticationGeneration))
+                return false;
 
-            if (await IsAuthenticatedAsync())
+            if (authenticated)
             {
                 var dto = new UpdateSettingValueDto { Value = value };
-                await _apiClient.UpdateUserSettingAsync(key, dto, cancellationToken: ct);
-                return true;
+                var result = await _apiClient.UpdateUserSettingAsync(key, dto, cancellationToken: ct);
+                return result?.Success == true && generation == Volatile.Read(ref _authenticationGeneration);
             }
 
-            if (!OperatingSystem.IsBrowser())
+            if (!IsRegisteredAnonymousKey(key))
+                return false;
+            var tenant = await GetAnonymousTenantAsync();
+            if (tenant is null || generation != Volatile.Read(ref _authenticationGeneration))
                 return false;
 
             var module = await GetJsModuleAsync();
-            await module.InvokeVoidAsync("set", ct, key, value);
-            return true;
+            if (generation != Volatile.Read(ref _authenticationGeneration))
+                return false;
+            bool applied = await module.InvokeAsync<bool>("set", ct, tenant, key, value);
+            return applied && generation == Volatile.Read(ref _authenticationGeneration);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to update setting '{Key}'", key);
             return false;
         }
+        finally
+        {
+            InvalidateAllCaches();
+        }
     }
 
     public async Task<bool> ResetSettingAsync(string key, CancellationToken ct = default)
     {
+        if (Volatile.Read(ref _disposed))
+            return false;
+
         try
         {
-            _cache.Clear();
+            InvalidateAllCaches();
+            long generation = Volatile.Read(ref _authenticationGeneration);
+            bool authenticated = await IsAuthenticatedAsync();
+            if (generation != Volatile.Read(ref _authenticationGeneration))
+                return false;
 
-            if (await IsAuthenticatedAsync())
+            if (authenticated)
             {
-                await _apiClient.ResetUserSettingAsync(key, cancellationToken: ct);
-                return true;
+                var result = await _apiClient.ResetUserSettingAsync(key, cancellationToken: ct);
+                return result?.Success == true && generation == Volatile.Read(ref _authenticationGeneration);
             }
 
-            if (!OperatingSystem.IsBrowser())
+            if (!IsRegisteredAnonymousKey(key))
+                return false;
+            var tenant = await GetAnonymousTenantAsync();
+            if (tenant is null || generation != Volatile.Read(ref _authenticationGeneration))
                 return false;
 
             var module = await GetJsModuleAsync();
-            await module.InvokeVoidAsync("remove", ct, key);
-            return true;
+            if (generation != Volatile.Read(ref _authenticationGeneration))
+                return false;
+            bool applied = await module.InvokeAsync<bool>("remove", ct, tenant, key);
+            return applied && generation == Volatile.Read(ref _authenticationGeneration);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to reset setting '{Key}'", key);
             return false;
         }
+        finally
+        {
+            InvalidateAllCaches();
+        }
     }
 
     public async Task<bool> ResetAllAsync(string category, CancellationToken ct = default)
     {
+        if (Volatile.Read(ref _disposed))
+            return false;
+
         try
         {
             InvalidateCache(category);
+            long generation = Volatile.Read(ref _authenticationGeneration);
+            bool authenticated = await IsAuthenticatedAsync();
+            if (generation != Volatile.Read(ref _authenticationGeneration))
+                return false;
 
-            if (await IsAuthenticatedAsync())
+            if (authenticated)
             {
-                // Fetch current settings to identify all keys, then reset each in parallel
+                // Recheck the context between resets so a change stops remaining writes.
                 var current = await GetAuthenticatedSettingsAsync(category, ct);
-                if (current?.Settings is { Count: > 0 })
+                if (current is null || generation != Volatile.Read(ref _authenticationGeneration))
+                    return false;
+                foreach (var setting in current.Settings)
                 {
-                    var resetTasks = current.Settings
-                        .Select(s => _apiClient.ResetUserSettingAsync(s.Key, cancellationToken: ct));
-                    await Task.WhenAll(resetTasks);
+                    if (generation != Volatile.Read(ref _authenticationGeneration))
+                        return false;
+                    var result = await _apiClient.ResetUserSettingAsync(setting.Key, cancellationToken: ct);
+                    if (result?.Success != true)
+                        return false;
                 }
 
-                return true;
+                return generation == Volatile.Read(ref _authenticationGeneration);
             }
 
-            // Anonymous: clear all localStorage entries for this category
-            if (!OperatingSystem.IsBrowser())
+            var keyPrefix = CategoryToKeyPrefix(category);
+            var tenant = await GetAnonymousTenantAsync();
+            if (tenant is null || generation != Volatile.Read(ref _authenticationGeneration))
                 return false;
 
             var module = await GetJsModuleAsync();
-            var keyPrefix = CategoryToKeyPrefix(category);
-            await module.InvokeVoidAsync("clearPrefix", ct, keyPrefix);
-            return true;
+            if (generation != Volatile.Read(ref _authenticationGeneration))
+                return false;
+            await module.InvokeAsync<int>("clearPrefix", ct, tenant, keyPrefix);
+            return generation == Volatile.Read(ref _authenticationGeneration);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to reset all settings for category '{Category}'", category);
             return false;
         }
+        finally
+        {
+            InvalidateCache(category);
+        }
     }
 
     public void InvalidateCache(string category)
     {
-        _cache.Remove(category);
+        Interlocked.Increment(ref _cacheGeneration);
+        _cache.TryRemove(category, out _);
+    }
+
+    private void OnAuthenticationStateChanged(Task<AuthenticationState> _)
+    {
+        OnPublicExperienceSettingsChanged();
+    }
+
+    private void OnPublicExperienceSettingsChanged()
+    {
+        Interlocked.Increment(ref _authenticationGeneration);
+        InvalidateAllCaches();
+    }
+
+    private void InvalidateAllCaches()
+    {
+        Interlocked.Increment(ref _cacheGeneration);
+        _cache.Clear();
     }
 
     private async Task<SettingGroupResponseDto?> GetAuthenticatedSettingsAsync(string category, CancellationToken ct)
@@ -237,27 +354,92 @@ public sealed class UserSettingsService : IUserSettingsService, IAsyncDisposable
 
     private async ValueTask<IJSObjectReference> GetJsModuleAsync()
     {
-        return _jsModule ??= await _jsRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "/js/user-settings.js");
-    }
+        Task<IJSObjectReference> acquisition;
+        lock (_jsModuleLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            acquisition = _jsModuleTask ??= _jsRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "/js/user-settings.js").AsTask();
+        }
 
-    /// <summary>
-    /// Converts API category (kebab-case "event-list") to key prefix (underscore "event_list").
-    /// </summary>
-    private static string CategoryToKeyPrefix(string category)
-    {
-        return category.Replace('-', '_');
-    }
-
-    public async ValueTask DisposeAsync()
-    {
         try
         {
-            if (_jsModule is not null)
+            return await acquisition;
+        }
+        catch
+        {
+            lock (_jsModuleLock)
             {
-                await _jsModule.DisposeAsync();
-                _jsModule = null;
+                if (!_disposed && ReferenceEquals(_jsModuleTask, acquisition))
+                    _jsModuleTask = null;
             }
+            throw;
+        }
+    }
+
+    private async Task<string?> GetAnonymousTenantAsync()
+    {
+        var settings = await _publicExperienceService.GetCachedSettingsAsync();
+        return settings?.TenantId is { } tenantId && tenantId != Guid.Empty
+            ? tenantId.ToString("N")
+            : null;
+    }
+
+    internal static string CategoryToKeyPrefix(string category) => category switch
+    {
+        "PublicExperiencePreferences" => "public_experience_preferences",
+        "AiAssistantPreferences" => "ai_assistant_preferences",
+        "UiShellPreferences" => "ui_shell_preferences",
+        "AtprotoFederation" => "federation",
+        "EventList" or "event-list" => "event_list",
+        "HomeDiscovery" or "home-discovery" => "home_discovery",
+        _ => throw new ArgumentOutOfRangeException(nameof(category), category, "Unregistered anonymous preference category.")
+    };
+
+    private static bool IsRegisteredAnonymousKey(string key) =>
+        key.StartsWith("public_experience_preferences.", StringComparison.Ordinal)
+        || key.StartsWith("ai_assistant_preferences.", StringComparison.Ordinal)
+        || key.StartsWith("ui_shell_preferences.", StringComparison.Ordinal)
+        || key.StartsWith("federation.", StringComparison.Ordinal)
+        || key.StartsWith("event_list.", StringComparison.Ordinal)
+        || key.StartsWith("home_discovery.", StringComparison.Ordinal);
+
+    public ValueTask DisposeAsync()
+    {
+        lock (_jsModuleLock)
+        {
+            if (_disposeTask is null)
+            {
+                Volatile.Write(ref _disposed, true);
+                _authenticationStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+                _publicExperienceService.SettingsChanged -= OnPublicExperienceSettingsChanged;
+                Interlocked.Increment(ref _authenticationGeneration);
+                InvalidateAllCaches();
+                _disposeTask = DisposeModuleAsync(_jsModuleTask);
+            }
+            return new ValueTask(_disposeTask);
+        }
+    }
+
+    private async Task DisposeModuleAsync(Task<IJSObjectReference>? acquisition)
+    {
+        if (acquisition is null)
+            return;
+
+        IJSObjectReference module;
+        try
+        {
+            module = await acquisition;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "User settings module import failed before disposal");
+            return;
+        }
+
+        try
+        {
+            await module.DisposeAsync();
         }
         catch (JSDisconnectedException)
         {

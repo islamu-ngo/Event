@@ -23,6 +23,24 @@ reader merely through their role. Switching tenant or account requires a fresh
 private context. Do not embed learning state in public page prerendering,
 browser transfer state or shared caches.
 
+## Announcement Dismissal And Browser Privacy
+
+Anonymous announcement dismissal stays in the browser and is separated by
+tenant. Signing in does not copy that marker into your account; signed-in
+preferences use the account's server-backed settings. Old browser markers that
+did not identify a tenant are ignored, so an announcement may appear again after
+this change. If the current tenant cannot be established, no anonymous preference
+is read or saved.
+
+The close action keeps the announcement visible and reports a save failure when
+storage or the server does not confirm the dismissal. You can explicitly try
+again. Switching account, tenant or announcement settings invalidates pending
+results so an older save cannot hide the replacement announcement.
+
+This repair keeps the existing integer announcement revision. It does not add
+multiple publications, scheduling, acknowledgements or the later material-edition
+contract.
+
 ## What Practice Represents
 
 The shipped `learning-core` pack contains six deterministic exercises:

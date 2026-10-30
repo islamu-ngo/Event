@@ -1,3 +1,5 @@
+using NSubstitute.Extensions;
+
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class PublicExperienceServiceTests
@@ -153,6 +155,318 @@ public class PublicExperienceServiceTests
 
         await Assert.That(await service.GetCachedShellAsync()).IsNull();
         await Assert.That(service.ShellAvailability).IsEqualTo(PublicExperienceAvailability.Unavailable);
+    }
+
+    [Test]
+    public async Task SettingsNotificationObservesTheInstalledSnapshotWithoutRefetching()
+    {
+        var settings = SettingsWithIdentity("Current directory") with { TenantId = Guid.CreateVersion7() };
+        _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(settings);
+        Task<PublicExperienceSettingsDto?>? observed = null;
+        PublicExperienceAvailability availability = PublicExperienceAvailability.Unknown;
+        _service.SettingsChanged += () =>
+        {
+            availability = _service.SettingsAvailability;
+            observed = _service.GetCachedSettingsAsync();
+        };
+
+        await _service.GetSettingsAsync();
+
+        await Assert.That(observed is not null).IsTrue();
+        await Assert.That(await observed!).IsSameReferenceAs(settings);
+        await Assert.That(availability).IsEqualTo(PublicExperienceAvailability.Available);
+    }
+
+    [Test]
+    [Arguments("tenant")]
+    [Arguments("revision")]
+    [Arguments("message")]
+    [Arguments("link-text")]
+    [Arguments("link-url")]
+    [Arguments("enabled")]
+    public async Task RelevantSettingsChangesNotifyOnceAndEquivalentRefreshDoesNotNotify(string field)
+    {
+        var original = SettingsWithIdentity("Current directory") with
+        {
+            TenantId = Guid.CreateVersion7(), AnnouncementBarEnabled = true,
+            AnnouncementBarRevision = 4, AnnouncementBarMessage = "Original"
+        };
+        var changed = field switch
+        {
+            "tenant" => original with { TenantId = Guid.CreateVersion7() },
+            "revision" => original with { AnnouncementBarRevision = 5 },
+            "message" => original with { AnnouncementBarMessage = "Replacement" },
+            "link-text" => original with { AnnouncementBarLinkText = "Details" },
+            "link-url" => original with { AnnouncementBarLinkUrl = "/events" },
+            "enabled" => original with { AnnouncementBarEnabled = false },
+            _ => throw new ArgumentOutOfRangeException(nameof(field))
+        };
+        _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(original, changed, changed with { EnabledModules = ["Islamic"] });
+        await _service.GetSettingsAsync();
+        var notifications = new List<Task<PublicExperienceSettingsDto?>>();
+        _service.SettingsChanged += () => notifications.Add(_service.GetCachedSettingsAsync());
+
+        await _service.GetSettingsAsync();
+        await _service.GetSettingsAsync();
+
+        await Assert.That(notifications.Count).IsEqualTo(1);
+        await Assert.That(await notifications.Single()).IsSameReferenceAs(changed);
+    }
+
+    [Test]
+    public async Task RepeatedUnavailableSettingsNotifyOnceAndRecoveryInstallsCurrentIdentity()
+    {
+        var original = SettingsWithIdentity("Original directory");
+        _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>()).Returns(original);
+        await _service.GetSettingsAsync();
+        var availability = new List<PublicExperienceAvailability>();
+        _service.SettingsChanged += () => availability.Add(_service.SettingsAvailability);
+        _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
+            .Returns<Task<PublicExperienceSettingsDto>>(_ => throw new HttpRequestException("Unavailable"));
+
+        await _service.GetSettingsAsync();
+        await _service.GetSettingsAsync();
+        var recovered = SettingsWithIdentity("Recovered directory");
+        _apiClient.Configure().GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>()).Returns(recovered);
+        await _service.GetSettingsAsync();
+
+        await Assert.That(availability.Count).IsEqualTo(2);
+        await Assert.That(availability[0]).IsEqualTo(PublicExperienceAvailability.Unavailable);
+        await Assert.That(availability[1]).IsEqualTo(PublicExperienceAvailability.Available);
+        await Assert.That(await _service.GetCachedSettingsAsync()).IsSameReferenceAs(recovered);
+    }
+
+    [Test]
+    public async Task MissingDirectoryIdentityInvalidatesAvailabilityBeforeNotification()
+    {
+        _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>()).Returns(SettingsWithIdentity("Original directory"));
+        await _service.GetSettingsAsync();
+        var observed = new List<PublicExperienceAvailability>();
+        _service.SettingsChanged += () => observed.Add(_service.SettingsAvailability);
+        _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>()).Returns(new PublicExperienceSettingsDto());
+
+        await _service.GetSettingsAsync();
+        var cached = await _service.GetCachedSettingsAsync();
+
+        await Assert.That(observed.Count).IsEqualTo(1);
+        await Assert.That(observed.Single()).IsEqualTo(PublicExperienceAvailability.Unavailable);
+        await Assert.That(cached).IsNull();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task OlderSettingsSuccessCannotReplaceNewerSettingsOrReachItsCaller(bool cachedCaller)
+    {
+        var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var response = new TaskCompletionSource<PublicExperienceSettingsDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var older = SettingsWithIdentity("Earlier directory") with
+        {
+            TenantId = Guid.CreateVersion7(), AnnouncementBarRevision = 4
+        };
+        var newer = SettingsWithIdentity("Current directory") with
+        {
+            TenantId = Guid.CreateVersion7(), AnnouncementBarRevision = 5
+        };
+        _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                requested.TrySetResult();
+                return response.Task;
+            }, _ => Task.FromResult(newer));
+        int notifications = 0;
+        _service.SettingsChanged += () => notifications++;
+        var pending = cachedCaller ? _service.GetCachedSettingsAsync() : _service.GetSettingsAsync();
+        await requested.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var current = await _service.GetSettingsAsync();
+        response.SetResult(older);
+        var stale = await pending.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await Assert.That(current).IsSameReferenceAs(newer);
+        await Assert.That(stale).IsNull();
+        await Assert.That(await _service.GetCachedSettingsAsync()).IsSameReferenceAs(newer);
+        await Assert.That(_service.SettingsAvailability).IsEqualTo(PublicExperienceAvailability.Available);
+        await Assert.That(notifications).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments("missing-identity")]
+    [Arguments("api-failure")]
+    [Arguments("transport-failure")]
+    public async Task OlderSettingsFailureCannotInvalidateANewerVerifiedSnapshot(string outcome)
+    {
+        var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var response = new TaskCompletionSource<PublicExperienceSettingsDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var newer = SettingsWithIdentity("Current directory") with
+        {
+            TenantId = Guid.CreateVersion7(), AnnouncementBarRevision = 5
+        };
+        _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                requested.TrySetResult();
+                return response.Task;
+            }, _ => Task.FromResult(newer));
+        int notifications = 0;
+        _service.SettingsChanged += () => notifications++;
+        var pending = _service.GetSettingsAsync();
+        await requested.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await _service.GetSettingsAsync();
+        switch (outcome)
+        {
+            case "missing-identity":
+                response.SetResult(new PublicExperienceSettingsDto());
+                break;
+            case "api-failure":
+                response.SetException(new ApiException("Unavailable", 503, string.Empty,
+                    new Dictionary<string, IEnumerable<string>>(), null));
+                break;
+            case "transport-failure":
+                response.SetException(new HttpRequestException("Unavailable"));
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(outcome));
+        }
+
+        await Assert.That(await pending.WaitAsync(TimeSpan.FromSeconds(10))).IsNull();
+        await Assert.That(await _service.GetCachedSettingsAsync()).IsSameReferenceAs(newer);
+        await Assert.That(_service.SettingsAvailability).IsEqualTo(PublicExperienceAvailability.Available);
+        await Assert.That(notifications).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments("success")]
+    [Arguments("missing-identity")]
+    [Arguments("api-failure")]
+    [Arguments("transport-failure")]
+    public async Task ResetRejectsPreResetSettingsCompletionAndKeepsTheNextReadFresh(string outcome)
+    {
+        var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var response = new TaskCompletionSource<PublicExperienceSettingsDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var earlier = SettingsWithIdentity("Earlier directory") with
+        {
+            TenantId = Guid.CreateVersion7(), AnnouncementBarRevision = 4
+        };
+        var current = SettingsWithIdentity("Current directory") with
+        {
+            TenantId = Guid.CreateVersion7(), AnnouncementBarRevision = 5
+        };
+        _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                requested.TrySetResult();
+                return response.Task;
+            }, _ => Task.FromResult(current));
+        int notifications = 0;
+        _service.SettingsChanged += () => notifications++;
+        var pending = _service.GetCachedSettingsAsync();
+        await requested.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        _service.ResetCache();
+        switch (outcome)
+        {
+            case "success":
+                response.SetResult(earlier);
+                break;
+            case "missing-identity":
+                response.SetResult(new PublicExperienceSettingsDto());
+                break;
+            case "api-failure":
+                response.SetException(new ApiException("Unavailable", 503, string.Empty,
+                    new Dictionary<string, IEnumerable<string>>(), null));
+                break;
+            case "transport-failure":
+                response.SetException(new HttpRequestException("Unavailable"));
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(outcome));
+        }
+
+        await Assert.That(await pending.WaitAsync(TimeSpan.FromSeconds(10))).IsNull();
+        await Assert.That(_service.SettingsAvailability).IsEqualTo(PublicExperienceAvailability.Unknown);
+        await Assert.That(notifications).IsEqualTo(1);
+        await Assert.That(await _service.GetCachedSettingsAsync()).IsSameReferenceAs(current);
+        await Assert.That(_service.SettingsAvailability).IsEqualTo(PublicExperienceAvailability.Available);
+        await Assert.That(notifications).IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task ANewerPendingSettingsRequestAlreadyOwnsPublication()
+    {
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstResponse = new TaskCompletionSource<PublicExperienceSettingsDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondResponse = new TaskCompletionSource<PublicExperienceSettingsDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var newer = SettingsWithIdentity("Current directory") with
+        {
+            TenantId = Guid.CreateVersion7(), AnnouncementBarRevision = 5
+        };
+        _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                firstStarted.TrySetResult();
+                return firstResponse.Task;
+            }, _ =>
+            {
+                secondStarted.TrySetResult();
+                return secondResponse.Task;
+            });
+        int notifications = 0;
+        _service.SettingsChanged += () => notifications++;
+        var first = _service.GetSettingsAsync();
+        await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var second = _service.GetSettingsAsync();
+        await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        firstResponse.SetResult(SettingsWithIdentity("Earlier directory") with { AnnouncementBarRevision = 4 });
+
+        await Assert.That(await first.WaitAsync(TimeSpan.FromSeconds(10))).IsNull();
+        await Assert.That(_service.SettingsAvailability).IsEqualTo(PublicExperienceAvailability.Unknown);
+        await Assert.That(notifications).IsEqualTo(0);
+        secondResponse.SetResult(newer);
+        await Assert.That(await second.WaitAsync(TimeSpan.FromSeconds(10))).IsSameReferenceAs(newer);
+        await Assert.That(await _service.GetCachedSettingsAsync()).IsSameReferenceAs(newer);
+        await Assert.That(notifications).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task ResetDuringSettingsNotificationPreventsReturningPreResetIdentity()
+    {
+        var settings = SettingsWithIdentity("Earlier directory") with { TenantId = Guid.CreateVersion7() };
+        _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>()).Returns(settings);
+        bool reset = false;
+        int notifications = 0;
+        _service.SettingsChanged += () =>
+        {
+            notifications++;
+            if (!reset)
+            {
+                reset = true;
+                _service.ResetCache();
+            }
+        };
+
+        var result = await _service.GetSettingsAsync();
+
+        await Assert.That(result).IsNull();
+        await Assert.That(_service.SettingsAvailability).IsEqualTo(PublicExperienceAvailability.Unknown);
+        await Assert.That(notifications).IsEqualTo(2);
     }
 
     private static PublicExperienceSettingsDto SettingsWithIdentity(string name) => new()

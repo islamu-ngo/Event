@@ -12,7 +12,7 @@
                   Dense="true"
                   Variant="@Variant.Text"
                   ContentAlignment="HorizontalAlignment.Center"
-                  ShowCloseIcon="true"
+                  ShowCloseIcon="@(!_isSaving && !_isLoading)"
                   CloseIconClicked="CloseBar"
                   NoIcon="true">
             <div class="announcement-bar__content">
@@ -29,6 +29,10 @@
                        @onclick:stopPropagation>
                         @_linkText
                     </a>
+                }
+                @if (_saveFailed)
+                {
+                    <MudText role="status">Dismissal could not be saved. Try again.</MudText>
                 }
             </div>
         </MudAlert>

@@ -1,0 +1,28 @@
+Change-Id: CHG-01M668NXDM88SCYQE1MXYDJQ8E
+Title: "persist announcement dismissal in the correct browser scope"
+Type: fix
+Scope: notifications
+Summary: "Correct category namespaces, tenant-qualified anonymous storage, stale callback handling and failed dismissal reporting without changing the server marker contract."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Detail: Anonymous preferences are tenant-qualified and never merged into an account; captured context generations reject stale reads and dismissal results after account, tenant or settings changes.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: Old unscoped browser markers are ignored, so announcements can reappear; failed or unapplied saves leave the bar visible and require another explicit close action. The integer server revision contract is unchanged.

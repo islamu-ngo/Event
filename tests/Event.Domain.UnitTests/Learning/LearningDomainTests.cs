@@ -10,10 +10,30 @@ public sealed class LearningDomainTests
 
     private static Guid Id() => Guid.CreateVersion7();
     private static UserLearningState Learner() => UserLearningState.Create(Id(), Id(), Id(), Now);
-    private static void Start(UserLearningState state, Guid? claim = null, int version = 1,
+    private static readonly string PlanFingerprint = new('a', 64);
+    private static readonly string PolicySourceStamp = new('B', 64);
+    private static LearningTourDefinition Tour(LearningTourFamily family = LearningTourFamily.Shell, int version = 2) =>
+        new(family, version,
+            [new("navigation", 1), new("workspace", 1), new("review", 1)]);
+
+    private static void Start(UserLearningState state, Guid? claim = null, int version = 2,
         LearningTourFamily family = LearningTourFamily.Shell, bool replay = false, DateTime? now = null) =>
-        state.ClaimTour(state.Tours.SingleOrDefault(t => t.Family == family && t.MaterialVersion == version)?.Id ?? Id(),
-            family, version, claim ?? Id(), Id(), state.Revision, now ?? Now, replay: replay);
+        state.ClaimSemanticTour(state.Tours.SingleOrDefault(t => t.Family == family && t.MaterialVersion == version)?.Id ?? Id(),
+            Tour(family, version), claim ?? Id(), Id(), state.Revision, now ?? Now,
+            PlanFingerprint, PolicySourceStamp, replay: replay);
+
+    private static void TourAction(UserLearningState state, Guid? claim, LearningTourAction action,
+        string? stepKey = null, int? stepVersion = null, Guid? intent = null, long? expected = null,
+        DateTime? now = null, LearningTourDefinition? definition = null, Guid? progressId = null,
+        LearningSnoozeDuration? snoozeDuration = null, string? planFingerprint = null, string? policySourceStamp = null)
+    {
+        definition ??= Tour();
+        state.RecordSemanticTourAction(progressId ?? state.Tours.SingleOrDefault(t =>
+                t.Family == definition.Family && t.MaterialVersion == definition.MaterialVersion)?.Id ?? Id(),
+            definition, claim, intent ?? Id(), action, stepKey, stepVersion, snoozeDuration,
+            planFingerprint ?? PlanFingerprint, policySourceStamp ?? PolicySourceStamp,
+            expected ?? state.Revision, now ?? Now, state.ActiveContextKey ?? "self", state.ActiveEventContextId);
+    }
 
     private static void Practice(UserLearningState state, string context = "self", string recipe = "event-details",
         LearningPracticeAction action = LearningPracticeAction.Start, LearningPracticeChoice choice = LearningPracticeChoice.None,
@@ -90,10 +110,12 @@ public sealed class LearningDomainTests
         UserLearningState state = Learner();
         Guid claim = Id();
         Start(state, claim);
+        foreach (LearningTourStep step in Tour().Steps)
+            TourAction(state, claim, LearningTourAction.Progress, step.StepKey, step.StepVersion);
         await Assert.That(state.ClaimExpiresAtUtc).IsEqualTo(Now.AddSeconds(120));
-        await Assert.That(() => state.RecordTourOutcome(claim, Id(), LearningTourOutcome.Completed, 3,
-            state.Revision, Now.AddSeconds(120))).Throws<InvalidOperationException>();
-        Start(state, now: Now.AddSeconds(120));
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Complete,
+            now: Now.AddSeconds(120))).Throws<InvalidOperationException>();
+        Start(state, replay: true, now: Now.AddSeconds(120));
         await Assert.That(state.ActiveClaimId == claim).IsFalse();
     }
 
@@ -105,11 +127,20 @@ public sealed class LearningDomainTests
         Start(state, claim);
         await Assert.That(() => Start(state, family: LearningTourFamily.Studio, now: Now.AddSeconds(1)))
             .Throws<InvalidOperationException>();
-        state.RecordTourOutcome(claim, Id(), LearningTourOutcome.InProgress, 1, state.Revision, Now.AddSeconds(100));
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Complete,
+            now: Now.AddSeconds(100))).Throws<InvalidOperationException>();
+        TourAction(state, claim, LearningTourAction.Progress, "navigation", 1, now: Now.AddSeconds(100));
         await Assert.That(state.ClaimExpiresAtUtc).IsEqualTo(Now.AddSeconds(220));
-        state.RecordTourOutcome(claim, Id(), LearningTourOutcome.Completed, 3, state.Revision, Now.AddSeconds(219));
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Complete,
+            now: Now.AddSeconds(219))).Throws<InvalidOperationException>();
+        TourAction(state, claim, LearningTourAction.Progress, "workspace", 1, now: Now.AddSeconds(219));
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Complete,
+            now: Now.AddSeconds(219))).Throws<InvalidOperationException>();
+        TourAction(state, claim, LearningTourAction.Progress, "review", 1, now: Now.AddSeconds(219));
+        TourAction(state, claim, LearningTourAction.Complete, now: Now.AddSeconds(219));
         await Assert.That(state.ActiveClaimId).IsNull();
         await Assert.That(state.Tours.Single().Outcome).IsEqualTo(LearningTourOutcome.Completed);
+        await Assert.That(state.Tours.Single().Steps.Count).IsEqualTo(3);
     }
 
     [Test]
@@ -118,27 +149,45 @@ public sealed class LearningDomainTests
         UserLearningState state = Learner();
         Guid claim = Id();
         Start(state, claim);
-        await Assert.That(() => state.RecordTourOutcome(Id(), Id(), LearningTourOutcome.Completed, 3,
-            state.Revision, Now)).Throws<InvalidOperationException>();
-        await Assert.That(() => state.RecordTourOutcome(claim, Id(), LearningTourOutcome.Completed, 3, 0, Now))
+        await Assert.That(() => TourAction(state, Id(), LearningTourAction.Progress, "workspace", 1))
             .Throws<InvalidOperationException>();
-        state.RecordTourOutcome(claim, Id(), LearningTourOutcome.InProgress, 2, state.Revision, Now);
-        await Assert.That(() => state.RecordTourOutcome(claim, Id(), LearningTourOutcome.InProgress, 1,
-            state.Revision, Now)).Throws<InvalidOperationException>();
-        await Assert.That(state.Tours.Single().Step).IsEqualTo(2);
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Progress, "workspace", 1, expected: 0))
+            .Throws<InvalidOperationException>();
+        TourAction(state, claim, LearningTourAction.Progress, "workspace", 1);
+        // Semantic progress is a set: an earlier applicable step is new evidence, not a backwards cursor.
+        TourAction(state, claim, LearningTourAction.Progress, "navigation", 1);
+        long revision = state.Revision;
+        DateTime? expiry = state.ClaimExpiresAtUtc;
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Progress, "workspace", 1))
+            .Throws<InvalidOperationException>();
+        await Assert.That(state.Tours.Single().Steps.Count).IsEqualTo(2);
+        await Assert.That(state.Tours.Single().Steps.Any(step => step.StepKey == "workspace" && step.StepVersion == 1)).IsTrue();
+        await Assert.That(state.Tours.Single().Steps.Any(step => step.StepKey == "navigation" && step.StepVersion == 1)).IsTrue();
+        await Assert.That(state.Revision).IsEqualTo(revision);
+        await Assert.That(state.ClaimExpiresAtUtc).IsEqualTo(expiry);
     }
 
     [Test]
     public async Task InvitationCanBeSkippedWithoutTakingAClaim()
     {
         UserLearningState state = Learner();
-        state.SkipInvitation(Id(), LearningTourFamily.Studio, 1, Id(), 0, Now);
+        TourAction(state, null, LearningTourAction.Skip, definition: Tour(LearningTourFamily.Studio));
         await Assert.That(state.ActiveClaimId).IsNull();
         await Assert.That(state.Tours.Single().Outcome).IsEqualTo(LearningTourOutcome.Skipped);
         await Assert.That(state.Revision).IsEqualTo(1);
         Start(state, family: LearningTourFamily.Shell);
-        await Assert.That(() => state.SkipInvitation(Id(), LearningTourFamily.NormalAi, 1, Id(), state.Revision, Now))
+        await Assert.That(() => TourAction(state, null, LearningTourAction.Skip,
+            definition: Tour(LearningTourFamily.NormalAi)))
             .Throws<InvalidOperationException>();
+        await Assert.That(() => TourAction(state, null, LearningTourAction.Snooze,
+            definition: Tour(LearningTourFamily.NormalAi), snoozeDuration: LearningSnoozeDuration.OneHour))
+            .Throws<InvalidOperationException>();
+        TourAction(state, state.ActiveClaimId, LearningTourAction.Interrupt);
+        TourAction(state, null, LearningTourAction.Snooze, definition: Tour(LearningTourFamily.NormalAi),
+            snoozeDuration: LearningSnoozeDuration.OneHour);
+        await Assert.That(state.ActiveClaimId).IsNull();
+        await Assert.That(state.Tours.Single(t => t.Family == LearningTourFamily.NormalAi).SnoozedUntilUtc)
+            .IsEqualTo(Now.AddHours(1));
     }
 
     [Test]
@@ -149,12 +198,16 @@ public sealed class LearningDomainTests
             UserLearningState state = Learner();
             Guid first = Id();
             Start(state, first);
-            state.RecordTourOutcome(first, Id(), outcome, 3, state.Revision, Now);
+            if (outcome == LearningTourOutcome.Completed)
+                foreach (LearningTourStep step in Tour().Steps)
+                    TourAction(state, first, LearningTourAction.Progress, step.StepKey, step.StepVersion);
+            TourAction(state, first, outcome == LearningTourOutcome.Completed
+                ? LearningTourAction.Complete : LearningTourAction.Skip);
             await Assert.That(() => Start(state)).Throws<InvalidOperationException>();
             Guid replay = Id();
             Start(state, replay, replay: true);
             await Assert.That(state.Tours.Single().Outcome).IsEqualTo(outcome);
-            state.RecordTourOutcome(replay, Id(), LearningTourOutcome.Interrupted, 0, state.Revision, Now);
+            TourAction(state, replay, LearningTourAction.Interrupt);
             await Assert.That(state.Tours.Single().Outcome).IsEqualTo(outcome);
             await Assert.That(state.ActiveClaimId).IsNull();
         }
@@ -166,12 +219,12 @@ public sealed class LearningDomainTests
         UserLearningState state = Learner();
         foreach (LearningTourFamily family in Enum.GetValues<LearningTourFamily>())
         {
-            for (int version = 1; version <= 3; version++)
-                state.SkipInvitation(Id(), family, version, Id(), state.Revision, Now);
+            for (int version = 2; version <= 4; version++)
+                TourAction(state, null, LearningTourAction.Skip, definition: Tour(family, version));
         }
         await Assert.That(state.Tours.Count).IsEqualTo(8);
-        await Assert.That(state.Tours.All(t => t.MaterialVersion is 2 or 3)).IsTrue();
-        await Assert.That(() => state.SkipInvitation(Id(), LearningTourFamily.Shell, 1, Id(), state.Revision, Now))
+        await Assert.That(state.Tours.All(t => t.MaterialVersion is 3 or 4)).IsTrue();
+        await Assert.That(() => TourAction(state, null, LearningTourAction.Skip, definition: Tour(version: 2)))
             .Throws<InvalidOperationException>();
     }
 
@@ -181,15 +234,17 @@ public sealed class LearningDomainTests
         UserLearningState state = Learner();
         Guid claim = Id(), intent = Id();
         Start(state, claim);
+        foreach (LearningTourStep step in Tour().Steps)
+            TourAction(state, claim, LearningTourAction.Progress, step.StepKey, step.StepVersion);
         long expected = state.Revision;
-        state.RecordTourOutcome(claim, intent, LearningTourOutcome.Completed, 3, expected, Now);
+        TourAction(state, claim, LearningTourAction.Complete, intent: intent, expected: expected);
         long final = state.Revision;
-        state.RecordTourOutcome(claim, intent, LearningTourOutcome.Completed, 3, expected, Now.AddSeconds(1));
+        TourAction(state, claim, LearningTourAction.Complete, intent: intent, expected: expected, now: Now.AddSeconds(1));
         await Assert.That(state.Revision).IsEqualTo(final);
-        await Assert.That(() => state.RecordTourOutcome(claim, intent, LearningTourOutcome.Skipped, 3, expected, Now))
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Skip, intent: intent, expected: expected))
             .Throws<InvalidOperationException>();
-        await Assert.That(() => state.RecordTourOutcome(claim, Id(), LearningTourOutcome.Completed, 3,
-            state.Revision, Now)).Throws<InvalidOperationException>();
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Complete))
+            .Throws<InvalidOperationException>();
     }
 
     [Test]
@@ -301,7 +356,7 @@ public sealed class LearningDomainTests
         UserLearningState state = Learner();
         Practice(state);
         await Assert.That(() => ((ICollection<LearningPracticeState>)state.Practices).Clear()).Throws<NotSupportedException>();
-        state.SkipInvitation(Id(), LearningTourFamily.Shell, 1, Id(), state.Revision, Now);
+        TourAction(state, null, LearningTourAction.Skip);
         await Assert.That(() => ((ICollection<LearningTourProgress>)state.Tours).Clear()).Throws<NotSupportedException>();
     }
 
@@ -311,7 +366,7 @@ public sealed class LearningDomainTests
         UserLearningState state = Learner();
         Guid userId = state.UserId;
         Practice(state, $"actor:{Id():D}");
-        state.SkipInvitation(Id(), LearningTourFamily.Shell, 1, Id(), state.Revision, Now);
+        TourAction(state, null, LearningTourAction.Skip);
         LearningPracticeState practice = state.Practices.Single();
         LearningTourProgress tour = state.Tours.Single();
         await Assert.That(practice.TenantId).IsEqualTo(state.TenantId);
@@ -328,20 +383,33 @@ public sealed class LearningDomainTests
     {
         UserLearningState state = Learner();
         Guid progress = Id(), claim = Id(), intent = Id();
-        state.ClaimTour(progress, LearningTourFamily.EventManagement, 1, claim, intent, 0, Now);
-        state.ClaimTour(progress, LearningTourFamily.EventManagement, 1, claim, intent, 0, Now.AddSeconds(1));
+        LearningTourDefinition definition = Tour(LearningTourFamily.EventManagement);
+        state.ClaimSemanticTour(progress, definition, claim, intent, 0, Now, PlanFingerprint, PolicySourceStamp);
+        state.ClaimSemanticTour(progress, definition, claim, intent, 0, Now.AddSeconds(1), PlanFingerprint, PolicySourceStamp);
         await Assert.That(state.Revision).IsEqualTo(1);
         await Assert.That(state.ClaimExpiresAtUtc).IsEqualTo(Now.AddSeconds(120));
-        await Assert.That(() => state.ClaimTour(progress, LearningTourFamily.EventManagement, 1, claim,
-            intent, 0, Now, eventContextId: Id())).Throws<InvalidOperationException>();
-        state.RecordTourOutcome(claim, Id(), LearningTourOutcome.Interrupted, 0, state.Revision, Now);
+        await Assert.That(state.ActivePlanFingerprint).IsEqualTo(PlanFingerprint);
+        await Assert.That(state.ActivePolicySourceStamp).IsEqualTo(PolicySourceStamp);
+        await Assert.That(() => state.ClaimSemanticTour(progress, definition, claim,
+            intent, 0, Now, PlanFingerprint, PolicySourceStamp, eventContextId: Id())).Throws<InvalidOperationException>();
+        await Assert.That(() => state.ClaimSemanticTour(progress, definition, claim,
+            intent, 0, Now, new string('c', 64), PolicySourceStamp)).Throws<InvalidOperationException>();
+        await Assert.That(() => state.ClaimSemanticTour(progress, definition, claim,
+            intent, 0, Now, PlanFingerprint, new string('d', 64))).Throws<InvalidOperationException>();
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Interrupt, definition: definition,
+            planFingerprint: new string('c', 64))).Throws<InvalidOperationException>();
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Interrupt, definition: definition,
+            policySourceStamp: new string('d', 64))).Throws<InvalidOperationException>();
+        TourAction(state, claim, LearningTourAction.Interrupt, definition: definition);
         Guid skip = Id();
         long expected = state.Revision;
-        state.SkipInvitation(progress, LearningTourFamily.EventManagement, 1, skip, expected, Now);
-        state.SkipInvitation(progress, LearningTourFamily.EventManagement, 1, skip, expected, Now.AddSeconds(1));
+        TourAction(state, null, LearningTourAction.Skip, intent: skip, expected: expected, definition: definition);
+        TourAction(state, null, LearningTourAction.Skip, intent: skip, expected: expected,
+            definition: definition, now: Now.AddSeconds(1));
         await Assert.That(state.Revision).IsEqualTo(3);
-        await Assert.That(() => state.SkipInvitation(progress, LearningTourFamily.EventManagement, 2,
-            skip, expected, Now)).Throws<InvalidOperationException>();
+        await Assert.That(() => TourAction(state, null, LearningTourAction.Skip, intent: skip, expected: expected,
+            definition: Tour(LearningTourFamily.EventManagement, 3), progressId: progress))
+            .Throws<InvalidOperationException>();
     }
 
     [Test]
@@ -350,13 +418,14 @@ public sealed class LearningDomainTests
         UserLearningState state = Learner();
         Guid claim = Id();
         Start(state, claim);
-        state.RecordTourOutcome(claim, Id(), LearningTourOutcome.InProgress, 1, state.Revision, Now.AddSeconds(30));
-        await Assert.That(() => state.RecordTourOutcome(claim, Id(), LearningTourOutcome.InProgress, 1,
-            state.Revision, Now.AddSeconds(100))).Throws<InvalidOperationException>();
+        foreach (LearningTourStep step in Tour().Steps)
+            TourAction(state, claim, LearningTourAction.Progress, step.StepKey, step.StepVersion, now: Now.AddSeconds(30));
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Progress, "navigation", 1,
+            now: Now.AddSeconds(100))).Throws<InvalidOperationException>();
         PracticeAt(state, Now.AddSeconds(120));
         await Assert.That(state.ClaimExpiresAtUtc).IsEqualTo(Now.AddSeconds(150));
-        await Assert.That(() => state.RecordTourOutcome(claim, Id(), LearningTourOutcome.Completed, 3,
-            state.Revision, Now.AddSeconds(150))).Throws<InvalidOperationException>();
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Complete,
+            now: Now.AddSeconds(150))).Throws<InvalidOperationException>();
     }
 
     private static void PracticeAt(UserLearningState state, DateTime utcNow) =>
@@ -371,13 +440,17 @@ public sealed class LearningDomainTests
         Start(state, oldClaim);
         Guid current = Id(), eventId = Id();
         string context = $"actor:{Id():D}";
-        state.ClaimTour(Id(), LearningTourFamily.EventManagement, 1, current, Id(), state.Revision,
-            Now.AddSeconds(120), context, eventId);
+        LearningTourDefinition definition = Tour(LearningTourFamily.EventManagement);
+        state.ClaimSemanticTour(Id(), definition, current, Id(), state.Revision,
+            Now.AddSeconds(120), PlanFingerprint, PolicySourceStamp, context, eventId);
+        foreach (LearningTourStep step in definition.Steps)
+            TourAction(state, current, LearningTourAction.Progress, step.StepKey, step.StepVersion,
+                definition: definition, now: Now.AddSeconds(120));
         await Assert.That(state.ActiveContextKey).IsEqualTo(context);
         await Assert.That(state.ActiveEventContextId).IsEqualTo(eventId);
-        await Assert.That(() => state.RecordTourOutcome(oldClaim, Id(), LearningTourOutcome.Completed, 3,
-            state.Revision, Now.AddSeconds(121))).Throws<InvalidOperationException>();
-        state.RecordTourOutcome(current, Id(), LearningTourOutcome.Skipped, 0, state.Revision, Now.AddSeconds(121));
+        await Assert.That(() => TourAction(state, oldClaim, LearningTourAction.Complete,
+            definition: definition, now: Now.AddSeconds(121))).Throws<InvalidOperationException>();
+        TourAction(state, current, LearningTourAction.Skip, definition: definition, now: Now.AddSeconds(121));
         await Assert.That(state.ActiveContextKey).IsNull();
         await Assert.That(state.ActiveEventContextId).IsNull();
     }
@@ -412,14 +485,23 @@ public sealed class LearningDomainTests
         Start(state, claim);
         long revision = state.Revision;
         DateTime? expiry = state.ClaimExpiresAtUtc;
-        await Assert.That(() => state.ClaimTour(Id(), (LearningTourFamily)99, 1, Id(), Id(), revision, Now))
+        await Assert.That(() => state.ClaimSemanticTour(Id(), Tour((LearningTourFamily)99),
+            Id(), Id(), revision, Now, PlanFingerprint, PolicySourceStamp))
             .Throws<ArgumentOutOfRangeException>();
-        await Assert.That(() => state.RecordTourOutcome(claim, Id(), (LearningTourOutcome)99, 0, revision, Now))
+        await Assert.That(() => TourAction(state, claim, (LearningTourAction)99))
             .Throws<ArgumentOutOfRangeException>();
-        await Assert.That(() => state.RecordTourOutcome(claim, Id(), LearningTourOutcome.None, 0, revision, Now))
+        await Assert.That(() => TourAction(state, claim, (LearningTourAction)0))
             .Throws<ArgumentOutOfRangeException>();
-        await Assert.That(() => state.RecordTourOutcome(claim, Id(), LearningTourOutcome.InProgress, 33, revision, Now))
-            .Throws<ArgumentOutOfRangeException>();
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Progress, "navigation", 33))
+            .Throws<ArgumentException>();
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Complete, "navigation", 1))
+            .Throws<ArgumentException>();
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Progress, "not-applicable", 1))
+            .Throws<ArgumentException>();
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Interrupt, planFingerprint: new string('a', 63)))
+            .Throws<ArgumentException>();
+        await Assert.That(() => TourAction(state, claim, LearningTourAction.Interrupt, policySourceStamp: new string('g', 64)))
+            .Throws<ArgumentException>();
         await Assert.That(() => state.UpdatePreferences(false, false, false, revision, Now.AddTicks(-1)))
             .Throws<InvalidOperationException>();
         await Assert.That(state.Revision).IsEqualTo(revision);

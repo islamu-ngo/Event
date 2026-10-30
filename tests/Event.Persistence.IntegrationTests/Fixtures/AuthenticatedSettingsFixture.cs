@@ -3,9 +3,11 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Event.Testing.DataProtection;
+using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
@@ -40,6 +42,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
@@ -77,7 +80,8 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
         Func<ExploreDbContext, Dictionary<string, string?>, Task>? configurePostgres,
         Action<SanitizedRequestFailure>? requestFailureObserver = null,
         Action<Dictionary<string, string?>>? configure = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        PrivacyErasureAuthorityTopology privacyAuthorityTopology = PrivacyErasureAuthorityTopology.CoLocated)
     {
         await EnvironmentOwner.WaitAsync(TestContext.Current!.Execution.CancellationToken);
         var fixture = new AuthenticatedSettingsFixture(createDatabase);
@@ -85,7 +89,7 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
         {
             fixture.SetEnvironment("SECRET_PROVIDER", "Environment");
             fixture.SetEnvironment("SecretProvider__Provider", "Environment");
-            fixture.SetEnvironment("PrivacyErasure__Authority__Topology", "CoLocated");
+            fixture.SetEnvironment("PrivacyErasure__Authority__Topology", privacyAuthorityTopology.ToString());
             fixture.SetEnvironment("IdentityDatabase__Topology", "Colocated");
             fixture.SetEnvironment("Authentication__Provider", "local");
             fixture.SetEnvironment("Authorization__Provider", "local");
@@ -102,7 +106,7 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
                 ["Authorization:Provider"] = "local",
                 ["Authentication:Local:JwtKey"] = jwtKey,
                 ["SecretProvider:Provider"] = "Environment",
-                ["PrivacyErasure:Authority:Topology"] = "CoLocated",
+                ["PrivacyErasure:Authority:Topology"] = privacyAuthorityTopology.ToString(),
                 ["IdentityDatabase:Topology"] = "Colocated",
                 ["Deployment:Mode"] = "SingleTenant",
                 ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),
@@ -157,7 +161,9 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
             {
                 await configurePostgres(seed, configuration);
             }
-            foreach (var item in configuration.Where(pair => pair.Key.StartsWith("Database:", StringComparison.Ordinal)))
+            foreach (var item in configuration.Where(pair =>
+                pair.Key.StartsWith("Database:", StringComparison.Ordinal)
+                || pair.Key == "Testing:UseRealDatabase"))
                 fixture.SetEnvironment(item.Key.Replace(":", "__", StringComparison.Ordinal), item.Value);
 
             Guid bootstrapActor = await InstanceSettingsCommandFixture.SeedAdministratorAsync(seed);
@@ -191,8 +197,9 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
                 observedFailure = failure;
                 requestFailureObserver?.Invoke(failure);
             }, configureServices);
-            await using (var scope = fixture.host.Services.CreateAsyncScope())
+            if (privacyAuthorityTopology == PrivacyErasureAuthorityTopology.CoLocated)
             {
+                await using var scope = fixture.host.Services.CreateAsyncScope();
                 await using DbContext authority = configurePostgres is null
                     ? await scope.ServiceProvider.GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>()
                         .CreateDbContextAsync()
@@ -215,15 +222,90 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
                 AllowAutoRedirect = false
             });
             var login = await fixture.CreateLocalAdministratorAsync(bootstrapActor);
-            using var response = await fixture.client.PostAsJsonAsync("/api/auth/local/login", login);
+            var loginFailureGate = new object();
+            var loginExceptionTypes = new HashSet<string>(StringComparer.Ordinal);
+            var loginSqlStates = new HashSet<string>(StringComparer.Ordinal);
+            var loginMethods = new HashSet<string>(StringComparer.Ordinal);
+            bool capturingLoginFailure = false;
+            EventHandler<FirstChanceExceptionEventArgs>? loginObserver = null;
+            LoginCommandErrorObserver? loginCommandObserver = null;
+            if (privacyAuthorityTopology == PrivacyErasureAuthorityTopology.ExternalDatabase)
+            {
+                var accessor = fixture.host.Services.GetRequiredService<IHttpContextAccessor>();
+                loginCommandObserver = new LoginCommandErrorObserver(accessor, configuration, seed);
+                loginObserver = (_, args) =>
+                {
+                    lock (loginFailureGate)
+                    {
+                        if (capturingLoginFailure) return;
+                        capturingLoginFailure = true;
+                        try
+                        {
+                            var context = accessor.HttpContext;
+                            if (context is null || !HttpMethods.IsPost(context.Request.Method)
+                                || context.Request.Path != "/api/auth/local/login"
+                                || !ReferenceEquals(context.RequestServices.GetService<IHttpContextAccessor>(), accessor))
+                                return;
+                            var chain = new List<Exception>();
+                            for (Exception? current = args.Exception; current is not null && chain.Count < 8;
+                                current = current.InnerException)
+                                chain.Add(current);
+                            var methods = chain.SelectMany(error =>
+                                    new StackTrace(error, fNeedFileInfo: false).GetFrames() ?? [])
+                                .Concat(new StackTrace(fNeedFileInfo: false).GetFrames() ?? [])
+                                .Select(frame => frame.GetMethod())
+                                .Where(method => method?.DeclaringType?.FullName?.StartsWith(
+                                    "Explore.", StringComparison.Ordinal) == true)
+                                .Select(method => $"{method!.DeclaringType!.FullName}.{method.Name}")
+                                .Distinct(StringComparer.Ordinal).Take(16).ToArray();
+                            if (methods.Length == 0) return;
+                            foreach (var error in chain)
+                            {
+                                if (loginExceptionTypes.Count < 16)
+                                    loginExceptionTypes.Add(error.GetType().FullName ?? error.GetType().Name);
+                                if (error is Npgsql.PostgresException postgres && loginSqlStates.Count < 8)
+                                    loginSqlStates.Add(postgres.SqlState);
+                            }
+                            foreach (string method in methods)
+                                if (loginMethods.Count < 64) loginMethods.Add(method);
+                        }
+                        catch (Exception)
+                        {
+                            // Diagnostic collection must never replace the real login outcome.
+                        }
+                        finally { capturingLoginFailure = false; }
+                    }
+                };
+                AppDomain.CurrentDomain.FirstChanceException += loginObserver;
+            }
+            HttpResponseMessage loginResponse;
+            try { loginResponse = await fixture.client.PostAsJsonAsync("/api/auth/local/login", login); }
+            finally
+            {
+                if (loginObserver is not null)
+                    AppDomain.CurrentDomain.FirstChanceException -= loginObserver;
+                loginCommandObserver?.Dispose();
+            }
+            using var response = loginResponse;
+            SanitizedRequestFailure? loginFailure = null;
+            if (loginObserver is not null)
+                lock (loginFailureGate)
+                    loginFailure = new([.. loginExceptionTypes], [.. loginSqlStates], [.. loginMethods]);
+            string loginDiagnostics = loginFailure is null ? string.Empty
+                : $" First-chance types: {string.Join(",", loginFailure.ExceptionTypes)}; "
+                    + $"SQL states: {string.Join(",", loginFailure.SqlStates)}; "
+                    + $"native methods: {string.Join(",", loginFailure.Methods)}.";
+            if (loginCommandObserver is not null)
+                loginDiagnostics += loginCommandObserver.Summary();
             if (response.StatusCode != HttpStatusCode.OK)
                 throw new InvalidOperationException($"Real Local settings login failed: {response.StatusCode}; "
                     + $"types: {string.Join(",", observedFailure?.ExceptionTypes ?? [])}; "
                     + $"SQL states: {string.Join(",", observedFailure?.SqlStates ?? [])}; "
-                    + $"methods: {string.Join(",", observedFailure?.Methods ?? [])}.");
+                    + $"methods: {string.Join(",", observedFailure?.Methods ?? [])}."
+                    + loginDiagnostics);
             using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             if (!body.RootElement.GetProperty("success").GetBoolean())
-                throw new InvalidOperationException("Real Local settings login was rejected.");
+                throw new InvalidOperationException("Real Local settings login was rejected." + loginDiagnostics);
             fixture.accessToken = body.RootElement.GetProperty("token").GetString()!;
             fixture.host.RuntimeRequests = true;
             return fixture;
@@ -531,6 +613,114 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
 
     internal sealed record SanitizedRequestFailure(
         ImmutableArray<string> ExceptionTypes, ImmutableArray<string> SqlStates, ImmutableArray<string> Methods);
+
+    private sealed class LoginCommandErrorObserver : IObserver<DiagnosticListener>,
+        IObserver<KeyValuePair<string, object?>>, IDisposable
+    {
+        private readonly IHttpContextAccessor accessor;
+        private readonly (string Purpose, string? Username)[] logins;
+        private readonly (string Label, string Column)[] columns;
+        private readonly object sync = new();
+        private readonly HashSet<string> failures = new(StringComparer.Ordinal);
+        private readonly List<IDisposable> subscriptions = [];
+        private readonly IDisposable listeners;
+        private bool disposed;
+
+        internal LoginCommandErrorObserver(IHttpContextAccessor accessor,
+            IReadOnlyDictionary<string, string?> configuration, ExploreDbContext modelOwner)
+        {
+            this.accessor = accessor;
+            logins = new[]
+            {
+                PrimaryDatabaseRole.Migrator, PrimaryDatabaseRole.Runtime,
+                PrimaryDatabaseRole.Global, PrimaryDatabaseRole.LocalIdentityWriter
+            }.Select(role => (role.ToString(), configuration.GetValueOrDefault($"Database:{role}:Username")))
+                .ToArray();
+            var pii = modelOwner.Model.FindEntityType(typeof(UserPii))!;
+            var table = StoreObjectIdentifier.Table(pii.GetTableName()!, pii.GetSchema());
+            var sql = modelOwner.GetService<ISqlGenerationHelper>();
+            columns = new[]
+            {
+                (Label: "DeclaredBirthDate", Property: "_dateOfBirth"),
+                (Label: "BirthDateCollectionReceiptId", Property: "_birthDateCollectionReceiptId"),
+                (Label: "BirthDateRevision", Property: "_birthDateRevision")
+            }.Select(column => (column.Label,
+                sql.DelimitIdentifier(pii.FindProperty(column.Property)!.GetColumnName(table)!))).ToArray();
+            listeners = DiagnosticListener.AllListeners.Subscribe(this);
+        }
+
+        public void OnNext(DiagnosticListener listener)
+        {
+            try
+            {
+                if (listener.Name != DbLoggerCategory.Name) return;
+                lock (sync)
+                    if (!disposed)
+                        subscriptions.Add(listener.Subscribe(this, name => name == RelationalEventId.CommandError.Name));
+            }
+            catch (Exception)
+            {
+                // Diagnostic subscription must not change host or login behavior.
+            }
+        }
+
+        public void OnNext(KeyValuePair<string, object?> diagnostic)
+        {
+            try
+            {
+                lock (sync)
+                {
+                    if (disposed || failures.Count >= 8 || diagnostic.Value is not CommandErrorEventData data
+                        || data.Command.Connection is not Npgsql.NpgsqlConnection connection)
+                        return;
+                    var context = accessor.HttpContext;
+                    if (context is null || !HttpMethods.IsPost(context.Request.Method)
+                        || context.Request.Path != "/api/auth/local/login"
+                        || !ReferenceEquals(context.RequestServices.GetService<IHttpContextAccessor>(), accessor)
+                        || !data.Command.CommandText.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+                        return;
+                    var matches = logins.Where(login => !string.IsNullOrWhiteSpace(login.Username)
+                            && string.Equals(login.Username, connection.UserName, StringComparison.Ordinal))
+                        .Select(login => login.Purpose).ToArray();
+                    string purpose = matches.Length switch
+                    {
+                        1 => matches[0],
+                        0 => "Unrecognized",
+                        _ => "Ambiguous"
+                    };
+                    // SQL is inspected transiently; only fixed labels and booleans survive.
+                    failures.Add($"purpose={purpose}; " + string.Join(", ", columns.Select(column =>
+                        $"{column.Label}={data.Command.CommandText.Contains(column.Column, StringComparison.Ordinal)}")));
+                }
+            }
+            catch (Exception)
+            {
+                // Passive diagnostics must never replace the command's actual failure.
+            }
+        }
+
+        internal string Summary()
+        {
+            lock (sync) return $" Login command errors: [{string.Join(" | ", failures)}].";
+        }
+
+        public void OnCompleted() { }
+        public void OnError(Exception error) { }
+
+        public void Dispose()
+        {
+            IDisposable[] captured;
+            lock (sync)
+            {
+                if (disposed) return;
+                disposed = true;
+                captured = subscriptions.ToArray();
+                subscriptions.Clear();
+            }
+            listeners.Dispose();
+            foreach (var subscription in captured) subscription.Dispose();
+        }
+    }
 
     private sealed class RequestFailureObserver(Action<SanitizedRequestFailure> observe) : IExceptionHandler
     {

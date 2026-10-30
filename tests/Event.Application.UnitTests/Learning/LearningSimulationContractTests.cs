@@ -222,9 +222,15 @@ public sealed class LearningSimulationContractTests
         RejectJson<LearningUpdatePreferencesRequest>(
             """{"ExpectedScopeStamp":"scope","ExpectedRevision":0,"SuppressAutomaticTours":false,"HideLearning":false,"PinLearning":false,"UserId":"foreign"}""");
         RejectJson<LearningClaimTourRequest>(
-            """{"ExpectedScopeStamp":"scope","ExpectedRevision":0,"IntentId":"019f0e00-0000-7000-8000-000000000001","Family":"Shell","MaterialVersion":1,"ContextKey":"self","EffectUrl":"/publish"}""");
+            """{"ExpectedScopeStamp":"scope","ExpectedRevision":0,"IntentId":"019f0e00-0000-7000-8000-000000000001","Family":"Shell","MaterialVersion":2,"ContextKey":"self","ExpectedPlanFingerprint":"plan","ExpectedPolicySourceStamp":"policy","Replay":false,"EffectUrl":"/publish"}""");
         RejectJson<LearningRecordTourOutcomeRequest>(
-            """{"ExpectedScopeStamp":"scope","ExpectedRevision":0,"IntentId":"019f0e00-0000-7000-8000-000000000001","Family":"Shell","MaterialVersion":1,"Outcome":"Unknown","StepIndex":0}""");
+            """{"ExpectedScopeStamp":"scope","ExpectedRevision":0,"IntentId":"019f0e00-0000-7000-8000-000000000001","Family":"Shell","MaterialVersion":2,"ContextKey":"self","ExpectedPlanFingerprint":"plan","ExpectedPolicySourceStamp":"policy","Action":"Unknown"}""");
+        RejectJson<LearningRecordTourOutcomeRequest>(
+            """{"ExpectedScopeStamp":"scope","ExpectedRevision":0,"IntentId":"019f0e00-0000-7000-8000-000000000001","Family":"Shell","MaterialVersion":2,"ContextKey":"self","ExpectedPlanFingerprint":"plan","ExpectedPolicySourceStamp":"policy","Action":1}""");
+        RejectJson<LearningRecordTourOutcomeRequest>(
+            """{"ExpectedScopeStamp":"scope","ExpectedRevision":0,"IntentId":"019f0e00-0000-7000-8000-000000000001","Family":"Shell","MaterialVersion":2,"ContextKey":"self","ExpectedPlanFingerprint":"plan","ExpectedPolicySourceStamp":"policy","Action":"Snooze","SnoozeDuration":1}""");
+        RejectJson<LearningRecordTourOutcomeRequest>(
+            """{"ExpectedScopeStamp":"scope","ExpectedRevision":0,"IntentId":"019f0e00-0000-7000-8000-000000000001","Family":"Shell","MaterialVersion":2,"ContextKey":"self","ExpectedPlanFingerprint":"plan","ExpectedPolicySourceStamp":"policy","Action":"Complete","Outcome":"Completed","StepIndex":1}""");
         RejectJson<LearningManageSpaceRequest>(
             """{"ExpectedScopeStamp":"scope","ExpectedRevision":0,"Action":"Remove","TenantId":"foreign"}""");
         await Assert.That(JsonSerializer.Deserialize<LearningApplyPracticeActionRequest>(
@@ -248,7 +254,7 @@ public sealed class LearningSimulationContractTests
         var lessons = new List<LearningLessonDto> { lesson };
         var tours = new List<LearningTourProgressDto>
         {
-            new() { Family = LearningTourFamily.Shell, MaterialVersion = 1, StepIndex = 0 }
+            new() { Family = LearningTourFamily.Shell, MaterialVersion = 2, CurrentCoverage = false }
         };
         LearningContextDto context = Context() with { Lessons = lessons, Tours = tours };
         lessons.Clear();
@@ -257,6 +263,16 @@ public sealed class LearningSimulationContractTests
         await Assert.That(context.Tours.Count).IsEqualTo(1);
         AssertReadOnly(context.Lessons);
         AssertReadOnly(context.Tours);
+        var completion = new LearningTourStepCompletionDto
+        {
+            StepKey = "shell.navigation", StepVersion = 1,
+            CompletedAtUtc = new DateTimeOffset(2026, 10, 29, 12, 0, 0, TimeSpan.Zero)
+        };
+        var completions = new List<LearningTourStepCompletionDto> { completion };
+        var progress = context.Tours[0] with { CompletedSteps = completions };
+        completions.Clear();
+        await Assert.That(progress.CompletedSteps.Single()).IsEqualTo(completion);
+        AssertReadOnly(progress.CompletedSteps);
 
         var facts = new List<LearningSyntheticFactDto> { new("capacity", "12") };
         LearningSyntheticPresentationDto presentation = Apply("event-details", LearningPracticeAction.Start).Presentation
@@ -307,9 +323,9 @@ public sealed class LearningSimulationContractTests
         LearningTourClaimDto claim = new()
         {
             Token = Guid.Parse("00000000-0000-0000-0000-000000000002"),
-            Family = LearningTourFamily.Studio, MaterialVersion = 1,
+            Family = LearningTourFamily.Studio, MaterialVersion = 2,
             ExpiresAtUtc = new DateTimeOffset(2026, 10, 28, 12, 2, 0, TimeSpan.Zero),
-            Revision = 3
+            Revision = 3, PlanFingerprint = new string('A', 64), PolicySourceStamp = new string('B', 64)
         };
         LearningMutationReceiptDto receipt = new()
         {
@@ -325,6 +341,8 @@ public sealed class LearningSimulationContractTests
         await Assert.That(rebound.Claim.ExpiresAtUtc).IsEqualTo(claim.ExpiresAtUtc);
         await Assert.That(rebound.Claim.Family).IsEqualTo(LearningTourFamily.Studio);
         await Assert.That(rebound.Claim.Revision).IsEqualTo(3L);
+        await Assert.That(rebound.Claim.PlanFingerprint).IsEqualTo(claim.PlanFingerprint);
+        await Assert.That(rebound.Claim.PolicySourceStamp).IsEqualTo(claim.PolicySourceStamp);
         await Assert.That(rebound.Space!.Status).IsEqualTo(LearningSpaceStatus.Active);
         await Assert.That(rebound.SimulationStatus).IsEqualTo(LearningSimulationStatus.Simulated);
     }
@@ -334,10 +352,16 @@ public sealed class LearningSimulationContractTests
     {
         LearningTourProgressDto tour = new()
         {
-            Family = LearningTourFamily.Shell, MaterialVersion = 1, StepIndex = 0
+            Family = LearningTourFamily.Shell, MaterialVersion = 2, CurrentCoverage = false
         };
         LearningLessonDto lesson = LearningLessonCatalog.Lessons[0];
         RequireBoundRefusal(() => Context() with { Tours = Enumerable.Repeat(tour, 9).ToArray() });
+        var completed = new LearningTourStepCompletionDto
+        {
+            StepKey = "shell.navigation", StepVersion = 1,
+            CompletedAtUtc = new DateTimeOffset(2026, 10, 29, 12, 0, 0, TimeSpan.Zero)
+        };
+        RequireBoundRefusal(() => tour with { CompletedSteps = Enumerable.Repeat(completed, 33).ToArray() });
         RequireBoundRefusal(() => Context() with { Lessons = Enumerable.Repeat(lesson, 7).ToArray() });
         RequireBoundRefusal(() => lesson with { Choices = Enumerable.Repeat(lesson.Choices[0], 4).ToArray() });
         RequireBoundRefusal(() => lesson with { Transitions = Enumerable.Repeat(lesson.Transitions[0], 33).ToArray() });

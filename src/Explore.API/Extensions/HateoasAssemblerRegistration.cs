@@ -89,6 +89,7 @@ public static class HateoasAssemblerRegistration
     public static IServiceCollection AddHateoasAssemblers(this IServiceCollection services)
     {
         services.AddHalResource<LearningContextDto, LearningContextLinkPolicy, LearningContextCollectionLinkPolicy>();
+        services.AddHalResource<LearningTourPlanDto, LearningTourPlanLinkPolicy, LearningTourPlanCollectionLinkPolicy>();
         services.AddHalResource<LearningPracticeDto, LearningPracticeLinkPolicy, LearningPracticeCollectionLinkPolicy>();
         services.AddHalResource<LearningMutationReceiptDto, LearningMutationReceiptLinkPolicy, LearningMutationReceiptCollectionLinkPolicy>();
         services.AddHalResource<RecognitionRecoveryEscalationDto, RecognitionRecoveryEscalationDetailLinkPolicy, RecognitionRecoveryEscalationCollectionLinkPolicy>();

@@ -17,4 +17,8 @@ internal static class LearningInputRules
     internal static bool IsScopeStamp(string? value) =>
         value is { Length: 64 } && value.All(character =>
             character is >= '0' and <= '9' or >= 'A' and <= 'F');
+
+    internal static bool IsStepKey(string? value) =>
+        value is { Length: > 0 and <= 96 } && value.All(character =>
+            character is >= 'a' and <= 'z' or >= '0' and <= '9' or '.' or '-');
 }

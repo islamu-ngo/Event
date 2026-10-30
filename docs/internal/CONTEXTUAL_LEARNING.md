@@ -1,8 +1,8 @@
 # Private Learning State And Authored Practice
 
 > **Audience:** Developers and operators
-> **Status:** Backend implemented; scoped assurance and baseline exclusions below
-> **Last Verified:** 2026-10-28
+> **Status:** Backend-only source integration; C04 semantic assurance incomplete
+> **Contract Updated:** 2026-10-30; historical verification receipts retained below
 > **Source Anchors:** `src/Explore.Domain/Learning/`, `ILearningRepository`, `ILearningPrivacyErasureStore`, `PrivacyErasureApplier`
 
 ## Delivery Boundary
@@ -59,6 +59,44 @@ This browser repair retains the integer revision contract. Server-issued
 material editions and coordinated inherited publication remain separate work;
 neither this source integration nor component mocks prove actual-host behavior.
 
+## C04 Semantic Tour Contract
+
+`LearningExperienceCatalog` owns tour material version **2** independently of
+`LearningLessonCatalog` and the `learning-core` practice pack, which remain version
+**1**. `LearningTourPlanResolver` selects currently applicable steps from the
+authored family inventory. `GetLearningTourPlanQueryHandler` serves the private
+named-family plan; [API Architecture](API.md#private-contextual-learning) owns its
+exact transport fields. A plan is a captured context, not permission to execute
+later, and its `TargetKey` is presentation metadata, not an executable selector,
+route or expression. No current renderer or UI readiness follows from this catalog.
+
+Semantic identity is `(StepKey, StepVersion)`, not ordinal position, instruction
+copy or target layout. `LearningTourDefinition.AuthoredSteps` retains the full
+authored identity inventory while `Steps` contains only applicable identities.
+`LearningTourProgress.CarryCompatibleEvidence` carries matching authored evidence
+across retained versions even when a step is temporarily omitted from the
+applicable plan. Reordering or omitting a step does not erase its evidence; a new
+key/version is new work. `CurrentCoverage` is computed against the current
+applicable identities and is separate from historical `Outcome`. A preserved
+`Completed` or `Skipped` outcome does not prove current coverage. `Complete`
+requires evidence for every applicable identity.
+
+`ClaimSemanticTour` binds the accepted plan fingerprint, policy-source stamp,
+context key and optional event to the active claim. `RecordSemanticTourAction`
+requires those same accepted bindings for claimed actions. Only new explicit
+`Progress` renews the 120-second claim; duplicate progress cannot keep it alive.
+`Skip` and `Snooze` may dismiss an unclaimed invitation when no live claim exists.
+Claim-bound `Skip`, `Interrupt` or `Snooze` can release an owned claim after its
+source becomes unavailable or is removed, using its accepted bindings rather
+than requiring that removed source to become available again. This cleanup
+neither restores preview authority nor accepts progress/completion against a
+stale plan.
+
+Suppression, snooze, skip and existing coverage require explicit `Replay` for a
+manual claim. Replay preserves historical completed/skipped outcomes and
+compatible evidence; nothing automatically replays a tour. Learning remains
+optional and is not a hard production gate.
+
 ## Domain Ownership And Bounds
 
 `TenantLearningSpace` is the tenant's single `learning-core` material-version-1
@@ -74,11 +112,12 @@ reassignment. No practice-to-production user/actor/event foreign key is added;
 actor context is a canonical scalar key.
 
 There are four tour families: Shell, Studio, EventManagement and NormalAi. Each
-retains only the current and previous material versions, at most eight progress
-rows. One learner has at most one active claim across tabs. The inactivity
+authored inventory has at most 32 semantic steps and retains only the current and
+previous material versions: at most eight tour progress rows and 256 semantic
+step-evidence rows per learner. One learner has at most one active claim across tabs. The inactivity
 deadline is 120 server seconds. Only an advancing explicit progress step renews
 it; retries, unchanged steps, preference writes and practice activity do not.
-An invitation may be skipped without claiming. Other outcomes are claim-bound.
+An invitation may be skipped or snoozed without claiming. Other actions are claim-bound.
 Manual replay preserves the earlier completed/skipped outcome.
 
 Practice uses canonical `self` or `actor:{guid:D}` context keys, at most 20
@@ -94,7 +133,7 @@ and each retained child's latest intent, not an unlimited request journal.
 
 ## EF Persistence And Isolation
 
-All four entity types carry the named tenant filter. Repository reads include
+Learning roots, tour progress, semantic step evidence and practice carry the named tenant filter. Repository reads include
 explicit tenant and internal-user predicates; knowing a practice UUID does not
 authorize its retrieval. Queries do not create either root.
 
@@ -105,7 +144,7 @@ provider exception classification; handlers must receive a typed conflict,
 not a provider-specific error or a silent retry.
 
 PostgreSQL's existing migration composition installs fixed learning storage
-rights through `PostgresLearningPermissions`. Runtime has CRUD on the four
+rights through `PostgresLearningPermissions`. Runtime has CRUD on the five
 learning relations under the existing forced tenant RLS. The established Global
 erasure purpose receives only SELECT/DELETE on learner roots, with a
 purpose-specific all-tenant RLS policy; child disposal follows the foreign-key
@@ -119,15 +158,28 @@ authority. Compromise of that erasure database credential can read/delete learne
 roots across tenants; this is the documented application-owned persistence
 trade-off, not a second SQL workflow or a subject grant supplied by the client.
 
-Both roots cascade from the tenant. Children cascade only from their learner
-through the composite `(TenantId, UserLearningStateId)` key. This enforces child
-tenant consistency without adding a second production-owner cascade route,
-including on SQL Server. No actor or production user is deleted by learning.
+Tour and practice rows reference their learner through the composite
+`(TenantId, UserLearningStateId)` key. Semantic step evidence references its tour
+through the composite tenant/tour key. These relationships enforce child tenant
+consistency without a second production-owner cascade route. SQL Server uses
+NO ACTION constraints and explicit ordered deletion: steps precede tours and
+practices, which precede learner roots. The other providers use the configured
+foreign-key cascades. No actor or production user is deleted by learning.
 
 The generated `AddTenantLearningState` migration cohorts belong to the primary,
 SQLite, SQL Server and MySQL migration owners. MariaDB consumes the MySQL cohort
 but requires independent execution evidence. Migrations and snapshots are
 generated artifacts; edit entities/configurations and regenerate instead.
+
+The C04 `AddSemanticLearningSteps` cohorts were generated natively for all four
+catalogs. The original SQL Server scaffold exposed a pre-existing owned
+foreign-key metadata defect; a separate generator correction and empty physical
+checkpoint resolved it before regenerating the learning-only cohort. The other
+three cohorts were regenerated after merging develop so their target models
+retain upstream mutation-evidence metadata. Complete Up/Down inspection found
+only learning changes, and all four catalogs have model-agreement receipts.
+These are model-only checks, not physical deployment or full-history migration
+acceptance. No database upgrade or reset is claimed.
 
 ## Common Erasure Boundary
 
@@ -213,6 +265,17 @@ readiness supply contextual tour availability. Credential readiness resolves
 before physical ownership, never by opening an AI conversation under a database
 transaction. Synthetic AI review is independent of live provider readiness.
 
+`ILearningSourceRetention` observes the actual selected tenant's workspace
+settings, guidance document (including actual absence) and policy/governance
+sources. `LearningSourceRetention` acquires their issuer-bound lease on the
+original selected Serializable owner and retains the source image, connection,
+transaction and human lifetime through final admission. Revalidation compares
+the actual source image; a caller's expected fingerprint or detached
+`LearningSourceFacts` cannot replace the lease. Normal-AI capability is observed
+outside the transaction, not a credential-validity lease or a guarantee that a
+provider will remain callable. Original human credential validity remains a
+separate terminal admission check.
+
 Before exposing `/api/learning`, the native Application/API slice must prove
 current human and tenant authority, exact selected-context/original-transaction
 custody, retained erasure exclusion, completion-image validation and terminal
@@ -235,6 +298,111 @@ describes the adopter boundary. The task context records actual commands,
 evidence and open gates; source structure alone is not acceptance.
 
 ## Verification And Release Readiness
+
+### Current C04 Evidence And Limits
+
+This semantic contract has targeted backend verification, not release
+certification. No UI has shipped; no hosted assurance or final provider/migration
+assurance is complete.
+The current reported passing evidence is 14 semantic Domain cases and 27
+migrated original Domain cases rerun after dead ordinal removal. The eight-case
+final-admission class also passes, including native injected-child rollback.
+Earlier evidence includes seven SQLite model cases. These narrow receipts do not
+establish all actual-role behavior or the full provider matrix.
+
+On disposable SQLite storage, the initial and semantic generated cohorts
+round-tripped Down/Up twice. The check verifies all five tables, current columns
+and unique indexes, unchanged unrelated tables, and empty migration history.
+It executes native generated operations without fabricating earlier migration
+receipts; the separate full-history gate remains required.
+
+The native read-purpose correction passed all 13 learning HTTP contract cases
+on SQLite, including authenticated, private plan reads without materializing
+learner or policy rows. Separate bounded runs passed nine operation cases,
+four race cases, two lifecycle cases and two actor-context cases. Four
+generated-learning contract cases passed after
+native schema/client regeneration. Those checks guard the named plan route,
+closed action/snooze enum tokens, source-bound semantic inputs, and populated
+plan HAL shape; the generated client also compiled in Release. These receipts
+do not prove PostgreSQL source retention or the full provider matrix.
+
+The nine-case actual-role run failed during fixture setup, before source-retention
+assertions. A focused retry and an untouched-baseline probe both reproduced
+PostgreSQL `42501` on `authority_counter` during genuine Local account enrollment.
+The selected co-located Runtime authority storage-permission profile remains an
+unresolved prerequisite; no original-human source-issuer assertion Red or Green
+is claimed from those setup failures. A separate storage-only test, using the
+fixture's genuine restricted Runtime tenant factory without human authentication,
+reached the intended missing-retain-function rejection. The fixed retain-only
+entrypoints are implemented in the existing ordinary/mixed catalogs. Five
+storage-only cases passed with the actual Runtime login: successful original
+Serializable retention, reader-role restrictions, and wrong-tenant/isolation
+rejections. The mixed reader role grants only the closed learning retain/read
+routines, not mixed-settings writes, direct document-table access or Global role
+membership. An additional actual-Runtime probe confirmed direct guidance-table
+SELECT is denied. The implementation therefore uses a fixed selected-tenant
+guidance projection with exact native body/ACL attestation. Its absence/direct
+table denial case and full six-field document image/foreign-tenant rejection
+case pass. Two deterministic independent-backend anchor-exclusion cases also
+pass: ordinary and mixed anchors reject exclusive acquisition while Runtime
+retains them and permit it after settlement.
+These entrypoints retain revision anchors and issue no settings or learning
+mutation authority. The original co-located fixture failure above remains a
+historical, separately quarantined receipt.
+
+The dedicated external privacy-authority profile subsequently passed both real
+original-human cases: retained-source acquisition/validation and rejection after
+an independent guidance insertion. Separate login prerequisites preserved
+birth-data restrictions and passed eight actual-role continuity cases. Setup
+now precedes the tests' unchanged 60-second source-operation deadline.
+
+Native guidance command construction also exposed repeated expected-body
+generation at about 15.5 seconds per call. `PostgresMixedSettingsContract` now
+memoizes only expected attestation SQL using a weak context key and immutable
+five-login enrollment key. The context fixes model/schema/provider inputs;
+sequential EF context use remains required. No database state, readiness result,
+guidance image, tenant, principal or transaction is cached. Every invocation
+still executes live body/hash/catalog/role/grant checks. An actual Runtime
+cold/warm-read witness passed, then independently changed the installed routine
+through the owned fixture's bootstrap Migrator and verified exact body-drift
+rejection. This is not restricted-Migrator or full-provider certification.
+
+After the develop merge, targeted Application learning cases and the corrected
+client clock cases compiled and passed; the older compilation failures below
+remain historical receipts, not current assertions. Fresh API export, native
+client generation and Release compilation passed, as did all four semantic
+generated-contract cases. Main owns execution, the triad's exact commands and
+transient monitor IDs, final assurance and commits.
+No database upgrade or reset is claimed. Pending evidence must not be inferred
+from generated artifacts, earlier
+counts or source inspection.
+
+### Renderer Admission And Contribution Ledger
+
+GuideFlow remains an uninstalled candidate. On 2026-10-30, exact 1.0.1 catalog
+metadata declared MIT/net8.0, and a streaming archive digest matched the catalog
+SHA512. This is provenance evidence, not dependency or hosted-behavior admission.
+The [source-free admission record](../../dev/active/contextual-tenant-onboarding/contextual-tenant-onboarding-renderer-admission.md)
+contains sources, integrity evidence, notice/graph limits and remaining checks.
+
+| Evidence class | Current disposition |
+| --- | --- |
+| Verified renderer capability | No runtime behavior verified; exact metadata/integrity only |
+| Documented, not verified on the pinned artifact | Earlier public-API research records lifecycle/cancellation, navigation/state, async content and optional local storage |
+| Reproduced generic gap | None; no missing hook or contribution is inferred |
+| Event-owned responsibility | Tenant policy, HAL/authorization, original identity, claims, progress, erasure and presentation arbitration |
+| Accepted/deferred action | Retain candidate, uninstalled pending attribution clarification after the renderer-path question timed out; selected graph, host modes and accessibility remain open |
+
+No package input or lockfile changed. No upstream message was sent. Subsequent
+implementation must receive the sanitized requirements in a fresh context;
+the research context expanded a README usage example and is not an
+implementation context from that point onward.
+
+### Historical Backend Receipts (Before C04 Semantic Changes)
+
+The following receipts are preserved as historical evidence, not current C04
+release proof. In particular, earlier generated-schema/client and provider
+passes do not certify the changed semantic wire contract or migration cohort.
 
 The backend has real HTTP, database and restricted-role evidence. This is not a
 green whole-solution release: independently reproduced baseline failures still

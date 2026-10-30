@@ -15,6 +15,13 @@ public sealed class LearningContextLinkPolicy : ILinkPolicy<LearningContextDto>
         if (!dto.Capabilities.CanLearn)
             yield break;
 
+        foreach (LearningTourFamily family in dto.Tours.Select(tour => tour.Family).Distinct()
+                     .Where(family => family != LearningTourFamily.EventManagement || dto.EventContextId.HasValue))
+            yield return new("tour-plan", RouteNames.GetLearningTourPlan,
+                new { family = family.ToString(), contextKey = dto.ContextKey,
+                    eventContextId = family == LearningTourFamily.EventManagement ? dto.EventContextId : null },
+                "GET", RequiresAuth: true);
+
         yield return new("preferences", RouteNames.UpdateLearningPreferences, null, "PATCH", RequiresAuth: true);
         if (dto.Capabilities.CanClaimTours && dto.Tours.Any(tour => tour.IsAvailable))
         {
@@ -37,6 +44,21 @@ public sealed class LearningContextLinkPolicy : ILinkPolicy<LearningContextDto>
             else if (dto.SpaceStatus == LearningSpaceStatus.Removed)
                 yield return new("recreate-learning-space", RouteNames.ManageTenantLearningSpace, null, "POST", RequiresAuth: true);
         }
+    }
+}
+
+/// <summary>Plan links use the retained context and server-evaluated claim eligibility.</summary>
+public sealed class LearningTourPlanLinkPolicy : ILinkPolicy<LearningTourPlanDto>
+{
+    public IEnumerable<LinkDefinition> GetLinks(LearningTourPlanDto dto, ClaimsPrincipal? user)
+    {
+        yield return new(LinkRelations.Self, RouteNames.GetLearningTourPlan,
+            new { family = dto.Family.ToString(), contextKey = dto.ContextKey,
+                eventContextId = dto.EventContextId }, "GET", RequiresAuth: true);
+        yield return new("learning-context", RouteNames.GetLearningContext,
+            new { contextKey = dto.ContextKey, eventContextId = dto.EventContextId }, "GET", RequiresAuth: true);
+        if (dto.CanClaim)
+            yield return new("claim-tour", RouteNames.ClaimLearningTour, null, "POST", RequiresAuth: true);
     }
 }
 
@@ -85,6 +107,12 @@ public sealed class LearningContextCollectionLinkPolicy : ICollectionLinkPolicy<
 public sealed class LearningPracticeCollectionLinkPolicy : ICollectionLinkPolicy<LearningPracticeDto>
 {
     public IEnumerable<LinkDefinition> GetItemLinks(LearningPracticeDto dto, ClaimsPrincipal? user) => [];
+    public IEnumerable<LinkDefinition> GetCollectionLinks(ClaimsPrincipal? user) => [];
+}
+
+public sealed class LearningTourPlanCollectionLinkPolicy : ICollectionLinkPolicy<LearningTourPlanDto>
+{
+    public IEnumerable<LinkDefinition> GetItemLinks(LearningTourPlanDto dto, ClaimsPrincipal? user) => [];
     public IEnumerable<LinkDefinition> GetCollectionLinks(ClaimsPrincipal? user) => [];
 }
 

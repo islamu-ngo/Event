@@ -418,9 +418,27 @@ public static partial class PostgresOrdinarySettingsContract
             """;
     }
 
+    private static string LearningRetainBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) => $"""
+        BEGIN
+            {Guard(context, enrollment)}
+            {PostgresPrivilegeGuard.RestrictedCallerSql}
+            IF current_user <> '{OwnerRole}' OR session_user <> {Text(enrollment.RuntimeLogin)}
+                OR pg_catalog.current_setting('role') NOT IN ('none',session_user::text)
+                OR pg_catalog.current_setting('session_replication_role') <> 'origin'
+                OR pg_catalog.current_setting('transaction_isolation') <> 'serializable'
+                OR p_tenant IS NULL OR p_tenant = '00000000-0000-0000-0000-000000000000'::uuid
+                OR NULLIF(pg_catalog.current_setting('app.current_tenant_id',true),'')::uuid IS DISTINCT FROM p_tenant
+            THEN RAISE EXCEPTION 'ordinary_settings_learning_original_owner' USING ERRCODE = '42501'; END IF;
+            PERFORM revision FROM {new HumanPrincipalSourceSql(context).Name(SourceTable)}
+                WHERE id = 1 FOR SHARE NOWAIT;
+            IF NOT FOUND THEN RAISE EXCEPTION 'ordinary_settings_anchor_missing' USING ERRCODE = '55000'; END IF;
+        END;
+        """;
+
     private static string Body(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment, string name) => name switch
     {
         "read" => ReadBody(context, enrollment),
+        "learning_retain" => LearningRetainBody(context, enrollment),
         "acquire" => AcquireBody(context, enrollment),
         "write" => WriteBody(context, enrollment),
         "complete" => CompleteBody(context, enrollment, true),

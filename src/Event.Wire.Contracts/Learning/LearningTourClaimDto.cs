@@ -15,6 +15,8 @@ public sealed record LearningTourClaimDto : LearningResourceDto
         init => _expiresAtUtc = value.ToUniversalTime();
     }
     public required long Revision { get; init; }
+    public required string PlanFingerprint { get; init; }
+    public required string PolicySourceStamp { get; init; }
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -28,6 +30,9 @@ public sealed record LearningClaimTourRequest
     public required int MaterialVersion { get; init; }
     public required string ContextKey { get; init; }
     public Guid? EventContextId { get; init; }
+    public required string ExpectedPlanFingerprint { get; init; }
+    public required string ExpectedPolicySourceStamp { get; init; }
+    public required bool Replay { get; init; }
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -37,10 +42,16 @@ public sealed record LearningRecordTourOutcomeRequest
     public required long ExpectedRevision { get; init; }
     public required Guid IntentId { get; init; }
     public Guid? ClaimToken { get; init; }
+    public required string ContextKey { get; init; }
+    public Guid? EventContextId { get; init; }
     [JsonConverter(typeof(LearningStringEnumJsonConverter<LearningTourFamily>))]
     public required LearningTourFamily Family { get; init; }
     public required int MaterialVersion { get; init; }
-    [JsonConverter(typeof(LearningStringEnumJsonConverter<LearningTourOutcome>))]
-    public required LearningTourOutcome Outcome { get; init; }
-    public required int StepIndex { get; init; }
+    [JsonConverter(typeof(LearningStringEnumJsonConverter<LearningTourAction>))]
+    public required LearningTourAction Action { get; init; }
+    public string? StepKey { get; init; }
+    public int? StepVersion { get; init; }
+    public LearningSnoozeDuration? SnoozeDuration { get; init; }
+    public required string ExpectedPlanFingerprint { get; init; }
+    public required string ExpectedPolicySourceStamp { get; init; }
 }

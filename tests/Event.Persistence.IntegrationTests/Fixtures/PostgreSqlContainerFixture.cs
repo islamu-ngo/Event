@@ -47,6 +47,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
     private readonly object _initializationLock = new();
     private Task? _initialization;
     private Task? _localIdentityWriterPreparation;
+    private int _disposed;
     private readonly ConcurrentBag<string> _isolatedSchemas = new();
     private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
     private string? _runtimeConnectionString;
@@ -435,6 +436,8 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
         var failures = new List<Exception>();
         try { RecordStage(AssuranceStage.DisposalEntered); }
         catch (Exception failure) { failures.Add(failure); }

@@ -98,6 +98,8 @@ internal static class OpenApiStringEnumSchemaCatalog
     [
         typeof(LearningTourFamily),
         typeof(LearningTourOutcome),
+        typeof(LearningTourAction),
+        typeof(LearningSnoozeDuration),
         typeof(LearningPracticeAction),
         typeof(LearningPracticeChoiceSlot),
         typeof(LearningSpaceAction),
@@ -144,6 +146,8 @@ internal static class OpenApiStringEnumSchemaCatalog
     [
         typeof(LearningTourFamily),
         typeof(LearningTourOutcome),
+        typeof(LearningTourAction),
+        typeof(LearningSnoozeDuration),
         typeof(LearningPracticeAction),
         typeof(LearningPracticeChoiceSlot),
         typeof(LearningSpaceAction),

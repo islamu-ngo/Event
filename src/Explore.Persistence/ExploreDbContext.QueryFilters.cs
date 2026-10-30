@@ -28,6 +28,9 @@ public partial class ExploreDbContext
         modelBuilder.Entity<LearningTourProgress>()
             .HasQueryFilter(QueryFilterNames.Tenant, value =>
                 IsTenantFilterBypassed || value.TenantId == TenantFilterTenantId);
+        modelBuilder.Entity<LearningTourStepProgress>()
+            .HasQueryFilter(QueryFilterNames.Tenant, value =>
+                IsTenantFilterBypassed || value.TenantId == TenantFilterTenantId);
         modelBuilder.Entity<LearningPracticeState>()
             .HasQueryFilter(QueryFilterNames.Tenant, value =>
                 IsTenantFilterBypassed || value.TenantId == TenantFilterTenantId);

@@ -106,10 +106,12 @@ public sealed class LearningPersistenceSqliteTests
         var winner = (await firstRepository.GetStateAsync(database.TenantId, database.UserId, true, default))!;
         var loser = (await secondRepository.GetStateAsync(database.TenantId, database.UserId, true, default))!;
         Guid winningClaim = Guid.CreateVersion7();
-        winner.ClaimTour(Guid.CreateVersion7(), LearningTourFamily.Shell, 1, winningClaim,
-            Guid.CreateVersion7(), winner.Revision, Now);
-        loser.ClaimTour(Guid.CreateVersion7(), LearningTourFamily.Studio, 1, Guid.CreateVersion7(),
-            Guid.CreateVersion7(), loser.Revision, Now);
+        winner.ClaimSemanticTour(Guid.CreateVersion7(),
+            new(LearningTourFamily.Shell, 2, [new("shell.navigation", 1)]), winningClaim,
+            Guid.CreateVersion7(), winner.Revision, Now, new string('A', 64), new string('B', 64));
+        loser.ClaimSemanticTour(Guid.CreateVersion7(),
+            new(LearningTourFamily.Studio, 2, [new("studio.actor-context", 1)]), Guid.CreateVersion7(),
+            Guid.CreateVersion7(), loser.Revision, Now, new string('A', 64), new string('B', 64));
         await firstRepository.SaveChangesAsync(default);
         await Assert.ThrowsAsync<ConcurrencyConflictException>(() => secondRepository.SaveChangesAsync(default));
         await Assert.That((await firstRepository.GetStateAsync(database.TenantId, database.UserId, false, default))!

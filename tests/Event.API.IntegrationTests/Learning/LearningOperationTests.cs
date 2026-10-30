@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using WireAction = ISLAMU.Wire.Contracts.Learning.LearningPracticeAction;
 using WireFamily = ISLAMU.Wire.Contracts.Learning.LearningTourFamily;
 using WireOutcome = ISLAMU.Wire.Contracts.Learning.LearningTourOutcome;
+using WireTourAction = ISLAMU.Wire.Contracts.Learning.LearningTourAction;
 
 namespace Event.API.IntegrationTests.Learning;
 
@@ -123,12 +124,8 @@ public sealed class LearningOperationTests(LearningHttpFixture fixture)
     public async Task OneTourClaimAndItsTerminalRetryPreserveTheOriginalOutcome()
     {
         using LearningHttpMember member = await fixture.CreateMemberAsync();
-        var context = await Context(member.Client);
-        var claim = new LearningClaimTourRequest
-        {
-            ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = 0, IntentId = Guid.CreateVersion7(),
-            ContextKey = "self", Family = WireFamily.Shell, MaterialVersion = 1
-        };
+        var plan = await TourPlan(member.Client, WireFamily.Shell);
+        var claim = TourClaim(plan, replay: false);
         using var claimedResponse = await member.Client.PostAsJsonAsync("/api/learning/tours/claim", claim);
         await Assert.That(claimedResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var claimed = (await claimedResponse.Content.ReadFromJsonAsync<LearningMutationReceiptDto>())!;
@@ -137,11 +134,10 @@ public sealed class LearningOperationTests(LearningHttpFixture fixture)
             IntentId = Guid.CreateVersion7(), ExpectedRevision = claimed.LearnerRevision
         });
         await Assert.That(lost.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
-        var outcome = new LearningRecordTourOutcomeRequest
+        var progressed = await ProgressTourSteps(member.Client, plan, claimed);
+        var outcome = TourAction(plan, claimed, WireTourAction.Complete) with
         {
-            ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = claimed.LearnerRevision,
-            IntentId = Guid.CreateVersion7(), ClaimToken = claimed.Claim!.Token,
-            Family = WireFamily.Shell, MaterialVersion = 1, Outcome = WireOutcome.Completed, StepIndex = 1
+            ExpectedRevision = progressed.LearnerRevision
         };
         using var completedResponse = await member.Client.PostAsJsonAsync("/api/learning/tours/outcome", outcome);
         await Assert.That(completedResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -157,6 +153,68 @@ public sealed class LearningOperationTests(LearningHttpFixture fixture)
         using var changedFamily = await member.Client.PostAsJsonAsync("/api/learning/tours/outcome",
             outcome with { Family = WireFamily.Studio });
         await Assert.That(changedFamily.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        using var changedPayload = await member.Client.PostAsJsonAsync("/api/learning/tours/outcome",
+            outcome with { Action = WireTourAction.Skip });
+        await Assert.That(changedPayload.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        await Assert.That((await Context(member.Client)).LearnerRevision).IsEqualTo(completed.LearnerRevision);
+    }
+
+    internal static async Task<LearningTourPlanDto> TourPlan(
+        HttpClient client, WireFamily family, string contextKey = "self", Guid? eventContextId = null)
+    {
+        string route = $"/api/learning/tours/{family}/plan?contextKey={Uri.EscapeDataString(contextKey)}";
+        if (eventContextId is { } eventId)
+            route += $"&eventContextId={eventId:D}";
+        using var response = await client.GetAsync(route);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
+        var plan = (await response.Content.ReadFromJsonAsync<LearningTourPlanDto>())!;
+        await Assert.That(plan.Family).IsEqualTo(family);
+        await Assert.That(plan.MaterialVersion).IsEqualTo(2);
+        await Assert.That(plan.ContextKey).IsEqualTo(contextKey);
+        await Assert.That(plan.EventContextId).IsEqualTo(eventContextId);
+        await Assert.That(plan.IsAvailable).IsTrue();
+        await Assert.That(plan.CanClaim).IsTrue();
+        await Assert.That(plan.Steps.Count).IsGreaterThan(0);
+        return plan;
+    }
+
+    internal static LearningClaimTourRequest TourClaim(LearningTourPlanDto plan, bool replay) => new()
+    {
+        ExpectedScopeStamp = plan.ScopeStamp, ExpectedRevision = plan.LearnerRevision,
+        IntentId = Guid.CreateVersion7(), Family = plan.Family, MaterialVersion = plan.MaterialVersion,
+        ContextKey = plan.ContextKey, EventContextId = plan.EventContextId,
+        ExpectedPlanFingerprint = plan.PlanFingerprint, ExpectedPolicySourceStamp = plan.PolicySourceStamp,
+        Replay = replay
+    };
+
+    internal static LearningRecordTourOutcomeRequest TourAction(
+        LearningTourPlanDto plan, LearningMutationReceiptDto claimed, WireTourAction action) => new()
+    {
+        ExpectedScopeStamp = claimed.ScopeStamp, ExpectedRevision = claimed.LearnerRevision,
+        IntentId = Guid.CreateVersion7(), ClaimToken = claimed.Claim!.Token,
+        Family = claimed.Claim.Family, MaterialVersion = claimed.Claim.MaterialVersion,
+        ContextKey = plan.ContextKey, EventContextId = plan.EventContextId, Action = action,
+        ExpectedPlanFingerprint = claimed.Claim.PlanFingerprint,
+        ExpectedPolicySourceStamp = claimed.Claim.PolicySourceStamp
+    };
+
+    internal static async Task<LearningMutationReceiptDto> ProgressTourSteps(
+        HttpClient client, LearningTourPlanDto plan, LearningMutationReceiptDto claimed)
+    {
+        var latest = claimed;
+        foreach (var step in plan.Steps)
+        {
+            var input = TourAction(plan, claimed, WireTourAction.Progress) with
+            {
+                ExpectedRevision = latest.LearnerRevision,
+                StepKey = step.StepKey, StepVersion = step.StepVersion
+            };
+            using var response = await client.PostAsJsonAsync("/api/learning/tours/outcome", input);
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            latest = (await response.Content.ReadFromJsonAsync<LearningMutationReceiptDto>())!;
+        }
+        return latest;
     }
 
     internal static async Task<LearningContextDto> Context(HttpClient client)
@@ -227,6 +285,53 @@ public sealed class LearningFinalAdmissionTests
         await Assert.That(resurrect.IsSuccessStatusCode).IsFalse();
         await using var observer = fixture.OpenInspection();
         await Assert.That(await observer.UserLearningStates.AnyAsync(row => row.UserId == member.UserId)).IsFalse();
+    }
+
+    [Test]
+    public async Task SemanticEvidenceInsertedDuringSavingCannotEscapeTheOriginalWriteInventory()
+    {
+        bool childWasWritten = false;
+        var interception = new AfterLearningSaved(async (database, state, token) =>
+        {
+            childWasWritten = await database.Set<LearningTourStepProgress>()
+                .AnyAsync(row => row.TenantId == state.TenantId, token);
+        }, database =>
+        {
+            var state = database.ChangeTracker.Entries<UserLearningState>()
+                .Single(entry => entry.State == EntityState.Added).Entity;
+            var definition = new LearningTourDefinition(
+                Explore.Domain.Learning.LearningTourFamily.Shell, 2, [new("shell.navigation", 1)]);
+            Guid tourId = Guid.CreateVersion7();
+            Guid claimId = Guid.CreateVersion7();
+            string plan = new('A', 64);
+            string policy = new('B', 64);
+            state.ClaimSemanticTour(tourId, definition, claimId, Guid.CreateVersion7(),
+                state.Revision, state.UpdatedAtUtc, plan, policy, replay: true);
+            state.RecordSemanticTourAction(tourId, definition, claimId, Guid.CreateVersion7(),
+                Explore.Domain.Learning.LearningTourAction.Progress, "shell.navigation", 1, null,
+                plan, policy, state.Revision, state.UpdatedAtUtc);
+            database.ChangeTracker.DetectChanges();
+        });
+        await using var local = new LearningHttpFixture();
+        await local.InitializeAsync(interception, null);
+        using var member = await local.CreateMemberAsync();
+        var context = await LearningOperationTests.Context(member.Client);
+        interception.Armed = true;
+
+        using var response = await member.Client.PatchAsJsonAsync("/api/learning/preferences",
+            new LearningUpdatePreferencesRequest
+            {
+                ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = 0,
+                SuppressAutomaticTours = true, HideLearning = false, PinLearning = false
+            });
+
+        await Assert.That(interception.Observed).IsTrue();
+        await Assert.That(childWasWritten).IsTrue();
+        await Assert.That(response.IsSuccessStatusCode).IsFalse();
+        await using var observer = local.OpenInspection();
+        await Assert.That(await observer.UserLearningStates.AnyAsync(row => row.UserId == member.UserId)).IsFalse();
+        await Assert.That(await observer.Set<LearningTourStepProgress>()
+            .AnyAsync(row => row.TenantId == local.TenantId)).IsFalse();
     }
 
     [Test]

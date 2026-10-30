@@ -5,6 +5,7 @@ namespace Explore.Domain.Learning;
 public sealed class LearningTourProgress : ITenantEntity
 {
     private Guid _tenantId;
+    private readonly List<LearningTourStepProgress> _steps = [];
     private LearningTourProgress() { }
 
     public Guid Id { get; private set; }
@@ -22,7 +23,9 @@ public sealed class LearningTourProgress : ITenantEntity
     public LearningTourFamily Family { get; private set; }
     public int MaterialVersion { get; private set; }
     public LearningTourOutcome Outcome { get; private set; }
-    public int Step { get; private set; }
+    public DateTime? SnoozedUntilUtc { get; private set; }
+    public string? LastStepKey { get; private set; }
+    public IReadOnlyCollection<LearningTourStepProgress> Steps => _steps.AsReadOnly();
     public DateTime UpdatedAtUtc { get; private set; }
     public Guid? LastIntentId { get; private set; }
     public string? LastIntentFingerprint { get; private set; }
@@ -35,22 +38,55 @@ public sealed class LearningTourProgress : ITenantEntity
             Family = family, MaterialVersion = materialVersion, UpdatedAtUtc = utcNow
         };
 
-    internal void Begin(Guid intentId, string fingerprint, DateTime utcNow)
+    internal void CarryCompatibleEvidence(LearningTourDefinition definition,
+        IEnumerable<LearningTourProgress> history)
     {
-        Step = 0;
+        var compatible = history.SelectMany(tour => tour.Steps)
+            .Where(completed => definition.AuthoredSteps.Any(step =>
+                step.StepKey == completed.StepKey && step.StepVersion == completed.StepVersion))
+            .GroupBy(completed => (completed.StepKey, completed.StepVersion))
+            .Select(group => group.MinBy(completed => completed.CompletedAtUtc)!).ToArray();
+        _steps.RemoveAll(completed => !definition.AuthoredSteps.Any(step =>
+            step.StepKey == completed.StepKey && step.StepVersion == completed.StepVersion));
+        foreach (LearningTourStepProgress completed in compatible)
+            if (!_steps.Any(step => step.StepKey == completed.StepKey && step.StepVersion == completed.StepVersion))
+                _steps.Add(LearningTourStepProgress.Create(this,
+                    new(completed.StepKey, completed.StepVersion), completed.CompletedAtUtc));
+    }
+
+    internal bool Covers(LearningTourDefinition definition) =>
+        definition.Steps.All(step => _steps.Any(completed =>
+            completed.StepKey == step.StepKey && completed.StepVersion == step.StepVersion));
+
+    internal void BeginSemantic(Guid intentId, string fingerprint, DateTime utcNow)
+    {
+        SnoozedUntilUtc = null;
         if (Outcome is not (LearningTourOutcome.Completed or LearningTourOutcome.Skipped))
             Outcome = LearningTourOutcome.InProgress;
         Remember(intentId, fingerprint, utcNow);
     }
 
-    internal void Record(LearningTourOutcome outcome, int step, Guid intentId, string fingerprint, DateTime utcNow)
+    internal void RecordSemantic(LearningTourAction action, LearningTourStep? step,
+        DateTime? snoozedUntilUtc, Guid intentId, string fingerprint, DateTime utcNow)
     {
-        if (step < Step)
-            throw new InvalidOperationException("Tour progress cannot move backwards.");
-        Step = step;
-        // A manual replay never downgrades the durable terminal outcome.
+        if (step is not null)
+        {
+            if (_steps.Any(completed => completed.StepKey == step.StepKey
+                    && completed.StepVersion == step.StepVersion))
+                throw new InvalidOperationException("Only new explicit semantic progress renews a claim.");
+            _steps.RemoveAll(completed => completed.StepKey == step.StepKey);
+            _steps.Add(LearningTourStepProgress.Create(this, step, utcNow));
+            LastStepKey = step.StepKey;
+        }
+        SnoozedUntilUtc = snoozedUntilUtc;
         if (Outcome is not (LearningTourOutcome.Completed or LearningTourOutcome.Skipped))
-            Outcome = outcome;
+            Outcome = action switch
+            {
+                LearningTourAction.Progress => LearningTourOutcome.InProgress,
+                LearningTourAction.Complete => LearningTourOutcome.Completed,
+                LearningTourAction.Skip => LearningTourOutcome.Skipped,
+                _ => LearningTourOutcome.Interrupted
+            };
         Remember(intentId, fingerprint, utcNow);
     }
 

@@ -21,9 +21,12 @@ public sealed class LearningMigrationRoundTripTests
         await using var context = database.OpenSystem();
         await context.Database.OpenConnectionAsync();
         var assembly = context.GetService<IMigrationsAssembly>();
-        var selected = assembly.Migrations.Single(pair =>
-            pair.Key.EndsWith("_AddTenantLearningState", StringComparison.Ordinal));
-        var migration = assembly.CreateMigration(selected.Value, context.Database.ProviderName!);
+        var migrations = assembly.Migrations
+            .Where(pair => pair.Key.EndsWith("_AddTenantLearningState", StringComparison.Ordinal)
+                || pair.Key.EndsWith("_AddSemanticLearningSteps", StringComparison.Ordinal))
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => assembly.CreateMigration(pair.Value, context.Database.ProviderName!)).ToArray();
+        await Assert.That(migrations.Length).IsEqualTo(2);
         var generator = context.GetService<IMigrationsSqlGenerator>();
         string query = database.Provider switch
         {
@@ -36,20 +39,26 @@ public sealed class LearningMigrationRoundTripTests
         };
         string? schema = context.Model.GetDefaultSchema();
         string[] complete = await ReadNamesAsync(context, query, string.Empty, schema);
-        string[] learning = migration.UpOperations.OfType<CreateTableOperation>()
+        string[] learning = migrations.SelectMany(migration => migration.UpOperations).OfType<CreateTableOperation>()
             .Select(operation => operation.Name).ToArray();
         string[] preceding = complete.Except(learning, StringComparer.Ordinal).ToArray();
-        bool present = false;
         // Exercise only the generated cohort; the separate full-chain test remains mandatory.
-        foreach (var operations in new[]
-            { migration.DownOperations, migration.UpOperations, migration.DownOperations, migration.UpOperations })
+        foreach (bool present in new[] { false, true, false, true })
         {
-            foreach (var command in generator.Generate(operations, context.GetService<IDesignTimeModel>().Model))
-                await context.Database.ExecuteSqlRawAsync(command.CommandText);
+            foreach (int index in present ? Enumerable.Range(0, migrations.Length)
+                : Enumerable.Range(0, migrations.Length).Reverse())
+            {
+                var migration = migrations[index];
+                var operations = present ? migration.UpOperations : migration.DownOperations;
+                var target = present ? migration.TargetModel : index > 0 ? migrations[index - 1].TargetModel : null;
+                var initialized = target is null ? null
+                    : context.GetService<IModelRuntimeInitializer>().Initialize(target, designTime: true);
+                foreach (var command in generator.Generate(operations, initialized))
+                    await context.Database.ExecuteSqlRawAsync(command.CommandText);
+            }
             await AssertSchemaAsync(context, database.Provider, present);
             await Assert.That(await ReadNamesAsync(context, query, string.Empty, schema))
                 .IsEquivalentTo(present ? complete : preceding);
-            present = !present;
         }
         await Assert.That(await context.Database.GetAppliedMigrationsAsync()).IsEmpty();
     }
@@ -87,7 +96,7 @@ public sealed class LearningMigrationRoundTripTests
     {
         await context.Database.OpenConnectionAsync();
         foreach (Type type in new[] { typeof(TenantLearningSpace), typeof(UserLearningState),
-            typeof(LearningTourProgress), typeof(LearningPracticeState) })
+            typeof(LearningTourProgress), typeof(LearningTourStepProgress), typeof(LearningPracticeState) })
         {
             var entity = context.Model.FindEntityType(type)!;
             string table = entity.GetTableName()!;

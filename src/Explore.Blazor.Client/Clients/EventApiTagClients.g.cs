@@ -94196,6 +94196,14 @@ namespace Explore.Blazor.Client.Clients
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
+        /// Get the current private learning tour plan
+        /// </summary>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<HalResourceOfLearningTourPlanDto> GetLearningTourPlanAsync(string family, string? contextKey = null, System.Guid? eventContextId = null, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
         /// Get private learning practice
         /// </summary>
         /// <returns>OK</returns>
@@ -94341,6 +94349,152 @@ namespace Explore.Blazor.Client.Clients
                         if (status_ == 200)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<HalResourceOfLearningContextDto>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Bad Request", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Unauthorized", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Forbidden", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Get the current private learning tour plan
+        /// </summary>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<HalResourceOfLearningTourPlanDto> GetLearningTourPlanAsync(string family, string? contextKey = null, System.Guid? eventContextId = null, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (family == null)
+                throw new System.ArgumentNullException("family");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (x_Api_Version != null)
+                        request_.Headers.TryAddWithoutValidation("X-Api-Version", ConvertToString(x_Api_Version, System.Globalization.CultureInfo.InvariantCulture));
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+
+                    // Operation Path: "api/learning/tours/{family}/plan"
+                    urlBuilder_.Append("api/learning/tours/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(family, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/plan");
+                    urlBuilder_.Append('?');
+                    if (contextKey != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("contextKey")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(contextKey, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (eventContextId != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("eventContextId")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(eventContextId, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (api_version != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("api-version")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(api_version, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<HalResourceOfLearningTourPlanDto>(response_, headers_, cancellationToken).ConfigureAwait(false);
                             if (objectResponse_.Object == null)
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
@@ -206519,6 +206673,79 @@ namespace Explore.Blazor.Client.Clients
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class HalResourceOfLearningTourPlanDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("family")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<LearningTourFamily>))]
+        public LearningTourFamily Family { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("materialVersion")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public int MaterialVersion { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("scopeStamp")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string ScopeStamp { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("policySourceStamp")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PolicySourceStamp { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("planFingerprint")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PlanFingerprint { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("learnerRevision")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long LearnerRevision { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("contextKey")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string ContextKey { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("eventContextId")]
+        public System.Guid? EventContextId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("isAvailable")]
+        public bool IsAvailable { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("canClaim")]
+        public bool CanClaim { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("unavailableReason")]
+        public LearningDisplayTextDto? UnavailableReason { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("steps")]
+        public System.Collections.Generic.ICollection<LearningTourStepDto>? Steps { get; set; } = default!;
+
+        /// <summary>
+        /// HAL hypermedia links
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_links")]
+        public System.Collections.Generic.IDictionary<string, HalLink>? _links { get; set; } = default!;
+
+        /// <summary>
+        /// Embedded related resources
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_embedded")]
+        public object? _embedded { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class HalResourceOfLocalCredentialIssueDto
     {
 
@@ -216966,6 +217193,17 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("eventContextId")]
         public System.Guid? EventContextId { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("expectedPlanFingerprint")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string ExpectedPlanFingerprint { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("expectedPolicySourceStamp")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string ExpectedPolicySourceStamp { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("replay")]
+        public bool Replay { get; set; } = default!;
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -217438,6 +217676,13 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("claimToken")]
         public System.Guid? ClaimToken { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("contextKey")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string ContextKey { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("eventContextId")]
+        public System.Guid? EventContextId { get; set; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("family")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<LearningTourFamily>))]
@@ -217448,15 +217693,29 @@ namespace Explore.Blazor.Client.Clients
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int MaterialVersion { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("outcome")]
+        [System.Text.Json.Serialization.JsonPropertyName("action")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<LearningTourOutcome>))]
-        public LearningTourOutcome Outcome { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<LearningTourAction>))]
+        public LearningTourAction Action { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("stepIndex")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonPropertyName("stepKey")]
+        public string? StepKey { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("stepVersion")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
-        public int StepIndex { get; set; } = default!;
+        public int? StepVersion { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("snoozeDuration")]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<LearningSnoozeDuration>))]
+        public LearningSnoozeDuration? SnoozeDuration { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("expectedPlanFingerprint")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string ExpectedPlanFingerprint { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("expectedPolicySourceStamp")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string ExpectedPolicySourceStamp { get; set; } = default!;
 
     }
 
@@ -217584,6 +217843,21 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Runtime.Serialization.EnumMember(Value = @"Cleared")]
         Cleared = 3,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum LearningSnoozeDuration
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"OneHour")]
+        OneHour = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"OneDay")]
+        OneDay = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"OneWeek")]
+        OneWeek = 2,
 
     }
 
@@ -217721,6 +217995,27 @@ namespace Explore.Blazor.Client.Clients
 }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum LearningTourAction
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Progress")]
+        Progress = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Complete")]
+        Complete = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Skip")]
+        Skip = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Interrupt")]
+        Interrupt = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Snooze")]
+        Snooze = 4,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial record class LearningTourClaimDto
     {
 
@@ -217746,6 +218041,14 @@ namespace Explore.Blazor.Client.Clients
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public long Revision { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("planFingerprint")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PlanFingerprint { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("policySourceStamp")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PolicySourceStamp { get; init; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -217800,6 +218103,72 @@ namespace Explore.Blazor.Client.Clients
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class LearningTourPlanDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("family")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<LearningTourFamily>))]
+        public LearningTourFamily Family { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("materialVersion")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public int MaterialVersion { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("scopeStamp")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string ScopeStamp { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("policySourceStamp")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PolicySourceStamp { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("planFingerprint")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PlanFingerprint { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("learnerRevision")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long LearnerRevision { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("contextKey")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string ContextKey { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("eventContextId")]
+        public System.Guid? EventContextId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("isAvailable")]
+        public bool IsAvailable { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("canClaim")]
+        public bool CanClaim { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("unavailableReason")]
+        public LearningDisplayTextDto? UnavailableReason { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("steps")]
+        public System.Collections.Generic.ICollection<LearningTourStepDto>? Steps { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial record class LearningTourProgressDto
     {
 
@@ -217817,16 +218186,93 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<LearningTourOutcome>))]
         public LearningTourOutcome? Outcome { get; init; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("stepIndex")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
-        public int StepIndex { get; init; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("lastStepKey")]
+        public string? LastStepKey { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("snoozedUntilUtc")]
+        public System.DateTimeOffset? SnoozedUntilUtc { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("currentCoverage")]
+        public bool CurrentCoverage { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("completedSteps")]
+        public System.Collections.Generic.ICollection<LearningTourStepCompletionDto>? CompletedSteps { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("isAvailable")]
         public bool? IsAvailable { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("unavailableReason")]
         public LearningDisplayTextDto? UnavailableReason { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class LearningTourStepCompletionDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("stepKey")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string StepKey { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("stepVersion")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public int StepVersion { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("completedAtUtc")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset CompletedAtUtc { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class LearningTourStepDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("stepKey")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string StepKey { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("stepVersion")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public int StepVersion { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("instruction")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public LearningDisplayTextDto Instruction { get; init; } = new LearningDisplayTextDto();
+
+        [System.Text.Json.Serialization.JsonPropertyName("targetKey")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string TargetKey { get; init; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

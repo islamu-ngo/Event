@@ -37,7 +37,8 @@ public static partial class PostgresMixedSettingsContract
                 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $body${function.Body}$body$;
             REVOKE ALL ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature}) FROM PUBLIC;
             GRANT EXECUTE ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature})
-                TO {(function.Name == "email_consume" ? PostgresEmailDeliveryPolicyContract.OwnerRole
+                TO {(function.Name is "learning_retain" or "learning_document" ? LearningReaderRole
+                    : function.Name == "email_consume" ? PostgresEmailDeliveryPolicyContract.OwnerRole
                     : function.Result == "trigger" ? migrator : GlobalRole)};
             COMMENT ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature}) IS {Text(Stamp + Hash(function.Body))};
             """));
@@ -56,7 +57,7 @@ public static partial class PostgresMixedSettingsContract
                 {SourceGuard(context, enrollment)}
                 SELECT count(*) INTO existing FROM pg_catalog.pg_roles WHERE rolname IN ({roles});
                 IF existing <> 0 THEN
-                    IF existing <> 3 THEN RAISE EXCEPTION 'mixed_settings_partial_roles' USING ERRCODE = '55000'; END IF;
+                    IF existing <> {Roles.Length} THEN RAISE EXCEPTION 'mixed_settings_partial_roles' USING ERRCODE = '55000'; END IF;
                     {Guard(context, enrollment)}
                     {ExactBodies(context, enrollment)}
                     RETURN;

@@ -2,11 +2,93 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Learning;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Domain.Constants;
+using WireFamily = ISLAMU.Wire.Contracts.Learning.LearningTourFamily;
 
 namespace Event.Application.UnitTests.Learning;
 
 public sealed class LearningAuthorityTests
 {
+    [Test]
+    public async Task CurrentShellPlanOmitsUnavailableStudioWithoutInventingCompletion()
+    {
+        Guid tenant = Guid.CreateVersion7();
+        var operation = new LearningOperationState(tenant, Guid.CreateVersion7(), "self", null,
+            null, null, null, [], false, false);
+        var sources = new LearningSourceFacts(tenant, new string('A', 64), new string('B', 64),
+            false, true, null, new Dictionary<string, ResolvedSetting>());
+
+        var resolved = LearningTourPlanResolver.Resolve(operation, sources, WireFamily.Shell);
+
+        await Assert.That(resolved.Plan.IsAvailable).IsTrue();
+        await Assert.That(resolved.Plan.Steps.Select(step => step.StepKey))
+            .IsEquivalentTo(["shell.navigation", "shell.help"]);
+        await Assert.That(resolved.Definition!.Steps.Count).IsEqualTo(2);
+        await Assert.That(resolved.Plan.LearnerRevision).IsEqualTo(0);
+        await Assert.That(operation.State).IsNull();
+    }
+
+    [Test]
+    public async Task PlanFingerprintBindsAcceptedWorkspaceSourcesWithoutCreatingAProgressNamespace()
+    {
+        Guid tenant = Guid.CreateVersion7();
+        var operation = new LearningOperationState(tenant, Guid.CreateVersion7(), "self", null,
+            null, null, null, [], false, false);
+        var sources = new LearningSourceFacts(tenant, new string('A', 64), new string('B', 64),
+            false, true, null, new Dictionary<string, ResolvedSetting>());
+        var first = LearningTourPlanResolver.Resolve(operation, sources, WireFamily.Shell);
+        var again = LearningTourPlanResolver.Resolve(operation, sources, WireFamily.Shell);
+        var changed = LearningTourPlanResolver.Resolve(operation, new LearningSourceFacts(
+            tenant, new string('C', 64), sources.PolicySourceStamp, false, true, null,
+            sources.EffectiveSettings), WireFamily.Shell);
+
+        await Assert.That(first.Plan.PlanFingerprint).IsEqualTo(again.Plan.PlanFingerprint);
+        await Assert.That(first.Plan.PlanFingerprint).IsNotEqualTo(changed.Plan.PlanFingerprint);
+        await Assert.That(first.Plan.Family).IsEqualTo(changed.Plan.Family);
+        await Assert.That(first.Plan.MaterialVersion).IsEqualTo(changed.Plan.MaterialVersion);
+        await Assert.That(first.Definition!.Steps).IsEquivalentTo(changed.Definition!.Steps);
+    }
+
+    [Test]
+    public async Task UnavailableOrForeignSourcePlanCannotSupplyAnApplicableDefinition()
+    {
+        Guid tenant = Guid.CreateVersion7();
+        var operation = new LearningOperationState(tenant, Guid.CreateVersion7(), "self", null,
+            null, null, null, [], false, false);
+        var sources = new LearningSourceFacts(tenant, new string('A', 64), new string('B', 64),
+            false, true, null, new Dictionary<string, ResolvedSetting>());
+
+        var unavailable = LearningTourPlanResolver.Resolve(operation, sources, WireFamily.NormalAi);
+
+        await Assert.That(unavailable.Plan.IsAvailable).IsFalse();
+        await Assert.That(unavailable.Plan.Steps).IsEmpty();
+        await Assert.That(unavailable.Definition).IsNull();
+        await Assert.That(() => LearningTourPlanResolver.Resolve(operation with
+            { TenantId = Guid.CreateVersion7() }, sources, WireFamily.Shell))
+            .Throws<UnauthorizedAccessException>();
+    }
+
+    [Test]
+    public async Task RetainedSettingsSnapshotDoesNotAliasCallerDictionaryOrMutableGroupParser()
+    {
+        var settings = new Dictionary<string, ResolvedSetting>
+        {
+            [GovernanceSettingKeys.AiAssistant.Enabled] = new() { Value = "true" }
+        };
+        var sources = new LearningSourceFacts(Guid.CreateVersion7(), new string('A', 64),
+            new string('B', 64), false, true, null, settings);
+        settings.Clear();
+        var parsed = sources.CreateAiSettings();
+        parsed.Populate(new Dictionary<string, ResolvedSetting>
+        {
+            [GovernanceSettingKeys.AiAssistant.Enabled] = new() { Value = "false" }
+        });
+
+        await Assert.That(parsed.Enabled).IsFalse();
+        await Assert.That(sources.CreateAiSettings().Enabled).IsTrue();
+    }
+
     [Test]
     public async Task OrdinaryActiveTenantMemberCanLearnWithoutAnyPublishingOrAdministratorGrant()
     {

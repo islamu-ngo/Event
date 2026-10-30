@@ -33,12 +33,132 @@ public sealed class UserLearningState : ITenantEntity
     public Guid? ActiveTourId { get; private set; }
     public string? ActiveContextKey { get; private set; }
     public Guid? ActiveEventContextId { get; private set; }
+    public string? ActivePlanFingerprint { get; private set; }
+    public string? ActivePolicySourceStamp { get; private set; }
     public DateTime? ClaimExpiresAtUtc { get; private set; }
     public Guid? LastIntentId { get; private set; }
     public string? LastIntentFingerprint { get; private set; }
     public IReadOnlyCollection<LearningTourProgress> Tours => _tours.AsReadOnly();
     public IReadOnlyCollection<LearningPracticeState> Practices => _practices.AsReadOnly();
     public int TotalPracticePayloadBytes => _practices.Sum(p => p.PayloadBytes);
+
+    public void ClaimSemanticTour(Guid progressId, LearningTourDefinition definition,
+        Guid claimId, Guid intentId, long expectedRevision, DateTime utcNow,
+        string planFingerprint, string policySourceStamp, string contextKey = "self",
+        Guid? eventContextId = null, bool replay = false)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        ValidateTour(progressId, definition.Family, definition.MaterialVersion);
+        LearningGuard.Identity(claimId, nameof(claimId));
+        LearningGuard.Context(contextKey);
+        RequirePlanStamp(planFingerprint);
+        RequirePlanStamp(policySourceStamp);
+        if (eventContextId.HasValue) LearningGuard.Identity(eventContextId.Value, nameof(eventContextId));
+        string fingerprint = LearningGuard.Fingerprint(
+            $"semantic-claim|{progressId:D}|{definition.Family}|{definition.MaterialVersion}|{claimId:D}|{intentId:D}|{expectedRevision}|{contextKey}|{eventContextId:D}|{replay}|{planFingerprint}|{policySourceStamp}");
+        if (IsDuplicate(intentId, fingerprint, utcNow)) return;
+        LearningGuard.Mutation(Revision, expectedRevision, UpdatedAtUtc, utcNow);
+        if (ActiveClaimId == claimId || HasLiveClaim(utcNow))
+            throw new InvalidOperationException("A learning tour already owns the active claim.");
+        LearningTourProgress? existing = FindTour(progressId, definition.Family, definition.MaterialVersion);
+        if (!replay && (SuppressAutomaticTours || existing?.SnoozedUntilUtc > utcNow
+            || existing?.Outcome == LearningTourOutcome.Skipped || HasTourCoverage(definition)))
+            throw new InvalidOperationException("This tour requires explicit manual replay.");
+        DateTime expiry = utcNow.AddSeconds(120);
+        LearningTourProgress progress = existing ?? AddSemanticTour(progressId, definition, utcNow);
+        progress.CarryCompatibleEvidence(definition, _tours.Where(tour => tour.Family == definition.Family));
+        progress.BeginSemantic(intentId, fingerprint, utcNow);
+        ActiveClaimId = claimId;
+        ActiveTourId = progress.Id;
+        ActiveContextKey = contextKey;
+        ActiveEventContextId = eventContextId;
+        ActivePlanFingerprint = planFingerprint;
+        ActivePolicySourceStamp = policySourceStamp;
+        ClaimExpiresAtUtc = expiry;
+        Remember(intentId, fingerprint, utcNow);
+    }
+
+    public void RecordSemanticTourAction(Guid progressId, LearningTourDefinition definition,
+        Guid? claimId, Guid intentId, LearningTourAction action, string? stepKey,
+        int? stepVersion, LearningSnoozeDuration? snoozeDuration, string planFingerprint,
+        string policySourceStamp, long expectedRevision, DateTime utcNow,
+        string contextKey = "self", Guid? eventContextId = null)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        ValidateTour(progressId, definition.Family, definition.MaterialVersion);
+        if (!Enum.IsDefined(action)) throw new ArgumentOutOfRangeException(nameof(action));
+        RequirePlanStamp(planFingerprint);
+        RequirePlanStamp(policySourceStamp);
+        LearningGuard.Context(contextKey);
+        if (eventContextId.HasValue) LearningGuard.Identity(eventContextId.Value, nameof(eventContextId));
+        LearningTourStep? step = null;
+        if (action == LearningTourAction.Progress)
+            step = definition.Steps.SingleOrDefault(value => value.StepKey == stepKey && value.StepVersion == stepVersion)
+                ?? throw new ArgumentException("The semantic step is not currently applicable.", nameof(stepKey));
+        else if (stepKey is not null || stepVersion.HasValue)
+            throw new ArgumentException("Only Progress accepts semantic step fields.", nameof(stepKey));
+        if ((action == LearningTourAction.Snooze) != snoozeDuration.HasValue
+            || snoozeDuration.HasValue && !Enum.IsDefined(snoozeDuration.Value))
+            throw new ArgumentException("Snooze requires one closed duration.", nameof(snoozeDuration));
+        if (claimId.HasValue) LearningGuard.Identity(claimId.Value, nameof(claimId));
+        string fingerprint = LearningGuard.Fingerprint(
+            $"semantic-action|{progressId:D}|{definition.Family}|{definition.MaterialVersion}|{claimId:D}|{intentId:D}|{action}|{stepKey}|{stepVersion}|{snoozeDuration}|{planFingerprint}|{policySourceStamp}|{expectedRevision}|{contextKey}|{eventContextId:D}");
+        if (IsDuplicate(intentId, fingerprint, utcNow)) return;
+        LearningGuard.Mutation(Revision, expectedRevision, UpdatedAtUtc, utcNow);
+        LearningTourProgress? existing = FindTour(progressId, definition.Family, definition.MaterialVersion);
+        if (claimId.HasValue)
+        {
+            if (!HasLiveClaim(utcNow) || ActiveClaimId != claimId || ActiveTourId != existing?.Id
+                || ActiveContextKey != contextKey || ActiveEventContextId != eventContextId
+                || ActivePlanFingerprint != planFingerprint || ActivePolicySourceStamp != policySourceStamp)
+                throw new InvalidOperationException("The learning claim or its accepted sources changed.");
+        }
+        else if (action is not (LearningTourAction.Skip or LearningTourAction.Snooze) || HasLiveClaim(utcNow))
+            throw new InvalidOperationException("Only an unclaimed invitation may be skipped or snoozed.");
+        if (action == LearningTourAction.Complete && (existing is null || !existing.Covers(definition)))
+            throw new InvalidOperationException("Complete every applicable semantic step before completing the tour.");
+        if (step is not null && existing!.Steps.Any(value =>
+                value.StepKey == step.StepKey && value.StepVersion == step.StepVersion))
+            throw new InvalidOperationException("Only new explicit semantic progress renews a claim.");
+        DateTime? snoozedUntil = snoozeDuration switch
+        {
+            LearningSnoozeDuration.OneHour => utcNow.AddHours(1),
+            LearningSnoozeDuration.OneDay => utcNow.AddDays(1),
+            LearningSnoozeDuration.OneWeek => utcNow.AddDays(7),
+            _ => null
+        };
+        LearningTourProgress progress = existing ?? AddSemanticTour(progressId, definition, utcNow);
+        progress.CarryCompatibleEvidence(definition, _tours.Where(tour => tour.Family == definition.Family));
+        progress.RecordSemantic(action, step, snoozedUntil, intentId, fingerprint, utcNow);
+        if (action == LearningTourAction.Progress) ClaimExpiresAtUtc = utcNow.AddSeconds(120);
+        else ReleaseClaim();
+        Remember(intentId, fingerprint, utcNow);
+    }
+
+    public bool HasTourCoverage(LearningTourDefinition definition) =>
+        definition.Steps.All(step => _tours
+            .Where(tour => tour.Family == definition.Family)
+            .SelectMany(tour => tour.Steps)
+            .Any(completed => completed.StepKey == step.StepKey
+                && completed.StepVersion == step.StepVersion));
+
+    private LearningTourProgress AddSemanticTour(Guid progressId, LearningTourDefinition definition, DateTime utcNow)
+    {
+        LearningTourProgress[] history = _tours.Where(tour => tour.Family == definition.Family)
+            .OrderBy(tour => tour.MaterialVersion).ToArray();
+        LearningTourProgress progress = LearningTourProgress.Create(progressId, this,
+            definition.Family, definition.MaterialVersion, utcNow);
+        progress.CarryCompatibleEvidence(definition, history);
+        if (history.Length == 2) _tours.Remove(history[0]);
+        _tours.Add(progress);
+        return progress;
+    }
+
+    private static void RequirePlanStamp(string value)
+    {
+        if (value is null || value.Length != 64 || value.Any(character => !char.IsAsciiHexDigit(character)))
+            throw new ArgumentException("A bounded plan or policy source fingerprint is required.", nameof(value));
+    }
 
     public static UserLearningState Create(Guid id, Guid tenantId, Guid userId, DateTime utcNow)
     {
@@ -57,80 +177,6 @@ public sealed class UserLearningState : ITenantEntity
         IsHidden = hidden;
         IsPinned = pinned;
         Advance(utcNow);
-    }
-
-    public void ClaimTour(Guid progressId, LearningTourFamily family, int materialVersion,
-        Guid claimId, Guid intentId, long expectedRevision, DateTime utcNow,
-        string contextKey = "self", Guid? eventContextId = null, bool replay = false)
-    {
-        ValidateTour(progressId, family, materialVersion);
-        LearningGuard.Identity(claimId, nameof(claimId));
-        LearningGuard.Context(contextKey);
-        if (eventContextId.HasValue)
-            LearningGuard.Identity(eventContextId.Value, nameof(eventContextId));
-        string fingerprint = LearningGuard.Fingerprint(
-            $"claim|{progressId:D}|{family}|{materialVersion}|{claimId:D}|{intentId:D}|{expectedRevision}|{contextKey}|{eventContextId:D}|{replay}");
-        if (IsDuplicate(intentId, fingerprint, utcNow)) return;
-        LearningGuard.Mutation(Revision, expectedRevision, UpdatedAtUtc, utcNow);
-        if (ActiveClaimId == claimId || HasLiveClaim(utcNow))
-            throw new InvalidOperationException("A learning tour already owns the active claim.");
-        LearningTourProgress? existing = FindTour(progressId, family, materialVersion);
-        if (!replay && existing?.Outcome is LearningTourOutcome.Completed or LearningTourOutcome.Skipped)
-            throw new InvalidOperationException("A finished tour requires explicit manual replay.");
-        DateTime expiry = utcNow.AddSeconds(120);
-        LearningTourProgress progress = existing ?? AddTour(progressId, family, materialVersion, utcNow);
-        progress.Begin(intentId, fingerprint, utcNow);
-        ActiveClaimId = claimId;
-        ActiveTourId = progress.Id;
-        ActiveContextKey = contextKey;
-        ActiveEventContextId = eventContextId;
-        ClaimExpiresAtUtc = expiry;
-        Remember(intentId, fingerprint, utcNow);
-    }
-
-    public void RecordTourOutcome(Guid claimId, Guid intentId, LearningTourOutcome outcome,
-        int step, long expectedRevision, DateTime utcNow)
-    {
-        LearningGuard.Identity(claimId, nameof(claimId));
-        if (!Enum.IsDefined(outcome) || outcome == LearningTourOutcome.None)
-            throw new ArgumentOutOfRangeException(nameof(outcome));
-        if (step is < 0 or > 32)
-            throw new ArgumentOutOfRangeException(nameof(step));
-        string fingerprint = LearningGuard.Fingerprint(
-            $"outcome|{claimId:D}|{intentId:D}|{outcome}|{step}|{expectedRevision}");
-        if (IsDuplicate(intentId, fingerprint, utcNow)) return;
-        LearningGuard.Mutation(Revision, expectedRevision, UpdatedAtUtc, utcNow);
-        if (ActiveClaimId != claimId || !HasLiveClaim(utcNow))
-            throw new InvalidOperationException("The learning claim is stale, expired or owned by another session.");
-        LearningTourProgress progress = _tours.Single(t => t.Id == ActiveTourId);
-        if (outcome == LearningTourOutcome.InProgress && step <= progress.Step)
-            throw new InvalidOperationException("Only an advancing explicit progress step renews the claim.");
-        DateTime? expiry = outcome == LearningTourOutcome.InProgress ? utcNow.AddSeconds(120) : null;
-        progress.Record(outcome, step, intentId, fingerprint, utcNow);
-        if (outcome == LearningTourOutcome.InProgress)
-            ClaimExpiresAtUtc = expiry;
-        else
-            ReleaseClaim();
-        Remember(intentId, fingerprint, utcNow);
-    }
-
-    public void SkipInvitation(Guid progressId, LearningTourFamily family, int materialVersion,
-        Guid intentId, long expectedRevision, DateTime utcNow)
-    {
-        ValidateTour(progressId, family, materialVersion);
-        string fingerprint = LearningGuard.Fingerprint(
-            $"invitation-skip|{progressId:D}|{family}|{materialVersion}|{intentId:D}|{expectedRevision}");
-        if (IsDuplicate(intentId, fingerprint, utcNow)) return;
-        LearningGuard.Mutation(Revision, expectedRevision, UpdatedAtUtc, utcNow);
-        if (HasLiveClaim(utcNow))
-            throw new InvalidOperationException("An invitation cannot overwrite an active tour claim.");
-        LearningTourProgress? existing = FindTour(progressId, family, materialVersion);
-        if (existing?.Outcome is LearningTourOutcome.Completed or LearningTourOutcome.Skipped)
-            throw new InvalidOperationException("This invitation already has a durable outcome.");
-        LearningTourProgress progress = existing ?? AddTour(progressId, family, materialVersion, utcNow);
-        progress.Record(LearningTourOutcome.Skipped, progress.Step, intentId, fingerprint, utcNow);
-        ReleaseClaim();
-        Remember(intentId, fingerprint, utcNow);
     }
 
     public void ApplyPractice(Guid practiceId, string contextKey, string recipeKey, int recipeVersion,
@@ -210,15 +256,6 @@ public sealed class UserLearningState : ITenantEntity
         return existing;
     }
 
-    private LearningTourProgress AddTour(Guid progressId, LearningTourFamily family, int materialVersion, DateTime utcNow)
-    {
-        LearningTourProgress[] history = _tours.Where(t => t.Family == family).OrderBy(t => t.MaterialVersion).ToArray();
-        if (history.Length == 2) _tours.Remove(history[0]);
-        LearningTourProgress progress = LearningTourProgress.Create(progressId, this, family, materialVersion, utcNow);
-        _tours.Add(progress);
-        return progress;
-    }
-
     private bool IsDuplicate(Guid intentId, string fingerprint, DateTime utcNow)
     {
         LearningGuard.Identity(intentId, nameof(intentId));
@@ -238,6 +275,8 @@ public sealed class UserLearningState : ITenantEntity
         ActiveTourId = null;
         ActiveContextKey = null;
         ActiveEventContextId = null;
+        ActivePlanFingerprint = null;
+        ActivePolicySourceStamp = null;
         ClaimExpiresAtUtc = null;
     }
 

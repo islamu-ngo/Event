@@ -47,7 +47,7 @@ public static class PostgresLearningPermissions
             return names.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
         }
         string[] tables = new[] { typeof(TenantLearningSpace), typeof(UserLearningState),
-            typeof(LearningTourProgress), typeof(LearningPracticeState) }.Select(Table).ToArray();
+            typeof(LearningTourProgress), typeof(LearningTourStepProgress), typeof(LearningPracticeState) }.Select(Table).ToArray();
         string learner = Table(typeof(UserLearningState));
         string policy = names.DelimitIdentifier(ErasurePolicy);
         await using var transaction = context.Database.CurrentTransaction is null

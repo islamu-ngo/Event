@@ -5,13 +5,14 @@ namespace Explore.GeneratedContracts.Tests;
 public sealed class LearningGeneratedContractTests
 {
     [Test]
-    public async Task PublishedLearningOperationsKeepTheirSevenNamedNativeContracts()
+    public async Task PublishedLearningOperationsKeepTheirNamedNativeContracts()
     {
         using var document = await ReadAsync();
         var paths = document.RootElement.GetProperty("paths");
         var expected = new[]
         {
             (Path: "/api/learning/context", Method: "get", Id: "GetLearningContext"),
+            (Path: "/api/learning/tours/{family}/plan", Method: "get", Id: "GetLearningTourPlan"),
             (Path: "/api/learning/practice/{id}", Method: "get", Id: "GetLearningPractice"),
             (Path: "/api/learning/tours/claim", Method: "post", Id: "ClaimLearningTour"),
             (Path: "/api/learning/tours/outcome", Method: "post", Id: "RecordLearningTourOutcome"),
@@ -48,6 +49,8 @@ public sealed class LearningGeneratedContractTests
         var expected = new Dictionary<string, string[]>
         {
             ["LearningTourFamily"] = ["Shell", "Studio", "EventManagement", "NormalAi"],
+            ["LearningTourAction"] = ["Progress", "Complete", "Skip", "Interrupt", "Snooze"],
+            ["LearningSnoozeDuration"] = ["OneHour", "OneDay", "OneWeek"],
             ["LearningTourOutcome"] = ["InProgress", "Completed", "Skipped", "Interrupted"],
             ["LearningPracticeAction"] = ["Start", "Choose", "Confirm", "Reset", "Clear"],
             ["LearningPracticeChoiceSlot"] = ["None", "Primary", "Secondary", "Tertiary"],
@@ -59,9 +62,38 @@ public sealed class LearningGeneratedContractTests
         {
             var schema = schemas.GetProperty(enumeration.Key);
             await Assert.That(schema.GetProperty("type").GetString()).IsEqualTo("string");
-            await Assert.That(schema.GetProperty("enum").EnumerateArray().Select(value => value.GetString()))
+            await Assert.That(schema.GetProperty("enum").EnumerateArray().Select(value =>
+                    value.GetString() ?? throw new JsonException("An enum member must be a string.")))
                 .IsEquivalentTo(enumeration.Value);
         }
+    }
+
+    [Test]
+    public async Task SemanticPlanHalAndActionsExposeUsableSourceBoundContracts()
+    {
+        using var document = await ReadAsync();
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        var plan = schemas.GetProperty("HalResourceOfLearningTourPlanDto").GetProperty("properties");
+        foreach (string name in new[]
+        {
+            "family", "contextKey", "eventContextId", "planFingerprint", "policySourceStamp",
+            "learnerRevision", "steps", "_links"
+        })
+            await Assert.That(plan.TryGetProperty(name, out _)).IsTrue();
+
+        var action = schemas.GetProperty("LearningRecordTourOutcomeRequest").GetProperty("properties");
+        foreach (string name in new[]
+        {
+            "action", "stepKey", "stepVersion", "snoozeDuration",
+            "expectedPlanFingerprint", "expectedPolicySourceStamp", "contextKey", "eventContextId"
+        })
+            await Assert.That(action.TryGetProperty(name, out _)).IsTrue();
+        await Assert.That(action.TryGetProperty("outcome", out _)).IsFalse();
+        await Assert.That(action.TryGetProperty("stepIndex", out _)).IsFalse();
+        var progress = schemas.GetProperty("LearningTourProgressDto").GetProperty("properties");
+        await Assert.That(progress.TryGetProperty("completedSteps", out _)).IsTrue();
+        await Assert.That(progress.TryGetProperty("currentCoverage", out _)).IsTrue();
+        await Assert.That(progress.TryGetProperty("stepIndex", out _)).IsFalse();
     }
 
     [Test]

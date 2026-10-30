@@ -35,7 +35,7 @@ public static class HumanSettingsMutationPreparationServicesRegistration
             () => provider.GetRequiredService<IActorRepository>(),
             () => provider.GetRequiredService<IAiActorContextRepository>(),
             () => provider.GetRequiredService<ITenantAdministratorCommitAuthority>(),
-            () => provider.GetRequiredService<Explore.Application.Contracts.Infrastructure.IHierarchicalSettingsResolver>(),
+            () => provider.GetRequiredService<ILearningSourceRetention>(),
             () => provider.GetRequiredService<Explore.Application.Contracts.Infrastructure.Ai.IAiProviderCapabilityResolver>(),
             () => provider.GetRequiredService<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>()));
         return services;

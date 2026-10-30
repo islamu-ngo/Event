@@ -1,4 +1,5 @@
 using Explore.Application.Exceptions;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Responses;
 using Explore.Domain.Learning;
 using ISLAMU.Wire.Contracts.Learning;
@@ -13,6 +14,8 @@ internal static class LearningRepresentation
     internal static LearningContextDto Context(LearningOperationState operation)
     {
         UserLearningState? state = operation.State;
+        LearningSourceFacts sources = operation.Sources
+            ?? throw new InvalidOperationException("Learning representation requires its retained source image.");
         bool currentPack = operation.Space is null
             || operation.Space is { IsRemoved: false, PackKey: LearningLessonCatalog.PackKey,
                 PackVersion: LearningLessonCatalog.MaterialVersion };
@@ -24,25 +27,36 @@ internal static class LearningRepresentation
             LearningTourProgress[] history = state?.Tours
                 .Where(tour => (int)tour.Family == (int)family)
                 .OrderByDescending(tour => tour.MaterialVersion).ToArray() ?? [];
-            bool available = currentPack && IsFamilyAvailable(operation, family);
+            var currentPlan = LearningTourPlanResolver.Resolve(operation, sources, family);
+            bool available = currentPlan.Plan.IsAvailable;
+            bool covered = currentPlan.Definition is not null && state?.HasTourCoverage(currentPlan.Definition) == true;
             foreach (LearningTourProgress tour in history)
                 tours.Add(new()
                 {
                     Family = family,
                     MaterialVersion = tour.MaterialVersion,
                     Outcome = Outcome(tour.Outcome),
-                    StepIndex = tour.Step,
-                    IsAvailable = available && tour.MaterialVersion == LearningLessonCatalog.MaterialVersion,
-                    UnavailableReason = tour.MaterialVersion != LearningLessonCatalog.MaterialVersion
+                    LastStepKey = tour.LastStepKey,
+                    SnoozedUntilUtc = tour.SnoozedUntilUtc is { } snoozed
+                        ? new DateTimeOffset(DateTime.SpecifyKind(snoozed, DateTimeKind.Utc)) : null,
+                    CurrentCoverage = tour.MaterialVersion == LearningExperienceCatalog.MaterialVersion && covered,
+                    CompletedSteps = tour.Steps.Select(step => new LearningTourStepCompletionDto
+                    {
+                        StepKey = step.StepKey,
+                        StepVersion = step.StepVersion,
+                        CompletedAtUtc = new DateTimeOffset(DateTime.SpecifyKind(step.CompletedAtUtc, DateTimeKind.Utc))
+                    }).ToArray(),
+                    IsAvailable = available && tour.MaterialVersion == LearningExperienceCatalog.MaterialVersion,
+                    UnavailableReason = tour.MaterialVersion != LearningExperienceCatalog.MaterialVersion
                         ? Reason("material-unavailable", "This historical tour material is not currently available.")
                         : available ? null : TourUnavailableReason(family, currentPack)
                 });
-            if (history.All(tour => tour.MaterialVersion != LearningLessonCatalog.MaterialVersion))
+            if (history.All(tour => tour.MaterialVersion != LearningExperienceCatalog.MaterialVersion))
                 tours.Add(new()
                 {
                     Family = family,
-                    MaterialVersion = LearningLessonCatalog.MaterialVersion,
-                    StepIndex = 0,
+                    MaterialVersion = LearningExperienceCatalog.MaterialVersion,
+                    CurrentCoverage = covered,
                     IsAvailable = available,
                     UnavailableReason = available ? null : TourUnavailableReason(family, currentPack)
                 });
@@ -167,24 +181,20 @@ internal static class LearningRepresentation
             || state.ActiveEventContextId != operation.EventContextId)
             return null;
         LearningTourProgress tour = state.Tours.Single(value => value.Id == state.ActiveTourId);
+        if (tour.MaterialVersion != LearningExperienceCatalog.MaterialVersion
+            || state.ActivePlanFingerprint is null || state.ActivePolicySourceStamp is null)
+            return null;
         return new()
         {
             Token = token,
             Family = (WireFamily)tour.Family,
             MaterialVersion = tour.MaterialVersion,
             ExpiresAtUtc = new DateTimeOffset(expires, TimeSpan.Zero),
-            Revision = state.Revision
+            Revision = state.Revision,
+            PlanFingerprint = state.ActivePlanFingerprint,
+            PolicySourceStamp = state.ActivePolicySourceStamp
         };
     }
-
-    private static bool IsFamilyAvailable(LearningOperationState operation, WireFamily family) => family switch
-    {
-        WireFamily.Shell => true,
-        WireFamily.Studio => operation.StudioAvailable,
-        WireFamily.EventManagement => operation.CanManageEvent,
-        WireFamily.NormalAi => operation.NormalAiAvailable,
-        _ => false
-    };
 
     private static LearningSpaceStatus SpaceStatus(TenantLearningSpace? space) =>
         space is null ? LearningSpaceStatus.Absent

@@ -1,0 +1,41 @@
+Change-Id: CHG-01M66X3Y89HQHYQDYR5TS4C49Y
+Title: "retain learning progress by semantic step"
+Type: feat
+Scope: onboarding
+Summary: "Keep compatible learning completion when applicable steps change, with bounded semantic records, original-owner admission and complete erasure."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Tour requests and results use semantic step keys and versions instead of
+      numeric Step. Regenerate clients and apply AddSemanticLearningSteps;
+      old ordinal state is not backfilled.
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Detail: >-
+      Retain original-human settings and guidance sources through admission;
+      enforce tenant-qualified semantic children and complete owner erasure.
+      Expected-SQL memoization never caches successful authority or live data.
+  Migration:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Detail: >-
+      Apply the selected provider's generated AddSemanticLearningSteps cohort.
+      Preferences and practice remain; no ordinal completion is fabricated and
+      no shared database reset is authorized. Full deployment acceptance is separate.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      Upgrade semantic-contract clients with their schema migration. Targeted
+      backend checks do not certify hosted onboarding or every provider/topology.

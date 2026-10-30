@@ -5,6 +5,7 @@ using UserLearningState = Explore.Domain.Learning.UserLearningState;
 using Explore.Persistence;
 using Explore.Persistence.Privacy;
 using Explore.Persistence.Repositories;
+using Explore.Domain.Settings.Documents;
 using ISLAMU.Wire.Contracts.Learning;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -15,31 +16,60 @@ namespace Event.API.IntegrationTests.Learning;
 public sealed class LearningRaceTests
 {
     [Test]
+    public async Task GuidanceInsertedAfterObservedAbsenceRejectsTheOriginalPreferenceWrite()
+    {
+        var barrier = new LearningSourceObservationBarrier();
+        await using var fixture = new LearningHttpFixture();
+        await fixture.InitializeAsync(barrier, null);
+        using var member = await fixture.CreateMemberAsync();
+        var context = await LearningOperationTests.Context(member.Client);
+        await using (var metadata = fixture.OpenInspection())
+            barrier.DocumentTable = metadata.Model.FindEntityType(typeof(TenantSettingsDocument))!.GetTableName()!;
+        barrier.Armed = true;
+        var pending = member.Client.PatchAsJsonAsync("/api/learning/preferences", Preferences(context));
+        try
+        {
+            await Task.WhenAny(barrier.Arrived.Task, pending).WaitAsync(TimeSpan.FromSeconds(30));
+            await Assert.That(barrier.Arrived.Task.IsCompletedSuccessfully).IsTrue()
+                .Because("the source observation must be intercepted before the request can settle");
+            await using var writer = fixture.OpenInspection();
+            var document = TenantSettingsDocument.Create(fixture.TenantId,
+                SettingsDocumentKeys.Tenant.LearningGuidance, 1, "1", """{"enabled":false}""");
+            document.Id = Guid.CreateVersion7();
+            writer.TenantSettingsDocuments.Add(document);
+            await writer.SaveChangesAsync();
+        }
+        finally { barrier.Release.TrySetResult(); }
+
+        using var rejected = await pending;
+        await Assert.That(rejected.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        await using var observer = fixture.OpenInspection();
+        await Assert.That(await observer.TenantSettingsDocuments.AnyAsync(row =>
+            row.TenantId == fixture.TenantId
+            && row.DocumentKey == SettingsDocumentKeys.Tenant.LearningGuidance)).IsTrue();
+        await Assert.That(await observer.UserLearningStates.AnyAsync(row =>
+            row.TenantId == fixture.TenantId && row.UserId == member.UserId)).IsFalse();
+    }
+
+    [Test]
     public async Task RetainedErasureCommittedAfterHumanPreparationRejectsThePausedOriginalOutcome()
     {
         var barrier = new LearningPreflightBarrier();
         await using var fixture = new LearningHttpFixture();
         await fixture.InitializeAsync(barrier, null);
         using var member = await fixture.CreateMemberAsync();
-        var before = await LearningOperationTests.Context(member.Client);
+        var plan = await LearningOperationTests.TourPlan(member.Client, LearningTourFamily.Shell);
         using var claimResponse = await member.Client.PostAsJsonAsync("/api/learning/tours/claim",
-            new LearningClaimTourRequest
-            {
-                ExpectedScopeStamp = before.ScopeStamp, ExpectedRevision = 0, IntentId = Guid.CreateVersion7(),
-                ContextKey = "self", Family = ISLAMU.Wire.Contracts.Learning.LearningTourFamily.Shell, MaterialVersion = 1
-            });
+            LearningOperationTests.TourClaim(plan, replay: false));
         await Assert.That(claimResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var claimed = (await claimResponse.Content.ReadFromJsonAsync<LearningMutationReceiptDto>())!;
         await using (var metadata = fixture.OpenInspection())
             barrier.Table = metadata.Model.FindEntityType(typeof(UserLearningState))!.GetTableName()!;
         barrier.Armed = true;
         var pending = member.Client.PostAsJsonAsync("/api/learning/tours/outcome",
-            new LearningRecordTourOutcomeRequest
+            LearningOperationTests.TourAction(plan, claimed, LearningTourAction.Progress) with
             {
-                ExpectedScopeStamp = before.ScopeStamp, ExpectedRevision = claimed.LearnerRevision,
-                IntentId = Guid.CreateVersion7(), ClaimToken = claimed.Claim!.Token,
-                Family = ISLAMU.Wire.Contracts.Learning.LearningTourFamily.Shell, MaterialVersion = 1,
-                Outcome = LearningTourOutcome.Completed, StepIndex = 1
+                StepKey = plan.Steps[0].StepKey, StepVersion = plan.Steps[0].StepVersion
             });
         Explore.Domain.PrivacyErasureIntent? fact = null;
         try
@@ -68,12 +98,8 @@ public sealed class LearningRaceTests
         await using var fixture = new LearningHttpFixture();
         await fixture.InitializeAsync(barrier, null);
         using var member = await fixture.CreateMemberAsync();
-        var context = await LearningOperationTests.Context(member.Client);
-        var input = new LearningClaimTourRequest
-        {
-            ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = 0, IntentId = Guid.CreateVersion7(),
-            ContextKey = "self", Family = ISLAMU.Wire.Contracts.Learning.LearningTourFamily.Shell, MaterialVersion = 1
-        };
+        var plan = await LearningOperationTests.TourPlan(member.Client, LearningTourFamily.Shell);
+        var input = LearningOperationTests.TourClaim(plan, replay: false);
         barrier.Armed = true;
         var firstTask = member.Client.PostAsJsonAsync("/api/learning/tours/claim", input);
         Task<HttpResponseMessage>? secondTask = null;
@@ -243,6 +269,31 @@ public sealed class LearningRaceTests
                 Armed = false;
                 if (!owner.HasHumanCommitContextLease)
                     throw new InvalidOperationException("The preflight barrier requires the original prepared human.");
+                Arrived.TrySetResult();
+                await Release.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            }
+            return result;
+        }
+    }
+
+    private sealed class LearningSourceObservationBarrier : DbCommandInterceptor
+    {
+        internal string DocumentTable { get; set; } = string.Empty;
+        internal bool Armed { get; set; }
+        internal TaskCompletionSource Arrived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override async ValueTask<DbDataReader> ReaderExecutedAsync(
+            DbCommand command, CommandExecutedEventData eventData, DbDataReader result,
+            CancellationToken cancellationToken = default)
+        {
+            if (Armed && eventData.Context is ExploreDbContext { HasHumanCommitContextLease: true } owner
+                && owner.Database.CurrentTransaction is null
+                && command.CommandText.Contains(DocumentTable, StringComparison.Ordinal))
+            {
+                if (result.HasRows)
+                    throw new InvalidOperationException("The original guidance source must be absent.");
+                Armed = false;
                 Arrived.TrySetResult();
                 await Release.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
             }

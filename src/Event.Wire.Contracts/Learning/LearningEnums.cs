@@ -21,6 +21,24 @@ public enum LearningTourOutcome
     Interrupted = 4
 }
 
+[JsonConverter(typeof(LearningStringEnumJsonConverter<LearningTourAction>))]
+public enum LearningTourAction
+{
+    Progress = 1,
+    Complete = 2,
+    Skip = 3,
+    Interrupt = 4,
+    Snooze = 5
+}
+
+[JsonConverter(typeof(LearningStringEnumJsonConverter<LearningSnoozeDuration>))]
+public enum LearningSnoozeDuration
+{
+    OneHour = 1,
+    OneDay = 2,
+    OneWeek = 3
+}
+
 [JsonConverter(typeof(LearningStringEnumJsonConverter<LearningPracticeAction>))]
 public enum LearningPracticeAction
 {

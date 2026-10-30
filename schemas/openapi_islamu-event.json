@@ -73172,6 +73172,160 @@
         "x-endpoint-class": "Authenticated"
       }
     },
+    "/api/learning/tours/{family}/plan": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Get the current private learning tour plan",
+        "operationId": "GetLearningTourPlan",
+        "parameters": [
+          {
+            "name": "family",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contextKey",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "self"
+            }
+          },
+          {
+            "name": "eventContextId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfLearningTourPlanDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfLearningTourPlanDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Authenticated"
+      }
+    },
     "/api/learning/practice/{id}": {
       "get": {
         "tags": [
@@ -175601,6 +175755,96 @@
           }
         }
       },
+      "HalResourceOfLearningTourPlanDto": {
+        "required": [
+          "family",
+          "materialVersion",
+          "scopeStamp",
+          "policySourceStamp",
+          "planFingerprint",
+          "learnerRevision",
+          "contextKey",
+          "isAvailable",
+          "canClaim"
+        ],
+        "type": "object",
+        "properties": {
+          "family": {
+            "$ref": "#/components/schemas/LearningTourFamily"
+          },
+          "materialVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "scopeStamp": {
+            "type": "string"
+          },
+          "policySourceStamp": {
+            "type": "string"
+          },
+          "planFingerprint": {
+            "type": "string"
+          },
+          "learnerRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "contextKey": {
+            "type": "string"
+          },
+          "eventContextId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "isAvailable": {
+            "type": "boolean"
+          },
+          "canClaim": {
+            "type": "boolean"
+          },
+          "unavailableReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LearningDisplayTextDto"
+              }
+            ]
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningTourStepDto"
+            }
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
       "HalResourceOfLocalCredentialIssueDto": {
         "type": "object",
         "properties": {
@@ -190934,7 +191178,10 @@
           "intentId",
           "family",
           "materialVersion",
-          "contextKey"
+          "contextKey",
+          "expectedPlanFingerprint",
+          "expectedPolicySourceStamp",
+          "replay"
         ],
         "type": "object",
         "properties": {
@@ -190973,6 +191220,15 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "expectedPlanFingerprint": {
+            "type": "string"
+          },
+          "expectedPolicySourceStamp": {
+            "type": "string"
+          },
+          "replay": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -191426,10 +191682,12 @@
           "expectedScopeStamp",
           "expectedRevision",
           "intentId",
+          "contextKey",
           "family",
           "materialVersion",
-          "outcome",
-          "stepIndex"
+          "action",
+          "expectedPlanFingerprint",
+          "expectedPolicySourceStamp"
         ],
         "type": "object",
         "properties": {
@@ -191455,6 +191713,16 @@
             ],
             "format": "uuid"
           },
+          "contextKey": {
+            "type": "string"
+          },
+          "eventContextId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
           "family": {
             "$ref": "#/components/schemas/LearningTourFamily"
           },
@@ -191466,16 +191734,39 @@
             ],
             "format": "int32"
           },
-          "outcome": {
-            "$ref": "#/components/schemas/LearningTourOutcome"
+          "action": {
+            "$ref": "#/components/schemas/LearningTourAction"
           },
-          "stepIndex": {
+          "stepKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "stepVersion": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
               "integer",
               "string"
             ],
             "format": "int32"
+          },
+          "snoozeDuration": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LearningSnoozeDuration"
+              }
+            ]
+          },
+          "expectedPlanFingerprint": {
+            "type": "string"
+          },
+          "expectedPolicySourceStamp": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -191597,6 +191888,14 @@
         ],
         "type": "string"
       },
+      "LearningSnoozeDuration": {
+        "enum": [
+          "OneHour",
+          "OneDay",
+          "OneWeek"
+        ],
+        "type": "string"
+      },
       "LearningSpaceAction": {
         "enum": [
           "Remove",
@@ -191690,13 +191989,25 @@
           }
         }
       },
+      "LearningTourAction": {
+        "enum": [
+          "Progress",
+          "Complete",
+          "Skip",
+          "Interrupt",
+          "Snooze"
+        ],
+        "type": "string"
+      },
       "LearningTourClaimDto": {
         "required": [
           "token",
           "family",
           "materialVersion",
           "expiresAtUtc",
-          "revision"
+          "revision",
+          "planFingerprint",
+          "policySourceStamp"
         ],
         "type": "object",
         "properties": {
@@ -191726,6 +192037,12 @@
               "string"
             ],
             "format": "int64"
+          },
+          "planFingerprint": {
+            "type": "string"
+          },
+          "policySourceStamp": {
+            "type": "string"
           }
         }
       },
@@ -191747,11 +192064,87 @@
         ],
         "type": "string"
       },
+      "LearningTourPlanDto": {
+        "required": [
+          "family",
+          "materialVersion",
+          "scopeStamp",
+          "policySourceStamp",
+          "planFingerprint",
+          "learnerRevision",
+          "contextKey",
+          "isAvailable",
+          "canClaim"
+        ],
+        "type": "object",
+        "properties": {
+          "family": {
+            "$ref": "#/components/schemas/LearningTourFamily"
+          },
+          "materialVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "scopeStamp": {
+            "type": "string"
+          },
+          "policySourceStamp": {
+            "type": "string"
+          },
+          "planFingerprint": {
+            "type": "string"
+          },
+          "learnerRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "contextKey": {
+            "type": "string"
+          },
+          "eventContextId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "isAvailable": {
+            "type": "boolean"
+          },
+          "canClaim": {
+            "type": "boolean"
+          },
+          "unavailableReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LearningDisplayTextDto"
+              }
+            ]
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningTourStepDto"
+            }
+          }
+        }
+      },
       "LearningTourProgressDto": {
         "required": [
           "family",
           "materialVersion",
-          "stepIndex"
+          "currentCoverage"
         ],
         "type": "object",
         "properties": {
@@ -191776,13 +192169,27 @@
               }
             ]
           },
-          "stepIndex": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
+          "lastStepKey": {
             "type": [
-              "integer",
+              "null",
+              "string"
+            ]
+          },
+          "snoozedUntilUtc": {
+            "type": [
+              "null",
               "string"
             ],
-            "format": "int32"
+            "format": "date-time"
+          },
+          "currentCoverage": {
+            "type": "boolean"
+          },
+          "completedSteps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningTourStepCompletionDto"
+            }
           },
           "isAvailable": {
             "type": "boolean"
@@ -191796,6 +192203,59 @@
                 "$ref": "#/components/schemas/LearningDisplayTextDto"
               }
             ]
+          }
+        }
+      },
+      "LearningTourStepCompletionDto": {
+        "required": [
+          "stepKey",
+          "stepVersion",
+          "completedAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "stepKey": {
+            "type": "string"
+          },
+          "stepVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "LearningTourStepDto": {
+        "required": [
+          "stepKey",
+          "stepVersion",
+          "instruction",
+          "targetKey"
+        ],
+        "type": "object",
+        "properties": {
+          "stepKey": {
+            "type": "string"
+          },
+          "stepVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "instruction": {
+            "$ref": "#/components/schemas/LearningDisplayTextDto"
+          },
+          "targetKey": {
+            "type": "string"
           }
         }
       },

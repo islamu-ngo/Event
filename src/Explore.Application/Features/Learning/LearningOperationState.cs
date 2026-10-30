@@ -1,5 +1,6 @@
 using Explore.Domain;
 using Explore.Domain.Learning;
+using Explore.Application.Contracts.Persistence;
 
 namespace Explore.Application.Features.Learning;
 
@@ -19,4 +20,5 @@ public sealed record LearningOperationState(
     public bool StudioAvailable { get; init; }
     public bool NormalAiAvailable { get; init; }
     public DateTime ObservedAtUtc { get; init; }
+    public LearningSourceFacts? Sources { get; init; }
 }

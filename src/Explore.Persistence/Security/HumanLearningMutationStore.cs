@@ -149,7 +149,11 @@ internal sealed class HumanLearningMutationStore(
         {
             bool ownerCleanup = mutation.Intent is LearningPreferencesIntent
                 or LearningPracticeIntent { Action: LearningPracticeAction.Clear }
-                or LearningTourOutcomeIntent { Outcome: not LearningTourOutcome.InProgress };
+                or LearningTourOutcomeIntent { Action: LearningTourAction.Skip or LearningTourAction.Interrupt
+                    or LearningTourAction.Snooze }
+                || mutation.Intent is LearningTourOutcomeIntent retained && state?.Tours.Any(tour =>
+                    tour.Family == retained.Family && tour.MaterialVersion == retained.MaterialVersion
+                    && tour.LastIntentId == retained.IntentId) == true;
             if (space?.IsRemoved == true && !ownerCleanup)
                 throw Conflict("The shared learning source has been removed.");
             if (space is null && !ownerCleanup)
@@ -165,7 +169,7 @@ internal sealed class HumanLearningMutationStore(
                     mutation.SubjectId, mutation.UpdatedAtUtc);
                 await repository.AddStateAsync(state, token);
             }
-            ApplyState(mutation, state);
+            ApplyState(mutation, state, space);
             if (mutation.Intent is LearningPracticeIntent selected)
                 practice = state.Practices.SingleOrDefault(value =>
                     value.ContextKey == selected.ContextKey && value.RecipeKey == selected.RecipeKey);
@@ -175,11 +179,14 @@ internal sealed class HumanLearningMutationStore(
         return new(mutation.TenantId, mutation.SubjectId, responseContext, mutation.EventContextId,
             space, state, practice, mutation.AvailableActors, mutation.CanManageSpace, mutation.CanManageEvent)
         {
-            ObservedAtUtc = clock.GetUtcNow().UtcDateTime
+            ObservedAtUtc = clock.GetUtcNow().UtcDateTime,
+            Sources = mutation.Sources,
+            StudioAvailable = mutation.StudioAvailable,
+            NormalAiAvailable = mutation.NormalAiAvailable
         };
     }
 
-    private void ApplyState(IHumanLearningMutation mutation, UserLearningState state)
+    private void ApplyState(IHumanLearningMutation mutation, UserLearningState state, TenantLearningSpace? space)
     {
         try
         {
@@ -191,46 +198,54 @@ internal sealed class HumanLearningMutationStore(
                     break;
                 case LearningTourClaimIntent claim:
                 {
-                    RequireMaterial(claim.MaterialVersion);
+                    RequireTourMaterial(claim.MaterialVersion);
+                    var resolved = ResolveTour(mutation, state, space, claim.Family);
+                    RequirePlan(resolved.Plan, claim.ExpectedPlanFingerprint, claim.ExpectedPolicySourceStamp);
+                    var definition = resolved.Definition
+                        ?? throw Conflict("The current tour is unavailable.");
                     var progress = state.Tours.SingleOrDefault(value =>
                         value.Family == claim.Family && value.MaterialVersion == claim.MaterialVersion);
-                    Guid claimId = (state.LastIntentId == claim.IntentId || progress?.LastIntentId == claim.IntentId)
+                    bool duplicate = state.LastIntentId == claim.IntentId || progress?.LastIntentId == claim.IntentId;
+                    Guid claimId = duplicate
                         && state.ActiveTourId == progress?.Id && state.ActiveClaimId.HasValue
                         ? state.ActiveClaimId.Value : mutation.CandidateClaimId;
-                    state.ClaimTour(progress?.Id ?? mutation.CandidateChildId, claim.Family,
-                        claim.MaterialVersion, claimId, claim.IntentId, claim.ExpectedRevision,
-                        mutation.UpdatedAtUtc, claim.ContextKey, claim.EventContextId,
-                        replay: progress?.Outcome is LearningTourOutcome.Completed or LearningTourOutcome.Skipped);
-                    _claimDeadline = state.ClaimExpiresAtUtc;
+                    state.ClaimSemanticTour(progress?.Id ?? mutation.CandidateChildId, definition,
+                        claimId, claim.IntentId, claim.ExpectedRevision, mutation.UpdatedAtUtc,
+                        claim.ExpectedPlanFingerprint, claim.ExpectedPolicySourceStamp,
+                        claim.ContextKey, claim.EventContextId, claim.Replay);
+                    _claimDeadline = duplicate ? null : state.ClaimExpiresAtUtc;
                     break;
                 }
                 case LearningTourOutcomeIntent outcome:
                 {
-                    RequireMaterial(outcome.MaterialVersion);
+                    RequireTourMaterial(outcome.MaterialVersion);
                     var progress = state.Tours.SingleOrDefault(value =>
                         value.Family == outcome.Family && value.MaterialVersion == outcome.MaterialVersion);
-                    if (outcome.ClaimToken is { } claimToken)
-                    {
-                        bool duplicate = state.LastIntentId == outcome.IntentId
-                            || progress?.LastIntentId == outcome.IntentId;
-                        if (duplicate && progress?.LastIntentId != outcome.IntentId)
-                            throw Conflict("The retained outcome belongs to another tour family or material version.");
-                        if (!duplicate && (progress is null || state.ActiveTourId != progress.Id))
-                            throw Conflict("The requested tour does not own the active claim.");
-                        _claimDeadline = duplicate ? null : state.ClaimExpiresAtUtc;
-                        state.RecordTourOutcome(claimToken, outcome.IntentId, outcome.Outcome,
-                            outcome.StepIndex, outcome.ExpectedRevision, mutation.UpdatedAtUtc);
-                    }
-                    else if (outcome.Outcome == LearningTourOutcome.Skipped && outcome.StepIndex == 0)
-                        state.SkipInvitation(progress?.Id ?? mutation.CandidateChildId, outcome.Family,
-                            outcome.MaterialVersion, outcome.IntentId, outcome.ExpectedRevision, mutation.UpdatedAtUtc);
+                    bool duplicate = state.LastIntentId == outcome.IntentId || progress?.LastIntentId == outcome.IntentId;
+                    if (duplicate && progress?.LastIntentId != outcome.IntentId)
+                        throw Conflict("The retained action belongs to another tour family or material version.");
+                    bool release = outcome.ClaimToken.HasValue && outcome.Action is
+                        LearningTourAction.Skip or LearningTourAction.Interrupt or LearningTourAction.Snooze;
+                    LearningTourDefinition definition;
+                    if (duplicate || release)
+                        definition = LearningExperienceCatalog.GetDefinition(outcome.Family);
                     else
-                        throw new ArgumentException("Only invitation skip may omit a claim token.");
+                    {
+                        var resolved = ResolveTour(mutation, state, space, outcome.Family);
+                        RequirePlan(resolved.Plan, outcome.ExpectedPlanFingerprint, outcome.ExpectedPolicySourceStamp);
+                        definition = resolved.Definition ?? throw Conflict("The current tour is unavailable.");
+                    }
+                    _claimDeadline = duplicate || !outcome.ClaimToken.HasValue ? null : state.ClaimExpiresAtUtc;
+                    state.RecordSemanticTourAction(progress?.Id ?? mutation.CandidateChildId, definition,
+                        outcome.ClaimToken, outcome.IntentId, outcome.Action, outcome.StepKey,
+                        outcome.StepVersion, outcome.SnoozeDuration, outcome.ExpectedPlanFingerprint,
+                        outcome.ExpectedPolicySourceStamp, outcome.ExpectedRevision, mutation.UpdatedAtUtc,
+                        outcome.ContextKey, outcome.EventContextId);
                     break;
                 }
                 case LearningPracticeIntent input:
                 {
-                    RequireMaterial(input.MaterialVersion);
+                    RequirePracticeMaterial(input.MaterialVersion);
                     var current = state.Practices.SingleOrDefault(value =>
                         value.ContextKey == input.ContextKey && value.RecipeKey == input.RecipeKey);
                     if (input.PracticeId.HasValue && current?.Id != input.PracticeId
@@ -305,6 +320,10 @@ internal sealed class HumanLearningMutationStore(
                     && value.TenantId == mutation.TenantId && value.UserId == mutation.SubjectId,
                 LearningTourProgress value => value.TenantId == mutation.TenantId
                     && value.UserLearningStateId == result.State?.Id,
+                LearningTourStepProgress value => value.TenantId == mutation.TenantId
+                    && context.ChangeTracker.Entries<LearningTourProgress>().Any(tour =>
+                        tour.Entity.Id == value.TourProgressId && tour.Entity.TenantId == mutation.TenantId
+                        && tour.Entity.UserLearningStateId == result.State!.Id),
                 LearningPracticeState value => value.TenantId == mutation.TenantId
                     && value.UserLearningStateId == result.State?.Id,
                 _ => false
@@ -321,6 +340,8 @@ internal sealed class HumanLearningMutationStore(
             Space = space is null ? null : ScalarImage(space),
             State = state is null ? null : ScalarImage(state),
             Tours = state?.Tours.OrderBy(value => value.Id).Select(value => ScalarImage(value)).ToArray(),
+            Steps = state?.Tours.SelectMany(value => value.Steps)
+                .OrderBy(value => value.Id).Select(value => ScalarImage(value)).ToArray(),
             Practices = state?.Practices.OrderBy(value => value.Id).Select(value => ScalarImage(value)).ToArray()
         });
     }
@@ -365,10 +386,34 @@ internal sealed class HumanLearningMutationStore(
             throw new UnauthorizedAccessException("The original learning transaction or connection changed.");
     }
 
-    private static void RequireMaterial(int version)
+    private static void RequirePracticeMaterial(int version)
     {
         if (version != LearningLessonCatalog.MaterialVersion)
             throw Conflict("The learning material is stale or unsupported.");
+    }
+
+    private static void RequireTourMaterial(int version)
+    {
+        if (version != LearningExperienceCatalog.MaterialVersion)
+            throw Conflict("The semantic tour material is stale or unsupported.");
+    }
+
+    private (Wire.LearningTourPlanDto Plan, LearningTourDefinition? Definition) ResolveTour(
+        IHumanLearningMutation mutation, UserLearningState state, TenantLearningSpace? space, LearningTourFamily family) =>
+        LearningTourPlanResolver.Resolve(new(mutation.TenantId, mutation.SubjectId, mutation.ContextKey,
+            mutation.EventContextId, space, state, null, mutation.AvailableActors,
+            mutation.CanManageSpace, mutation.CanManageEvent)
+        {
+            Sources = mutation.Sources,
+            StudioAvailable = mutation.StudioAvailable,
+            NormalAiAvailable = mutation.NormalAiAvailable,
+            ObservedAtUtc = clock.GetUtcNow().UtcDateTime
+        }, mutation.Sources, (Wire.LearningTourFamily)family);
+
+    private static void RequirePlan(Wire.LearningTourPlanDto plan, string fingerprint, string policyStamp)
+    {
+        if (!plan.IsAvailable || plan.PlanFingerprint != fingerprint || plan.PolicySourceStamp != policyStamp)
+            throw Conflict("The accepted learning plan or policy sources changed. Refresh the private plan.");
     }
 
     private static ConcurrencyConflictException Conflict(string message) => new("learning_conflict", message);

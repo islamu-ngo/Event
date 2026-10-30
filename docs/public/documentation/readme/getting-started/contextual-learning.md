@@ -43,7 +43,7 @@ contract.
 
 ## What Practice Represents
 
-The shipped `learning-core` pack contains six deterministic exercises:
+The backend-defined version-1 `learning-core` practice pack contains six deterministic exercises:
 
 * Event details: choose in-person or online presentation.
 * Sessions/programme: choose one or two authored sessions.
@@ -65,10 +65,35 @@ leaves a tombstone so it stays removed until explicitly recreated. Tenant-wide
 source management is distinct from changing a learner's hide/pin/suppression
 preferences.
 
-The backend retains at most the current and previous material versions per
-tour family. A single claim coordinates concurrent tabs; it expires after
+Tour material is version 2, independent of the version-1 practice pack. The backend
+retains at most the current and previous tour material versions per family,
+with up to 32 semantic steps per family and 256 retained step-evidence rows per
+learner. A single claim coordinates concurrent tabs; it expires after
 120 seconds without advancing explicit progress. It is not kept alive by
 background polling. Manual replay preserves the earlier outcome.
+
+## Current Plans, Progress And Replay
+
+The private named-family plan at `GET /api/learning/tours/{family}/plan` describes
+only guidance applicable to the learner's current workspace and, for event
+management, the selected event. Families are `Shell`, `Studio`, `EventManagement`
+and `NormalAi`. The response includes the captured context, source/plan stamps,
+scope and learner revision, with current HAL links indicating claim eligibility.
+An earlier response is not permission to act after switching account, tenant or
+context.
+
+Steps are identified by a stable key and version, not their screen position.
+Compatible completed evidence survives a temporarily unavailable step or a
+reordered tour. Historical completion or skip remains distinct from coverage of
+the steps applicable now; updated guidance may introduce new work without
+rewriting that history. Completion requires coverage of every applicable step.
+These backend semantics do not mean a tour renderer has shipped.
+
+Replay must be a deliberate learner choice. Skip and snooze can dismiss an
+unclaimed invitation; snooze offers one hour, one day or one week rather than an
+arbitrary deadline. An owned claim can be released after its source is removed
+without restoring access to that source. No tour starts again automatically,
+and lessons never become a hard gate on production work.
 
 Practice is bounded to 20 self/actor contexts and six recipes per context,
 1 KiB per record and 128 KiB per learner. Learners may clear their own practice
@@ -84,23 +109,36 @@ or actors; existing tenant-retirement rules still govern production data.
 
 ## Operator Rollout Boundary
 
-The backend source defines seven `/api/learning` operations: private context and
-practice reads; tour claim/outcome, preference, authored-practice and shared-source
+The backend source defines eight `/api/learning` operations: private context,
+named-family tour-plan and practice reads; tour claim/action, preference, authored-practice and shared-source
 actions. Even reads require the current authenticated tenant member. Responses
 and errors are private/no-store. Use the returned HAL links for actions rather
 than inferring permission from a role or an earlier response.
 
-Clients send the current scope stamp and expected revisions. Claims, outcomes and
-practice also carry one stable intent ID for a bounded retry of the same payload.
-A conflict requires refreshing the private context. Learning does not cache a
+Integrations must use the semantic tour contract: tour version 2, expected plan
+and policy-source stamps, captured context and explicit `Replay` on claims.
+The existing tour-outcome route now accepts `Action` (`Progress`, `Complete`,
+`Skip`, `Interrupt` or `Snooze`), not ordinal `StepIndex` or `Outcome` input.
+Only progress supplies a step key/version; only snooze supplies a closed duration.
+There is no compatibility adapter for old ordinal inputs.
+
+Clients also send the current scope stamp and expected revisions. Claims, actions
+and practice carry one stable intent ID for a bounded retry of the same payload.
+A conflict requires refreshing the private context and applicable plan. Learning does not cache a
 private response to bypass current authorization, and an uncertain commit must
-not be automatically repeated as a new action. No existing endpoint or
-compatibility adapter is replaced.
+not be automatically repeated as a new action. Source stamps detect stale input;
+they grant no access. Observed AI availability is not a guarantee that a provider
+credential remains valid or that a later AI request will succeed.
 
 This backend adds learning-owned schema through the normal generated provider
 migrations. It adds no tour package, configuration flag, secret, external
-provider account or compatibility route. Apply the normal deployment migration
-procedure; never hand-edit generated migrations or reset a shared database.
+provider account or compatibility route. All four semantic migration cohorts
+were regenerated and checked against the current model. The original SQL Server
+metadata defect was corrected separately; the semantic cohort no longer carries
+that unrelated foreign-key change. These checks are not proof of deployment.
+No database has been upgraded or reset as evidence for this increment. Require
+the normal deployment migration procedure and selected-provider acceptance before
+rollout; never hand-edit generated migrations or reset a shared database.
 For PostgreSQL, run the existing declared-purpose migration composition as well:
 it installs Runtime tenant-scoped learning rights and the existing protected
 Global purpose's limited learner-root erasure rights. Do not grant broad child
@@ -114,6 +152,12 @@ representative-comprehension evidence. Do not describe backend tests as proof
 that the complete onboarding experience is ready.
 
 This increment is not yet release-certified across the provider matrix.
+No hosted or final migration/provider assurance is complete, and no learning UI
+has shipped. Earlier isolated checks do not certify the current semantic contract
+or renderer. Targeted actual-role checks now cover original-user source
+retention, rejection after a concurrent guidance insertion, and live routine
+drift detection after a warmed read. API/client regeneration and compilation also
+passed. These results do not certify every authority topology or deployment.
 Existing schema failures block MySQL/MariaDB learning assurance, and existing
 historical migration failures block the complete SQLite/SQL Server gates.
 Native PostgreSQL tenant retirement is also blocked by an existing discovery

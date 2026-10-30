@@ -15,7 +15,9 @@ public sealed class ClaimLearningTourValidator : AbstractValidator<ClaimLearning
             RuleFor(command => command.Input.ExpectedRevision).GreaterThanOrEqualTo(0);
             RuleFor(command => command.Input.IntentId).Must(LearningInputRules.IsIdentity);
             RuleFor(command => command.Input.Family).IsInEnum();
-            RuleFor(command => command.Input.MaterialVersion).Equal(LearningLessonCatalog.MaterialVersion);
+            RuleFor(command => command.Input.MaterialVersion).Equal(LearningExperienceCatalog.MaterialVersion);
+            RuleFor(command => command.Input.ExpectedPlanFingerprint).Must(LearningInputRules.IsScopeStamp);
+            RuleFor(command => command.Input.ExpectedPolicySourceStamp).Must(LearningInputRules.IsScopeStamp);
             RuleFor(command => command.Input.ContextKey).Must(LearningInputRules.IsContext);
             RuleFor(command => command.Input.EventContextId).Must(LearningInputRules.IsOptionalIdentity);
             RuleFor(command => command.Input).Must(input =>

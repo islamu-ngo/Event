@@ -23,6 +23,7 @@ public partial class ExploreDbContext
     public DbSet<TenantLearningSpace> TenantLearningSpaces { get; set; }
     public DbSet<UserLearningState> UserLearningStates { get; set; }
     public DbSet<LearningTourProgress> LearningTourProgress { get; set; }
+    public DbSet<LearningTourStepProgress> LearningTourStepProgress { get; set; }
     public DbSet<LearningPracticeState> LearningPracticeStates { get; set; }
 
     public DbSet<SetupTargetEnrollment> SetupTargetEnrollments { get; set; }

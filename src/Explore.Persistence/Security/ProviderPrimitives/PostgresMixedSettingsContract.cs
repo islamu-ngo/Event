@@ -21,6 +21,7 @@ public static partial class PostgresMixedSettingsContract
     public const string OwnerRole = "event_mixed_settings_owner";
     public const string MigratorRole = "event_mixed_settings_migrator";
     public const string GlobalRole = "event_mixed_settings_global";
+    public const string LearningReaderRole = "event_mixed_settings_learning_reader";
     public const string SourceTable = "mixed_settings_source";
     private const string AttemptTable = "mixed_settings_attempt";
     private const string Prefix = "mixed_settings_";
@@ -29,10 +30,12 @@ public static partial class PostgresMixedSettingsContract
     private const string HumanSignature = "uuid,integer,text,uuid,text,uuid,uuid,jsonb";
     private const string HumanArguments = "p_actor uuid,p_provider integer,p_account text,p_tenant uuid,"
         + "p_stamp text,p_session uuid,p_resolved uuid,p_request jsonb";
-    private static readonly string[] Roles = [OwnerRole, MigratorRole, GlobalRole];
+    private static readonly string[] Roles = [OwnerRole, MigratorRole, GlobalRole, LearningReaderRole];
     private static readonly (string Name, string Signature, string Result)[] Routines =
     [
         ("ready", "uuid", "void"),
+        ("learning_retain", "uuid", "void"),
+        ("learning_document", "uuid", "jsonb"),
         ("data", "uuid,jsonb", "jsonb"),
         ("read", HumanSignature, "jsonb"),
         ("acquire", HumanSignature + ",jsonb", "jsonb"),
@@ -91,6 +94,23 @@ public static partial class PostgresMixedSettingsContract
         command.Parameters.Add(new NpgsqlParameter("tenant", NpgsqlDbType.Uuid)
         { Value = (object?)context.TenantFilterTenantId ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    internal static async Task<LearningGuidanceDocumentSource?> ReadLearningGuidanceAsync(
+        ExploreDbContext context, PostgresNativeQueueEnrollment enrollment, Guid tenant, CancellationToken token)
+    {
+        await using var command = context.Database.GetDbConnection().CreateCommand();
+        command.Transaction = context.Database.CurrentTransaction?.GetDbTransaction();
+        command.CommandTimeout = context.Database.GetCommandTimeout() ?? command.CommandTimeout;
+        command.CommandText = $"""
+            DO $ready$ BEGIN {ExactBodies(context, enrollment)} END $ready$;
+            SELECT {FunctionSql(context, "learning_document")}(@tenant)::text;
+            """;
+        command.Parameters.Add(new NpgsqlParameter("tenant", NpgsqlDbType.Uuid) { Value = tenant });
+        var result = await command.ExecuteScalarAsync(token);
+        return result is null or DBNull ? null
+            : JsonSerializer.Deserialize<LearningGuidanceDocumentSource>((string)result)
+                ?? throw new InvalidOperationException("The native guidance document image is invalid.");
     }
 
     internal static async Task<string> ReadHumanAsync(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,

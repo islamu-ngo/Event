@@ -38,6 +38,7 @@ public static partial class PostgresOrdinarySettingsContract
     private static readonly (string Name, string Signature, string Arguments, string Result)[] Routines =
     [
         ("read", "uuid,uuid,jsonb", "p_tenant uuid,p_user uuid,p_keys jsonb", "jsonb"),
+        ("learning_retain", "uuid", "p_tenant uuid", "void"),
         ("acquire", "uuid,uuid,jsonb,jsonb", "p_tenant uuid,p_user uuid,p_request jsonb,p_before jsonb", "void"),
         ("write", "text,text,integer,jsonb,jsonb", "p_group text,p_key text,p_operation integer,p_before jsonb,p_after jsonb", "jsonb"),
         ("verify", "jsonb", "p_expected jsonb", "void"),

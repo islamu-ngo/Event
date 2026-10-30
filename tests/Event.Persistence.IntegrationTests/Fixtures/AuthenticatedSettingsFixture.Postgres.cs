@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Explore.Application.Configuration;
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -20,9 +21,30 @@ internal sealed partial class AuthenticatedSettingsFixture
         IInterceptor? interceptor = null, Action<SanitizedRequestFailure>? requestFailureObserver = null,
         Action<Dictionary<string, string?>>? configure = null,
         Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>? configureServices = null)
+        => CreatePostgresAsync(createDatabase, postgres, interceptor, requestFailureObserver,
+            configure, configureServices);
+
+    /// <summary>
+    /// Selects external privacy authority storage without changing Local identity storage.
+    /// The caller owns installation and supplies only its enrolled authority Runtime configuration.
+    /// </summary>
+    internal static Task<AuthenticatedSettingsFixture> CreateWithExternalPrivacyAuthorityAsync(
+        Func<ExploreDbContext> createDatabase, PostgreSqlContainerFixture postgres,
+        Action<Dictionary<string, string?>> configureAuthority)
+        => CreatePostgresAsync(createDatabase, postgres, null, null, null, null,
+            configureAuthority);
+
+    private static Task<AuthenticatedSettingsFixture> CreatePostgresAsync(
+        Func<ExploreDbContext> createDatabase, PostgreSqlContainerFixture? postgres,
+        IInterceptor? interceptor, Action<SanitizedRequestFailure>? requestFailureObserver,
+        Action<Dictionary<string, string?>>? configure,
+        Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>? configureServices,
+        Action<Dictionary<string, string?>>? configureAuthority = null)
     {
         return CreateCoreAsync(createDatabase, interceptor, postgres is null ? null : ConfigureAsync,
-            requestFailureObserver, configure, configureServices);
+            requestFailureObserver, configure, configureServices,
+            configureAuthority is null ? PrivacyErasureAuthorityTopology.CoLocated
+                : PrivacyErasureAuthorityTopology.ExternalDatabase);
 
         async Task ConfigureAsync(ExploreDbContext seed, Dictionary<string, string?> configuration)
         {
@@ -82,6 +104,7 @@ internal sealed partial class AuthenticatedSettingsFixture
             configuration["Database:InstanceKeyIssuance:Username"] = issuanceLogin;
             configuration["Database:InstanceKeyIssuance:Password"] = issuancePassword;
             configuration["Database:InstanceKeyIssuance:TlsMode"] = "Disabled";
+            configureAuthority?.Invoke(configuration);
         }
     }
 

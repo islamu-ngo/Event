@@ -38,13 +38,17 @@ public sealed class HumanLearningMutationPreparation(
         ClaimLearningTourCommand command, CancellationToken cancellationToken) =>
         ExecuteAsync(new LearningTourClaimIntent(command.Input.ExpectedRevision, command.Input.IntentId,
             Map(command.Input.Family), command.Input.MaterialVersion, command.Input.ContextKey,
-            command.Input.EventContextId), command.Input.ExpectedScopeStamp, cancellationToken);
+            command.Input.EventContextId, command.Input.ExpectedPlanFingerprint,
+            command.Input.ExpectedPolicySourceStamp, command.Input.Replay),
+            command.Input.ExpectedScopeStamp, cancellationToken);
 
     public Task<LearningOperationState> ExecuteAsync(
         RecordLearningTourOutcomeCommand command, CancellationToken cancellationToken) =>
         ExecuteAsync(new LearningTourOutcomeIntent(command.Input.ExpectedRevision, command.Input.IntentId,
             command.Input.ClaimToken, Map(command.Input.Family), command.Input.MaterialVersion,
-            Map(command.Input.Outcome), command.Input.StepIndex),
+            Map(command.Input.Action), command.Input.StepKey, command.Input.StepVersion,
+            Map(command.Input.SnoozeDuration), command.Input.ExpectedPlanFingerprint,
+            command.Input.ExpectedPolicySourceStamp, command.Input.ContextKey, command.Input.EventContextId),
             command.Input.ExpectedScopeStamp, cancellationToken);
 
     public Task<LearningOperationState> ExecuteAsync(
@@ -108,6 +112,7 @@ public sealed class HumanLearningMutationPreparation(
         var repository = services.GetRequiredService<ILearningRepository>();
         string contextKey = "self";
         Guid? eventContextId = null;
+        bool retainedTourAction = false;
         switch (intent)
         {
             case LearningTourClaimIntent claim:
@@ -120,12 +125,16 @@ public sealed class HumanLearningMutationPreparation(
                 var state = await repository.GetStateAsync(tenantId, userId, tracked: false, cancellationToken);
                 var retained = state?.Tours.SingleOrDefault(row => row.Family == outcome.Family
                     && row.MaterialVersion == outcome.MaterialVersion && row.LastIntentId == outcome.IntentId);
+                retainedTourAction = retained is not null;
                 // A retained exact outcome is self-owned; released claims retain no contextual grant.
-                if (retained is null && state?.ActiveClaimId is not null)
+                if (retained is null)
                 {
-                    contextKey = state.ActiveContextKey
-                        ?? throw new InvalidOperationException("The active learning context is missing.");
-                    eventContextId = state.ActiveEventContextId;
+                    contextKey = outcome.ContextKey;
+                    eventContextId = outcome.EventContextId;
+                    if (state?.ActiveClaimId is not null && (contextKey != state.ActiveContextKey
+                        || eventContextId != state.ActiveEventContextId))
+                        throw new ConcurrencyConflictException("learning_context_changed",
+                            "The action does not retain its original tour context.");
                 }
                 break;
             case LearningPracticeIntent practice:
@@ -149,12 +158,13 @@ public sealed class HumanLearningMutationPreparation(
         Guid? actorId = RequireCanonicalContext(contextKey);
         if (eventContextId == Guid.Empty)
             throw new NotFoundException("Learning event context", eventContextId);
-        bool requiresContextAuthority = intent is LearningTourClaimIntent
-            or LearningTourOutcomeIntent { Outcome: LearningTourOutcome.InProgress }
-            or LearningPracticeIntent { Action: not LearningPracticeAction.Clear };
+        bool requiresContextAuthority = !retainedTourAction && (intent is LearningTourClaimIntent
+            or LearningTourOutcomeIntent { Action: LearningTourAction.Progress or LearningTourAction.Complete }
+            or LearningPracticeIntent { Action: not LearningPracticeAction.Clear });
+        var learningSources = services.GetRequiredService<ILearningSourceRetention>();
+        var observedLearning = await learningSources.ObserveAsync(cancellationToken);
         var workspaces = await LearningWorkspaceAvailability.ObserveAsync(
-            services.GetRequiredService<IHierarchicalSettingsResolver>(),
-            services.GetRequiredService<IAiProviderCapabilityResolver>(), tenantId, cancellationToken);
+            observedLearning.Facts, services.GetRequiredService<IAiProviderCapabilityResolver>(), cancellationToken);
         RequireCustody(clock.GetUtcNow());
         if (intent is LearningTourClaimIntent { Family: LearningTourFamily.NormalAi } && !workspaces.NormalAi)
             throw new AuthorizationException("The native AI workspace is not ready.");
@@ -177,6 +187,7 @@ public sealed class HumanLearningMutationPreparation(
         IHumanPrincipalSourceLease? heldPrincipal = null;
         IHumanSupportAccessSourceLease? heldSupport = null;
         IHumanEventAssignmentSourceLease? heldAssignments = null;
+        ILearningSourceLease? heldLearning = null;
         HumanPrincipalSourceFacts? finalPrincipal = null;
         HumanSupportAccessSourceFacts? finalSupport = null;
         HumanEventAssignmentSourceFacts? finalAssignments = null;
@@ -186,6 +197,8 @@ public sealed class HumanLearningMutationPreparation(
         mutation = new Mutation(userId, tenantId, contextKey, eventContextId, preparedAt.UtcDateTime,
             Guid.CreateVersion7(preparedAt), Guid.CreateVersion7(preparedAt),
             Guid.CreateVersion7(preparedAt), Guid.CreateVersion7(preparedAt), intent,
+            () => (heldLearning
+                ?? throw new UnauthorizedAccessException("Retained learning sources are missing.")).Facts, workspaces,
             RequireOriginalAsync, RequireCurrentAsync, RequireCurrentAt);
         _current = mutation;
         try
@@ -197,6 +210,8 @@ public sealed class HumanLearningMutationPreparation(
             {
                 StudioAvailable = workspaces.Studio(mutation.AvailableActors),
                 NormalAiAvailable = workspaces.NormalAi,
+                Sources = (heldLearning
+                    ?? throw new UnauthorizedAccessException("Retained learning sources are missing.")).Facts,
                 ObservedAtUtc = clock.GetUtcNow().UtcDateTime
             };
         }
@@ -223,8 +238,11 @@ public sealed class HumanLearningMutationPreparation(
                 heldAssignments = assignmentSource is null
                     ? null : await assignmentSource.AcquireAsync(exclusion, token);
                 RequireAssignments(heldAssignments?.Facts, clock.GetUtcNow());
+                heldLearning = await learningSources.AcquireAsync(observedLearning, token);
             }
             await exclusion.ValidateAsync(token);
+            await (heldLearning
+                ?? throw new UnauthorizedAccessException("Retained learning sources are missing.")).ValidateAsync(token);
             var currentPrincipal = await heldPrincipal!.ValidateAsync(token);
             RequirePrincipal(currentPrincipal, clock.GetUtcNow());
             var currentSupport = await heldSupport!.ValidateAsync(token);
@@ -273,6 +291,8 @@ public sealed class HumanLearningMutationPreparation(
             RequireSupport(finalSupport
                 ?? throw new UnauthorizedAccessException("Current learning support sources are missing."));
             RequireAssignments(finalAssignments, now);
+            (heldLearning ?? throw new UnauthorizedAccessException("Retained learning sources are missing."))
+                .RequireCurrentAt(now);
         }
 
         void RequirePrincipal(HumanPrincipalSourceFacts current, DateTimeOffset now)
@@ -341,13 +361,23 @@ public sealed class HumanLearningMutationPreparation(
         _ => throw new ArgumentOutOfRangeException(nameof(family))
     };
 
-    private static LearningTourOutcome Map(Wire.LearningTourOutcome outcome) => outcome switch
+    private static LearningTourAction Map(Wire.LearningTourAction action) => action switch
     {
-        Wire.LearningTourOutcome.InProgress => LearningTourOutcome.InProgress,
-        Wire.LearningTourOutcome.Completed => LearningTourOutcome.Completed,
-        Wire.LearningTourOutcome.Skipped => LearningTourOutcome.Skipped,
-        Wire.LearningTourOutcome.Interrupted => LearningTourOutcome.Interrupted,
-        _ => throw new ArgumentOutOfRangeException(nameof(outcome))
+        Wire.LearningTourAction.Progress => LearningTourAction.Progress,
+        Wire.LearningTourAction.Complete => LearningTourAction.Complete,
+        Wire.LearningTourAction.Skip => LearningTourAction.Skip,
+        Wire.LearningTourAction.Interrupt => LearningTourAction.Interrupt,
+        Wire.LearningTourAction.Snooze => LearningTourAction.Snooze,
+        _ => throw new ArgumentOutOfRangeException(nameof(action))
+    };
+
+    private static LearningSnoozeDuration? Map(Wire.LearningSnoozeDuration? duration) => duration switch
+    {
+        null => null,
+        Wire.LearningSnoozeDuration.OneHour => LearningSnoozeDuration.OneHour,
+        Wire.LearningSnoozeDuration.OneDay => LearningSnoozeDuration.OneDay,
+        Wire.LearningSnoozeDuration.OneWeek => LearningSnoozeDuration.OneWeek,
+        _ => throw new ArgumentOutOfRangeException(nameof(duration))
     };
 
     private static LearningPracticeAction Map(Wire.LearningPracticeAction action) => action switch
@@ -366,7 +396,8 @@ public sealed class HumanLearningMutationPreparation(
     private sealed class Mutation(
         Guid subjectId, Guid tenantId, string contextKey, Guid? eventContextId, DateTime updatedAtUtc,
         Guid candidateStateId, Guid candidateSpaceId, Guid candidateChildId, Guid candidateClaimId,
-        LearningMutationIntent intent, Func<CancellationToken, Task> requireOriginal,
+        LearningMutationIntent intent, Func<LearningSourceFacts> sources, LearningWorkspaceAvailability workspaces,
+        Func<CancellationToken, Task> requireOriginal,
         Func<CancellationToken, Task> requireCurrent, Action<DateTimeOffset> requireCurrentAt)
         : IHumanLearningMutation
     {
@@ -380,6 +411,9 @@ public sealed class HumanLearningMutationPreparation(
         public Guid CandidateChildId { get; } = candidateChildId;
         public Guid CandidateClaimId { get; } = candidateClaimId;
         public LearningMutationIntent Intent { get; } = intent;
+        public LearningSourceFacts Sources => sources();
+        public bool StudioAvailable => workspaces.Studio(AvailableActors);
+        public bool NormalAiAvailable => workspaces.NormalAi;
         public IReadOnlyList<Actor> AvailableActors { get; set; } = Array.AsReadOnly(Array.Empty<Actor>());
         public bool CanManageSpace { get; set; }
         public bool CanManageEvent { get; set; }

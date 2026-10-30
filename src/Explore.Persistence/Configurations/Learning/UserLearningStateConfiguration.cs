@@ -14,6 +14,8 @@ public sealed class UserLearningStateConfiguration : IEntityTypeConfiguration<Us
         builder.Property(value => value.Revision).IsConcurrencyToken();
         builder.Property(value => value.ActiveContextKey).HasMaxLength(42).IsUnicode(false);
         builder.Property(value => value.LastIntentFingerprint).HasMaxLength(64).IsUnicode(false);
+        builder.Property(value => value.ActivePlanFingerprint).HasMaxLength(64).IsUnicode(false);
+        builder.Property(value => value.ActivePolicySourceStamp).HasMaxLength(64).IsUnicode(false);
         builder.Ignore(value => value.TotalPracticePayloadBytes);
         builder.HasIndex(value => new { value.TenantId, value.UserId }).IsUnique();
         builder.HasOne<Tenant>().WithMany().HasForeignKey(value => value.TenantId)

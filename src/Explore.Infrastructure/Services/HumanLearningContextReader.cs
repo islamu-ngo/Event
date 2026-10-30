@@ -35,7 +35,7 @@ public sealed class HumanLearningContextReader(
     Func<IActorRepository> resolveActors,
     Func<IAiActorContextRepository> resolveAvailableActors,
     Func<ITenantAdministratorCommitAuthority> resolveAdministrator,
-    Func<IHierarchicalSettingsResolver> resolveSettings,
+    Func<ILearningSourceRetention> resolveLearningSources,
     Func<IAiProviderCapabilityResolver> resolveAiCapabilities,
     Func<IPrivacyIdentityFenceAuthority> resolvePrivacy) : IHumanLearningContextReader
 {
@@ -79,8 +79,10 @@ public sealed class HumanLearningContextReader(
                 throw new UnauthorizedAccessException("Original learning request credential or custody changed.");
         }
         RequireCustody(clock.GetUtcNow());
+        var learningSources = resolveLearningSources();
+        var observedLearning = await learningSources.ObserveAsync(cancellationToken);
         var workspaces = await LearningWorkspaceAvailability.ObserveAsync(
-            resolveSettings(), resolveAiCapabilities(), tenantId, cancellationToken);
+            observedLearning.Facts, resolveAiCapabilities(), cancellationToken);
         RequireCustody(clock.GetUtcNow());
         if (practiceId is null) RequireCanonicalContext(contextKey);
         if (eventContextId == Guid.Empty)
@@ -120,6 +122,7 @@ public sealed class HumanLearningContextReader(
             var heldAssignments = assignmentSource is null
                 ? null : await assignmentSource.AcquireAsync(exclusion, token);
             RequireEvent(heldAssignments?.Facts, clock.GetUtcNow());
+            var heldLearning = await learningSources.AcquireAsync(observedLearning, token);
             HumanSupportAccessSourceFacts? finalSupport = null;
             HumanEventAssignmentSourceFacts? finalAssignments = null;
             resolveFinalizer().Register(async finalToken =>
@@ -132,12 +135,14 @@ public sealed class HumanLearningContextReader(
                 finalAssignments = heldAssignments is null
                     ? null : await heldAssignments.ValidateAsync(finalToken);
                 RequireEvent(finalAssignments, clock.GetUtcNow());
+                await heldLearning.ValidateAsync(finalToken);
             }, now =>
             {
                 RequireCustody(now);
                 RequireSupport(finalSupport
                     ?? throw new UnauthorizedAccessException("Final learning support sources are missing."));
                 RequireEvent(finalAssignments, now);
+                heldLearning.RequireCurrentAt(now);
             });
 
             var repository = resolveLearning();
@@ -167,6 +172,7 @@ public sealed class HumanLearningContextReader(
             {
                 StudioAvailable = workspaces.Studio(availableActors),
                 NormalAiAvailable = workspaces.NormalAi,
+                Sources = heldLearning.Facts,
                 ObservedAtUtc = clock.GetUtcNow().UtcDateTime
             };
         }, gateToken), RequireUnfencedAsync, RequireCustody, cancellationToken);

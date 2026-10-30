@@ -33,6 +33,7 @@ namespace Explore.API.Controllers;
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
 public sealed class LearningController(
     IQueryHandler<GetLearningContextQuery, LearningContextDto> contextQuery,
+    IQueryHandler<GetLearningTourPlanQuery, LearningTourPlanDto> tourPlanQuery,
     IQueryHandler<GetLearningPracticeQuery, LearningPracticeDto> practiceQuery,
     ICommandHandler<ClaimLearningTourCommand, LearningMutationResult> claimCommand,
     ICommandHandler<RecordLearningTourOutcomeCommand, LearningMutationResult> outcomeCommand,
@@ -40,6 +41,7 @@ public sealed class LearningController(
     ICommandHandler<ApplyLearningPracticeActionCommand, LearningMutationResult> practiceCommand,
     ICommandHandler<ManageTenantLearningSpaceCommand, LearningMutationResult> spaceCommand,
     IResourceAssembler<LearningContextDto, LearningContextDto> contextAssembler,
+    IResourceAssembler<LearningTourPlanDto, LearningTourPlanDto> tourPlanAssembler,
     IResourceAssembler<LearningPracticeDto, LearningPracticeDto> practiceAssembler,
     IResourceAssembler<LearningMutationReceiptDto, LearningMutationReceiptDto> receiptAssembler) : ControllerBase
 {
@@ -62,6 +64,21 @@ public sealed class LearningController(
         LearningContextDto context = await contextQuery.QueryAsync(
             new GetLearningContextQuery(contextKey, eventContextId), cancellationToken);
         return Ok(await contextAssembler.ToResource(context, HttpContext));
+    }
+
+    [HttpGet("tours/{family}/plan", Name = RouteNames.GetLearningTourPlan)]
+    [AllowAnonymous]
+    [EndpointSummary("Get the current private learning tour plan")]
+    [ProducesResponseType(typeof(HalResource<LearningTourPlanDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<HalResource<LearningTourPlanDto>>> GetTourPlan(
+        string family,
+        [FromQuery] string contextKey = "self",
+        [FromQuery] Guid? eventContextId = null,
+        CancellationToken cancellationToken = default)
+    {
+        LearningTourPlanDto plan = await tourPlanQuery.QueryAsync(
+            new GetLearningTourPlanQuery(family, contextKey, eventContextId), cancellationToken);
+        return Ok(await tourPlanAssembler.ToResource(plan, HttpContext));
     }
 
     [HttpGet("practice/{id:guid}", Name = RouteNames.GetLearningPractice)]

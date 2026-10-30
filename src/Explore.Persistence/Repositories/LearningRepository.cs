@@ -20,7 +20,8 @@ public sealed class LearningRepository(ExploreDbContext context) : ILearningRepo
     {
         var query = context.UserLearningStates
             .Where(value => value.TenantId == tenantId && value.UserId == userId)
-            .Include(value => value.Tours).Include(value => value.Practices).AsSplitQuery();
+            .Include(value => value.Tours).ThenInclude(value => value.Steps)
+            .Include(value => value.Practices).AsSplitQuery();
         return (tracked ? query : query.AsNoTracking()).SingleOrDefaultAsync(cancellationToken);
     }
 

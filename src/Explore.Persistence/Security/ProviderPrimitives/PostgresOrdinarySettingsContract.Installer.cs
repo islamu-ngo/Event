@@ -35,7 +35,8 @@ public static partial class PostgresOrdinarySettingsContract
                     LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $body${body}$body$;
                 REVOKE ALL ON FUNCTION {FunctionSql(context, routine.Name)}({routine.Signature}) FROM PUBLIC;
                 GRANT EXECUTE ON FUNCTION {FunctionSql(context, routine.Name)}({routine.Signature})
-                    TO {(routine.Result == "trigger" ? sql.Quote(enrollment.MigratorLogin) : RuntimeRole + "," + GlobalRole)};
+                    TO {(routine.Result == "trigger" ? sql.Quote(enrollment.MigratorLogin)
+                        : routine.Name == "learning_retain" ? RuntimeRole : RuntimeRole + "," + GlobalRole)};
                 COMMENT ON FUNCTION {FunctionSql(context, routine.Name)}({routine.Signature}) IS {Text(Stamp + Hash(body))};
                 """;
         }));

@@ -7,6 +7,7 @@ namespace Explore.API.Hateoas;
 public static class RouteNames
 {
     public const string GetLearningContext = nameof(GetLearningContext);
+    public const string GetLearningTourPlan = nameof(GetLearningTourPlan);
     public const string GetLearningPractice = nameof(GetLearningPractice);
     public const string ClaimLearningTour = nameof(ClaimLearningTour);
     public const string RecordLearningTourOutcome = nameof(RecordLearningTourOutcome);

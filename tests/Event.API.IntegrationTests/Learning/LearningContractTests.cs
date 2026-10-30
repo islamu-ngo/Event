@@ -24,6 +24,66 @@ namespace Event.API.IntegrationTests.Learning;
 public sealed class LearningContractTests(LearningHttpFixture fixture)
 {
     [Test]
+    public async Task CurrentTourPlanIsPrivateAndDoesNotCreateLearnerOrPolicyRows()
+    {
+        using var member = await fixture.CreateMemberAsync();
+        await using var before = fixture.OpenInspection();
+        int spacesBefore = await before.TenantLearningSpaces.CountAsync(row => row.TenantId == fixture.TenantId);
+        int documentsBefore = await before.TenantSettingsDocuments.CountAsync(row => row.TenantId == fixture.TenantId);
+
+        using var response = await member.Client.GetAsync("/api/learning/tours/Shell/plan?contextKey=self");
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
+        await Assert.That(response.Headers.GetValues("Referrer-Policy")).Contains("no-referrer");
+        var plan = (await response.Content.ReadFromJsonAsync<LearningTourPlanDto>())!;
+        await Assert.That(plan.Family).IsEqualTo(LearningTourFamily.Shell);
+        await Assert.That(plan.MaterialVersion).IsEqualTo(2);
+        await Assert.That(plan.LearnerRevision).IsEqualTo(0);
+        await Assert.That(plan.ScopeStamp).IsNotEmpty();
+        await Assert.That(plan.PolicySourceStamp).IsNotEmpty();
+        await Assert.That(plan.PlanFingerprint).IsNotEmpty();
+        await Assert.That(plan.IsAvailable).IsTrue();
+        await Assert.That(plan.Steps.Any(step => step.StepKey == "shell.help" && step.StepVersion == 1)).IsTrue();
+        await Assert.That(plan.AdditionalProperties.ContainsKey("_links")).IsTrue();
+        await using var after = fixture.OpenInspection();
+        await Assert.That(await after.UserLearningStates.AnyAsync(row =>
+            row.TenantId == fixture.TenantId && row.UserId == member.UserId)).IsFalse();
+        await Assert.That(await after.TenantLearningSpaces.CountAsync(row => row.TenantId == fixture.TenantId))
+            .IsEqualTo(spacesBefore);
+        await Assert.That(await after.TenantSettingsDocuments.CountAsync(row => row.TenantId == fixture.TenantId))
+            .IsEqualTo(documentsBefore);
+    }
+
+    [Test]
+    public async Task CurrentTourPlanRejectsAnonymousAccess()
+    {
+        using var client = fixture.CreateClient();
+        using var response = await client.GetAsync("/api/learning/tours/Shell/plan?contextKey=self");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
+    }
+
+    [Test]
+    [Arguments("1", false)]
+    [Arguments("shell", false)]
+    [Arguments("Unknown", false)]
+    [Arguments("EventManagement", false)]
+    [Arguments("Shell", true)]
+    public async Task CurrentTourPlanRejectsInvalidFamilyOrMismatchedEventContext(string family, bool withEvent)
+    {
+        using var member = await fixture.CreateMemberAsync();
+        string eventQuery = withEvent ? $"&eventContextId={Guid.CreateVersion7():D}" : string.Empty;
+        using var response = await member.Client.GetAsync(
+            $"/api/learning/tours/{family}/plan?contextKey=self{eventQuery}");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
+        await using var observer = fixture.OpenInspection();
+        await Assert.That(await observer.UserLearningStates.AnyAsync(row =>
+            row.TenantId == fixture.TenantId && row.UserId == member.UserId)).IsFalse();
+    }
+
+    [Test]
     public async Task OrdinaryLearnerCannotManageTheTenantLearningSource()
     {
         using var member = await fixture.CreateMemberAsync();
@@ -117,7 +177,9 @@ public sealed class LearningContractTests(LearningHttpFixture fixture)
             {
                 expectedScopeStamp = new string('0', 64), expectedRevision = 0,
                 intentId = Guid.CreateVersion7(),
-                family = 1, materialVersion = 1, contextKey = "self"
+                family = 1, materialVersion = 2, contextKey = "self",
+                expectedPlanFingerprint = new string('0', 64),
+                expectedPolicySourceStamp = new string('0', 64), replay = false
             });
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);

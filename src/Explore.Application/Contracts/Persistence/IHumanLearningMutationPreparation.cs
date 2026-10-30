@@ -33,6 +33,9 @@ public interface IHumanLearningMutation
     IReadOnlyList<Actor> AvailableActors { get; }
     bool CanManageSpace { get; }
     bool CanManageEvent { get; }
+    LearningSourceFacts Sources { get; }
+    bool StudioAvailable { get; }
+    bool NormalAiAvailable { get; }
 
     Task RequireOriginalAsync(CancellationToken cancellationToken);
     Task RequireCurrentAsync(CancellationToken cancellationToken);
@@ -50,11 +53,14 @@ public abstract record LearningMutationIntent(long ExpectedRevision);
 
 public sealed record LearningTourClaimIntent(
     long ExpectedRevision, Guid IntentId, LearningTourFamily Family, int MaterialVersion,
-    string ContextKey, Guid? EventContextId) : LearningMutationIntent(ExpectedRevision);
+    string ContextKey, Guid? EventContextId, string ExpectedPlanFingerprint,
+    string ExpectedPolicySourceStamp, bool Replay) : LearningMutationIntent(ExpectedRevision);
 
 public sealed record LearningTourOutcomeIntent(
     long ExpectedRevision, Guid IntentId, Guid? ClaimToken, LearningTourFamily Family,
-    int MaterialVersion, LearningTourOutcome Outcome, int StepIndex) : LearningMutationIntent(ExpectedRevision);
+    int MaterialVersion, LearningTourAction Action, string? StepKey, int? StepVersion,
+    LearningSnoozeDuration? SnoozeDuration, string ExpectedPlanFingerprint,
+    string ExpectedPolicySourceStamp, string ContextKey, Guid? EventContextId) : LearningMutationIntent(ExpectedRevision);
 
 public sealed record LearningPreferencesIntent(
     long ExpectedRevision, bool SuppressAutomaticTours, bool HideLearning, bool PinLearning)

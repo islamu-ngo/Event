@@ -5,10 +5,11 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Private Contextual Learning
 
-`LearningController` exposes seven named `/api/learning` operations:
-`GET context`, `GET practice/{id}`, `POST tours/claim`, `POST tours/outcome`,
+`LearningController` defines eight named `/api/learning` operations:
+`GET context`, `GET tours/{family}/plan`, `GET practice/{id}`,
+`POST tours/claim`, `POST tours/outcome`,
 `PATCH preferences`, `POST practice/actions`, and `POST space/actions`.
-The two GET actions retain `[AllowAnonymous]` metadata but their original-human
+The three GET actions retain `[AllowAnonymous]` metadata but their original-human
 query boundary requires a resolved authenticated account, active selected tenant
 membership and current contextual authority. Anonymous access is not a public
 progress reader. Writes are `[Authorize]` and use the standard selected-tenant
@@ -22,9 +23,64 @@ revision. Claims, outcomes and practice require a stable `IntentId` for bounded
 owner-local retries. Their endpoints bypass generic idempotency response storage:
 an earlier private response is never replayed instead of fresh authorization.
 
+### Named-Family Plan And Semantic Actions
+
+`GET /api/learning/tours/{family}/plan` accepts exact case-sensitive family names
+`Shell`, `Studio`, `EventManagement` or `NormalAi`, never numbers. Query coordinates
+are `contextKey` (default `self`, otherwise canonical `actor:{guid:D}`) and optional
+`eventContextId`; an event is required for `EventManagement` and forbidden for
+the other families. Current contextual authority is independently resolved.
+
+`LearningTourPlanDto` returns `Family`, tour `MaterialVersion` **2**, `ScopeStamp`,
+`PolicySourceStamp`, `PlanFingerprint`, `LearnerRevision`, captured `ContextKey`
+and `EventContextId`, `IsAvailable`, `CanClaim`, optional `UnavailableReason` and
+the currently applicable `Steps` in presentation order. Each step has `StepKey`,
+`StepVersion`, localizable `Instruction` and `TargetKey`. HAL claim eligibility
+is represented by the current authorized `_links`; `CanClaim` is not a reusable
+grant. The fingerprint incorporates workspace/policy source bindings and the
+applicable identity inventory; it is not client authority or a credential lease.
+Practice material remains version **1**, independently of the tour catalog.
+
+`POST tours/claim` requires `ExpectedScopeStamp`, `ExpectedRevision`, `IntentId`,
+`Family`, `MaterialVersion`, `ContextKey`, `ExpectedPlanFingerprint`,
+`ExpectedPolicySourceStamp` and explicit boolean `Replay`, plus `EventContextId`
+only for event management. Refresh the private plan after a source/revision
+conflict. Explicit replay can bypass invitation suppression, snooze, skip or
+coverage, never current authorization, source availability or another live claim.
+The returned claim includes its token, expiry, revision and accepted plan/policy
+bindings.
+
+`POST tours/outcome` retains its route name but accepts semantic **actions**, not
+an `Outcome` input or ordinal `StepIndex`:
+
+| Input | Contract |
+| --- | --- |
+| `Action` | Exact named `Progress`, `Complete`, `Skip`, `Interrupt` or `Snooze`. |
+| Common bindings | Required `ExpectedScopeStamp`, `ExpectedRevision`, `IntentId`, `Family`, tour `MaterialVersion`, `ContextKey`, `ExpectedPlanFingerprint` and `ExpectedPolicySourceStamp`; event context only for event management. |
+| `ClaimToken` | Required for progress, completion and interruption. Only skip/snooze may dismiss an unclaimed invitation, with no live claim. Claimed actions match the accepted context, event and plan/policy bindings. |
+| `StepKey`, `StepVersion` | Required applicable semantic key and positive version only for `Progress`; absent/null for all other actions. |
+| `SnoozeDuration` | Required only for `Snooze`: exact `OneHour`, `OneDay` or `OneWeek`; absent/null otherwise. No arbitrary deadline. |
+
+Closed inputs reject obsolete ordinal/outcome fields and unknown members;
+enum names are case-sensitive. Completion requires evidence for every currently
+applicable step. Historical response `Outcome` remains distinct from
+`CurrentCoverage`; neither is a caller-supplied action. Matching authored
+key/version evidence survives temporary applicability omissions and retained
+material changes, bounded to 32 steps per family, two versions and 256 evidence
+rows per learner.
+
+The backend retains actual selected-owner workspace/policy sources through final
+admission. Expected hashes only detect mismatches; they cannot supply that
+custody. Owned skip/interrupt/snooze cleanup may release a removed-source claim
+using its accepted bindings without restoring source availability. Normal-AI
+capability is observed outside the transaction and provides no credential-validity
+lease. There is no automatic replay or lesson-based production gate.
+
+### Private Responses And Delivery Limits
+
 `PrivateNoStoreMiddleware` applies `private, no-store`, `Pragma: no-cache` and
 `Referrer-Policy: no-referrer` before authentication, including rejected requests.
-Context, practice detail and receipt have separate HAL policies; collection
+Context, tour plan, practice detail and receipt have separate HAL policies; collection
 policies do not reuse detail actions. Receipt `Id`, scope and revisions identify
 the settled result, not a reusable action capability. Clients must follow the
 current `_links` rather than infer permission from lesson completion or roles.
@@ -33,6 +89,13 @@ See [private learning](CONTEXTUAL_LEARNING.md) for storage, original settlement,
 erasure and the explicitly separate presentation successors. Runtime acceptance
 is recorded in the workstream's verification evidence, not inferred from schema
 generation.
+
+This is backend-only contract documentation. The semantic generated-contract
+checks and dedicated original-human PostgreSQL admission cases pass, including
+rejection of independently changed guidance. No UI has shipped and no current
+renderer readiness, hosted assurance or final provider/migration acceptance is
+claimed. Historical receipts and current pending/blocked evidence
+are separated in [the verification record](CONTEXTUAL_LEARNING.md#verification-and-release-readiness).
 
 ## Membership Discovery Read Enrollment
 

@@ -6,6 +6,9 @@ internal static class HalOpenApiSchemaCatalog
     [
         // Private learning wire contracts, including named nested and strict input objects.
         typeof(ISLAMU.Wire.Contracts.Learning.LearningContextDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningTourPlanDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningTourStepDto),
+        typeof(ISLAMU.Wire.Contracts.Learning.LearningTourStepCompletionDto),
         typeof(ISLAMU.Wire.Contracts.Learning.LearningPracticeSummaryDto),
         typeof(ISLAMU.Wire.Contracts.Learning.LearningPreferencesDto),
         typeof(ISLAMU.Wire.Contracts.Learning.LearningCapabilitiesDto),
@@ -402,6 +405,7 @@ internal static class HalOpenApiSchemaCatalog
     public static IReadOnlyDictionary<string, Type> DetailResourceMappings { get; } = new Dictionary<string, Type>
     {
         ["HalResourceOfLearningContextDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningContextDto),
+        ["HalResourceOfLearningTourPlanDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningTourPlanDto),
         ["HalResourceOfLearningPracticeDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningPracticeDto),
         ["HalResourceOfLearningMutationReceiptDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningMutationReceiptDto),
         ["HalResourceOfModerationNoticeDto"] = typeof(Explore.Application.Features.Moderation.Notices.ModerationNoticeDto),

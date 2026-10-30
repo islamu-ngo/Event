@@ -77,12 +77,34 @@ public sealed record LearningCapabilitiesDto
 
 public sealed record LearningTourProgressDto
 {
+    private IReadOnlyList<LearningTourStepCompletionDto> _completedSteps =
+        Array.AsReadOnly(Array.Empty<LearningTourStepCompletionDto>());
+
     public required LearningTourFamily Family { get; init; }
     public required int MaterialVersion { get; init; }
     public LearningTourOutcome? Outcome { get; init; }
-    public required int StepIndex { get; init; }
+    public string? LastStepKey { get; init; }
+    public DateTimeOffset? SnoozedUntilUtc { get; init; }
+    public required bool CurrentCoverage { get; init; }
+    public IReadOnlyList<LearningTourStepCompletionDto> CompletedSteps
+    {
+        get => _completedSteps;
+        init => _completedSteps = LearningWireSnapshot.List(value, 32);
+    }
     public bool IsAvailable { get; init; }
     public LearningDisplayTextDto? UnavailableReason { get; init; }
+}
+
+public sealed record LearningTourStepCompletionDto
+{
+    private DateTimeOffset _completedAtUtc;
+    public required string StepKey { get; init; }
+    public required int StepVersion { get; init; }
+    public required DateTimeOffset CompletedAtUtc
+    {
+        get => _completedAtUtc;
+        init => _completedAtUtc = value.ToUniversalTime();
+    }
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

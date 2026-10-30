@@ -3,6 +3,54 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-30
+
+- The semantic learning contract below now has fresh native API/client
+  generation, Release client compilation and four passing generated-contract
+  cases. Both dedicated external-authority original-human source cases passed.
+  These are targeted backend receipts, not hosted or full-provider acceptance.
+- The original SQL Server semantic-scaffold quarantine was resolved by a
+  separate metadata-generator correction and regeneration. All four semantic
+  catalogs now have learning-only operation inspection and model-agreement
+  receipts; no database upgrade/reset or full-history acceptance is claimed.
+- Expected native body-check SQL is memoized per original context/enrollment,
+  never as successful authorization or readiness. Live attestation still runs
+  every time; an actual Runtime warmed-read/body-drift rejection case passed.
+  No wire contract or database permission was added by this optimization.
+
+## 2026-10-29
+
+- C04 semantic tour source contract adds private
+  `GET /api/learning/tours/{family}/plan` for exact named `Shell`, `Studio`,
+  `EventManagement` and `NormalAi` families. It returns current applicable
+  semantic steps, plan/policy-source fingerprints, scope, learner revision,
+  captured actor/event context and authorized HAL claim eligibility. Tour material
+  is version 2; authored practice remains version 1.
+- Tour claims now require expected plan/policy stamps and explicit `Replay`.
+  The existing `POST /api/learning/tours/outcome` route accepts closed `Action`
+  values `Progress`, `Complete`, `Skip`, `Interrupt` and `Snooze`, context/event
+  coordinates and accepted source bindings. Only progress accepts key/version;
+  only snooze accepts a registered duration. Ordinal `StepIndex` and `Outcome`
+  inputs are removed, not aliased. Integrators must adopt the semantic contract;
+  historical response `Outcome` remains separate from current applicable
+  `CurrentCoverage`. Authored identity evidence survives applicability omissions;
+  bounds are 32 steps per family, two retained versions and 256 evidence rows.
+- Actual selected-owner sources remain retained through final admission; request
+  fingerprints are not authority. Normal-AI capability is observed outside the
+  transaction, not leased credential validity. Owned cleanup can release claims
+  after source removal without admitting stale progress/completion. No automatic
+  replay, hard production gate or UI delivery is introduced.
+- This entry records source changes, not a release or C04 completion. PostgreSQL,
+  SQLite and MySQL semantic scaffolds were generated offline. The SQL Server
+  scaffold's identical pre-existing moderation FK delta was reproduced on the
+  untouched baseline and is quarantined, not accepted. No database upgrade/reset
+  or final migration/provider acceptance is claimed. Current reported evidence:
+  14 semantic Domain cases; 27 migrated original Domain cases before dead ordinal
+  removal; earlier seven SQLite model cases and one native injected-child
+  rollback. A fresh nine-case actual-role run is pending. Application `CS0105`
+  and client `CA1001` remain quarantined. Historical receipts below are not fresh
+  C04 proof; no hosted assurance or current renderer/UI readiness is established.
+
 ## 2026-10-28
 
 - Added the private `/api/learning` context, practice, tour, preference and

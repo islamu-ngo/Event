@@ -1,0 +1,142 @@
+.learning-practice {
+    display: grid;
+    gap: var(--isl-space-section);
+    min-inline-size: 0;
+    color: var(--isl-color-text);
+    overflow-wrap: anywhere;
+    container-type: inline-size;
+}
+
+.learning-practice__simulation {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--isl-space-3);
+    padding: var(--isl-space-block);
+    border: var(--isl-card-border);
+    border-inline-start: var(--isl-focus-ring-width) solid var(--isl-color-primary);
+    border-radius: var(--isl-radius-input);
+    background: var(--isl-state-hover);
+}
+
+.learning-practice__simulation p {
+    margin: 0;
+}
+
+.learning-practice__header,
+.learning-practice__guidance,
+.learning-practice__choice,
+.learning-practice__result {
+    display: grid;
+    gap: var(--isl-space-3);
+}
+
+.learning-practice__header p,
+.learning-practice__guidance p,
+.learning-practice__choice p,
+.learning-practice__result p {
+    margin: 0;
+}
+
+.learning-practice__eyebrow {
+    color: var(--isl-color-text-secondary);
+    font-size: var(--isl-typography-overline-size);
+    font-weight: var(--isl-typography-overline-weight);
+    line-height: var(--isl-typography-overline-line-height);
+    text-transform: var(--isl-typography-overline-text-transform);
+}
+
+.learning-practice__title {
+    margin: 0;
+    font-size: var(--isl-typography-h2-size);
+    font-weight: var(--isl-typography-h2-weight);
+    line-height: var(--isl-typography-h2-line-height);
+
+    &:focus-visible {
+        outline: var(--isl-focus-ring-width) solid var(--isl-color-primary);
+        outline-offset: var(--isl-focus-ring-offset);
+    }
+}
+
+.learning-practice__guidance {
+    padding-inline-start: var(--isl-space-block);
+    border-inline-start: var(--isl-card-border);
+}
+
+.learning-practice__muted {
+    color: var(--isl-color-text-secondary);
+    font-size: var(--isl-typography-body2-size);
+    line-height: var(--isl-typography-body2-line-height);
+}
+
+.learning-practice__fieldset {
+    display: grid;
+    gap: var(--isl-space-block);
+    min-inline-size: 0;
+    margin: 0;
+    padding: var(--isl-space-block);
+    border: var(--isl-card-border);
+    border-radius: var(--isl-radius-card);
+}
+
+.learning-practice__fieldset legend {
+    padding-inline: var(--isl-space-2);
+    font-weight: var(--isl-typography-h6-weight);
+}
+
+.learning-practice__choices,
+.learning-practice__facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--isl-space-16) * 4)), 1fr));
+    gap: var(--isl-space-block);
+    min-inline-size: 0;
+}
+
+.learning-practice__choice {
+    align-content: start;
+    padding: var(--isl-space-block);
+    background: var(--isl-color-surface);
+    border: var(--isl-card-border);
+    border-radius: var(--isl-radius-card);
+}
+
+.learning-practice__facts {
+    margin: 0;
+}
+
+.learning-practice__fact {
+    padding: var(--isl-space-block);
+    border: var(--isl-card-border);
+    border-radius: var(--isl-radius-input);
+    background: var(--isl-color-surface);
+}
+
+.learning-practice__fact dt {
+    color: var(--isl-color-text-secondary);
+    font-size: var(--isl-typography-body2-size);
+}
+
+.learning-practice__fact dd {
+    margin: var(--isl-space-2) 0 0;
+    font-weight: var(--isl-typography-h6-weight);
+}
+
+.learning-practice__result {
+    padding: var(--isl-space-block);
+    border: var(--isl-card-border);
+    border-radius: var(--isl-radius-card);
+    background: var(--isl-color-surface);
+}
+
+.learning-practice__result h3 {
+    margin: 0;
+    font-size: var(--isl-typography-h3-size);
+    font-weight: var(--isl-typography-h3-weight);
+    line-height: var(--isl-typography-h3-line-height);
+}
+
+.learning-practice__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--isl-space-3);
+}

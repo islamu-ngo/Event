@@ -13,6 +13,7 @@ using Explore.Blazor.Client.Contracts.Services.PaidEventPolicies;
 using Explore.Blazor.Client.Contracts.Services.Footer;
 using Explore.Blazor.Client.Contracts.Services.Lookup;
 using Explore.Blazor.Client.Contracts.Services.LegalDocuments;
+using Explore.Blazor.Client.Contracts.Services.Learning;
 using Explore.Blazor.Client.Contracts.Services.Notifications;
 using Explore.Blazor.Client.Contracts.Services.Organizations;
 using Explore.Blazor.Client.Contracts.Services.Reporting;
@@ -32,6 +33,7 @@ using Explore.Blazor.Client.Services.EventSessionTemplateSync;
 using Explore.Blazor.Client.Services.EventTemplateSync;
 using Explore.Blazor.Client.Services.Http;
 using Explore.Blazor.Client.Services.Interop;
+using Explore.Blazor.Client.Services.Learning;
 using Explore.Blazor.Client.Contracts.Services.Scheduling;
 using Explore.Blazor.Client.Services.Lookup;
 using Explore.Blazor.Client.Services.Scheduling;
@@ -62,6 +64,7 @@ public static class ServiceCollectionExtensions
 
         // Domain services backed by specific NSwag per-tag clients
         services.AddScoped<IApiClientExecutor, ApiClientExecutor>();
+        services.AddScoped<ILearningClientService, LearningClientService>();
         services.AddScoped<AdmissionScannerCapabilityState>();
         services.AddScoped<IAdmissionScannerCapabilityState>(provider =>
             provider.GetRequiredService<AdmissionScannerCapabilityState>());

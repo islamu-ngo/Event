@@ -38,6 +38,39 @@ Use the specialized docs for deep detail:
 | Accessibility rules | [ACCESSIBILITY.md](ACCESSIBILITY.md) |
 | Localization stack | [LOCALIZATION.md](LOCALIZATION.md) |
 
+## Private Authored Learning
+
+`LearningHub` and `LearningPractice` register in the existing `Routes` catalog
+as authenticated, noncached `/learning` and `/learning/demo/:practiceId`.
+`RouteConfigurationPathBase` retains prefix ownership; the authentication guard
+uses a base-relative login destination with the original escaped return URL.
+The practice page reads the current identifier from `RouterStateService` during
+parameter updates, following the established routed-page contract rather than
+assuming Blazouter populates a Razor route parameter.
+
+Both pages begin private reads only after interactive rendering. Components
+consume `ILearningClientService`, with one scoped `LearningClientService`
+implementation registered in DI. The facade uses generated `ILearningClient` through the existing
+BFF boundary, snapshots tenant/account/self-or-managed-actor context and
+invalidates pending work on authentication, current-user, actor or tenant changes.
+Cancelled transports are not assumed to stop: generation and scope checks fence
+late reads, writes and post-write refreshes. Disposal clears private state.
+Static rendering contains no practice data or private transfer state.
+
+The hub consumes the five current server-authored recipes. The practice surface
+renders their choices, confirmation, result and reset/clear states without
+mounting Studio or initializing live AI. Received HAL relations alone expose
+actions; capability booleans are not grants. A mutation advances the display
+only after a valid private receipt and fresh context/practice HAL reads.
+An uncertain or unconfirmed save requires explicit reload before resubmission.
+Completion notifications may synchronously replace scope, so success is checked
+again after notification before returning a practice identifier or applied flag.
+
+Mounted component and framework-static-rendering checks cover these boundaries.
+Actual-host keyboard, screen-reader, theme, RTL and viewport assurance remains
+part of programme exit, not a claim supplied by those tests. The backend
+contracts and erasure rules remain in [CONTEXTUAL_LEARNING.md](CONTEXTUAL_LEARNING.md).
+
 ## Guided Instance Administration
 
 `InstanceGettingStartedSection` reads existing onboarding status/journey services;

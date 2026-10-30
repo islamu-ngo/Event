@@ -18,6 +18,6 @@ public sealed class AuthenticatedRouteGuard(AuthenticationStateProvider authStat
             ? "/"
             : match.MatchedPath;
 
-        return Task.FromResult<string?>($"/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
+        return Task.FromResult<string?>($"login?returnUrl={Uri.EscapeDataString(returnUrl)}");
     }
 }

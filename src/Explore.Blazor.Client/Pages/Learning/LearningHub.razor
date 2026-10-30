@@ -1,0 +1,324 @@
+@page "/learning"
+@using Explore.Blazor.Client.Contracts.Services.Learning
+@using Explore.Blazor.Client.Services.Learning
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@rendermode InteractiveAuto
+@implements IDisposable
+@inject ILearningClientService Learning
+@inject ITranslationService Translation
+@inject NavigationManager Navigation
+
+<PageTitle>@T("ui.learning.hub.title", "Learning hub")</PageTitle>
+<HeadContent>
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="referrer" content="no-referrer" />
+</HeadContent>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-6">
+    <section data-testid="learning-hub" aria-busy="@(Learning.IsBusy ? "true" : "false")">
+        <header class="mb-6">
+            <MudText Typo="Typo.h4" HtmlTag="h1">@T("ui.learning.hub.title", "Learning hub")</MudText>
+            <MudText Typo="Typo.body1" Class="mt-2">
+                @T("ui.learning.hub.introduction", "Explore fictional examples privately, then return to real work when you choose.")
+            </MudText>
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
+                @T("ui.learning.simulation.label", "Simulation only. Nothing here creates, publishes, sells, invites, or changes a real event.")
+            </MudAlert>
+        </header>
+
+        @if (!_interactiveReady || Learning.IsBusy && Learning.Context is null)
+        {
+            <p role="status">@T("ui.learning.loading", "Loading your private learning context...")</p>
+        }
+        else
+        {
+            @if (Learning.Failure != LearningClientFailure.None)
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" role="alert" Class="mb-4">
+                    @FailureText
+                </MudAlert>
+            }
+            @if (Learning.IsSaving)
+            {
+                <p role="status">@T("ui.learning.saving", "Waiting for the server to confirm this learning change...")</p>
+            }
+            else if (Learning.LastMutationApplied == true)
+            {
+                <p role="status">@T("ui.learning.change.applied", "The server confirmed the learning change. Real events were not changed.")</p>
+            }
+
+            @if (Learning.Context is { } context)
+            {
+                @if (context.SpaceStatus == LearningSpaceStatus.Removed)
+                {
+                    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4" data-learning-state="removed">
+                        @T("ui.learning.space.removed", "The shared learning source was removed. Opening this page does not recreate it.")
+                    </MudAlert>
+                }
+                @if (context.Capabilities.UnavailableReason is { } unavailable)
+                {
+                    <p data-learning-state="unavailable">@Display(unavailable)</p>
+                }
+
+                <section aria-labelledby="learning-owned-title" class="mb-8">
+                    <MudText Typo="Typo.h5" HtmlTag="h2" id="learning-owned-title">
+                        @T("ui.learning.owned.title", "Your practice")
+                    </MudText>
+                    @if (!Learning.OwnedPractices.Any())
+                    {
+                        <p class="mt-3" data-learning-state="empty">
+                            @T("ui.learning.owned.empty", "You have not started an exercise in this tenant. Choose an available example below.")
+                        </p>
+                    }
+                    else
+                    {
+                        <MudStack Spacing="3" Class="mt-4">
+                            @foreach (var owned in Learning.OwnedPractices)
+                            {
+                                var lesson = Learning.Lessons.FirstOrDefault(item =>
+                                    item.RecipeKey == owned.RecipeKey && item.MaterialVersion == owned.MaterialVersion);
+                                <AppCard Outlined="true" @key="owned.Id">
+                                    <MudCardContent>
+                                        <MudText Typo="Typo.h6" HtmlTag="h3">
+                                            @(lesson is null ? T("ui.learning.owned.exercise", "Private exercise") : Display(lesson.Title))
+                                        </MudText>
+                                        @if (Learning.CanPreview(owned))
+                                        {
+                                            <AppButton Href="@Route($"learning/demo/{owned.Id:D}")"
+                                                       Variant="Variant.Outlined" Class="mt-3">
+                                                @T("ui.learning.owned.open", "Continue practice")
+                                            </AppButton>
+                                        }
+                                        else
+                                        {
+                                            <p class="mt-2" data-learning-state="preview-unavailable">
+                                                @(owned.UnavailableReason is { } reason
+                                                    ? Display(reason)
+                                                    : T("ui.learning.owned.scope_unavailable", "This preview is unavailable in the current context. Select its authorized actor to continue."))
+                                            </p>
+                                        }
+                                        @if (Learning.HasContextAction("clear-practice"))
+                                        {
+                                            <div class="mt-3">
+                                                @if (_clearPracticeId == owned.Id)
+                                                {
+                                                    <p>@T("ui.learning.clear.confirmation", "Clear this private exercise? This does not remove the shared source or any real work.")</p>
+                                                    <AppButton OnClick="@(() => ClearPracticeAsync(owned))"
+                                                               Disabled="@(!Learning.CanSubmit)"
+                                                               data-learning-action="clear-practice"
+                                                               data-practice-id="@owned.Id">
+                                                        @T("ui.learning.clear.confirm", "Confirm clear")
+                                                    </AppButton>
+                                                    <AppButton OnClick="@(() => _clearPracticeId = null)"
+                                                               Variant="Variant.Text" Disabled="@Learning.IsBusy">
+                                                        @T("ui.learning.cancel", "Cancel")
+                                                    </AppButton>
+                                                }
+                                                else
+                                                {
+                                                    <AppButton OnClick="@(() => _clearPracticeId = owned.Id)"
+                                                               Variant="Variant.Text" Disabled="@(!Learning.CanSubmit)"
+                                                               data-learning-action="clear-practice">
+                                                        @T("ui.learning.clear.label", "Clear practice")
+                                                    </AppButton>
+                                                }
+                                            </div>
+                                        }
+                                    </MudCardContent>
+                                </AppCard>
+                            }
+                        </MudStack>
+                    }
+                </section>
+
+                <section aria-labelledby="learning-exercises-title" class="mb-8">
+                    <MudText Typo="Typo.h5" HtmlTag="h2" id="learning-exercises-title">
+                        @T("ui.learning.exercises.title", "Explore an example")
+                    </MudText>
+                    @if (!Learning.Lessons.Any())
+                    {
+                        <p class="mt-3">@T("ui.learning.exercises.unavailable", "No exercises are available in this context right now.")</p>
+                    }
+                    else
+                    {
+                        <MudGrid Spacing="4" Class="mt-2">
+                            @foreach (var lesson in Learning.Lessons)
+                            {
+                                <MudItem xs="12" md="6" @key="lesson.RecipeKey">
+                                    <AppCard Outlined="true">
+                                        <MudCardContent>
+                                            <article data-recipe-key="@lesson.RecipeKey">
+                                                <MudText Typo="Typo.h6" HtmlTag="h3">@Display(lesson.Title)</MudText>
+                                                <p class="mt-2">@Display(lesson.Description)</p>
+                                                <p class="mt-2">@Display(lesson.Prerequisite)</p>
+                                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                                                    @Display(lesson.CapabilityExplanation)
+                                                </MudText>
+                                                @if (Learning.HasContextAction("start-simulation"))
+                                                {
+                                                    <AppButton OnClick="@(() => StartAsync(lesson))"
+                                                               Disabled="@(!Learning.CanSubmit)" Class="mt-4"
+                                                               data-learning-action="start-simulation"
+                                                               data-recipe-key="@lesson.RecipeKey">
+                                                        @T("ui.learning.exercises.start", "Start simulation")
+                                                    </AppButton>
+                                                }
+                                            </article>
+                                        </MudCardContent>
+                                    </AppCard>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    }
+                </section>
+
+                @if (Learning.HasContextAction("remove-learning-space") || Learning.HasContextAction("recreate-learning-space"))
+                {
+                    <section aria-labelledby="learning-source-title" class="mb-6">
+                        <MudText Typo="Typo.h5" HtmlTag="h2" id="learning-source-title">
+                            @T("ui.learning.space.title", "Shared learning source")
+                        </MudText>
+                        <p class="my-3">
+                            @T("ui.learning.space.explanation", "Removing the tenant source makes practice unavailable. Recreating it is an explicit action, separate from opening learning.")
+                        </p>
+                        @if (_spaceAction is { } action && Learning.HasContextAction(SpaceRelation(action)))
+                        {
+                            <p>@T("ui.learning.space.confirmation", "Apply this change to the shared learning source for this tenant? Real events remain unchanged.")</p>
+                            <AppButton OnClick="@(() => ManageSpaceAsync(action))" Disabled="@(!Learning.CanSubmit)"
+                                       data-learning-action="@SpaceRelation(action)">
+                                @T("ui.learning.space.confirm", "Confirm source change")
+                            </AppButton>
+                            <AppButton OnClick="@(() => _spaceAction = null)" Variant="Variant.Text" Disabled="@Learning.IsBusy">
+                                @T("ui.learning.cancel", "Cancel")
+                            </AppButton>
+                        }
+                        else if (Learning.HasContextAction("remove-learning-space"))
+                        {
+                            <AppButton OnClick="@(() => _spaceAction = LearningSpaceAction.Remove)"
+                                       Variant="Variant.Outlined" Disabled="@(!Learning.CanSubmit)"
+                                       data-learning-action="remove-space">
+                                @T("ui.learning.space.remove", "Remove learning source")
+                            </AppButton>
+                        }
+                        else if (Learning.HasContextAction("recreate-learning-space"))
+                        {
+                            <AppButton OnClick="@(() => _spaceAction = LearningSpaceAction.Recreate)"
+                                       Variant="Variant.Outlined" Disabled="@(!Learning.CanSubmit)"
+                                       data-learning-action="recreate-learning-space">
+                                @T("ui.learning.space.recreate", "Recreate learning source")
+                            </AppButton>
+                        }
+                    </section>
+                }
+                <p>@T("ui.learning.real_work.explanation", "Practice does not grant permission to create or publish. Real work starts separately through the creation options advertised in your workspace; no example data is transferred.")</p>
+            }
+            @if (Learning.Failure != LearningClientFailure.None)
+            {
+                <AppButton OnClick="ReloadAsync" Variant="Variant.Outlined" Disabled="@Learning.IsBusy" Class="mt-4">
+                    @T("ui.learning.reload", "Reload current context")
+                </AppButton>
+            }
+        }
+    </section>
+</MudContainer>
+
+@code {
+    [CascadingParameter(Name = "TenantContext")] private TenantContext? TenantContext { get; set; }
+    private readonly CancellationTokenSource _lifetime = new();
+    private LearningClientScope? _observedScope;
+    private Guid? _clearPracticeId;
+    private LearningSpaceAction? _spaceAction;
+    private bool _interactiveReady;
+    private bool _loadRequested = true;
+    private bool _disposed;
+
+    protected override void OnInitialized()
+    {
+        Learning.Clear();
+        Learning.Changed += OnLearningChanged;
+        Translation.OnLanguageChanged += OnLanguageChanged;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (TenantContext is not null)
+            Learning.SetTenantContext(TenantContext.TenantId);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _interactiveReady = true;
+        if (!_disposed && !Learning.IsBusy && (_loadRequested || Learning.RequiresContextRefresh))
+        {
+            _loadRequested = false;
+            await ReloadAsync();
+        }
+    }
+
+    private Task ReloadAsync() => Learning.LoadContextAsync(_lifetime.Token);
+
+    private async Task StartAsync(LearningLessonDto lesson)
+    {
+        Guid? id = await Learning.StartPracticeAsync(lesson, _lifetime.Token);
+        if (!_disposed && id is { } practiceId)
+            Navigation.NavigateTo(Route($"learning/demo/{practiceId:D}"));
+    }
+
+    private async Task ClearPracticeAsync(LearningPracticeSummaryDto practice)
+    {
+        if (await Learning.ClearPracticeAsync(practice, _lifetime.Token))
+            _clearPracticeId = null;
+    }
+
+    private async Task ManageSpaceAsync(LearningSpaceAction action)
+    {
+        if (await Learning.ManageSpaceAsync(action, _lifetime.Token))
+            _spaceAction = null;
+    }
+
+    private void OnLearningChanged()
+    {
+        if (_observedScope != Learning.Scope)
+        {
+            _observedScope = Learning.Scope;
+            _clearPracticeId = null;
+            _spaceAction = null;
+        }
+        if (!_disposed)
+            _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLanguageChanged(string language)
+    {
+        if (!_disposed)
+            _ = InvokeAsync(StateHasChanged);
+    }
+
+    private string T(string key, string fallback) => Translation.T(key, fallback);
+    private string Display(LearningDisplayTextDto text) => T(text.Key, text.Fallback);
+    private string Route(string path) => Navigation.ToAbsoluteUri(path).PathAndQuery;
+    private static string SpaceRelation(LearningSpaceAction action) =>
+        action == LearningSpaceAction.Remove ? "remove-learning-space" : "recreate-learning-space";
+
+    private string FailureText => Learning.Failure switch
+    {
+        LearningClientFailure.SignInRequired => T("ui.learning.failure.sign_in", "Sign in to read your private learning state."),
+        LearningClientFailure.Unavailable => T("ui.learning.failure.unavailable", "This learning context is unavailable. No private practice was opened."),
+        LearningClientFailure.Conflict => T("ui.learning.failure.conflict", "The learning state changed. Reload before choosing another action."),
+        LearningClientFailure.SaveNotApplied => T("ui.learning.failure.not_applied", "The server did not confirm that this change was applied. Your displayed state was not advanced. Reload before trying again."),
+        _ => T("ui.learning.failure.request", "Learning could not be updated or loaded. A change may have reached the server; reload to check its current state before trying again.")
+    };
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+        _disposed = true;
+        Learning.Changed -= OnLearningChanged;
+        Translation.OnLanguageChanged -= OnLanguageChanged;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+        Learning.Clear();
+    }
+}

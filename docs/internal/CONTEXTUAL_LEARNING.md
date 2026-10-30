@@ -1,23 +1,49 @@
 # Private Learning State And Authored Practice
 
 > **Audience:** Developers and operators
-> **Status:** Backend integration with targeted semantic, guidance and acknowledgement checks; full programme/host assurance remains open
+> **Status:** Private backend and five-exercise UI integration with targeted checks; full programme/host assurance remains open
 > **Contract Updated:** 2026-10-30; historical verification receipts retained below
 > **Source Anchors:** `src/Explore.Domain/Learning/`, `ILearningRepository`, `ILearningPrivacyErasureStore`, `PrivacyErasureApplier`
 
 ## Delivery Boundary
 
-This workstream adds a private learning backend, not rendered tours, a learning
-workspace or a live AI mode. Required successors first compose isolated practice
-in the actual event/chat presentation, then add contextual invitations and
-guidance. Completing this backend cannot discharge those successors'
-accessibility, comprehension or package-admission release gates.
+The workstream includes the private learning backend, an authenticated learning
+hub and five isolated authored exercises. It does not yet deliver rendered tours
+or simulated shared-chat presentation. Those ordered successors retain their
+accessibility, comprehension and renderer package-admission release gates.
 
 Learning is optional. An authenticated, active tenant member may learn in self
 context without publishing, organization administration or event-creation
 authority. An actor context requires current membership in that actor's actual
 tenant placement. Learning never grants production authority, changes provider
 readiness or completes tenant provisioning.
+
+## Private Practice Presentation
+
+`/learning` lists owned practice and the currently available server-authored
+recipes; `/learning/demo/{practiceId}` opens an existing private exercise.
+The five rendered recipes are event details, sessions/program, ticket capacity,
+attendees/team and publication lifecycle. The sixth AI recipe is not advertised
+as a functional presentation before its separate shared-chat packet.
+
+Pages defer transport until authenticated interactive rendering. A scoped
+generated-client facade retains canonical tenant/account/context identity,
+cancels replaced work and rejects late responses even when the transport ignores
+cancellation. Static rendering does not read or embed private practice.
+Opening an address never starts an exercise or recreates a removed source.
+
+Choices and confirmation submit closed server-defined actions with one intent,
+scope stamp and observed learner/practice revisions. A valid receipt is not a
+fresh capability: the facade rereads actual HAL resources before publishing the
+new display. False or malformed receipts retain truthful state; cancellation
+after a write attempt requires explicit reconciliation in the same scope.
+Reentrant completion notifications cannot return superseded success.
+
+Actions follow received HAL links rather than local roles or capability flags.
+No production-creation relation is currently advertised by learning HAL, so the
+UI does not invent one or convert example state into production data. Existing
+workspace creation remains a separate action. Frontend route/lifecycle details
+belong in [BLAZOR.md](BLAZOR.md#private-authored-learning).
 
 ## Single Announcement Bar Browser Scope
 

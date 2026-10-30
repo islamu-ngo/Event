@@ -2,13 +2,36 @@
 description: Private authored learning storage, simulation boundaries, and operator responsibilities.
 ---
 
-# Private learning backend
+# Private learning and practice
 
-The private learning backend stores optional learning preferences, tour progress
-and authored practice independently of the rendered onboarding experience.
-It does not deliver tour overlays, practice pages or a
-simulation mode in the live AI interface; those require the ordered presentation
-and guidance successors.
+The private learning hub at `/learning` offers available exercises under your
+current membership and tenant guidance policy. It stores learning preferences
+and practice separately from real event work. Tour overlays and simulated
+presentation in the shared AI interface remain separate delivery steps.
+
+## Five Private Exercises
+
+Explore event details, sessions/program, ticket capacity, attendees/team and
+publication lifecycle through fictional choices and explicit confirmation.
+Their results do not create, publish, sell, invite or change a real event.
+The sixth AI example is not offered as a working presentation yet.
+
+An existing exercise opens at `/learning/demo/{practiceId}`. Opening its address
+does not start new practice or recreate a removed shared source. Reset returns
+the exercise to its initial choice; clearing removes your private exercise
+without deleting real work. Available actions come from the server, not your
+browser's interpretation of a role.
+
+A change is shown as applied only after the server confirms it and the current
+private resources are refreshed. If a save is unconfirmed or interrupted, reload
+to reconcile its outcome before submitting another action. Switching account,
+tenant or managed actor discards pending results from the previous context.
+Private practice is not embedded into the initial static page.
+
+Real work starts separately through your workspace's available creation options;
+example data is never copied into it. Targeted component and static-rendering
+checks cover these boundaries. Full hosted visual and accessibility assurance
+remains a programme release gate.
 
 ## Learning Does Not Grant Production Authority
 

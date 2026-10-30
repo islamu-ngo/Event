@@ -50,6 +50,11 @@ action and does not import this example.
 
 ## Learning Does Not Grant Production Authority
 
+Instance operators can use **Manage directories** in Getting started when that
+action is available. It opens instance directory administration at
+`/admin/instance/tenants`. Directory administration is separate from a tenant's
+learning settings and does not expose members' private progress.
+
 An active tenant member can learn without publishing or administration rights.
 Organization/group context still requires current membership in the appropriate
 tenant placement. Completing a lesson does not configure payments, make a

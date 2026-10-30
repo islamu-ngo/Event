@@ -1,6 +1,7 @@
 @using Explore.Blazor.Client.Services
 @using Explore.Blazor.Client.Clients
 @using Explore.Blazor.Client.Helpers
+@using Explore.Blazor.Client.Routing.InstanceAdmin
 @inject IInstanceOnboardingService Onboarding
 
 <section class="instance-getting-started" aria-labelledby="instance-getting-started-heading" aria-busy="@(_loading ? "true" : "false")">
@@ -53,7 +54,7 @@
             }
             @if (_status.HasHalLink("manage-tenants"))
             {
-                <a href="/admin/tenants">Manage directories</a>
+                <a href="@InstanceAdminRoutes.Tenants">Manage directories</a>
             }
         </nav>
     }

@@ -82,6 +82,14 @@ native learning save inventory and HTTP database effect-count witnesses provide
 separate backend evidence. Full programme/provider and hosted accessibility
 acceptance remain open.
 
+## Instance Administration Entry
+
+Instance Getting started exposes directory management only when the received
+status advertises `manage-tenants`. Its UI destination is the registered
+`InstanceAdminRoutes.Tenants` (`/admin/instance/tenants`), not the retired
+`/admin/tenants` address. This is instance administration, not tenant learning
+authority or access to private learner records.
+
 ## Single Announcement Bar Browser Scope
 
 `UserSettingsService` obtains anonymous tenant identity from

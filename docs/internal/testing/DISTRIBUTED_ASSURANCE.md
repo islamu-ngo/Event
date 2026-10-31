@@ -73,10 +73,12 @@ precision, worker provenance and result admission remain unchanged. Smoke
 launches retain their existing in-process Dry job. Command-contract tests do
 not establish a measured baseline.
 
-Native benchmark setup diagnostics emit the exception type and stack frames
-without file information. They never format the original exception message or
-argument values. Original causes remain privately retained by the failure
-wrapper; a setup failure is not a measurement or an admitted result.
+The native benchmark failure wrapper emits the first cause's exception type
+and stack frames without file information. BenchmarkDotNet validation retains
+this wrapper message but can suppress console output from setup. The wrapper
+never formats the original exception message or argument values; original
+causes remain privately retained. A setup failure is not a measurement or an
+admitted result.
 
 ## Ownership admission
 

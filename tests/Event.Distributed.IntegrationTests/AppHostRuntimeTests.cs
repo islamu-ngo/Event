@@ -640,15 +640,28 @@ public sealed partial class AppHostRuntimeTests
                 expiredSettlement.Token)).Throws<OperationCanceledException>();
             await Assert.That(!pendingReader.Task.IsCompleted
                 && incomplete!.CancellationToken == expiredSettlement.Token).IsTrue();
-            // Controlled typed identities exercise association custody, not actual daemon creation.
-            var containerIdentity = new OwnedAppHostFixture.ContainerCleanupIdentity(selectedContainer, "owned-container-instance",
-                new string('a', 64), "sha256:" + new string('b', 64), new HashSet<string>(), string.Empty, 0, [], false);
+            // Compose the native parser and publication contracts without claiming actual daemon creation.
+            string inspection = JsonSerializer.Serialize(new object[]
+            {
+                new string('a', 64), "/owned-container-instance", "sha256:" + new string('b', 64),
+                new Dictionary<string, string>
+                {
+                    ["islamu.assurance.owner"] = owner.RunId,
+                    ["islamu.assurance.resource"] = selectedContainer.Name
+                },
+                Array.Empty<object>(), true, 0
+            });
+            bool parsed = OwnedAppHostFixture.TryReadContainerIdentity([selectedContainer], selectedContainer,
+                "owned-container-instance", owner.RunId, new string('b', 64), new HashSet<string>(),
+                new HashSet<string>(), new HashSet<string>(), inspection, out var capturedIdentity, out string reason);
+            await Assert.That(parsed).IsTrue().Because(reason);
+            var containerIdentity = capturedIdentity!;
             await Task.WhenAll(observation.PublishContainerAsync(containerIdentity, CancellationToken.None),
                 observation.PublishContainerAsync(containerIdentity, CancellationToken.None));
             await Assert.That(async () => await observation.PublishContainerAsync(containerIdentity with
             { Resource = new ContainerResource(selectedContainer.Name) }, CancellationToken.None)).Throws<InvalidOperationException>();
             await Assert.That(async () => await observation.PublishContainerAsync(containerIdentity with
-            { Image = "sha256:" + new string('c', 64) }, CancellationToken.None)).Throws<InvalidOperationException>();
+            { Image = new string('c', 64) }, CancellationToken.None)).Throws<InvalidOperationException>();
             string containerLead = Directory.GetFiles(owner.Root, "managed-launch-container-*.json").Single();
             using (var associationDocument = JsonDocument.Parse(await File.ReadAllBytesAsync(containerLead)))
             {
@@ -659,7 +672,7 @@ public sealed partial class AppHostRuntimeTests
                     && association.EnumerateObject().Count() == 5
                     && association.GetProperty("Resource").GetString() == selectedContainer.Name
                     && association.GetProperty("ContainerId").GetString() == containerIdentity.Id
-                    && association.GetProperty("ImageId").GetString() == containerIdentity.Image
+                    && association.GetProperty("ImageId").GetString() == "sha256:" + containerIdentity.Image
                     && association.GetProperty("Present").GetBoolean()
                     && instanceDigest is { Length: 64 }
                     && instanceDigest.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f')

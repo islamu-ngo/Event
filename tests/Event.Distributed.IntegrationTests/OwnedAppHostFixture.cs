@@ -1413,8 +1413,9 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             static bool LowerHex(string value) => value.Length == 64
                 && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
             if (string.IsNullOrEmpty(identity.Instance) || identity.Instance.Length > 256 || !LowerHex(identity.Id)
-                || !identity.Image.StartsWith("sha256:", StringComparison.Ordinal) || !LowerHex(identity.Image[7..]))
+                || !LowerHex(identity.Image))
                 throw new InvalidOperationException("test_managed_container_identity_invalid");
+            string imageId = "sha256:" + identity.Image;
             string digest = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(identity.Instance))).ToLowerInvariant();
             await Publication.WaitAsync(token);
             try
@@ -1424,14 +1425,14 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                     if (containers.TryGetValue(identity.Resource, out var prior)
                         && prior.TryGetValue((digest, identity.Id), out var previous))
                     {
-                        if (previous.ImageId != identity.Image)
+                        if (previous.ImageId != imageId)
                             throw new InvalidOperationException("test_managed_container_identity_changed");
                         return;
                     }
                 }
                 if (snapshotClosed) throw new InvalidOperationException("test_managed_launch_observation_closed");
                 if (records >= 64) throw new InvalidOperationException("test_managed_launch_observation_limit");
-                var association = new ManagedContainerAssociation(identity.Resource.Name, digest, identity.Id, identity.Image, true);
+                var association = new ManagedContainerAssociation(identity.Resource.Name, digest, identity.Id, imageId, true);
                 VerifyPrivateRoot(root, runId);
                 string name = $"managed-launch-container-{digest}-{identity.Id}-{records}.json";
                 await WritePrivateJsonAsync(Path.Combine(root, name), new { Schema = 1, RunId = runId, Container = association }, token);

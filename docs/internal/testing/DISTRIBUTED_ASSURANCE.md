@@ -12,6 +12,25 @@ listener. The environment is `Assurance`, so production worker registration and
 rate limiters retain their normal enabled behavior rather than the `Testing`
 environment's substitutions.
 
+## Controlled cleanup child
+
+`ManagedCleanupChildTests.OwnedFixtureRemainsLiveUntilItsNativeOwnerStopsIt`
+is an explicit native diagnostic child, not an assurance journey. It starts
+the genuine Split fixture and remains pending until its owning native process
+controller stops it. Its bounded cancellation disposes the fixture when a
+controller fails to stop the invocation. Ordinary test execution does not
+select this child; its `NativeCleanupChild` category is separate from the
+registered runtime, browser and load profiles.
+
+A parent cleanup regression must use the child's actual discovered UID and
+candidate-qualified assembly inputs. It must observe genuine fixture,
+container and mount custody before forcing termination. The intentionally
+killed child cannot produce an admitted execution result. The parent must
+separately prove exclusive-resource cleanup and preservation of foreign
+consumers; merely observing the child's failure proves neither. Do not qualify
+modified child sources against a prior candidate or count this helper as a
+passing registered case.
+
 ## Ownership admission
 
 `TestingResourceIsolation.Admit` runs before dotenv loading and before the Aspire

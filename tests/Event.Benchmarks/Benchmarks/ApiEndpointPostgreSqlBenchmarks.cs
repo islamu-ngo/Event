@@ -104,6 +104,8 @@ public class ApiEndpointPostgreSqlBenchmarks : IAsyncDisposable
         }
         catch (Exception setupFailure)
         {
+            Console.Error.WriteLine("benchmark_setup_failure_type: " + setupFailure.GetType().FullName);
+            Console.Error.WriteLine(new System.Diagnostics.StackTrace(setupFailure, false));
             var failures = await CleanupCoreAsync();
             failures.Insert(0, setupFailure);
             throw new NativeBenchmarkFailure(FailurePhase.Setup, failures);

@@ -191,6 +191,58 @@ public sealed partial class ModerationCaseNativeProofTests
     }
 
     [Test]
+    [Arguments("source")]
+    [Arguments("receipt")]
+    public async Task ReceiptCommitterRefusesSavedEntityReplacement(string boundary)
+    {
+        await using var database = await NativeDatabase.CreateAsync(ModerationCaseTargetKind.Form);
+        var checkpoint = new ReceiptSavedCheckpoint(async context =>
+        {
+            var entry = context.ChangeTracker.Entries().Single(candidate => boundary == "source"
+                ? candidate.Entity is ModerationCaseTargetSource
+                : candidate.Entity is ModerationCaseTargetReceipt);
+            var original = entry.Entity;
+            var replacement = entry.CurrentValues.ToObject();
+            entry.State = EntityState.Detached;
+            context.Attach(replacement);
+            await Assert.That(ReferenceEquals(original, replacement)).IsFalse();
+            await Assert.That(context.Entry(replacement).State).IsEqualTo(EntityState.Unchanged);
+        });
+        await using var context = database.Context(checkpoint);
+        var committer = IssuanceCommitter(context, database, database.Caller);
+        await Assert.That(await committer.IssueSubmissionReceiptAsync(database.Request(), default)).IsNull();
+        await Assert.That(checkpoint.ObservedReceiptSave).IsTrue();
+        await Assert.That(context.Database.CurrentTransaction).IsNull();
+        await Assert.That(context.ModerationTrustDomainId).IsNull();
+        await Assert.That(context.ChangeTracker.Entries().Any()).IsFalse();
+        await using var verify = database.Context();
+        await Assert.That(await verify.ModerationCaseTargetReceipts.AnyAsync()).IsFalse();
+        await Assert.That(await verify.ModerationCaseTargetSources.AnyAsync()).IsFalse();
+    }
+
+    [Test]
+    public async Task ReceiptCommitterRefusesSavedTransactionRemoval()
+    {
+        await using var database = await NativeDatabase.CreateAsync(ModerationCaseTargetKind.Form);
+        var checkpoint = new ReceiptSavedCheckpoint(async context =>
+        {
+            await Assert.That(context.Database.CurrentTransaction).IsNotNull();
+            await context.Database.UseTransactionAsync(null);
+            await Assert.That(context.Database.CurrentTransaction).IsNull();
+        });
+        await using var context = database.Context(checkpoint);
+        var committer = IssuanceCommitter(context, database, database.Caller);
+        await Assert.That(await committer.IssueSubmissionReceiptAsync(database.Request(), default)).IsNull();
+        await Assert.That(checkpoint.ObservedReceiptSave).IsTrue();
+        await Assert.That(context.Database.CurrentTransaction).IsNull();
+        await Assert.That(context.ModerationTrustDomainId).IsNull();
+        await Assert.That(context.ChangeTracker.Entries().Any()).IsFalse();
+        await using var verify = database.Context();
+        await Assert.That(await verify.ModerationCaseTargetReceipts.AnyAsync()).IsFalse();
+        await Assert.That(await verify.ModerationCaseTargetSources.AnyAsync()).IsFalse();
+    }
+
+    [Test]
     [Arguments("machine")]
     [Arguments("authentication")]
     [Arguments("missing-caller")]

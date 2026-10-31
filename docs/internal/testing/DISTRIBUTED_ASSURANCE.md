@@ -38,6 +38,13 @@ does not change allowed metadata fields, duplicate rejection, candidate joins
 or output-index custody. Regression cases accept a 16 MiB metadata fixture and
 reject a 33 MiB fixture; this is build-admission proof, not runtime cleanup proof.
 
+Served package roots may come from owning project references. Admission follows
+only the bounded source-declared reference closure. Every traversed project needs
+a candidate-tracked lock and an unambiguous matching restore index; package version
+and content hash must agree. Roots outside that closure or with ambiguous identity
+are rejected. The fingerprint includes each traversed owner's lock and restore
+bytes. This proves input provenance, not native execution or resource cleanup.
+
 ## Ownership admission
 
 `TestingResourceIsolation.Admit` runs before dotenv loading and before the Aspire

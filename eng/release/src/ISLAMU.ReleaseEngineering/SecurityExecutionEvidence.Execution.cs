@@ -2829,6 +2829,7 @@ public static partial class SecurityExecutionEvidence
         var targets = new Dictionary<string, OwningManagedTarget>(StringComparer.Ordinal);
         var generatedRoots = new HashSet<string>(StringComparer.Ordinal);
         var restoreIndexes = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var projectReferences = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         int visitedEntries = 0;
         while (pending.TryPop(out string? project))
         {
@@ -2855,6 +2856,7 @@ public static partial class SecurityExecutionEvidence
                         throw new InvalidDataException("own_project_graph_invalid");
                     pending.Push(relative);
                 }
+                projectReferences.Add(project, edges);
             }
             string intermediate = Path.Combine(Path.GetDirectoryName(projectPath)!, "obj");
             if (!Directory.Exists(intermediate)) continue;
@@ -2915,7 +2917,7 @@ public static partial class SecurityExecutionEvidence
             string runtime = Path.Combine(Path.GetDirectoryName(target.AssemblyPath)!, target.Build.RuntimeManifestFileName);
             string endpoints = Path.Combine(Path.GetDirectoryName(target.AssemblyPath)!, target.Build.EndpointManifestFileName!);
             var packages = ReadServedLockedPackageRoots(repository, project, runtime,
-                restoreIndexes[project], tracked, out string restoreDigest);
+                restoreIndexes, projectReferences, tracked, out string restoreDigest);
             string[] generated = generatedRoots.Order(StringComparer.Ordinal).ToArray();
             if (!TryCaptureLocalServedAssets(repository, candidate, [runtime], generated, packages,
                 out var served, out _, new Dictionary<string, string>(StringComparer.Ordinal) { [runtime] = endpoints }))
@@ -2931,68 +2933,85 @@ public static partial class SecurityExecutionEvidence
         return targets;
     }
 
-    private static IReadOnlyList<string> ReadServedLockedPackageRoots(string repository, string project,
-        string runtimeManifest, IReadOnlyList<string> restoreIndexes, IReadOnlyDictionary<string, string> tracked,
+    internal static IReadOnlyList<string> ReadServedLockedPackageRoots(string repository, string project,
+        string runtimeManifest, IReadOnlyDictionary<string, List<string>> restoreIndexes,
+        IReadOnlyDictionary<string, HashSet<string>> projectReferences, IReadOnlyDictionary<string, string> tracked,
         out string restoreDigest)
     {
-        string projectPath = Path.Combine(repository, project);
-        string lockRelative = Path.Combine(Path.GetDirectoryName(project)!, "packages.lock.json");
-        if (!tracked.ContainsKey(lockRelative)) throw new InvalidDataException("own_restore_lock_missing");
-        byte[] lockedBytes = ReadBoundedFile(Path.Combine(repository, lockRelative), MaximumReportBytes);
-        using JsonDocument locked = JsonDocument.Parse(lockedBytes, DocumentOptions);
-        var packages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (JsonProperty framework in locked.RootElement.GetProperty("dependencies").EnumerateObject())
-            foreach (JsonProperty package in framework.Value.EnumerateObject())
-            {
-                if (!package.Value.TryGetProperty("resolved", out JsonElement resolved)) continue;
-                string key = package.Name + "/" + resolved.GetString(), hash = Text(package.Value, "contentHash");
-                if (hash.Length is < 1 or > 1024 || packages.Count >= 16_384
-                    || packages.TryGetValue(key, out string? previous) && previous != hash)
-                    throw new InvalidDataException("own_restore_lock_invalid");
-                packages[key] = hash;
-            }
-        byte[]? selected = null;
-        foreach (string index in restoreIndexes)
-        {
-            byte[] bytes = ReadBoundedFile(index, MaximumReportBytes);
-            using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
-            if (Text(document.RootElement.GetProperty("project").GetProperty("restore"), "projectPath") != projectPath) continue;
-            if (selected is not null) throw new InvalidDataException("own_restore_index_ambiguous");
-            selected = bytes;
-        }
-        if (selected is null) throw new InvalidDataException("own_restore_index_missing");
-        using JsonDocument assets = JsonDocument.Parse(selected, DocumentOptions);
         using JsonDocument runtime = JsonDocument.Parse(ReadBoundedFile(runtimeManifest, MaximumReportBytes), DocumentOptions);
-        var roots = new HashSet<string>(StringComparer.Ordinal);
-        string[] packageFolders = assets.RootElement.GetProperty("packageFolders").EnumerateObject()
-            .Select(folder => InputDirectory(folder.Name)).Take(9).ToArray();
-        if (packageFolders.Length is < 1 or > 8) throw new InvalidDataException("own_restore_index_invalid");
-        JsonProperty[] libraries = assets.RootElement.GetProperty("libraries").EnumerateObject().Take(16_385).ToArray();
-        if (libraries.Length > 16_384) throw new InvalidDataException("own_restore_index_limit");
+        var matches = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         foreach (JsonElement element in runtime.RootElement.GetProperty("ContentRoots").EnumerateArray())
         {
             string root = InputDirectory(element.GetString()!);
             if (root == repository || InputWithin(root, repository)) continue;
-            var matches = new HashSet<string>(StringComparer.Ordinal);
-            foreach (JsonProperty library in libraries)
-            {
-                if (Text(library.Value, "type") != "package") continue;
-                string relative = Text(library.Value, "path");
-                if (!SafeInputRelativePath(relative) || !packages.TryGetValue(library.Name, out string? hash)
-                    || Text(library.Value, "sha512") != hash) continue;
-                foreach (string folder in packageFolders)
-                {
-                    string candidateRoot = Path.Combine(folder, relative);
-                    if ((root == candidateRoot || InputWithin(root, candidateRoot)) && Directory.Exists(candidateRoot))
-                        matches.Add(InputDirectory(candidateRoot));
-                }
-            }
-            if (matches.Count != 1 || roots.Count >= 128) throw new InvalidDataException("own_served_package_unlocked");
-            roots.Add(matches.Single());
+            if (matches.Count >= 128) throw new InvalidDataException("own_served_package_unlocked");
+            matches.TryAdd(root, new(StringComparer.Ordinal));
         }
-        restoreDigest = DigestBytes(JsonSerializer.SerializeToUtf8Bytes(new
-        { lockSha256 = DigestBytes(lockedBytes), assetsSha256 = DigestBytes(selected) }));
-        return roots.Order(StringComparer.Ordinal).ToArray();
+        var closure = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Stack<string>([project]);
+        while (pending.TryPop(out string? owner))
+        {
+            if (!closure.Add(owner)) continue;
+            if (closure.Count > 128 || !projectReferences.TryGetValue(owner, out var references))
+                throw new InvalidDataException("own_project_graph_invalid");
+            foreach (string reference in references) pending.Push(reference);
+        }
+        var restoreInputs = new List<object>();
+        foreach (string owner in closure.Order(StringComparer.Ordinal))
+        {
+            string projectPath = Path.Combine(repository, owner);
+            string lockRelative = Path.Combine(Path.GetDirectoryName(owner)!, "packages.lock.json");
+            if (!tracked.ContainsKey(lockRelative)) throw new InvalidDataException("own_restore_lock_missing");
+            byte[] lockedBytes = ReadBoundedFile(Path.Combine(repository, lockRelative), MaximumReportBytes);
+            using JsonDocument locked = JsonDocument.Parse(lockedBytes, DocumentOptions);
+            var packages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (JsonProperty framework in locked.RootElement.GetProperty("dependencies").EnumerateObject())
+                foreach (JsonProperty package in framework.Value.EnumerateObject())
+                {
+                    if (!package.Value.TryGetProperty("resolved", out JsonElement resolved)) continue;
+                    string key = package.Name + "/" + resolved.GetString(), hash = Text(package.Value, "contentHash");
+                    if (hash.Length is < 1 or > 1024 || packages.Count >= 16_384
+                        || packages.TryGetValue(key, out string? previous) && previous != hash)
+                        throw new InvalidDataException("own_restore_lock_invalid");
+                    packages[key] = hash;
+                }
+            byte[]? selected = null;
+            if (!restoreIndexes.TryGetValue(owner, out var indexes))
+                throw new InvalidDataException("own_restore_index_missing");
+            foreach (string index in indexes)
+            {
+                byte[] bytes = ReadBoundedFile(index, MaximumReportBytes);
+                using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
+                if (Text(document.RootElement.GetProperty("project").GetProperty("restore"), "projectPath") != projectPath) continue;
+                if (selected is not null) throw new InvalidDataException("own_restore_index_ambiguous");
+                selected = bytes;
+            }
+            if (selected is null) throw new InvalidDataException("own_restore_index_missing");
+            using JsonDocument assets = JsonDocument.Parse(selected, DocumentOptions);
+            string[] packageFolders = assets.RootElement.GetProperty("packageFolders").EnumerateObject()
+                .Select(folder => InputDirectory(folder.Name)).Take(9).ToArray();
+            if (packageFolders.Length is < 1 or > 8) throw new InvalidDataException("own_restore_index_invalid");
+            JsonProperty[] libraries = assets.RootElement.GetProperty("libraries").EnumerateObject().Take(16_385).ToArray();
+            if (libraries.Length > 16_384) throw new InvalidDataException("own_restore_index_limit");
+            foreach (var root in matches)
+                foreach (JsonProperty library in libraries)
+                {
+                    if (Text(library.Value, "type") != "package") continue;
+                    string relative = Text(library.Value, "path");
+                    if (!SafeInputRelativePath(relative) || !packages.TryGetValue(library.Name, out string? hash)
+                        || Text(library.Value, "sha512") != hash) continue;
+                    foreach (string folder in packageFolders)
+                    {
+                        string candidateRoot = Path.Combine(folder, relative);
+                        if ((root.Key == candidateRoot || InputWithin(root.Key, candidateRoot)) && Directory.Exists(candidateRoot))
+                            root.Value.Add(InputDirectory(candidateRoot));
+                    }
+                }
+            restoreInputs.Add(new { project = owner, lockSha256 = DigestBytes(lockedBytes), assetsSha256 = DigestBytes(selected) });
+        }
+        if (matches.Values.Any(roots => roots.Count != 1)) throw new InvalidDataException("own_served_package_unlocked");
+        restoreDigest = DigestBytes(JsonSerializer.SerializeToUtf8Bytes(restoreInputs));
+        return matches.Values.Select(roots => roots.Single()).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
     }
 
     private static bool SafeInputRelativePath(string path) => path.Length is > 0 and <= 4096 &&

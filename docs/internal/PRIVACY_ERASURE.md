@@ -324,6 +324,22 @@ each other or with the selected authority path. The documented standalone
 image is the in-process exception: it applies those same three migration
 responsibilities before binding HTTP.
 
+The PostgreSQL `CoLocated` catalog includes the generated
+`20261031102545_RestoreCoLocatedAuthorityRecoveryCoordinates` correction.
+It brings `authority_counter` into agreement with `PrivacyErasureCounterConfiguration`:
+`recovery_generation` and concurrency-token `revision` start at `1`, and
+`store_id` receives a database-generated UUIDv7. The recovery constraint requires
+positive counters and a valid UUIDv7 store identity. Existing rows receive these
+defaults when the migration adds the columns; no erasure facts are rewritten.
+The canonical migration model remains `islamu_event`, including when the selected
+storage namespace differs. This correction does not change other authority catalogs.
+
+Apply it through the selected migration owner before serving traffic. Its generated
+`Down` reverses the schema by dropping the constraint and all three columns, but
+discards recovery coordinates and store identity. It is not a data-preserving
+operational rollback after adoption. Preserve matched primary/authority backups
+and use the documented recovery procedure rather than downgrading the live store.
+
 ## 6. Retained Floor, Holds, and Recovery
 
 `PrivacyErasureAuthorityState` contains only `HighWaterSequence` and

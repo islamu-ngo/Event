@@ -118,6 +118,24 @@ The Privacy Erasure Authority store must be configured in your environment via `
 
 ---
 
+## PostgreSQL Co-Located Authority Upgrade
+
+For PostgreSQL installations using `CoLocated`, the
+`20261031102545_RestoreCoLocatedAuthorityRecoveryCoordinates` migration adds the
+missing authority recovery coordinates required by the current application.
+The migration initializes existing authority rows with positive revision and
+recovery-generation counters and a generated store identity. It preserves
+existing erasure facts. Run the normal selected migration service before
+allowing application traffic; do not add these columns manually or bypass
+pending-model validation.
+
+Take matched primary and authority backups before upgrading. Downgrading this
+migration drops the recovery coordinates and store identity, so it cannot
+preserve the recovery history established after adoption. Use the
+[Backup, Restore & Upgrade](../configuration-and-operations/backup-restore-upgrade.md)
+procedure for recovery instead of applying a live downgrade. This correction
+does not change the other authority storage topologies.
+
 ## The Golden Rule of Disaster Recovery
 
 > [!CAUTION]

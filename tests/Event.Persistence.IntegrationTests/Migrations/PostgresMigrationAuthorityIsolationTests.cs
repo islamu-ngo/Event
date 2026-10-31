@@ -8,6 +8,8 @@ using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 
@@ -17,6 +19,86 @@ namespace Event.Persistence.IntegrationTests.Migrations;
 [Property("Category", "ExploreDatabaseMigrator")]
 public sealed class PostgresMigrationAuthorityIsolationTests(PostgreSqlContainerFixture fixture)
 {
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task CoLocatedRecoveryUpgradePreservesExistingCounterAndNamespace(bool customSchema)
+    {
+        string suffix = Guid.CreateVersion7().ToString("N");
+        string databaseName = $"authority_upgrade_{suffix}";
+        string schema = customSchema ? $"authority_{suffix}" : RelationalModelNamespace.DefaultSchema;
+        var administrator = new NpgsqlConnectionStringBuilder(fixture.ConnectionString)
+        {
+            Database = "postgres",
+            Pooling = false
+        };
+        await using var administration = new NpgsqlConnection(administrator.ConnectionString);
+        await administration.OpenAsync();
+        await ExecuteAsync(administration, $"CREATE DATABASE \"{databaseName}\"");
+        try
+        {
+            var database = Options(administrator, databaseName,
+                administrator.Username!, administrator.Password!, PrimaryDatabaseRole.Migrator) with
+            {
+                Schema = schema
+            };
+            var options = TestDbContextOptions.Create<CoLocatedPrivacyErasureAuthorityDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(options, database);
+            await using var authority = new CoLocatedPrivacyErasureAuthorityDbContext(options.Options);
+            await authority.GetService<IMigrator>().MigrateAsync("20261002043813_RetainedExternalIdentityFences");
+            await using var connection = new NpgsqlConnection(
+                PrimaryDatabaseConfiguration.BuildConnectionString(database).ConnectionString);
+            await connection.OpenAsync();
+            // The predecessor model lacks recovery columns, so seed its physical shape.
+            await ExecuteAsync(connection, $"""
+                INSERT INTO "{schema}".authority_counter
+                    (singleton, last_sequence, retained_floor_sequence)
+                VALUES (true, 9, 4);
+                """);
+            await authority.Database.MigrateAsync();
+            var runtimeOptions = TestDbContextOptions.Create<CoLocatedPrivacyErasureAuthorityDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
+                runtimeOptions, database with { Role = PrimaryDatabaseRole.Runtime });
+            await using var runtime = new CoLocatedPrivacyErasureAuthorityDbContext(runtimeOptions.Options);
+            var counter = await runtime.AuthorityCounters.AsNoTracking().SingleAsync();
+            await Assert.That(counter.LastSequence).IsEqualTo(9);
+            await Assert.That(counter.RetainedFloorSequence).IsEqualTo(4);
+            await Assert.That(counter.Revision).IsEqualTo(1);
+            await Assert.That(counter.RecoveryGeneration).IsEqualTo(1);
+            await Assert.That(counter.StoreId.Version).IsEqualTo(7);
+            await authority.Database.MigrateAsync();
+            await using (var reopened = new CoLocatedPrivacyErasureAuthorityDbContext(runtimeOptions.Options))
+            {
+                await Assert.That((await reopened.AuthorityCounters.AsNoTracking().SingleAsync()).StoreId)
+                    .IsEqualTo(counter.StoreId);
+            }
+            foreach (string assignment in new[]
+            {
+                "revision = 0",
+                "recovery_generation = -1",
+                "store_id = '00000000-0000-4000-8000-000000000001'::uuid",
+                "store_id = '00000000-0000-7000-0000-000000000001'::uuid"
+            })
+            {
+                var rejected = await Assert.ThrowsAsync<PostgresException>(() =>
+                    ExecuteAsync(connection, $"UPDATE \"{schema}\".authority_counter SET {assignment}"));
+                await Assert.That(rejected!.SqlState).IsEqualTo(PostgresErrorCodes.CheckViolation);
+                await Assert.That(rejected.ConstraintName)
+                    .IsEqualTo("ck_privacy_erasure_authority_counter_recovery");
+            }
+            if (customSchema)
+            {
+                await using var query = new NpgsqlCommand(
+                    "SELECT to_regclass('islamu_event.authority_counter') IS NULL", connection);
+                await Assert.That((bool)(await query.ExecuteScalarAsync())!).IsTrue();
+            }
+        }
+        finally
+        {
+            await ExecuteAsync(administration, $"DROP DATABASE \"{databaseName}\" WITH (FORCE)");
+        }
+    }
+
     [Test]
     [TUnit.Core.Executors.TestExecutor<FreshEfProcessExecutor>]
     public async Task MigrateAndSeedUsesConfiguredNamespaceForPoliciesAndSeedWithoutRuntimeCredentialPromotion()

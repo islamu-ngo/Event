@@ -4,6 +4,7 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Models;
+using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Schema;
 using Event.Persistence.IntegrationTests.Migrations;
 using Microsoft.Extensions.Configuration;
@@ -11,6 +12,8 @@ using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using MySqlConnector;
@@ -21,6 +24,43 @@ namespace Event.Persistence.IntegrationTests.Database;
 
 public sealed class ExploreDbContextModelProviderTests
 {
+    [Test]
+    [Arguments(RelationalModelNamespace.DefaultSchema)]
+    [Arguments("authority_model_probe")]
+    public async Task CoLocatedAuthorityMigratorModelMatchesItsSnapshot(string storageSchema)
+    {
+        var options = TestDbContextOptions.Create<CoLocatedPrivacyErasureAuthorityDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthorityModel(
+            options, new PrimaryDatabaseConnectionOptions
+            {
+                Role = PrimaryDatabaseRole.Migrator,
+                Provider = PrimaryDatabaseProvider.PostgreSql,
+                Schema = storageSchema
+            });
+        using var context = new CoLocatedPrivacyErasureAuthorityDbContext(options.Options);
+        var assembly = context.GetService<IMigrationsAssembly>();
+        IModel snapshot = assembly.ModelSnapshot?.Model
+            ?? throw new InvalidOperationException("Co-located authority snapshot is missing.");
+        IModel initialized = context.GetService<IModelRuntimeInitializer>()
+            .Initialize(snapshot, designTime: true, validationLogger: null);
+        IModel model = context.GetService<IDesignTimeModel>().Model;
+        var differences = context.GetService<IMigrationsModelDiffer>().GetDifferences(
+            initialized.GetRelationalModel(), model.GetRelationalModel());
+        foreach (MigrationOperation operation in differences)
+        {
+            string target = operation switch
+            {
+                ColumnOperation column => $"{column.Schema}.{column.Table}.{column.Name}",
+                TableOperation table => $"{table.Schema}.{table.Name}",
+                CreateIndexOperation index => $"{index.Schema}.{index.Table}.{index.Name}",
+                DropIndexOperation index => $"{index.Schema}.{index.Table}.{index.Name}",
+                _ => operation.GetType().Name
+            };
+            Console.WriteLine($"authority_model_difference={operation.GetType().Name}:{target}");
+        }
+        await Assert.That(differences).IsEmpty();
+    }
+
     [Test]
     [Arguments("PostgreSql")]
     [Arguments("Sqlite")]

@@ -11,6 +11,17 @@ ABOUTME: Grounds release operations in provider-native database tools, authority
 
 This runbook covers self-hosted deployments using the repository Docker Compose topology. Treat every upgrade as a data operation first and an image rollout second.
 
+## Co-Located Authority Recovery Coordinates
+
+For PostgreSQL `CoLocated` authority, apply
+`20261031102545_RestoreCoLocatedAuthorityRecoveryCoordinates` through the selected
+migration owner before traffic. It initializes the missing recovery counters and
+store identity without rewriting erasure facts. Take matched primary/authority
+backups first. Its generated `Down` drops those coordinates; it is not a
+data-preserving rollback after adoption. See the
+[migration contract](PRIVACY_ERASURE.md#5-migration-ownership-and-history-separation)
+for defaults and ownership, and retain the authority during recovery.
+
 ## SecretKit Lifecycle Cutover
 
 Before upgrading from the retired Secrets implementation, remove `SecretRefresh`

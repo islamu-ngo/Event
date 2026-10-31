@@ -57,6 +57,12 @@ meaning. Equivalent aliases must resolve to the same initial cached image ID;
 conflicts fail closed. Native image inspection and original-image membership
 checks still run; normalization never pulls, retags or substitutes an image.
 
+Untagged-image cache sentinels (`<none>:<none>` in `RepoTags` and
+`<none>@<none>` in `RepoDigests`) grant no selectable reference. Their image IDs
+remain in the initial cache inventory. The same sentinel on multiple untagged
+images is not an alias conflict; wrong-field or malformed sentinel forms still
+fail closed.
+
 ## Native benchmark compilation
 
 Baseline benchmark launches allow 600 seconds for BenchmarkDotNet's generated

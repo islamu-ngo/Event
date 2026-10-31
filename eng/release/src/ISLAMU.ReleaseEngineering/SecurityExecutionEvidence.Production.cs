@@ -1201,7 +1201,11 @@ public static partial class SecurityExecutionEvidence
                 foreach (JsonElement value in values.EnumerateArray())
                 {
                     if (value.ValueKind != JsonValueKind.String) throw new InvalidDataException();
-                    string reference = LocalImageReferenceKey(value.GetString()!);
+                    string reference = value.GetString()!;
+                    if ((field == "RepoTags" && reference == "<none>:<none>")
+                        || (field == "RepoDigests" && reference == "<none>@<none>")) continue;
+                    if (reference.Contains("<none>", StringComparison.Ordinal)) throw new InvalidDataException();
+                    reference = LocalImageReferenceKey(reference);
                     if (references.TryGetValue(reference, out string? previous) && previous != id) throw new InvalidDataException();
                     references[reference] = id;
                     if (references.Count > 131_072) throw new InvalidDataException();

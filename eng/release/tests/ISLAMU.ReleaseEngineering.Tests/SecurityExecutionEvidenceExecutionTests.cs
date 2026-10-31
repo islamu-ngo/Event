@@ -1234,6 +1234,74 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(Encoding.UTF8.GetBytes("[]"), expected,
             out var pendingResources)).IsTrue();
         await Assert.That(pendingResources!.Count).IsEqualTo(0);
+        foreach (bool labelled in new[] { false, true })
+        {
+            JsonObject retired = RuntimeContainer();
+            retired["Id"] = new string('4', 64);
+            retired["State"] = "exited";
+            retired["Labels"] = labelled
+                ? new JsonObject { ["islamu.assurance.owner"] = new string('b', 32) }
+                : new JsonObject();
+            JsonObject retiredMount = retired["Mounts"]![0]!.AsObject();
+            retiredMount["Name"] = "retired-unrelated-volume";
+            retiredMount["Source"] = string.Empty;
+            await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+                JsonSerializer.SerializeToUtf8Bytes(new JsonArray(RuntimeContainer(), retired.DeepClone())),
+                expected, out var withRetired)).IsTrue();
+            await Assert.That(withRetired!.Single().Container).IsEqualTo(exactObserved.Single().Container);
+            foreach (string? state in new string?[] { "exited", "dead", "running", "paused", "created",
+                "restarting", "removing", "unknown", null })
+            {
+                JsonObject changedState = retired.DeepClone().AsObject();
+                changedState["State"] = state;
+                await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+                    JsonSerializer.SerializeToUtf8Bytes(new JsonArray(changedState)), expected,
+                    out var stateResources)).IsEqualTo(state is "exited" or "dead");
+                if (stateResources is not null) await Assert.That(stateResources.Count).IsEqualTo(0);
+            }
+            foreach (string bindSource in new[] { mountpoint, mountpoint + "/child", "/native-volumes",
+                "/", "/unrelated-retired-bind" })
+            {
+                JsonObject mixed = retired.DeepClone().AsObject();
+                mixed["Mounts"]!.AsArray().Add(new JsonObject
+                {
+                    ["Type"] = "bind", ["Source"] = bindSource, ["Destination"] = "/foreign-bind", ["RW"] = false
+                });
+                await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+                    JsonSerializer.SerializeToUtf8Bytes(new JsonArray(mixed)), expected, out _))
+                    .IsEqualTo(bindSource == "/unrelated-retired-bind");
+            }
+            foreach (string invalid in new[] { "declared-name", "implicit-name", "missing-source",
+                "null-source", "numeric-source", "boolean-source", "object-source", "array-source",
+                "whitespace-source", "relative-source", "trailing-slash-source", "empty-bind-source" })
+            {
+                JsonObject conflict = retired.DeepClone().AsObject();
+                JsonObject conflictMount = conflict["Mounts"]![0]!.AsObject();
+                switch (invalid)
+                {
+                    case "declared-name": conflictMount["Name"] = source; break;
+                    case "implicit-name": conflictMount["Name"] = anonymous; break;
+                    case "missing-source": conflictMount.Remove("Source"); break;
+                    case "null-source": conflictMount["Source"] = null; break;
+                    case "numeric-source": conflictMount["Source"] = 1; break;
+                    case "boolean-source": conflictMount["Source"] = false; break;
+                    case "object-source": conflictMount["Source"] = new JsonObject(); break;
+                    case "array-source": conflictMount["Source"] = new JsonArray(); break;
+                    case "whitespace-source": conflictMount["Source"] = " "; break;
+                    case "relative-source": conflictMount["Source"] = "relative"; break;
+                    case "trailing-slash-source": conflictMount["Source"] = "/foreign/"; break;
+                    case "empty-bind-source": conflictMount["Type"] = "bind"; conflictMount.Remove("Name"); break;
+                }
+                await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+                    JsonSerializer.SerializeToUtf8Bytes(new JsonArray(withImplicit.DeepClone(), conflict)),
+                    implicitExpected, out _)).IsFalse();
+            }
+        }
+        JsonObject missingOwnedSource = RuntimeContainer();
+        missingOwnedSource["State"] = "exited";
+        missingOwnedSource["Mounts"]![0]!["Source"] = string.Empty;
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+            RuntimeBytes(missingOwnedSource), expected, out _)).IsFalse();
         await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(Encoding.UTF8.GetBytes("[]"),
             expected with
             {

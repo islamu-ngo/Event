@@ -67,6 +67,13 @@ prevent directory cleanup. If cleanup fails, retain the error and inspect the ex
 run ID before removing anything. A compilation or discovery pass alone is not
 evidence that the application became healthy.
 
+The assurance parent can encounter stopped, unrelated containers whose old
+named volumes no longer have a reported source path. Only explicitly empty
+sources on exited or dead foreign containers receive that treatment. Their
+volume names still block conflicting cleanup, and bind-path conflicts remain
+errors. This does not qualify an owned mount or permit deleting unrelated
+containers; owned mounts still require exact source-path evidence.
+
 On startup failure, cancellation reaches the actual host and cleanup waits for
 its execution to finish. If execution cannot be observed or does not settle
 within the cleanup deadline, the run's stores remain available for investigation.

@@ -1054,8 +1054,7 @@ public static partial class SecurityExecutionEvidence
             {
                 if (item.ValueKind != JsonValueKind.Object) return false;
                 string id = Text(item, "Id");
-                if (id.Length != 64 || !LowerHex(id) || !allIds.Add(id)
-                    || !TryReadRuntimeMounts(item, out var mounts)) return false;
+                if (id.Length != 64 || !LowerHex(id) || !allIds.Add(id)) return false;
                 string owner = string.Empty;
                 if (item.TryGetProperty("Labels", out JsonElement labels) && labels.ValueKind != JsonValueKind.Null)
                 {
@@ -1067,6 +1066,11 @@ public static partial class SecurityExecutionEvidence
                     }
                     else if (labels.TryGetProperty("islamu.assurance.resource", out _)) return false;
                 }
+                bool retiredForeign = owner != inputs.Owner && item.TryGetProperty("State", out var foreignState)
+                    && foreignState.ValueKind == JsonValueKind.String
+                    && foreignState.GetString() is "exited" or "dead";
+                if (!TryReadRuntimeMounts(item, out var mounts, allowEmptyForeignVolumeSource: retiredForeign))
+                    return false;
                 if (owner != inputs.Owner)
                 {
                     foreignMounts.AddRange(mounts);
@@ -1131,7 +1135,8 @@ public static partial class SecurityExecutionEvidence
     private static bool ObservedMountPathsOverlap(string left, string right) => left == right || left == "/" || right == "/"
         || InputWithin(left, right) || InputWithin(right, left);
 
-    private static bool TryReadRuntimeMounts(JsonElement container, out IReadOnlyList<ObservedContainerMount> result)
+    private static bool TryReadRuntimeMounts(JsonElement container, out IReadOnlyList<ObservedContainerMount> result,
+        bool allowEmptyForeignVolumeSource = false)
     {
         result = [];
         if (!container.TryGetProperty("Mounts", out JsonElement mounts) || mounts.ValueKind != JsonValueKind.Array
@@ -1146,7 +1151,8 @@ public static partial class SecurityExecutionEvidence
                 || !mount.TryGetProperty("RW", out JsonElement writable)
                 || writable.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
             string name = mount.TryGetProperty("Name", out _) ? Text(mount, "Name") : string.Empty;
-            if (type == "volume" && (!RuntimeVolumeName(name) || !CanonicalObservedMountPath(source))
+            if (type == "volume" && (!RuntimeVolumeName(name)
+                    || !CanonicalObservedMountPath(source) && !(allowEmptyForeignVolumeSource && source.Length == 0))
                 || type == "bind" && !CanonicalObservedMountPath(source)
                 || type != "volume" && name.Length != 0) return false;
             observed.Add(new(type, name, source, target, writable.GetBoolean()));

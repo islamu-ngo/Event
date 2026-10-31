@@ -1,0 +1,37 @@
+Change-Id: CHG-01M6933MMN76MCCMF8VB2ZBZF2
+Title: Handle retired foreign volume mounts without losing conflicts
+Type: fix
+Scope: testing
+Summary: >-
+  Allow native assurance to inspect unrelated exited or dead containers whose
+  named volumes have explicitly empty source paths, while preserving foreign
+  volume-name conflicts, bind overlaps and exact owned-resource custody.
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/testing/DISTRIBUTED_ASSURANCE.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Restrict empty-source handling to validated foreign retired rows in the
+      configured-resource join. Retain every mount for conflict checks and keep
+      strict canonical sources for owned custody and other parser callers.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/contributing/distributed-testing.md
+    Disposition: documented
+    Detail: >-
+      Preserve unrelated containers rather than pruning historical rows to
+      prepare an assurance run. Owned mounts still require exact path evidence,
+      and cleanup conflicts remain failures.

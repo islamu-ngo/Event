@@ -14,6 +14,15 @@ environment's substitutions.
 
 ## Controlled cleanup child
 
+The configured-resource join retains foreign named-volume conflicts even when
+Docker reports an explicitly empty mount `Source` on an exited or dead foreign
+container. Such historical rows do not establish owned custody: their volume
+names still conflict with declared or retained volumes, and bind mounts on the
+same row still undergo canonical-path and overlap checks. Missing, null or
+malformed sources, live-container empty sources and owned empty sources remain
+rejected. All other mount-parser callers retain the strict canonical-source
+contract. Do not prune unrelated containers to make qualification pass.
+
 `ManagedCleanupChildTests.OwnedFixtureRemainsLiveUntilItsNativeOwnerStopsIt`
 is an explicit native diagnostic child, not an assurance journey. It starts
 the genuine Split fixture and remains pending until its owning native process

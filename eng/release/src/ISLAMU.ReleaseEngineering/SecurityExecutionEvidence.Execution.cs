@@ -489,19 +489,22 @@ public static partial class SecurityExecutionEvidence
     }
 
     internal static async Task<LiveNativeTool?> CaptureLiveNativeToolAsync(OwnedNativeProcessContext invocation,
-        int pid, CancellationToken token)
+        int pid, CancellationToken token, Func<Task>? afterExecutableLinked = null)
     {
+        ManagedProcessIdentity? process = null;
         try
         {
             if (!OperatingSystem.IsLinux() || invocation.Pid <= 0 || invocation.Start == 0
                 || invocation.Group != invocation.Pid || invocation.Session != invocation.Pid) return null;
-            ManagedProcessIdentity? owner = ReadManagedProcessIdentity(invocation.Pid), process = ReadManagedProcessIdentity(pid);
+            ManagedProcessIdentity? owner = ReadManagedProcessIdentity(invocation.Pid);
+            process = ReadManagedProcessIdentity(pid);
             if (owner is null || process is null || owner.Start != invocation.Start || owner.Group != invocation.Group
                 || owner.Session != invocation.Session || owner.State is 'Z' or 'X') return null;
             List<ManagedProcessIdentity>? chain = ReadLiveHostAncestorChain(process, owner, token);
             if (chain is null) return null;
             string executable = "/proc/" + pid.ToString(CultureInfo.InvariantCulture) + "/exe";
             string path = new FileInfo(executable).LinkTarget ?? throw new InvalidDataException("native_tool_unavailable");
+            if (afterExecutableLinked is not null) await afterExecutableLinked().ConfigureAwait(false);
             LiveFileIdentity identity = await ReadLiveMetadataAsync(executable, true, token).ConfigureAwait(false);
             if (!Path.IsPathFullyQualified(path) || path.Length > 8192 || path.Any(char.IsControl)
                 || (identity.Bits & 0xf000) != 0x8000 || identity.Bytes is < 1 or > 1_073_741_824) return null;
@@ -557,6 +560,10 @@ public static partial class SecurityExecutionEvidence
             return new(pid, process.Start, path, identity.Device, identity.Inode, identity.Bytes, hash,
                 script, scriptHash, chain.Select(item => item.Pid).ToArray(), workloadRun, config, configHash, loadOrigin);
         }
+        catch (AggregateException failure) when (!token.IsCancellationRequested && process is not null
+            && failure.InnerExceptions is [InvalidDataException { Message: "managed_metadata_unavailable" }]
+            && !SameLiveProcess(ReadManagedProcessIdentity(pid), process))
+        { return null; }
         catch (Exception failure) when (failure is IOException or UnauthorizedAccessException or InvalidDataException
             or InvalidOperationException or ArgumentException or OverflowException or FormatException or NotSupportedException)
         { return null; }

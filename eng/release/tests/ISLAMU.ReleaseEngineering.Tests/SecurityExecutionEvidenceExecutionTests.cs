@@ -1782,6 +1782,76 @@ public sealed class SecurityExecutionEvidenceParentModelTests
     }
 
     [Test]
+    public async Task ExitedNativeToolCannotFaultObservationOrBecomeQualified()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = new SecurityExecutionEvidenceProcessTests.ProcessFixture();
+        ProcessStartInfo command = await fixture.CommandAsync("hold");
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        bool linked = false, rejected = false;
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command,
+            TimeSpan.FromSeconds(20), cancellation.Token, async (context, _) =>
+            {
+                var captured = await SecurityExecutionEvidence.CaptureLiveNativeToolAsync(context,
+                    context.Pid, CancellationToken.None, async () =>
+                    {
+                        using var process = Process.GetProcessById(context.Pid);
+                        var exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                        process.Exited += (_, _) => exited.TrySetResult();
+                        process.EnableRaisingEvents = true;
+                        linked = true;
+                        await cancellation.CancelAsync();
+                        await exited.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                    });
+                rejected = captured is null;
+            });
+        if (result.ObserverFailures.Count != 0)
+            throw new AggregateException("Native executable probe failed.", result.ObserverFailures);
+        await Assert.That(linked && rejected).IsTrue();
+        await Assert.That(result.Cancelled && result.CleanupSucceeded && result.ObserverSettled
+            && !result.ResidualOwnedChildren && result.ObserverFailures.Count == 0).IsTrue();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task NativeToolMetadataRetainsLiveAndIndependentFailures(bool expireWithIndependentFailure)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = new SecurityExecutionEvidenceProcessTests.ProcessFixture();
+        ProcessStartInfo command = await fixture.CommandAsync("hold");
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var metadataFailure = new InvalidDataException("managed_metadata_unavailable");
+        var independentFailure = new InvalidOperationException("independent_metadata_failure");
+        var failure = expireWithIndependentFailure
+            ? new AggregateException(metadataFailure, independentFailure)
+            : new AggregateException(metadataFailure);
+        bool linked = false;
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command,
+            TimeSpan.FromSeconds(20), cancellation.Token, async (context, _) =>
+            {
+                await SecurityExecutionEvidence.CaptureLiveNativeToolAsync(context,
+                    context.Pid, CancellationToken.None, async () =>
+                    {
+                        linked = true;
+                        if (expireWithIndependentFailure)
+                        {
+                            using var process = Process.GetProcessById(context.Pid);
+                            var exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                            process.Exited += (_, _) => exited.TrySetResult();
+                            process.EnableRaisingEvents = true;
+                            await cancellation.CancelAsync();
+                            await exited.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                        }
+                        throw failure;
+                    });
+            });
+        await Assert.That(linked && result.ObserverSettled && result.CleanupSucceeded
+            && !result.ResidualOwnedChildren).IsTrue();
+        await Assert.That(result.ObserverFailures.Count == 1 && ReferenceEquals(result.ObserverFailures[0], failure)).IsTrue();
+    }
+
+    [Test]
     [Arguments(16, true)]
     [Arguments(33, false)]
     public async Task OwnBuildMetadataRemainsBoundedForLargeNativeAssemblies(int metadataMiB, bool accepted)

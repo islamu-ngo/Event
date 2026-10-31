@@ -45,6 +45,12 @@ and content hash must agree. Roots outside that closure or with ambiguous identi
 are rejected. The fingerprint includes each traversed owner's lock and restore
 bytes. This proves input provenance, not native execution or resource cleanup.
 
+Native-tool metadata inspection can race the original process exiting. A single
+aggregated `managed_metadata_unavailable` is treated as disappearance only after
+the original process identity is no longer live. Aggregates from a still-live
+process or with independent failures remain errors. Disappearance never qualifies
+the tool.
+
 ## Ownership admission
 
 `TestingResourceIsolation.Admit` runs before dotenv loading and before the Aspire

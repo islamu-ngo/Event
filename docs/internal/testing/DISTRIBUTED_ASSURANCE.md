@@ -51,6 +51,12 @@ the original process identity is no longer live. Aggregates from a still-live
 process or with independent failures remain errors. Disappearance never qualifies
 the tool.
 
+Cached image references use canonical registry/repository/tag or digest keys.
+Short Docker Hub names are expanded without changing requested tag or digest
+meaning. Equivalent aliases must resolve to the same initial cached image ID;
+conflicts fail closed. Native image inspection and original-image membership
+checks still run; normalization never pulls, retags or substitutes an image.
+
 ## Ownership admission
 
 `TestingResourceIsolation.Admit` runs before dotenv loading and before the Aspire

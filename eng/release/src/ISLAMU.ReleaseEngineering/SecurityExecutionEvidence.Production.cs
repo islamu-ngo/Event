@@ -1156,6 +1156,60 @@ public static partial class SecurityExecutionEvidence
 
     private static string DigestBytes(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
+    internal static string LocalImageReferenceKey(string reference)
+    {
+        if (!BoundedIdentity(reference, 2048)) throw new InvalidDataException();
+        if (FullLocalImageId(reference)) return reference;
+        int digest = reference.IndexOf('@');
+        string repository = digest < 0 ? reference : reference[..digest];
+        string suffix = digest < 0 ? ":latest" : reference[digest..];
+        if (digest >= 0 && !FullLocalImageId(reference[(digest + 1)..])) throw new InvalidDataException();
+        int tag = repository.LastIndexOf(':');
+        if (tag > repository.LastIndexOf('/'))
+        {
+            if (digest < 0) suffix = repository[tag..];
+            repository = repository[..tag];
+        }
+        int slash = repository.IndexOf('/');
+        if (slash < 0)
+            repository = "docker.io/library/" + repository;
+        else
+        {
+            string first = repository[..slash];
+            if (!first.Contains('.') && !first.Contains(':') && first != "localhost")
+                repository = "docker.io/" + repository;
+            if (repository.StartsWith("docker.io/", StringComparison.Ordinal) && !repository["docker.io/".Length..].Contains('/'))
+                repository = "docker.io/library/" + repository["docker.io/".Length..];
+        }
+        return repository + suffix;
+    }
+
+    internal static Dictionary<string, string> ReadCachedImageReferences(JsonElement inventory)
+    {
+        if (inventory.ValueKind != JsonValueKind.Array || inventory.GetArrayLength() > 65_536) throw new InvalidDataException();
+        var references = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (JsonElement item in inventory.EnumerateArray())
+        {
+            string id = Text(item, "Id");
+            if (!FullLocalImageId(id)) throw new InvalidDataException();
+            references[id] = id;
+            foreach (string field in new[] { "RepoTags", "RepoDigests" })
+            {
+                if (!item.TryGetProperty(field, out JsonElement values) || values.ValueKind == JsonValueKind.Null) continue;
+                if (values.ValueKind != JsonValueKind.Array || values.GetArrayLength() > 1024) throw new InvalidDataException();
+                foreach (JsonElement value in values.EnumerateArray())
+                {
+                    if (value.ValueKind != JsonValueKind.String) throw new InvalidDataException();
+                    string reference = LocalImageReferenceKey(value.GetString()!);
+                    if (references.TryGetValue(reference, out string? previous) && previous != id) throw new InvalidDataException();
+                    references[reference] = id;
+                    if (references.Count > 131_072) throw new InvalidDataException();
+                }
+            }
+        }
+        return references;
+    }
+
     private sealed class SelectedDaemon : IDisposable
     {
         private readonly SocketsHttpHandler _handler;
@@ -1378,7 +1432,7 @@ public static partial class SecurityExecutionEvidence
             string image = await LocalImageIdAsync("postgres:18-alpine", token).ConfigureAwait(false);
             HashSet<string> initialImages = await CachedImageIdsAsync(token).ConfigureAwait(false);
             Dictionary<string, string> initialReferences = await CachedImageReferencesAsync(token).ConfigureAwait(false);
-            if (!initialImages.Contains(image) || !initialReferences.TryGetValue("postgres:18-alpine", out string? initialImage)
+            if (!initialImages.Contains(image) || !initialReferences.TryGetValue(LocalImageReferenceKey("postgres:18-alpine"), out string? initialImage)
                 || initialImage != image) throw new OwnedExecutionFailure("benchmark_cached_image_missing");
             HashSet<string> initialContainers = await InitialContainersAsync(owner, token).ConfigureAwait(false);
             Dictionary<string, string> initialVolumes = await VolumeMountpointsAsync(token).ConfigureAwait(false);
@@ -1869,7 +1923,7 @@ public static partial class SecurityExecutionEvidence
             async Task ResolveImageAsync(string reference)
             {
                 string id = await LocalImageIdAsync(reference, CancellationToken.None).ConfigureAwait(false);
-                if (!initialImages.Contains(id) || !initialReferences.TryGetValue(reference, out string? initialImage)
+                if (!initialImages.Contains(id) || !initialReferences.TryGetValue(LocalImageReferenceKey(reference), out string? initialImage)
                     || initialImage != id || images.TryGetValue(reference, out string? previous) && previous != id)
                     throw new OwnedExecutionFailure("declared_image_cache_changed");
                 images[reference] = id;
@@ -2466,7 +2520,7 @@ public static partial class SecurityExecutionEvidence
                         throw new OwnedExecutionFailure("api_creation_capture_conflict");
                     if (stop.IsCancellationRequested) return;
                     string image = await LocalImageIdAsync(proof.Creation.ImageReference, CancellationToken.None).ConfigureAwait(false);
-                    if (!cachedImageIds.Contains(image) || !initialReferences.TryGetValue(proof.Creation.ImageReference, out string? initialImage)
+                    if (!cachedImageIds.Contains(image) || !initialReferences.TryGetValue(LocalImageReferenceKey(proof.Creation.ImageReference), out string? initialImage)
                         || initialImage != image || images.TryGetValue(proof.Creation.ImageReference, out string? previousImage)
                         && previousImage != image) throw new OwnedExecutionFailure("api_image_reference_changed");
                     images[proof.Creation.ImageReference] = image;
@@ -2649,29 +2703,7 @@ public static partial class SecurityExecutionEvidence
         private async Task<Dictionary<string, string>> CachedImageReferencesAsync(CancellationToken token)
         {
             using JsonDocument document = await GetAsync("/v1.40/images/json?all=true", token).ConfigureAwait(false);
-            JsonElement inventory = document.RootElement;
-            if (inventory.ValueKind != JsonValueKind.Array || inventory.GetArrayLength() > 65_536) throw new InvalidDataException();
-            var references = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (JsonElement item in inventory.EnumerateArray())
-            {
-                string id = Text(item, "Id");
-                if (!FullLocalImageId(id)) throw new InvalidDataException();
-                references[id] = id;
-                foreach (string field in new[] { "RepoTags", "RepoDigests" })
-                {
-                    if (!item.TryGetProperty(field, out JsonElement values) || values.ValueKind == JsonValueKind.Null) continue;
-                    if (values.ValueKind != JsonValueKind.Array || values.GetArrayLength() > 1024) throw new InvalidDataException();
-                    foreach (JsonElement value in values.EnumerateArray())
-                    {
-                        if (value.ValueKind != JsonValueKind.String || !BoundedIdentity(value.GetString()!, 2048)) throw new InvalidDataException();
-                        string reference = value.GetString()!;
-                        if (references.TryGetValue(reference, out string? previous) && previous != id) throw new InvalidDataException();
-                        references[reference] = id;
-                        if (references.Count > 131_072) throw new InvalidDataException();
-                    }
-                }
-            }
-            return references;
+            return ReadCachedImageReferences(document.RootElement);
         }
 
         private async Task<string> LocalImageIdAsync(string reference, CancellationToken token)

@@ -31,6 +31,13 @@ consumers; merely observing the child's failure proves neither. Do not qualify
 modified child sources against a prior candidate or count this helper as a
 passing registered case.
 
+Owning-assembly metadata is bounded to 32 MiB. The current native
+`Explore.Application.dll` contains 15,332,280 metadata bytes, so the former
+8 MiB cap rejected a genuine build before child execution. The larger bound
+does not change allowed metadata fields, duplicate rejection, candidate joins
+or output-index custody. Regression cases accept a 16 MiB metadata fixture and
+reject a 33 MiB fixture; this is build-admission proof, not runtime cleanup proof.
+
 ## Ownership admission
 
 `TestingResourceIsolation.Admit` runs before dotenv loading and before the Aspire

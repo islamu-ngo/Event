@@ -1781,9 +1781,33 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             .EndsWith(".deps.json", StringComparison.Ordinal))).IsTrue();
     }
 
-    private static void WriteOwnMetadataAssembly(string path, IEnumerable<KeyValuePair<string, string>> fields)
+    [Test]
+    [Arguments(16, true)]
+    [Arguments(33, false)]
+    public async Task OwnBuildMetadataRemainsBoundedForLargeNativeAssemblies(int metadataMiB, bool accepted)
+    {
+        using var fixture = new SecurityExecutionEvidenceCandidateTests.SourceFixture();
+        string assembly = Path.Combine(fixture.Root, "large-own-metadata.dll");
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["ISLAMU.Assurance.ProjectPath"] = "src/Own/Own.csproj",
+            ["ISLAMU.Assurance.TargetPath"] = "src/Own/bin/Release/net10.0/Own.dll",
+            ["ISLAMU.Assurance.TargetName"] = "Own"
+        };
+        WriteOwnMetadataAssembly(assembly, fields, metadataMiB * 1_048_576);
+        if (accepted)
+            await Assert.That(SecurityExecutionEvidence.ReadOwnManagedBuild(assembly)).IsEqualTo(
+                new SecurityExecutionEvidence.OwnManagedBuild("src/Own/Own.csproj",
+                    "src/Own/bin/Release/net10.0/Own.dll", "Own", null, null));
+        else
+            await Assert.That(() => SecurityExecutionEvidence.ReadOwnManagedBuild(assembly))
+                .Throws<InvalidDataException>();
+    }
+
+    private static void WriteOwnMetadataAssembly(string path, IEnumerable<KeyValuePair<string, string>> fields, int metadataPadding = 0)
     {
         var metadata = new MetadataBuilder();
+        if (metadataPadding != 0) metadata.GetOrAddBlob(new byte[metadataPadding]);
         metadata.AddModule(0, metadata.GetOrAddString("Own.dll"), metadata.GetOrAddGuid(Guid.CreateVersion7()), default, default);
         AssemblyDefinitionHandle assembly = metadata.AddAssembly(metadata.GetOrAddString("Own"), new Version(1, 0, 0, 0),
             default, default, default, default);

@@ -2748,7 +2748,7 @@ public static partial class SecurityExecutionEvidence
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         using var image = new PEReader(stream);
         if (!image.HasMetadata) return null;
-        if (image.PEHeaders.CorHeader?.MetadataDirectory.Size is not (>= 1 and <= 8_388_608))
+        if (image.PEHeaders.CorHeader?.MetadataDirectory.Size is not (>= 1 and <= 33_554_432))
             throw new InvalidDataException("own_build_metadata_limit");
         MetadataReader reader = image.GetMetadataReader();
         if (!reader.IsAssembly) return null;

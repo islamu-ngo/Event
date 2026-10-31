@@ -1,0 +1,83 @@
+.learning-settings {
+    display: grid;
+    gap: var(--isl-space-4, 1rem);
+    overflow-wrap: anywhere;
+}
+
+.learning-settings__fields {
+    display: grid;
+    gap: var(--isl-space-4, 1rem);
+    min-inline-size: 0;
+    margin-block: var(--isl-space-4, 1rem);
+    padding: var(--isl-space-4, 1rem);
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: var(--mud-default-borderradius);
+}
+
+.learning-settings__toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--isl-space-3, .75rem);
+    min-block-size: 2.75rem;
+    cursor: pointer;
+}
+
+.learning-settings__toggle input {
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+    flex-shrink: 0;
+    accent-color: var(--mud-palette-primary);
+}
+
+.learning-settings__field {
+    display: grid;
+    gap: var(--isl-space-2, .5rem);
+    min-inline-size: 0;
+}
+
+.learning-settings__field select {
+    inline-size: 100%;
+    min-inline-size: 0;
+    min-block-size: 2.75rem;
+    padding-inline: var(--isl-space-3, .75rem);
+    color: var(--mud-palette-text-primary);
+    background: var(--mud-palette-surface);
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: var(--mud-default-borderradius);
+    font: inherit;
+}
+
+.learning-settings__family-fields {
+    min-inline-size: 0;
+    display: grid;
+    gap: var(--isl-space-3, .75rem);
+    margin-block: var(--isl-space-2, .5rem);
+    padding: var(--isl-space-3, .75rem);
+    border: 1px solid var(--mud-palette-lines-default);
+}
+
+.learning-settings__button {
+    min-block-size: 2.75rem;
+    padding-block: var(--isl-space-2, .5rem);
+    padding-inline: var(--isl-space-4, 1rem);
+    color: var(--mud-palette-primary-text);
+    background: var(--mud-palette-primary);
+    border: 1px solid var(--mud-palette-primary);
+    border-radius: var(--mud-default-borderradius);
+    font: inherit;
+    cursor: pointer;
+
+    &:disabled {
+        color: var(--mud-palette-text-disabled);
+        background: var(--mud-palette-action-disabled-background);
+        border-color: var(--mud-palette-lines-default);
+        cursor: default;
+    }
+}
+
+.learning-settings input:focus-visible,
+.learning-settings select:focus-visible,
+.learning-settings button:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 3px;
+}

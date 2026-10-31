@@ -63,6 +63,26 @@ administrator notice remains a distinct explicit action, even when automatic
 guidance is suppressed. Acknowledging it records that notice only, not
 competence or permission to publish or take payments.
 
+## Configure Tenant Guidance
+
+Tenant administrators can open **Learning guidance** from tenant administration,
+including the combined settings layout. The page is at
+`/settings/admin/learning`. It controls availability, automatic invitations,
+independent invitation/manual audiences, administrator orientation and the four
+guidance families. Disabled guidance can still be re-enabled by an administrator
+whose current server response permits editing.
+
+Your current personal notice is shown separately from the policy form. Hiding
+optional learning or suppressing invitations does not acknowledge or hide a
+pending notice. Read it and use its explicit acknowledgement action when the
+server offers that action; editing permission does not grant acknowledgement.
+
+When editing is not offered, the page is read-only. A conflicting or unconfirmed
+save leaves the draft available for review; use the explicit discard-and-reload
+action before saving again. Changes are not replayed automatically. These
+settings do not configure providers, clear real setup blockers, expose members'
+private progress or install a tour renderer.
+
 ## Learning Does Not Grant Production Authority
 
 Instance operators can use **Manage directories** in Getting started when that

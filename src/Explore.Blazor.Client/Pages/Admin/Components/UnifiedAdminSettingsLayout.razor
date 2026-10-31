@@ -83,6 +83,12 @@ else
                 <MudItem xs="12" md="3" Class="@(_showMobileMenu ? "d-block" : "d-none d-md-block")">
                     <MudPaper Elevation="0" Class="settings-sidebar pa-0" Style="background-color: transparent;">
                         <MudList T="string" Dense="true" DisablePadding="true">
+                            @if (IsSingleTenantMode && _canManageTenant)
+                            {
+                                <MudListItem Icon="@Icons.Material.Filled.School"
+                                             Text="@Translations.T("ui.learning.settings.navigation", "Learning guidance")"
+                                             Href="@Navigation.ToAbsoluteUri("settings/admin/learning").PathAndQuery" />
+                            }
                             @{
                                 string? renderedGroup = null;
                             }

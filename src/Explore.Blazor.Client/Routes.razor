@@ -198,6 +198,7 @@
             new RouteConfig { Path = "/admin/instance/plans/:Key", Component = typeof(InstanceTenantPlanDetailPage), Transition = RouteTransition.Fade, Guards = RequireMultiTenantAdmin() },
              new RouteConfig { Path = "/settings/instance", Component = typeof(AdminSettingsPage), Transition = RouteTransition.Fade, Guards = RequireAdmin() },
              new RouteConfig { Path = "/settings/admin", Component = typeof(AdminSettingsPage), Transition = RouteTransition.Fade, Guards = RequireTenantAdmin() },
+             new RouteConfig { Path = "/settings/admin/learning", Component = typeof(TenantLearningSettings), Transition = RouteTransition.None, EnableCache = false, Guards = RequireTenantAdmin() },
              new RouteConfig { Path = "/settings/organization/:OrganizationId", Component = typeof(OrganizationAdminSettings), Transition = RouteTransition.Fade, Guards = RequireOrgAdmin() },
              new RouteConfig { Path = "/settings/group/:GroupId", Component = typeof(GroupAdminSettings), Transition = RouteTransition.Fade, Guards = RequireGroupAdmin() },
     };

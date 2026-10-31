@@ -19,6 +19,7 @@
 @inject AiAssistantState AiAssistantState
 @inject ISnackbar Snackbar
 @inject ILogger<TenantAdminSettingsLayout> Logger
+@inject NavigationManager Navigation
 
 <div class="settings-layout">
     <MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
@@ -87,6 +88,9 @@
                 <MudItem xs="12" md="3" Class="@(_showMobileMenu ? "d-block" : "d-none d-md-block")">
                     <MudPaper Elevation="0" Class="settings-sidebar pa-0" Style="background-color: transparent;">
                         <MudList T="string" Dense="true" DisablePadding="true">
+                            <MudListItem Icon="@Icons.Material.Filled.School"
+                                         Text="@Translations.T("ui.learning.settings.navigation", "Learning guidance")"
+                                         Href="@Navigation.ToAbsoluteUri("settings/admin/learning").PathAndQuery" />
                             <MudListItem Icon="@Icons.Material.Filled.Policy"
                                          Text="Policies"
                                          Class="@GetNavItemClass("policies")"

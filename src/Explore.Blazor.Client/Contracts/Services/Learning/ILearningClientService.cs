@@ -10,6 +10,7 @@ public interface ILearningClientService : IDisposable
     LearningClientScope? Scope { get; }
     HalResourceOfLearningContextDto? Context { get; }
     HalResourceOfLearningPracticeDto? Practice { get; }
+    HalResourceOfLearningGuidancePolicyDto? GuidancePolicy { get; }
     LearningClientFailure Failure { get; }
     bool IsBusy { get; }
     bool IsSaving { get; }
@@ -21,10 +22,16 @@ public interface ILearningClientService : IDisposable
 
     bool HasContextAction(string relation);
     bool HasPracticeAction(string relation);
+    bool HasGuidancePolicyAction(string relation);
     bool CanPreview(LearningPracticeSummaryDto practice);
     void SetTenantContext(Guid? tenantId);
     Task LoadContextAsync(CancellationToken cancellationToken = default);
     Task LoadPracticeAsync(Guid practiceId, CancellationToken cancellationToken = default);
+    Task LoadGuidancePolicyAsync(CancellationToken cancellationToken = default);
+    Task<bool> UpdateGuidancePolicyAsync(
+        HalResourceOfLearningGuidancePolicyDto source,
+        LearningGuidancePolicyPayload policy,
+        CancellationToken cancellationToken = default);
     Task<bool> UpdatePreferencesAsync(
         bool suppressAutomaticTours, bool hideLearning, bool pinLearning,
         CancellationToken cancellationToken = default);

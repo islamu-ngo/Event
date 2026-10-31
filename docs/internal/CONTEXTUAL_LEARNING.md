@@ -1,7 +1,7 @@
 # Private Learning State And Authored Practice
 
 > **Audience:** Developers and operators
-> **Status:** Private backend, authored practice and scoped Help integration; full programme/host assurance remains open
+> **Status:** Private backend, authored practice and scoped Help/settings integration; full programme/host assurance remains open
 > **Contract Updated:** 2026-10-30; historical verification receipts retained below
 > **Source Anchors:** `src/Explore.Domain/Learning/`, `ILearningRepository`, `ILearningPrivacyErasureStore`, `PrivacyErasureApplier`
 
@@ -10,7 +10,7 @@
 The workstream includes the private learning backend, an authenticated learning
 hub and six isolated authored exercises, including shared-chat simulation.
 Permanent Help and private self/member panels consume the existing scoped
-learning contract.
+learning contract; tenant guidance has a dedicated policy editor.
 Rendered tours remain an ordered successor with accessibility, comprehension
 and renderer package-admission release gates.
 
@@ -106,6 +106,35 @@ values, not optimistic local successes. Pending administrator orientation is
 explicit self-acknowledgement of the authored notice; suppression/hiding do not
 acknowledge it or conceal its pending state. Scope replacement and disposal
 cancel retained work and prevent former-owner data or callbacks from returning.
+
+## Tenant Guidance Editor
+
+`/settings/admin/learning` uses the existing tenant-administrator route guard and
+is linked from both native settings layouts. The page reads private data only
+after interactive rendering. Editing follows the policy resource's `edit`
+relation, independently of learning eligibility, so an authorized administrator
+can re-enable disabled guidance.
+
+The draft contains only the closed availability, invitation/manual audiences,
+requirement policy and four-family overrides. It is separate from the received
+resource. A save snapshots those values and the observed nullable `Guid`
+concurrency stamp; an absent stamp represents the server's default document,
+not a guessed revision. A changed write stamp alone is insufficient: the facade
+requires matching fresh policy and context reads under the original owner.
+Conflicts and unconfirmed writes retain the draft, prevent resubmission and
+require explicit discard/reload without replay.
+
+The page also consumes `LearningRequirementNotice`, shared with the private
+profile panel, outside its policy form and edit-disabled fieldsets. Current
+personal requirement status and acknowledgement follow the private context,
+not policy-edit authority. Suppressing invitations or hiding optional practice
+does not hide a pending notice. Only an explicit current self-context action
+with supported material and its own HAL relation can acknowledge it.
+
+This editor changes guidance policy only. Real readiness, inherited controls,
+production permissions and other learners' private state retain their existing
+owners. Hosted accessibility and the unadmitted renderer are separate programme
+gates, not conclusions from component tests.
 
 ## Instance Administration Entry
 

@@ -19,7 +19,7 @@ public enum LearningClientFailure
 
 /// <summary>
 /// Owns interactive private learning reads and single-attempt, server-advertised
-/// simulation writes. Scope changes invalidate both transport and retained state.
+/// learning and guidance writes. Scope changes invalidate transport and retained state.
 /// </summary>
 public sealed class LearningClientService : ILearningClientService
 {
@@ -60,6 +60,7 @@ public sealed class LearningClientService : ILearningClientService
     public LearningClientScope? Scope { get; private set; }
     public HalResourceOfLearningContextDto? Context { get; private set; }
     public HalResourceOfLearningPracticeDto? Practice { get; private set; }
+    public HalResourceOfLearningGuidancePolicyDto? GuidancePolicy { get; private set; }
     public LearningClientFailure Failure { get; private set; }
     public bool IsBusy { get; private set; }
     public bool IsSaving { get; private set; }
@@ -83,6 +84,9 @@ public sealed class LearningClientService : ILearningClientService
     public bool HasPracticeAction(string relation) =>
         Practice?._links?.ContainsKey(relation) == true;
 
+    public bool HasGuidancePolicyAction(string relation) =>
+        GuidancePolicy?._links?.ContainsKey(relation) == true;
+
     public bool CanPreview(LearningPracticeSummaryDto practice) =>
         Context?.SpaceStatus != LearningSpaceStatus.Removed
         && practice.PreviewAvailable == true && practice.ContextKey == Scope?.ContextKey
@@ -104,6 +108,9 @@ public sealed class LearningClientService : ILearningClientService
     /// <summary>A read never starts an exercise or recreates a removed source.</summary>
     public Task LoadPracticeAsync(Guid practiceId, CancellationToken cancellationToken = default) =>
         LoadAsync(practiceId, cancellationToken);
+
+    public Task LoadGuidancePolicyAsync(CancellationToken cancellationToken = default) =>
+        LoadAsync(null, cancellationToken, loadGuidancePolicy: true);
 
     public async Task<bool> UpdatePreferencesAsync(
         bool suppressAutomaticTours, bool hideLearning, bool pinLearning,
@@ -170,6 +177,134 @@ public sealed class LearningClientService : ILearningClientService
                 && receipt.State is { } state && IsAcknowledged(state.Requirement),
             refreshPractice: false, cancellationToken,
             context => IsAcknowledged(context.Requirement)) is not null;
+    }
+
+    public async Task<bool> UpdateGuidancePolicyAsync(
+        HalResourceOfLearningGuidancePolicyDto source,
+        LearningGuidancePolicyPayload policy,
+        CancellationToken cancellationToken = default)
+    {
+        var context = Context;
+        var scope = Scope;
+        if (_disposed || context is null || scope is null || !CanSubmit
+            || !ReferenceEquals(source, GuidancePolicy) || !HasGuidancePolicyAction("edit")
+            || policy is null || policy.FamilyOverrides is null || policy.FamilyOverrides.Count > 4
+            || !Enum.IsDefined(policy.InvitationAudience) || !Enum.IsDefined(policy.ManualAccessAudience)
+            || !Enum.IsDefined(policy.RequirementPolicy)
+            || !policy.Enabled && policy.RequirementPolicy != LearningRequirementPolicy.Optional
+            || policy.FamilyOverrides.Select(family => family.Family).Distinct().Count()
+                != policy.FamilyOverrides.Count
+            || policy.FamilyOverrides.Any(family => !Enum.IsDefined(family.Family)
+                || family.InvitationAudience is { } invitation && !Enum.IsDefined(invitation)
+                || family.ManualAccessAudience is { } manual && !Enum.IsDefined(manual)))
+            return false;
+
+        // Generated protocol inputs are mutable: snapshot only the closed fields
+        // before yielding so later draft changes cannot alter the submitted intent.
+        var submitted = CopyPolicy(policy);
+        var expectedStamp = source.ConcurrencyStamp;
+        string scopeStamp = context.ScopeStamp;
+        var request = new UpdateLearningGuidancePolicyRequest
+        {
+            ExpectedConcurrencyStamp = expectedStamp,
+            Policy = submitted
+        };
+        var operation = BeginOperation(saving: true, cancellationToken);
+        var token = operation.Token;
+        var generation = _generation;
+        bool writeAttempted = false;
+        bool accepted = false;
+        Changed?.Invoke();
+        try
+        {
+            if (!await AuthenticateAsync(generation, token))
+                return false;
+
+            Task<HalResourceOfLearningGuidancePolicyDto> response;
+            lock (_stateGate)
+            {
+                if (!IsCurrent(generation, token) || Scope != scope
+                    || !ReferenceEquals(context, Context) || !ReferenceEquals(source, GuidancePolicy)
+                    || !HasGuidancePolicyAction("edit"))
+                    return false;
+                writeAttempted = true;
+                response = _client.UpdateLearningGuidancePolicyAsync(request, cancellationToken: token);
+            }
+            var receipt = await response;
+            if (!IsCurrent(generation, token))
+                return false;
+            if (receipt is null || receipt.ConcurrencyStamp is null
+                || receipt.ConcurrencyStamp == Guid.Empty
+                || receipt.ConcurrencyStamp == expectedStamp
+                || !SamePolicy(receipt.Policy, submitted))
+            {
+                lock (_stateGate)
+                {
+                    if (IsCurrent(generation, token))
+                    {
+                        Failure = LearningClientFailure.SaveNotApplied;
+                        LastMutationApplied = false;
+                        _saveRequiresReload = true;
+                    }
+                }
+                return false;
+            }
+
+            var fresh = await _client.GetLearningGuidancePolicyAsync(cancellationToken: token);
+            if (!IsCurrent(generation, token))
+                return false;
+            var freshContext = await _client.GetLearningContextAsync(scope.ContextKey, cancellationToken: token);
+            lock (_stateGate)
+            {
+                if (!IsCurrent(generation, token) || Scope != scope)
+                    return false;
+                if (fresh is null || fresh.ConcurrencyStamp != receipt.ConcurrencyStamp
+                    || !SamePolicy(fresh.Policy, submitted)
+                    || !MatchesContext(freshContext, scope.ContextKey)
+                    || freshContext.ScopeStamp != scopeStamp
+                    || freshContext.LearnerRevision < context.LearnerRevision
+                    || freshContext.ResourceRevision < context.ResourceRevision)
+                {
+                    Failure = LearningClientFailure.Conflict;
+                    _saveRequiresReload = true;
+                    return false;
+                }
+                GuidancePolicy = fresh;
+                Context = freshContext;
+                Practice = null;
+                LastMutationApplied = true;
+                accepted = true;
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            lock (_stateGate)
+            {
+                if (IsCurrent(generation, token))
+                {
+                    ReportFailure(exception);
+                    _saveRequiresReload = true;
+                }
+            }
+        }
+        finally
+        {
+            lock (_stateGate)
+            {
+                if (writeAttempted && !_disposed && generation == _generation
+                    && Scope == scope && token.IsCancellationRequested)
+                {
+                    Failure = LearningClientFailure.RequestFailed;
+                    LastMutationApplied = null;
+                    _saveRequiresReload = true;
+                }
+            }
+            CompleteOperation(operation, generation);
+        }
+        lock (_stateGate)
+            return accepted && !_disposed && generation == _generation && Scope == scope
+                && _contextKey == SelectedContextKey();
     }
 
     public async Task<Guid?> StartPracticeAsync(
@@ -304,13 +439,15 @@ public sealed class LearningClientService : ILearningClientService
             CancelPending();
             Context = null;
             Practice = null;
+            GuidancePolicy = null;
             Scope = null;
             Changed = null;
         }
         GC.SuppressFinalize(this);
     }
 
-    private async Task LoadAsync(Guid? practiceId, CancellationToken cancellationToken)
+    private async Task LoadAsync(
+        Guid? practiceId, CancellationToken cancellationToken, bool loadGuidancePolicy = false)
     {
         if (_disposed)
             return;
@@ -321,6 +458,7 @@ public sealed class LearningClientService : ILearningClientService
         string contextKey = _contextKey;
         Context = null;
         Practice = null;
+        GuidancePolicy = null;
         Changed?.Invoke();
         try
         {
@@ -340,6 +478,22 @@ public sealed class LearningClientService : ILearningClientService
                 }
                 Scope = new(context.TenantId, context.UserId, contextKey);
                 Context = context;
+            }
+            if (loadGuidancePolicy)
+            {
+                // Policy administration remains available when learning itself is disabled.
+                var policy = await _client.GetLearningGuidancePolicyAsync(cancellationToken: token);
+                lock (_stateGate)
+                {
+                    if (!IsCurrent(generation, token))
+                        return;
+                    if (policy is null)
+                    {
+                        Failure = LearningClientFailure.Unavailable;
+                        return;
+                    }
+                    GuidancePolicy = policy;
+                }
             }
             if (practiceId is { } id)
             {
@@ -476,6 +630,7 @@ public sealed class LearningClientService : ILearningClientService
                     return null;
                 Context = context;
                 Practice = practice;
+                GuidancePolicy = null;
                 LastMutationApplied = true;
             }
             acceptedReceipt = receipt;
@@ -541,6 +696,38 @@ public sealed class LearningClientService : ILearningClientService
         ChoiceKey = choiceKey
     };
 
+    private static LearningGuidancePolicyPayload CopyPolicy(LearningGuidancePolicyPayload policy) => new()
+    {
+        Enabled = policy.Enabled,
+        AutomaticInvitations = policy.AutomaticInvitations,
+        InvitationAudience = policy.InvitationAudience,
+        ManualAccessAudience = policy.ManualAccessAudience,
+        RequirementPolicy = policy.RequirementPolicy,
+        FamilyOverrides = policy.FamilyOverrides.Select(family => new LearningGuidanceFamilyOverrideDto
+        {
+            Family = family.Family,
+            Enabled = family.Enabled,
+            AutomaticInvitations = family.AutomaticInvitations,
+            InvitationAudience = family.InvitationAudience,
+            ManualAccessAudience = family.ManualAccessAudience
+        }).ToArray()
+    };
+
+    private static bool SamePolicy(LearningGuidancePolicyPayload? left, LearningGuidancePolicyPayload right) =>
+        left is not null && left.FamilyOverrides is not null
+        && left.Enabled == right.Enabled && left.AutomaticInvitations == right.AutomaticInvitations
+        && left.InvitationAudience == right.InvitationAudience
+        && left.ManualAccessAudience == right.ManualAccessAudience
+        && left.RequirementPolicy == right.RequirementPolicy
+        && left.FamilyOverrides.Count == right.FamilyOverrides.Count
+        && left.FamilyOverrides.Select(family => family.Family).Distinct().Count()
+            == left.FamilyOverrides.Count
+        && left.FamilyOverrides.All(family => right.FamilyOverrides.Any(other =>
+            family.Family == other.Family && family.Enabled == other.Enabled
+            && family.AutomaticInvitations == other.AutomaticInvitations
+            && family.InvitationAudience == other.InvitationAudience
+            && family.ManualAccessAudience == other.ManualAccessAudience));
+
     private bool MatchesContext(HalResourceOfLearningContextDto? context, string contextKey) =>
         context is not null && context.TenantId != Guid.Empty && context.UserId != Guid.Empty
         && !string.IsNullOrWhiteSpace(context.ScopeStamp)
@@ -566,6 +753,7 @@ public sealed class LearningClientService : ILearningClientService
 
             Context = null;
             Practice = null;
+            GuidancePolicy = null;
             Scope = null;
             Failure = LearningClientFailure.SignInRequired;
             return false;
@@ -624,6 +812,7 @@ public sealed class LearningClientService : ILearningClientService
         {
             Context = null;
             Practice = null;
+            GuidancePolicy = null;
             Scope = null;
         }
     }
@@ -663,6 +852,7 @@ public sealed class LearningClientService : ILearningClientService
             CancelPending();
             Context = null;
             Practice = null;
+            GuidancePolicy = null;
             Scope = null;
             Failure = LearningClientFailure.None;
             LastMutationApplied = null;

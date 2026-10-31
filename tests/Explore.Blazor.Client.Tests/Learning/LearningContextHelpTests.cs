@@ -284,6 +284,10 @@ public sealed class LearningContextHelpTests : IDisposable
             HideLearning = true
         };
         _learning.Context.Returns(context);
+        _learning.GuidancePolicy.Returns(new HalResourceOfLearningGuidancePolicyDto
+        {
+            Policy = new() { Enabled = state != "disabled", FamilyOverrides = [] }
+        });
         var cut = _ctx.Render<LearningContextHelp>();
 
         await Assert.That(HelpActions(cut.FindAll("a,button,summary")).Count()).IsEqualTo(1);
@@ -553,6 +557,7 @@ public sealed class LearningContextHelpTests : IDisposable
         InvalidateOwner(facade, change);
         await Assert.That(facade.Scope is null).IsTrue();
         await Assert.That(facade.Context is null).IsTrue();
+        await Assert.That(facade.GuidancePolicy is null).IsTrue();
         // Deliver the old owner's data even though invalidation cancelled its transport.
         if (!duringRefresh)
             response.SetResult(PrivateReceipt(settled));
@@ -592,6 +597,7 @@ public sealed class LearningContextHelpTests : IDisposable
 
         await Assert.That(facade.Context is null).IsTrue();
         await Assert.That(facade.Scope is null).IsTrue();
+        await Assert.That(facade.GuidancePolicy is null).IsTrue();
         await Assert.That(facade.LastMutationApplied is null).IsTrue();
     }
 

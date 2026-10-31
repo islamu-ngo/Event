@@ -144,6 +144,21 @@ status advertises `manage-tenants`. Its UI destination is the registered
 `/admin/tenants` address. This is instance administration, not tenant learning
 authority or access to private learner records.
 
+## Truthful Public Event Search
+
+`EventList` describes the accepted temporal query rather than claiming that the
+tenant has no event history. Its default query is `UpcomingAndOngoing`; filtered,
+past and all-event results retain their own empty-state meaning. Completed
+zero-result searches are distinct from loading, failed/recovering requests and
+truncated traversal.
+
+The past-results action and the return to upcoming/ongoing results both use the
+existing discovery endpoint. They change only the temporal view, retaining
+search, actor, format and age filters. Existing curated destinations remain
+available. No archive endpoint, synthetic event card or additional permission
+is introduced. Component HTTP tests verify actual requests and return results;
+hosted visual and accessibility assurance remains open.
+
 ## Single Announcement Bar Browser Scope
 
 `UserSettingsService` obtains anonymous tenant identity from

@@ -101,6 +101,18 @@ reader merely through their role. Switching tenant or account requires a fresh
 private context. Do not embed learning state in public page prerendering,
 browser transfer state or shared caches.
 
+## Browse Past And Upcoming Events
+
+An empty event search describes the selected dates and filters, not the
+workspace's entire event history. The normal view searches upcoming and ongoing
+events. When it has no matches, you can search past events and then return to
+upcoming events without losing your search or actor, format and age filters.
+Existing curated links remain available.
+
+Loading, failed requests and incomplete result traversal are shown separately
+from a completed search with no matches. These actions search real public
+events; they do not create examples or open a separate archive.
+
 ## Announcement Dismissal And Browser Privacy
 
 Anonymous announcement dismissal stays in the browser and is separated by

@@ -182,6 +182,8 @@ public class EventListTests : IDisposable
 
         await Assert.That(cut.FindAll(".event-list__recovery").Count).IsEqualTo(1);
         await Assert.That(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventListPagination>().Count).IsEqualTo(0);
+        await Assert.That(cut.FindAll("[data-discovery-state]")).IsEmpty();
+        await Assert.That(cut.FindAll("[data-discovery-action='past']")).IsEmpty();
         await Assert.That(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventCard>()
             .Select(card => card.Instance.Event.Id)).IsEquivalentTo(new Guid?[] { oldId });
         await Assert.That(handler.Requests.Count).IsEqualTo(2);
@@ -205,6 +207,8 @@ public class EventListTests : IDisposable
         await Assert.That(cut.FindAll(".event-list__truncated").Count).IsEqualTo(1);
         await Assert.That(cut.FindAll(".event-list__truncated + button").Count).IsEqualTo(1);
         await Assert.That(cut.Markup).DoesNotContain("No events found");
+        await Assert.That(cut.FindAll("[data-discovery-state]")).IsEmpty();
+        await Assert.That(cut.FindAll("[data-discovery-action='past']")).IsEmpty();
     }
 
     [Test]
@@ -214,6 +218,176 @@ public class EventListTests : IDisposable
         var cut = _ctx.RenderMudComponent<EventList>();
         await Assert.That(cut.FindAll(".event-list__recovery").Count).IsEqualTo(1);
         await Assert.That(cut.Markup).DoesNotContain("No events found");
+        await Assert.That(cut.FindAll("[data-discovery-state]")).IsEmpty();
+        await Assert.That(cut.FindAll("[data-discovery-action='past']")).IsEmpty();
+    }
+
+    [Test]
+    public async Task EmptyUpcoming_PastActionQueriesExistingDiscoveryWithoutInventingEvents()
+    {
+        using var handler = new DiscoveryHttpHandler(
+            (200, CreateResult(1, 20, [])),
+            (200, CreateResult(1, 20, [])));
+        using var http = RegisterDiscoveryHttpClient(handler);
+        var cut = _ctx.RenderMudComponent<EventList>();
+
+        await Assert.That(cut.FindAll("[data-discovery-state='upcoming']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventCard>()).IsEmpty();
+        await Assert.That(handler.Requests.Count).IsEqualTo(1);
+        await Assert.That(System.Web.HttpUtility.ParseQueryString(handler.Requests[0].Query)["view"])
+            .IsEqualTo("UpcomingAndOngoing");
+
+        await cut.Find("[data-discovery-action='past']").ClickAsync(new MouseEventArgs());
+
+        await Assert.That(handler.Requests.Count).IsEqualTo(2);
+        await Assert.That(handler.Requests[1].AbsolutePath).IsEqualTo(handler.Requests[0].AbsolutePath);
+        var query = System.Web.HttpUtility.ParseQueryString(handler.Requests[1].Query);
+        await Assert.That(query["view"]).IsEqualTo("Past");
+        await Assert.That(query["cursor"]).IsNull();
+        await Assert.That(cut.FindAll("[data-discovery-state='past']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-discovery-state='upcoming']")).IsEmpty();
+        await Assert.That(cut.FindAll("[data-discovery-action='past']")).IsEmpty();
+        await Assert.That(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventCard>()).IsEmpty();
+    }
+
+    [Test]
+    public async Task EmptyFilteredUpcoming_PastActionRetainsSearchFiltersAndCuratedUrls()
+    {
+        var actorId = Guid.NewGuid();
+        var organizationId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        const string curatedUrl = "/events?AudienceAgeIds=2";
+        _publicExperienceService.GetCachedShellAsync().Returns(Task.FromResult<PublicExperienceShellDto?>(new()
+        {
+            EventSections =
+            [
+                new PublicExperienceEventSectionDto { Key = "youth", Label = "Youth Programs", Url = curatedUrl }
+            ]
+        }));
+        using var handler = new DiscoveryHttpHandler(
+            (200, CreateResult(1, 20, [])),
+            (200, CreateResult(1, 20, [])),
+            (200, CreateResult(1, 20, [])));
+        using var http = RegisterDiscoveryHttpClient(handler);
+        _ctx.Services.GetRequiredService<NavigationManager>()
+            .NavigateTo($"/events?q=community&actorId={actorId}&organizationId={organizationId}&groupId={groupId}");
+        var cut = _ctx.RenderMudComponent<EventList>();
+        var filter = cut.FindComponent<Explore.Blazor.Client.Pages.Events.Components.EventFilterBar>().Instance;
+        await cut.InvokeAsync(async () =>
+        {
+            filter.SelectedFormatIds = [2];
+            filter.SelectedAudienceAgeIds = [3];
+            await filter.OnSearchRequested.InvokeAsync();
+        });
+
+        await Assert.That(cut.FindAll("[data-discovery-state='filtered']").Count).IsEqualTo(1);
+        await Assert.That(cut.Find(".event-list__preset-list a").GetAttribute("href")).IsEqualTo(curatedUrl);
+        var originalQuery = System.Web.HttpUtility.ParseQueryString(handler.Requests[1].Query);
+        await Assert.That(originalQuery["searchTerm"]).IsEqualTo("community");
+        await Assert.That(originalQuery["actorId"]).IsEqualTo(actorId.ToString());
+        await Assert.That(originalQuery["organizationId"]).IsEqualTo(organizationId.ToString());
+        await Assert.That(originalQuery["groupId"]).IsEqualTo(groupId.ToString());
+        await Assert.That(originalQuery["formatIds"]).IsEqualTo("2");
+        await Assert.That(originalQuery["audienceAgeIds"]).IsEqualTo("3");
+
+        await cut.Find("[data-discovery-action='past']").ClickAsync(new MouseEventArgs());
+
+        await Assert.That(handler.Requests.Count).IsEqualTo(3);
+        await Assert.That(handler.Requests[2].AbsolutePath).IsEqualTo(handler.Requests[0].AbsolutePath);
+        var pastQuery = System.Web.HttpUtility.ParseQueryString(handler.Requests[2].Query);
+        await Assert.That(pastQuery["view"]).IsEqualTo("Past");
+        await Assert.That(pastQuery["cursor"]).IsNull();
+        foreach (var key in originalQuery.AllKeys.Where(key =>
+                     key is not null && !string.Equals(key, "view", StringComparison.OrdinalIgnoreCase)))
+        {
+            var expectedValues = originalQuery.GetValues(key)
+                ?? throw new InvalidOperationException($"Expected query values for '{key}'.");
+            await Assert.That(pastQuery.GetValues(key)).IsEquivalentTo(expectedValues);
+        }
+        await Assert.That(cut.FindAll("[data-discovery-state='past']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-discovery-action='past']")).IsEmpty();
+        await Assert.That(cut.Find(".event-list__preset-list a").GetAttribute("href")).IsEqualTo(curatedUrl);
+        await Assert.That(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventCard>()).IsEmpty();
+    }
+
+    [Test]
+    public async Task EmptyPast_UpcomingActionRestoresDefaultViewAndRetainsFilters()
+    {
+        var actorId = Guid.NewGuid();
+        using var handler = new DiscoveryHttpHandler(
+            (200, CreateResult(1, 20, [])),
+            (200, CreateResult(1, 20, [])),
+            (200, CreateResult(1, 20, [])));
+        using var http = RegisterDiscoveryHttpClient(handler);
+        _ctx.Services.GetRequiredService<NavigationManager>()
+            .NavigateTo($"/events?q=community&actorId={actorId}");
+        var cut = _ctx.RenderMudComponent<EventList>();
+        var filter = cut.FindComponent<Explore.Blazor.Client.Pages.Events.Components.EventFilterBar>().Instance;
+        await cut.InvokeAsync(async () =>
+        {
+            filter.SelectedTemporalView = Explore.Blazor.Client.Models.TemporalView.Past;
+            filter.SelectedFormatIds = [2];
+            filter.SelectedAudienceAgeIds = [3];
+            await filter.OnSearchRequested.InvokeAsync();
+        });
+
+        await Assert.That(handler.Requests.Count).IsEqualTo(2);
+        var pastQuery = System.Web.HttpUtility.ParseQueryString(handler.Requests[1].Query);
+        await Assert.That(pastQuery["view"]).IsEqualTo("Past");
+        await Assert.That(pastQuery["searchTerm"]).IsEqualTo("community");
+        await Assert.That(pastQuery["actorId"]).IsEqualTo(actorId.ToString());
+        await Assert.That(pastQuery["formatIds"]).IsEqualTo("2");
+        await Assert.That(pastQuery["audienceAgeIds"]).IsEqualTo("3");
+        await Assert.That(cut.FindAll("[data-discovery-state='past']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-discovery-action='upcoming']").Count).IsEqualTo(1);
+
+        await cut.Find("[data-discovery-action='upcoming']").ClickAsync(new MouseEventArgs());
+
+        await Assert.That(handler.Requests.Count).IsEqualTo(3);
+        await Assert.That(handler.Requests[2].AbsolutePath).IsEqualTo(handler.Requests[0].AbsolutePath);
+        var upcomingQuery = System.Web.HttpUtility.ParseQueryString(handler.Requests[2].Query);
+        await Assert.That(upcomingQuery["view"]).IsEqualTo("UpcomingAndOngoing");
+        await Assert.That(upcomingQuery["cursor"]).IsNull();
+        foreach (var key in pastQuery.AllKeys.Where(key =>
+                     key is not null && !string.Equals(key, "view", StringComparison.OrdinalIgnoreCase)))
+        {
+            var expectedValues = pastQuery.GetValues(key)
+                ?? throw new InvalidOperationException($"Expected query values for '{key}'.");
+            await Assert.That(upcomingQuery.GetValues(key)).IsEquivalentTo(expectedValues);
+        }
+        await Assert.That(cut.FindAll("[data-discovery-state='filtered']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-discovery-state='past']")).IsEmpty();
+        await Assert.That(cut.FindAll("[data-discovery-action='upcoming']")).IsEmpty();
+        await Assert.That(cut.FindAll("[data-discovery-action='past']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventCard>()).IsEmpty();
+    }
+
+    [Test]
+    [Arguments(Explore.Blazor.Client.Models.TemporalView.Past, "past")]
+    [Arguments(Explore.Blazor.Client.Models.TemporalView.All, "all")]
+    public async Task EmptyExplicitTemporalView_DistinguishesPresentationWithoutPastAction(
+        Explore.Blazor.Client.Models.TemporalView view, string state)
+    {
+        using var handler = new DiscoveryHttpHandler(
+            (200, CreateResult(1, 20, [])),
+            (200, CreateResult(1, 20, [])));
+        using var http = RegisterDiscoveryHttpClient(handler);
+        var cut = _ctx.RenderMudComponent<EventList>();
+        var filter = cut.FindComponent<Explore.Blazor.Client.Pages.Events.Components.EventFilterBar>().Instance;
+
+        await cut.InvokeAsync(async () =>
+        {
+            filter.SelectedTemporalView = view;
+            await filter.OnSearchRequested.InvokeAsync();
+        });
+
+        await Assert.That(handler.Requests.Count).IsEqualTo(2);
+        await Assert.That(System.Web.HttpUtility.ParseQueryString(handler.Requests[1].Query)["view"])
+            .IsEqualTo(view.ToString());
+        await Assert.That(cut.FindAll($"[data-discovery-state='{state}']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-discovery-state]").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-discovery-action='past']")).IsEmpty();
+        await Assert.That(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventCard>()).IsEmpty();
     }
 
     private HttpClient RegisterDiscoveryHttpClient(DiscoveryHttpHandler handler)
@@ -536,9 +710,18 @@ public class EventListTests : IDisposable
 
         // Assert — empty state must not appear while load is pending
         await Assert.That(cut.Markup).DoesNotContain("No events found");
+        await Assert.That(cut.FindAll(".event-list__page[aria-busy='true']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-discovery-state]")).IsEmpty();
+        await Assert.That(cut.FindAll("[data-discovery-action='past']")).IsEmpty();
 
-        // Cleanup to avoid dangling async work
-        pendingResult.TrySetResult(CreateResult(1, 20, []));
+        var loaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        cut.OnMarkupUpdated += (_, _) =>
+        {
+            if (cut.FindAll(".event-list__page[aria-busy='false']").Count == 1)
+                loaded.TrySetResult();
+        };
+        pendingResult.SetResult(CreateResult(1, 20, []));
+        await loaded.Task.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Test]
@@ -551,16 +734,24 @@ public class EventListTests : IDisposable
         var cut = _ctx.RenderMudComponent<EventList>();
 
         // Pre-condition: while pending, empty state is not shown
-        cut.WaitForAssertion(() =>
+        await Assert.That(cut.FindAll("[data-discovery-state]")).IsEmpty();
+        await Assert.That(cut.FindAll(".event-list__page[aria-busy='true']").Count).IsEqualTo(1);
+        var loaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        cut.OnMarkupUpdated += (_, _) =>
         {
-            Assert.That(cut.Markup).DoesNotContain("No events found");
-        });
+            if (cut.FindAll(".event-list__page[aria-busy='false']").Count == 1)
+                loaded.TrySetResult();
+        };
 
         // Complete the request already subscribed by the rendered component.
         pendingResult.SetResult(CreateResult(1, 20, []));
+        await loaded.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        cut.WaitForAssertion(() =>
-            Assert.That(cut.Markup).Contains("No events found"));
+        await Assert.That(cut.FindAll("[data-discovery-state='upcoming']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-discovery-action='past']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll(".event-list__recovery")).IsEmpty();
+        await Assert.That(cut.FindAll(".event-list__truncated")).IsEmpty();
+        await Assert.That(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventCard>()).IsEmpty();
     }
 
     [Test]
@@ -573,31 +764,39 @@ public class EventListTests : IDisposable
 
         var cut = _ctx.RenderMudComponent<EventList>();
 
-        cut.WaitForAssertion(() =>
-        {
-            Assert.That(cut.Markup).Contains("No matching events found");
-            Assert.That(cut.Markup).Contains("Try adjusting your filters or search query.");
-        });
+        await Assert.That(cut.FindAll("[data-discovery-state='filtered']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-discovery-action='past']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll(".event-list__page[aria-busy='false']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll(".event-list__recovery")).IsEmpty();
+        await Assert.That(cut.FindAll(".event-list__truncated")).IsEmpty();
     }
 
     [Test]
     public async Task HidesNoEventsState_WhenResultsExist()
     {
-        // Arrange — immediate result with one event
         var events = new List<EventListDto>
         {
             new() { Id = Guid.NewGuid(), Title = "Blazor Summit", Description = "Event description" }
         };
-        SetupPagedResult(Task.FromResult(CreateResult(1, 20, events)));
+        var pendingResult = new TaskCompletionSource<EventDiscoveryTraversalResource>(TaskCreationOptions.RunContinuationsAsynchronously);
+        SetupPagedResult(pendingResult.Task);
 
-        // Act
         var cut = _ctx.RenderMudComponent<EventList>();
-
-        cut.WaitForAssertion(() =>
+        var loaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        cut.OnMarkupUpdated += (_, _) =>
         {
-            Assert.That(cut.Markup).Contains("Blazor Summit");
-            Assert.That(cut.Markup).DoesNotContain("No events found");
-        });
+            if (cut.FindAll(".event-list__page[aria-busy='false']").Count == 1)
+                loaded.TrySetResult();
+        };
+        pendingResult.SetResult(CreateResult(1, 20, events));
+        await loaded.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await Assert.That(cut.Markup).Contains("Blazor Summit");
+        await Assert.That(cut.Markup).DoesNotContain("No events found");
+        await Assert.That(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventCard>()
+            .Select(card => card.Instance.Event.Id)).IsEquivalentTo(events.Select(evt => evt.Id));
+        await Assert.That(cut.FindAll("[data-discovery-state]")).IsEmpty();
+        await Assert.That(cut.FindAll("[data-discovery-action='past']")).IsEmpty();
     }
 
     [Test]

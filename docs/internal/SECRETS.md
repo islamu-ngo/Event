@@ -43,6 +43,14 @@ authentication inputs from process environment, never application JSON or
 vault-returned configuration. User Secrets remains a separately selected local
 authority rather than an Infisical bootstrap fallback.
 
+`MigrationDatabaseAcquisition` retains the complete alias map for null masks but
+excludes `Database:LocalIdentityWriter:Password` and
+`IdentityDatabase:LocalIdentityWriter:Password` from acquisition. It still acquires
+those roles' usernames for enrollment. Canonical and environment password aliases
+remain masked when this projection overlays lower-priority host configuration.
+An explicitly empty required migrator credential still rejects acquisition
+rather than selecting another alias.
+
 Native entrypoints require `SecretProvider:Infisical:TokenLifetime` to be
 `Finite` or `Periodic`. Periodic additionally requires `TokenPeriodSeconds` equal
 to the login's reported expiration; finite rejects that field. The native owner

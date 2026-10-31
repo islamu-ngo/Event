@@ -26,6 +26,29 @@ the caller activity. Its separate explicit version/info/container/image/image pr
 read-only acquisition on the selected daemon. Neither proves resource custody,
 workload completion, cleanup or registered candidate admission.
 
+## Engine readiness before bounded daemon exchanges
+
+`SelectedDaemon` retains asynchronous Unix connection, HTTP and response-body
+operations, a five-second request budget and a three-second connection allowance.
+GET retains incremental byte, JSON-depth and duplicate-property bounds.
+Cancellation after transmitting a mutation does not establish cleanup success.
+
+A Docker Desktop API proxy can serve version, info and container inventory from
+cache while its VM is stopped. Those successful responses do not establish that
+the engine can serve image inventory or execute a workload. On October 31, 2026,
+the selected runtime log showed image inventory starting the VM at 16:40:19 UTC;
+the engine became ready at 16:40:31 UTC, after both five-second probes expired.
+This explains that reproduction without attributing it to .NET socket completion.
+
+Establish actual engine readiness separately, before starting assurance requests:
+use a bounded read-only uncached inventory operation on the same selected socket.
+Record its status, duration and the runtime's startup transition separately from
+the subsequent native test results. This prerequisite neither extends the
+client's request deadline nor retries a failed mutation. Do not reset the daemon,
+change global resource-saving settings, substitute an endpoint or claim that a
+cached health response proves readiness. A ready-engine probe still does not
+prove resource custody, workload completion or owned cleanup.
+
 ## Controlled cleanup child
 
 The configured-resource join retains foreign named-volume conflicts even when

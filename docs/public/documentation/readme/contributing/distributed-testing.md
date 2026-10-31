@@ -23,6 +23,16 @@ This does not disable application tracing, change credentials or extend request
 deadlines. A successful read-only daemon probe proves transport only, not that
 the application graph started or that owned cleanup completed.
 
+Ensure the selected engine is actually running before starting assurance tests.
+Docker Desktop can answer version, info and container-list requests from cache
+while its VM is stopped; the first uncached inventory request can then wait for
+VM startup. Use a separately bounded read-only inventory check on that same
+endpoint and retain its readiness result. Do not reset the runtime or change
+global resource-saving settings. The asynchronous daemon client's five-second
+request budget and three-second connection allowance remain unchanged.
+A lost DELETE response leaves an unknown outcome: retain the failure and inspect
+the exact resource rather than replaying the mutation or declaring cleanup complete.
+
 Each case creates its own run ID, root directory, marker, data volumes, and
 dynamic ports. The fixture supplies `ISLAMU_TEST_RUN_ID` and `ISLAMU_TEST_ROOT`;
 do not point them at existing storage. The directory basename must match the

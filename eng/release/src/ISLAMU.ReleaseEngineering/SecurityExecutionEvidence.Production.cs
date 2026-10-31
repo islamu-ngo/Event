@@ -1161,7 +1161,7 @@ public static partial class SecurityExecutionEvidence
     {
         if (!BoundedIdentity(reference, 2048)) throw new InvalidDataException();
         if (FullLocalImageId(reference)) return reference;
-        int digest = reference.IndexOf('@');
+        int digest = reference.IndexOf('@', StringComparison.Ordinal);
         string repository = digest < 0 ? reference : reference[..digest];
         string suffix = digest < 0 ? ":latest" : reference[digest..];
         if (digest >= 0 && !FullLocalImageId(reference[(digest + 1)..])) throw new InvalidDataException();
@@ -1171,15 +1171,15 @@ public static partial class SecurityExecutionEvidence
             if (digest < 0) suffix = repository[tag..];
             repository = repository[..tag];
         }
-        int slash = repository.IndexOf('/');
+        int slash = repository.IndexOf('/', StringComparison.Ordinal);
         if (slash < 0)
             repository = "docker.io/library/" + repository;
         else
         {
             string first = repository[..slash];
-            if (!first.Contains('.') && !first.Contains(':') && first != "localhost")
+            if (!first.Contains('.', StringComparison.Ordinal) && !first.Contains(':', StringComparison.Ordinal) && first != "localhost")
                 repository = "docker.io/" + repository;
-            if (repository.StartsWith("docker.io/", StringComparison.Ordinal) && !repository["docker.io/".Length..].Contains('/'))
+            if (repository.StartsWith("docker.io/", StringComparison.Ordinal) && !repository["docker.io/".Length..].Contains('/', StringComparison.Ordinal))
                 repository = "docker.io/library/" + repository["docker.io/".Length..];
         }
         return repository + suffix;

@@ -846,9 +846,10 @@ public sealed class K6LoadProcessHarnessTests
     }
 
     [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task CancellationAndDeadlineKillTheOwnedTreeAndCloseItsOutputPipes(bool useDeadline)
+    [Arguments(false, false)]
+    [Arguments(true, false)]
+    [Arguments(true, true)]
+    public async Task CancellationAndDeadlineKillTheOwnedTreeAndCloseItsOutputPipes(bool useDeadline, bool observeAfterCompletion)
     {
         using var root = new OwnedProcessDirectory();
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
@@ -862,11 +863,18 @@ public sealed class K6LoadProcessHarnessTests
         var run = RunChildAsync(root, "tree", useDeadline ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(10), cancellation.Token);
         try
         {
+            if (observeAfterCompletion)
+            {
+                try { await run; }
+                catch (OperationCanceledException) { }
+            }
             await ready.Task.WaitAsync(TimeSpan.FromSeconds(3), cancellation.Token);
-            await Assert.That(IsRunning(root.Path, "parent.pid")).IsTrue();
-            await Assert.That(IsRunning(root.Path, "descendant.pid")).IsTrue();
             if (!useDeadline)
+            {
+                await Assert.That(IsRunning(root.Path, "parent.pid")).IsTrue();
+                await Assert.That(IsRunning(root.Path, "descendant.pid")).IsTrue();
                 await cancellation.CancelAsync();
+            }
             await Assert.That(async () => await run).Throws<OperationCanceledException>();
             await Assert.That(elapsed.Elapsed.TotalSeconds).IsLessThan(10);
             await Assert.That(IsRunning(root.Path, "parent.pid")).IsFalse();

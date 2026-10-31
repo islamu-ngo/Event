@@ -48,6 +48,21 @@ available. There are no uploads, reference searches, model tools or live actor
 switches in this exercise. Starting a real conversation is a separate workspace
 action and does not import this example.
 
+## Reopen Help And Your Private Learning
+
+Help stays available without opening the account menu, including when optional
+guidance is hidden or disabled. It explains browsing, participation, personal
+work and organization/group collaboration. Administration links reflect the
+settings scopes currently offered by the server; Help does not grant them.
+
+Your own profile or currently selected authorized organization/group context can
+show your private learning panel after sign-in. Other visitors see no private
+progress. The panel keeps personal preferences and fictional practice separate
+from the actor's public activity and from other members' records. A pending
+administrator notice remains a distinct explicit action, even when automatic
+guidance is suppressed. Acknowledging it records that notice only, not
+competence or permission to publish or take payments.
+
 ## Learning Does Not Grant Production Authority
 
 Instance operators can use **Manage directories** in Getting started when that

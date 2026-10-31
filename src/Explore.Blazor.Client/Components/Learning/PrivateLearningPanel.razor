@@ -1,0 +1,346 @@
+@using Explore.Blazor.Client.Contracts.Services.Learning
+@using Explore.Blazor.Client.Contracts.Services.Shell
+@using Explore.Blazor.Client.Services.Learning
+@using Explore.Blazor.Client.Services.Shell
+@implements IDisposable
+@inject ILearningClientService Learning
+@inject IUserService Users
+@inject IUiShellContextService ShellContext
+@inject UiShellState Shell
+@inject CurrentUserState CurrentUser
+@inject AuthenticationStateProvider Authentication
+@inject ITranslationService Translation
+@inject NavigationManager Navigation
+
+@if (!_interactiveReady || !_admitted)
+{
+    <p class="private-learning__placeholder" data-testid="private-learning-placeholder">
+        @T("ui.learning.private.placeholder", "Private learning is separate from this public profile. Only your own learning is available after sign-in in an authorized context.")
+    </p>
+    @if (_interactiveReady && _readFailed)
+    {
+        <div class="private-learning">
+            <p role="alert">@T("ui.learning.private.admission_failed", "Private learning could not be opened in the current context. No private state is displayed.")</p>
+            <button type="button" @onclick="ReloadAsync">@T("ui.learning.reload", "Reload current context")</button>
+        </div>
+    }
+}
+else
+{
+    <section class="private-learning" data-testid="private-learning-panel"
+             aria-label="@T("ui.learning.private.title", "Your private learning")"
+             aria-busy="@(_loading || Learning.IsBusy ? "true" : "false")">
+        <h2>@T("ui.learning.private.title", "Your private learning")</h2>
+        <p>@_scopeExplanation <bdi dir="auto">@_actingName</bdi></p>
+        <p>@T("ui.learning.private.boundary", "These are your preferences and practice, not this actor's public activity or a report about other members. Optional lessons do not establish real event, public-disclosure or paid-commerce readiness.")</p>
+        @if (!_selectedScopeMatches)
+        {
+            <p>@T("ui.learning.private.select_scope", "Learning follows your selected acting scope. Select this profile's acting scope in the existing workspace controls to view its private practice; viewing a profile does not select it.")</p>
+        }
+        else if (_loading)
+        {
+            <p role="status">@T("ui.learning.loading", "Loading your private learning context...")</p>
+        }
+        else
+        {
+            @if (_readFailed || Learning.Failure != LearningClientFailure.None)
+            {
+                <p role="alert">@T("ui.learning.private.failure", "The current learning state could not be confirmed. A submitted change may have reached the server. Reload before trying again; no change is replayed automatically.")</p>
+            }
+            @if (Learning.IsSaving)
+            {
+                <p role="status">@T("ui.learning.saving", "Waiting for the server to confirm this learning change...")</p>
+            }
+            else if (Learning.LastMutationApplied == true)
+            {
+                <p role="status">@T("ui.learning.change.applied", "The server confirmed the learning change. Real events were not changed.")</p>
+            }
+            @if (VisibleContext is { } context)
+            {
+                var suppressAutomaticTours = context.Preferences.SuppressAutomaticTours == true;
+                var hideLearning = context.Preferences.HideLearning == true;
+                var pinLearning = context.Preferences.PinLearning == true;
+                <dl class="private-learning__preferences">
+                    <dt>@T("ui.learning.private.automatic", "Automatic guidance")</dt>
+                    <dd>@(suppressAutomaticTours
+                        ? T("ui.learning.private.suppressed", "Suppressed by your preference")
+                        : T("ui.learning.private.not_suppressed", "Not suppressed; current directory policy still applies"))</dd>
+                    <dt>@T("ui.learning.private.visibility", "Optional learning panel")</dt>
+                    <dd>@(hideLearning
+                        ? T("ui.learning.private.hidden", "Hidden")
+                        : T("ui.learning.private.shown", "Shown"))</dd>
+                    <dt>@T("ui.learning.private.pin", "Learning pin")</dt>
+                    <dd>@(pinLearning
+                        ? T("ui.learning.private.pinned", "Pinned")
+                        : T("ui.learning.private.not_pinned", "Not pinned"))</dd>
+                </dl>
+                @if (Learning.HasContextAction("preferences"))
+                {
+                    <div class="private-learning__actions">
+                        <button type="button" data-learning-action="preferences" data-learning-preference="suppress-automatic-tours" disabled="@(!Learning.CanSubmit)"
+                                @onclick="@(() => SavePreferencesAsync(context, !suppressAutomaticTours, hideLearning, pinLearning))">
+                            @(suppressAutomaticTours
+                                ? T("ui.learning.private.allow_guidance", "Allow automatic guidance")
+                                : T("ui.learning.private.suppress_guidance", "Suppress automatic guidance"))
+                        </button>
+                        <button type="button" data-learning-action="preferences" data-learning-preference="hide-learning" disabled="@(!Learning.CanSubmit)"
+                                @onclick="@(() => SavePreferencesAsync(context, suppressAutomaticTours, !hideLearning, pinLearning))">
+                            @(hideLearning
+                                ? T("ui.learning.private.show", "Show optional learning")
+                                : T("ui.learning.private.hide", "Hide optional learning"))
+                        </button>
+                        <button type="button" data-learning-action="preferences" data-learning-preference="pin-learning" disabled="@(!Learning.CanSubmit)"
+                                @onclick="@(() => SavePreferencesAsync(context, suppressAutomaticTours, hideLearning, !pinLearning))">
+                            @(pinLearning
+                                ? T("ui.learning.private.unpin", "Unpin learning")
+                                : T("ui.learning.private.pin_action", "Pin learning"))
+                        </button>
+                    </div>
+                }
+                @if (context.Capabilities.UnavailableReason is { } reason)
+                {
+                    <p>@T(reason.Key, reason.Fallback)</p>
+                }
+                <LearningRequirementNotice Context="context" IsCurrentContext="IsRequirementContextCurrent"
+                                           CancellationToken="_pending.Token" />
+                @if (!hideLearning)
+                {
+                    <p>@T("ui.learning.private.practice", "Continue your own optional fictional exercises in the learning hub. They stay separate from real upcoming and past events.")</p>
+                    <a href="@(Navigation.ToAbsoluteUri("learning").PathAndQuery)">@T("ui.learning.help.practice.link", "Open your private learning hub")</a>
+                    <p>@T("ui.learning.private.history", "Saved exercises in this selected scope:") @Learning.OwnedPractices.Count(practice => practice.ContextKey == context.ContextKey)</p>
+                }
+                @if (Learning.HasContextAction("remove-learning-space") || Learning.HasContextAction("recreate-learning-space"))
+                {
+                    <section class="private-learning__notice">
+                        <h3>@T("ui.learning.space.title", "Shared learning source")</h3>
+                        <p>@T("ui.learning.private.admin_scope", "These controls affect the current directory's shared learning source, not production events or another learner's private history. Real setup and inherited policy remain in their existing administration surfaces.")</p>
+                        @if (Learning.HasContextAction("remove-learning-space"))
+                        {
+                            @if (_confirmRemove)
+                            {
+                                <p>@T("ui.learning.private.remove.confirm", "Remove the shared source for this directory? Opening Help will not recreate it.")</p>
+                                <div class="private-learning__actions">
+                                    <button type="button" data-learning-action="remove-learning-space" disabled="@(!Learning.CanSubmit)" @onclick="@(() => ManageSpaceAsync(context, LearningSpaceAction.Remove))">
+                                        @T("ui.learning.private.remove.action", "Confirm removal of shared learning source")
+                                    </button>
+                                    <button type="button" disabled="@Learning.IsBusy" @onclick="@(() => _confirmRemove = false)">
+                                        @T("ui.learning.cancel", "Cancel")
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <button type="button" data-learning-action="request-remove-learning-space" disabled="@(!Learning.CanSubmit)" @onclick="@(() => _confirmRemove = true)">
+                                    @T("ui.learning.private.remove", "Remove shared learning source")
+                                </button>
+                            }
+                        }
+                        @if (Learning.HasContextAction("recreate-learning-space"))
+                        {
+                            <button type="button" data-learning-action="recreate-learning-space" disabled="@(!Learning.CanSubmit)" @onclick="@(() => ManageSpaceAsync(context, LearningSpaceAction.Recreate))">
+                                @T("ui.learning.private.recreate", "Recreate shared learning source")
+                            </button>
+                        }
+                    </section>
+                }
+            }
+            <button type="button" data-learning-action="reload" disabled="@Learning.IsBusy" @onclick="ReloadAsync">
+                @T("ui.learning.reload", "Reload current context")
+            </button>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public Guid ActorId { get; set; }
+    [Parameter] public Guid? TenantId { get; set; }
+    [CascadingParameter(Name = "TenantContext")] private TenantContext? TenantContext { get; set; }
+
+    private CancellationTokenSource _pending = new();
+    private (Guid Actor, Guid? Tenant)? _requested;
+    private long _generation;
+    private bool _interactiveReady;
+    private bool _loadRequested = true;
+    private bool _loading;
+    private bool _admitted;
+    private bool _selectedScopeMatches;
+    private bool _readFailed;
+    private bool _confirmRemove;
+    private bool _disposed;
+    private Guid? _userId;
+    private string? _contextKey;
+    private string? _actingName;
+    private string _scopeExplanation = string.Empty;
+    private Guid? EffectiveTenantId => TenantId ?? TenantContext?.TenantId;
+
+    private HalResourceOfLearningContextDto? VisibleContext =>
+        _interactiveReady && _admitted && _selectedScopeMatches
+        && Learning.Scope is { } scope && scope.UserId == _userId
+        && scope.TenantId == EffectiveTenantId && scope.ContextKey == _contextKey
+        && Learning.Context is { } context && context.UserId == _userId
+        && context.TenantId == EffectiveTenantId && context.ContextKey == _contextKey
+            ? context : null;
+
+    protected override void OnInitialized()
+    {
+        Learning.Changed += OnLearningChanged;
+        Authentication.AuthenticationStateChanged += OnAuthenticationChanged;
+        CurrentUser.OnChanged += OnOwnerChanged;
+        Shell.Changed += OnOwnerChanged;
+    }
+
+    protected override void OnParametersSet()
+    {
+        var requested = (ActorId, EffectiveTenantId);
+        if (_requested == requested)
+            return;
+        _requested = requested;
+        Invalidate();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _interactiveReady = true;
+        if (!_disposed && _loadRequested)
+        {
+            _loadRequested = false;
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        Invalidate(requestLoad: false);
+        if (_disposed || !_interactiveReady || ActorId == Guid.Empty
+            || EffectiveTenantId is not { } tenantId || tenantId == Guid.Empty)
+            return;
+
+        var generation = _generation;
+        var token = _pending.Token;
+        var actorId = ActorId;
+        _loading = true;
+        try
+        {
+            var authentication = await Authentication.GetAuthenticationStateAsync().WaitAsync(token);
+            if (!IsCurrent(generation, token) || authentication.User.Identity?.IsAuthenticated != true)
+                return;
+
+            // This read never synchronizes or creates a missing account.
+            var user = await Users.GetCurrentUserResourceAsync().WaitAsync(token);
+            if (!IsCurrent(generation, token) || user?.Id is not { } userId || userId == Guid.Empty
+                || CurrentUser.Current is { } current && current.Id != userId)
+                return;
+            var ownProfile = user.ActorId == actorId;
+            if (!ownProfile)
+            {
+                var shell = await ShellContext.GetContextAsync(token);
+                if (!IsCurrent(generation, token) || shell?.TenantId != tenantId
+                    || shell.ManagedActors?.Any(actor => actor.ActorId == actorId) != true)
+                    return;
+            }
+
+            _userId = userId;
+            _contextKey = Shell.ActiveActorId is { } selectedActorId ? $"actor:{selectedActorId:D}" : "self";
+            _selectedScopeMatches = ownProfile || Shell.ActiveActorId == actorId;
+            _actingName = Shell.ActiveActor?.DisplayName;
+            _scopeExplanation = ownProfile
+                ? T("ui.learning.private.scope.self", "Your own learning in the current directory and selected working context. Viewing your profile does not change your acting scope.")
+                : T("ui.learning.private.scope.member", "Your learning as an authorized collaborator of this organization or group in the current directory.");
+            _admitted = true;
+            if (!_selectedScopeMatches)
+                return;
+            Learning.SetTenantContext(tenantId);
+            await Learning.LoadContextAsync(token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch
+        {
+            if (IsCurrent(generation, token))
+                _readFailed = true;
+        }
+        finally
+        {
+            if (IsCurrent(generation, token))
+            {
+                _loading = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async Task SavePreferencesAsync(
+        HalResourceOfLearningContextDto source, bool suppress, bool hide, bool pin)
+    {
+        if (!ReferenceEquals(source, VisibleContext) || !Learning.CanSubmit
+            || !Learning.HasContextAction("preferences"))
+            return;
+        await Learning.UpdatePreferencesAsync(suppress, hide, pin, _pending.Token);
+    }
+
+    private bool IsRequirementContextCurrent(HalResourceOfLearningContextDto source) =>
+        !_disposed && ReferenceEquals(source, VisibleContext);
+
+    private async Task ManageSpaceAsync(HalResourceOfLearningContextDto source, LearningSpaceAction action)
+    {
+        if (!ReferenceEquals(source, VisibleContext) || !Learning.CanSubmit)
+            return;
+        _confirmRemove = false;
+        await Learning.ManageSpaceAsync(action, _pending.Token);
+    }
+
+    private bool IsCurrent(long generation, CancellationToken token) =>
+        !_disposed && !token.IsCancellationRequested && generation == _generation;
+
+    private void OnAuthenticationChanged(Task<AuthenticationState> authentication) => OnOwnerChanged();
+
+    private void OnOwnerChanged()
+    {
+        if (_disposed)
+            return;
+        Invalidate();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLearningChanged()
+    {
+        if (!_disposed)
+            _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void Invalidate(bool requestLoad = true)
+    {
+        _generation++;
+        _pending.Cancel();
+        _pending.Dispose();
+        _pending = new();
+        _admitted = false;
+        _selectedScopeMatches = false;
+        _userId = null;
+        _contextKey = null;
+        _actingName = null;
+        _confirmRemove = false;
+        _readFailed = false;
+        _loading = false;
+        _loadRequested = requestLoad;
+        if (_interactiveReady)
+            Learning.Clear();
+    }
+
+    private string T(string key, string fallback) => Translation.T(key, fallback);
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+        _disposed = true;
+        _generation++;
+        Learning.Changed -= OnLearningChanged;
+        Authentication.AuthenticationStateChanged -= OnAuthenticationChanged;
+        CurrentUser.OnChanged -= OnOwnerChanged;
+        Shell.Changed -= OnOwnerChanged;
+        _pending.Cancel();
+        _pending.Dispose();
+        if (_interactiveReady)
+            Learning.Clear();
+    }
+}

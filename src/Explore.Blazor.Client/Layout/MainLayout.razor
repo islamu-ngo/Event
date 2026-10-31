@@ -1,6 +1,7 @@
 @using Explore.Blazor.Client.Services.Docking
 @using Explore.Blazor.Client.Components.Docking
 @using Explore.Blazor.Client.Components.Shell
+@using Explore.Blazor.Client.Components.Learning
 @inherits LayoutComponentBase
 
 <MudThemeProvider @ref="_mudThemeProvider" Theme="@_theme" @bind-IsDarkMode="@_isDarkMode" />
@@ -21,7 +22,7 @@
             <header class="main-layout__header">
                 <AnnouncementBar OnVisibilityChanged="OnAnnouncementVisibilityChanged" />
                 <nav aria-label="Sidebar navigation">
-                    <NavMenu />
+                    <NavMenu HelpSettingsScopes="@_shellContext?.SettingsScopes" />
                 </nav>
                 <SupportAccessBanner OnVisibilityChanged="OnSupportAccessBannerVisibilityChanged" />
             </header>
@@ -46,6 +47,10 @@
         <DockLayoutHost Scope="@DockScope.Shell" MinimumContentWidth="@ActiveWorkspaceContentFloor">
             <MudMainContent Class="main-layout__main" Style="padding-top: 0 !important;">
                 <main id="main-content" tabindex="-1" class="@MainContentClass" style="@MainContentStyle">
+                    @if (_hideChrome)
+                    {
+                        <LearningContextHelp AuthorizedSettingsScopes="@_shellContext?.SettingsScopes" />
+                    }
                     @Body
                 </main>
                 @if (!_hideChrome)

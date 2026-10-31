@@ -1,4 +1,5 @@
 @using Explore.Blazor.Client.Routing.InstanceAdmin
+@using Explore.Blazor.Client.Components.Learning
 @*
     NavMenu Component - BEM Methodology
     Block: navbar / navbar--search-active
@@ -428,4 +429,10 @@
 @if (_dropdownOpen)
 {
     <div class="navbar__dropdown-overlay" @onclick="CloseDropdown" aria-hidden="true"></div>
+}
+
+<LearningContextHelp AuthorizedSettingsScopes="@HelpSettingsScopes" />
+
+@code {
+    [Parameter] public IEnumerable<SettingsScopeDto>? HelpSettingsScopes { get; set; }
 }

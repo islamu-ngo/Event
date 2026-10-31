@@ -3,6 +3,7 @@
 @using Explore.Blazor.Client.Contracts.Services
 @using Explore.Blazor.Client.Contracts.Services.Lookup
 @using Explore.Blazor.Client.Helpers
+@using Explore.Blazor.Client.Components.Learning
 @using Explore.Blazor.Client.Shared
 @using MudBlazor
 @attribute [StreamRendering]
@@ -99,6 +100,7 @@
                 }
             </div>
         </article>
+        <PrivateLearningPanel ActorId="@ActorId" TenantId="@TenantId" @key="(ActorId, TenantId)" />
     }
 </MudContainer>
 

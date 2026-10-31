@@ -25,6 +25,12 @@ public interface ILearningClientService : IDisposable
     void SetTenantContext(Guid? tenantId);
     Task LoadContextAsync(CancellationToken cancellationToken = default);
     Task LoadPracticeAsync(Guid practiceId, CancellationToken cancellationToken = default);
+    Task<bool> UpdatePreferencesAsync(
+        bool suppressAutomaticTours, bool hideLearning, bool pinLearning,
+        CancellationToken cancellationToken = default);
+    Task<bool> AcknowledgeRequirementAsync(
+        LearningRequirementDto requirement,
+        CancellationToken cancellationToken = default);
     Task<Guid?> StartPracticeAsync(LearningLessonDto lesson, CancellationToken cancellationToken = default);
     Task<bool> ApplyPracticeActionAsync(
         LearningPracticeAction action, string? choiceKey = null,

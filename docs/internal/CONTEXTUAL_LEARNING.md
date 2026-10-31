@@ -1,7 +1,7 @@
 # Private Learning State And Authored Practice
 
 > **Audience:** Developers and operators
-> **Status:** Private backend and six-exercise UI integration; full programme/host assurance remains open
+> **Status:** Private backend, authored practice and scoped Help integration; full programme/host assurance remains open
 > **Contract Updated:** 2026-10-30; historical verification receipts retained below
 > **Source Anchors:** `src/Explore.Domain/Learning/`, `ILearningRepository`, `ILearningPrivacyErasureStore`, `PrivacyErasureApplier`
 
@@ -9,6 +9,8 @@
 
 The workstream includes the private learning backend, an authenticated learning
 hub and six isolated authored exercises, including shared-chat simulation.
+Permanent Help and private self/member panels consume the existing scoped
+learning contract.
 Rendered tours remain an ordered successor with accessibility, comprehension
 and renderer package-admission release gates.
 
@@ -81,6 +83,29 @@ side-effect absence. The existing closed catalogue, compiled dependency guards,
 native learning save inventory and HTTP database effect-count witnesses provide
 separate backend evidence. Full programme/provider and hosted accessibility
 acceptance remain open.
+
+## Permanent Help And Private Profile Panels
+
+`LearningContextHelp` is a native disclosure composed by the actual `NavMenu`
+and the hidden-chrome layout branch. Its public explanation requires no private
+learning read. Authenticated users receive organizing/collaboration explanations;
+administration destinations come from the existing shell's advertised settings
+scopes and are not rendered into static public HTML. A missing tenant does not
+create an instance-owned learner row.
+
+`PrivateLearningPanel` remains separate from the actor's public representation.
+Initial rendering exposes a public-safe placeholder only. Interactive admission
+reads the current user's resource to identify the personal actor, or checks the
+current shell's managed actors for a member context. Viewing an actor or
+supplying a tenant identifier is not admission. The selected acting context must
+match before the scoped facade reads private learning.
+
+Preferences, private practice links and source controls use the current private
+context and HAL. Suppression, hiding and pin preferences are submitted as closed
+values, not optimistic local successes. Pending administrator orientation is
+explicit self-acknowledgement of the authored notice; suppression/hiding do not
+acknowledge it or conceal its pending state. Scope replacement and disposal
+cancel retained work and prevent former-owner data or callbacks from returning.
 
 ## Instance Administration Entry
 

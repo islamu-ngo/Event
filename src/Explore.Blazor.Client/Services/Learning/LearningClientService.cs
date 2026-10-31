@@ -105,6 +105,73 @@ public sealed class LearningClientService : ILearningClientService
     public Task LoadPracticeAsync(Guid practiceId, CancellationToken cancellationToken = default) =>
         LoadAsync(practiceId, cancellationToken);
 
+    public async Task<bool> UpdatePreferencesAsync(
+        bool suppressAutomaticTours, bool hideLearning, bool pinLearning,
+        CancellationToken cancellationToken = default)
+    {
+        var source = Context;
+        if (source is null || !CanSubmit || !HasContextAction("preferences"))
+            return false;
+
+        var request = new LearningUpdatePreferencesRequest
+        {
+            ExpectedScopeStamp = source.ScopeStamp,
+            ExpectedRevision = source.LearnerRevision,
+            SuppressAutomaticTours = suppressAutomaticTours,
+            HideLearning = hideLearning,
+            PinLearning = pinLearning
+        };
+        bool MatchesPreferences(LearningPreferencesDto preferences) =>
+            preferences.SuppressAutomaticTours == suppressAutomaticTours
+            && preferences.HideLearning == hideLearning && preferences.PinLearning == pinLearning;
+
+        return await MutateAsync(source,
+            token => _client.UpdateLearningPreferencesAsync(request, cancellationToken: token),
+            receipt => receipt.LearnerRevision > source.LearnerRevision
+                && receipt.State is { } state && MatchesPreferences(state.Preferences),
+            refreshPractice: false, cancellationToken,
+            context => MatchesPreferences(context.Preferences)) is not null;
+    }
+
+    /// <summary>Explicit acknowledgement is private evidence, never competence or production authority.</summary>
+    public async Task<bool> AcknowledgeRequirementAsync(
+        LearningRequirementDto requirement, CancellationToken cancellationToken = default)
+    {
+        var source = Context;
+        var current = source?.Requirement;
+        if (source is null || current is null || !CanSubmit
+            || source.ContextKey != "self" || !HasContextAction("acknowledge-requirement")
+            || current.Status != LearningRequirementStatus.Pending
+            || requirement.Status != LearningRequirementStatus.Pending
+            || current.RequirementKey != requirement.RequirementKey
+            || current.MaterialVersion != requirement.MaterialVersion
+            || current.PolicySourceStamp != requirement.PolicySourceStamp)
+            return false;
+
+        var request = new LearningAcknowledgeRequirementRequest
+        {
+            IntentId = Guid.CreateVersion7(),
+            ExpectedScopeStamp = source.ScopeStamp,
+            ExpectedRevision = source.LearnerRevision,
+            ExpectedPolicySourceStamp = current.PolicySourceStamp,
+            MaterialVersion = current.MaterialVersion
+        };
+        bool IsAcknowledged(LearningRequirementDto observed) =>
+            observed.RequirementKey == current.RequirementKey
+            && observed.MaterialVersion == current.MaterialVersion
+            && observed.PolicySourceStamp == current.PolicySourceStamp
+            && observed.Status == LearningRequirementStatus.Satisfied
+            && observed.AcknowledgedAtUtc is not null;
+
+        return await MutateAsync(source,
+            token => _client.LearningAcknowledgeRequirementAsync(
+                current.RequirementKey, request, cancellationToken: token),
+            receipt => receipt.LearnerRevision > source.LearnerRevision
+                && receipt.State is { } state && IsAcknowledged(state.Requirement),
+            refreshPractice: false, cancellationToken,
+            context => IsAcknowledged(context.Requirement)) is not null;
+    }
+
     public async Task<Guid?> StartPracticeAsync(
         LearningLessonDto lesson, CancellationToken cancellationToken = default)
     {
@@ -319,7 +386,8 @@ public sealed class LearningClientService : ILearningClientService
         HalResourceOfLearningContextDto source,
         Func<CancellationToken, Task<HalResourceOfLearningMutationReceiptDto>> write,
         Func<HalResourceOfLearningMutationReceiptDto, bool> applied,
-        bool refreshPractice, CancellationToken cancellationToken)
+        bool refreshPractice, CancellationToken cancellationToken,
+        Func<HalResourceOfLearningContextDto, bool>? validateFreshContext = null)
     {
         var scope = Scope;
         if (_disposed || scope is null || !ReferenceEquals(source, Context))
@@ -369,7 +437,8 @@ public sealed class LearningClientService : ILearningClientService
                 return null;
             if (!MatchesContext(context, scope.ContextKey)
                 || context.ScopeStamp != source.ScopeStamp
-                || context.LearnerRevision < receipt.LearnerRevision)
+                || context.LearnerRevision < receipt.LearnerRevision
+                || validateFreshContext is not null && !validateFreshContext(context))
             {
                 lock (_stateGate)
                 {

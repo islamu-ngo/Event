@@ -1708,7 +1708,7 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         await Assert.That(outsideBenchmarkArtifacts).IsTrue();
         ProcessStartInfo baselineCommand = SecurityExecutionEvidence.ApiBenchmarkStartInfo(benchmarkEntry, benchmarkTemporary, benchmarkArtifacts, "baseline");
         await Assert.That(baselineCommand.ArgumentList.SequenceEqual(new[] { benchmarkEntry, "--filter", "*ApiEndpointPostgreSqlBenchmarks*",
-            "*EfCoreQueryBenchmarks*", "--stopOnFirstError", "--artifacts", benchmarkArtifacts })).IsTrue();
+            "*EfCoreQueryBenchmarks*", "--buildTimeout", "600", "--stopOnFirstError", "--artifacts", benchmarkArtifacts })).IsTrue();
         if (OperatingSystem.IsLinux())
         {
             File.SetUnixFileMode(metadataFixture.Root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);

@@ -102,7 +102,8 @@ public static partial class SecurityExecutionEvidence
             WorkingDirectory = temporary
         };
         foreach (string argument in new[] { assembly, "--filter", "*ApiEndpointPostgreSqlBenchmarks*" }) command.ArgumentList.Add(argument);
-        if (mode == "baseline") command.ArgumentList.Add("*EfCoreQueryBenchmarks*");
+        if (mode == "baseline")
+            foreach (string argument in new[] { "*EfCoreQueryBenchmarks*", "--buildTimeout", "600" }) command.ArgumentList.Add(argument);
         else foreach (string argument in new[] { "--job", "Dry", "--inProcess" }) command.ArgumentList.Add(argument);
         foreach (string argument in new[] { "--stopOnFirstError", "--artifacts", artifacts }) command.ArgumentList.Add(argument);
         return command;

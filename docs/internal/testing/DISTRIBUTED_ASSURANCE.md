@@ -57,6 +57,16 @@ meaning. Equivalent aliases must resolve to the same initial cached image ID;
 conflicts fail closed. Native image inspection and original-image membership
 checks still run; normalization never pulls, retags or substitutes an image.
 
+## Native benchmark compilation
+
+Baseline benchmark launches allow 600 seconds for BenchmarkDotNet's generated
+project build. The retained native SDK build completed in 3:00.93 after the
+default 120-second attempt timed out without executing any benchmarks. This
+allowance changes compilation time only: adaptive measurement settings,
+precision, worker provenance and result admission remain unchanged. Smoke
+launches retain their existing in-process Dry job. Command-contract tests do
+not establish a measured baseline.
+
 ## Ownership admission
 
 `TestingResourceIsolation.Admit` runs before dotenv loading and before the Aspire

@@ -853,10 +853,18 @@ public sealed class K6LoadProcessHarnessTests
         using var root = new OwnedProcessDirectory();
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
         var elapsed = Stopwatch.StartNew();
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var watcher = new FileSystemWatcher(root.Path, "descendant.ready");
+        watcher.Created += (_, _) => ready.TrySetResult();
+        watcher.Renamed += (_, _) => ready.TrySetResult();
+        watcher.Error += (_, args) => ready.TrySetException(args.GetException());
+        watcher.EnableRaisingEvents = true;
         var run = RunChildAsync(root, "tree", useDeadline ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(10), cancellation.Token);
         try
         {
-            await WaitForAsync(() => File.Exists(System.IO.Path.Combine(root.Path, "descendant.ready")), TimeSpan.FromSeconds(3));
+            await ready.Task.WaitAsync(TimeSpan.FromSeconds(3), cancellation.Token);
+            await Assert.That(IsRunning(root.Path, "parent.pid")).IsTrue();
+            await Assert.That(IsRunning(root.Path, "descendant.pid")).IsTrue();
             if (!useDeadline)
                 await cancellation.CancelAsync();
             await Assert.That(async () => await run).Throws<OperationCanceledException>();
@@ -902,26 +910,17 @@ public sealed class K6LoadProcessHarnessTests
             K6LoadHarnessChild.ChildStartInfo(scenario, root.Path), System.IO.Path.Combine(root.Path, "summary.json"), K6LoadProfile.OpenLookup, timeout,
             cancellationToken == default ? TestContext.Current!.Execution.CancellationToken : cancellationToken);
 
-    private static async Task WaitForAsync(Func<bool> condition, TimeSpan timeout)
-    {
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
-        deadline.CancelAfter(timeout);
-        while (!condition())
-            await Task.Delay(20, deadline.Token);
-    }
-
     private static bool IsRunning(string root, string name)
     {
         string file = System.IO.Path.Combine(root, name);
         if (!File.Exists(file))
             return false;
-        int id = int.Parse(File.ReadAllText(file), CultureInfo.InvariantCulture);
-        try
-        {
-            using var process = Process.GetProcessById(id);
-            return !process.HasExited;
-        }
-        catch (ArgumentException) { return false; }
+        string[] recorded = File.ReadAllText(file).Split(':');
+        int id = int.Parse(recorded[0], CultureInfo.InvariantCulture);
+        var current = K6LoadHarnessChild.ReadLifetime(id);
+        bool sameLifetime = current is not null && current.Value.Start == long.Parse(recorded[1], CultureInfo.InvariantCulture);
+        Console.WriteLine($"{name}: state={current?.State.ToString() ?? "absent"}; sameLifetime={sameLifetime}");
+        return current is { } lifetime && sameLifetime && lifetime.State is not ('Z' or 'X');
     }
 
     private sealed class OwnedProcessDirectory : IDisposable
@@ -950,6 +949,24 @@ internal static class K6LoadHarnessChild
     internal const string CanaryName = "ISLAMU_LOAD_HARNESS_SECRET_CANARY";
     private const string ChildFlag = "--assurance-process-child";
     private static readonly string[] Scenarios = ["success", "nonzero", "missing", "oversized", "tree", "descendant", "secrets", "version"];
+
+    internal static (long Start, char State)? ReadLifetime(int pid)
+    {
+        try
+        {
+            if (OperatingSystem.IsLinux())
+            {
+                string stat = File.ReadAllText("/proc/" + pid.ToString(CultureInfo.InvariantCulture) + "/stat");
+                string[] fields = stat[(stat.LastIndexOf(')') + 2)..].Split(' ');
+                return (long.Parse(fields[19], CultureInfo.InvariantCulture), fields[0][0]);
+            }
+            using var process = Process.GetProcessById(pid);
+            return process.HasExited ? null : (process.StartTime.ToUniversalTime().Ticks, 'R');
+        }
+        catch (FileNotFoundException) { return null; }
+        catch (DirectoryNotFoundException) { return null; }
+        catch (ArgumentException) { return null; }
+    }
 
     [ModuleInitializer]
     internal static void DispatchChild()
@@ -1009,7 +1026,10 @@ internal static class K6LoadHarnessChild
         if (scenario is "tree" or "descendant")
         {
             string pidName = scenario == "tree" ? "parent.pid" : "descendant.pid";
-            File.WriteAllText(System.IO.Path.Combine(root, pidName), Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
+            var lifetime = ReadLifetime(Environment.ProcessId)
+                ?? throw new InvalidOperationException("load_child_lifetime_missing");
+            File.WriteAllText(System.IO.Path.Combine(root, pidName), Environment.ProcessId.ToString(CultureInfo.InvariantCulture)
+                + ":" + lifetime.Start.ToString(CultureInfo.InvariantCulture));
             if (scenario == "tree")
             {
                 var descendantStart = ChildStartInfo("descendant", root);
@@ -1022,7 +1042,9 @@ internal static class K6LoadHarnessChild
             }
             else
             {
-                File.WriteAllText(System.IO.Path.Combine(root, "descendant.ready"), "ready");
+                string pending = System.IO.Path.Combine(root, "descendant.pending");
+                File.WriteAllText(pending, "ready");
+                File.Move(pending, System.IO.Path.Combine(root, "descendant.ready"));
                 // Bound synthetic descendants even if a process-cleanup regression leaves one alive.
                 Thread.Sleep(TimeSpan.FromSeconds(15));
             }

@@ -13,6 +13,15 @@ A workflow correction on a PR branch does not replace the trusted-base version
 used by `pull_request_target`; arrange an independently reviewed base update
 before relying on its rerun.
 
+## Native browser prerequisites
+
+For native browser prerequisite failures, first distinguish installer restore
+from browser download and launch. The installer has a dedicated, committed
+locked dependency graph; preserve the other tools' shared lock. See
+[security fixture prerequisites](CI_CD_GOVERNANCE.md#security-integration-fixture-execution).
+Keep provisioning diagnostics private and do not substitute successful
+installation for actual owned browser-case results.
+
 ## Human administrator commit fences
 
 Tenant API-key revoke/details now acquire original S/P/H and repeat their existing

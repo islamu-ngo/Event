@@ -34,6 +34,15 @@ separate runtime evidence and are never inferred from Harness results.
 
 ## Security integration fixture execution
 
+The browser prerequisite uses `eng/tools/InstallAssuranceBrowser.cs` with its
+own generated lock at `eng/tools/InstallAssuranceBrowser/packages.lock.json`.
+The installer requires locked restore and retains the approved Playwright
+version. It must not reuse or overwrite `eng/tools/packages.lock.json`, which
+belongs to other tools: disabling lock generation does not bypass an existing
+lock and causes `NU1005`. Verify the ordinary installer command against its
+committed lock before interpreting a prerequisite failure as a browser or
+runtime regression. Installation alone is not browser execution evidence.
+
 The existing `security-execution.v1.json` packet is governed by the embedded
 `executionRequirements` in `eng/security/security-control-register.json`.
 Producer and validator derive each registered lane's project, closed host

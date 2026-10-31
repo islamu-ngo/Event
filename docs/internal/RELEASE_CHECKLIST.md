@@ -180,6 +180,9 @@ Use `Not applicable` only when the change has no release-impact category. If the
   ```
 
 - [ ] Required per-project tests pass; do not run solution-level `dotnet test`.
+- [ ] Browser prerequisites restore against the installer's own committed lock
+  without changing the shared tools lock; actual named browser cases still run
+  for the candidate. See [fixture prerequisites](CI_CD_GOVERNANCE.md#security-integration-fixture-execution).
 - [ ] Architecture tests pass:
 
   ```bash

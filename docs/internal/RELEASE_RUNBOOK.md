@@ -30,6 +30,12 @@ different commits or label missing runtime lanes as complete. If publication fai
 follow [coverage publication operations](OPERATIONS.md#codecov-coverage-publication);
 do not substitute coverage percentages for the checklist's required tests.
 
+Prepare the owned browser through the existing native installer and its
+dedicated committed lock, preserving other tools' locks. Follow
+[security fixture prerequisites](CI_CD_GOVERNANCE.md#security-integration-fixture-execution)
+when restore or download fails. Only actual case execution, not installation,
+can satisfy the browser portion of the candidate's assurance.
+
 Generate the existing durable evidence bundle only as the checklist directs:
 
 ```sh

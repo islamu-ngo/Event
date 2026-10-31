@@ -615,6 +615,8 @@ intents:
       - "global.json"
       - "Explore.slnx"
       - "eng/release/**"
+      - "eng/tools/InstallAssuranceBrowser.cs"
+      - "eng/tools/InstallAssuranceBrowser/packages.lock.json"
       - "docs/internal/CI_CD_GOVERNANCE.md"
       - "docs/internal/OPERATIONS.md"
       - "docs/internal/TESTING.md"

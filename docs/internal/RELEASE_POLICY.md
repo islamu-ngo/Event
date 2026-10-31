@@ -130,6 +130,11 @@ runtime lanes must not be presented as complete platform coverage. Its scope and
 
 ## Trust, determinism, and privacy
 
+Assurance prerequisite installers retain separately owned, committed dependency
+locks. A restored or installed prerequisite does not attest execution of a
+registered profile; the exact-candidate requirements in the
+[release checklist](RELEASE_CHECKLIST.md#code-and-test-gates) remain separate.
+
 - The renderer MUST run from the trusted bundle with explicit configuration,
   `--offline`, and `--no-exec`; it MUST NOT use provider APIs, network configuration,
   or command processors.

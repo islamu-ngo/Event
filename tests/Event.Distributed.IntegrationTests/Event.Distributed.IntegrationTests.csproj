@@ -12,8 +12,17 @@
     <ProjectReference Include="../../src/Explore.AppHost/Explore.AppHost.csproj" />
     <ProjectReference Include="../../src/Explore.Persistence/Explore.Persistence.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../src/Explore.ServiceDefaults/Explore.ServiceDefaults.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj" ReferenceOutputAssembly="false" IsAspireProjectResource="false" />
     <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="Microsoft.Playwright" />
     <PackageReference Include="TUnit" />
   </ItemGroup>
+  <Target Name="CopyLoadProcessOwner" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <LoadProcessOwnerFile Include="../../eng/release/src/ISLAMU.ReleaseEngineering/bin/$(Configuration)/$(TargetFramework)/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(LoadProcessOwnerFile)"
+          DestinationFiles="@(LoadProcessOwnerFile->'$(TargetDir)LoadProcessOwner/%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>

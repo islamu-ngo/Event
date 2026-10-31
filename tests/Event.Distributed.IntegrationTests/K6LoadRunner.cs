@@ -1343,55 +1343,13 @@ internal static class K6LoadRunner
         var budget = BudgetFor(profile);
         if (timeout <= TimeSpan.Zero || timeout > budget.ProcessDeadline)
             throw new InvalidOperationException("load_deadline_not_admitted");
-        using var process = new Process { StartInfo = startInfo };
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(timeout);
-        var wall = Stopwatch.StartNew();
-        process.Start();
-        long startedTimestamp = Stopwatch.GetTimestamp();
-        long exitedTimestamp;
-        Task output = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, CancellationToken.None);
-        Task error = process.StandardError.BaseStream.CopyToAsync(Stream.Null, CancellationToken.None);
-        int samples = 0;
-        long peakRss = 0;
-        double peakCpuRatio = 0;
-        double previousSeconds = 0;
-        TimeSpan previousCpu = TimeSpan.Zero;
-        try
-        {
-            while (!process.HasExited)
-            {
-                await Task.Delay(TimeSpan.FromMilliseconds(100), deadline.Token);
-                process.Refresh();
-                if (process.HasExited)
-                    break;
-                double seconds = wall.Elapsed.TotalSeconds;
-                TimeSpan cpu = process.TotalProcessorTime;
-                peakCpuRatio = Math.Max(peakCpuRatio,
-                    (cpu - previousCpu).TotalSeconds / (seconds - previousSeconds) / Environment.ProcessorCount);
-                peakRss = Math.Max(peakRss, process.WorkingSet64);
-                if (peakRss > MemoryBudgetBytes)
-                    throw new InvalidOperationException("load_generator_pressure_invalidates_measurement");
-                samples++;
-                previousCpu = cpu;
-                previousSeconds = seconds;
-            }
-            await process.WaitForExitAsync(deadline.Token);
-            exitedTimestamp = Stopwatch.GetTimestamp();
-        }
-        finally
-        {
-            if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
-            await Task.WhenAll(output, error).WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
-        }
-        wall.Stop();
-        if (process.ExitCode != 0 || !File.Exists(summaryPath) || new FileInfo(summaryPath).Length > 4096)
+        var observation = await ObserveOwnedProcessAsync(startInfo, timeout, captureLimit: 0, cancellationToken);
+        if (observation.ExitCode != 0 || !File.Exists(summaryPath) || new FileInfo(summaryPath).Length > 4096)
             throw new InvalidOperationException("load_process_or_summary_failed");
         var summary = ParseSummary(await File.ReadAllTextAsync(summaryPath, cancellationToken), profile, journey);
-        return new K6ProcessMeasurement(summary, wall.Elapsed.TotalMilliseconds, samples, peakCpuRatio, peakRss,
-            startedTimestamp, exitedTimestamp);
+        return new K6ProcessMeasurement(summary, observation.WallMilliseconds, observation.SampleCount,
+            observation.PeakCpuPercent / 100, observation.PeakRssBytes,
+            observation.StartedTimestamp, observation.ExitedTimestamp);
     }
 
     internal static Uri ValidateTarget(Uri ownedOrigin, Uri target)
@@ -1565,28 +1523,146 @@ internal static class K6LoadRunner
     internal static async Task<string> ReadVersionAsync(ProcessStartInfo startInfo, CancellationToken cancellationToken)
     {
         await ValidateExecutableAsync(startInfo.FileName, cancellationToken);
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(TimeSpan.FromSeconds(5));
-        using var process = new Process { StartInfo = startInfo };
-        process.Start();
-        var output = process.StandardOutput.ReadToEndAsync(deadline.Token);
-        var error = process.StandardError.BaseStream.CopyToAsync(Stream.Null, CancellationToken.None);
+        var observation = await ObserveOwnedProcessAsync(startInfo, TimeSpan.FromSeconds(5),
+            captureLimit: 4096, cancellationToken);
+        if (observation.ExitCode != 0 || !observation.Output.StartsWith("k6 v2.3.0 ", StringComparison.Ordinal))
+            throw new InvalidOperationException("load_k6_version_not_admitted");
+        return "2.3.0";
+    }
+
+    internal static async Task<OwnedProcessObservation> ObserveOwnedProcessAsync(ProcessStartInfo workload,
+        TimeSpan timeout, int captureLimit, CancellationToken cancellationToken, ProcessStartInfo? ownerStart = null)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var start = ownerStart ?? StartInfo(Path.Combine(AppContext.BaseDirectory, "LoadProcessOwner", "ISLAMU.ReleaseEngineering"));
+        start.RedirectStandardInput = true;
+        if (ownerStart is null) start.ArgumentList.Add("own-load-process");
+        using var owner = new Process { StartInfo = start };
+        using var deadline = new CancellationTokenSource(timeout + TimeSpan.FromSeconds(20));
+        owner.Start();
+        using var cancellation = cancellationToken.UnsafeRegister(static state =>
+        {
+            try { ((Stream)state!).Dispose(); }
+            catch (IOException) { }
+        }, owner.StandardInput.BaseStream);
+        Task errors = owner.StandardError.BaseStream.CopyToAsync(Stream.Null, CancellationToken.None);
+        Exception? failure = null;
+        OwnedProcessObservation? observation = null;
         try
         {
-            await process.WaitForExitAsync(deadline.Token);
-            string version = await output;
-            if (process.ExitCode != 0 || !version.StartsWith("k6 v2.3.0 ", StringComparison.Ordinal))
-                throw new InvalidOperationException("load_k6_version_not_admitted");
-            return "2.3.0";
+            using var ready = await ReadOwnerMessageAsync(owner.StandardOutput.BaseStream, deadline.Token);
+            JsonDocument terminal;
+            if (ready.RootElement.GetProperty("type").GetString() == "result")
+                terminal = JsonDocument.Parse(ready.RootElement.GetRawText());
+            else
+            {
+                if (ready.RootElement.GetProperty("type").GetString() != "ready" ||
+                    ready.RootElement.GetProperty("protocolVersion").GetInt32() != 1 ||
+                    ready.RootElement.GetProperty("stopwatchFrequency").GetInt64() != Stopwatch.Frequency ||
+                    ready.RootElement.GetProperty("processorCount").GetInt32() != Environment.ProcessorCount)
+                    throw new InvalidOperationException("load_owner_not_ready");
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    string request = JsonSerializer.Serialize(new
+                    {
+                        type = "start",
+                        executable = workload.FileName,
+                        arguments = workload.ArgumentList.ToArray(),
+                        workingDirectory = string.IsNullOrEmpty(workload.WorkingDirectory)
+                            ? Environment.CurrentDirectory : workload.WorkingDirectory,
+                        environment = workload.Environment.ToDictionary(pair => pair.Key,
+                            pair => pair.Value ?? throw new InvalidOperationException("load_environment_value_missing")),
+                        timeoutMilliseconds = checked((int)timeout.TotalMilliseconds),
+                        captureLimit
+                    });
+                    if (Encoding.UTF8.GetByteCount(request) > 65536)
+                        throw new InvalidOperationException("load_owner_request_too_large");
+                    try
+                    {
+                        await owner.StandardInput.WriteLineAsync(request.AsMemory(), deadline.Token);
+                        await owner.StandardInput.FlushAsync(deadline.Token);
+                    }
+                    catch (Exception exception) when (cancellationToken.IsCancellationRequested &&
+                        exception is IOException or ObjectDisposedException)
+                    {
+                        // EOF is the cancellation request. Still consume the owner's cleanup result.
+                    }
+                }
+                using var started = await ReadOwnerMessageAsync(owner.StandardOutput.BaseStream, deadline.Token);
+                terminal = started.RootElement.GetProperty("type").GetString() == "started"
+                    ? await ReadOwnerMessageAsync(owner.StandardOutput.BaseStream, deadline.Token)
+                    : JsonDocument.Parse(started.RootElement.GetRawText());
+            }
+            using (terminal)
+            {
+                JsonElement result = terminal.RootElement;
+                if (result.GetProperty("type").GetString() != "result")
+                    throw new InvalidOperationException("load_owner_result_missing");
+                var cleanup = result.GetProperty("cleanupFailures").EnumerateArray()
+                    .Select(value => new InvalidOperationException(value.GetString() ?? "load_owner_cleanup_failed")).ToArray();
+                string? primary = result.GetProperty("primaryFailure").GetString();
+                bool cancelled = result.GetProperty("cancelled").GetBoolean() ||
+                    primary == "deadline_exceeded" || cancellationToken.IsCancellationRequested;
+                Exception? primaryFailure = cancelled ? new OperationCanceledException(cancellationToken)
+                    : primary is null ? null : new InvalidOperationException(primary);
+                if (cleanup.Length != 0)
+                    throw new AggregateException(primaryFailure is null ? cleanup : [primaryFailure, .. cleanup]);
+                if (primaryFailure is not null) ExceptionDispatchInfo.Capture(primaryFailure).Throw();
+                observation = new OwnedProcessObservation(result.GetProperty("exitCode").GetInt32(),
+                    result.GetProperty("wallMilliseconds").GetDouble(),
+                    result.GetProperty("sampleCount").GetInt32(),
+                    result.GetProperty("peakCpuPercent").GetDouble(),
+                    result.GetProperty("peakRssBytes").GetInt64(),
+                    result.GetProperty("startedTimestamp").GetInt64(),
+                    result.GetProperty("exitedTimestamp").GetInt64(),
+                    result.GetProperty("output").GetString() ?? string.Empty);
+            }
         }
+        catch (Exception primaryFailure) { failure = primaryFailure; }
         finally
         {
-            if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
-            await error.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+            try { owner.StandardInput.BaseStream.Dispose(); }
+            catch (Exception closeFailure)
+            {
+                failure = failure is null ? closeFailure : new AggregateException(failure, closeFailure);
+            }
+            try
+            {
+                await owner.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(12), CancellationToken.None);
+                if (owner.ExitCode != 0 && failure is null)
+                    failure = new InvalidOperationException("load_owner_failed");
+            }
+            catch (Exception cleanupFailure)
+            {
+                failure = failure is null ? cleanupFailure : new AggregateException(failure, cleanupFailure);
+            }
+            try { await errors.WaitAsync(TimeSpan.FromSeconds(2), CancellationToken.None); }
+            catch (Exception drainFailure)
+            {
+                failure = failure is null ? drainFailure : new AggregateException(failure, drainFailure);
+            }
         }
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+        return observation ?? throw new InvalidOperationException("load_owner_observation_missing");
     }
+
+    private static async Task<JsonDocument> ReadOwnerMessageAsync(Stream stream, CancellationToken token)
+    {
+        byte[] line = new byte[65537];
+        int length = 0;
+        while (length < line.Length)
+        {
+            int read = await stream.ReadAsync(line.AsMemory(length, 1), token);
+            if (read == 0) throw new InvalidOperationException("load_owner_protocol_closed");
+            if (line[length] == (byte)'\n')
+                return JsonDocument.Parse(line.AsMemory(0, length));
+            length++;
+        }
+        throw new InvalidOperationException("load_owner_message_too_large");
+    }
+
+    internal sealed record OwnedProcessObservation(int ExitCode, double WallMilliseconds, int SampleCount,
+        double PeakCpuPercent, long PeakRssBytes, long StartedTimestamp, long ExitedTimestamp, string Output);
 
     private static async Task ValidateExecutableAsync(string executable, CancellationToken cancellationToken)
     {

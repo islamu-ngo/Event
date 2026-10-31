@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Aspire.Hosting;
@@ -890,6 +891,239 @@ public sealed class K6LoadProcessHarnessTests
     }
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ExitedParentCannotLeaveAnOwnedDescendantOrOpenOutputPipes(bool escapeSession)
+    {
+        using var root = new OwnedProcessDirectory();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
+        cancellation.CancelAfter(TimeSpan.FromSeconds(15));
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var watcher = new FileSystemWatcher(root.Path, "descendant.ready");
+        watcher.Created += (_, _) => ready.TrySetResult();
+        watcher.Renamed += (_, _) => ready.TrySetResult();
+        watcher.Error += (_, args) => ready.TrySetException(args.GetException());
+        watcher.EnableRaisingEvents = true;
+        var run = RunChildAsync(root, escapeSession ? "escaping-parent" : "exiting-parent",
+            TimeSpan.FromSeconds(10), cancellation.Token);
+        Exception? failure = null;
+        bool rejected = false;
+        try
+        {
+            await ready.Task.WaitAsync(cancellation.Token);
+            await Assert.That(IsRunning(root.Path, "parent.pid")).IsTrue();
+            await Assert.That(IsRunning(root.Path, "descendant.pid")).IsTrue();
+            if (escapeSession)
+            {
+                string pid = File.ReadAllText(System.IO.Path.Combine(root.Path, "descendant.pid")).Split(':')[0];
+                string stat = File.ReadAllText("/proc/" + pid + "/stat");
+                string[] fields = stat[(stat.LastIndexOf(')') + 2)..].Split(' ');
+                await Assert.That(fields[3]).IsEqualTo(pid);
+            }
+            await K6LoadHarnessChild.ReleaseControlAsync(root.Path, parent: true, cancellation.Token);
+            var rejection = await Assert.That(async () => await run).Throws<InvalidOperationException>();
+            await Assert.That(rejection!.Message).IsEqualTo("load_process_or_summary_failed");
+            rejected = true;
+            await Assert.That(IsRunning(root.Path, "parent.pid")).IsFalse();
+            await Assert.That(IsRunning(root.Path, "descendant.pid")).IsFalse();
+            await Assert.That(File.Exists(System.IO.Path.Combine(root.Path, "summary.json"))).IsFalse();
+        }
+        catch (Exception observationFailure) { failure = observationFailure; }
+        finally
+        {
+            try
+            {
+                using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                if (IsRunning(root.Path, "descendant.pid"))
+                {
+                    int pid = int.Parse(File.ReadAllText(System.IO.Path.Combine(root.Path, "descendant.pid")).Split(':')[0],
+                        CultureInfo.InvariantCulture);
+                    using var descendant = Process.GetProcessById(pid);
+                    await K6LoadHarnessChild.ReleaseControlAsync(root.Path, parent: false, cleanup.Token);
+                    await descendant.WaitForExitAsync(cleanup.Token);
+                }
+                await cancellation.CancelAsync();
+            }
+            catch (Exception cleanupFailure)
+            {
+                failure = failure is null ? cleanupFailure : new AggregateException(failure, cleanupFailure);
+            }
+            try { await run; }
+            catch (Exception runFailure)
+            {
+                if (!rejected)
+                    failure = failure is null ? runFailure : new AggregateException(failure, runFailure);
+            }
+        }
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [Test]
+    public async Task CancellationClosesTheLeaseBeforeOwnerReadiness()
+    {
+        using var root = new OwnedProcessDirectory();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var eof = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var watcher = new FileSystemWatcher(root.Path);
+        watcher.Created += (_, args) =>
+        {
+            if (args.Name == "owner-peer.ready") ready.TrySetResult();
+            if (args.Name == "owner-peer.eof") eof.TrySetResult();
+        };
+        watcher.Error += (_, args) =>
+        {
+            ready.TrySetException(args.GetException());
+            eof.TrySetException(args.GetException());
+        };
+        watcher.EnableRaisingEvents = true;
+        var run = K6LoadRunner.ObserveOwnedProcessAsync(
+            K6LoadHarnessChild.ChildStartInfo("success", root.Path), TimeSpan.FromSeconds(1), 0,
+            cancellation.Token, K6LoadHarnessChild.ChildStartInfo("owner-withheld-ready", root.Path));
+        Exception? failure = null;
+        try
+        {
+            await ready.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellation.Token);
+            await cancellation.CancelAsync();
+            await eof.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            await Assert.That(async () => await run).Throws<OperationCanceledException>();
+        }
+        catch (Exception observationFailure) { failure = observationFailure; }
+        finally
+        {
+            await cancellation.CancelAsync();
+            try { await run; }
+            catch (OperationCanceledException) { }
+            catch (Exception runFailure)
+            {
+                failure = failure is null ? runFailure : new AggregateException(failure, runFailure);
+            }
+        }
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [Test]
+    public async Task PreReadyResultPreservesPrimaryAndCleanupFailures()
+    {
+        using var root = new OwnedProcessDirectory();
+        var failure = await Assert.That(async () => await K6LoadRunner.ObserveOwnedProcessAsync(
+            K6LoadHarnessChild.ChildStartInfo("success", root.Path), TimeSpan.FromSeconds(1), 0,
+            TestContext.Current!.Execution.CancellationToken,
+            K6LoadHarnessChild.ChildStartInfo("owner-initialization-failure", root.Path))).Throws<AggregateException>();
+        await Assert.That(failure!.Flatten().InnerExceptions.Select(exception => exception.Message).ToArray())
+            .IsEquivalentTo(["owner_peer_primary", "owner_peer_cleanup"]);
+    }
+
+    [Test]
+    public async Task ControllerExitClosesTheLeaseAndSettlesTheOwnedTree()
+    {
+        using var root = new OwnedProcessDirectory();
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(20));
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var watcher = new FileSystemWatcher(root.Path, "descendant.ready");
+        watcher.Created += (_, _) => ready.TrySetResult();
+        watcher.Renamed += (_, _) => ready.TrySetResult();
+        watcher.Error += (_, args) => ready.TrySetException(args.GetException());
+        watcher.EnableRaisingEvents = true;
+        using var controller = Process.Start(K6LoadHarnessChild.ChildStartInfo("controller", root.Path))
+            ?? throw new InvalidOperationException("load_controller_start_failed");
+        Task output = controller.StandardOutput.BaseStream.CopyToAsync(Stream.Null);
+        Task error = controller.StandardError.BaseStream.CopyToAsync(Stream.Null);
+        try
+        {
+            await ready.Task.WaitAsync(deadline.Token);
+            await Assert.That(IsRunning(root.Path, "parent.pid")).IsTrue();
+            await Assert.That(IsRunning(root.Path, "descendant.pid")).IsTrue();
+            await Assert.That(IsRunning(root.Path, "helper.pid")).IsTrue();
+            int helperPid = int.Parse(File.ReadAllText(System.IO.Path.Combine(root.Path, "helper.pid")).Split(':')[0],
+                CultureInfo.InvariantCulture);
+            using var helper = Process.GetProcessById(helperPid);
+            using (var control = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified))
+                await control.ConnectAsync(new UnixDomainSocketEndPoint(
+                    System.IO.Path.Combine(root.Path, "controller.control")), deadline.Token);
+            await controller.WaitForExitAsync(deadline.Token);
+            await helper.WaitForExitAsync(deadline.Token);
+            await Task.WhenAll(output, error).WaitAsync(deadline.Token);
+            await Assert.That(controller.ExitCode).IsEqualTo(0);
+            await Assert.That(IsRunning(root.Path, "parent.pid")).IsFalse();
+            await Assert.That(IsRunning(root.Path, "descendant.pid")).IsFalse();
+            await Assert.That(IsRunning(root.Path, "helper.pid")).IsFalse();
+        }
+        finally
+        {
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            if (!controller.HasExited)
+            {
+                using var control = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+                await control.ConnectAsync(new UnixDomainSocketEndPoint(
+                    System.IO.Path.Combine(root.Path, "controller.control")), cleanup.Token);
+            }
+            if (IsRunning(root.Path, "parent.pid"))
+                await K6LoadHarnessChild.ReleaseControlAsync(root.Path, parent: true, cleanup.Token);
+            if (IsRunning(root.Path, "descendant.pid"))
+                await K6LoadHarnessChild.ReleaseControlAsync(root.Path, parent: false, cleanup.Token);
+            await controller.WaitForExitAsync(cleanup.Token);
+            await Task.WhenAll(output, error).WaitAsync(cleanup.Token);
+        }
+    }
+
+    [Test]
+    public async Task OwnedCleanupPreservesAnUnrelatedProcess()
+    {
+        using var root = new OwnedProcessDirectory();
+        using var foreignRoot = new OwnedProcessDirectory();
+        using var guard = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
+        guard.CancelAfter(TimeSpan.FromSeconds(15));
+        using var cancellation = new CancellationTokenSource();
+        var foreignReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var foreignWatcher = new FileSystemWatcher(foreignRoot.Path, "descendant.ready");
+        foreignWatcher.Created += (_, _) => foreignReady.TrySetResult();
+        foreignWatcher.Renamed += (_, _) => foreignReady.TrySetResult();
+        foreignWatcher.Error += (_, args) => foreignReady.TrySetException(args.GetException());
+        foreignWatcher.EnableRaisingEvents = true;
+        using var foreign = Process.Start(K6LoadHarnessChild.ChildStartInfo("held-descendant", foreignRoot.Path))
+            ?? throw new InvalidOperationException("load_foreign_canary_start_failed");
+        Task<K6ProcessMeasurement>? run = null;
+        try
+        {
+            await foreignReady.Task.WaitAsync(guard.Token);
+            var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var watcher = new FileSystemWatcher(root.Path, "descendant.ready");
+            watcher.Created += (_, _) => ready.TrySetResult();
+            watcher.Renamed += (_, _) => ready.TrySetResult();
+            watcher.Error += (_, args) => ready.TrySetException(args.GetException());
+            watcher.EnableRaisingEvents = true;
+            Task<K6ProcessMeasurement> observedRun = RunChildAsync(root, "tree", TimeSpan.FromSeconds(10), cancellation.Token);
+            run = observedRun;
+            await ready.Task.WaitAsync(guard.Token);
+            await cancellation.CancelAsync();
+            await Assert.That(async () => await observedRun).Throws<OperationCanceledException>();
+            await Assert.That(IsRunning(root.Path, "parent.pid")).IsFalse();
+            await Assert.That(IsRunning(root.Path, "descendant.pid")).IsFalse();
+            await Assert.That(foreign.HasExited).IsFalse();
+            await Assert.That(IsRunning(foreignRoot.Path, "descendant.pid")).IsTrue();
+        }
+        finally
+        {
+            await cancellation.CancelAsync();
+            try
+            {
+                if (run is not null)
+                {
+                    try { await run; }
+                    catch (OperationCanceledException) { }
+                }
+            }
+            finally
+            {
+                if (!foreign.HasExited) foreign.Kill();
+                await foreign.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+            }
+        }
+    }
+
+    [Test]
     public async Task InheritedSecretCanaryCannotReachChildArgumentsOrRetainedDiagnostics()
     {
         using var root = new OwnedProcessDirectory();
@@ -956,7 +1190,41 @@ internal static class K6LoadHarnessChild
 {
     internal const string CanaryName = "ISLAMU_LOAD_HARNESS_SECRET_CANARY";
     private const string ChildFlag = "--assurance-process-child";
-    private static readonly string[] Scenarios = ["success", "nonzero", "missing", "oversized", "tree", "descendant", "secrets", "version"];
+    private static readonly string[] Scenarios =
+        ["success", "nonzero", "missing", "oversized", "tree", "descendant", "exiting-parent", "escaping-parent",
+            "held-descendant", "controller", "owner-withheld-ready", "owner-initialization-failure", "secrets", "version"];
+
+    internal static async Task ReleaseControlAsync(string root, bool parent, CancellationToken token)
+    {
+        if (!IsOwnedRoot(root)) throw new InvalidOperationException("load_child_control_owner_invalid");
+        using var control = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        await control.ConnectAsync(new UnixDomainSocketEndPoint(System.IO.Path.Combine(root,
+            parent ? "parent.control" : "descendant.control")), token);
+    }
+
+    private static Socket CreateControl(string root, bool parent)
+    {
+        var control = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        try
+        {
+            control.Bind(new UnixDomainSocketEndPoint(System.IO.Path.Combine(root,
+                parent ? "parent.control" : "descendant.control")));
+            control.Listen(1);
+            return control;
+        }
+        catch
+        {
+            control.Dispose();
+            throw;
+        }
+    }
+
+    private static void WaitForRelease(Socket control)
+    {
+        if (!control.Poll(15_000_000, SelectMode.SelectRead))
+            throw new TimeoutException("load_child_control_deadline");
+        using var released = control.Accept();
+    }
 
     internal static (long Start, char State)? ReadLifetime(int pid)
     {
@@ -1023,6 +1291,69 @@ internal static class K6LoadHarnessChild
     private static int RunChild(string scenario, string root)
     {
         string summary = System.IO.Path.Combine(root, "summary.json");
+        if (scenario is "owner-withheld-ready" or "owner-initialization-failure")
+        {
+            bool withheld = scenario == "owner-withheld-ready";
+            if (withheld)
+            {
+                File.WriteAllText(System.IO.Path.Combine(root, "owner-peer.ready"), "ready");
+                _ = Console.In.ReadToEnd();
+                File.WriteAllText(System.IO.Path.Combine(root, "owner-peer.eof"), "eof");
+            }
+            Console.WriteLine(JsonSerializer.Serialize(new
+            {
+                type = "result",
+                exitCode = (int?)null,
+                wallMilliseconds = 0,
+                startedTimestamp = (long?)null,
+                exitedTimestamp = (long?)null,
+                sampleCount = 0,
+                peakCpuPercent = 0,
+                peakRssBytes = 0,
+                cancelled = withheld,
+                primaryFailure = withheld ? "controller_eof" : "owner_peer_primary",
+                cleanupFailures = withheld ? Array.Empty<string>() : ["owner_peer_cleanup"],
+                output = string.Empty
+            }));
+            return 70;
+        }
+        if (scenario == "controller")
+        {
+            using var control = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+            control.Bind(new UnixDomainSocketEndPoint(System.IO.Path.Combine(root, "controller.control")));
+            control.Listen(1);
+            var ownerStart = K6LoadRunner.StartInfo(System.IO.Path.Combine(
+                AppContext.BaseDirectory, "LoadProcessOwner", "ISLAMU.ReleaseEngineering"));
+            ownerStart.RedirectStandardInput = true;
+            ownerStart.ArgumentList.Add("own-load-process");
+            using var owner = Process.Start(ownerStart)
+                ?? throw new InvalidOperationException("load_owner_start_failed");
+            using var ready = JsonDocument.Parse(owner.StandardOutput.ReadLine()
+                ?? throw new InvalidOperationException("load_owner_not_ready"));
+            if (ready.RootElement.GetProperty("type").GetString() != "ready")
+                throw new InvalidOperationException("load_owner_not_ready");
+            var lifetime = ReadLifetime(owner.Id) ?? throw new InvalidOperationException("load_owner_lifetime_missing");
+            File.WriteAllText(System.IO.Path.Combine(root, "helper.pid"),
+                owner.Id.ToString(CultureInfo.InvariantCulture) + ":" + lifetime.Start.ToString(CultureInfo.InvariantCulture));
+            var workload = ChildStartInfo("exiting-parent", root);
+            owner.StandardInput.WriteLine(JsonSerializer.Serialize(new
+            {
+                type = "start",
+                executable = workload.FileName,
+                arguments = workload.ArgumentList.ToArray(),
+                workingDirectory = Environment.CurrentDirectory,
+                environment = workload.Environment,
+                timeoutMilliseconds = 10000,
+                captureLimit = 0
+            }));
+            owner.StandardInput.Flush();
+            using var started = JsonDocument.Parse(owner.StandardOutput.ReadLine()
+                ?? throw new InvalidOperationException("load_owner_not_started"));
+            if (started.RootElement.GetProperty("type").GetString() != "started")
+                throw new InvalidOperationException("load_owner_not_started");
+            WaitForRelease(control);
+            return 0;
+        }
         if (scenario == "version")
         {
             File.WriteAllText(System.IO.Path.Combine(root, "version-launched"), "launched");
@@ -1031,30 +1362,44 @@ internal static class K6LoadHarnessChild
         }
         if (scenario == "secrets" && Environment.GetEnvironmentVariable(CanaryName) is not null)
             return 73;
-        if (scenario is "tree" or "descendant")
+        if (scenario is "tree" or "descendant" or "exiting-parent" or "escaping-parent" or "held-descendant")
         {
-            string pidName = scenario == "tree" ? "parent.pid" : "descendant.pid";
+            bool parent = scenario is "tree" or "exiting-parent" or "escaping-parent";
+            string pidName = parent ? "parent.pid" : "descendant.pid";
             var lifetime = ReadLifetime(Environment.ProcessId)
                 ?? throw new InvalidOperationException("load_child_lifetime_missing");
             File.WriteAllText(System.IO.Path.Combine(root, pidName), Environment.ProcessId.ToString(CultureInfo.InvariantCulture)
                 + ":" + lifetime.Start.ToString(CultureInfo.InvariantCulture));
-            if (scenario == "tree")
+            if (parent)
             {
-                var descendantStart = ChildStartInfo("descendant", root);
+                using var control = scenario != "tree" ? CreateControl(root, parent: true) : null;
+                var descendantStart = ChildStartInfo(scenario == "tree" ? "descendant" : "held-descendant", root);
+                if (scenario == "escaping-parent")
+                {
+                    string executable = descendantStart.FileName;
+                    descendantStart.FileName = "/usr/bin/setsid";
+                    descendantStart.ArgumentList.Insert(0, executable);
+                }
                 descendantStart.RedirectStandardOutput = false;
                 descendantStart.RedirectStandardError = false;
                 using var descendant = Process.Start(descendantStart)
                     ?? throw new InvalidOperationException("load_child_descendant_start_failed");
-                if (!descendant.WaitForExit(20_000))
+                if (control is not null) WaitForRelease(control);
+                else if (!descendant.WaitForExit(20_000))
                     throw new TimeoutException("load_child_descendant_deadline");
             }
             else
             {
+                using var control = scenario == "held-descendant" ? CreateControl(root, parent: false) : null;
                 string pending = System.IO.Path.Combine(root, "descendant.pending");
                 File.WriteAllText(pending, "ready");
                 File.Move(pending, System.IO.Path.Combine(root, "descendant.ready"));
-                // Bound synthetic descendants even if a process-cleanup regression leaves one alive.
-                Thread.Sleep(TimeSpan.FromSeconds(15));
+                if (control is not null) WaitForRelease(control);
+                else
+                {
+                    // Bound synthetic descendants even if a process-cleanup regression leaves one alive.
+                    Thread.Sleep(TimeSpan.FromSeconds(15));
+                }
             }
             return 74;
         }

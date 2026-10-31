@@ -109,6 +109,34 @@ remain in the initial cache inventory. The same sentinel on multiple untagged
 images is not an alias conflict; wrong-field or malformed sentinel forms still
 fail closed.
 
+## Load-process custody
+
+`K6LoadRunner` launches workload and version probes through the separately staged
+`ISLAMU.ReleaseEngineering own-load-process` executable. The test project builds
+that executable and copies its complete output into `LoadProcessOwner/`; running
+an old test output directory does not rebuild the owner.
+
+The owner requires Linux x64, glibc, procfs child lists, pidfds, non-reaping
+`waitid`, and `close_range(CLOEXEC)`. Initialization checks the required behavior.
+It becomes a child subreaper in its own disposable process, never in the test
+host. Native spawn and exclusive waiting retain each child lifetime until its
+pidfd is acquired. Termination uses those descriptors, not numeric process-group
+signals. Repeated direct-child adoption covers descendants whose parent exited
+or which created a new session.
+
+The controller sends the executable, arguments and explicitly admitted environment
+over a bounded private stdin protocol. Workload output cannot inherit that
+protocol. Closing the sole stdin lease requests cancellation, including during
+startup or controller exit. Cleanup has its own ten-second budget and succeeds
+only after kernel `ECHILD` and actual EOF on both workload output pipes.
+Primary and cleanup failures remain separate; deadline expiry retains the
+runner's cancellation exception contract. Root CPU, RSS and timing measurements
+exclude helper startup and descendant cleanup.
+
+The owner cannot guarantee cleanup if it is itself killed with `SIGKILL`.
+Process-harness results establish only this lifecycle contract, not application
+readiness, offered-load correctness, capacity or final candidate admission.
+
 ## Native benchmark compilation
 
 Baseline benchmark launches allow 600 seconds for BenchmarkDotNet's generated

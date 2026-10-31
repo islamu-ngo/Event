@@ -33,6 +33,19 @@ request budget and three-second connection allowance remain unchanged.
 A lost DELETE response leaves an unknown outcome: retain the failure and inspect
 the exact resource rather than replaying the mutation or declaring cleanup complete.
 
+Load probes use a dedicated process owner built and staged with the distributed
+test project. Use Linux x64 with glibc, accessible procfs child lists, pidfds and
+`close_range(CLOEXEC)` support; unsupported native behavior fails initialization.
+Build the project before using its output directory so the owner executable and
+runtime files are present.
+
+Cancellation or controller exit closes a private lease. The owner then terminates
+and reaps its descendants, including those whose parent exited or which changed
+sessions, without signalling unrelated process groups. Allow its separate
+ten-second cleanup budget; retain any primary and cleanup failures. Killing the
+owner itself with `SIGKILL` is outside that guarantee. Passing lifecycle tests
+does not establish application capacity or complete distributed assurance.
+
 Each case creates its own run ID, root directory, marker, data volumes, and
 dynamic ports. The fixture supplies `ISLAMU_TEST_RUN_ID` and `ISLAMU_TEST_ROOT`;
 do not point them at existing storage. The directory basename must match the

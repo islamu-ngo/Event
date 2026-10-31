@@ -1215,18 +1215,20 @@ public static partial class SecurityExecutionEvidence
         return references;
     }
 
-    private sealed class SelectedDaemon : IDisposable
+    internal sealed class SelectedDaemon : IDisposable
     {
         private readonly SocketsHttpHandler _handler;
         private readonly HttpClient _client;
 
-        internal SelectedDaemon(string socketPath)
+        internal SelectedDaemon(string socketPath, Action<Socket>? socketConnected = null,
+            Func<Stream, Stream>? streamConnected = null)
         {
             _handler = new SocketsHttpHandler
             {
                 UseProxy = false,
                 UseCookies = false,
                 AllowAutoRedirect = false,
+                ActivityHeadersPropagator = null,
                 ConnectTimeout = TimeSpan.FromSeconds(3)
             };
             try
@@ -1237,7 +1239,20 @@ public static partial class SecurityExecutionEvidence
                     try
                     {
                         await socket.ConnectAsync(new UnixDomainSocketEndPoint(socketPath), token).ConfigureAwait(false);
-                        return new NetworkStream(socket, ownsSocket: true);
+                        socketConnected?.Invoke(socket);
+                        var stream = new NetworkStream(socket, ownsSocket: true);
+                        Stream selected = stream;
+                        try
+                        {
+                            selected = streamConnected is null ? stream : streamConnected(stream);
+                            token.ThrowIfCancellationRequested();
+                            return selected;
+                        }
+                        catch
+                        {
+                            selected.Dispose();
+                            throw;
+                        }
                     }
                     catch
                     {
@@ -2746,7 +2761,7 @@ public static partial class SecurityExecutionEvidence
             return ids;
         }
 
-        private async Task<JsonDocument> GetAsync(string path, CancellationToken token)
+        internal async Task<JsonDocument> GetAsync(string path, CancellationToken token)
         {
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
             deadline.CancelAfter(TimeSpan.FromSeconds(5));

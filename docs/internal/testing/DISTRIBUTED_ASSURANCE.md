@@ -12,6 +12,20 @@ listener. The environment is `Assurance`, so production worker registration and
 rate limiters retain their normal enabled behavior rather than the `Testing`
 environment's substitutions.
 
+## Daemon context isolation
+
+The dedicated daemon handler does not propagate ambient activity headers or
+baggage to the privileged Unix API. This is handler-scoped: it does not replace
+the global propagator, clear the caller's activity or disable application
+tracing. Proxy, cookie, redirect, endpoint and daemon-identity rules remain
+unchanged, as do the three-second connect and five-second request bounds.
+
+`SecurityExecutionEvidenceDaemonTransportTests` checks header names on an actual
+local Unix peer under a synthetic W3C activity, decodes the response and preserves
+the caller activity. Its separate explicit version/info/container/image/image probe checks
+read-only acquisition on the selected daemon. Neither proves resource custody,
+workload completion, cleanup or registered candidate admission.
+
 ## Controlled cleanup child
 
 The configured-resource join retains foreign named-volume conflicts even when

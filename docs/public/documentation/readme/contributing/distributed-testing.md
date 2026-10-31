@@ -18,6 +18,11 @@ Testcontainers cases alongside these tests. Never restart or prune somebody
 else's runtime to prepare a test. Set `TMPDIR` to a disk-backed scratch location
 with sufficient free space.
 
+The daemon control client does not forward ambient tracing headers or baggage.
+This does not disable application tracing, change credentials or extend request
+deadlines. A successful read-only daemon probe proves transport only, not that
+the application graph started or that owned cleanup completed.
+
 Each case creates its own run ID, root directory, marker, data volumes, and
 dynamic ports. The fixture supplies `ISLAMU_TEST_RUN_ID` and `ISLAMU_TEST_ROOT`;
 do not point them at existing storage. The directory basename must match the

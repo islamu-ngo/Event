@@ -3306,6 +3306,9 @@ the server does not release a bearer or treat a matching identifier as proof.
 This adds no configuration key or new authority to the submission request.
 The server preserves the stored recovery singleton slot during normal issuance;
 operators do not need to reset recovery metadata to obtain a receipt.
+Cancellation, changed caller selection or expiry during commit completion can
+withhold the token even when a receipt row was committed. A stored row alone is
+not a returned bearer and does not grant present read access.
 Authentication and authorization failures retain 401/403.
 Malformed requests return 400, changed original allegation intent returns 409,
 and unavailable current native authority returns 503. These routes require a

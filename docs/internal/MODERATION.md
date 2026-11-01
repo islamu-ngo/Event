@@ -5746,6 +5746,12 @@ the untracked entity and restores that value when attaching it. Attaching the
 entity alone loses shadow state; its CLR sentinel is not the persisted singleton
 slot and cannot serve as an ownership witness.
 
+After commit acknowledgement, publication independently checks cancellation, the
+original context and connection, caller/tenant/machine selection and the token's
+clock window. A failed publication check withholds and zeroes the bearer even
+when the receipt has committed. It neither replays minting nor reopens the
+transaction or claims that committed history was rolled back.
+
 `ModerationCaseReadGrantController` separates administrative read-purpose intent
 from receipt minting. Authenticated
 `POST /api/moderation/case-read-grants/{caseId}` accepts `operationId`,

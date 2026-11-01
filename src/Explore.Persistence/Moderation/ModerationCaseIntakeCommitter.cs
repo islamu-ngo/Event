@@ -129,9 +129,17 @@ public sealed class ModerationCaseIntakeCommitter(
                 }
                 catch (TimeoutException) { return false; }
             });
-            if (!committed) return null;
+            if (!committed || staged is not { } publication) return null;
+            cancellationToken.ThrowIfCancellationRequested();
+            var publicationTime = clock.GetUtcNow();
+            if (!CallerUnchanged(tenantId, callerId) || context.ContextId != contextId
+                || !ReferenceEquals(context.Database.GetDbConnection(), connection)
+                || publicationTime < publication.Receipt.IssuedAt
+                || publicationTime >= publication.Receipt.ExpiresAt
+                || publication.Receipt.ExpiresAt == DateTimeOffset.MaxValue)
+                return null;
             published = true;
-            return staged;
+            return publication;
         }
         finally
         {

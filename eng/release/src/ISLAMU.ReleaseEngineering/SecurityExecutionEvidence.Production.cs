@@ -466,7 +466,7 @@ public static partial class SecurityExecutionEvidence
         internal string Code { get; } = code;
     }
     private sealed record OwnedEntry(string Project, string Directory, string Assembly);
-    private sealed record LoadToolInputs(string Executable, string ExecutableSha256, string Script, string ScriptSha256);
+    internal sealed record LoadToolInputs(string Executable, string ExecutableSha256, string Script, string ScriptSha256);
     private sealed record OwnedInputs(CandidateSourceIdentity Source, string Fingerprint, byte[] Manifest,
         IReadOnlyDictionary<string, OwningManagedTarget> Targets, LoadToolInputs? LoadTool);
     private sealed record OwnedChild(OwnedNativeProcessResult Process, byte[] Report, byte[] ResourceEvidence,

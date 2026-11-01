@@ -264,3 +264,32 @@ dotnet tests/Event.API.IntegrationTests/bin/Release/net10.0/Event.API.Integratio
 - [x] Retain this measured framework/container distinction and independent request-tenant custody lesson in the testing journal; the API/storage guides own the production contract.
 
 ---
+
+[2026-10-31 Europe/Brussels] — Green cleanup cases do not establish descendant custody
+
+**Context**: The PR79 follow-up reproduced an exited load parent leaving a live descendant with inherited output pipes. The work used the approved test-suite and CI tooling contracts.
+
+**Symptom / Observation**: The original runner skipped tree termination after parent exit and raised a drain `TimeoutException`. A proposed numeric process-group repair passed all 11 then-selected cases, but independent review still found session escape and an inspection-to-signal identity-reuse window. That Green run was rejected, not treated as containment proof.
+
+**Root Cause**: Process identity checks and later numeric signalling are separate operations; adding another check does not make them atomic. Tests that only keep the parent and descendants in one session omit the boundary that the repair claims to protect. A separate readiness test also required processes to remain live after their deadline had correctly removed them.
+
+**Resolution**: Commit `07004574d008312bb27b67fbbd821835c7c3866f` uses a dedicated native subreaper, exclusive waiting and pidfds acquired before reaping. Its protocol lease covers controller exit, and acceptance requires kernel `ECHILD` plus real output EOF. The paired guides own the operational contract and SIGKILL limitation. The corrected 16-case class includes actual parent exit, session escape, controller exit, unrelated-process preservation and event-controlled adapter failures. The owning Release build passed with 10 existing warnings; all 16 cases passed with no failures or skips in 7.722 seconds:
+
+```bash
+dotnet build tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-restore --verbosity quiet
+timeout --signal=INT --kill-after=15s 150s dotnet tests/Event.Distributed.IntegrationTests/bin/Release/net10.0/Event.Distributed.IntegrationTests.dll --treenode-filter "/*/*/K6LoadProcessHarnessTests/*" --minimum-expected-tests 16 --maximum-parallel-tests 1 --timeout 120s --progress off --report-trx --show-stdout All --results-directory "$TMPDIR/pr79-assurance-intake/k6-native-owner-green"
+```
+
+These working-source lifecycle receipts do not qualify offered load, application capacity, container cleanup or final-candidate admission.
+
+**Why This Matters for Future Work**: Name the lifetime and escape boundary before accepting a cleanup test result. Preserve a rejected Green experiment when adversarial review exposes a missing invariant; expand the native regression rather than weakening the ownership claim or repeatedly rerunning the same cases.
+
+**References**:
+- `eng/release/src/ISLAMU.ReleaseEngineering/LoadProcessOwner.cs:394`.
+- `tests/Event.Distributed.IntegrationTests/K6LoadRunner.cs:1533`.
+- `tests/Event.Distributed.IntegrationTests/K6LoadTests.cs:896`.
+- `docs/internal/testing/DISTRIBUTED_ASSURANCE.md`, Load-process custody.
+- Commit: `07004574d008312bb27b67fbbd821835c7c3866f`.
+
+**Promotion Consideration**:
+- [x] Stays in journal as the rejected-approach lesson; the existing paired guides own the implemented contract.

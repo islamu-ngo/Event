@@ -3299,6 +3299,13 @@ by the adopted deadline. Additional genuine material stays distinct.
 The first response contains only the committed receipt identity, opaque token
 and expiry; the token is needed by the second request. Both responses prohibit
 caching. Do not retain the token in logs or shared client storage.
+Saving a receipt is not enough to publish its token. The original receipt,
+source and transaction-owned recovery advancement must remain qualified through
+the final recheck. Lost or substituted ownership makes issuance unavailable;
+the server does not release a bearer or treat a matching identifier as proof.
+This adds no configuration key or new authority to the submission request.
+The server preserves the stored recovery singleton slot during normal issuance;
+operators do not need to reset recovery metadata to obtain a receipt.
 Authentication and authorization failures retain 401/403.
 Malformed requests return 400, changed original allegation intent returns 409,
 and unavailable current native authority returns 503. These routes require a

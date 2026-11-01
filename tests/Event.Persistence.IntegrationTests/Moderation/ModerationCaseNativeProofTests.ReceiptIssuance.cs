@@ -221,6 +221,32 @@ public sealed partial class ModerationCaseNativeProofTests
     }
 
     [Test]
+    [Arguments("source")]
+    [Arguments("receipt")]
+    public async Task ReceiptCommitterRefusesSavedEntityDetachment(string boundary)
+    {
+        await using var database = await NativeDatabase.CreateAsync(ModerationCaseTargetKind.Form);
+        var checkpoint = new ReceiptSavedCheckpoint(context =>
+        {
+            var entry = context.ChangeTracker.Entries().Single(candidate => boundary == "source"
+                ? candidate.Entity is ModerationCaseTargetSource
+                : candidate.Entity is ModerationCaseTargetReceipt);
+            entry.State = EntityState.Detached;
+            return Task.CompletedTask;
+        });
+        await using var context = database.Context(checkpoint);
+        var issued = await IssuanceCommitter(context, database, database.Caller)
+            .IssueSubmissionReceiptAsync(database.Request(), default);
+        await Assert.That(issued).IsNull();
+        await Assert.That(checkpoint.ObservedReceiptSave).IsTrue();
+        await Assert.That(context.Database.CurrentTransaction).IsNull();
+        await Assert.That(context.ChangeTracker.Entries().Any()).IsFalse();
+        await using var verify = database.Context();
+        await Assert.That(await verify.ModerationCaseTargetReceipts.AnyAsync()).IsFalse();
+        await Assert.That(await verify.ModerationCaseTargetSources.AnyAsync()).IsFalse();
+    }
+
+    [Test]
     public async Task ReceiptCommitterRefusesSavedTransactionRemoval()
     {
         await using var database = await NativeDatabase.CreateAsync(ModerationCaseTargetKind.Form);
@@ -240,6 +266,62 @@ public sealed partial class ModerationCaseNativeProofTests
         await using var verify = database.Context();
         await Assert.That(await verify.ModerationCaseTargetReceipts.AnyAsync()).IsFalse();
         await Assert.That(await verify.ModerationCaseTargetSources.AnyAsync()).IsFalse();
+    }
+
+    [Test]
+    [Arguments("changed")]
+    [Arguments("changed-clean")]
+    [Arguments("slot-clean")]
+    [Arguments("replaced")]
+    [Arguments("detached")]
+    [Arguments("deleted")]
+    public async Task ReceiptCommitterCannotPublishAfterLosingItsRecoveryAdvancement(string defect)
+    {
+        await using var database = await NativeDatabase.CreateAsync(ModerationCaseTargetKind.Form);
+        await using var inspect = database.Context();
+        var before = await inspect.Set<ModerationRecoveryStoreState>().AsNoTracking().SingleAsync();
+        var checkpoint = new ReceiptSavedCheckpoint(async context =>
+        {
+            var entry = context.ChangeTracker.Entries<ModerationRecoveryStoreState>().Single();
+            switch (defect)
+            {
+                case "changed": entry.Property(row => row.Position).CurrentValue++; break;
+                case "changed-clean":
+                    var changedPosition = entry.Entity.Position + 1;
+                    entry.Property(row => row.Position).CurrentValue = changedPosition;
+                    entry.OriginalValues.SetValues(entry.CurrentValues);
+                    entry.State = EntityState.Unchanged;
+                    await Assert.That(entry.Entity.Position).IsEqualTo(changedPosition);
+                    break;
+                case "slot-clean":
+                    entry.Property("InstallationSlot").CurrentValue = 2;
+                    entry.OriginalValues.SetValues(entry.CurrentValues);
+                    entry.State = EntityState.Unchanged;
+                    await Assert.That(entry.Property("InstallationSlot").CurrentValue).IsEqualTo(2);
+                    break;
+                case "replaced":
+                    var values = entry.CurrentValues.Clone();
+                    var replacement = ModerationRecoveryStoreState.Start(entry.Entity.Id);
+                    entry.State = EntityState.Detached;
+                    context.Attach(replacement).CurrentValues.SetValues(values);
+                    break;
+                case "detached": entry.State = EntityState.Detached; break;
+                case "deleted": entry.State = EntityState.Deleted; break;
+                default: throw new ArgumentOutOfRangeException(nameof(defect));
+            }
+        });
+        await using var context = database.Context(checkpoint);
+        var committer = IssuanceCommitter(context, database, database.Caller);
+        await Assert.That(await committer.IssueSubmissionReceiptAsync(database.Request(), default)).IsNull();
+        await Assert.That(checkpoint.ObservedReceiptSave).IsTrue();
+        await Assert.That(context.Database.CurrentTransaction).IsNull();
+        await Assert.That(context.ChangeTracker.Entries().Any()).IsFalse();
+        await using var verify = database.Context();
+        await Assert.That(await verify.ModerationCaseTargetReceipts.AnyAsync()).IsFalse();
+        await Assert.That(await verify.ModerationCaseTargetSources.AnyAsync()).IsFalse();
+        var after = await verify.Set<ModerationRecoveryStoreState>().AsNoTracking().SingleAsync();
+        await Assert.That((after.Id, after.Revision, after.Generation, after.Position))
+            .IsEqualTo((before.Id, before.Revision, before.Generation, before.Position));
     }
 
     [Test]

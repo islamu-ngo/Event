@@ -5731,6 +5731,21 @@ without reminting. Lost commit acknowledgement withholds the token even if the
 receipt reached storage. Owned material and failed bearer buffers are zeroed;
 caller-owned transaction/work is not cleared on entry rejection.
 
+The issuance write set includes only its original receipt, any original tracked
+source, and the recovery advancement created by that save. The context lease,
+physical connection and original transaction wrapper remain pinned through the
+final recheck. Recovery admission requires the same native object, unchanged
+coordinates and singleton installation slot; its original object must remain
+tracked even when detachment would remove it from tracker enumeration. Replaced
+or detached receipt/source objects and lost recovery ownership withhold the
+bearer; a still-live owned transaction is rolled back. Reusing a persisted source that was
+not tracked by this issuance remains valid; matching an identifier alone never
+admits a substituted tracked object.
+The recovery save projects the persisted shadow `InstallationSlot` alongside
+the untracked entity and restores that value when attaching it. Attaching the
+entity alone loses shadow state; its CLR sentinel is not the persisted singleton
+slot and cannot serve as an ownership witness.
+
 `ModerationCaseReadGrantController` separates administrative read-purpose intent
 from receipt minting. Authenticated
 `POST /api/moderation/case-read-grants/{caseId}` accepts `operationId`,

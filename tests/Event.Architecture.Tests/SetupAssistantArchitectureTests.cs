@@ -145,10 +145,10 @@ public sealed class SetupAssistantArchitectureTests
         await Assert.That(violations).IsEmpty();
         await Assert.That(ValidateCiGovernance(
             caller.Replace(
-                "src/Explore.Application/Contracts/Secrets/ISetupSecretBindingWriter.cs|",
-                string.Empty, StringComparison.Ordinal),
+                "select-build-test-changes",
+                "select-docs-only-changes", StringComparison.Ordinal),
             reusable)).Contains(
-                "missing SetupLive route input: src/Explore.Application/Contracts/Secrets/ISetupSecretBindingWriter.cs");
+                "native build/test selector is missing");
         await Assert.That(ValidateCiGovernance(caller,
             reusable.Replace("--maximum-parallel-tests 1", "--maximum-parallel-tests 8",
                 StringComparison.Ordinal))).Contains("serial 35-case SetupLive gate is missing");
@@ -201,48 +201,10 @@ public sealed class SetupAssistantArchitectureTests
             step.Children.TryGetValue(new YamlScalarNode("id"), out YamlNode? id)
             && ((YamlScalarNode)id).Value == "changes");
         string routingScript = ((YamlScalarNode)routing.Children[new YamlScalarNode("run")]).Value!;
-        string[] routeInputs =
-        [
-            "configurator/definitions/*", "tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/*",
-            "src/Explore.Blazor.Client/Services/SetupLive/*",
-            "tests/Explore.Blazor.Client.Tests/SetupLive/*",
-            "src/Event.Wire.Contracts/SetupLive/*",
-            "src/Explore.Domain/SetupLive/*",
-            "src/Explore.Application/ApplicationServicesRegistration.cs",
-            "src/Explore.Application/Contracts/SetupLive/*",
-            "src/Explore.Application/Contracts/Persistence/ISetupLiveRepository.cs",
-            "src/Explore.Application/Contracts/Infrastructure/ISetupSecretBindingReadinessReader.cs",
-            "src/Explore.Application/Contracts/Secrets/ISetupSecretBindingWriter.cs",
-            "src/Explore.Application/Contracts/Secrets/ISetupSecretBindingCommitBarrier.cs",
-            "src/Explore.Application/Features/SetupLive/*",
-            "src/Explore.Application/Telemetry/SetupLiveTelemetry.cs",
-            "src/Explore.Persistence/PersistenceServicesRegistration.cs",
-            "src/Explore.Persistence/ExploreDbContext.DbSets.cs",
-            "src/Explore.Persistence/ExploreDbContext.QueryFilters.cs",
-            "src/Explore.Persistence/Configurations/Entities/SetupLiveConfigurations.cs",
-            "src/Explore.Persistence/Repositories/SetupLiveRepository.cs",
-            "src/Explore.Persistence/RelationalSetupSecretBindingOperationCoordinator.cs",
-            "src/Explore.Persistence/Migrations/*AddSetupLivePersistence*",
-            "src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs",
-            "src/Explore.Persistence.Migrations.MySql/Migrations/*AddSetupLivePersistence*",
-            "src/Explore.Persistence.Migrations.MySql/Migrations/ExploreDbContextModelSnapshot.cs",
-            "src/Explore.Persistence.Migrations.SqlServer/Migrations/*AddSetupLivePersistence*",
-            "src/Explore.Persistence.Migrations.SqlServer/Migrations/ExploreDbContextModelSnapshot.cs",
-            "src/Explore.Persistence.Migrations.Sqlite/Migrations/*AddSetupLivePersistence*",
-            "src/Explore.Persistence.Migrations.Sqlite/Migrations/ExploreDbContextModelSnapshot.cs",
-            "src/Explore.Infrastructure/Secrets/*",
-            "src/Explore.ServiceDefaults/Secrets/*",
-            "src/Explore.Infrastructure/InfrastructureServicesRegistration.cs",
-            "src/Explore.Infrastructure/Services/SetupSecretProvider.cs",
-            "src/Explore.API/Controllers/SetupTargetEnrollmentsController.cs",
-            "src/Explore.API/OpenApi/SetupLiveRequestBodyTransformer.cs",
-            "src/Explore.Blazor.Client/Clients/EventApiClients.cs",
-            "src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs",
-            "tests/Event.API.IntegrationTests/Features/SetupLive*"
-        ];
-        foreach (string input in routeInputs)
-            if (!routingScript.Contains(input, StringComparison.Ordinal))
-                violations.Add($"missing SetupLive route input: {input}");
+        if (!routingScript.Contains(
+                "ISLAMU.ReleaseEngineering.dll select-build-test-changes \"$changed_paths\"",
+                StringComparison.Ordinal))
+            violations.Add("native build/test selector is missing");
 
         var jobs = (YamlMappingNode)reusableRoot.Children[new YamlScalarNode("jobs")];
         var fastJob = (YamlMappingNode)jobs.Children[new YamlScalarNode("build-and-test")];

@@ -20,7 +20,7 @@ Workflow YAML defines what runs; repository settings define which checks are req
 ## Native build and test selection
 
 `Build & Test` consumes `select-build-test-changes` from the existing release
-engineering executable. The workflow accepts exactly eight unique boolean
+engineering executable. The workflow accepts exactly seven unique boolean
 decisions and rejects malformed, missing or inconsistent output before exporting
 job outputs. The native selector independently chooses Architecture for both
 configuration schema artifacts and their generator; only root README and public
@@ -31,6 +31,12 @@ include the Setup gate when its shared application, persistence or UI contracts
 can change. The fast reusable workflow runs the distributed project's pure
 `Harness` category; real `Distributed` and browser execution require their
 separate runtime evidence and are never inferred from Harness results.
+
+SetupLive routing is verified by passing all 37 governed input families through
+the native command and requiring both Architecture and Setup selection.
+Workflow architecture checks verify the native command wiring, read-only
+authority, fork-safe secret handling and serial Setup execution. They do not
+require the retired inline path-glob list to remain in the workflow shell script.
 
 ## Security integration fixture execution
 

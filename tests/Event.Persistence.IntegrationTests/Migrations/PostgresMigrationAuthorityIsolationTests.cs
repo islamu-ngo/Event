@@ -9,6 +9,7 @@ using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
@@ -20,6 +21,55 @@ namespace Event.Persistence.IntegrationTests.Migrations;
 [Property("Category", "ExploreDatabaseMigrator")]
 public sealed class PostgresMigrationAuthorityIsolationTests(PostgreSqlContainerFixture fixture)
 {
+    [Test]
+    public async Task UserPiiRevisionDefaultMatchesTheModelAfterNativeMigrations()
+    {
+        string databaseName = $"revision_default_{Guid.CreateVersion7():N}";
+        var administrator = new NpgsqlConnectionStringBuilder(fixture.ConnectionString)
+        {
+            Database = "postgres",
+            Pooling = false
+        };
+        await using var administration = new NpgsqlConnection(administrator.ConnectionString);
+        await administration.OpenAsync();
+        await ExecuteAsync(administration, $"CREATE DATABASE \"{databaseName}\"");
+        try
+        {
+            await using var context = CreateContext(Options(administrator, databaseName,
+                administrator.Username!, administrator.Password!, PrimaryDatabaseRole.Migrator));
+            await context.Database.MigrateAsync();
+            var entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(Explore.Domain.UserPii))
+                ?? throw new InvalidOperationException("user_pii_model_missing");
+            var revision = entity.FindProperty("_birthDateRevision")
+                ?? throw new InvalidOperationException("user_pii_revision_model_missing");
+            var literal = revision.FindAnnotation(RelationalAnnotationNames.DefaultValue);
+            string? expected = literal is null ? revision.GetDefaultValueSql()
+                : Convert.ToString(literal.Value, System.Globalization.CultureInfo.InvariantCulture);
+            await context.Database.OpenConnectionAsync();
+            await using var query = new NpgsqlCommand("""
+                SELECT pg_catalog.pg_get_expr(d.adbin,d.adrelid)
+                FROM pg_catalog.pg_attribute a
+                JOIN pg_catalog.pg_class c ON c.oid=a.attrelid
+                JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+                LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum
+                WHERE n.nspname=@schema AND c.relname=@table AND a.attname=@column
+                    AND a.attnum>0 AND NOT a.attisdropped
+                """, (NpgsqlConnection)context.Database.GetDbConnection());
+            query.Parameters.AddWithValue("schema", entity.GetSchema() ?? RelationalModelNamespace.DefaultSchema);
+            query.Parameters.AddWithValue("table", entity.GetTableName()!);
+            query.Parameters.AddWithValue("column", revision.GetColumnName(
+                StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema()))!);
+            await using var reader = await query.ExecuteReaderAsync();
+            await Assert.That(await reader.ReadAsync()).IsTrue();
+            string? actual = reader.IsDBNull(0) ? null : reader.GetString(0);
+            await Assert.That(actual).IsEqualTo(expected);
+        }
+        finally
+        {
+            await ExecuteAsync(administration, $"DROP DATABASE \"{databaseName}\" WITH (FORCE)");
+        }
+    }
+
     [Test]
     [Arguments(false)]
     [Arguments(true)]

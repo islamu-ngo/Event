@@ -265,6 +265,40 @@ dotnet tests/Event.API.IntegrationTests/bin/Release/net10.0/Event.API.Integratio
 
 ---
 
+[2026-10-31 Europe/Brussels] — Retired foreign volume paths are not owned custody
+
+**Context**: The native assurance parent was qualifying the genuine managed-cleanup child under the `ci-cd-change` contract. The selected Docker Desktop inventory included unrelated historical containers that the workstream did not own.
+
+**Symptom / Observation**: The configured-resource join failed before qualified inventory. A private read-only snapshot contained 37 containers; 15 named-volume mounts had an explicitly empty string `Source`, all on unrelated exited containers without assurance labels. Names, destinations and `RW` fields remained present. The intended host-free regression failed on accepting one such unrelated row beside an otherwise valid owned resource.
+
+**Root Cause**: `TryReadConfiguredOwnedResources` parsed every mount with the strict owned-source contract before classifying the row's owner. Historical foreign volume-consumption evidence therefore had to establish the same canonical source path as an owned mount. Foreign named-volume conflicts actually depend on retained volume names; foreign bind conflicts still require canonical source paths and overlap checks.
+
+**Resolution**: Commit `4759a7a51e7d8830ab0710b29be237d004bd5b02` classifies validated labels first and allows an explicitly empty named-volume source only for foreign rows with explicit string state `exited` or `dead`. It retains every mount for conflict checks. Owned sources and other shared-parser callers remain strict; missing, null, wrong-type, relative and empty bind sources remain refusals. No unrelated container or volume was removed.
+
+The owning Release build passed with zero errors, and this exact selection passed 8/8 with zero skips in 19.578 seconds:
+
+```bash
+dotnet eng/release/tests/ISLAMU.ReleaseEngineering.Tests/bin/Release/net10.0/ISLAMU.ReleaseEngineering.Tests.dll --treenode-filter "/*/*/SecurityExecutionEvidenceParentModelTests/*" --minimum-expected-tests 8 --maximum-parallel-tests 1 --timeout 300s --report-trx --results-directory "$TMPDIR/pr79-assurance-intake/retired-foreign-volume-parent-green"
+```
+
+The subsequent native cleanup attempt failed earlier in daemon image acquisition and did not reach this repaired join. These results do not certify native fallback cleanup or candidate admission.
+
+**Why This Matters for Future Work**: Distinguish foreign-conflict evidence from evidence granting owned-resource custody. Preserve conflict-relevant fields when accepting a legitimate historical shape; do not skip stopped rows, fabricate paths, prune somebody else's runtime, or relax every caller of a shared parser.
+
+**References**:
+
+- `eng/release/src/ISLAMU.ReleaseEngineering/SecurityExecutionEvidence.Execution.cs`, `TryReadConfiguredOwnedResources` and `TryReadRuntimeMounts`.
+- `eng/release/tests/ISLAMU.ReleaseEngineering.Tests/SecurityExecutionEvidenceExecutionTests.cs`, `PrivateDeclarationRequiresExactOwnerResourceImageAndMountInventory`.
+- `docs/internal/testing/DISTRIBUTED_ASSURANCE.md`, Controlled cleanup child.
+- `docs/public/documentation/readme/contributing/distributed-testing.md`.
+- Commit `4759a7a51e7d8830ab0710b29be237d004bd5b02`.
+
+**Promotion Consideration**:
+
+- [x] Keep the observed historical-container failure in this journal; the internal and public distributed guides already own the narrow parser contract.
+
+---
+
 [2026-10-31 Europe/Brussels] — Green cleanup cases do not establish descendant custody
 
 **Context**: The PR79 follow-up reproduced an exited load parent leaving a live descendant with inherited output pipes. The work used the approved test-suite and CI tooling contracts.

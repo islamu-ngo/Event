@@ -10,7 +10,7 @@ namespace Explore.Blazor.Services;
 
 public sealed class InProcessEventApiDispatcher
 {
-    public static readonly Uri InternalBaseAddress = new("http://event-api.internal/");
+    public static readonly Uri InternalBaseAddress = new("https://event-api.internal/");
     private static readonly object RequestMarker = new();
 
     private RequestDelegate? _pipeline;

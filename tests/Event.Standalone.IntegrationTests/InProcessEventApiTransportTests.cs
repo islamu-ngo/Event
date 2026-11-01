@@ -6,6 +6,7 @@ using Explore.Blazor.Extensions;
 using Explore.Blazor.Hosting;
 using Explore.Blazor.Services;
 using Explore.Blazor.Services.Auth;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -18,6 +19,34 @@ namespace Event.Standalone.IntegrationTests;
 
 public sealed class InProcessEventApiTransportTests
 {
+    [Test]
+    public async Task InProcessRequestsReachApiWhenHttpsRedirectionIsEnabled()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new Explore.ServiceDefaults.EarlyRequestAdmission(TimeProvider.System, enabled: true));
+        services.AddLogging();
+        services.AddHttpContextAccessor();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        services.AddHttpsRedirection(options => options.HttpsPort = 7287);
+        await using var provider = services.BuildServiceProvider();
+        var pipeline = new ApplicationBuilder(provider);
+        pipeline.UseHttpsRedirection();
+        pipeline.Run(context => context.Response.WriteAsync("api-response", context.RequestAborted));
+        var dispatcher = new InProcessEventApiDispatcher();
+        dispatcher.BindEndpointSelector(_ => Task.CompletedTask);
+        dispatcher.Bind(pipeline.Build());
+        using var handler = new InProcessEventApiHttpMessageHandler(
+            dispatcher,
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            provider.GetRequiredService<IHttpContextAccessor>());
+        using var client = new HttpClient(handler) { BaseAddress = InProcessEventApiDispatcher.InternalBaseAddress };
+
+        using var response = await client.GetAsync("api/probe");
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(await response.Content.ReadAsStringAsync()).IsEqualTo("api-response");
+    }
+
     [Test]
     public async Task HandlerCopiesRequestAndResponseWithoutCookieOrAmbientPrincipal()
     {

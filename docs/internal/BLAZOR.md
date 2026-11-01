@@ -170,6 +170,10 @@ This cookie-to-API token conversion fails closed: a valid BFF cookie without a u
 
 `InProcessEventApiHttpMessageHandler` is the separate server-side bridge used by generated `IEventApiClient` services in the Combined profile. It creates an isolated HTTP context and service scope, copies HTTP semantics and permitted headers, but does not copy browser cookies, `Host`, or an ambient principal. It is an in-process transport implementation, not permission to bypass API authentication or Application authorization.
 
+The internal base URI uses the HTTPS scheme so that API HTTPS-redirection
+middleware does not redirect synthetic requests away from their selected
+handlers. Dispatch remains in process; this does not introduce a network hop.
+
 ### Antiforgery boundaries and Standalone limits
 
 Both Topology modes issue `XSRF-TOKEN` from the BFF and require unsafe browser API requests to send it as `X-CSRF-TOKEN`. Split performs this check at the BFF proxy boundary; Standalone performs the same check in the Combined bridge before entering the API pipeline. Direct API bearer-token or API-key callers do not have a browser cookie boundary and are not subject to BFF antiforgery.

@@ -5,6 +5,7 @@ using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Secrets;
 using Explore.Infrastructure.Services;
 using Explore.Infrastructure.Services.Privacy;
 using Explore.Persistence;
@@ -14,6 +15,7 @@ using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
+using ISLAMU.Moderation.Domain;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -631,6 +633,10 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
             probe.Parameters.Add(new NpgsqlParameter("table", table));
             await Assert.That((bool)(await probe.ExecuteScalarAsync())!).IsFalse();
         }
+        var providerKeyDenied = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.UserExternalLogins.IgnoreQueryFilters()
+                .Select(row => row.ProviderKey).Take(1).ToArrayAsync());
+        await Assert.That(providerKeyDenied!.SqlState).IsEqualTo("42501");
     }
 
     private sealed class OrdinaryLogins(PostgreSqlContainerFixture fixture) : IAsyncDisposable
@@ -639,6 +645,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         private readonly string _runtime = $"erasure_runtime_{Guid.CreateVersion7():N}";
         private string[] _mirrorTables = [];
         private string[] _requestTables = [];
+        private readonly List<string> _workflowRevocations = [];
         private string _eligibilityTable = null!;
         private readonly Dictionary<string, bool> _eligibilityColumns = new(StringComparer.Ordinal);
         private string _schema = null!;
@@ -659,6 +666,22 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
                 metadata = originalMetadata;
                 var sql = metadata.GetService<ISqlGenerationHelper>();
                 logins._schema = metadata.Model.FindEntityType(typeof(Location))!.GetSchema()!;
+                await Assert.That(await metadata.ModerationHostBindings.IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationRecognitionPending>().IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationRecognitionCaptureItem>().IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationRecognitionContinuityBinding>().IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationSanction>().IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationProfileSubjectConsent>().IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationProfileCollectionAssessmentAdoption>().IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationProfileCollectionAssessmentSource>().IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationProfileCollectionSubjectObservation>().IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.ModerationCaseNarratives.IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationParticipantIncidentResponsibilitySource>().IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationContentResponse>().IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationPreFindingCustody>().IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationPreFindingNotice>().IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationPreFindingReceipt>().IgnoreQueryFilters().AnyAsync()).IsFalse();
+                await Assert.That(await metadata.Set<ModerationAdjudicatedCaseReadGrant>().IgnoreQueryFilters().AnyAsync()).IsFalse();
                 logins._mirrorTables = new[] { typeof(PrivacyErasureSaga), typeof(PrivacyErasurePolicyCoverage),
                     typeof(PrivacyErasureReplayCheckpoint), typeof(PrivacyErasureProviderWork), typeof(OutboxMessage) }
                     .Select(Table).ToArray();
@@ -686,6 +709,101 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
                     """;
                 provisioningAttempted = true;
                 await grant.ExecuteNonQueryAsync();
+                Type[] recognitionReads =
+                [
+                    typeof(User), typeof(PlatformUserRole), typeof(TenantUser), typeof(TenantUserRoleGrant),
+                    typeof(ModerationHostBinding), typeof(ModerationRecognitionPending),
+                    typeof(ModerationRecognitionCaptureItem), typeof(ModerationRecognitionDisposition),
+                    typeof(ModerationRecognitionActionRecovery), typeof(ModerationRecognitionKeyLifecyclePurge),
+                    typeof(ModerationRecognitionContinuityBinding), typeof(ModerationDecision),
+                    typeof(ModerationSanction)
+                ];
+                Type[] recognitionFences =
+                [
+                    typeof(User), typeof(PlatformUserRole), typeof(TenantUser),
+                    typeof(TenantUserRoleGrant), typeof(ModerationRecognitionPending)
+                ];
+                grant.CommandText = $"""
+                    GRANT SELECT ON {string.Join(", ", recognitionReads.Select(Table))} TO "{logins._global}";
+                    """;
+                logins._workflowRevocations.Add(
+                    $"REVOKE SELECT ON {string.Join(", ", recognitionReads.Select(Table))} FROM \"{logins._global}\";");
+                foreach (var type in recognitionFences)
+                {
+                    grant.CommandText += $"""
+
+                        GRANT UPDATE ({FenceColumn(type)}) ON {Table(type)} TO "{logins._global}";
+                        """;
+                    logins._workflowRevocations.Add(
+                        $"REVOKE UPDATE ({FenceColumn(type)}) ON {Table(type)} FROM \"{logins._global}\";");
+                }
+                foreach (var (type, columns, fence) in new (Type Type, string[] Columns, bool Fence)[]
+                {
+                    (typeof(UserExternalLogin), [nameof(UserExternalLogin.Id), nameof(UserExternalLogin.UserId)], true),
+                    (typeof(Role), [nameof(Role.Id)], true),
+                    (typeof(SecretBinding), [nameof(SecretBinding.Id), nameof(SecretBinding.SettingKey)], true),
+                    (typeof(ModerationPolicyPublicationCandidate),
+                        [nameof(ModerationPolicyPublicationCandidate.Id), nameof(ModerationPolicyPublicationCandidate.PreparedByHumanId)], false),
+                    (typeof(ModerationPolicyPublication),
+                        [nameof(ModerationPolicyPublication.Id), nameof(ModerationPolicyPublication.PrincipalId)], false),
+                    (typeof(Tenant), [nameof(Tenant.Id)], false),
+                    (typeof(ModerationProfileSubjectConsent),
+                        [nameof(ModerationProfileSubjectConsent.Id), nameof(ModerationProfileSubjectConsent.SubjectHumanId)], false),
+                    (typeof(ModerationProfileCollectionAssessmentAdoption),
+                        [nameof(ModerationProfileCollectionAssessmentAdoption.Id), nameof(ModerationProfileCollectionAssessmentAdoption.SourceId)], false),
+                    (typeof(ModerationProfileCollectionAssessmentSource),
+                        [nameof(ModerationProfileCollectionAssessmentSource.Id), nameof(ModerationProfileCollectionAssessmentSource.SubjectHumanId)], false),
+                    (typeof(ModerationProfileCollectionSubjectObservation),
+                        [nameof(ModerationProfileCollectionSubjectObservation.Id), nameof(ModerationProfileCollectionSubjectObservation.SubjectHumanId)], false),
+                    (typeof(ModerationCaseNarrative),
+                        [nameof(ModerationCaseNarrative.Id), nameof(ModerationCaseNarrative.TenantId),
+                            nameof(ModerationCaseNarrative.ReporterUserId)], false),
+                    (typeof(ModerationParticipantIncidentResponsibilitySource),
+                        [nameof(ModerationParticipantIncidentResponsibilitySource.Id), nameof(ModerationParticipantIncidentResponsibilitySource.TenantId),
+                            nameof(ModerationParticipantIncidentResponsibilitySource.SubjectId),
+                            nameof(ModerationParticipantIncidentResponsibilitySource.AssessorHumanId),
+                            nameof(ModerationParticipantIncidentResponsibilitySource.ReadIssuerHumanId),
+                            nameof(ModerationParticipantIncidentResponsibilitySource.OriginalNarrativeId)], false),
+                    (typeof(ModerationContentResponse),
+                        [nameof(ModerationContentResponse.Id), nameof(ModerationContentResponse.TenantId),
+                            nameof(ModerationContentResponse.RepresentativeHumanId)], false),
+                    (typeof(ModerationPreFindingCustody),
+                        [nameof(ModerationPreFindingCustody.Id), nameof(ModerationPreFindingCustody.TenantId),
+                            nameof(ModerationPreFindingCustody.ProposedByHumanId),
+                            nameof(ModerationPreFindingCustody.PrivacyOwnerHumanId)], false),
+                    (typeof(ModerationPreFindingNotice),
+                        [nameof(ModerationPreFindingNotice.Id), nameof(ModerationPreFindingNotice.TenantId),
+                            nameof(ModerationPreFindingNotice.RecipientHumanId), nameof(ModerationPreFindingNotice.IssuedByHumanId),
+                            nameof(ModerationPreFindingNotice.SubjectKind), nameof(ModerationPreFindingNotice.SubjectId),
+                            nameof(ModerationPreFindingNotice.CustodyId), nameof(ModerationPreFindingNotice.CaseId),
+                            nameof(ModerationPreFindingNotice.HostBindingId), nameof(ModerationPreFindingNotice.TrustDomainId)], false),
+                    (typeof(ModerationPreFindingReceipt),
+                        [nameof(ModerationPreFindingReceipt.Id), nameof(ModerationPreFindingReceipt.TenantId),
+                            nameof(ModerationPreFindingReceipt.ActorHumanId)], false),
+                    (typeof(ModerationAdjudicatedCaseReadGrant),
+                        [nameof(ModerationAdjudicatedCaseReadGrant.Id), nameof(ModerationAdjudicatedCaseReadGrant.TenantId),
+                            nameof(ModerationAdjudicatedCaseReadGrant.RecipientUserId),
+                            nameof(ModerationAdjudicatedCaseReadGrant.IssuerUserId),
+                            nameof(ModerationAdjudicatedCaseReadGrant.RevokedByUserId)], false)
+                })
+                {
+                    grant.CommandText += $"""
+
+                        GRANT SELECT ({Columns(type, columns)}) ON {Table(type)} TO "{logins._global}";
+                        """;
+                    logins._workflowRevocations.Add(
+                        $"REVOKE SELECT ({Columns(type, columns)}) ON {Table(type)} FROM \"{logins._global}\";");
+                    if (fence)
+                    {
+                        grant.CommandText += $"""
+
+                            GRANT UPDATE ({FenceColumn(type)}) ON {Table(type)} TO "{logins._global}";
+                            """;
+                        logins._workflowRevocations.Add(
+                            $"REVOKE UPDATE ({FenceColumn(type)}) ON {Table(type)} FROM \"{logins._global}\";");
+                    }
+                }
+                await grant.ExecuteNonQueryAsync();
                 await PostgresLocalIdentityWriterPermissions.ApplyAsync(metadata,
                     new PostgresLocalIdentityWriterEnrollment(fixture.NativeQueueEnrollment.MigratorLogin,
                         logins._runtime, fixture.GetNativeQueueOptions(PrimaryDatabaseRole.LocalIdentityWriter).Username!,
@@ -700,6 +818,18 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
                     var entity = originalMetadata.Model.FindEntityType(type)!;
                     return sql.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
                 }
+
+                string Columns(Type type, string[] names)
+                {
+                    var entity = originalMetadata.Model.FindEntityType(type)!;
+                    var store = Microsoft.EntityFrameworkCore.Metadata.StoreObjectIdentifier.Table(
+                        entity.GetTableName()!, entity.GetSchema());
+                    return string.Join(", ", names.Select(name => sql.DelimitIdentifier(
+                        entity.FindProperty(name)!.GetColumnName(store)!)));
+                }
+
+                string FenceColumn(Type type) => Columns(type,
+                    [originalMetadata.Model.FindEntityType(type)!.FindPrimaryKey()!.Properties[0].Name]);
 
                 PrimaryDatabaseConnectionOptions Options(PrimaryDatabaseRole role, string login, string password) => new()
                 {
@@ -807,6 +937,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
                             string selected = string.Join(", ", _eligibilityColumns.Keys.Select(Quote));
                             string updated = string.Join(", ", _eligibilityColumns.Where(pair => pair.Value).Select(pair => Quote(pair.Key)));
                             revoke.CommandText = $"""
+                                {string.Join(Environment.NewLine, _workflowRevocations)}
                                 REVOKE SELECT ({selected}), UPDATE ({updated}) ON {_eligibilityTable} FROM "{_global}";
                                 REVOKE ALL ON {string.Join(", ", _mirrorTables)} FROM "{_global}";
                                 REVOKE {PostgresSubjectPrivacyErasureContract.GlobalRole} FROM "{_global}";

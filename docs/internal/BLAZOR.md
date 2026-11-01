@@ -174,6 +174,18 @@ The internal base URI uses the HTTPS scheme so that API HTTPS-redirection
 middleware does not redirect synthetic requests away from their selected
 handlers. Dispatch remains in process; this does not introduce a network hop.
 
+Local identity validation distinguishes rejection from unavailability.
+`BffAdminClaimsTransformation.ValidateLocalSessionAsync` preserves definitive
+identity rejection, but translates throttling, server failures, transport errors,
+non-caller timeouts and open circuits into `BffSessionAuthorityUnavailableException`.
+The HTTP boundary returns a non-cacheable `503` without signing out or revoking
+the native ticket. Standalone installs that boundary before its outer
+authentication and cookie-to-API bridge. An unavailable circuit activity does
+not reach its handler and does not permanently revoke the original circuit;
+the next activity must validate afresh. Caller cancellation and definitive
+revocation retain their existing behavior. No identity-validity cache or
+admission-limit exemption is introduced.
+
 ### Antiforgery boundaries and Standalone limits
 
 Both Topology modes issue `XSRF-TOKEN` from the BFF and require unsafe browser API requests to send it as `X-CSRF-TOKEN`. Split performs this check at the BFF proxy boundary; Standalone performs the same check in the Combined bridge before entering the API pipeline. Direct API bearer-token or API-key callers do not have a browser cookie boundary and are not subject to BFF antiforgery.

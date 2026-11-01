@@ -92,6 +92,12 @@ carried into SQLite configuration. Use the small Standalone projection below and
 the [environment reference](../configuration-and-operations/environment-variables.md)
 for advanced settings. Restrict the file to its operator (`chmod 600 .env`).
 
+Temporary Local identity-check failures, including API throttling, block protected
+operations without deleting an otherwise valid browser session. Protected HTTP
+requests return `503`; realtime activities remain blocked until a fresh check
+succeeds. Restore service availability and retry rather than disabling admission
+limits. A definitively invalid or revoked identity still requires a new sign-in.
+
 > [!TIP]
 > **Authentication recommendation:** Keep the default embedded Local Identity
 > for the easiest standalone deployment and for localhost/private-network use.

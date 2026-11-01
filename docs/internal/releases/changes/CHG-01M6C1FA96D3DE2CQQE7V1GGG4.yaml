@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6C1FA96D3DE2CQQE7V1GGG4
+Title: "retain Local sessions when identity validation is unavailable"
+Type: fix
+Scope: access
+Summary: "Temporary identity-check failures block protected operations without deleting otherwise valid browser sessions; fresh validation restores access."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Throttling, server failures, transport faults, non-caller timeouts and open circuits fail closed without revoking the native ticket. Definitively invalid identities still reject the session; every admitted circuit activity must validate afresh.
+  Migration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: Protected HTTP requests return a non-cacheable 503 during unavailable identity checks. Restore service availability and retry with the retained session; no identity-validity cache or admission-limit exemption is introduced.

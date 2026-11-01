@@ -15,6 +15,54 @@ namespace Event.Application.UnitTests.Operations;
 public sealed class InstanceOnboardingOwnerSelectionTests
 {
     [Test]
+    public async Task ProfileSaveMustSelectGlobalBeforeConstructingItsSettingsGraph()
+    {
+        var services = OperationCompositionTests.Services(
+            typeof(SaveInstanceOnboardingProfileCommand), typeof(SaveInstanceOnboardingProfileCommandHandler));
+        await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        await using var request = provider.CreateAsyncScope();
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await request.ServiceProvider
+                .GetRequiredService<ICommandHandler<SaveInstanceOnboardingProfileCommand, BaseCommandResponse<Guid>>>()
+                .ExecuteAsync(ProfileRequest(), CancellationToken.None));
+
+        await Assert.That(failure.Message.Contains(
+            typeof(IPolicyMutationExecutionScopeFactory).FullName!, StringComparison.Ordinal)).IsTrue();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ProfileSaveSelectsInstanceOwnerWithoutRebindingAmbientTenant(bool hasAmbientTenant)
+    {
+        var services = new ServiceCollection();
+        Guid? tenant = hasAmbientTenant ? Guid.CreateVersion7() : null;
+        if (tenant.HasValue)
+            services.AddSingleton<ITenantContextAccessor>(new FixedTenantFacts(tenant.Value));
+        await using var provider = services.BuildServiceProvider();
+
+        var selection = await PolicyMutationCommandScope.SelectAsync(ProfileRequest(), provider, CancellationToken.None);
+
+        await Assert.That(PolicyMutationCommandScope.Handles(typeof(SaveInstanceOnboardingProfileCommand))).IsTrue();
+        await Assert.That(selection).IsEqualTo(PolicyMutationScope.Instance);
+        await Assert.That(provider.GetService<ITenantContextAccessor>()?.TenantId).IsEqualTo(tenant);
+    }
+
+    [Test]
+    public async Task CancelledProfileSaveCannotSelectAnOwner()
+    {
+        await using var provider = new ServiceCollection().BuildServiceProvider();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var failure = await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await PolicyMutationCommandScope.SelectAsync(ProfileRequest(), provider, cancellation.Token));
+
+        await Assert.That(failure.CancellationToken).IsEqualTo(cancellation.Token);
+    }
+
+    [Test]
     public async Task LocalOnboardingMustSelectGlobalBeforeConstructingItsCredentialOrCompletionGraph()
     {
         var services = OperationCompositionTests.Services(
@@ -105,6 +153,11 @@ public sealed class InstanceOnboardingOwnerSelectionTests
 
         await Assert.That(failure.CancellationToken).IsEqualTo(cancellation.Token);
     }
+
+    private static SaveInstanceOnboardingProfileCommand ProfileRequest() => new()
+    {
+        Profile = new SelfHostOnboardingProfileDto()
+    };
 
     private static CompleteInstanceOnboardingCommand Request() => new()
     {

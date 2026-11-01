@@ -46,6 +46,7 @@ internal static class PolicyMutationCommandScope
         || request == typeof(UpdateEventPolicyCommand)
         || request == typeof(EnsureManagedProviderClientProvisionedCommand)
         || request == typeof(CreateTenantCommand)
+        || request == typeof(SaveInstanceOnboardingProfileCommand)
         || request == typeof(CompleteInstanceOnboardingCommand)
         || request == typeof(CompleteLocalInstanceOnboardingCommand)
         || request == typeof(CompleteTenantOnboardingCommand)
@@ -99,6 +100,7 @@ internal static class PolicyMutationCommandScope
     {
         UpdateLocalizationGovernanceCommand => PolicyMutationScope.Instance,
         UpdateUserLastActiveTenantCommand => PolicyMutationScope.Instance,
+        SaveInstanceOnboardingProfileCommand => PolicyMutationScope.Instance,
         CompleteInstanceOnboardingCommand => PolicyMutationScope.Instance,
         CompleteLocalInstanceOnboardingCommand => PolicyMutationScope.Instance,
         UpdateEventPolicyCommand => PolicyMutationScope.MixedSettingsInstance,

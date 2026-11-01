@@ -299,6 +299,35 @@ The subsequent native cleanup attempt failed earlier in daemon image acquisition
 
 ---
 
+[2026-10-31 Europe/Brussels] — Cached Desktop metadata does not prove engine readiness
+
+**Context**: Native managed-cleanup qualification under `ci-cd-change` repeatedly stopped at image acquisition before child launch. Local Unix-peer tests passed, and instrumentation or a later independent client sometimes made the native sequence pass.
+
+**Symptom / Observation**: The actual acquisition methods reported `selected_daemon_read_failed:3`. Version, info and container-list requests had succeeded. Socket-mode, fresh-connection and worker-scheduling experiments did not isolate a transport defect.
+
+**Root Cause**: In the timestamp-correlated reproduction, the Docker Desktop proxy served the first three requests from cache while its VM was stopped. Image inventory started the VM at 16:40:19 UTC; the runtime reported the daemon ready at 16:40:31 UTC, after both five-second image requests expired. A later passing client therefore did not constitute a contemporaneous control for the cold engine.
+
+**Resolution**: Restore the original asynchronous client and request deadlines; retain the independently proven handler-local trace-context isolation. Establish actual engine readiness with a separately bounded read-only uncached inventory request on the same selected socket. Do not change global settings, restart the backend, substitute endpoints or retry mutations. Archive rejected transport experiments and their failures instead of shipping them as a cure.
+
+The owning Release build and all three real-peer privacy/cancellation cases passed. After the separate readiness operation returned HTTP 200, this original asynchronous acquisition selection passed 2/2 with zero failures or skips in 2.053 seconds, without diagnostic runtime overrides:
+
+```bash
+timeout --signal=INT --kill-after=5s 150s dotnet eng/release/tests/ISLAMU.ReleaseEngineering.Tests/bin/Release/net10.0/ISLAMU.ReleaseEngineering.Tests.dll --treenode-filter "/*/*/SecurityExecutionEvidenceDaemonTransportTests/SelectedSocketCompletes*AcquisitionSequence" --minimum-expected-tests 2 --maximum-parallel-tests 1 --timeout 60s --report-trx --results-directory "$TMPDIR/pr79-assurance-intake/daemon-restored-ready-native"
+```
+
+Genuine killed-child cleanup was still running when this finding was recorded. These transport results do not establish cleanup, resource custody or registered-lane admission, and the correlation does not classify every historical failure.
+
+**Why This Matters for Future Work**: Correlate the selected runtime's actual startup state before rewriting an apparently stalled client. Cached metadata, instrumented passes and later probes can mask a cold-engine prerequisite; keep startup readiness distinct from bounded operational requests.
+
+**References**:
+- `docs/internal/testing/DISTRIBUTED_ASSURANCE.md`, Engine readiness before bounded daemon exchanges.
+- `docs/public/documentation/readme/contributing/distributed-testing.md`.
+- `eng/release/tests/ISLAMU.ReleaseEngineering.Tests/SecurityExecutionEvidenceDaemonTransportTests.cs`.
+- PR79 task context and private `daemon-desktop-readiness-correlation.json`, which locates the actual native TRX and runtime-log timestamps.
+
+**Promotion Consideration**:
+- [x] Keep the reproduction in this journal; the paired distributed-testing guides own the operational prerequisite.
+
 [2026-10-31 Europe/Brussels] — Green cleanup cases do not establish descendant custody
 
 **Context**: The PR79 follow-up reproduced an exited load parent leaving a live descendant with inherited output pipes. The work used the approved test-suite and CI tooling contracts.

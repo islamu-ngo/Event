@@ -356,3 +356,36 @@ These working-source lifecycle receipts do not qualify offered load, application
 
 **Promotion Consideration**:
 - [x] Stays in journal as the rejected-approach lesson; the existing paired guides own the implemented contract.
+
+[2026-11-01 Europe/Brussels] — Temporary role grants need lifetime-owned revocations
+
+**Context**: Native PostgreSQL privacy-assurance cases needed fixed table and projected-column permissions for their existing ordinary application purpose. The test-suite fixture retained its private-data denials and generated temporary logins.
+
+**Symptom / Observation**: After adding those permissions, both settlement cases failed during disposal with `2BP01`: the temporary global role could not be dropped because objects depended on it. Both independent static reviews identified missing privilege revocation. An `await using` disposal exception could replace an earlier workflow exception, so this failure did not establish that the workflow body had succeeded.
+
+**Root Cause**: The fixture's old cleanup revoked its previous mirror-table, eligibility-column and role-membership grants, but not the new direct table and column grants. The create and dispose paths no longer described the same privilege lifetime.
+
+**Resolution**: Record exact inverse `REVOKE SELECT` and `REVOKE UPDATE(column)` statements alongside each fixed grant group, then execute those statements before the existing role removal. Resolve physical identifiers through EF metadata. Do not replace this with `DROP OWNED`, cascading object deletion or a database-wide privilege sweep. The owning build passed:
+
+```bash
+dotnet build tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-restore --verbosity quiet
+```
+
+The subsequent two-case native run reported no cleanup exception, but still failed both cases on the previously masked `NpgsqlRetryingExecutionStrategy`/manual-transaction conflict in recognition expiry. Its result was **0 passed, 2 failed**, not a successful settlement or whole-fixture qualification. The task ledger retains the exact native commands and all earlier failures.
+
+The four newly affected forgery cases then passed on the current fixture: **4 passed, 0 failed or skipped**, in 21:02.716. Those cases include the private-read assertions and successful scope teardown. They do not qualify the two still-failing settlement cases.
+
+```bash
+timeout --signal=INT --kill-after=15s 1680s dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/PostgresSubjectPrivacyErasureAuthorityTests/ForgedPreparationAndMismatchedNativeTupleCannotErase" --minimum-expected-tests 4 --maximum-parallel-tests 1 --timeout 1620s --progress off --report-trx --results-directory "$TMPDIR/pr79-assurance-intake/privacy-fixture-forged-current"
+```
+
+**Why This Matters for Future Work**: A temporary database principal owns a privilege lifecycle as well as a login lifecycle. Keep each new permission and its inverse together, including column grants, and preserve the original body failure separately from teardown failure. Removing a cleanup error can reveal another defect; it is not evidence that the protected business operation completed.
+
+**References**:
+- `tests/Event.Persistence.IntegrationTests/Privacy/PostgresSubjectPrivacyErasureAuthorityTests.cs`, `OrdinaryLogins.CreateAsync` and `DisposeAsync`.
+- `dev/active/pr79-testing-assurance-follow-up/pr79-testing-assurance-follow-up-tasks.md`, native privacy fixture qualification.
+- Private native receipts: `privacy-fixture-key-native/` and `privacy-fixture-revoke-native/`.
+- Commit: `9deb4a917815d3f7dbe41e2563744b93268e4662`.
+
+**Promotion Consideration**:
+- [x] Stays in the testing journal; this is an observed fixture-lifetime failure, not a new product authorization or transaction policy.

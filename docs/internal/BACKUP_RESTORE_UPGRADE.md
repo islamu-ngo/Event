@@ -11,6 +11,22 @@ ABOUTME: Grounds release operations in provider-native database tools, authority
 
 This runbook covers self-hosted deployments using the repository Docker Compose topology. Treat every upgrade as a data operation first and an image rollout second.
 
+## Primary UserPii Revision Default
+
+The primary application correction `DeclareUserPiiBirthDateRevisionDefault`
+must also be applied through its selected migration owner. It adds the declared
+zero default for the private birth-date revision without changing stored dates
+or existing revisions. The four generated primary catalogs cover all five
+supported engines; MySQL and MariaDB share their catalog. No privacy-authority
+or Data Protection catalog is changed.
+
+SQL Server's native scaffold repeats the existing moderation-evidence foreign
+key operation. Its owning SQL generator retains the existing `NO ACTION`
+behavior in both directions; do not hand-edit generated metadata to remove the
+historical operation. The downgrade removes the revision default, not user
+rows. Use matched code/schema versions and retain the normal backups rather
+than weakening native readiness checks to start a mismatched deployment.
+
 ## Co-Located Authority Recovery Coordinates
 
 For PostgreSQL `CoLocated` authority, apply

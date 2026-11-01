@@ -118,6 +118,20 @@ The Privacy Erasure Authority store must be configured in your environment via `
 
 ---
 
+## Primary UserPii Revision Default
+
+Apply `DeclareUserPiiBirthDateRevisionDefault` through the normal selected
+migration service before traffic. Its four provider catalogs cover all five
+supported primary engines; MySQL and MariaDB share a catalog. The default is the
+initial revision number `0`, not a default birth date or verified-age claim.
+Existing private values and revision numbers are preserved.
+
+PostgreSQL startup still rejects model/storage default drift. Do not bypass that
+check, grant broader application permissions or change schemas as a workaround.
+The generated downgrade removes the default rather than deleting personal data;
+any rollback must use a matched application/schema version and the normal
+backup/restore procedure.
+
 ## PostgreSQL Co-Located Authority Upgrade
 
 For PostgreSQL installations using `CoLocated`, the

@@ -4093,7 +4093,7 @@ Table "user_pii" {
   "last_name" varchar(500) [not null]
   "date_of_birth" date [note: 'Private optional declaration, never verified age evidence or an ordinary user DTO field']
   "birth_date_collection_receipt_id" uuid [note: 'Current provenance pointer, intentionally not a retention-preserving FK']
-  "birth_date_revision" bigint [not null, note: 'Application-managed correction/clear concurrency token']
+  "birth_date_revision" bigint [not null, default: 0, note: 'Application-managed correction/clear concurrency token; zero is the initial revision, not a birth-date or age declaration']
 
   indexes {
     email [unique]

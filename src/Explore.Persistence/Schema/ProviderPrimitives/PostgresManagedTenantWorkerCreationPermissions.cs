@@ -549,6 +549,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
         if (literal is null && string.Equals(sql, "uuidv7()", StringComparison.Ordinal) && property.ClrType == typeof(Guid)) return "uuidv7()";
         if (sql is null && literal?.Value is bool boolean) return boolean ? "true" : "false";
         if (sql is null && literal?.Value is int integer) return integer.ToString(CultureInfo.InvariantCulture);
+        if (sql is null && literal?.Value is long longInteger) return longInteger.ToString(CultureInfo.InvariantCulture);
         throw new InvalidOperationException("managed_tenant_worker_default_model_drift");
     }
 

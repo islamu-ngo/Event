@@ -1,0 +1,40 @@
+Change-Id: CHG-01M6BHCAW28YPP18X99W3DVAWX
+Title: "Declare the private birth-date revision default"
+Type: fix
+Scope: privacy
+Summary: "Align the private birth-date revision model and primary-provider migrations so exact native startup admission recognizes its declared zero default."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Native creation admission compares explicitly declared long defaults with
+      the exact stored expression and dependencies. Private-table permissions,
+      concurrency checks and fail-closed drift detection remain enforced.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: >-
+      Apply DeclareUserPiiBirthDateRevisionDefault through the selected primary
+      migration owner. Four generated catalogs cover PostgreSQL, SQLite,
+      SQL Server and shared MySQL/MariaDB. Existing values and revisions are
+      preserved; privacy-authority and Data Protection catalogs are unchanged.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/privacy-erasure.md
+    Disposition: documented
+    Detail: >-
+      Run the selected migration service before traffic and retain matched
+      application/schema versions for rollback. The downgrade removes the
+      default without deleting personal data. Do not bypass native admission
+      or grant broader private-table access to start a mismatched deployment.

@@ -316,6 +316,15 @@ Use this decision matrix to select the right topology for your environment:
 
 ## 5. Migration Ownership and History Separation
 
+The primary `DeclareUserPiiBirthDateRevisionDefault` correction declares an
+explicit `long` zero default for `UserPii._birthDateRevision`. PostgreSQL native
+creation admission compares that model annotation with the exact stored default
+expression and dependencies; unsupported declarations or physical drift still
+fail closed. The revision remains a concurrency token, and existing private
+values and revisions are not rewritten. Four generated catalogs cover
+PostgreSQL, SQLite, SQL Server and the shared MySQL/MariaDB owner. They do not
+change the separate privacy-authority or Data Protection catalogs.
+
 For deployed installations, `Event.MigrationService` owns application, Data
 Protection, and **exactly one** authority migration path selected by the
 topology. Provider-native application and Data Protection migration assemblies

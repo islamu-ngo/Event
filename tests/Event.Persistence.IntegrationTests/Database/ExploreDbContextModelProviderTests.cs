@@ -113,6 +113,32 @@ public sealed class ExploreDbContextModelProviderTests
     [Arguments("SqlServer")]
     [Arguments("MariaDb")]
     [Arguments("MySql")]
+    public async Task UserPiiBirthDateRevisionHasExplicitLongZeroDefault(string provider)
+    {
+        using var context = CreatePrivateTableContext(Enum.Parse<PrimaryDatabaseProvider>(provider), external: false);
+        IProperty property = context.GetService<IDesignTimeModel>().Model
+            .FindEntityType(typeof(Explore.Domain.UserPii))!
+            .FindProperty("_birthDateRevision")!;
+
+        await Assert.That(property.FindAnnotation(RelationalAnnotationNames.DefaultValue)?.Value)
+            .IsEqualTo((object)0L);
+        await Assert.That(property.IsConcurrencyToken).IsTrue();
+        IModel snapshot = context.GetService<IMigrationsAssembly>().ModelSnapshot?.Model
+            ?? throw new InvalidOperationException("The selected primary migration snapshot is missing.");
+        var snapshotProperty = snapshot.FindEntityType(typeof(Explore.Domain.UserPii).FullName!)?
+            .FindProperty("_birthDateRevision")
+            ?? throw new InvalidOperationException("The selected snapshot is missing the birth-date revision.");
+        await Assert.That(snapshotProperty.FindAnnotation(RelationalAnnotationNames.DefaultValue)?.Value)
+            .IsEqualTo((object)0L);
+        await Assert.That(snapshotProperty.IsConcurrencyToken).IsTrue();
+    }
+
+    [Test]
+    [Arguments("PostgreSql")]
+    [Arguments("Sqlite")]
+    [Arguments("SqlServer")]
+    [Arguments("MariaDb")]
+    [Arguments("MySql")]
     public async Task LocationDerivedKeysHaveExactPortableOrdinalModelContract(string provider)
     {
         using var context = CreateContext(provider);

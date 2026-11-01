@@ -140,11 +140,7 @@ public static class ExploreDatabaseMigrator
         ExploreDbContext db, IConfiguration configuration, CancellationToken cancellationToken)
     {
         await db.Database.MigrateAsync(cancellationToken);
-        var mapping = db.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>();
-        await using var mappedDatabase = mapping is not null && mapping.ModelSchema != mapping.TargetSchema
-            ? CreateNamespaceExecutionContext(db, forSeeding: false)
-            : null;
-        var executionDatabase = mappedDatabase ?? db;
+        await using var executionDatabase = CreateNamespaceExecutionContext(db, forSeeding: false);
         PostgresNativeQueueEnrollment? queueEnrollment = executionDatabase.Database.IsNpgsql()
             ? PostgresNativeQueueEnrollment.Bind(configuration)
             : null;

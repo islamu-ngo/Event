@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
+using Testcontainers.PostgreSql;
 
 namespace Event.Persistence.IntegrationTests.Migrations;
 
@@ -157,6 +158,66 @@ public sealed class PostgresMigrationAuthorityIsolationTests(PostgreSqlContainer
         {
             await ExecuteAsync(administration, $"DROP DATABASE \"{databaseName}\" WITH (FORCE)");
         }
+    }
+
+    [Test]
+    public async Task CanonicalMigrationOwnsItsExecutionLeaseWithoutBindingTheCaller()
+    {
+        var selected = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator);
+        await using var container = new PostgreSqlBuilder("postgres:18-alpine")
+            .WithDatabase("migration_lease_" + Guid.CreateVersion7().ToString("N"))
+            .WithUsername(selected.Username!)
+            .WithPassword(selected.Password!)
+            .Build();
+        await container.StartAsync();
+        var endpoint = new NpgsqlConnectionStringBuilder(container.GetConnectionString());
+        await using var migration = CreateContext(Options(endpoint, endpoint.Database!,
+            selected.Username!, selected.Password!, PrimaryDatabaseRole.Migrator));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Database:Migrator:Username"] = fixture.NativeQueueEnrollment.MigratorLogin,
+                ["Database:Global:Username"] = fixture.NativeQueueEnrollment.GlobalLogin,
+                ["Database:Runtime:Username"] = fixture.NativeQueueEnrollment.RuntimeLogin,
+                ["Database:EmailPolicyInstanceMutation:Username"] =
+                    fixture.NativeQueueEnrollment.EmailInstanceMutationLogin,
+                ["Database:EmailPolicyTenantMutation:Username"] =
+                    fixture.NativeQueueEnrollment.EmailTenantMutationLogin,
+                ["Database:InstanceKeyRead:Username"] =
+                    fixture.GetNativeQueueOptions(PrimaryDatabaseRole.InstanceKeyRead).Username,
+                ["Database:InstanceKeyWrite:Username"] =
+                    fixture.GetNativeQueueOptions(PrimaryDatabaseRole.InstanceKeyWrite).Username,
+                ["Database:PlatformKeyReport:Username"] =
+                    fixture.GetNativeQueueOptions(PrimaryDatabaseRole.PlatformKeyReport).Username
+            }).Build();
+        await migration.Database.OpenConnectionAsync();
+        var connection = (NpgsqlConnection)migration.Database.GetDbConnection();
+        await AssertAuthorityAsync(connection, fixture.NativeQueueEnrollment.MigratorLogin, privileged: true);
+        // Native role ownership is cluster-wide; start without unrelated fixture grants.
+        foreach (var role in new[]
+        {
+            PrimaryDatabaseRole.Global, PrimaryDatabaseRole.Runtime,
+            PrimaryDatabaseRole.EmailPolicyInstanceMutation, PrimaryDatabaseRole.EmailPolicyTenantMutation,
+            PrimaryDatabaseRole.InstanceKeyRead, PrimaryDatabaseRole.InstanceKeyWrite,
+            PrimaryDatabaseRole.PlatformKeyReport
+        })
+        {
+            var account = fixture.GetNativeQueueOptions(role);
+            string login = account.Username!.Replace("\"", "\"\"", StringComparison.Ordinal);
+            string password = account.Password!.Replace("'", "''", StringComparison.Ordinal);
+            await ExecuteAsync(connection, $"""
+                CREATE ROLE "{login}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+                    NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD '{password}';
+                """);
+        }
+
+        await ExploreDatabaseMigrator.MigrateAsync(migration, configuration);
+
+        await AssertMigrationHistoryAsync(migration);
+        await AssertAuthorityAsync(connection, fixture.NativeQueueEnrollment.MigratorLogin, privileged: true);
+        var unbound = Assert.Throws<InvalidOperationException>(() => migration.RequireBoundTenantLease());
+        await Assert.That(unbound.Message).IsEqualTo("tenant_lease_not_bound");
+        await Assert.That(migration.ChangeTracker.Entries()).IsEmpty();
     }
 
     [Test]

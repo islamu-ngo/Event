@@ -2379,7 +2379,7 @@ intents:
       - "src/Explore.Persistence/Database/PrimaryDatabaseProviderComposition.cs"
       - "src/Explore.Persistence/PersistenceServicesRegistration.cs"
       - "src/Explore.Persistence/Privacy/ErasureAuthority/EmbeddedPrivacyErasureAuthorityDbContextFactory.cs"
-      - "src/Explore.Persistence/Schema/ExploreDatabaseMigrator.cs"
+      - "src/Explore.Persistence/Schema/ProviderPrimitives/ExploreDatabaseMigrator.cs"
       - "src/Event.MigrationService/Worker.cs"
       - "tests/Event.Persistence.IntegrationTests/Database/PrimaryDatabaseProviderCompositionTests.cs"
       - "tests/Event.Persistence.IntegrationTests/Privacy/PrivacyErasureAuthorityCompositionValidationTests.cs"

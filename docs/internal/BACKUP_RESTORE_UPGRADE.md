@@ -815,6 +815,7 @@ If release notes do not explicitly state that a rollback is image-only safe, ass
 - [ ] `EmbeddedSqlite` restore evidence proves the dedicated authority file was not overwritten by the primary restore and writer replica count remained one.
 - [ ] `CoLocated` restore evidence proves app + authority rows were restored and replay catches up correctly from the shared checkpoint.
 - [ ] `Event.MigrationService` completed twice against the restored provider before API/BFF startup.
+- [ ] Policy installation used its migration-owned execution context in the selected namespace; no request context was rebound or Runtime account promoted to repair a lease failure.
 - [ ] `docker compose ps` shows required services running.
 - [ ] API `/alive` and `/health` return expected status.
 - [ ] Blazor loads and can proxy API requests.

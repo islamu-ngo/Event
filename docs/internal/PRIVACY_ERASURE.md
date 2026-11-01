@@ -333,6 +333,11 @@ each other or with the selected authority path. The documented standalone
 image is the in-process exception: it applies those same three migration
 responsibilities before binding HTTP.
 
+Application policy installation uses a separate namespace execution context with
+an explicitly bound, absent tenant lease for both canonical and remapped schemas.
+It retains the selected migration authority without binding or borrowing the
+caller's context; authority migration histories remain separate.
+
 The PostgreSQL `CoLocated` catalog includes the generated
 `20261031102545_RestoreCoLocatedAuthorityRecoveryCoordinates` correction.
 It brings `authority_counter` into agreement with `PrivacyErasureCounterConfiguration`:

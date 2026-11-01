@@ -205,7 +205,7 @@ public sealed class HumanLearningMutationPreparation(
             Guid.CreateVersion7(preparedAt), Guid.CreateVersion7(preparedAt), intent,
             () => (heldLearning
                 ?? throw new UnauthorizedAccessException("Retained learning sources are missing.")).Facts, workspaces,
-            RequireOriginalAsync, RequireCurrentAsync, RequireCurrentAt);
+            RequireOriginalAsync, RequireOriginalAt, RequireCurrentAsync, RequireCurrentAt);
         _current = mutation;
         try
         {
@@ -226,8 +226,14 @@ public sealed class HumanLearningMutationPreparation(
         Task RequireOriginalAsync(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            RequireCustody(clock.GetUtcNow());
+            RequireOriginalAt(clock.GetUtcNow());
             return Task.CompletedTask;
+        }
+
+        void RequireOriginalAt(DateTimeOffset now)
+        {
+            RequireCurrentReference();
+            RequireCustody(now);
         }
 
         async Task RequireCurrentAsync(CancellationToken token)
@@ -407,7 +413,7 @@ public sealed class HumanLearningMutationPreparation(
         Guid subjectId, Guid tenantId, string contextKey, Guid? eventContextId, DateTime updatedAtUtc,
         Guid candidateStateId, Guid candidateSpaceId, Guid candidateChildId, Guid candidateClaimId,
         LearningMutationIntent intent, Func<LearningSourceFacts> sources, LearningWorkspaceAvailability workspaces,
-        Func<CancellationToken, Task> requireOriginal,
+        Func<CancellationToken, Task> requireOriginal, Action<DateTimeOffset> requireOriginalAt,
         Func<CancellationToken, Task> requireCurrent, Action<DateTimeOffset> requireCurrentAt)
         : IHumanLearningMutation
     {
@@ -428,6 +434,7 @@ public sealed class HumanLearningMutationPreparation(
         public bool CanManageSpace { get; set; }
         public bool CanManageEvent { get; set; }
         public Task RequireOriginalAsync(CancellationToken cancellationToken) => requireOriginal(cancellationToken);
+        public void RequireOriginalAt(DateTimeOffset utcNow) => requireOriginalAt(utcNow);
         public Task RequireCurrentAsync(CancellationToken cancellationToken) => requireCurrent(cancellationToken);
         public void RequireCurrentAt(DateTimeOffset utcNow) => requireCurrentAt(utcNow);
         public override string ToString() => nameof(Mutation);

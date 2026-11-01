@@ -39,6 +39,7 @@ public interface IHumanLearningMutation
     bool NormalAiAvailable { get; }
 
     Task RequireOriginalAsync(CancellationToken cancellationToken);
+    void RequireOriginalAt(DateTimeOffset utcNow);
     Task RequireCurrentAsync(CancellationToken cancellationToken);
     void RequireCurrentAt(DateTimeOffset utcNow);
 }

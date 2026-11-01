@@ -114,7 +114,13 @@ internal sealed class HumanLearningMutationStore(
                     ? await Settle(token)
                     : await authority.ExecuteOriginalEnrollmentAsync(Settle,
                         finalToken => mutation.RequireOriginalAsync(finalToken),
-                        mutation.RequireCurrentAt, token);
+                        now =>
+                        {
+                            // Source authority linearizes at the primary commit. Its
+                            // transaction locks do not survive the consumed receipt.
+                            if (settled) mutation.RequireOriginalAt(now);
+                            else mutation.RequireCurrentAt(now);
+                        }, token);
             }, mutation.RequireOriginalAsync, cancellationToken);
         }
         catch (Exception exception) when (settled && exception is not HumanMutationOutcomeUnknownException)

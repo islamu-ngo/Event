@@ -468,6 +468,16 @@ actual commit. Nonlearning changed entities are rejected. Exceptions after a
 settled receipt remain unknown outcomes instead of becoming a safe-to-retry
 business rejection.
 
+For separate authority storage, source authorization linearizes at the primary
+database commit. The store switches the authority's final synchronous check to
+original mutation-reference, request, principal, tenant and credential-lifetime
+custody only after consuming the issuing owner's exact committed receipt.
+Source leases still require the original Serializable transaction before that
+commit; they are not reused after their transaction locks have been released.
+The retained identity gate and asynchronous custody checks remain active through
+authority completion. A later custody failure remains an unknown outcome and
+must not trigger mutation replay.
+
 Preparation truncates candidate transition time to microsecond precision shared
 by the supported providers. Image comparison canonicalizes UTC kind but does not
 discard timestamp values. The expected tracked-entity inventory is also retained

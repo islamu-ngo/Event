@@ -65,6 +65,7 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
     private HttpClient client = null!;
     private string accessToken = null!;
     private string? ownedSqlitePath;
+    private string? ownedAuthorityDirectory;
     private string? ownedPasswordBlocklistPath;
     internal Guid ActorId { get; private set; }
 
@@ -191,6 +192,10 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
             await seed.SaveChangesAsync();
 
             configure?.Invoke(configuration);
+            foreach (var item in configuration.Where(pair =>
+                pair.Key == "Testing:UseRealDatabase"
+                || pair.Key.StartsWith("PrivacyErasureAuthorityEmbedded:", StringComparison.Ordinal)))
+                fixture.SetEnvironment(item.Key.Replace(":", "__", StringComparison.Ordinal), item.Value);
             SanitizedRequestFailure? observedFailure = null;
             fixture.host = new SettingsHost(configuration, createDatabase, interceptor, failure =>
             {
@@ -215,6 +220,16 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
                         table.GetSchema()!, table.GetTableName()!).SingleAsync() != 0;
                 if (!exists)
                     await seed.Database.ExecuteSqlRawAsync(authority.Database.GenerateCreateScript());
+            }
+            else if (privacyAuthorityTopology == PrivacyErasureAuthorityTopology.EmbeddedSqlite)
+            {
+                await using var scope = fixture.host.Services.CreateAsyncScope();
+                await scope.ServiceProvider.GetRequiredService<EmbeddedPrivacyErasureAuthorityStorage>()
+                    .EnsureReadyAsync(TestContext.Current!.Execution.CancellationToken);
+                await using var authority = await scope.ServiceProvider
+                    .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>()
+                    .CreateDbContextAsync(TestContext.Current!.Execution.CancellationToken);
+                await authority.Database.EnsureCreatedAsync(TestContext.Current!.Execution.CancellationToken);
             }
             fixture.client = fixture.host.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -532,6 +547,11 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
             EnvironmentOwner.Release();
             if (ownedSqlitePath is { } path)
                 DeleteSqlite(path);
+            if (ownedAuthorityDirectory is { } authorityDirectory)
+            {
+                DeleteSqlite(Path.Combine(authorityDirectory, "authority.db"));
+                Directory.Delete(authorityDirectory, recursive: true);
+            }
             if (ownedPasswordBlocklistPath is { } passwordPolicyPath)
                 File.Delete(passwordPolicyPath);
         }

@@ -29,6 +29,12 @@ to reconcile its outcome before submitting another action. Switching account,
 tenant or managed actor discards pending results from the previous context.
 Private practice is not embedded into the initial static page.
 
+Private learning saves also complete when privacy-erasure authority uses a
+separate embedded database. No configuration change or data migration is
+required for this correction. If an earlier save was unconfirmed, reload its
+current state before making another choice; do not automatically repeat the
+previous action.
+
 Real work starts separately through your workspace's available creation options;
 example data is never copied into it. Targeted component and static-rendering
 checks cover these boundaries. Full hosted visual and accessibility assurance

@@ -132,3 +132,32 @@ dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persis
 
 **Promotion Consideration**:
 - [x] Stays in journal only; do not introduce another general connection wrapper without a demonstrated caller need.
+
+---
+
+[2026-10-31 Europe/Brussels] — Model-only authority comparison separates mapping from drift
+
+**Context**: A PostgreSQL privacy test failed with `PendingModelChangesWarning` before its protected-work assertions. Replacing its custom storage schema with the canonical schema did not resolve the failure.
+
+**Symptom / Observation**: The real provider's `IMigrationsModelDiffer` reported identical missing recovery columns and a check constraint for both canonical and custom storage inputs. No database connection, credentials or container was needed to reproduce that difference.
+
+**Root Cause**: The co-located authority migrator deliberately uses the canonical model schema while the namespace machinery selects physical storage. Its separate generated snapshot lacked already-configured recovery coordinates. Changing the storage namespace therefore could not repair the stale catalog.
+
+**Resolution**: Commit `4c01baf17639948675bd57e550ba0502bc4a1b63` adds the EF-generated correction and snapshot, with paired upgrade guidance. Both model comparisons passed, followed by both populated PostgreSQL predecessor upgrades and the protected-work case. These are separate receipts, not a full provider-matrix result. The exact model-only command was:
+
+```bash
+timeout --signal=INT --kill-after=15s 360s dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/ExploreDbContextModelProviderTests/CoLocatedAuthorityMigratorModelMatchesItsSnapshot" --minimum-expected-tests 2 --maximum-parallel-tests 1 --timeout 300s --report-trx --results-directory "$TMPDIR/pr79-assurance-intake/authority-recovery-migration-model-green"
+```
+
+**Why This Matters for Future Work**: Compare the selected design-time model with its own initialized snapshot before attributing a migration warning to schema remapping. Keep model parity distinct from physical DDL, backfill and lifecycle evidence. A model-only pass cannot certify those native behaviors.
+
+**References**:
+- `tests/Event.Persistence.IntegrationTests/Database/ExploreDbContextModelProviderTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Migrations/PostgresMigrationAuthorityIsolationTests.cs`
+- `src/Explore.Persistence/Database/PrimaryDatabaseProviderComposition.cs`
+- `src/Explore.Persistence/Migrations/CoLocatedPrivacyErasureAuthority/20261031102545_RestoreCoLocatedAuthorityRecoveryCoordinates.cs:13`
+- `docs/internal/PRIVACY_ERASURE.md`
+- `docs/internal/BACKUP_RESTORE_UPGRADE.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal as a diagnostic lesson; implementation and downgrade limits are documented in the referenced technical and operator guides.

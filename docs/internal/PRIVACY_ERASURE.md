@@ -145,6 +145,12 @@ permission to bypass replay or restore erased old-subject data.
 
 ### Reserved Moderation Recognition Configuration
 
+Standalone SQLite recognition retains an exclusive handle on its physical
+primary database for the owner's lifetime and verifies exclusion with a competing open.
+Linux error 11 from that competing open is a contention result, alongside the
+existing sharing violation mapping. Other I/O failures still reject topology;
+the change does not admit a second writer or an in-memory recognition database.
+
 `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and
 `PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` remain optional reserved configuration for
 future moderation recognition, not mandatory ordinary-erasure startup inputs.

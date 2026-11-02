@@ -96,6 +96,14 @@ transaction. This prevents a check from waiting on its own write lock or
 seeing an older counter. Failed enrollment still rolls back its changes;
 no timeout, retry setting or replica-exclusion control is relaxed.
 
+## Standalone Recognition Ownership
+
+Standalone SQLite recognition requires one writer and a lifetime-exclusive
+lock on its primary database. Normal Linux lock contention is recognized as
+proof that another owner is excluded; other file errors prevent recognition
+from qualifying the store.
+Stop all writers before restoring or replacing the database file.
+
 ## Reserved Future Moderation Keys
 
 `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and

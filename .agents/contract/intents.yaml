@@ -2445,6 +2445,7 @@ intents:
     paths_in_scope:
       - "src/Explore.Persistence/Privacy/ErasureAuthority/Repositories/EmbeddedPrivacyErasureAuthorityRepository.cs"
       - "tests/Event.Persistence.IntegrationTests/Privacy/EmbeddedPrivacyErasureRecoveryTests.cs"
+      - "src/Explore.Persistence/Repositories/ModerationRecognitionKeyLifecycleReplicaOwner.cs"
       - "src/Explore.Persistence/Database/PrimaryDatabaseProviderComposition.cs"
       - "src/Explore.Persistence/PersistenceServicesRegistration.cs"
       - "src/Explore.Persistence/Privacy/ErasureAuthority/EmbeddedPrivacyErasureAuthorityDbContextFactory.cs"
@@ -2478,6 +2479,7 @@ intents:
       - docs/internal/TROUBLESHOOTING.md
       - docs/internal/TESTING.md
     unique_acceptance:
+      - "Replica qualification recognizes native Linux contention only after a competing exclusive handle is rejected; other I/O errors remain fail-closed"
       - "Primary application and Data Protection persistence retain PostgreSQL, SQLite, SQL Server, MariaDB, and MySQL provider composition without collapsing provider migration owners or history tables"
       - "PrivacyErasure:Authority:Topology keeps EmbeddedSqlite with any primary provider, CoLocated only for PostgreSQL or SQLite, and ExternalDatabase only for separate PostgreSQL"
       - "Unsupported SQL Server, MariaDB, and MySQL CoLocated authority combinations fail during composition before adapter use and without exposing credentials, connection strings, or structured database values"

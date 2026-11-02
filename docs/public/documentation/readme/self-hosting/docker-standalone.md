@@ -273,6 +273,12 @@ Studio can list managed events on SQLite, including events without a schedule
 and schedules recorded with different UTC offsets. This correction requires no
 additional configuration or database migration.
 
+After setup, use Studio to create a private, information-only draft before
+publishing an event. If a save is interrupted or returns an error, check your
+Studio inventory before submitting it again: a lost response can leave a
+committed draft. Open the existing draft when it is present to avoid duplicates.
+The draft-save correction requires no additional configuration or database migration.
+
 Create subsequent Local accounts through
 `/settings/instance?section=local-accounts`, using current instance-administrator
 access. That screen collects email and profile details, but hands over the

@@ -3658,3 +3658,42 @@ temporary probe; the expected deparse was not guessed.
 
 **Promotion Consideration**:
 - [x] Stays in journal only; bounded launch-calibration lesson, not a new general test-runner policy.
+
+[2026-11-01 Europe/Brussels] — Shared privacy transactions have a different commit observer
+
+**Context**: While repairing SQLite Studio and initial draft creation during
+contextual onboarding, a real HTTP draft-save test needed to inject connector
+loss immediately after the physical commit without substituting authority.
+
+**Symptom / Observation**: Draft creation succeeded while the event-context
+commit interceptor observed zero commits. Matching EF diagnostic commit events
+to the event-writing `ExploreDbContext` also missed the commit. Matching the
+physical transaction reproduced a lost-outcome classification after a real save.
+
+**Root Cause**: Co-located privacy enrollment starts the transaction on
+`EmbeddedPrivacyErasureAuthorityDbContext` and enlists `ExploreDbContext` into
+that transaction. The authority context commits it. Consequently, the context
+that writes the event differs from the context in the commit diagnostic, even
+though both use the same physical `DbTransaction`. Separately constructed tenant
+factories also bypass interceptor options applied to the ordinary DI context.
+
+**Resolution**: The HTTP test captures the physical transaction from the exact
+fixture-owned draft write and matches that reference at commit. Initial event
+creation now acquires source/discovery custody before its transaction and retains
+original transport plus reconciliation evidence when custody is lost. The real
+commit-loss case proves explicit outcome classification and exactly one stored
+event. The complete native HTTP slice passed five cases with:
+`dotnet run --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/LocalEventManagementHttpTests/*" --minimum-expected-tests 5 --progress off --maximum-parallel-tests 1`.
+
+**Why This Matters for Future Work**: Identify the physical transaction owner
+before injecting commit failures. A test whose injector never fires is setup
+evidence, not a passing failure-path test. Lost original custody must not silently
+authorize a new connector or replay a possibly committed operation.
+
+**References**:
+- `src/Explore.Persistence/Privacy/ErasureAuthority/Repositories/EmbeddedPrivacyErasureAuthorityRepository.IdentityFence.cs:98`
+- `src/Explore.Persistence/Services/EventRoleAssignmentMutationBoundary.InitialCreation.cs`
+- `tests/Event.API.IntegrationTests/Features/LocalEventManagementHttpTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; reusable fault-injection lesson, no new authority policy.

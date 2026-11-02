@@ -548,6 +548,12 @@ Studio context loads actor-owned events through `EventRepository.GetEventsByActo
 SQLite orders the first-session instant with the existing offset-aware collation;
 tenant/deletion filters, database-side ordering and title/ID tie-breaks remain active.
 
+Initial event creation acquires human-source and discovery enrollment custody
+before the privacy or primary transaction begins. It retains those leases through
+settlement and receipt reconciliation. Lost connector custody never permits a
+replacement lease or replay; transport and reconciliation evidence retain their
+known-committed or unknown-outcome classification through cleanup.
+
 Resource management uses the audience collection's `manage-resources` relation
 for both Overview actions and direct-route mounting. The event's public
 `resources` relation is not management authority. Collection results are

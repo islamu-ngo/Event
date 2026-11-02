@@ -101,7 +101,9 @@ public sealed partial class ModerationPolicyPublicationTests
             builder.UseSqlite(_connection)
                 .UseSnakeCaseNamingConvention().AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance);
             if (interceptors.Length != 0) builder.AddInterceptors(interceptors);
-            return new(builder.Options) { TenantContext = this };
+            var context = new ExploreDbContext(builder.Options) { TenantContext = this };
+            context.BindTenantLease();
+            return context;
         }
 
         public static async Task<Database> CreateAsync(bool implementedInventory = false, bool physicalFile = false)

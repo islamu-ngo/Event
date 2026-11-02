@@ -116,6 +116,24 @@ Recognition erasure checks that its protected subject exists without loading
 the private profile. It uses its existing narrow database permissions; do not
 grant private-table read access to make this existence check succeed.
 
+Newly qualified recognition material is inserted with its original identifiers
+before its receipt can complete. Existing completed material is not regenerated;
+pending requests continue through the existing reconciliation flow. No schema,
+key, permission or retention-setting change is required.
+Binding a newly appended fact checks its exact retained record and the original
+settlement deadline. It can finish while replay is still behind that new fact;
+this does not admit capture from a stale restore or extend a pending deadline.
+If an acknowledgement is lost, recovery verifies the observed fact against the
+retained store before finishing its original primary binding. Missing retention
+or conflicting evidence is a refusal, not permission to create replacement proof.
+Recovery also refuses missing original key obligations. If recognition is no
+longer required, it completes the original request without creating new material.
+When a returning account qualifies for recognition, tenant enrollment can save
+that binding while the retained capture remains hidden from ordinary tenant
+queries. Qualification expires at its original deadline and belongs to the same
+account binding and database transaction; copied or altered bindings must qualify
+again. No broader database role or tenant-read permission is required.
+
 ## Reserved Future Moderation Keys
 
 `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and

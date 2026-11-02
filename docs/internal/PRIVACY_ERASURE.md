@@ -135,6 +135,40 @@ It does not materialize the unused `User` aggregate and its private profile.
 The subject predicate, query filters and missing-subject refusal are unchanged;
 the narrow erasure purpose receives no additional private-table permissions.
 
+After the original key-lifecycle enlistment succeeds, recognition capture
+explicitly adds its newly minted material rows to the EF context. Their assigned
+identities remain unchanged; attaching them through an existing pending aggregate
+must not turn them into updates of nonexistent rows. Completed material receipts
+still return through the existing early path without regenerating their children.
+The append lease verifies keys and the restore floor before the retained append.
+Binding then rereads the exact retained fact and rechecks canonical material
+under the same original transaction, without resolving keys against the new
+authority head that intentionally precedes replay. The original settlement
+deadline still applies; recovery of a previously committed fact remains separate.
+For an acknowledgement lost during the same invocation, the application retains
+the observed fact only as a lookup hint. Recognition reconciliation opens a fresh
+identity gate, authenticates that exact retained fact and committed recovery
+tuple, and commits its primary binding before releasing the gate. A sequence
+beyond the current head returns to full append qualification; retention loss,
+conflicting facts and changed recovery state fail closed. Borrowed SQLite
+transactions remain owned by the identity gate. This is not new startup-recovery
+proof; ordinary retained replay remains responsible for process restarts.
+Binding and recovery require the original key obligations to exist; they cannot
+reconstruct deleted custody from capture rows. A pending request whose qualified
+contributions have disappeared binds the exact fact without inventing an empty
+material receipt, using the same no-longer-required transition as normal append.
+
+Tenant enrollment may attach a newly qualified continuity binding to its hidden
+capture row without exposing that row to ordinary tenant queries. Qualification
+captures the original context, tenant, connection and serializable transaction
+before its first asynchronous read. An invocation-local permit belongs to the
+exact binding object, its complete scalar values and the original qualification
+deadline. Save validates those coordinates before considering an Added parent;
+copying the binding or staging its parent cannot confer authority. Failed staging
+revokes the invocation's permits and detaches its additions. This exception applies
+only to the new binding's capture reference; tenant filters and other references
+retain their existing checks.
+
 PostgreSQL's mixed-settings authority guard resolves its fixed routine signatures
 through an uncorrelated `VALUES` query in the two catalog exclusion predicates.
 This keeps signature resolution independent of the scanned catalog rows while

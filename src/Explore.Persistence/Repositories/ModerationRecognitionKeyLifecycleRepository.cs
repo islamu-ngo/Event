@@ -198,6 +198,7 @@ public sealed partial class ModerationRecognitionKeyLifecycleRepository(
                 ?? await Rows<KeyObligation>().SingleOrDefaultAsync(row => row.Id == item.Id, token);
             if (existing is null)
             {
+                if (pending.AuthoritySequence is not null) throw Unavailable();
                 // A new original or alias must use the current writer. Original settled obligations
                 // can subsequently bind authority without changing their now-readable key identity.
                 if (item.RingGeneration != lifecycle.RingGeneration

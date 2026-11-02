@@ -273,6 +273,7 @@ public sealed partial class ModerationRecognitionErasureRepository(
             // lawful deadline; reaching that ceiling drops eligibility, never renews it.
             pending.Capture(items, now);
             await keyLifecycle.EnlistCaptureAsync(pending, token);
+            context.AddRange(items);
             await context.SaveChangesAsync(token);
             if (clock.GetUtcNow() >= pending.SettleBy || clock.GetUtcNow() >= ring.CurrentUntil
                 || contributions.Any(item => clock.GetUtcNow() >= item.Source.ValidUntil
@@ -354,6 +355,12 @@ public sealed partial class ModerationRecognitionErasureRepository(
             context.Attach(pending);
             pending.BindAuthority(fact, clock.GetUtcNow());
             await keyLifecycle.EnlistCaptureAsync(pending, token);
+            await context.SaveChangesAsync(token);
+        }
+        else if (pending is not null)
+        {
+            context.Attach(pending);
+            pending.BindNoLongerRequired(fact, clock.GetUtcNow());
             await context.SaveChangesAsync(token);
         }
     }
@@ -567,8 +574,15 @@ public sealed partial class ModerationRecognitionErasureRepository(
                 prunedDeadline = purge.RetainUntil;
                 return;
             }
+            await owner.RequireRetainedFactAsync(fact, token);
             var authority = await owner.AcquireSubjectAsync(request, token);
-            if (!await owner.VerifyAsync(authority, request, pending, afterAuthority: false, token))
+            if (pending?.HasCompleteMaterial == true && owner.Clock.GetUtcNow() >= pending.SettleBy)
+            {
+                await owner.FailAsync(pending, ModerationRecognitionPendingFailure.IncompleteMaterial, token);
+                throw new InvalidOperationException("moderation_recognition_erasure_unsettled");
+            }
+            // The original lease verified keys before append; its new fact now leads the replay checkpoint.
+            if (!await owner.VerifyAsync(authority, request, pending, afterAuthority: true, token))
                 throw new InvalidOperationException("moderation_recognition_erasure_unsettled");
             if (pending?.HasCompleteMaterial == true)
             {

@@ -269,6 +269,7 @@ intents:
       - .agents/rules/efcore-persistence.md
     paths_in_scope:
       - "src/Explore.Persistence/Repositories/**/*.cs"
+      - "src/Explore.Persistence/Database/ProviderPrimitives/ModerationNarrativeTemporalQuery.cs"
     minimum_tests:
       - Event.Persistence.IntegrationTests
       - Event.Architecture.Tests

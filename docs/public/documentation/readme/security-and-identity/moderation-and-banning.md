@@ -3398,6 +3398,9 @@ Independently qualified additional facts for the same occurrence join its
 internal case without exposing other reports or reopening a closed finding.
 Each reporter receives their own immutable acceptance. Reissuing copied material
 does not duplicate evidence, extend its custody or recreate purged plaintext.
+SQLite uses the same earliest-acceptance rule as the other supported providers,
+including a deterministic choice when acceptance times are equal. A later receipt
+does not restart the retention period for that material.
 This is a breaking development contract; generated clients, wire checks and
 runtime assurance remain pending.
 Unrelated authenticated reporters can now qualify publicly eligible published

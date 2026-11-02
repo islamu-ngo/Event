@@ -5631,6 +5631,12 @@ per tenant/caller/operation and per receipt. Reissued existing material receives
 its own immutable reporter acceptance without duplicate evidence, extended
 narrative custody or resurrection after physical purge. Replay digests use
 `moderation.case.intake.v3`; old development request coordinates are not accepted.
+The retained narrative floor selects the earliest UTC acceptance, then its
+acknowledgement ID for equal instants. `ModerationNarrativeTemporalQuery` orders
+SQLite's persisted UTC timestamp text because its provider cannot order the
+`DateTimeOffset` CLR value directly; other providers retain typed ordering.
+The original tenant/case/material predicates and the selected acknowledgement's
+transaction fence and final equality check still apply.
 Hidden-content occurrence coordinates are stable across independently qualified
 material sources; their source generations and material remain separately bound.
 Current actor enforcement is retained until the approved complete cutover.

@@ -2443,6 +2443,8 @@ intents:
       - .agents/rules/efcore-migrations.md
       - .agents/rules/tests.md
     paths_in_scope:
+      - "src/Explore.Persistence/Privacy/ErasureAuthority/Repositories/EmbeddedPrivacyErasureAuthorityRepository.cs"
+      - "tests/Event.Persistence.IntegrationTests/Privacy/EmbeddedPrivacyErasureRecoveryTests.cs"
       - "src/Explore.Persistence/Database/PrimaryDatabaseProviderComposition.cs"
       - "src/Explore.Persistence/PersistenceServicesRegistration.cs"
       - "src/Explore.Persistence/Privacy/ErasureAuthority/EmbeddedPrivacyErasureAuthorityDbContextFactory.cs"

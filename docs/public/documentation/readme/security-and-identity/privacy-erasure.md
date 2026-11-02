@@ -89,6 +89,13 @@ migration service with SQLite 3.42 or newer, and preserve matched backups before
 upgrading. Downgrading this schema removes its recovery identity and counters;
 use the documented recovery procedure instead of downgrading an adopted store.
 
+## Enrollment State Consistency
+
+Erasure-state checks during enrollment now observe that enrollment's own
+transaction. This prevents a check from waiting on its own write lock or
+seeing an older counter. Failed enrollment still rolls back its changes;
+no timeout, retry setting or replica-exclusion control is relaxed.
+
 ## Reserved Future Moderation Keys
 
 `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and

@@ -49,6 +49,13 @@ erasure request -> append authority fact (committed first)
 
 ### Serialized Enrollment And Erased-Subject Fencing
 
+Embedded authority state reads inside serialized enrollment reuse that
+enrollment's original context and transaction, as retained-fact reads do.
+Opening a second reader there can either block on the counter or observe its
+pre-enrollment state. Reused reads neither commit nor dispose the writer;
+outside enrollment they retain independently owned read contexts. An aborted
+enrollment rolls back its facts and counters together.
+
 `PrivacyErasureService` establishes the sanctioned instance execution scope before
 constructing the mutation workflow. It acquires Human security custody before
 Discovery disclosure custody and holds both through settlement. An already

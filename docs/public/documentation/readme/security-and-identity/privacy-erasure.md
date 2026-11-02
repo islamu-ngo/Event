@@ -134,6 +134,20 @@ queries. Qualification expires at its original deadline and belongs to the same
 account binding and database transaction; copied or altered bindings must qualify
 again. No broader database role or tenant-read permission is required.
 
+## Recognition Expiry Completion
+
+Scheduled recognition expiry, where retained material exists, runs once under
+the retained authority gate and its original primary-store ownership. A failed
+or uncertain commit is not a successful expiry pass and is not automatically
+replayed. Independent stores do not form one atomic transaction; preserve the
+retained authority when investigating an uncertain result. This introduces no
+new key, retry setting or moderation permission.
+
+Recognition key maintenance and material pruning follow the same rule: a lost
+commit acknowledgement does not trigger an automatic second attempt. Expiry of
+an already-purged receipt uses only its primary store and can still complete
+when the external erasure authority is unavailable.
+
 ## Reserved Future Moderation Keys
 
 `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and

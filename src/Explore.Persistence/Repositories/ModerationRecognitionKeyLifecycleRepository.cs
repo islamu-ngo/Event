@@ -292,7 +292,7 @@ public sealed partial class ModerationRecognitionKeyLifecycleRepository(
 
     private Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation,
         Func<CancellationToken, Task>? verifySelectedAtCommit, CancellationToken token) =>
-        identity.ExecuteEnrollmentSerializedAsync(async ct =>
+        ExecuteOnceAsync(() => identity.ExecuteEnrollmentSerializedAsync(async ct =>
         {
             if (context.ChangeTracker.HasChanges() || context.IsTenantFilterBypassed) throw Unavailable();
             await using var transaction = context.Database.CurrentTransaction is null
@@ -311,7 +311,20 @@ public sealed partial class ModerationRecognitionKeyLifecycleRepository(
                 return result;
             }
             finally { context.ChangeTracker.Clear(); }
-        }, verifySelectedAtCommit ?? (_ => Task.CompletedTask), token);
+        }, verifySelectedAtCommit ?? (_ => Task.CompletedTask), token));
+
+    private Task<T> ExecuteOnceAsync<T>(Func<Task<T>> operation)
+    {
+        if (ExecutionStrategy.Current?.RetriesOnFailure == true) throw Unavailable();
+        // A lost commit acknowledgement cannot authorize reacquiring either native owner.
+        return new LifecycleExecutionStrategy(context).ExecuteAsync(operation);
+    }
+
+    private sealed class LifecycleExecutionStrategy(DbContext context)
+        : ExecutionStrategy(context, maxRetryCount: 0, maxRetryDelay: TimeSpan.Zero)
+    {
+        protected override bool ShouldRetryOn(Exception exception) => false;
+    }
 
     private void RequireTransaction()
     {

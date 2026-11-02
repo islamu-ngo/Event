@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Moderation;
@@ -64,9 +65,15 @@ public sealed partial class ModerationRecognitionErasureRepository(
     public Task<int> ExpireMatchingEligibilityAsync(int limit, CancellationToken token)
     {
         if (limit is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(limit));
-        return identity.ExecuteSerializedAsync(async ct =>
+        if (ExecutionStrategy.Current?.RetriesOnFailure == true)
+            throw new InvalidOperationException("Recognition expiry cannot execute inside a replaying outer strategy.");
+        // Both native owners must be acquired inside the same non-replaying scope.
+        // A lost acknowledgement from either commit cannot authorize another attempt.
+        return new ExpiryExecutionStrategy(context).ExecuteAsync(() => identity.ExecuteSerializedAsync(async ct =>
         {
-            await using var transaction = await BeginAsync(ct);
+            var transaction = await BeginAsync(ct);
+            Exception? failure = null;
+            var expired = 0;
             try
             {
                 var now = clock.GetUtcNow();
@@ -109,10 +116,37 @@ public sealed partial class ModerationRecognitionErasureRepository(
                 }
                 await context.SaveChangesAsync(ct);
                 await CommitAsync(transaction, ct);
-                return current.Count;
+                expired = current.Count;
             }
-            finally { context.ChangeTracker.Clear(); }
-        }, token);
+            catch (Exception primary)
+            {
+                failure = primary;
+                if (transaction is null)
+                    context.IdentityFenceTransactionFailed = true;
+            }
+            finally
+            {
+                context.ChangeTracker.Clear();
+                // BeginAsync returns null for the borrowed SQLite owner. Only the
+                // identity gate may commit, roll back or dispose that transaction.
+                if (transaction is not null)
+                {
+                    try { await transaction.DisposeAsync(); }
+                    catch (Exception cleanup)
+                    {
+                        failure = failure is null ? cleanup : new AggregateException(failure, cleanup);
+                    }
+                }
+            }
+            if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+            return expired;
+        }, token));
+    }
+
+    private sealed class ExpiryExecutionStrategy(DbContext context)
+        : ExecutionStrategy(context, maxRetryCount: 0, maxRetryDelay: TimeSpan.Zero)
+    {
+        protected override bool ShouldRetryOn(Exception exception) => false;
     }
 
     public async Task RecordFailureAsync(PrivacyErasureRequest request,

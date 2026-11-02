@@ -1,6 +1,10 @@
+using System.Data.Common;
+using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
+using Explore.Application.Contracts.Moderation;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Services;
 using Explore.Domain;
@@ -15,9 +19,11 @@ using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
+using Explore.Persistence.Security;
 using ISLAMU.Moderation.Domain;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Caching.Hybrid;
@@ -34,6 +40,146 @@ namespace Event.Persistence.IntegrationTests.Privacy;
 public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContainerFixture fixture)
 {
     private readonly string _authoritySchema = $"erasure_fact_{Guid.CreateVersion7():N}";
+
+    [Test]
+    [Arguments("none", false)]
+    [Arguments("primary-before", false)]
+    [Arguments("primary-after", false)]
+    [Arguments("primary-after", true)]
+    [Arguments("authority-after", false)]
+    [Arguments("ambient", false)]
+    public async Task RecognitionExpiryKeepsOriginalNativeOwnersAndNeverReplays(string failurePoint, bool failCleanup)
+        => await VerifyRecognitionOwnersAsync(failurePoint, failCleanup, prune: false);
+
+    [Test]
+    [Arguments("none")]
+    [Arguments("primary-before")]
+    [Arguments("primary-after")]
+    [Arguments("authority-after")]
+    [Arguments("ambient")]
+    public async Task RecognitionPruningKeepsOriginalNativeOwnersAndNeverReplays(string failurePoint)
+        => await VerifyRecognitionOwnersAsync(failurePoint, failCleanup: false, prune: true);
+
+    private async Task VerifyRecognitionOwnersAsync(string failurePoint, bool failCleanup, bool prune)
+    {
+        GlobalLocationPrivacyErasureTests.ErasureGraph graph;
+        int outboxCount;
+        await using (var seed = await CreateBoundFixtureContextAsync(fixture))
+        {
+            await PostgresSubjectPrivacyErasureContract.ApplyAsync(seed);
+            graph = await GlobalLocationPrivacyErasureTests.SeedErasureGraphAsync(seed);
+            outboxCount = await seed.OutboxMessages.CountAsync();
+        }
+        await using (var migrations = new CoLocatedPrivacyErasureAuthorityDbContext(
+            AuthorityOptions(PrimaryDatabaseRole.Migrator)))
+            await migrations.Database.MigrateAsync();
+        var observation = new ExpiryTransactionObservation(failurePoint);
+        var authorityOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>(
+            AuthorityOptions(PrimaryDatabaseRole.Runtime)).AddInterceptors(observation).Options;
+        await using var authority = new CoLocatedPrivacyErasureAuthorityDbContext(authorityOptions);
+        var retained = new CoLocatedPostgresPrivacyErasureAuthorityRepository(
+            authority, TimeProvider.System, Options.Create(new PrivacyErasureOptions()));
+        var fact = await retained.AppendAsync(PrivacyErasureRequest.Create(Guid.CreateVersion7(),
+            PrivacyErasureSubjectKind.User, graph.OwnerUserId, PrivacyErasureReasonCode.AccountDeletion,
+            new PrivacyErasureOptions().CurrentPolicyVersion));
+        await using var logins = await OrdinaryLogins.CreateAsync(fixture);
+        var primaryOptions = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(primaryOptions, logins.GlobalOptions);
+        primaryOptions.AddInterceptors(
+            PostgresTenantSessionInterceptor.ForGlobalLogin(logins.GlobalOptions.Username!), observation);
+        await using var application = new ExploreDbContext(primaryOptions.Options);
+        application.BindTenantLease();
+        await AssertOrdinaryAsync(application, logins.GlobalOptions.Username!);
+        await AssertPrivateReadDeniedAsync(application);
+        await Assert.That(application.Database.CreateExecutionStrategy().RetriesOnFailure).IsTrue();
+        var contextLease = application.ContextId;
+        var authorityLease = authority.ContextId;
+        var connection = application.Database.GetDbConnection();
+        var authorityConnection = authority.Database.GetDbConnection();
+        await Assert.That(ReferenceEquals(connection, authorityConnection)).IsFalse();
+        using var replicaOwner = new ModerationRecognitionKeyLifecycleReplicaOwner();
+        var lifecycle = new ModerationRecognitionKeyLifecycleRepository(application, retained, retained,
+            replicaOwner, TimeProvider.System);
+        var repository = new ModerationRecognitionErasureRepository(application,
+            NSubstitute.Substitute.For<IModerationRecognitionKeyRingProvider>(),
+            TimeProvider.System, retained, retained, lifecycle);
+        async Task<int> RunAsync()
+        {
+            if (prune)
+            {
+                var cleanup = await lifecycle.PruneAsync(null, 1, CancellationToken.None);
+                await Assert.That(cleanup.LastInspectedIntentId).IsNull();
+                return 0;
+            }
+            return await repository.ExpireMatchingEligibilityAsync(1, CancellationToken.None);
+        }
+        observation.Arm(application, authority);
+        using var cleanup = new ExpiryCleanupFault(application, observation, failCleanup);
+        if (failurePoint == "none")
+        {
+            await Assert.That(await RunAsync()).IsEqualTo(0);
+        }
+        else if (failurePoint == "ambient")
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                application.Database.CreateExecutionStrategy().ExecuteAsync(() =>
+                    RunAsync()));
+        }
+        else
+        {
+            var failure = await Assert.ThrowsAsync<Exception>(() =>
+                RunAsync());
+            if (failCleanup)
+            {
+                await Assert.That(failure).IsTypeOf<AggregateException>();
+                var failures = ((AggregateException)failure!).Flatten().InnerExceptions;
+                await Assert.That(failures.Count).IsEqualTo(2);
+                await Assert.That(failures.Any(value => ReferenceEquals(value, observation.Failure))).IsTrue();
+                await Assert.That(failures.Any(value => ReferenceEquals(value, cleanup.Failure))).IsTrue();
+            }
+            else
+                await Assert.That(ReferenceEquals(failure, observation.Failure)).IsTrue();
+        }
+        observation.Disarm();
+        bool entered = failurePoint != "ambient";
+        await Assert.That(observation.PrimaryStarts).IsEqualTo(entered ? 1 : 0);
+        await Assert.That(observation.AuthorityStarts).IsEqualTo(entered ? 1 : 0);
+        await Assert.That(observation.PrimaryCommits).IsEqualTo(entered && failurePoint != "primary-before" ? 1 : 0);
+        await Assert.That(observation.AuthorityCommits).IsEqualTo(
+            failurePoint is "none" or "authority-after" ? 1 : 0);
+        await Assert.That(observation.OriginalOwnersRetained).IsTrue();
+        await Assert.That(cleanup.Reached).IsEqualTo(failCleanup);
+        await Assert.That(application.ContextId).IsEqualTo(contextLease);
+        await Assert.That(authority.ContextId).IsEqualTo(authorityLease);
+        await Assert.That(ReferenceEquals(application.Database.GetDbConnection(), connection)).IsTrue();
+        await Assert.That(ReferenceEquals(authority.Database.GetDbConnection(), authorityConnection)).IsTrue();
+        if (!failCleanup)
+            await Assert.That(application.Database.CurrentTransaction).IsNull();
+        else if (connection.State == System.Data.ConnectionState.Open)
+        {
+            await using var probe = connection.CreateCommand();
+            probe.CommandText = "SELECT txid_current_if_assigned() IS NULL";
+            await Assert.That(await probe.ExecuteScalarAsync()).IsEqualTo((object)true);
+        }
+        else
+            await Assert.That(connection.State).IsEqualTo(System.Data.ConnectionState.Closed);
+        await Assert.That(authority.Database.CurrentTransaction).IsNull();
+        await Assert.That(ExecutionStrategy.Current).IsNull();
+        await Assert.That(application.Database.CreateExecutionStrategy().RetriesOnFailure).IsTrue();
+        await using (var freshApplication = await new GlobalExploreDbContextFactory(logins.GlobalOptions).CreateDbContextAsync())
+            await AssertPrivateReadDeniedAsync(freshApplication);
+        var facts = await retained.ReadAfterAsync(0, 10);
+        await Assert.That(facts.Count).IsEqualTo(1);
+        await Assert.That(facts[0].IntentId).IsEqualTo(fact.IntentId);
+        await using var persisted = await CreateBoundFixtureContextAsync(fixture);
+        await Assert.That(await persisted.UserPii.CountAsync(row =>
+            row.UserId == graph.OwnerUserId || row.UserId == graph.UnrelatedUserId)).IsEqualTo(2);
+        await Assert.That(await persisted.Locations.IgnoreQueryFilters().CountAsync(row =>
+            row.OwnerUserId == graph.OwnerUserId && row.PiiErasedAtUtc == null)).IsEqualTo(2);
+        await Assert.That(await persisted.PrivacyErasureProviderWork.CountAsync()).IsEqualTo(0);
+        await Assert.That(await persisted.PrivacyErasureReplayCheckpoints.CountAsync()).IsEqualTo(0);
+        await Assert.That(await persisted.OutboxMessages.CountAsync()).IsEqualTo(outboxCount);
+    }
 
     [Test]
     [Arguments(false)]
@@ -130,6 +276,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
             await GlobalLocationPrivacyErasureTests.InstallOutboxFailureTriggerAsync(administration);
         }
         bool settled = false;
+        Exception? workflowFailure = null;
         var locatorProtector = new PrivacyErasureProviderLocatorProtector(new EphemeralDataProtectionProvider());
         try
         {
@@ -153,7 +300,11 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
                 fixture.RecordStage(FixtureStage.ReplayRepeatReturned, injectFailure);
             }
         }
-        finally
+        catch (Exception failure)
+        {
+            workflowFailure = failure;
+        }
+        try
         {
             if (injectFailure)
             {
@@ -163,6 +314,11 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
             await AssertRetainedAndApplicationAsync(retained, fact, graph, !settled, locatorProtector);
             await AssertStorageAsync(storage, graph, !settled);
         }
+        catch (Exception verificationFailure) when (workflowFailure is not null)
+        {
+            throw new AggregateException(workflowFailure, verificationFailure);
+        }
+        if (workflowFailure is not null) ExceptionDispatchInfo.Capture(workflowFailure).Throw();
         fixture.RecordStage(FixtureStage.CommittedStateAsserted, injectFailure);
         await Assert.That(application.TenantFilterTenantId).IsNull();
         await AssertPrivateReadDeniedAsync(application);
@@ -322,6 +478,154 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
             row.EventType == "LocationPiiErased" || row.EventType == "LocationPrivacyCorrectionRequested"
                 || row.EventType == "PrivacyErasureCacheInvalidationRequested")).IsEqualTo(0);
         fixture.RecordStage(FixtureStage.ProtectedWorkStateAsserted);
+    }
+
+    private sealed class ExpiryTransactionObservation(string failurePoint) : DbTransactionInterceptor
+    {
+        private ExploreDbContext? primary;
+        private CoLocatedPrivacyErasureAuthorityDbContext? authority;
+        private DbContextId primaryLease;
+        private DbContextId authorityLease;
+        private DbTransaction? authorityTransaction;
+        private int primaryBackend;
+        private int authorityBackend;
+        private bool armed;
+
+        internal TimeoutException Failure { get; } = new("Injected expiry completion acknowledgement loss.");
+        internal DbTransaction? PrimaryTransaction { get; private set; }
+        internal int PrimaryStarts { get; private set; }
+        internal int AuthorityStarts { get; private set; }
+        internal int PrimaryCommits { get; private set; }
+        internal int AuthorityCommits { get; private set; }
+        internal bool OriginalOwnersRetained { get; private set; } = true;
+
+        internal void Arm(ExploreDbContext application, CoLocatedPrivacyErasureAuthorityDbContext retained)
+        {
+            primary = application;
+            authority = retained;
+            primaryLease = application.ContextId;
+            authorityLease = retained.ContextId;
+            armed = true;
+        }
+
+        internal void Disarm() => armed = false;
+
+        public override ValueTask<DbTransaction> TransactionStartedAsync(DbConnection connection,
+            TransactionEndEventData eventData, DbTransaction result, CancellationToken cancellationToken = default)
+        {
+            if (!armed) return ValueTask.FromResult(result);
+            OriginalOwnersRetained &= ExecutionStrategy.Current is { RetriesOnFailure: false };
+            if (ReferenceEquals(eventData.Context, primary))
+            {
+                PrimaryStarts++;
+                PrimaryTransaction = result;
+                primaryBackend = ((NpgsqlConnection)connection).ProcessID;
+                OriginalOwnersRetained &= primary!.ContextId == primaryLease
+                    && ReferenceEquals(primary.Database.GetDbConnection(), connection)
+                    && authorityTransaction is not null
+                    && ReferenceEquals(authority!.Database.CurrentTransaction?.GetDbTransaction(), authorityTransaction)
+                    && !ReferenceEquals(authorityTransaction.Connection, connection);
+            }
+            else if (ReferenceEquals(eventData.Context, authority))
+            {
+                AuthorityStarts++;
+                authorityTransaction = result;
+                authorityBackend = ((NpgsqlConnection)connection).ProcessID;
+                OriginalOwnersRetained &= authority!.ContextId == authorityLease
+                    && ReferenceEquals(authority.Database.GetDbConnection(), connection)
+                    && primary!.Database.CurrentTransaction is null;
+            }
+            else OriginalOwnersRetained = false;
+            return ValueTask.FromResult(result);
+        }
+
+        public override ValueTask<InterceptionResult> TransactionCommittingAsync(DbTransaction transaction,
+            TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
+        {
+            if (!armed) return ValueTask.FromResult(result);
+            bool isPrimary = ReferenceEquals(eventData.Context, primary);
+            var owner = isPrimary ? (DbContext)primary! : authority!;
+            OriginalOwnersRetained &= owner.ContextId == (isPrimary ? primaryLease : authorityLease)
+                && ReferenceEquals(transaction, isPrimary ? PrimaryTransaction : authorityTransaction)
+                && ReferenceEquals(owner.Database.CurrentTransaction?.GetDbTransaction(), transaction)
+                && ReferenceEquals(owner.Database.GetDbConnection(), transaction.Connection)
+                && ((NpgsqlConnection)owner.Database.GetDbConnection()).ProcessID == (isPrimary ? primaryBackend : authorityBackend);
+            if (isPrimary && failurePoint == "primary-before") throw Failure;
+            return ValueTask.FromResult(result);
+        }
+
+        public override Task TransactionCommittedAsync(DbTransaction transaction, TransactionEndEventData eventData,
+            CancellationToken cancellationToken = default)
+        {
+            if (!armed) return Task.CompletedTask;
+            bool isPrimary = ReferenceEquals(eventData.Context, primary);
+            if (isPrimary) PrimaryCommits++;
+            else AuthorityCommits++;
+            if (isPrimary && failurePoint == "primary-after" || !isPrimary && failurePoint == "authority-after")
+                throw Failure;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ExpiryCleanupFault : IObserver<DiagnosticListener>,
+        IObserver<KeyValuePair<string, object?>>, IDisposable
+    {
+        private readonly ExploreDbContext context;
+        private readonly DbContextId contextLease;
+        private readonly ExpiryTransactionObservation observation;
+        private readonly bool enabled;
+        private readonly IDisposable allListeners;
+        private readonly List<IDisposable> subscriptions = [];
+        private readonly object lifetime = new();
+        private bool disposed;
+
+        internal ExpiryCleanupFault(ExploreDbContext context, ExpiryTransactionObservation observation, bool enabled)
+        {
+            this.context = context;
+            contextLease = context.ContextId;
+            this.observation = observation;
+            this.enabled = enabled;
+            allListeners = DiagnosticListener.AllListeners.Subscribe(this);
+        }
+
+        internal IOException Failure { get; } = new("Injected expiry transaction cleanup failure.");
+        internal bool Reached { get; private set; }
+
+        public void OnNext(DiagnosticListener listener)
+        {
+            lock (lifetime)
+                if (!disposed && enabled && listener.Name == "Microsoft.EntityFrameworkCore")
+                    subscriptions.Add(listener.Subscribe(this, name => name == RelationalEventId.TransactionDisposed.Name));
+        }
+
+        public void OnNext(KeyValuePair<string, object?> diagnostic)
+        {
+            lock (lifetime)
+            {
+                if (disposed || !enabled || Reached || observation.PrimaryTransaction is null
+                    || diagnostic.Key != RelationalEventId.TransactionDisposed.Name
+                    || diagnostic.Value is not TransactionEventData data
+                    || !ReferenceEquals(data.Context, context) || data.Context?.ContextId != contextLease
+                    || !ReferenceEquals(data.Transaction, observation.PrimaryTransaction))
+                    return;
+                Reached = true;
+            }
+            throw Failure;
+        }
+
+        public void OnCompleted() { }
+        public void OnError(Exception error) { }
+
+        public void Dispose()
+        {
+            lock (lifetime)
+            {
+                if (disposed) return;
+                disposed = true;
+                allListeners.Dispose();
+                foreach (var subscription in subscriptions) subscription.Dispose();
+            }
+        }
     }
 
     private static async Task<ExploreDbContext> CreateBoundFixtureContextAsync(PostgreSqlContainerFixture fixture)

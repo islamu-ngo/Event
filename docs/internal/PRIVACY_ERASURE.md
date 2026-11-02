@@ -178,6 +178,25 @@ within each statement; no result survives into a later statement. The normal
 native-contract installation path refreshes the routine body without changing
 tables, retained erasure facts, checkpoints, permissions or command timeouts.
 
+Recognition eligibility expiry enters a zero-retry execution strategy before
+acquiring either the retained identity gate or its independent primary
+transaction. It refuses an ambient replaying strategy without changing the
+provider's configured retry policy. Expiry reports its count only after both
+owners return successful completion; a lost commit acknowledgement does not
+authorize another attempt. Primary-operation and primary-disposal failures are
+retained together. On shared SQLite, the identity gate remains the transaction
+owner: expiry neither commits nor disposes that borrowed transaction, and a
+failed pass marks the enclosing identity transaction failed. This is not an
+atomic transaction across independent databases.
+
+Recognition key-lifecycle mutations and material pruning use the same
+non-replaying boundary before acquiring their identity and primary owners.
+Purge-receipt expiry also uses a zero-retry scope for its own primary transaction;
+it deliberately makes no external authority call, so an authority outage cannot
+extend an expired proof. The configured provider retry policy remains available
+to unrelated operations. Native completion failures propagate without replacing
+the original transaction or silently starting another pass.
+
 Replay validates retained floor, high-water, sequence continuity and checkpoint
 identity before purging old-subject records. It does not scan reusable provider
 identities and append erasure facts for a different fresh User UUID. After normal

@@ -129,6 +129,12 @@ transaction. External PostgreSQL retains function-only runtime privileges throug
 No fingerprint secret is resolved or validated by ordinary enrollment, erasure
 or startup replay.
 
+Recognition erasure checks subject existence with filtered `AnyAsync` after
+acquiring the ordered user fences under the original identity transaction.
+It does not materialize the unused `User` aggregate and its private profile.
+The subject predicate, query filters and missing-subject refusal are unchanged;
+the narrow erasure purpose receives no additional private-table permissions.
+
 PostgreSQL's mixed-settings authority guard resolves its fixed routine signatures
 through an uncorrelated `VALUES` query in the two catalog exclusion predicates.
 This keeps signature resolution independent of the scanned catalog rows while

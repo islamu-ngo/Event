@@ -112,6 +112,10 @@ The ownership and privilege checks remain in place. Use the normal migration
 and startup sequence to refresh these native contracts; no credential,
 permission, timeout or retained-ledger change is required.
 
+Recognition erasure checks that its protected subject exists without loading
+the private profile. It uses its existing narrow database permissions; do not
+grant private-table read access to make this existence check succeed.
+
 ## Reserved Future Moderation Keys
 
 `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and

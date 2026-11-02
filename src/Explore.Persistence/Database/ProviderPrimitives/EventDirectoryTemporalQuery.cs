@@ -13,6 +13,19 @@ internal static class EventDirectoryTemporalQuery
 {
     private const string InstantCollation = "event_directory_instant";
 
+    internal static IOrderedQueryable<Event> OrderEventsByFirstSessionDescending(
+        ExploreDbContext dbContext, IQueryable<Event> query)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            RegisterInstantCollation(dbContext);
+            return query.OrderByDescending(entity =>
+                EF.Functions.Collate((string)(object)entity.FirstSessionStartUtc!, InstantCollation));
+        }
+
+        return query.OrderByDescending(entity => entity.FirstSessionStartUtc);
+    }
+
     internal static IQueryable<EventSession> ApplyOccurrences(
         ExploreDbContext dbContext, IQueryable<EventSession> query, EventOccurrenceDiscoveryFilter filter)
     {

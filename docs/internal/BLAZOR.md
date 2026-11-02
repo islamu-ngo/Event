@@ -544,6 +544,10 @@ Event detail and profile surfaces are HAL-driven management views:
 
 ### Canonical Studio Event Workspace
 
+Studio context loads actor-owned events through `EventRepository.GetEventsByActorWithDetails`.
+SQLite orders the first-session instant with the existing offset-aware collation;
+tenant/deletion filters, database-side ordering and title/ID tie-breaks remain active.
+
 Resource management uses the audience collection's `manage-resources` relation
 for both Overview actions and direct-route mounting. The event's public
 `resources` relation is not management authority. Collection results are

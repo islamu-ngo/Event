@@ -269,6 +269,10 @@ The profile's **Support email** is public site identity, not the account's
 credential email or an SMTP From address. Saving it does not configure a sender
 or enable delivery; use the separate SMTP administration when email is wanted.
 
+Studio can list managed events on SQLite, including events without a schedule
+and schedules recorded with different UTC offsets. This correction requires no
+additional configuration or database migration.
+
 Create subsequent Local accounts through
 `/settings/instance?section=local-accounts`, using current instance-administrator
 access. That screen collects email and profile details, but hands over the

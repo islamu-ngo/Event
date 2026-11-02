@@ -3818,7 +3818,7 @@ Table "privacy_erasure_authority"."authority_counter" {
   "revision" bigint [not null, default: 1]
   "store_id" uuid [not null, default: `uuidv7()`]
 
-  Note: 'Singleton sequence allocator and durable compaction floor for typed platform privacy-erasure facts. Checks require 0 <= retained_floor_sequence <= last_sequence, positive recovery_generation/revision and UUIDv7 store identity. Revision is an application concurrency token. The selected topology migration owns this table; PostgreSQL CoLocated recovery coordinates are restored by generated migration 20261031102545. Downgrade drops those coordinates and is not data-preserving.'
+  Note: 'Singleton sequence allocator and durable compaction floor for typed platform privacy-erasure facts. Checks require 0 <= retained_floor_sequence <= last_sequence, positive recovery_generation/revision and UUIDv7 store identity. Revision is an application concurrency token. The selected topology migration owns this table; PostgreSQL CoLocated recovery coordinates are restored by generated migration 20261031102545. Embedded SQLite RestoreEmbeddedAuthorityRecoveryCoordinates initializes missing revision/generation to 1 and store identity through native UUIDv7 defaults, preserving explicit domain values. Downgrade drops those coordinates and is not data-preserving.'
 }
 
 Table "privacy_erasure_authority"."erasure_intents" {

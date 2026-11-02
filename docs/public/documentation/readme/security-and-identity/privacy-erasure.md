@@ -81,6 +81,14 @@ its provider identity resembles an erased account. Preserve the retained
 authority and supported backup horizon; a fresh signup does not bypass an
 invalid restore or an unavailable authority.
 
+## Embedded Authority Upgrades
+
+The embedded SQLite authority upgrade adds missing recovery coordinates while
+retaining the erasure ledger and its retained floor. Use the application's
+migration service with SQLite 3.42 or newer, and preserve matched backups before
+upgrading. Downgrading this schema removes its recovery identity and counters;
+use the documented recovery procedure instead of downgrading an adopted store.
+
 ## Reserved Future Moderation Keys
 
 `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and

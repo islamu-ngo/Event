@@ -213,6 +213,11 @@ intents:
       - .agents/rules/efcore-migrations.md
     paths_in_scope:
       - "src/Explore.Persistence/Migrations/**/*.cs"
+      - "src/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite/Migrations/**/*.cs"
+      - "src/Explore.Persistence/Privacy/ErasureAuthority/Configurations/EmbeddedPrivacyErasureCounterConfiguration.cs"
+      - "src/Explore.Persistence/Privacy/ErasureAuthority/EmbeddedPrivacyErasureAuthorityDbContextFactory.cs"
+      - "src/Explore.Persistence/Privacy/ErasureAuthority/ProviderPrimitives/EmbeddedPrivacyErasureMigrationsSqlGenerator.cs"
+      - "tests/Event.Persistence.IntegrationTests/Privacy/EmbeddedAuthorityMigrationRecoveryTests.cs"
       - "src/Explore.Domain/**/*.cs"
     minimum_tests:
       - Event.Persistence.IntegrationTests

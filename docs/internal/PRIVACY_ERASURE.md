@@ -316,6 +316,28 @@ Use this decision matrix to select the right topology for your environment:
 
 ## 5. Migration Ownership and History Separation
 
+The embedded SQLite authority's `PrepareEmbeddedAuthorityRecoveryCoordinates`
+and `RestoreEmbeddedAuthorityRecoveryCoordinates` corrections add its missing
+store identity, revision and recovery generation. Preparation adds a nullable
+identity column; restoration rebuilds the table with the final defaults and
+recovery constraint. This avoids SQLite's nonconstant `ADD COLUMN` default
+restriction. Startup must finish both steps before serving traffic; preparation
+alone is not a qualified runtime model.
+
+The authority-specific SQL generator fills only null store identities before
+the required-column rebuild: EF otherwise explicitly copies nulls and bypasses
+the expression default. Nonnull identities are never replaced; the final
+constraint still rejects invalid retained coordinates. This is a storage
+migration primitive; application authorization and recovery retain their existing owners.
+
+Model defaults initialize the two counters to `1` and create a UUIDv7 using
+SQLite built-ins, without a connection-registered function. Domain-created
+counters retain their explicit values. This requires SQLite 3.42 or newer for
+fractional Unix time. The generated rebuild must preserve retained sequence,
+floor and identity-key metadata; apply through the selected authority migrator.
+Reversing both generated migrations drops the new recovery coordinates, so it
+is not an operational rollback after those coordinates have been adopted.
+
 The primary `DeclareUserPiiBirthDateRevisionDefault` correction declares an
 explicit `long` zero default for `UserPii._birthDateRevision`. PostgreSQL native
 creation admission compares that model annotation with the exact stored default

@@ -614,6 +614,8 @@ public sealed partial class MixedSettingsNativeContractTests(PostgreSqlContainer
     [Arguments("email-peer-execute")]
     [Arguments("email-peer-missing")]
     [Arguments("email-owner-login")]
+    [Arguments("foreign-routine-owner")]
+    [Arguments("foreign-routine-grant")]
     public async Task NativeAdmissionRejectsPrivilegeCatalogAndSourceDriftWithoutRepair(string drift)
     {
         var seeded = await SeedAsync();
@@ -628,6 +630,7 @@ public sealed partial class MixedSettingsNativeContractTests(PostgreSqlContainer
                 .SequenceEqual([nameof(SystemSetting.SettingKey)])).GetDatabaseName()!;
         string settingIndex = names.Name(indexName);
         string indexColumn = names.Column(typeof(SystemSetting), nameof(SystemSetting.SettingKey));
+        string foreignRoutine = names.Name($"foreign_mixed_{Guid.CreateVersion7():N}") + "()";
         string change = drift switch
         {
             "owner-login" => $"ALTER ROLE {PostgresMixedSettingsContract.OwnerRole} LOGIN",
@@ -635,6 +638,8 @@ public sealed partial class MixedSettingsNativeContractTests(PostgreSqlContainer
             "email-peer-execute" => $"GRANT EXECUTE ON FUNCTION {consumer} TO {PostgresMixedSettingsContract.GlobalRole}",
             "email-peer-missing" => $"REVOKE EXECUTE ON FUNCTION {consumer} FROM {PostgresEmailDeliveryPolicyContract.OwnerRole}",
             "email-owner-login" => $"ALTER ROLE {PostgresEmailDeliveryPolicyContract.OwnerRole} LOGIN",
+            "foreign-routine-owner" => $"CREATE FUNCTION {foreignRoutine} RETURNS integer LANGUAGE sql AS 'SELECT 1'; ALTER FUNCTION {foreignRoutine} OWNER TO {PostgresMixedSettingsContract.OwnerRole}",
+            "foreign-routine-grant" => $"CREATE FUNCTION {foreignRoutine} RETURNS integer LANGUAGE sql AS 'SELECT 1'; GRANT EXECUTE ON FUNCTION {foreignRoutine} TO {PostgresMixedSettingsContract.OwnerRole}",
             "disabled-exclusion" => $"ALTER TABLE {names.Table(typeof(SystemSetting))} DISABLE TRIGGER mixed_settings_changed",
             "source-column" => $"ALTER TABLE {sourceTable} ADD COLUMN foreign_state integer",
             "source-check" => $"ALTER TABLE {sourceTable} DROP CONSTRAINT mixed_settings_source_revision_check",
@@ -648,6 +653,7 @@ public sealed partial class MixedSettingsNativeContractTests(PostgreSqlContainer
             "email-peer-execute" => $"REVOKE EXECUTE ON FUNCTION {consumer} FROM {PostgresMixedSettingsContract.GlobalRole}",
             "email-peer-missing" => $"GRANT EXECUTE ON FUNCTION {consumer} TO {PostgresEmailDeliveryPolicyContract.OwnerRole}",
             "email-owner-login" => $"ALTER ROLE {PostgresEmailDeliveryPolicyContract.OwnerRole} NOLOGIN",
+            "foreign-routine-owner" or "foreign-routine-grant" => $"DROP FUNCTION {foreignRoutine}",
             "disabled-exclusion" => $"ALTER TABLE {names.Table(typeof(SystemSetting))} ENABLE ALWAYS TRIGGER mixed_settings_changed",
             "source-column" => $"ALTER TABLE {sourceTable} DROP COLUMN foreign_state",
             "source-check" => $"ALTER TABLE {sourceTable} ADD CONSTRAINT mixed_settings_source_revision_check CHECK (revision >= 0)",
@@ -658,7 +664,9 @@ public sealed partial class MixedSettingsNativeContractTests(PostgreSqlContainer
         try
         {
             await using var caller = Open(PrimaryDatabaseRole.Global, null);
-            await Assert.ThrowsAsync<PostgresException>(() => ReadAsync(caller, seeded, Request(), null));
+            var failure = await Assert.ThrowsAsync<PostgresException>(() => ReadAsync(caller, seeded, Request(), null));
+            if (drift is "foreign-routine-owner" or "foreign-routine-grant")
+                await Assert.That(failure!.MessageText).IsEqualTo("mixed_settings_authority_drift");
             await Assert.ThrowsAsync<PostgresException>(() => PostgresMixedSettingsContract.ApplyAsync(migration, fixture.NativeQueueEnrollment));
         }
         finally { await migration.Database.ExecuteSqlRawAsync(restore); }
@@ -914,6 +922,7 @@ public sealed partial class MixedSettingsNativeContractTests(PostgreSqlContainer
     private async Task<Seeded> SeedAsync()
     {
         await using var migration = fixture.CreateDbContext();
+        migration.BindTenantLease();
         await PostgresMixedSettingsContract.ApplyAsync(migration, fixture.NativeQueueEnrollment);
         var actor = new User
         {

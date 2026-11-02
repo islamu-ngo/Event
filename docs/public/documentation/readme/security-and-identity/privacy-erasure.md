@@ -104,6 +104,14 @@ proof that another owner is excluded; other file errors prevent recognition
 from qualifying the store.
 Stop all writers before restoring or replacing the database file.
 
+## PostgreSQL Contract Refresh
+
+The mixed-settings checks used during PostgreSQL erasure now resolve their
+fixed routine inventory independently of the catalog rows being inspected.
+The ownership and privilege checks remain in place. Use the normal migration
+and startup sequence to refresh these native contracts; no credential,
+permission, timeout or retained-ledger change is required.
+
 ## Reserved Future Moderation Keys
 
 `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and

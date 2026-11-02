@@ -129,6 +129,15 @@ transaction. External PostgreSQL retains function-only runtime privileges throug
 No fingerprint secret is resolved or validated by ordinary enrollment, erasure
 or startup replay.
 
+PostgreSQL's mixed-settings authority guard resolves its fixed routine signatures
+through an uncorrelated `VALUES` query in the two catalog exclusion predicates.
+This keeps signature resolution independent of the scanned catalog rows while
+preserving the same `NOT IN` null semantics, ownership and privilege checks.
+Earlier missing-routine checks remain mandatory. Authority is still checked
+within each statement; no result survives into a later statement. The normal
+native-contract installation path refreshes the routine body without changing
+tables, retained erasure facts, checkpoints, permissions or command timeouts.
+
 Replay validates retained floor, high-water, sequence continuity and checkpoint
 identity before purging old-subject records. It does not scan reusable provider
 identities and append erasure facts for a different fresh User UUID. After normal

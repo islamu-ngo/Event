@@ -1,3 +1,4 @@
+using Event.Testing.PostgreSql;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -7,6 +8,7 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
 using Explore.Persistence.Schema;
+using Explore.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Security.Cryptography;
@@ -27,14 +29,20 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         await using var database = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("phase85subjects")
             .WithUsername("postgres")
-            .WithPassword("postgres")
+            .WithPassword(PostgresTestRoleBootstrap.ReadBootstrapPassword())
             .Build();
         await database.StartAsync();
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(database.GetConnectionString())
             .UseSnakeCaseNamingConvention()
             .Options;
-        (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder();
+        await using ExploreDbContext context = CreateContext(options, true);
+        await AssertParticipantFulfillmentAsync(context);
+    }
+
+    internal static async Task AssertParticipantFulfillmentAsync(ExploreDbContext context)
+    {
+        (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder(out FinalizationPrincipals principals);
         RegistrationRequirement required = RegistrationRequirement.Create(
             workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
@@ -45,42 +53,20 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         RegistrationParticipant second = RegistrationParticipant.Create(
             order.TenantId, order.Id, null, ParticipantTypeEnum.Adult, null);
 
-        await using ExploreDbContext context = CreateContext(options, true);
-        await context.Database.EnsureCreatedAsync();
-        await context.Database.OpenConnectionAsync();
-        await context.Database.ExecuteSqlRawAsync("SET session_replication_role = replica");
+        await InitializeAsync(context, principals);
         context.RegistrationOrders.Add(order);
         context.RegistrationWorkflows.Add(workflow);
         context.RegistrationRequirements.Add(required);
         context.RegistrationParticipants.AddRange(first, second);
         await context.SaveChangesAsync();
-        await context.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO islamu_event.registration_requirement_fulfillments
-                (id, tenant_id, event_id, registration_order_id, registration_workflow_id,
-                 registration_requirement_id, subject_type_id, subject_id,
-                 source_registration_submission_id, is_skipped, recorded_at, created_at)
-            VALUES
-                ({Guid.CreateVersion7()}, {order.TenantId}, {order.EventId}, {order.Id}, {workflow.Id},
-                 {required.Id}, {(int)RegistrationAnswerSubjectTypeEnum.Participant}, {first.Id},
-                 {Guid.CreateVersion7()}, false, {UtcNow}, {UtcNow})
-            """);
+        await InsertFulfillmentAsync(context, order, required, RegistrationAnswerSubjectTypeEnum.Participant, first.Id);
 
         var repository = new RegistrationFinalizationRepository(context);
         bool oneOfTwoReady = await repository.AreMandatoryRequirementsFulfilledAsync(
             order.TenantId, order.Id, CancellationToken.None);
-        await context.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO islamu_event.registration_requirement_fulfillments
-                (id, tenant_id, event_id, registration_order_id, registration_workflow_id,
-                 registration_requirement_id, subject_type_id, subject_id,
-                 source_registration_submission_id, is_skipped, recorded_at, created_at)
-            VALUES
-                ({Guid.CreateVersion7()}, {order.TenantId}, {order.EventId}, {order.Id}, {workflow.Id},
-                 {required.Id}, {(int)RegistrationAnswerSubjectTypeEnum.Participant}, {second.Id},
-                 {Guid.CreateVersion7()}, false, {UtcNow}, {UtcNow})
-            """);
+        await InsertFulfillmentAsync(context, order, required, RegistrationAnswerSubjectTypeEnum.Participant, second.Id);
         bool bothReady = await repository.AreMandatoryRequirementsFulfilledAsync(
             order.TenantId, order.Id, CancellationToken.None);
-        await context.Database.ExecuteSqlRawAsync("SET session_replication_role = origin");
 
         await Assert.That(oneOfTwoReady).IsFalse();
         await Assert.That(bothReady).IsTrue();
@@ -93,15 +79,28 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         await using var database = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("phase85matrix")
             .WithUsername("postgres")
-            .WithPassword("postgres")
+            .WithPassword(PostgresTestRoleBootstrap.ReadBootstrapPassword())
             .Build();
         await database.StartAsync();
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(database.GetConnectionString())
             .UseSnakeCaseNamingConvention()
             .Options;
-        (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder();
-        Guid ticketTypeId = Guid.CreateVersion7();
+        await using ExploreDbContext context = CreateContext(options, true);
+        await AssertApplicabilityMatrixAsync(context);
+    }
+
+    internal static async Task AssertApplicabilityMatrixAsync(ExploreDbContext context)
+    {
+        (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder(out FinalizationPrincipals principals);
+        var catalog = principals.Catalog;
+        var ticketType = EventTicketType.Create(Guid.CreateVersion7(), order.TenantId, catalog.Id, "Matrix", "EUR",
+            TicketPricingModeEnum.Free, null, null, null, ParticipantDataCollectionModeEnum.None,
+            null, null, null, false, false, null, null, null, null);
+        catalog.AddTicketType(ticketType, null);
+        catalog.AddEntitlement(ticketType, TicketTypeEntitlement.CreateForEvent(ticketType.Id, order.TenantId, order.EventId, 1));
+        catalog.Publish();
+        Guid ticketTypeId = ticketType.Id;
         Guid sessionSelectionId = Guid.CreateVersion7();
         RegistrationRequirement[] requirements =
         [
@@ -116,7 +115,9 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
             order.TenantId, order.Id, null, ParticipantTypeEnum.Adult, null);
         RegistrationParticipant child = RegistrationParticipant.Create(
             order.TenantId, order.Id, null, ParticipantTypeEnum.Child, adult);
-        Guid lineId = Guid.CreateVersion7();
+        RegistrationOrderLine line = RegistrationOrderLine.Create(catalog, ticketType, order.Id, 2, null, null);
+        order.AddLine(line);
+        Guid lineId = line.Id;
         RegistrationTicketAssignment firstAssignment = RegistrationTicketAssignment.Create(
             Guid.CreateVersion7(), order.TenantId, order.Id, lineId, 1, null,
             AssignmentStatusEnum.Unassigned, null, UtcNow);
@@ -124,26 +125,12 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
             Guid.CreateVersion7(), order.TenantId, order.Id, lineId, 2, null,
             AssignmentStatusEnum.Unassigned, null, UtcNow);
 
-        await using ExploreDbContext context = CreateContext(options, true);
-        await context.Database.EnsureCreatedAsync();
-        await context.Database.OpenConnectionAsync();
-        await context.Database.ExecuteSqlRawAsync("SET session_replication_role = replica");
+        await InitializeAsync(context, principals);
         context.RegistrationOrders.Add(order);
         context.RegistrationWorkflows.Add(workflow);
         context.RegistrationRequirements.AddRange(requirements);
         context.RegistrationParticipants.AddRange(adult, child);
         await context.SaveChangesAsync();
-        await context.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO islamu_event.registration_order_lines
-                (id, concurrency_stamp, created_at, currency_code_snapshot, line_subtotal_snapshot,
-                 pre_discount_line_subtotal_minor_snapshot, promotion_discount_amount_minor_snapshot,
-                 post_discount_line_subtotal_minor_snapshot,
-                 quantity, registration_order_id, tenant_id, ticket_catalog_version_id,
-                 ticket_pricing_mode_snapshot, ticket_type_id, ticket_type_name_snapshot, unit_price_amount_snapshot)
-            VALUES
-                ({lineId}, {Guid.CreateVersion7()}, {UtcNow}, {"EUR"}, {0L}, {0L}, {0L}, {0L}, {2}, {order.Id},
-                 {order.TenantId}, {order.TicketCatalogVersionId}, {1}, {ticketTypeId}, {"Matrix"}, {0L})
-            """);
         context.RegistrationTicketAssignments.AddRange(firstAssignment, secondAssignment);
         await context.SaveChangesAsync();
         await InsertFulfillmentAsync(context, order, requirements[0], RegistrationAnswerSubjectTypeEnum.RegistrationOrder, order.Id);
@@ -160,7 +147,6 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         await InsertFulfillmentAsync(context, order, requirements[1], RegistrationAnswerSubjectTypeEnum.TicketAssignment, secondAssignment.Id);
         bool fullMatrixReady = await repository.AreMandatoryRequirementsFulfilledAsync(
             order.TenantId, order.Id, CancellationToken.None);
-        await context.Database.ExecuteSqlRawAsync("SET session_replication_role = origin");
 
         await Assert.That(oneOfTwoTicketsReady).IsFalse();
         await Assert.That(fullMatrixReady).IsTrue();
@@ -173,14 +159,14 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         await using var database = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("phase86skipatomic")
             .WithUsername("postgres")
-            .WithPassword("postgres")
+            .WithPassword(PostgresTestRoleBootstrap.ReadBootstrapPassword())
             .Build();
         await database.StartAsync();
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(database.GetConnectionString())
             .UseSnakeCaseNamingConvention()
             .Options;
-        (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder();
+        (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder(out FinalizationPrincipals principals);
         RegistrationRequirement optional = RegistrationRequirement.Create(
             workflow, 1, RegistrationRequirementCriticalityEnum.Optional, true,
             RegistrationRequirementCompletionEffectEnum.EnrichesRegistration,
@@ -200,23 +186,18 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
 
         await using (ExploreDbContext setup = CreateContext(options, true))
         {
-            await setup.Database.EnsureCreatedAsync();
-            await setup.Database.OpenConnectionAsync();
-            await setup.Database.ExecuteSqlRawAsync("SET session_replication_role = replica");
+            await InitializeAsync(setup, principals);
             setup.RegistrationOrders.Add(order);
             setup.RegistrationWorkflows.Add(workflow);
             setup.RegistrationForms.Add(form);
             setup.RegistrationAttempts.Add(attempt);
             await setup.SaveChangesAsync();
-            await setup.Database.ExecuteSqlRawAsync("SET session_replication_role = origin");
         }
 
         await using ExploreDbContext firstContext = CreateContext(options, true);
         await using ExploreDbContext secondContext = CreateContext(options, true);
         await firstContext.Database.OpenConnectionAsync();
         await secondContext.Database.OpenConnectionAsync();
-        await firstContext.Database.ExecuteSqlRawAsync("SET session_replication_role = replica");
-        await secondContext.Database.ExecuteSqlRawAsync("SET session_replication_role = replica");
         RegistrationAttempt firstAttempt = await firstContext.RegistrationAttempts.AsNoTracking().SingleAsync();
         RegistrationAttempt secondAttempt = await secondContext.RegistrationAttempts.AsNoTracking().SingleAsync();
         Guid expectedStamp = firstAttempt.ConcurrencyStamp;
@@ -251,35 +232,26 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         await using var database = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("phase85")
             .WithUsername("postgres")
-            .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
+            .WithPassword(PostgresTestRoleBootstrap.ReadBootstrapPassword())
             .Build();
         await database.StartAsync();
         string suffix = Guid.CreateVersion7().ToString("N");
         var enrollment = new PostgresNativeQueueEnrollment("postgres", $"final_global_{suffix}",
             $"final_runtime_{suffix}", $"final_instance_{suffix}", $"final_tenant_{suffix}");
         string globalPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-        await using (var connection = new NpgsqlConnection(database.GetConnectionString()))
+        var purposeLogins = new Dictionary<PrimaryDatabaseRole, (string Username, string Password)>
         {
-            await connection.OpenAsync();
-            foreach (string login in new[]
-                     {
-                         enrollment.GlobalLogin, enrollment.RuntimeLogin,
-                         enrollment.EmailInstanceMutationLogin, enrollment.EmailTenantMutationLogin
-                     })
-            {
-                await using var command = connection.CreateCommand();
-                string password = login == enrollment.GlobalLogin
-                    ? $" PASSWORD '{globalPassword}'"
-                    : string.Empty;
-                command.CommandText = $"CREATE ROLE \"{login}\" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS{password}";
-                await command.ExecuteNonQueryAsync();
-            }
-        }
+            [PrimaryDatabaseRole.Global] = (enrollment.GlobalLogin, globalPassword),
+            [PrimaryDatabaseRole.Runtime] = (enrollment.RuntimeLogin, Convert.ToHexString(RandomNumberGenerator.GetBytes(24))),
+            [PrimaryDatabaseRole.EmailPolicyInstanceMutation] = (enrollment.EmailInstanceMutationLogin, Convert.ToHexString(RandomNumberGenerator.GetBytes(24))),
+            [PrimaryDatabaseRole.EmailPolicyTenantMutation] = (enrollment.EmailTenantMutationLogin, Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
+        };
+        await PostgresTestRoleBootstrap.ProvisionAsync(database.GetConnectionString(), enrollment, purposeLogins);
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(database.GetConnectionString())
             .UseSnakeCaseNamingConvention()
             .Options;
-        (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder();
+        (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder(out FinalizationPrincipals principals);
         RegistrationRequirement optional = RegistrationRequirement.Create(
             workflow, 1, RegistrationRequirementCriticalityEnum.Optional, true,
             RegistrationRequirementCompletionEffectEnum.EnrichesRegistration,
@@ -288,9 +260,7 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
 
         await using (ExploreDbContext setup = CreateContext(options, true))
         {
-            await setup.Database.EnsureCreatedAsync();
-            await setup.Database.OpenConnectionAsync();
-            await setup.Database.ExecuteSqlRawAsync("SET session_replication_role = replica");
+            await InitializeAsync(setup, principals);
             setup.RegistrationOrders.Add(order);
             setup.RegistrationWorkflows.Add(workflow);
             setup.RegistrationRequirements.Add(optional);
@@ -299,7 +269,6 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
                 order, optional, RegistrationAnswerSubjectTypeEnum.RegistrationOrder, order.Id, UtcNow);
             bool ready = await new RegistrationFinalizationRepository(setup)
                 .RecordFulfillmentAsync(skip, UtcNow, CancellationToken.None);
-            await setup.Database.ExecuteSqlRawAsync("SET session_replication_role = origin");
             await Assert.That(ready).IsTrue();
             await Assert.That(await setup.RegistrationRequirementFulfillments.CountAsync()).IsEqualTo(1);
             await Assert.That(await setup.RegistrationFinalizationEffects.CountAsync()).IsEqualTo(1);
@@ -323,6 +292,8 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         await using ExploreDbContext secondContext = CreateContext(options, false);
         firstContext.TenantContext = new FinalizationTenantContext(order.TenantId);
         secondContext.TenantContext = new FinalizationTenantContext(order.TenantId);
+        firstContext.BindTenantLease();
+        secondContext.BindTenantLease();
         var first = new RegistrationFinalizationRepository(firstContext);
         var second = new RegistrationFinalizationRepository(secondContext);
         var claims = await Task.WhenAll(
@@ -363,35 +334,36 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         await using var database = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase(databaseName)
             .WithUsername("postgres")
-            .WithPassword("postgres")
+            .WithPassword(PostgresTestRoleBootstrap.ReadBootstrapPassword())
             .Build();
         await database.StartAsync();
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(database.GetConnectionString())
             .UseSnakeCaseNamingConvention()
             .Options;
-        (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder();
+        await AssertConvergesAsync(options, callbackFirst);
+    }
+
+    internal static async Task AssertConvergesAsync(DbContextOptions<ExploreDbContext> options, bool callbackFirst)
+    {
+        (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder(out FinalizationPrincipals principals);
         RegistrationRequirement required = CreateRequired(
             workflow, 1, RegistrationRequirementSubjectTypeEnum.AllOrders, null);
 
         await using (ExploreDbContext setup = CreateContext(options, true))
         {
-            await setup.Database.EnsureCreatedAsync();
-            await setup.Database.OpenConnectionAsync();
-            await setup.Database.ExecuteSqlRawAsync("SET session_replication_role = replica");
+            await InitializeAsync(setup, principals);
             setup.RegistrationOrders.Add(order);
             setup.RegistrationWorkflows.Add(workflow);
             setup.RegistrationRequirements.Add(required);
             await setup.SaveChangesAsync();
-            await setup.Database.ExecuteSqlRawAsync("SET session_replication_role = origin");
         }
 
         await using ExploreDbContext context = CreateContext(options, true);
         await context.Database.OpenConnectionAsync();
-        await context.Database.ExecuteSqlRawAsync("SET session_replication_role = replica");
         var repository = new RegistrationFinalizationRepository(context);
-        RegistrationSubmission callbackSubmission = CreateProviderSubmission(order, required, UtcNow);
-        RegistrationSubmission userReturnSubmission = CreateNativeSubmission(order, required, UtcNow.AddSeconds(1));
+        RegistrationSubmission callbackSubmission = await CreateSubmissionAsync(context, order, required, UtcNow, provider: true);
+        RegistrationSubmission userReturnSubmission = await CreateSubmissionAsync(context, order, required, UtcNow.AddSeconds(1));
         RegistrationRequirementFulfillment callback = RegistrationRequirementFulfillment.CreateFulfilled(
             order, required, callbackSubmission, RegistrationAnswerSubjectTypeEnum.RegistrationOrder, order.Id, UtcNow);
         RegistrationRequirementFulfillment userReturn = RegistrationRequirementFulfillment.CreateFulfilled(
@@ -409,50 +381,62 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         RegistrationFinalizationEffect effect = await context.RegistrationFinalizationEffects.SingleAsync();
         await Assert.That(effect.RegistrationOrderId).IsEqualTo(order.Id);
         await Assert.That(effect.Status).IsEqualTo(OutboxMessageStatus.Pending);
-        await context.Database.ExecuteSqlRawAsync("SET session_replication_role = origin");
     }
 
-    private static RegistrationSubmission CreateNativeSubmission(
+    private static async Task<RegistrationSubmission> CreateSubmissionAsync(
+        ExploreDbContext context,
         RegistrationOrder order,
         RegistrationRequirement requirement,
-        DateTime receivedAt)
+        DateTime receivedAt,
+        bool provider = false)
     {
+        string suffix = Guid.CreateVersion7().ToString("N");
+        var form = RegistrationForm.Create(order.TenantId, order.EventId, "platform.registration",
+            $"fulfillment-{suffix}", "Fulfillment", UtcNow);
+        var version = RegistrationFormVersion.Create(form, 1, "en", null, null, UtcNow);
+        form.AddVersion(version);
+        context.Add(form);
+        RegistrationProviderBinding? binding = null;
+        RegistrationEvidenceHash? mappingHash = null;
+        if (provider)
+        {
+            var connection = RegistrationProviderConnection.Create(order.TenantId, "Fulfillment provider",
+                RegistrationProviderKindEnum.ExternalForm, RegistrationProviderDeploymentKindEnum.HostedSaas,
+                "FORMBRICKS", "HOSTED_SAAS", "v1", "formbricks-policy-v1", "evidence-v1",
+                "https://provider.example/management", "https://provider.example", $"workspace-{suffix}",
+                null, null, UtcNow);
+            binding = RegistrationProviderBinding.Create(order.TenantId, connection.Id, form.Id, version.Id,
+                RegistrationProviderPresentationModeEnum.Redirect, RegistrationProviderCollectionModeEnum.ProviderHosted,
+                RegistrationProviderCompletionModeEnum.Callback, RegistrationProviderTrustLevelEnum.SelectedFields, null, UtcNow);
+            mappingHash = RegistrationEvidenceHash.Create(Hash($"mapping-{suffix}"));
+            binding.Publish(mappingHash, UtcNow);
+            context.AddRange(connection, binding);
+        }
+        int ordinal = await context.RegistrationChannels.CountAsync(value => value.RegistrationRequirementId == requirement.Id) + 1;
+        var channel = RegistrationChannel.Create(requirement, ordinal, !provider, binding?.Id, UtcNow);
+        context.Add(channel);
+        await context.SaveChangesAsync();
         RegistrationAttempt attempt = RegistrationAttempt.Create(
             order.TenantId, order.EventId, order.Id, requirement.RegistrationWorkflowId, requirement.Id,
-            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
-            CapabilityTokenHash.Create(Hash("native-capability")), null, null, UtcNow, UtcNow.AddMinutes(10));
-        return attempt.SubmitNative(
-            RegistrationEvidenceHash.Create(Hash("native-evidence")), receivedAt,
-            RegistrationTransportIdempotencyHash.Create(Hash("native-transport")));
-    }
-
-    private static RegistrationSubmission CreateProviderSubmission(
-        RegistrationOrder order,
-        RegistrationRequirement requirement,
-        DateTime receivedAt)
-    {
-        RegistrationAttempt attempt = RegistrationAttempt.Create(
-            order.TenantId, order.EventId, order.Id, requirement.RegistrationWorkflowId, requirement.Id,
-            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
-            CapabilityTokenHash.Create(Hash("provider-capability")), Guid.CreateVersion7(),
-            RegistrationEvidenceHash.Create(Hash("provider-mapping")), UtcNow, UtcNow.AddMinutes(10));
-        return attempt.SubmitProvider(
-            RegistrationEvidenceHash.Create(Hash("provider-evidence")), receivedAt,
-            RegistrationTransportIdempotencyHash.Create(Hash("provider-transport")),
-            "provider-submission", "revision-1", null, null);
+            channel.Id, form.Id, version.Id, CapabilityTokenHash.Create(Hash($"capability-{suffix}")),
+            binding?.Id, mappingHash, UtcNow, UtcNow.AddMinutes(10));
+        var evidence = RegistrationEvidenceHash.Create(Hash($"evidence-{suffix}"));
+        var transport = RegistrationTransportIdempotencyHash.Create(Hash($"transport-{suffix}"));
+        var submission = provider
+            ? attempt.SubmitProvider(evidence, receivedAt, transport, "provider-submission", "revision-1", null, null)
+            : attempt.SubmitNative(evidence, receivedAt, transport);
+        context.AddRange(attempt, submission);
+        await context.SaveChangesAsync();
+        return submission;
     }
 
     private static string Hash(string value) =>
         Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value)));
 
-    private static async Task<IReadOnlyList<RegistrationFinalizationClaim>> ClaimAsync(
+    private static Task<IReadOnlyList<RegistrationFinalizationClaim>> ClaimAsync(
         IGlobalExploreDbContextFactory factory, string owner, DateTime claimedAt)
-    {
-        await using var context = await factory.CreateDbContextAsync();
-        return await context.Database.SqlQueryRaw<RegistrationFinalizationClaim>(
-            $"SELECT * FROM {PostgresRegistrationFinalizationQueueContract.FunctionSql(context)}({{0}}, {{1}}, {{2}}, {{3}})",
-            owner, 1, claimedAt, TimeSpan.FromMinutes(1)).ToListAsync();
-    }
+        => new RegistrationFinalizationQueueRepository(factory).ClaimDueAsync(
+            owner, 1, claimedAt, TimeSpan.FromMinutes(1), CancellationToken.None);
 
     private sealed record FinalizationTenantContext(Guid TenantId) : Explore.Application.Contracts.Infrastructure.ITenantContext;
 
@@ -462,6 +446,7 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         if (bypassTenantFilter)
         {
             context.EnableTenantFilterBypass("Phase 8.5 real PostgreSQL setup or verification.");
+            context.BindTenantLease();
         }
         return context;
     }
@@ -482,27 +467,47 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         RegistrationAnswerSubjectTypeEnum subjectType,
         Guid subjectId)
     {
-        await context.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO islamu_event.registration_requirement_fulfillments
-                (id, tenant_id, event_id, registration_order_id, registration_workflow_id,
-                 registration_requirement_id, subject_type_id, subject_id,
-                 source_registration_submission_id, is_skipped, recorded_at, created_at)
-            VALUES
-                ({Guid.CreateVersion7()}, {order.TenantId}, {order.EventId}, {order.Id}, {requirement.RegistrationWorkflowId},
-                 {requirement.Id}, {(int)subjectType}, {subjectId}, {Guid.CreateVersion7()}, false, {UtcNow}, {UtcNow})
-            """);
+        RegistrationSubmission submission = await CreateSubmissionAsync(context, order, requirement, UtcNow);
+        context.Add(RegistrationRequirementFulfillment.CreateFulfilled(order, requirement, submission, subjectType, subjectId, UtcNow));
+        await context.SaveChangesAsync();
     }
 
-    private static (RegistrationOrder Order, RegistrationWorkflow Workflow) CreateOrder()
+    private static (RegistrationOrder Order, RegistrationWorkflow Workflow) CreateOrder(out FinalizationPrincipals principals)
     {
-        Guid tenantId = Guid.CreateVersion7();
-        Guid eventId = Guid.CreateVersion7();
+        var tenant = new Tenant { Id = Guid.CreateVersion7(), FullName = "Finalization", Slug = $"finalization-{Guid.CreateVersion7():N}",
+            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null! };
+        var user = new User { Id = Guid.CreateVersion7(), Pii = new UserPii { Email = $"{Guid.CreateVersion7():N}@example.test", FirstName = "Finalization", LastName = "Registrant" } };
+        var actor = new Actor { Id = Guid.CreateVersion7(), Pii = new ActorPii { DisplayName = "Organizer" }, ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!, UserId = user.Id };
+        var eventEntity = new Explore.Domain.Event(EventStatusEnum.Draft)
+        {
+            Id = Guid.CreateVersion7(), Title = "Finalization", TenantId = tenant.Id, Tenant = null!,
+            ActorId = actor.Id, Actor = null!, EventStatus = null!, EventFormatId = 1, EventFormat = null!,
+            EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+            VisibilityTypeId = 1, VisibilityType = null!, ConcurrencyStamp = Guid.CreateVersion7()
+        };
+        Guid tenantId = tenant.Id;
+        Guid eventId = eventEntity.Id;
+        var catalog = EventTicketCatalogVersion.Create(tenantId, eventId, "EUR", 1);
+        principals = new(tenant, user, actor, eventEntity, catalog);
         RegistrationWorkflow workflow = RegistrationWorkflow.Create(tenantId, eventId, "REGISTRATION", UtcNow);
         RegistrationOrder order = RegistrationOrder.Create(
-            tenantId, eventId, Guid.CreateVersion7(), null, BookingPartyTypeEnum.Individual,
-            Guid.CreateVersion7(), RegistrationParticipationSnapshot.Create(
+            tenantId, eventId, user.Id, null, BookingPartyTypeEnum.Individual,
+            catalog.Id, RegistrationParticipationSnapshot.Create(
                 Guid.CreateVersion7(), 4, 3, 2, GuestRecoveryPolicyEnum.VerifiedEmailRequired),
             workflow.Id, null, "EUR", UtcNow, UtcNow.AddMinutes(15));
         return (order, workflow);
     }
+
+    private static async Task InitializeAsync(ExploreDbContext context, FinalizationPrincipals principals)
+    {
+        context.BindTenantLease();
+        await context.Database.EnsureCreatedAsync();
+        await LookupTableSeeder.SeedAsync(context);
+        context.AddRange(principals.Tenant, principals.User, principals.Actor, principals.Event, principals.Catalog);
+        await context.SaveChangesAsync();
+    }
+
+    private sealed record FinalizationPrincipals(Tenant Tenant, User User, Actor Actor,
+        Explore.Domain.Event Event, EventTicketCatalogVersion Catalog);
 }

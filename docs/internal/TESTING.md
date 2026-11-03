@@ -970,6 +970,12 @@ or blank input fails before container creation. There is no default password or
 sibling-role fallback. Purpose-specific runtime logins remain separate from this
 bootstrap authority, and their ephemeral credentials must never appear in logs.
 
+`TypedPersistenceFixtureTests` exercises finalization arrangements with relational
+constraints enabled: missing submission evidence and cross-tenant lineage must
+fail, while complete participant/applicability graphs and both callback arrival
+orders persist correctly. These SQLite cases reuse the native test scenarios;
+they do not qualify PostgreSQL role admission, lease contention or lock behavior.
+
 - **Domain unit tests**: construct entities directly with valid state
 - **Application unit tests**: use in-memory fakes or builder patterns for repositories
 - **Integration tests**: use the real database with test containers or Docker infrastructure

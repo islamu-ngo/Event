@@ -1177,9 +1177,9 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
             await setup.SaveChangesAsync();
         }
 
-        var secondLock = new FinalizationLockCommandSignal();
+        var secondTransaction = new FinalizationTransactionSignal();
         await using ExploreDbContext firstContext = TenantContext(seed.TenantId);
-        await using ExploreDbContext secondContext = TenantContext(seed.TenantId, secondLock);
+        await using ExploreDbContext secondContext = TenantContext(seed.TenantId, secondTransaction);
         var gatedDigest = new GatedAdmissionDigestService(
             new AdmissionCredentialDigestService(
                 new AdmissionSecretResolver(),
@@ -1193,8 +1193,23 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
         Task<AdmissionIssuanceResult> first = firstService.IssueConfirmedAsync(request, timeout.Token);
         await gatedDigest.FirstGenerationEntered.WaitAsync(timeout.Token);
         Task<AdmissionIssuanceResult> second = secondService.IssueConfirmedAsync(request, timeout.Token);
-        await secondLock.CommandStarted.WaitAsync(timeout.Token);
-        gatedDigest.ReleaseFirstGeneration();
+        try
+        {
+            await secondTransaction.Started.WaitAsync(timeout.Token);
+            int firstBackend = ((NpgsqlConnection)firstContext.Database.GetDbConnection()).ProcessID;
+            int secondBackend = ((NpgsqlConnection)secondContext.Database.GetDbConnection()).ProcessID;
+            await using ExploreDbContext observer = fixture.CreateDbContext();
+            while (!await observer.Database.SqlQuery<bool>(
+                       $"SELECT {firstBackend} = ANY (pg_blocking_pids({secondBackend})) AS \"Value\"")
+                       .SingleAsync(timeout.Token))
+            {
+                await Task.Yield();
+            }
+        }
+        finally
+        {
+            gatedDigest.ReleaseFirstGeneration();
+        }
         AdmissionIssuanceResult[] outcomes = await Task.WhenAll(first, second);
 
         await Assert.That(gatedDigest.GenerationCount).IsEqualTo(1);
@@ -2298,40 +2313,20 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
             CancellationToken cancellationToken) => inner.VerifyAsync(request, cancellationToken);
     }
 
-    private sealed class FinalizationLockCommandSignal : DbCommandInterceptor
+    private sealed class FinalizationTransactionSignal : DbTransactionInterceptor
     {
-        private readonly TaskCompletionSource commandStarted =
+        private readonly TaskCompletionSource started =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        internal Task CommandStarted => commandStarted.Task;
+        internal Task Started => started.Task;
 
-        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
-            DbCommand command,
-            CommandEventData eventData,
-            InterceptionResult<DbDataReader> result,
+        public override ValueTask<DbTransaction> TransactionStartedAsync(
+            DbConnection connection,
+            TransactionEndEventData eventData,
+            DbTransaction result,
             CancellationToken cancellationToken = default)
         {
-            if (command.CommandText.Contains("registration_finalization_effects", StringComparison.OrdinalIgnoreCase) &&
-                command.CommandText.Contains("FOR UPDATE", StringComparison.OrdinalIgnoreCase))
-            {
-                commandStarted.TrySetResult();
-            }
-            return ValueTask.FromResult(result);
-        }
-
-        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
-            DbCommand command,
-            CommandEventData eventData,
-            InterceptionResult<int> result,
-            CancellationToken cancellationToken = default)
-        {
-            if (command.CommandText.Contains(
-                    "registration_finalization_effects",
-                    StringComparison.OrdinalIgnoreCase) &&
-                command.CommandText.Contains("FOR UPDATE", StringComparison.OrdinalIgnoreCase))
-            {
-                commandStarted.TrySetResult();
-            }
+            started.TrySetResult();
             return ValueTask.FromResult(result);
         }
     }

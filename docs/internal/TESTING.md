@@ -962,6 +962,14 @@ TDD is the default unless explicitly allowed to skip.
 
 ## Test Data And Fixtures
 
+The registration finalization/consent, PostgreSQL model-constraint, and location
+privacy/token-visibility fixtures bind container bootstrap passwords through
+`PostgresTestRoleBootstrap.ReadBootstrapPassword`. Inject the documented
+`DATABASE_MIGRATOR_PASSWORD` authority before running these native cases; missing
+or blank input fails before container creation. There is no default password or
+sibling-role fallback. Purpose-specific runtime logins remain separate from this
+bootstrap authority, and their ephemeral credentials must never appear in logs.
+
 - **Domain unit tests**: construct entities directly with valid state
 - **Application unit tests**: use in-memory fakes or builder patterns for repositories
 - **Integration tests**: use the real database with test containers or Docker infrastructure

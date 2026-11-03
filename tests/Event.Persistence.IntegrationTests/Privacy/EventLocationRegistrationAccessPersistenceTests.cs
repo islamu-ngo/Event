@@ -434,7 +434,7 @@ public sealed class RegistrationCoveragePostgreSqlFixture : IAsyncInitializer, I
         .WithImage("postgres:18-alpine")
         .WithDatabase("registration_coverage")
         .WithUsername("postgres")
-        .WithPassword("postgres")
+        .WithPassword(global::Event.Testing.PostgreSql.PostgresTestRoleBootstrap.ReadBootstrapPassword())
         .Build();
 
     public string ConnectionString => _container.GetConnectionString();

@@ -18,7 +18,7 @@ public sealed class PostgresModelConstraintApplierTests
         await using var database = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("constraint_applier_test")
             .WithUsername("postgres")
-            .WithPassword("postgres")
+            .WithPassword(global::Event.Testing.PostgreSql.PostgresTestRoleBootstrap.ReadBootstrapPassword())
             .Build();
         await database.StartAsync();
 

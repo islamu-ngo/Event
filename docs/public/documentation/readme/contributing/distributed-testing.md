@@ -95,12 +95,20 @@ prevent directory cleanup. If cleanup fails, retain the error and inspect the ex
 run ID before removing anything. A compilation or discovery pass alone is not
 evidence that the application became healthy.
 
-The assurance parent can encounter stopped, unrelated containers whose old
-named volumes no longer have a reported source path. Only explicitly empty
-sources on exited or dead foreign containers receive that treatment. Their
-volume names still block conflicting cleanup, and bind-path conflicts remain
+The assurance parent can encounter unrelated containers whose named volumes
+have no source path in Docker's runtime listing. An explicitly empty volume
+source is accepted for these containers in known Docker states. Their validated
+volume names still block conflicting cleanup, and overlapping bind paths remain
 errors. This does not qualify an owned mount or permit deleting unrelated
 containers; owned mounts still require exact source-path evidence.
+
+For owned containers, the parent checks detailed inspection when Docker's list
+response omits a named volume's source path. Inspection must match the same
+container, image and mount identities before supplying that path. Foreign bind
+consumers are checked using the runtime paths from complete listings, including
+stopped containers. Configured paths can differ on Docker Desktop. Failed or
+partial responses prevent cleanup; they never mean that no consumers exist.
+Do not prune unrelated containers to make the check pass.
 
 On startup failure, cancellation reaches the actual host and cleanup waits for
 its execution to finish. If execution cannot be observed or does not settle

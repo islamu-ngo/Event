@@ -60,6 +60,14 @@ malformed sources, live-container empty sources and owned empty sources remain
 rejected. All other mount-parser callers retain the strict canonical-source
 contract. Do not prune unrelated containers to make qualification pass.
 
+For a live container whose list response abbreviates a named-volume source,
+the parent obtains detailed inspection from the same selected daemon. The
+container ID, image ID and complete mount identity set must agree; only an
+explicitly empty volume source may be completed from that inspection. The
+strict configured-resource parser still requires the physical source, and
+foreign volume-name and bind-path conflicts remain disqualifying. Inspection
+never turns a foreign container into an owned resource.
+
 `ManagedCleanupChildTests.OwnedFixtureRemainsLiveUntilItsNativeOwnerStopsIt`
 is an explicit native diagnostic child, not an assurance journey. It starts
 the genuine Split fixture and remains pending until its owning native process
@@ -76,6 +84,13 @@ separately prove exclusive-resource cleanup and preservation of foreign
 consumers; merely observing the child's failure proves neither. Do not qualify
 modified child sources against a prior candidate or count this helper as a
 passing registered case.
+
+The parent diagnostic can select a separate clean checkout through
+`ISLAMU_NATIVE_CLEANUP_REPOSITORY` (an absolute repository path). This permits
+uncommitted parent regression work without representing dirty child inputs as
+the committed candidate. The selected checkout still passes the ordinary
+candidate, compiled-input and served-asset checks; the override grants no
+admission exception.
 
 Owning-assembly metadata is bounded to 32 MiB. The current native
 `Explore.Application.dll` contains 15,332,280 metadata bytes, so the former
@@ -108,6 +123,13 @@ Untagged-image cache sentinels (`<none>:<none>` in `RepoTags` and
 remain in the initial cache inventory. The same sentinel on multiple untagged
 images is not an alias conflict; wrong-field or malformed sentinel forms still
 fail closed.
+
+The fixture's native inspection parser stores container and image identities as
+bare 64-digit hexadecimal hashes. Managed container associations publish the
+image as a `sha256:` digest. Formatting belongs at that publication boundary;
+association equality compares the published digest. The regression composes
+the inspection parser with publication so a manually constructed identity cannot
+hide a mismatch. This composition check does not claim native resource cleanup.
 
 ## Load-process custody
 
@@ -229,6 +251,19 @@ awaits its actual execution if attachment fails. A task faulted with an
 is actually Canceled is accepted as completed cancellation.
 The testing facade's startup/stop tasks and lifecycle notification tokens alone
 are not used as proof that a pending hosted startup callback has finished.
+
+Volume-consumer checks read the selected Unix daemon's unfiltered
+`/v1.40/containers/json?all=true` runtime inventory. Container inspection can
+retain configured bind paths that differ from daemon runtime paths; it is not
+the consumer-location authority. Require HTTP 200 without Content-Range, disable
+redirects/cookies/proxy/tracing headers, and bound each response to 4 MiB. Parse two
+complete duplicate-free inventories, require equal exact container-ID sets, and
+retain the union of their consumers. A membership change permits one fresh
+attempt; failures remain attached if complete reobservation does not succeed.
+Volume names and canonical overlapping bind paths identify consumers regardless
+of whether they are running. The parent accepts explicitly empty foreign volume
+sources only with a known Docker state; owned sources still require the separate
+exact model/inspection join. Daemon errors do not prove resource absence.
 
 Current verification is incomplete: fresh Split and Standalone runs stop at
 `discovery_traversal_source_catalog_drift` during migration. The delayed

@@ -161,6 +161,9 @@ public static class PersistenceCapabilityAudit
                     IPropertyReferenceOperation property when property.Parent is IAssignmentOperation assignment
                         && ReferenceEquals(assignment.Target, property) => property.Property.OriginalDefinition,
                     IPropertyReferenceOperation property when property.Property.IsIndexer => property.Property.OriginalDefinition,
+                    IPropertyReferenceOperation property when property.Property.ContainingType.ToDisplayString()
+                        == "Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade" && property.Property.Name == "ProviderName"
+                        => property.Property.OriginalDefinition,
                     _ => null
                 };
                 if (target is null) continue;
@@ -221,6 +224,15 @@ public static class PersistenceCapabilityAudit
     private static bool IsRaw(ISymbol symbol)
     {
         string type = symbol.ContainingType?.ToDisplayString() ?? "";
+        string ns = symbol.ContainingNamespace?.ToDisplayString() ?? "";
+        if ((ns.StartsWith("Microsoft.EntityFrameworkCore.", StringComparison.Ordinal)
+             || ns.StartsWith("Npgsql.EntityFrameworkCore.", StringComparison.Ordinal)
+             || ns.StartsWith("Pomelo.EntityFrameworkCore.", StringComparison.Ordinal))
+            && ns.Split('.').Contains("Internal", StringComparer.Ordinal)) return true;
+        if (type == "Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade" && symbol.Name == "ProviderName") return true;
+        if (ns == "Microsoft.EntityFrameworkCore"
+            && (symbol.Name is "IsNpgsql" or "IsSqlite" or "IsSqlServer" or "IsMySql" or "IsMariaDb"
+                or "ToTable" or "HasColumnName" or "HasDatabaseName")) return true;
         if (type is "Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions"
             or "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions")
             return symbol.Name.StartsWith("ExecuteSql", StringComparison.Ordinal)

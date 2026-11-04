@@ -108,6 +108,32 @@ public sealed class PersistenceCapabilityAuditTests
     }
 
     [Test]
+    public async Task ProviderDetectionAndPhysicalMappingRequireExplicitStorageCapability()
+    {
+        const string source = """
+            using Microsoft.EntityFrameworkCore;
+            public sealed class Row { public int Id { get; set; } }
+            public static class Mapping {
+                public static void Configure(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<Row> entity,
+                    Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade database) {
+                    if (database.IsSqlite()) entity.ToTable("physical_rows");
+                }
+            }
+            """;
+        await Assert.That(Analyze(source).Count(value => value.Category == "persistence-unapproved")).IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task ProviderInternalTypesCannotHideBehindAlias()
+    {
+        const string source = """
+            using Detector = Microsoft.EntityFrameworkCore.Infrastructure.Internal.ConcurrencyDetector;
+            public static class InternalDependency { public static object Build() => new Detector(); }
+            """;
+        await Assert.That(Analyze(source).Any(value => value.Category == "persistence-unapproved")).IsTrue();
+    }
+
+    [Test]
     public async Task CommandTextAssignmentAndDelegateCaptureCannotHideBoundaries()
     {
         const string source = """

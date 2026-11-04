@@ -1916,6 +1916,13 @@ they never promote or retarget an existing request lease. Preliminary API
 tenant-routing reads finish in a disposed independent service scope before
 binding the request tenant.
 
+Moderation owners share `PostgresTenantSessionProbe` for the provider session
+read, passing the original EF transaction explicitly. It grants no authority:
+each caller retains its own frozen tenant, lease, provenance and completion
+checks. Absent tenant identity is accepted only by owners already admitting an
+instance scope. `PostgresTenantSessionInterceptor` remains responsible for
+connection binding, readiness and command identity checks.
+
 Migration-owned `SECURITY DEFINER` functions use fixed search paths and
 separate NOLOGIN owners, migration installers and execution groups. PUBLIC
 execution is revoked. API-key/scanner authentication exposes exact credential

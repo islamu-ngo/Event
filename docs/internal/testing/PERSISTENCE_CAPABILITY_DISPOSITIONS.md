@@ -27,6 +27,23 @@ native permissions, transaction correctness, performance or provider parity.
 Those remain responsibilities of the owning native suites and the final provider
 matrix; no historical test result is promoted into a new candidate's evidence.
 
+## Principal fact projections
+
+`HumanPrincipalSourceProjection` is the shared EF projection for selected
+identity-writer and portable principal-source reads. It retains deleted source
+candidates, subject-qualified cross-tenant facts and owner-list multiplicity.
+`IdentityWriterHumanSourceQueries` keeps the original execution-pair, transaction
+and Local lifecycle custody; the portable fence checks its captured transaction
+and selection before and after every query. Projection never selects a new
+identity context or grants authority.
+
+`AuthoritySourceInvariantTests` guards Application completion against changed
+human, tenant, grant and permission facts. `IdentityWriterHumanSourceQueryTests`
+and `HumanPrincipalSourceFenceTests` exercise actual SQLite projections and the
+ordinary co-located Local boundary. PostgreSQL source contracts remain live
+until their dependent source families and replacement permissions migrate;
+these SQLite cases do not qualify their retirement or other providers' locks.
+
 ## Workflow ownership
 
 Raw persistence diagnostics belong to the actual workflow owner and its complete

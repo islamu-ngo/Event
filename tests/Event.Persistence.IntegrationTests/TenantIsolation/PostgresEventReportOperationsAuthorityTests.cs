@@ -17,11 +17,14 @@ namespace Event.Persistence.IntegrationTests.TenantIsolation;
 public sealed class PostgresEventReportOperationsAuthorityTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
-    [Arguments(false, true, false)]
-    [Arguments(true, true, false)]
-    [Arguments(false, true, true)]
-    [Arguments(false, false, false)]
-    public async Task OperationalCountsIncludeBothTenantsWithoutChangingRequestLease(bool absentTenant, bool capability, bool softDeleted)
+    [Arguments(false, true, false, false, false)]
+    [Arguments(true, true, false, false, false)]
+    [Arguments(false, true, true, false, false)]
+    [Arguments(false, false, false, false, false)]
+    [Arguments(false, true, false, true, false)]
+    [Arguments(false, true, false, false, true)]
+    public async Task OperationalCountsIncludeBothTenantsWithoutChangingRequestLease(
+        bool absentTenant, bool capability, bool softDeleted, bool tamperPolicy, bool delegateRuntime)
     {
         await using var rows = await PostgresAuthenticationLookupAuthorityTests.AuthenticationRows.CreateAsync(fixture);
         DateTime cutoff = DateTime.UtcNow.AddMinutes(-10);
@@ -95,12 +98,38 @@ public sealed class PostgresEventReportOperationsAuthorityTests(PostgreSqlContai
             await rows.AssertOrdinaryRoleAsync(context);
             await Assert.That(await context.EventReportExternalLinks.IgnoreQueryFilters()
                 .AnyAsync(link => link.TenantId == rows.B)).IsFalse();
+            if (tamperPolicy || delegateRuntime)
+            {
+                await using var change = administration.CreateCommand();
+                change.CommandText = tamperPolicy
+                    ? $"ALTER POLICY report_operations_authority ON {table} USING (false)"
+                    : $"GRANT \"{PostgresEventReportOperationsContract.GlobalRole}\" TO \"{role}\" WITH INHERIT TRUE, SET FALSE";
+                await change.ExecuteNonQueryAsync();
+                await using var rejected = delegateRuntime
+                    ? rows.Context(rows.A)
+                    : await new GlobalExploreDbContextFactory(options).CreateDbContextAsync();
+                var unavailable = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                    await rejected.Database.OpenConnectionAsync());
+                await Assert.That(unavailable!.Message).IsEqualTo("postgres_tenant_runtime_authority_not_ready");
+                return;
+            }
             var factory = new GlobalExploreDbContextFactory(options);
             await using (var global = await factory.CreateDbContextAsync())
             {
                 var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
                     await global.EventReportExternalLinks.IgnoreQueryFilters().AsNoTracking().ToListAsync());
                 await Assert.That(denied!.SqlState).IsEqualTo("42501");
+                var providerContent = await Assert.ThrowsAsync<PostgresException>(async () =>
+                    await global.EventReportExternalLinks.IgnoreQueryFilters()
+                        .Select(link => link.ProviderUrl).ToListAsync());
+                await Assert.That(providerContent!.SqlState).IsEqualTo("42501");
+                var reporter = await Assert.ThrowsAsync<PostgresException>(async () =>
+                    await global.EventReports.IgnoreQueryFilters().Select(report => report.ReporterUserId).ToListAsync());
+                await Assert.That(reporter!.SqlState).IsEqualTo("42501");
+                var write = await Assert.ThrowsAsync<PostgresException>(async () =>
+                    await global.EventReportExternalLinks.IgnoreQueryFilters()
+                        .Where(link => link.ReportId == Guid.Empty).ExecuteDeleteAsync());
+                await Assert.That(write!.SqlState).IsEqualTo("42501");
                 await Assert.That(global.TenantContext).IsNull();
             }
             var repository = new EventReportOperationsRepository(factory);
@@ -124,8 +153,24 @@ public sealed class PostgresEventReportOperationsAuthorityTests(PostgreSqlContai
         }
         finally
         {
+            if (tamperPolicy)
+            {
+                await using var installer = fixture.CreateDbContext();
+                await PostgresEventReportOperationsContract.ApplyAsync(installer);
+            }
             using var pool = new NpgsqlConnection(PrimaryDatabaseConfiguration.BuildConnectionString(options).ConnectionString);
             NpgsqlConnection.ClearPool(pool);
+            await using var revoke = administration.CreateCommand();
+            revoke.CommandText = $"""
+                REVOKE SELECT ON {table}, {reportsTable} FROM "{role}";
+                REVOKE USAGE ON SCHEMA "{rows.Schema}" FROM "{globalRole}";
+                """;
+            if (capability)
+                revoke.CommandText += $"\nREVOKE \"{PostgresEventReportOperationsContract.GlobalRole}\" FROM \"{globalRole}\";";
+            if (delegateRuntime)
+                revoke.CommandText += $"\nREVOKE \"{PostgresEventReportOperationsContract.GlobalRole}\" FROM \"{role}\";";
+            revoke.CommandText += $"\nDROP ROLE \"{globalRole}\";";
+            await revoke.ExecuteNonQueryAsync();
             await using var cleanup = fixture.CreateDbContext();
             await cleanup.EventReportExternalLinks.IgnoreQueryFilters()
                 .Where(link => reportIds.Contains(link.ReportId)).ExecuteDeleteAsync();
@@ -135,15 +180,6 @@ public sealed class PostgresEventReportOperationsAuthorityTests(PostgreSqlContai
                 .DelimitIdentifier(root.GetTableName()!, root.GetSchema());
             string deleteEvents = $"DELETE FROM {rootTable} WHERE id = ANY({{0}})";
             await cleanup.Database.ExecuteSqlRawAsync(deleteEvents, [eventIds.ToArray()]);
-            await using var revoke = administration.CreateCommand();
-            revoke.CommandText = $"""
-                REVOKE SELECT ON {table}, {reportsTable} FROM "{role}";
-                REVOKE USAGE ON SCHEMA "{rows.Schema}" FROM "{globalRole}";
-                """;
-            if (capability)
-                revoke.CommandText += $"\nREVOKE \"{PostgresEventReportOperationsContract.GlobalRole}\" FROM \"{globalRole}\";";
-            revoke.CommandText += $"\nDROP ROLE \"{globalRole}\";";
-            await revoke.ExecuteNonQueryAsync();
         }
     }
 }

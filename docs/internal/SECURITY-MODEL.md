@@ -1946,6 +1946,28 @@ Missing privileges or stale policies reject admission rather than falling
 back to another credential source. These are PostgreSQL guarantees; other
 providers retain EF filters and their native relational constraints.
 
+### Application-owned domain discovery and report health reads
+
+`ManagedTenantDomainQuery` and `EventReportOperationsRepository` use EF queries
+through the independently selected Global pool. Migration-owned capability
+groups `event_managed_domain_global` and `event_report_operations_global`
+receive fixed column reads; neither receives writes, owner membership or an
+ability to change tenant identity. Domain discovery's SELECT policy exposes
+only `domains.tenant_subdomain` and `domains.tenant_custom_domain`. Report health
+reads expose link status/time/parent coordinates and parent deletion metadata,
+excluding report content. EF retains the parent soft-delete filter and the
+strictly-before timestamp predicate. These grants intentionally permit the
+selected application purpose to read that metadata across tenants; compromise
+of its Global credential has the same bounded read access.
+
+The installers retire `managed_tenant_domain_find` and
+`event_report_operations_count`, revoke their former owner's table rights and
+remove its migration-role membership. Runtime readiness recognizes only the
+matching stamped SELECT policies for the enrolled Global login. Ordinary
+Runtime sessions retain tenant RLS; missing capabilities remain denied.
+Quiesce these consumers, apply the migrator's storage contract, then restart
+the matching application. Runtime never repairs grants or policies.
+
 ## Ticketing Recovery Trust Boundary
 
 Ticketing recovery is deployment/operator authority, never request-body,

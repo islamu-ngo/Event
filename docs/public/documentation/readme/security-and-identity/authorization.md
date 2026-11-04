@@ -8,6 +8,22 @@ Authorization in ISLAMU Event determines *what* an authenticated identity is per
 
 ---
 
+## PostgreSQL Metadata Readers
+
+Managed-domain collision checks and report synchronization health use the
+configured Global database login. Provision only the capability groups required
+by the running consumers: `event_managed_domain_global` exposes the two domain
+settings, while `event_report_operations_global` exposes synchronization and
+parent-deletion metadata. Neither permits administrative writes or report-body
+reads. Request Runtime credentials retain their tenant boundaries.
+
+For this storage-contract upgrade, stop the participating consumers, run the
+selected Migrator, then restart the matching application. The migrator replaces
+the former privileged reader functions with fixed read grants and row policies.
+Do not run mixed application versions. Missing rights or changed policies leave
+the consumer unavailable; repair them through the migrator rather than granting
+superuser, BYPASSRLS or owner access to Runtime or Global logins.
+
 ## Authorization Pipeline Flow
 
 Every mutation and sensitive query passes through a multi-stage, fail-closed authorization pipeline before reaching business logic:

@@ -882,6 +882,36 @@ that bypasses a compile-time contract, and token assurance over product source
 or documentation. Compiled endpoint/type/EF metadata and parsed JSON, YAML,
 schema, and project artifacts remain valid assurance seams.
 
+The persistence mode resolves EF and ADO operations from evaluated compilations,
+including aliases, provider overrides, delegates and wrapper calls. Export each
+owning project with `PersistenceAuditInputs.targets` and the explicit
+`ExportPersistenceAuditInputs` target. That target rebuilds the project before
+marking its source-generator manifest ready; ordinary incremental builds cannot
+certify a missing generator export. Store the resulting JSON outside tracked
+source. For example, from the worktree root:
+
+```bash
+dotnet msbuild eng/tools/Explore.AssuranceAudit/Explore.AssuranceAudit.csproj \
+  -target:ExportPersistenceAuditInputs -property:Configuration=Release \
+  -property:EmitCompilerGeneratedFiles=true \
+  -property:CompilerGeneratedFilesOutputPath=obj/persistence-audit-generated \
+  -property:CustomAfterMicrosoftCommonTargets="$PWD/eng/tools/Explore.AssuranceAudit/PersistenceAuditInputs.targets" \
+  -getProperty:MSBuildProjectFullPath,AssemblyName,DefineConstants,LangVersion,AllowUnsafeBlocks,OutputType,EmitCompilerGeneratedFiles,CompilerGeneratedFilesOutputPath,PersistenceAuditExportReady \
+  -getItem:Compile,ReferencePath,PersistenceAuditGeneratedCompile -verbosity:quiet -nologo \
+  > "$TMPDIR/persistence-audit-inputs.json"
+dotnet eng/tools/Explore.AssuranceAudit/bin/Release/net10.0/Explore.AssuranceAudit.dll \
+  . --persistence eng/tools/Explore.AssuranceAudit/persistence-capabilities.json \
+  "$TMPDIR/persistence-audit-inputs.json"
+```
+
+Supply all relevant runtime and native-test compilations together. An allowed
+capability names its exact assembly and method, approved API declaration IDs,
+provider gap, identifier/parameter handling, and an actual TUnit test owner.
+Missing symbols, incomplete exports, stale grants and dynamic dispatch fail the
+audit. The initial policy grants no exceptions; this mode exposes inherited SQL
+workflows as violations while their replacement proceeds. Passing the tool's own
+compilation is an input-path check, not repository-wide persistence qualification.
+
 
 `Event.Architecture.Tests` enforces project-wide conventions through reflection-based tests. These are not optional — they are CI gates.
 

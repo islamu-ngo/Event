@@ -387,7 +387,9 @@ public sealed class SecurityExecutionEvidenceParentModelTests
     }
 
     [Test]
-    public async Task LiveChildPossessionCannotBeReplacedByCopiedBytesOrDifferentProcessInputs()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task LiveChildPossessionCannotBeReplacedByCopiedBytesOrDifferentProcessInputs(bool useAppHost)
     {
         if (!OperatingSystem.IsLinux()) return;
         using var fixture = new SecurityExecutionEvidenceProcessTests.ProcessFixture();
@@ -728,6 +730,8 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         using var launcherFixture = new SecurityExecutionEvidenceProcessTests.ProcessFixture();
         using var launcherCaller = new CancellationTokenSource(TimeSpan.FromSeconds(40));
         ProcessStartInfo launcherCommand = await launcherFixture.CommandAsync("managed-launcher");
+        if (useAppHost)
+            launcherCommand.Environment["ISLAMU_RELEASE_NATIVE_CHILD_APPHOST"] = "1";
         ProcessStartInfo unrelatedCommand = await launcherFixture.CommandAsync("managed-claim");
         string launcherTemporary = launcherCommand.WorkingDirectory;
         File.SetUnixFileMode(launcherTemporary, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
@@ -3444,6 +3448,13 @@ public sealed class SecurityExecutionEvidenceProcessTests
                     typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location,
                     [TestContext.Current!.Metadata.TestDetails.Identity.TestId], Path.Combine(root, "host-results"),
                     root, "managed-host.trx", 60);
+                if (Environment.GetEnvironmentVariable("ISLAMU_RELEASE_NATIVE_CHILD_APPHOST") == "1")
+                {
+                    string assembly = hosted.StartInfo.ArgumentList[0];
+                    hosted.StartInfo.FileName = Path.Combine(Path.GetDirectoryName(assembly)!,
+                        Path.GetFileNameWithoutExtension(assembly));
+                    hosted.StartInfo.ArgumentList.RemoveAt(0);
+                }
                 hosted.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CONTROL"] = "managed-host";
                 hosted.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_ROOT"] = root;
                 hosted.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CANARY"] = canary;

@@ -1528,8 +1528,8 @@ public static partial class SecurityExecutionEvidence
             }
             else
             {
-                actualEntry = Path.ChangeExtension(executable, ".dll");
-                if (Path.GetFileNameWithoutExtension(executable) != Path.GetFileNameWithoutExtension(expectedEntry)) return null;
+                actualEntry = executable + ".dll";
+                if (Path.GetFileName(executable) != Path.GetFileNameWithoutExtension(expectedEntry)) return null;
             }
             if (actualEntry != expectedEntry) return null;
             string[] primaryPaths = [expectedEntry, Path.ChangeExtension(expectedEntry, ".deps.json"),

@@ -174,6 +174,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
             .Concat(PostgresIntegrationSyncReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresEmailRetentionReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresEventResourceAuditReadPermissions.GlobalCatalogueRelations(context))
+            .Concat(PostgresEffectAggregateHealthReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresInventoryHoldExpiryReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresLocalizationSecretStatusReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresExternalApiKeyAuthenticationContract.GlobalCatalogueRelations(context))
@@ -186,6 +187,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
             PostgresIntegrationSyncReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresEmailRetentionReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresEventResourceAuditReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresEffectAggregateHealthReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresInventoryHoldExpiryReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresLocalizationSecretStatusReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresExternalApiKeyAuthenticationContract.CompleteGlobalCataloguePredicate(context, enrollment),

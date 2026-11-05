@@ -245,6 +245,7 @@ public static class ExploreDatabaseMigrator
         {
             await PostgresEmailRetentionReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresEventResourceAuditReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresEffectAggregateHealthReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresWebhookLocalDeliveryAdmissionContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresWebhookClaimEndpointStateContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresWebhookLocalDeliveryHealthContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);

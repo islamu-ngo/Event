@@ -1142,6 +1142,8 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IEmailDispatchOutboxRepository, EmailDispatchOutboxRepository>();
         services.AddScoped<IEmailDispatchAdmission, EmailDispatchAdmission>();
         services.AddScoped<IEmailDispatchHealthSnapshotReader, EmailDispatchHealthSnapshotReader>();
+        services.AddScoped<IIncomingWebhookEffectHealthReader, IncomingWebhookEffectHealthReader>();
+        services.AddScoped<IFairReturnOrchestrationHealthReader, FairReturnOrchestrationHealthReader>();
         services.AddScoped<INotificationFanoutAdmission, NotificationFanoutAdmission>();
         services.AddScoped<INotificationOutboxAdmission, NotificationOutboxAdmission>();
         services.AddScoped<INotificationOutboxExecutionAuthority, NotificationOutboxExecutionAuthority>();

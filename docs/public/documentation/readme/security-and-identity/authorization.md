@@ -365,6 +365,12 @@ administrator grant within its transaction, after the selected authorization
 provider allows the operation. Listing remains self-owned; an exact-key
 administrative read or mutation may target another administrator's key.
 
+Webhook-effect and fair-return readiness use separate Global aggregate readers.
+Their database rights cover only the status and timing fields needed for counts,
+not retained messages, effect ownership, or writes. Readiness rejects altered
+permissions or tenant-bound sessions rather than treating an unauthorized query
+as an empty queue.
+
 Authorization-provider readiness reads saved instance configuration through a
 separate read owner. Ordinary application connections retain their existing
 restrictions. Missing saved settings remain distinguishable from defaults, and

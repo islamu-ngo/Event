@@ -1984,6 +1984,16 @@ PostgreSQL instance/cluster without the obsolete capability roles. A new databas
 inside a cluster retaining those roles is insufficient because roles are cluster-wide.
 The application never automatically removes those objects or deletes data.
 
+Effect readiness uses independent Global aggregate observers rather than the
+tenant mutation repositories. PostgreSQL grants exactly status/retry/lease
+columns for incoming webhook effects and status/failure-code/creation-time
+columns for fair-return effects. EF computes the aggregates; no new routine owns
+the workflow. Paired SELECT policies require the original Global login with an
+empty tenant session, while forced tenant RLS and its fingerprint remain intact.
+The complete Global application catalogue includes both relations and their
+exact non-grantable column ACLs. Added table rights, inherited authority, changed
+policies or a tenant-bound session reject readiness instead of returning zero.
+
 Authorization-provider observation uses `IInstanceSystemSettingsReader`, which
 owns an independent Global context and the existing ordinary-settings read
 primitive. It returns only requested detached stored rows; it does not merge

@@ -15,7 +15,7 @@ internal sealed class FleetHealthInstallationSql(
     string diagnosticPrefix)
 {
     // Valid before first grants: this check does not depend on the routine or dedicated roles.
-    internal string SourceGuard(string tables) => $"""
+    internal string SourceGuard(string tables, string declaredGlobalRead = "false") => $"""
         IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles role
             WHERE role.rolname = {Text(enrollment.GlobalLogin)} AND role.rolcanlogin
                 AND NOT role.rolsuper AND NOT role.rolbypassrls AND NOT role.rolcreatedb
@@ -32,8 +32,8 @@ internal sealed class FleetHealthInstallationSql(
                     OR (pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)}, relation.oid,
                         'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                         OR {PostgresPrivilegeGuard.MaintainPrivilegeSql(Text(enrollment.GlobalLogin), "relation.oid", false)})
-                    OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)}, relation.oid,
-                        'SELECT,INSERT,UPDATE,REFERENCES'))) THEN
+                    OR (pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)}, relation.oid,
+                        'SELECT,INSERT,UPDATE,REFERENCES') AND NOT ({declaredGlobalRead})))) THEN
             RAISE EXCEPTION '{diagnosticPrefix}_sources_not_ready' USING ERRCODE = '55000';
         END IF;
         """;

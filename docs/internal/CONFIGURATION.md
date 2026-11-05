@@ -321,6 +321,10 @@ is required. See the [operator procedure](../public/self-hosting/operator-identi
 
 ## Environment Variables & Secrets Authority
 
+The default database schema does not require a special tenant configuration for
+migration. `ExploreDatabaseMigrator` binds its own absent-tenant execution lease;
+changing `Database:Schema` is not a remedy for a missing migration lease.
+
 The authoritative reference catalogue of all deployment, identity, database, and integration environment variables is maintained in the **public documentation**:
 
 👉 **[Environment Variables Reference (Public Documentation)](../public/documentation/readme/configuration-and-operations/environment-variables.md)**

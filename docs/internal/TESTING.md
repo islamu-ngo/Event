@@ -468,6 +468,14 @@ dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTest
 
 ### Multi-provider database verification
 
+`PostgresMigrationAuthorityIsolationTests.CanonicalMigrationOwnsItsExecutionLeaseWithoutBindingTheCaller`
+uses a fresh PostgreSQL cluster with the fixture's declared accounts and selected
+credentials to exercise native installation with an unbound caller. This avoids
+the general fixture's extra grants. It requires migration completion, unchanged
+selected migrator identity and an empty, still-unbound caller context. A second
+database in the fixture's cluster is not equivalent: native roles have an exact
+database ownership contract, so that probes a different refusal.
+
 The CI database matrix uses real engines for migration/runtime evidence; the
 provider-model tests alone are not portability proof.
 

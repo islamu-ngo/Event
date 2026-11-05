@@ -47,8 +47,9 @@ queue identifiers or payloads. The function owner has only the predicate-column
 reads required for these counts and purpose-specific RLS policies; the Global
 executor has no direct table reads or writes. Routine ACL checks run during
 installation and invocation. Other providers retain the existing count predicates.
-The application migrator installs the function; operators separately enroll the
-configured Global login in the health executor group, not its owner or migrator.
+The canonical application migrator installs the function and enrolls the
+configured Global login in its health executor group with inheritance enabled
+and SET/ADMIN disabled. It does not enroll the serving login as owner or migrator.
 This contract does not attest every other capability sharing the Global pool.
 
 ## Tenant deletion reservation and owner

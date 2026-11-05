@@ -397,6 +397,13 @@ the BFF reads Google at `/runtime/bff/oidc/google` and Keycloak at
 use the corresponding documented deployment inputs. There is no fallback to
 another authority when the selected one fails.
 
+Public Keycloak endpoint, realm and client ID metadata may be present while
+Local Identity is selected. Without a confidential-client secret, that metadata
+leaves optional Keycloak sign-in unconfigured and does not block BFF or Standalone
+startup. Once a secret is supplied, its complete metadata group is required.
+Blank values, unresolved placeholders and failures in the selected secret
+authority still block startup; they never trigger credential fallback.
+
 Settings and onboarding show deployment-owned readiness metadata rather than a
 password field. The API never returns client-secret values, and submitting a
 removed secret field to ordinary authentication PATCH is rejected. The retired

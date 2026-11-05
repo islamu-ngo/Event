@@ -445,6 +445,10 @@ active tenants enable ingestion. Tenant overrides and instance locks remain
 authoritative; reading readiness does not promote the background caller's
 database permissions.
 
+Readiness continues to check current database privileges on every observation.
+Reusing generated validation text reduces repeated construction work without
+reusing earlier authorization decisions.
+
 Creation reveals a secret only in its initial successful response. Recovery
 returns digest-bound metadata, never a stored secret or credential hash.
 Historical reports include inactive tenants and instance-scoped keys but do not

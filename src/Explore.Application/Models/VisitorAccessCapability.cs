@@ -43,7 +43,8 @@ public sealed record VisitorAccessCapability
 
     public VisitorAccessMode Mode { get; }
     public bool AllowsNewNativeAllocation => Mode != VisitorAccessMode.DirectoryListingOnly;
-    public bool AllowsAnonymousParticipation => AllowsNewNativeAllocation;
+    public bool AllowsAnonymousParticipation =>
+        Mode is VisitorAccessMode.FullRegistrationAndAuth or VisitorAccessMode.AnonymousOnly;
     public bool AllowsAccountRequiredParticipation =>
         Mode == VisitorAccessMode.FullRegistrationAndAuth && !SignupDestinations.IsEmpty;
     public bool AllowsExistingAccountLogin { get; }

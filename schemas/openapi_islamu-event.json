@@ -221083,7 +221083,8 @@
         "enum": [
           "FullRegistrationAndAuth",
           "AnonymousOnly",
-          "DirectoryListingOnly"
+          "DirectoryListingOnly",
+          "AuthenticatedOnly"
         ],
         "type": "string"
       },

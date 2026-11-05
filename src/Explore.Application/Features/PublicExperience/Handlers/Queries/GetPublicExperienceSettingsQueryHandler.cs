@@ -40,6 +40,7 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
     private readonly IInstanceOperatorIdentityReadinessEvaluator _instanceOperatorReadiness;
     private readonly IVisitorAccessCapabilityResolver _visitorAccessCapabilityResolver;
     private readonly IAiProviderCapabilityResolver _aiCapabilityResolver;
+    private readonly IVisitorTenantReadAccessPolicy _visitorRead;
 
     public GetPublicExperienceSettingsQueryHandler(
         ITenantContext tenantContext,
@@ -58,7 +59,8 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
         IInstanceOperatorIdentityReadinessEvaluator instanceOperatorReadiness,
         IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver,
         ITenantLifecycleAccessService lifecycle,
-        IAiProviderCapabilityResolver aiCapabilityResolver)
+        IAiProviderCapabilityResolver aiCapabilityResolver,
+        IVisitorTenantReadAccessPolicy visitorRead)
     {
         _lifecycle = lifecycle;
         _tenantContext = tenantContext;
@@ -77,6 +79,7 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
         _instanceOperatorReadiness = instanceOperatorReadiness;
         _visitorAccessCapabilityResolver = visitorAccessCapabilityResolver;
         _aiCapabilityResolver = aiCapabilityResolver;
+        _visitorRead = visitorRead;
     }
 
     public async Task<PublicExperienceSettingsDto> QueryAsync(GetPublicExperienceSettingsQuery query, CancellationToken cancellationToken)
@@ -92,6 +95,7 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
             };
         }
 
+        await _visitorRead.RequireAsync(tenantId, cancellationToken);
         TenantDirectoryOperatorReadinessAssessment directoryAssessment =
             await _directoryOperatorReadiness.EvaluateAsync(
                 tenantId,

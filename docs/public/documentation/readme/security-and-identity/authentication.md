@@ -48,13 +48,32 @@ for the five supported states.
 
 ## Authentication In Native API Documentation
 
+An active community can require authentication for browsing with visitor mode
+`AuthenticatedOnly`. Public modes continue to allow visitors to browse without
+an account. Authentication is not approval of membership: event, organization
+and other resource permissions still apply after sign-in.
+
+The server enforces this requirement for direct API reads, discovery, exports,
+public images and MCP, including previously cached responses. An anonymous
+request receives an uncached 401 response; a temporary policy failure receives
+503 rather than public content. Sign-in, setup and individually authorized
+recovery/callback operations keep their own narrowly scoped authority.
+Federation cannot newly publish a private community's content merely because its
+worker is signed in.
+
+Changes take effect at the next read-admission check. A request admitted before
+the change may finish, and content downloaded while public cannot be recalled.
+Do not roll back to software that ignores a configured private mode; stop serving
+and restore compatible software or forward-fix the deployment.
+
 Protected operations in the native OpenAPI document advertise JWT bearer
 authentication (`Authorization: Bearer <token>`) or an external API key
 (`X-API-Key`) as alternatives, including when Keycloak is not configured.
 Bearer tokens can come from the deployment's supported identity providers;
 the documentation does not imply that Local Identity requires a Keycloak server.
 Configured Keycloak authorization metadata adds the existing OAuth option.
-Anonymous operations remain public, while purpose-bound credentials such as
+Anonymous operation metadata permits public-community access; the current tenant
+privacy policy still applies. Purpose-bound credentials such as
 erasure receipts and admission-scanner capabilities keep their separate schemes.
 An advertised credential does not bypass tenant, scope, or resource permission
 checks.

@@ -6,6 +6,7 @@
     <Compile Include="..\Shared\AssuranceOwnershipContext.cs" Link="Fixtures\AssuranceOwnershipContext.cs" />
     <Compile Include="..\Shared\Authorization\ProviderNeutralCorpus.cs" Link="Authorization\ProviderNeutralCorpus.cs" />
     <Compile Include="..\Shared\Settings\SmtpSettingsDatabase.cs" Link="Settings\SmtpSettingsDatabase.cs" />
+    <Compile Include="..\Shared\Settings\VisitorReadPolicyTestAuthority.cs" Link="Settings\VisitorReadPolicyTestAuthority.cs" />
     <Compile Include="..\Shared\ExternalDataProtectionTestAuthority.cs" Link="Fixtures\ExternalDataProtectionTestAuthority.cs" />
     <Compile Include="..\Shared\SecretKitHttpAuthority.cs" Link="Fixtures\SecretKitHttpAuthority.cs" />
     <Using Include="Event.Testing.Secrets" />

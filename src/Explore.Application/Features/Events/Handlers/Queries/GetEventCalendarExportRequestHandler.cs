@@ -8,16 +8,20 @@ namespace Explore.Application.Features.Events.Handlers.Queries;
 
 public sealed class GetEventCalendarExportRequestHandler(
     IModerationPublicEventCalendarRepository repository, ITenantContext tenant,
-    IEventLocationDisclosureService locations, TimeProvider clock)
+    IEventLocationDisclosureService locations, TimeProvider clock,
+    IVisitorTenantReadAccessPolicy visitorReadAccess)
     : IQueryHandler<GetEventCalendarExportRequest, PublicEventCalendarProjection?>
 {
-    public Task<PublicEventCalendarProjection?> QueryAsync(
+    public async Task<PublicEventCalendarProjection?> QueryAsync(
         GetEventCalendarExportRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
-        PublicEventCalendarProjection? projection = request.EventId == Guid.Empty || tenant.TenantId == Guid.Empty
-            ? null : new(repository, new(tenant.TenantId, request.EventId), locations, clock, cancellationToken);
-        return Task.FromResult(projection);
+        var tenantId = tenant.TenantId;
+        if (request.EventId == Guid.Empty || tenantId == Guid.Empty)
+            return null;
+
+        await visitorReadAccess.RequireAsync(tenantId, cancellationToken);
+        return new(repository, new(tenantId, request.EventId), locations, clock, cancellationToken);
     }
 }

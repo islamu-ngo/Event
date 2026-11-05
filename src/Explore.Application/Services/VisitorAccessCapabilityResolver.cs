@@ -1,12 +1,12 @@
 
 using System.Collections.Immutable;
-using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Domain.Services;
 
 namespace Explore.Application.Services;
 
@@ -54,31 +54,8 @@ public sealed class VisitorAccessCapabilityResolver(
 
     /// <summary>Resolves scalar mode inheritance for current or complete proposed native settings.</summary>
     public static VisitorAccessMode ResolveMode(SystemSetting? instanceSetting, TenantSetting? tenantSetting)
-    {
-        string? raw = instanceSetting?.IsLocked == true
-            ? instanceSetting.Value
-            : tenantSetting?.Value ?? instanceSetting?.Value;
-        if (raw is null)
-        {
-            return VisitorAccessMode.FullRegistrationAndAuth;
-        }
-
-        string? value;
-        try
-        {
-            value = JsonSerializer.Deserialize<string>(raw);
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidOperationException("The persisted visitor access mode is invalid.", exception);
-        }
-
-        return Enum.TryParse(value, out VisitorAccessMode mode)
-               && Enum.IsDefined(mode)
-               && string.Equals(mode.ToString(), value, StringComparison.Ordinal)
-            ? mode
-            : throw new InvalidOperationException("The persisted visitor access mode is invalid.");
-    }
+        => VisitorReadPolicy.ResolveMode(instanceSetting?.Value, instanceSetting?.IsLocked == true,
+            tenantSetting?.Value);
 
     public VisitorAccessCapability Evaluate(VisitorAccessPolicyState proposedState) => EvaluateProposedState(proposedState);
 

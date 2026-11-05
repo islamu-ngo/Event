@@ -26,10 +26,7 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
             return;
         }
 
-        var mcp = mcpOptions.Value;
-        bool tenantSurface = context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
-            || mcp.Enabled && !string.IsNullOrWhiteSpace(mcp.EndpointPath)
-                && context.Request.Path.StartsWithSegments(mcp.EndpointPath, StringComparison.OrdinalIgnoreCase);
+        bool tenantSurface = ApiTenantResolutionMiddleware.IsTenantSurface(context, mcpOptions.Value);
         bool privateSessionRead = IsPrivateAdministratorSessionRead(context.GetEndpoint());
         if (privateSessionRead && !tenantContext.IsResolved)
         {

@@ -183,7 +183,8 @@ public sealed class PublicEventCalendarProjectionTests
         var tenant = Substitute.For<ITenantContext>();
         tenant.TenantId.Returns(owner.Lease.Event.TenantId);
         return await new GetEventCalendarExportRequestHandler(owner, tenant,
-            locations ?? Substitute.For<IEventLocationDisclosureService>(), clock ?? new Clock())
+            locations ?? Substitute.For<IEventLocationDisclosureService>(), clock ?? new Clock(),
+            new Event.Testing.Settings.VisitorReadPolicyTestAuthority(tenant.TenantId).Policy)
             .QueryAsync(new(owner.Lease.Event.Id), CancellationToken.None);
     }
 

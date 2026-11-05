@@ -941,6 +941,16 @@ fleet convergence from an Admin response. See the public
 
 ### 3.4. HATEOAS Link Authorization
 
+Tenant read privacy is evaluated separately from HAL and participation.
+`VisitorTenantReadAccessPolicy` resolves the inherited current visitor mode;
+`AuthenticatedOnly` admits validated authentication without claiming approved
+membership. Existing resource authorization still applies. HTTP checks precede
+cached/conditional replay, while native readers invoke the same policy directly.
+Machine-public federation uses its anonymous decision even for an authenticated
+worker. Invalid or unavailable policy cannot become a public default. See
+[visitor read admission](MULTI_TENANCY.md#visitor-read-admission) for transport,
+bootstrap, cache and admission-timing contracts.
+
 The API uses a Hypermedia as the Engine of Application State (HATEOAS) model. HAL `_links` are the browser/client source of truth for action availability; Blazor and other clients must not recreate action gates from roles, claims, or cached local state.
 
 Visitor participation adds a capability condition, not a new permission or an

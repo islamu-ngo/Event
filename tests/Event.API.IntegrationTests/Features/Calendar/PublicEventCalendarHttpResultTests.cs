@@ -168,7 +168,9 @@ public sealed class PublicEventCalendarHttpResultTests
         var tenant = Substitute.For<ITenantContext>();
         tenant.TenantId.Returns(owner.Lease.Event.TenantId);
         var projection = await new GetEventCalendarExportRequestHandler(owner, tenant,
-            Substitute.For<IEventLocationDisclosureService>(), clock).QueryAsync(new(owner.Lease.Event.Id), CancellationToken.None);
+            Substitute.For<IEventLocationDisclosureService>(), clock,
+            new Event.Testing.Settings.VisitorReadPolicyTestAuthority(tenant.TenantId).Policy)
+            .QueryAsync(new(owner.Lease.Event.Id), CancellationToken.None);
         var urls = Substitute.For<IPublicUrlBuilder>();
         urls.GetEventUrl(owner.Lease.Event.Id).Returns($"https://example.invalid/events/{owner.Lease.Event.Id:D}");
         return new(projection!, builder, urls, _ => new StatusCodeResult(StatusCodes.Status503ServiceUnavailable));

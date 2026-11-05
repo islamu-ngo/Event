@@ -4,6 +4,29 @@ description: Operate Local Identity, Keycloak, or passwordless AT Protocol authe
 
 # Authentication Architecture
 
+In Split deployments, AppHost preserves the public Keycloak endpoint, realm and
+client ID it supplies to the browser host. Public metadata alone leaves the
+optional confidential client unconfigured; a configured client secret still
+requires a complete, valid credential group. No database permission changes are
+needed for this startup projection.
+
+API JWT refresh reads saved public provider metadata through a separate
+configuration reader. It does not need permission to read confidential-client
+bindings. Deployment-managed settings retain precedence, and a new signing-key
+configuration replaces the current one only after metadata retrieval succeeds.
+
+The browser host also obtains public tenant-routing configuration through the
+API's independent settings reader. Saved routing values and existing defaults
+remain authoritative; this bootstrap read requires no administrator credential
+or direct settings-table access for the ordinary API database identity.
+
+Private health and metrics checks support dual-stack listeners that represent
+IPv4 addresses in mapped IPv6 form. The physical address and port must still
+match the declared private listener; forwarded headers do not grant access.
+Private health and metrics probes stay on that listener without following a
+redirect to the public HTTPS endpoint. Ordinary public requests retain HTTPS
+redirection, and public listeners cannot serve the operational responses.
+
 Each deployment has exactly one **primary authentication provider**:
 
 * **Local Identity** uses ASP.NET Core Identity inside ISLAMU Event. It is the

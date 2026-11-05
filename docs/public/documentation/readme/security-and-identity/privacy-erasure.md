@@ -81,6 +81,73 @@ its provider identity resembles an erased account. Preserve the retained
 authority and supported backup horizon; a fresh signup does not bypass an
 invalid restore or an unavailable authority.
 
+## Embedded Authority Upgrades
+
+The embedded SQLite authority upgrade adds missing recovery coordinates while
+retaining the erasure ledger and its retained floor. Use the application's
+migration service with SQLite 3.42 or newer, and preserve matched backups before
+upgrading. Downgrading this schema removes its recovery identity and counters;
+use the documented recovery procedure instead of downgrading an adopted store.
+
+## Enrollment State Consistency
+
+Erasure-state checks during enrollment now observe that enrollment's own
+transaction. This prevents a check from waiting on its own write lock or
+seeing an older counter. Failed enrollment still rolls back its changes;
+no timeout, retry setting or replica-exclusion control is relaxed.
+
+## Standalone Recognition Ownership
+
+Standalone SQLite recognition requires one writer and a lifetime-exclusive
+lock on its primary database. Normal Linux lock contention is recognized as
+proof that another owner is excluded; other file errors prevent recognition
+from qualifying the store.
+Stop all writers before restoring or replacing the database file.
+
+## PostgreSQL Contract Refresh
+
+The mixed-settings checks used during PostgreSQL erasure now resolve their
+fixed routine inventory independently of the catalog rows being inspected.
+The ownership and privilege checks remain in place. Use the normal migration
+and startup sequence to refresh these native contracts; no credential,
+permission, timeout or retained-ledger change is required.
+
+Recognition erasure checks that its protected subject exists without loading
+the private profile. It uses its existing narrow database permissions; do not
+grant private-table read access to make this existence check succeed.
+
+Newly qualified recognition material is inserted with its original identifiers
+before its receipt can complete. Existing completed material is not regenerated;
+pending requests continue through the existing reconciliation flow. No schema,
+key, permission or retention-setting change is required.
+Binding a newly appended fact checks its exact retained record and the original
+settlement deadline. It can finish while replay is still behind that new fact;
+this does not admit capture from a stale restore or extend a pending deadline.
+If an acknowledgement is lost, recovery verifies the observed fact against the
+retained store before finishing its original primary binding. Missing retention
+or conflicting evidence is a refusal, not permission to create replacement proof.
+Recovery also refuses missing original key obligations. If recognition is no
+longer required, it completes the original request without creating new material.
+When a returning account qualifies for recognition, tenant enrollment can save
+that binding while the retained capture remains hidden from ordinary tenant
+queries. Qualification expires at its original deadline and belongs to the same
+account binding and database transaction; copied or altered bindings must qualify
+again. No broader database role or tenant-read permission is required.
+
+## Recognition Expiry Completion
+
+Scheduled recognition expiry, where retained material exists, runs once under
+the retained authority gate and its original primary-store ownership. A failed
+or uncertain commit is not a successful expiry pass and is not automatically
+replayed. Independent stores do not form one atomic transaction; preserve the
+retained authority when investigating an uncertain result. This introduces no
+new key, retry setting or moderation permission.
+
+Recognition key maintenance and material pruning follow the same rule: a lost
+commit acknowledgement does not trigger an automatic second attempt. Expiry of
+an already-purged receipt uses only its primary store and can still complete
+when the external erasure authority is unavailable.
+
 ## Reserved Future Moderation Keys
 
 `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and
@@ -117,6 +184,38 @@ The Privacy Erasure Authority store must be configured in your environment via `
 > - **We recommend `ExternalDatabase`** only for enterprise multi-node clusters running multiple API replicas that cannot share a local SQLite file.
 
 ---
+
+## Primary UserPii Revision Default
+
+Apply `DeclareUserPiiBirthDateRevisionDefault` through the normal selected
+migration service before traffic. Its four provider catalogs cover all five
+supported primary engines; MySQL and MariaDB share a catalog. The default is the
+initial revision number `0`, not a default birth date or verified-age claim.
+Existing private values and revision numbers are preserved.
+
+PostgreSQL startup still rejects model/storage default drift. Do not bypass that
+check, grant broader application permissions or change schemas as a workaround.
+The generated downgrade removes the default rather than deleting personal data;
+any rollback must use a matched application/schema version and the normal
+backup/restore procedure.
+
+## PostgreSQL Co-Located Authority Upgrade
+
+For PostgreSQL installations using `CoLocated`, the
+`20261031102545_RestoreCoLocatedAuthorityRecoveryCoordinates` migration adds the
+missing authority recovery coordinates required by the current application.
+The migration initializes existing authority rows with positive revision and
+recovery-generation counters and a generated store identity. It preserves
+existing erasure facts. Run the normal selected migration service before
+allowing application traffic; do not add these columns manually or bypass
+pending-model validation.
+
+Take matched primary and authority backups before upgrading. Downgrading this
+migration drops the recovery coordinates and store identity, so it cannot
+preserve the recovery history established after adoption. Use the
+[Backup, Restore & Upgrade](../configuration-and-operations/backup-restore-upgrade.md)
+procedure for recovery instead of applying a live downgrade. This correction
+does not change the other authority storage topologies.
 
 ## The Golden Rule of Disaster Recovery
 

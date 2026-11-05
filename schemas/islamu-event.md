@@ -3814,8 +3814,11 @@ Table "privacy_erasure_authority"."authority_counter" {
   "singleton" boolean [pk, not null]
   "last_sequence" bigint [not null]
   "retained_floor_sequence" bigint [not null, default: 0]
+  "recovery_generation" bigint [not null, default: 1]
+  "revision" bigint [not null, default: 1]
+  "store_id" uuid [not null, default: `uuidv7()`]
 
-  Note: 'Singleton sequence allocator and durable compaction floor for typed platform privacy-erasure facts. Checks require 0 <= retained_floor_sequence <= last_sequence. The selected topology migration owns this table.'
+  Note: 'Singleton sequence allocator and durable compaction floor for typed platform privacy-erasure facts. Checks require 0 <= retained_floor_sequence <= last_sequence, positive recovery_generation/revision and UUIDv7 store identity. Revision is an application concurrency token. The selected topology migration owns this table; PostgreSQL CoLocated recovery coordinates are restored by generated migration 20261031102545. Embedded SQLite RestoreEmbeddedAuthorityRecoveryCoordinates initializes missing revision/generation to 1 and store identity through native UUIDv7 defaults, preserving explicit domain values. Downgrade drops those coordinates and is not data-preserving.'
 }
 
 Table "privacy_erasure_authority"."erasure_intents" {
@@ -4090,7 +4093,7 @@ Table "user_pii" {
   "last_name" varchar(500) [not null]
   "date_of_birth" date [note: 'Private optional declaration, never verified age evidence or an ordinary user DTO field']
   "birth_date_collection_receipt_id" uuid [note: 'Current provenance pointer, intentionally not a retention-preserving FK']
-  "birth_date_revision" bigint [not null, note: 'Application-managed correction/clear concurrency token']
+  "birth_date_revision" bigint [not null, default: 0, note: 'Application-managed correction/clear concurrency token; zero is the initial revision, not a birth-date or age declaration']
 
   indexes {
     email [unique]

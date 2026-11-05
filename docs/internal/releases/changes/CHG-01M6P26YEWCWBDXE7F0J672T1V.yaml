@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6P26YEWCWBDXE7F0J672T1V
+Title: "Enroll Global operational health reads during canonical migration"
+Type: fix
+Scope: observability
+Summary: "Supply existing queue-drain and location-review aggregate capabilities and verify native operational consumers after fresh canonical migration."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Existing aggregate purposes expose bounded health counts without private-table reads or role switching."
+  Migration:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Canonical migration enrolls the configured Global login for queue-drain and location-review aggregates, independently of shared-fixture membership."
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: "Operational reads use their fixed Global capabilities; ordinary Runtime credentials remain restricted."

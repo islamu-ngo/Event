@@ -172,8 +172,11 @@ public static partial class PostgresMixedSettingsContract
     {
         var sql = new HumanPrincipalSourceSql(context);
         string roles = string.Join(",", Roles.Select(Text));
-        string routineIds = string.Join(",", Routines.Select(routine =>
-            $"pg_catalog.to_regprocedure({Text(FunctionSql(context, routine.Name) + "(" + routine.Signature + ")")})"));
+        // Keep fixed signature resolution uncorrelated with scanned catalog rows.
+        string routineIds = "SELECT pg_catalog.to_regprocedure(signature) FROM (VALUES "
+            + string.Join(",", Routines.Select(routine =>
+                $"({Text(FunctionSql(context, routine.Name) + "(" + routine.Signature + ")")})"))
+            + ") expected(signature)";
         string routines = string.Join("\n", Routines.Select(routine => $"""
             IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc f
                 WHERE f.oid = pg_catalog.to_regprocedure({Text(FunctionSql(context, routine.Name) + "(" + routine.Signature + ")")})

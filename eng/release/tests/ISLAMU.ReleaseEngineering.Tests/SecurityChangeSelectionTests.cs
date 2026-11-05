@@ -114,6 +114,68 @@ public sealed class SecurityChangeSelectionTests
         }
     }
 
+    [Test]
+    [Arguments("configurator/definitions/settings.yaml")]
+    [Arguments("tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/settings.json")]
+    [Arguments("src/Explore.Blazor.Client/Services/SetupLive/SetupService.cs")]
+    [Arguments("tests/Explore.Blazor.Client.Tests/SetupLive/SetupTests.cs")]
+    [Arguments("src/Event.Wire.Contracts/SetupLive/SetupRequest.cs")]
+    [Arguments("src/Explore.Domain/SetupLive/SetupState.cs")]
+    [Arguments("src/Explore.Application/ApplicationServicesRegistration.cs")]
+    [Arguments("src/Explore.Application/Contracts/SetupLive/ISetupService.cs")]
+    [Arguments("src/Explore.Application/Contracts/Persistence/ISetupLiveRepository.cs")]
+    [Arguments("src/Explore.Application/Contracts/Infrastructure/ISetupSecretBindingReadinessReader.cs")]
+    [Arguments("src/Explore.Application/Contracts/Secrets/ISetupSecretBindingWriter.cs")]
+    [Arguments("src/Explore.Application/Contracts/Secrets/ISetupSecretBindingCommitBarrier.cs")]
+    [Arguments("src/Explore.Application/Features/SetupLive/SetupCommand.cs")]
+    [Arguments("src/Explore.Application/Telemetry/SetupLiveTelemetry.cs")]
+    [Arguments("src/Explore.Persistence/PersistenceServicesRegistration.cs")]
+    [Arguments("src/Explore.Persistence/ExploreDbContext.DbSets.cs")]
+    [Arguments("src/Explore.Persistence/ExploreDbContext.QueryFilters.cs")]
+    [Arguments("src/Explore.Persistence/Configurations/Entities/SetupLiveConfigurations.cs")]
+    [Arguments("src/Explore.Persistence/Repositories/SetupLiveRepository.cs")]
+    [Arguments("src/Explore.Persistence/RelationalSetupSecretBindingOperationCoordinator.cs")]
+    [Arguments("src/Explore.Persistence/Migrations/20260101000000_AddSetupLivePersistence.cs")]
+    [Arguments("src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs")]
+    [Arguments("src/Explore.Persistence.Migrations.MySql/Migrations/20260101000000_AddSetupLivePersistence.cs")]
+    [Arguments("src/Explore.Persistence.Migrations.MySql/Migrations/ExploreDbContextModelSnapshot.cs")]
+    [Arguments("src/Explore.Persistence.Migrations.SqlServer/Migrations/20260101000000_AddSetupLivePersistence.cs")]
+    [Arguments("src/Explore.Persistence.Migrations.SqlServer/Migrations/ExploreDbContextModelSnapshot.cs")]
+    [Arguments("src/Explore.Persistence.Migrations.Sqlite/Migrations/20260101000000_AddSetupLivePersistence.cs")]
+    [Arguments("src/Explore.Persistence.Migrations.Sqlite/Migrations/ExploreDbContextModelSnapshot.cs")]
+    [Arguments("src/Explore.Infrastructure/Secrets/SetupSecret.cs")]
+    [Arguments("src/Explore.ServiceDefaults/Secrets/SetupSecret.cs")]
+    [Arguments("src/Explore.Infrastructure/InfrastructureServicesRegistration.cs")]
+    [Arguments("src/Explore.Infrastructure/Services/SetupSecretProvider.cs")]
+    [Arguments("src/Explore.API/Controllers/SetupTargetEnrollmentsController.cs")]
+    [Arguments("src/Explore.API/OpenApi/SetupLiveRequestBodyTransformer.cs")]
+    [Arguments("src/Explore.Blazor.Client/Clients/EventApiClients.cs")]
+    [Arguments("src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs")]
+    [Arguments("tests/Event.API.IntegrationTests/Features/SetupLiveTests.cs")]
+    public async Task SetupLiveInputsSelectArchitectureAndSerialSetupLanes(string path)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"setup-selection-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string file = Path.Combine(directory, "changed-paths.txt");
+            await File.WriteAllTextAsync(file, path);
+            using var output = new StringWriter();
+            await Assert.That(Program.Run(["select-build-test-changes", file], output)).IsEqualTo(Program.Success);
+            string[] lines = output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+            await Assert.That(lines.Length).IsEqualTo(7);
+            Dictionary<string, string> decisions = lines.Select(line => line.Split('='))
+                .ToDictionary(parts => parts[0], parts => parts[1]);
+            await Assert.That(decisions["run-tests"]).IsEqualTo("true");
+            await Assert.That(decisions["run-architecture-tests"]).IsEqualTo("true");
+            await Assert.That(decisions["run-setup-tests"]).IsEqualTo("true");
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static async Task AssertBuildCommand(string[] arguments, string expectedLanes)
     {
         using var output = new StringWriter();

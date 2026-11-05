@@ -10,6 +10,7 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
@@ -1039,10 +1040,11 @@ public sealed partial class EmailDispatchOutboxTransitionRepositoryTests(Postgre
     }
 
     [Test]
-    public async Task GetRabbitMqPublishBatchReturnsDueUnpausedRowsOnly()
+    public async Task PointerPublicationBatchReturnsDueUnpausedRowsOnly()
     {
         await fixture.ResetAsync();
         await using var context = fixture.CreateDbContext();
+        context.BindTenantLease();
         var activeTenant = await SeedTenantAsync(context, "rabbitmq-active");
         var pausedTenant = await SeedTenantAsync(context, "rabbitmq-paused");
         var now = DateTime.UtcNow;
@@ -1062,19 +1064,111 @@ public sealed partial class EmailDispatchOutboxTransitionRepositoryTests(Postgre
             UpdatedAt = now
         });
         await context.SaveChangesAsync();
-        var repository = new EmailDispatchOutboxRepository(context);
+        var store = new EmailDispatchPointerPublicationStore(
+            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)),
+            fixture.NativeQueueEnrollment);
 
-        IReadOnlyList<EmailDispatchOutbox> rows = await repository.GetRabbitMqPublishBatch(
+        IReadOnlyList<EmailDispatchPointerCandidate> rows = await store.GetPublishBatchAsync(
             10,
             now,
             now.AddSeconds(-30),
             CancellationToken.None);
 
-        await Assert.That(rows.Select(row => row.Id)).IsEquivalentTo([eligible.Id]);
-        await Assert.That(rows.Select(row => row.Id)).DoesNotContain(throttled.Id);
-        await Assert.That(rows.Select(row => row.Id)).DoesNotContain(deferred.Id);
-        await Assert.That(rows.Select(row => row.Id)).DoesNotContain(sent.Id);
-        await Assert.That(rows.Select(row => row.Id)).DoesNotContain(paused.Id);
+        await Assert.That(rows.Select(row => row.OutboxId)).IsEquivalentTo([eligible.Id]);
+        await Assert.That(rows.Select(row => row.OutboxId)).DoesNotContain(throttled.Id);
+        await Assert.That(rows.Select(row => row.OutboxId)).DoesNotContain(deferred.Id);
+        await Assert.That(rows.Select(row => row.OutboxId)).DoesNotContain(sent.Id);
+        await Assert.That(rows.Select(row => row.OutboxId)).DoesNotContain(paused.Id);
+        await Assert.That(rows.Single().Pointer.TenantId).IsEqualTo(activeTenant.Id);
+        await Assert.That(rows.Single().Pointer.PublishEventId).IsEqualTo(eligible.PublishEventId);
+    }
+
+    [Test]
+    public async Task PointerPublicationHonorsGlobalPauseAndExcludesRedactedAndDeletedRowsAfterResume()
+    {
+        await fixture.ResetAsync();
+        await using var context = fixture.CreateDbContext();
+        context.BindTenantLease();
+        var tenant = await SeedTenantAsync(context, "pointer-pause");
+        var eligible = await SeedDispatchAsync(context, tenant.Id, EmailDispatchStatus.Pending);
+        var redacted = await SeedDispatchAsync(context, tenant.Id, EmailDispatchStatus.Pending);
+        var deleted = await SeedDispatchAsync(context, tenant.Id, EmailDispatchStatus.Pending);
+        var now = AtPostgresPrecision(DateTime.UtcNow);
+        redacted.RecipientEmail = string.Empty;
+        redacted.Subject = string.Empty;
+        redacted.PlainTextBody = null;
+        redacted.HtmlBody = null;
+        redacted.ContentRedactedAt = now;
+        deleted.IsDeleted = true;
+        deleted.DeletedAt = now;
+        await context.SaveChangesAsync();
+        var repository = new EmailDispatchOutboxRepository(context);
+        await repository.SetProcessorPauseState(true, "publication pause", null, now, CancellationToken.None);
+        var store = new EmailDispatchPointerPublicationStore(
+            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)),
+            fixture.NativeQueueEnrollment);
+
+        var paused = await store.GetPublishBatchAsync(10, now, now, CancellationToken.None);
+
+        await Assert.That(paused).IsEmpty();
+
+        await repository.SetProcessorPauseState(false, null, null, now.AddSeconds(1), CancellationToken.None);
+        var resumed = await store.GetPublishBatchAsync(10, now.AddSeconds(1), now, CancellationToken.None);
+
+        await Assert.That(resumed.Select(candidate => candidate.OutboxId)).IsEquivalentTo([eligible.Id]);
+        await Assert.That(resumed.Select(candidate => candidate.OutboxId)).DoesNotContain(redacted.Id);
+        await Assert.That(resumed.Select(candidate => candidate.OutboxId)).DoesNotContain(deleted.Id);
+        await Assert.That(resumed.Single().Pointer.TenantId).IsEqualTo(tenant.Id);
+        await Assert.That(resumed.Single().Pointer.PublishEventId).IsEqualTo(eligible.PublishEventId);
+    }
+
+    [Test]
+    public async Task PointerPublicationMarkersCannotMutateDispatchAfterNativeSmtpClaim()
+    {
+        await fixture.ResetAsync();
+        await using var context = fixture.CreateDbContext();
+        context.BindTenantLease();
+        var tenant = await SeedTenantAsync(context, "pointer-smtp-claim");
+        var dispatch = await SeedDispatchAsync(context, tenant.Id, EmailDispatchStatus.Pending);
+        var now = AtPostgresPrecision(DateTime.UtcNow);
+        var store = new EmailDispatchPointerPublicationStore(
+            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)),
+            fixture.NativeQueueEnrollment);
+        var candidate = (await store.GetPublishBatchAsync(10, now, now, CancellationToken.None)).Single();
+        await Assert.That(candidate.OutboxId).IsEqualTo(dispatch.Id);
+        var repository = new EmailDispatchOutboxRepository(context);
+        var leaseToken = Guid.CreateVersion7();
+
+        await Assert.That(await ClaimSpecificAsync(repository, dispatch, leaseToken, now)).IsNotNull();
+        var claimed = await context.EmailDispatchOutbox.IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(row => row.Id == dispatch.Id);
+        await Assert.That(claimed.Status).IsEqualTo(EmailDispatchStatus.Processing);
+        await Assert.That(claimed.ProcessingLeaseToken).IsEqualTo(leaseToken);
+        await Assert.That(claimed.AttemptCount).IsEqualTo(0);
+
+        foreach (bool succeeded in new[] { true, false })
+        {
+            if (succeeded)
+            {
+                await store.MarkPublishSucceededAsync(candidate, now.AddSeconds(1), CancellationToken.None);
+            }
+            else
+            {
+                await store.MarkPublishFailedAsync(candidate, "mandatory_return", now.AddSeconds(2), CancellationToken.None);
+            }
+
+            var persisted = await context.EmailDispatchOutbox.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(row => row.Id == dispatch.Id);
+            await Assert.That(persisted.Status).IsEqualTo(claimed.Status);
+            await Assert.That(persisted.ProcessingLeaseToken).IsEqualTo(claimed.ProcessingLeaseToken);
+            await Assert.That(persisted.ProcessingStartedAt).IsEqualTo(claimed.ProcessingStartedAt);
+            await Assert.That(persisted.AttemptCount).IsEqualTo(claimed.AttemptCount);
+            await Assert.That(persisted.RabbitMqPublishAttemptCount).IsEqualTo(claimed.RabbitMqPublishAttemptCount);
+            await Assert.That(persisted.RabbitMqLastPublishedAt).IsEqualTo(claimed.RabbitMqLastPublishedAt);
+            await Assert.That(persisted.RabbitMqLastPublishAttemptAt).IsEqualTo(claimed.RabbitMqLastPublishAttemptAt);
+            await Assert.That(persisted.RabbitMqLastPublishFailureCategory).IsEqualTo(claimed.RabbitMqLastPublishFailureCategory);
+            await Assert.That(persisted.UpdatedAt).IsEqualTo(claimed.UpdatedAt);
+        }
     }
 
     [Test]
@@ -1082,15 +1176,26 @@ public sealed partial class EmailDispatchOutboxTransitionRepositoryTests(Postgre
     {
         await fixture.ResetAsync();
         await using var context = fixture.CreateDbContext();
+        context.BindTenantLease();
         var tenant = await SeedTenantAsync(context, "rabbitmq-markers");
         var success = await SeedDispatchAsync(context, tenant.Id, EmailDispatchStatus.Pending);
         var failure = await SeedDispatchAsync(context, tenant.Id, EmailDispatchStatus.Pending);
-        var repository = new EmailDispatchOutboxRepository(context);
+        var store = new EmailDispatchPointerPublicationStore(
+            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)),
+            fixture.NativeQueueEnrollment);
         var publishedAt = DateTime.UtcNow.AddMinutes(-2);
         var failedAt = DateTime.UtcNow;
 
-        await repository.MarkRabbitMqPublishSucceeded(success.Id, publishedAt, CancellationToken.None);
-        await repository.MarkRabbitMqPublishFailed(failure.Id, "mandatory_return", failedAt, CancellationToken.None);
+        var candidates = await store.GetPublishBatchAsync(10, failedAt, failedAt, CancellationToken.None);
+        await store.MarkPublishSucceededAsync(
+            candidates.Single(candidate => candidate.OutboxId == success.Id),
+            publishedAt,
+            CancellationToken.None);
+        await store.MarkPublishFailedAsync(
+            candidates.Single(candidate => candidate.OutboxId == failure.Id),
+            "mandatory_return",
+            failedAt,
+            CancellationToken.None);
 
         var rows = await context.EmailDispatchOutbox
             .IgnoreQueryFilters()
@@ -1645,7 +1750,7 @@ public sealed partial class EmailDispatchOutboxTransitionRepositoryTests(Postgre
     {
         var tenant = new Tenant
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             FullName = $"Email Dispatch {slugPrefix}",
             Slug = $"email-dispatch-{slugPrefix}-{Guid.NewGuid().ToString("N")[..8]}",
             TenantStatusId = (int)TenantStatusEnum.Active,

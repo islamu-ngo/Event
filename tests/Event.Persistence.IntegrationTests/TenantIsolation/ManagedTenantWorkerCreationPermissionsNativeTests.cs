@@ -363,7 +363,7 @@ public sealed partial class ManagedTenantWorkerCreationPermissionsNativeTests
         return ManagedTenantWorkerCreationInventory.Sources.Select(source => names.Table(source.Entity)).Distinct(StringComparer.Ordinal).ToArray();
     }
 
-    private static async Task EnsurePolicyProjectionAsync(ExploreDbContext migrator)
+    internal static async Task EnsurePolicyProjectionAsync(ExploreDbContext migrator)
     {
         var model = migrator.GetService<IDesignTimeModel>().Model;
         var entity = model.FindEntityType(typeof(ManagedTenantProvisioningPolicySetting))

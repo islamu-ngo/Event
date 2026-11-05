@@ -372,12 +372,7 @@ public sealed partial class ModerationNoticeReadRepository(
 
     private async Task<bool> ProviderTenantMatchesAsync(Guid tenantId, CancellationToken token)
     {
-        if (context.Database.ProviderName != RelationalNamedLock.PostgreSqlProvider) return true;
-        await using var command = context.Database.GetDbConnection().CreateCommand();
-        command.Transaction = context.Database.CurrentTransaction?.GetDbTransaction();
-        command.CommandText = "SELECT current_setting('app.current_tenant_id', true)";
-        return await command.ExecuteScalarAsync(token) is string value
-            && Guid.TryParse(value, out var current) && current == tenantId;
+        return await PostgresTenantSessionProbe.MatchesAsync(context, context.Database.CurrentTransaction, tenantId, token);
     }
 
     private sealed record QualifiedEntry(ModerationNoticeReadEntry Entry, DateTimeOffset ValidUntil);

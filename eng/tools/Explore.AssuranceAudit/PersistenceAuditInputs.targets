@@ -1,0 +1,15 @@
+<Project>
+  <Target Name="PreparePersistenceAuditInputs" BeforeTargets="CoreCompile">
+    <Error Condition="'$(EmitCompilerGeneratedFiles)' != 'true' Or '$(CompilerGeneratedFilesOutputPath)' == ''"
+           Text="Persistence audit requires emitted compiler-generated files and an explicit project-local output directory." />
+    <MakeDir Directories="$(CompilerGeneratedFilesOutputPath)" />
+  </Target>
+  <Target Name="ExportPersistenceAuditInputs" DependsOnTargets="Rebuild">
+    <ItemGroup>
+      <PersistenceAuditGeneratedCompile Include="$(CompilerGeneratedFilesOutputPath)/**/*.cs" />
+    </ItemGroup>
+    <PropertyGroup>
+      <PersistenceAuditExportReady>true</PersistenceAuditExportReady>
+    </PropertyGroup>
+  </Target>
+</Project>

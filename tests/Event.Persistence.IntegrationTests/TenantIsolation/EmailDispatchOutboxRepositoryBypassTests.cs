@@ -3,7 +3,9 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using TUnit.Core;
 
@@ -18,6 +20,7 @@ public class EmailDispatchOutboxRepositoryBypassTests(PostgreSqlContainerFixture
     {
         await fixture.ResetAsync();
         await using var seedContext = fixture.CreateDbContext();
+        seedContext.BindTenantLease();
 
         var tenantA = CreateTenant("email-worker-a");
         var tenantB = CreateTenant("email-worker-b");
@@ -41,13 +44,17 @@ public class EmailDispatchOutboxRepositoryBypassTests(PostgreSqlContainerFixture
         await seedContext.SaveChangesAsync();
 
         await using var tenantBContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantB.Id));
+        tenantBContext.BindTenantLease();
         var visibleWithoutBypass = await tenantBContext.EmailDispatchOutbox
             .AsNoTracking()
             .Select(dispatch => dispatch.Id)
             .ToListAsync();
 
         var repository = new EmailDispatchOutboxRepository(tenantBContext);
-        var rabbitMqBatch = await repository.GetRabbitMqPublishBatch(
+        var publicationStore = new EmailDispatchPointerPublicationStore(
+            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)),
+            fixture.NativeQueueEnrollment);
+        var rabbitMqBatch = await publicationStore.GetPublishBatchAsync(
             10,
             now,
             retryAttemptsBefore,
@@ -61,6 +68,7 @@ public class EmailDispatchOutboxRepositoryBypassTests(PostgreSqlContainerFixture
             CancellationToken.None);
 
         await using var verifyContext = fixture.CreateDbContext();
+        verifyContext.BindTenantLease();
         var rows = await verifyContext.EmailDispatchOutbox
             .AsNoTracking()
             .Where(dispatch => dispatch.Id == eligible.Id
@@ -72,8 +80,11 @@ public class EmailDispatchOutboxRepositoryBypassTests(PostgreSqlContainerFixture
             .ToDictionaryAsync(dispatch => dispatch.Id);
 
         await Assert.That(visibleWithoutBypass).IsEquivalentTo([ambientPaused.Id]);
-        await Assert.That(rabbitMqBatch.Select(dispatch => dispatch.Id))
+        await Assert.That(rabbitMqBatch.Select(candidate => candidate.OutboxId))
             .IsEquivalentTo([eligible.Id, retryDue.Id]);
+        await Assert.That(rabbitMqBatch.All(candidate => candidate.Pointer.TenantId == tenantA.Id)).IsTrue();
+        await Assert.That(rabbitMqBatch.Single(candidate => candidate.OutboxId == eligible.Id).Pointer.PublishEventId)
+            .IsEqualTo(eligible.PublishEventId);
 
         await Assert.That(claimed).IsNotNull();
         await Assert.That(futureClaimed).IsNull();

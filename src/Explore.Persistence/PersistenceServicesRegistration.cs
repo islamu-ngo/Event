@@ -1090,6 +1090,7 @@ public static class PersistenceServicesRegistration
                 provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
                 provider.GetService<PostgresNativeQueueEnrollment>()));
         services.AddScoped<IInstanceTenantSettingsReader, InstanceTenantSettingsReader>();
+        services.AddScoped<IInstanceSystemSettingsReader, InstanceSystemSettingsReader>();
         services.AddScoped<HumanSettingsDataBoundary>();
         services.AddScoped<ICoordinatedSettingMutationStore, CoordinatedSettingMutationRepository>();
         services.AddScoped<IOrdinarySettingsMutationStore, OrdinarySettingsMutationStore>();
@@ -1141,6 +1142,9 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IEmailDispatchOutboxRepository, EmailDispatchOutboxRepository>();
         services.AddScoped<IEmailDispatchAdmission, EmailDispatchAdmission>();
         services.AddScoped<IEmailDispatchHealthSnapshotReader, EmailDispatchHealthSnapshotReader>();
+        services.AddScoped<IEmailDispatchPointerPublicationStore, EmailDispatchPointerPublicationStore>();
+        services.AddScoped<IIncomingWebhookEffectHealthReader, IncomingWebhookEffectHealthReader>();
+        services.AddScoped<IFairReturnOrchestrationHealthReader, FairReturnOrchestrationHealthReader>();
         services.AddScoped<INotificationFanoutAdmission, NotificationFanoutAdmission>();
         services.AddScoped<INotificationOutboxAdmission, NotificationOutboxAdmission>();
         services.AddScoped<INotificationOutboxExecutionAuthority, NotificationOutboxExecutionAuthority>();

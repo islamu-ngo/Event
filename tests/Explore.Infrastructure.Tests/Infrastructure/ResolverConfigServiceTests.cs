@@ -12,12 +12,12 @@ public sealed class ResolverConfigServiceTests
     [Test]
     public async Task GetConfigurationAsync_WhenCachedResultIsMutated_ReturnsAnIsolatedDto()
     {
-        var repository = Substitute.For<ISystemSettingRepository>();
-        repository.GetByKey(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns((SystemSetting?)null);
+        var reader = Substitute.For<IInstanceSystemSettingsReader>();
+        reader.ReadAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<SystemSetting>());
         using var cache = new MemoryCache(new MemoryCacheOptions());
         using var services = new ServiceCollection().BuildServiceProvider();
-        var service = new ResolverConfigService(repository, cache, services);
+        var service = new ResolverConfigService(reader, cache, services);
 
         var first = await service.GetConfigurationAsync();
         first.PathPrefix = "/mutated";

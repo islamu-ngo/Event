@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 If startup fails and cleanup also reports an error, both failures are retained. Diagnose the startup error as well as the cleanup error; a cleanup failure does not replace the original startup failure. No configuration change or data reset is required for this behavior.
 
+If PostgreSQL migration in the default schema reports `tenant_lease_not_bound`
+during policy installation, use the corrected migration process with the existing
+migrator credentials and schema. The migrator owns the required execution lease;
+no tenant identifier or new configuration key is needed. Do not switch the API
+to the migrator account, change schemas as a workaround, or bypass lease guards.
+
 Setup Live enrollment and write receipts require the Runtime storage permissions
 installed by the current database migration process. If an enrollment request
 fails with PostgreSQL permission error `42501`, apply the updated migration

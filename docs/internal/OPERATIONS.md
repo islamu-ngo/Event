@@ -13,6 +13,15 @@ A workflow correction on a PR branch does not replace the trusted-base version
 used by `pull_request_target`; arrange an independently reviewed base update
 before relying on its rerun.
 
+## Native browser prerequisites
+
+For native browser prerequisite failures, first distinguish installer restore
+from browser download and launch. The installer has a dedicated, committed
+locked dependency graph; preserve the other tools' shared lock. See
+[security fixture prerequisites](CI_CD_GOVERNANCE.md#security-integration-fixture-execution).
+Keep provisioning diagnostics private and do not substitute successful
+installation for actual owned browser-case results.
+
 ## Human administrator commit fences
 
 Tenant API-key revoke/details now acquire original S/P/H and repeat their existing
@@ -2237,6 +2246,21 @@ structured YAML with specialist proposals, concrete invariant-breaker tests,
 weighted votes, and no unresolved critical finding. Architecture evidence
 contracts validate structured fields, executable behavior, and sentinel values
 rather than source text, prose, or prompt wording.
+
+The assurance daemon handler sets `ActivityHeadersPropagator` to `null` so
+controller activity headers and baggage do not cross the privileged Unix API.
+Caller activity and application tracing remain enabled. Diagnose transport
+failure before child launch separately from workload or cleanup failure; retain
+the bounded failure step and original exception, not raw headers or payloads.
+
+Before bounded native acquisition, establish actual engine readiness with a
+separate bounded read-only uncached inventory request on the selected socket.
+Docker Desktop may answer version/info/container requests from cache while the
+VM is stopped. Record startup/readiness separately; do not increase the
+asynchronous client's five-second request or three-second connection budgets.
+See [engine readiness](testing/DISTRIBUTED_ASSURANCE.md#engine-readiness-before-bounded-daemon-exchanges).
+Do not replay a DELETE whose response was lost: retain uncertainty and inspect
+the original resource.
 
 For multiple classes, place parenthesized alternatives inside the class segment:
 `/*/*/(EmailDeliveryGraphRevisionTests*)|(EventResourceStorageCleanupTests*)/*`.

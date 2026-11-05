@@ -1,0 +1,39 @@
+Change-Id: CHG-01M69HQX8X8V9148CE3DRBFHF8
+Title: Settle owned load descendants after parent or controller exit
+Type: fix
+Scope: testing
+Summary: >-
+  Give load and version probes a dedicated native process owner so parent exit,
+  session changes and controller cancellation cannot produce successful evidence
+  while descendants or inherited output pipes remain live.
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/testing/DISTRIBUTED_ASSURANCE.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Exclusive subreaping reserves child lifetimes before pidfd acquisition.
+      Descriptor-only termination preserves foreign processes, and completion
+      requires kernel ECHILD and actual output EOF. Primary and cleanup failures
+      remain reportable during startup, deadline expiry and controller exit.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/contributing/distributed-testing.md
+    Disposition: documented
+    Detail: >-
+      Build the distributed test project to stage the owner executable and its
+      runtime files. Linux x64 native facilities are required. Allow the separate
+      ten-second cleanup budget; killing the owner with SIGKILL is outside its
+      guarantee. Lifecycle tests do not qualify capacity or distributed lanes.

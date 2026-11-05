@@ -449,7 +449,7 @@ public sealed partial class ModerationPolicyPublicationTests
 
         public static async Task<RecognitionKeyScenario> CreateAsync(bool initialize = true)
         {
-            var database = await Database.CreateAsync();
+            var database = await Database.CreateAsync(physicalFile: true);
             var path = Path.Combine(Path.GetTempPath(), $"recognition-lifecycle-{Guid.CreateVersion7():N}.db");
             var connection = new SqliteConnection(new SqliteConnectionStringBuilder
             { DataSource = path, Pooling = false }.ToString());
@@ -457,9 +457,19 @@ public sealed partial class ModerationPolicyPublicationTests
             await using (var source = database.Context())
                 ((SqliteConnection)source.Database.GetDbConnection()).BackupDatabase(connection);
             var saveObserver = new RecognitionLifecycleSaveObserver();
-            var options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(connection)
-                .UseSnakeCaseNamingConvention().AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance, saveObserver);
-            var context = new ExploreDbContext(options.Options) { TenantContext = database };
+            var options = TestDbContextOptions.Create<ExploreDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
+            {
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Role = PrimaryDatabaseRole.Global,
+                Database = path
+            });
+            options.UseSqlite(connection).UseSnakeCaseNamingConvention()
+                .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance, saveObserver);
+            var context = new ExploreDbContext(options.Options);
+            context.BindTenantLease();
+            await Assert.That(context.TenantFilterTenantId).IsNull();
+            await Assert.That(context.IsTenantFilterBypassed).IsFalse();
             var clock = new DeploymentClock();
             var retained = await RecognitionAuthorityDatabase.CreateAsync(clock);
             var scenario = new RecognitionKeyScenario(database, path, connection, context, retained, clock, saveObserver);
@@ -514,6 +524,19 @@ public sealed partial class ModerationPolicyPublicationTests
 
         public async Task<KeyCapture> CaptureAsync(TimeSpan? retention = null)
         {
+            var options = TestDbContextOptions.Create<ExploreDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
+            {
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Role = PrimaryDatabaseRole.Runtime,
+                Database = path
+            });
+            options.UseSqlite(connection).UseSnakeCaseNamingConvention()
+                .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance);
+            await using var publicationContext = new ExploreDbContext(options.Options) { TenantContext = database };
+            publicationContext.BindTenantLease();
+            await Assert.That(publicationContext.TenantFilterTenantId).IsEqualTo(database.TenantId);
+            await Assert.That(Context.TenantFilterTenantId).IsNull();
             var request = database.Request();
             request = request with
             {
@@ -524,14 +547,14 @@ public sealed partial class ModerationPolicyPublicationTests
                 { Recognition = ModerationReferenceRecognition.SeparatelyQualifiedFinalAction }]
                 }
             };
-            var (admin, machine) = DeploymentIdentity(Context, database.AdminId);
-            var publications = new ModerationPolicyPublicationRepository(Context, admin, machine, database.Inventory, null, Clock);
+            var (admin, machine) = DeploymentIdentity(publicationContext, database.AdminId);
+            var publications = new ModerationPolicyPublicationRepository(publicationContext, admin, machine, database.Inventory, null, Clock);
             if ((await publications.PrepareAsync(request, Now.AddDays(10))).Outcome != ModerationPolicyPublicationOutcome.Known)
                 throw new InvalidOperationException("Native lifecycle source policy preparation failed.");
             var privacy = Guid.CreateVersion7();
             var recovery = Guid.CreateVersion7();
             var subject = Guid.CreateVersion7();
-            var role = await Context.Roles.SingleAsync(row =>
+            var role = await publicationContext.Roles.SingleAsync(row =>
                 row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
             foreach (var id in new[] { privacy, recovery, subject })
             {
@@ -541,17 +564,17 @@ public sealed partial class ModerationPolicyPublicationTests
                     Pii = new UserPii
                     { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Lifecycle", LastName = "Witness" }
                 };
-                Context.Users.Add(user);
-                if (id != subject) Context.PlatformUserRoles.Add(new PlatformUserRole
+                publicationContext.Users.Add(user);
+                if (id != subject) publicationContext.PlatformUserRoles.Add(new PlatformUserRole
                 { Id = Guid.CreateVersion7(), UserId = id, User = user, RoleId = role.Id, Role = role });
             }
-            await Context.SaveChangesAsync();
-            Context.ChangeTracker.Clear();
+            await publicationContext.SaveChangesAsync();
+            publicationContext.ChangeTracker.Clear();
             ModerationQualificationRepository Writer(Guid human)
             {
-                var actor = DeploymentIdentity(Context, human);
-                return new(Context, actor.Admin, actor.Machine, publications,
-                    new ModerationNativeActivationQualification(Context, database.Inventory, null, null, Clock),
+                var actor = DeploymentIdentity(publicationContext, human);
+                return new(publicationContext, actor.Admin, actor.Machine, publications,
+                    new ModerationNativeActivationQualification(publicationContext, database.Inventory, null, null, Clock),
                     Clock, Retained.Repository, deploymentInventory: database.Inventory);
             }
             var sourceRequest = new RecordModerationRecognitionPrivacySource
@@ -596,7 +619,8 @@ public sealed partial class ModerationPolicyPublicationTests
                 ValidUntil = Now.AddDays(7)
             })).Outcome != ModerationQualificationWriteOutcome.Known)
                 throw new InvalidOperationException("Native lifecycle original source was not adopted.");
-            var source = await Context.Set<ModerationRecognitionPrivacySource>().Include(row => row.Retention)
+            publicationContext.ModerationTrustDomainId = Trust;
+            var source = await publicationContext.Set<ModerationRecognitionPrivacySource>().Include(row => row.Retention)
                 .AsNoTracking().SingleAsync(row => row.Id == sourceRequest.SourceId);
             var instance = database.Scope.Parent!;
             var decision = ModerationDecision.Propose(Guid.CreateVersion7(), Guid.CreateVersion7(),

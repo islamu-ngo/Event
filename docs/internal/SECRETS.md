@@ -43,6 +43,14 @@ authentication inputs from process environment, never application JSON or
 vault-returned configuration. User Secrets remains a separately selected local
 authority rather than an Infisical bootstrap fallback.
 
+`MigrationDatabaseAcquisition` retains the complete alias map for null masks but
+excludes `Database:LocalIdentityWriter:Password` and
+`IdentityDatabase:LocalIdentityWriter:Password` from acquisition. It still acquires
+those roles' usernames for enrollment. Canonical and environment password aliases
+remain masked when this projection overlays lower-priority host configuration.
+An explicitly empty required migrator credential still rejects acquisition
+rather than selecting another alias.
+
 Native entrypoints require `SecretProvider:Infisical:TokenLifetime` to be
 `Finite` or `Periodic`. Periodic additionally requires `TokenPeriodSeconds` equal
 to the login's reported expiration; finite rejects that field. The native owner
@@ -477,6 +485,14 @@ claim. Configured Local bootstrap additionally resolves
 `authentication.local.bootstrap_password` from
 `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` (Infisical `/api/bootstrap` or `/api`); it is instance-only,
 bootstrap-classified and has no live-rotation path or source default.
+
+`SecretResolver.ResolveBindingAsync` resolves every `IsBootstrapSecret` definition
+through its registry reference before querying binding storage. Bootstrap
+credentials must remain available before persistence is ready; persisted binding
+metadata cannot redirect them. Resolution still uses only the selected authority
+and rejects material after its owner retires. Ordinary runtime secrets retain the
+tenant-to-instance binding hierarchy. This boundary requires no Runtime grant on
+`secret_bindings`.
 
 That secret creates only the initial temporary credential during incomplete
 setup. The native receipt coordinates Identity creation with application

@@ -10,6 +10,28 @@ public sealed class RuntimeSecretEnvironmentTests
     private static readonly SecretAcquisitionEntry[] Entries = SecretDefinitionRegistry.All.Values.Select(definition =>
         new SecretAcquisitionEntry(definition.DefaultInfisicalPath,
             definition.DefaultInfisicalKey, definition.DefaultEnvironmentVariableName)).ToArray();
+
+    [Test]
+    [Arguments(SecretConsumerRole.Bff)]
+    [Arguments(SecretConsumerRole.Combined)]
+    public async Task NativeKeycloakPublicMetadataSurvivesWithoutOptionalClientCredential(
+        SecretConsumerRole consumer)
+    {
+        var metadata = new Dictionary<string, object>
+        {
+            ["KEYCLOAK_ENDPOINT"] = "http://127.0.0.1:18080/auth",
+            ["KEYCLOAK_REALM"] = "assurance",
+            ["KEYCLOAK_CLIENT_ID"] = "assurance-browser"
+        };
+        var target = new Dictionary<string, object>(metadata);
+        RuntimeSecretEnvironment.Apply(target, Configuration(new()), [], consumer,
+            SecretAuthorityKind.Environment, Entries);
+
+        foreach (var entry in metadata)
+            await Assert.That(target[entry.Key]).IsEqualTo(entry.Value);
+        await Assert.That(target.ContainsKey("KEYCLOAK_BLAZOR_CLIENT_SECRET")).IsFalse();
+    }
+
     [Test]
     [Arguments(SecretConsumerRole.Api)]
     [Arguments(SecretConsumerRole.Bff)]
@@ -193,7 +215,7 @@ public sealed class RuntimeSecretEnvironmentTests
         [
             "DATABASE_RUNTIME_USERNAME", "DATABASE_GLOBAL_USERNAME", "DATABASE_MIGRATOR_USERNAME",
             "DATABASE_INSTANCE_KEY_READ_USERNAME", "DATABASE_INSTANCE_KEY_WRITE_USERNAME",
-            "DATABASE_PLATFORM_KEY_REPORT_USERNAME",
+            "DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME", "DATABASE_PLATFORM_KEY_REPORT_USERNAME",
             "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME", "DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME",
             "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME", "IDENTITY_DATABASE_RUNTIME_USERNAME",
             "IDENTITY_DATABASE_MIGRATOR_USERNAME", "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"
@@ -202,6 +224,7 @@ public sealed class RuntimeSecretEnvironmentTests
             inputs[name] = "declared_" + Guid.CreateVersion7().ToString("N");
         inputs["DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"] = CreateSecret();
         inputs["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"] = CreateSecret();
+        inputs["DATABASE_INSTANCE_KEY_ISSUANCE_PASSWORD"] = CreateSecret();
         var target = new Dictionary<string, object>();
 
         RuntimeSecretEnvironment.Apply(target, Configuration(inputs), inputs.Keys, consumer, provider, Entries);
@@ -213,6 +236,7 @@ public sealed class RuntimeSecretEnvironmentTests
         {
             await Assert.That(Equals(target["DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"], string.Empty)).IsTrue();
             await Assert.That(Equals(target["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"], string.Empty)).IsTrue();
+            await Assert.That(Equals(target["DATABASE_INSTANCE_KEY_ISSUANCE_PASSWORD"], string.Empty)).IsTrue();
         }
 
         (string Canonical, string Alias, string Value)[] enrollment =
@@ -221,6 +245,8 @@ public sealed class RuntimeSecretEnvironmentTests
                 "reader_" + Guid.CreateVersion7().ToString("N")),
             ("Database:InstanceKeyWrite:Username", "DATABASE_INSTANCE_KEY_WRITE_USERNAME",
                 "writer_" + Guid.CreateVersion7().ToString("N")),
+            ("Database:InstanceKeyIssuance:Username", "DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME",
+                "issuer_" + Guid.CreateVersion7().ToString("N")),
             ("Database:PlatformKeyReport:Username", "DATABASE_PLATFORM_KEY_REPORT_USERNAME",
                 "reporter_" + Guid.CreateVersion7().ToString("N"))
         ];

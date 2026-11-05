@@ -40,9 +40,10 @@ public sealed class IncomingWebhookEffectHealthCheck(
         try
         {
             await using var scope = scopeFactory.CreateAsyncScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IIncomingWebhookEffectOutboxRepository>();
-            due = await repository.CountDueAsync(observedAt, cancellationToken);
-            stale = await repository.CountStaleAsync(observedAt, cancellationToken);
+            var reader = scope.ServiceProvider.GetRequiredService<IIncomingWebhookEffectHealthReader>();
+            var snapshot = await reader.ReadAsync(observedAt, cancellationToken);
+            due = snapshot.DueEffects;
+            stale = snapshot.StaleLeases;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

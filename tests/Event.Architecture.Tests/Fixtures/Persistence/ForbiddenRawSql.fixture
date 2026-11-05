@@ -1,8 +1,0 @@
-// ABOUTME: Synthetic architecture fixture representing forbidden repository-local raw EF SQL.
-// ABOUTME: Exists only to prove the persistence capability-boundary scanner detects new violations.
-
-internal static class ForbiddenRawSqlFixture
-{
-    public static Task ExecuteAsync(ExploreDbContext context, CancellationToken cancellationToken) =>
-        context.Database.ExecuteSqlRawAsync("SELECT 1", cancellationToken);
-}

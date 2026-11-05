@@ -11,6 +11,33 @@ ABOUTME: Grounds release operations in provider-native database tools, authority
 
 This runbook covers self-hosted deployments using the repository Docker Compose topology. Treat every upgrade as a data operation first and an image rollout second.
 
+## Primary UserPii Revision Default
+
+The primary application correction `DeclareUserPiiBirthDateRevisionDefault`
+must also be applied through its selected migration owner. It adds the declared
+zero default for the private birth-date revision without changing stored dates
+or existing revisions. The four generated primary catalogs cover all five
+supported engines; MySQL and MariaDB share their catalog. No privacy-authority
+or Data Protection catalog is changed.
+
+SQL Server's native scaffold repeats the existing moderation-evidence foreign
+key operation. Its owning SQL generator retains the existing `NO ACTION`
+behavior in both directions; do not hand-edit generated metadata to remove the
+historical operation. The downgrade removes the revision default, not user
+rows. Use matched code/schema versions and retain the normal backups rather
+than weakening native readiness checks to start a mismatched deployment.
+
+## Co-Located Authority Recovery Coordinates
+
+For PostgreSQL `CoLocated` authority, apply
+`20261031102545_RestoreCoLocatedAuthorityRecoveryCoordinates` through the selected
+migration owner before traffic. It initializes the missing recovery counters and
+store identity without rewriting erasure facts. Take matched primary/authority
+backups first. Its generated `Down` drops those coordinates; it is not a
+data-preserving rollback after adoption. See the
+[migration contract](PRIVACY_ERASURE.md#5-migration-ownership-and-history-separation)
+for defaults and ownership, and retain the authority during recovery.
+
 ## SecretKit Lifecycle Cutover
 
 Before upgrading from the retired Secrets implementation, remove `SecretRefresh`
@@ -788,6 +815,7 @@ If release notes do not explicitly state that a rollback is image-only safe, ass
 - [ ] `EmbeddedSqlite` restore evidence proves the dedicated authority file was not overwritten by the primary restore and writer replica count remained one.
 - [ ] `CoLocated` restore evidence proves app + authority rows were restored and replay catches up correctly from the shared checkpoint.
 - [ ] `Event.MigrationService` completed twice against the restored provider before API/BFF startup.
+- [ ] Policy installation used its migration-owned execution context in the selected namespace; no request context was rebound or Runtime account promoted to repair a lease failure.
 - [ ] `docker compose ps` shows required services running.
 - [ ] API `/alive` and `/health` return expected status.
 - [ ] Blazor loads and can proxy API requests.

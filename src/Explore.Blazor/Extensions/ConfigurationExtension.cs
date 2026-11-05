@@ -38,8 +38,14 @@ public static class ConfigurationExtensions
                 throw new InvalidOperationException("bff_secret_authority_unavailable");
             }
             using var lease = result.Value;
-            if (group.Any(entry => string.IsNullOrWhiteSpace(lease.Configuration[entry.ConfigurationKey])
-                || lease.Configuration[entry.ConfigurationKey]!.Contains("${", StringComparison.Ordinal)))
+            if (group.Any(entry => lease.Configuration[entry.ConfigurationKey] is { } value
+                && (string.IsNullOrWhiteSpace(value) || value.Contains("${", StringComparison.Ordinal))))
+                throw new InvalidOperationException("bff_secret_authority_unavailable");
+            // Shared Keycloak metadata does not configure the optional confidential client.
+            if (group[0].Folder == "/runtime/bff/oidc/keycloak"
+                && lease.Configuration["KEYCLOAK_BLAZOR_CLIENT_SECRET"] is null)
+                continue;
+            if (group.Any(entry => lease.Configuration[entry.ConfigurationKey] is null))
                 throw new InvalidOperationException("bff_secret_authority_unavailable");
             foreach (SecretAcquisitionEntry entry in group)
                 staged.Add(entry.ConfigurationKey, lease.Configuration[entry.ConfigurationKey]);

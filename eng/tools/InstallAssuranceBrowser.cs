@@ -1,5 +1,7 @@
 #:property ManagePackageVersionsCentrally=false
-#:property RestorePackagesWithLockFile=false
+#:property RestorePackagesWithLockFile=true
+#:property NuGetLockFilePath=InstallAssuranceBrowser/packages.lock.json
+#:property RestoreLockedMode=true
 #:package Microsoft.Playwright@1.64.1
 
 if (args.Length != 0)

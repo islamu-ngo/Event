@@ -77,46 +77,13 @@ internal sealed class HumanSupportAccessSourceQueries(
                         row.AllowedValues.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
                             ? null : row.AllowedValues.GetRawText())).ToImmutableArray());
         }
-        bool current = transaction is not null && _context.Database.ProviderName == RelationalNamedLock.MySqlProvider;
-        string[] queries = new HumanSupportAccessSourceSql(_context).Queries;
-        var sessions = await RowsAsync<HumanSupportSessionFact>(queries[0] + (current ? " FOR UPDATE" : ""), transaction, ct);
-        var settings = await RowsAsync<HumanSupportSettingFact>(queries[1] + (current ? " FOR UPDATE" : ""), transaction, ct);
-        requireSelection();
-        return new(_forwarding, sessions, settings);
-    }
-
-    private async Task<ImmutableArray<T>> RowsAsync<T>(string sql, DbTransaction? transaction, CancellationToken ct)
-    {
-        await using var command = Command(transaction);
-        command.CommandText = sql;
-        Parameters(command);
-        await using var reader = await command.ExecuteReaderAsync(ct);
-        var rows = ImmutableArray.CreateBuilder<T>();
-        while (await reader.ReadAsync(ct))
+        void RequireOriginal()
         {
-            var values = new Dictionary<string, object?>(StringComparer.Ordinal);
-            for (int index = 0; index < reader.FieldCount; index++)
-                values.Add(reader.GetName(index), await reader.IsDBNullAsync(index, ct) ? null : reader.GetValue(index));
-            foreach (var property in typeof(T).GetProperties())
-            {
-                if (!values.TryGetValue(property.Name, out object? value) || value is null) continue;
-                if (property.PropertyType == typeof(Guid) || property.PropertyType == typeof(Guid?))
-                    values[property.Name] = value is Guid guid ? guid : Guid.Parse((string)value);
-                if (property.PropertyType == typeof(bool))
-                    values[property.Name] = Convert.ToBoolean(value, CultureInfo.InvariantCulture);
-                if (property.PropertyType == typeof(DateTimeOffset) || property.PropertyType == typeof(DateTimeOffset?))
-                    values[property.Name] = value switch
-                    {
-                        DateTimeOffset offset => offset,
-                        DateTime date => new DateTimeOffset(DateTime.SpecifyKind(date, DateTimeKind.Utc)),
-                        string text => DateTimeOffset.Parse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal),
-                        _ => throw new InvalidOperationException("human_support_time_storage_invalid")
-                    };
-            }
-            rows.Add(JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(values), Json)
-                ?? throw new InvalidOperationException("human_support_fact_row_invalid"));
+            requireSelection();
+            if (!ReferenceEquals(transaction, _context.Database.CurrentTransaction?.GetDbTransaction()))
+                throw new InvalidOperationException("human_support_original_transaction_changed");
         }
-        return rows.ToImmutable();
+        return await HumanSupportAccessSourceProjection.ReadAsync(_context, _tenant, _forwarding, RequireOriginal, ct);
     }
 
     internal async Task LockPortableAsync(DbTransaction transaction, CancellationToken ct)

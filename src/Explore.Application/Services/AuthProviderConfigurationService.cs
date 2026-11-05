@@ -101,6 +101,18 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
         return await ReadConfigurationCoreAsync(new(connection.Status, connection.Authority, connection.BlazorClientId));
     }
 
+    /// <summary>Projects public JWT authority without acquiring confidential-client material.</summary>
+    public static string? ProjectKeycloakJwtAuthority(
+        IReadOnlyDictionary<string, SystemSetting> settings, IConfiguration configuration)
+    {
+        var primary = ResolvePrimaryProvider(
+            settings.GetValueOrDefault(GovernanceSettingKeys.Authentication.PrimaryProviderId), configuration);
+        var keycloak = ProjectKeycloakConfiguration(primary,
+            settings.GetValueOrDefault(GovernanceSettingKeys.Authentication.KeycloakAuthority),
+            settings.GetValueOrDefault(GovernanceSettingKeys.Authentication.KeycloakClientId), configuration);
+        return keycloak.Enabled ? keycloak.Authority : null;
+    }
+
     private async Task<AuthProviderConfigurationDto> ReadConfigurationCoreAsync(
         ProviderKeycloakMaterial connection, ProviderConfigurationState? original = null,
         IConfiguration? deployment = null, SecretResolutionStatus? googleOriginal = null,
@@ -346,7 +358,7 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
     {
         var primaryProviderSetting = await _systemSettingRepository.GetByKey(
             GovernanceSettingKeys.Authentication.PrimaryProviderId);
-        AuthenticationProviderKind primaryProvider = ResolvePrimaryProvider(primaryProviderSetting);
+        AuthenticationProviderKind primaryProvider = ResolvePrimaryProvider(primaryProviderSetting, _configuration);
         var keycloak = await ResolveKeycloakConfigurationAsync(primaryProvider);
         var atprotoEnabled = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.AtprotoLoginEnabled);
         var googleEnabled = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.GoogleSsoEnabled);
@@ -427,10 +439,10 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
             : (false, storedAuthority, storedClientId, false);
     }
 
-    private AuthenticationProviderKind ResolvePrimaryProvider(SystemSetting? storedSetting, IConfiguration? deployment = null)
+    private static AuthenticationProviderKind ResolvePrimaryProvider(SystemSetting? storedSetting, IConfiguration configuration)
     {
         string? deploymentProvider = new[] { "Authentication:Provider", "AUTHENTICATION_PROVIDER" }
-            .Select(key => (deployment ?? _configuration)[key]).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
+            .Select(key => configuration[key]).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
         if (!string.IsNullOrWhiteSpace(deploymentProvider))
         {
             return RequireSupportedPrimaryProvider(

@@ -6,6 +6,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services.Moderation;
 using Explore.Domain;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Repositories;
 using ISLAMU.Moderation.Domain.Policies;
 using Microsoft.EntityFrameworkCore;
@@ -233,14 +234,7 @@ public sealed class ModerationMeasuredOperationsSourceOwner(
             || !await context.ModerationQualificationEpochs.AsNoTracking().AnyAsync(row =>
                 row.Id == native.Authority.Epoch.Id && row.HostBindingId == native.Authority.Binding.Id
                 && row.TenantId == native.Authority.Tenant.Id && row.Revision == native.Authority.Epoch.Revision, token)) return null;
-        if (context.Database.ProviderName == RelationalNamedLock.PostgreSqlProvider)
-        {
-            await using var command = context.Database.GetDbConnection().CreateCommand();
-            command.Transaction = native.Transaction.GetDbTransaction();
-            command.CommandText = "SELECT current_setting('app.current_tenant_id', true)";
-            if (!Guid.TryParse((await command.ExecuteScalarAsync(token))?.ToString(), out var tenant)
-                || tenant != native.Authority.Tenant.Id) return null;
-        }
+        if (!await PostgresTenantSessionProbe.MatchesAsync(context, native.Transaction, native.Authority.Tenant.Id, token)) return null;
         return await session.AcquireNativeAsync(transactionId, observedAt, token);
     }
 

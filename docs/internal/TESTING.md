@@ -165,6 +165,16 @@ from actual host execution and measurement. The integrated project owns all
 four categories; neither discovery nor a passing host-free selection admits
 an unexecuted browser, enabled worker, load or recovery profile.
 
+Native test projects declare the operations endpoint target host as `127.0.0.1`,
+matching `OperationalEndpoints:Address`. Leaving the target host as `localhost`
+can send probes through `::1`; the exact private-listener guard then correctly
+returns 404 despite a matching port. Keep the explicit binding rather than
+broadening the address guard or increasing readiness budgets.
+The owned test topology also explicitly declares that IPv4 target in
+`EffectiveHostAuthority:InstanceHosts`: the earlier host-authority guard otherwise
+rejects it before the private-listener check. Neither guard accepts an undeclared
+host or a mismatched local listener.
+
 `AppHostCompositionContractTests` uses
 `OwnedAppHostFixture.InspectCompositionAsync` to inspect the real AppHost resource
 registration without starting the graph. Its internal
@@ -210,6 +220,16 @@ invocation identity, honest no-ops, traversal/entity/size rejection and producer
 cleanup. `ReleaseCandidateVerificationTests` exercise the actual admission
 decision and deterministic manifest digest. Their synthetic report inputs prove
 protocol invariants, not execution of API security lanes.
+
+The explicit `SecurityExecutionEvidenceManagedCleanupTests` run a genuine
+compiled child and terminate its native owner only after all declared containers
+and managed project hosts have qualified. The child uses the same fifteen-minute
+cold-start allowance as `RealTopologyCompletesMigrationAndBecomesHealthy`; its
+native test command and process watchdog use the same 900-second limit. The
+parent has a twenty-minute deadline for setup and owner-death checks, with
+separately bounded teardown operations. These fixture lifetimes do not change
+product readiness deadlines or capacity thresholds. Model-only tests do not
+replace the real foreign-consumer and replaced-volume probes.
 
 `SecurityControlRegisterTests` consume the shipped machine catalogue and reject
 missing/duplicate identities, invalid ownership, missing mitigation pairs,
@@ -457,6 +477,14 @@ dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTest
 ```
 
 ### Multi-provider database verification
+
+`PostgresMigrationAuthorityIsolationTests.CanonicalMigrationOwnsItsExecutionLeaseWithoutBindingTheCaller`
+uses a fresh PostgreSQL cluster with the fixture's declared accounts and selected
+credentials to exercise native installation with an unbound caller. This avoids
+the general fixture's extra grants. It requires migration completion, unchanged
+selected migrator identity and an empty, still-unbound caller context. A second
+database in the fixture's cluster is not equivalent: native roles have an exact
+database ownership contract, so that probes a different refusal.
 
 The CI database matrix uses real engines for migration/runtime evidence; the
 provider-model tests alone are not portability proof.
@@ -882,6 +910,36 @@ that bypasses a compile-time contract, and token assurance over product source
 or documentation. Compiled endpoint/type/EF metadata and parsed JSON, YAML,
 schema, and project artifacts remain valid assurance seams.
 
+The persistence mode resolves EF and ADO operations from evaluated compilations,
+including aliases, provider overrides, delegates and wrapper calls. Export each
+owning project with `PersistenceAuditInputs.targets` and the explicit
+`ExportPersistenceAuditInputs` target. That target rebuilds the project before
+marking its source-generator manifest ready; ordinary incremental builds cannot
+certify a missing generator export. Store the resulting JSON outside tracked
+source. For example, from the worktree root:
+
+```bash
+dotnet msbuild eng/tools/Explore.AssuranceAudit/Explore.AssuranceAudit.csproj \
+  -target:ExportPersistenceAuditInputs -property:Configuration=Release \
+  -property:EmitCompilerGeneratedFiles=true \
+  -property:CompilerGeneratedFilesOutputPath=obj/persistence-audit-generated \
+  -property:CustomAfterMicrosoftCommonTargets="$PWD/eng/tools/Explore.AssuranceAudit/PersistenceAuditInputs.targets" \
+  -getProperty:MSBuildProjectFullPath,AssemblyName,DefineConstants,LangVersion,AllowUnsafeBlocks,OutputType,EmitCompilerGeneratedFiles,CompilerGeneratedFilesOutputPath,PersistenceAuditExportReady \
+  -getItem:Compile,ReferencePath,PersistenceAuditGeneratedCompile -verbosity:quiet -nologo \
+  > "$TMPDIR/persistence-audit-inputs.json"
+dotnet eng/tools/Explore.AssuranceAudit/bin/Release/net10.0/Explore.AssuranceAudit.dll \
+  . --persistence eng/tools/Explore.AssuranceAudit/persistence-capabilities.json \
+  "$TMPDIR/persistence-audit-inputs.json"
+```
+
+Supply all relevant runtime and native-test compilations together. An allowed
+capability names its exact assembly and method, approved API declaration IDs,
+provider gap, identifier/parameter handling, and an actual TUnit test owner.
+Missing symbols, incomplete exports, stale grants and dynamic dispatch fail the
+audit. The initial policy grants no exceptions; this mode exposes inherited SQL
+workflows as violations while their replacement proceeds. Passing the tool's own
+compilation is an input-path check, not repository-wide persistence qualification.
+
 
 `Event.Architecture.Tests` enforces project-wide conventions through reflection-based tests. These are not optional — they are CI gates.
 
@@ -961,6 +1019,20 @@ TDD is the default unless explicitly allowed to skip.
 - Add backward-compatibility tests for obsolete behavior while the project is in development mode
 
 ## Test Data And Fixtures
+
+The registration finalization/consent, PostgreSQL model-constraint, and location
+privacy/token-visibility fixtures bind container bootstrap passwords through
+`PostgresTestRoleBootstrap.ReadBootstrapPassword`. Inject the documented
+`DATABASE_MIGRATOR_PASSWORD` authority before running these native cases; missing
+or blank input fails before container creation. There is no default password or
+sibling-role fallback. Purpose-specific runtime logins remain separate from this
+bootstrap authority, and their ephemeral credentials must never appear in logs.
+
+`TypedPersistenceFixtureTests` exercises finalization arrangements with relational
+constraints enabled: missing submission evidence and cross-tenant lineage must
+fail, while complete participant/applicability graphs and both callback arrival
+orders persist correctly. These SQLite cases reuse the native test scenarios;
+they do not qualify PostgreSQL role admission, lease contention or lock behavior.
 
 - **Domain unit tests**: construct entities directly with valid state
 - **Application unit tests**: use in-memory fakes or builder patterns for repositories

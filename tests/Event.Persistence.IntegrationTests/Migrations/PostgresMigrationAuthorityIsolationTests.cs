@@ -4,12 +4,19 @@ using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Privacy.ErasureAuthority;
+using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
+using Testcontainers.PostgreSql;
 
 namespace Event.Persistence.IntegrationTests.Migrations;
 
@@ -17,6 +24,135 @@ namespace Event.Persistence.IntegrationTests.Migrations;
 [Property("Category", "ExploreDatabaseMigrator")]
 public sealed class PostgresMigrationAuthorityIsolationTests(PostgreSqlContainerFixture fixture)
 {
+    [Test]
+    public async Task UserPiiRevisionDefaultMatchesTheModelAfterNativeMigrations()
+    {
+        string databaseName = $"revision_default_{Guid.CreateVersion7():N}";
+        var administrator = new NpgsqlConnectionStringBuilder(fixture.ConnectionString)
+        {
+            Database = "postgres",
+            Pooling = false
+        };
+        await using var administration = new NpgsqlConnection(administrator.ConnectionString);
+        await administration.OpenAsync();
+        await ExecuteAsync(administration, $"CREATE DATABASE \"{databaseName}\"");
+        try
+        {
+            await using var context = CreateContext(Options(administrator, databaseName,
+                administrator.Username!, administrator.Password!, PrimaryDatabaseRole.Migrator));
+            await context.Database.MigrateAsync();
+            var entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(Explore.Domain.UserPii))
+                ?? throw new InvalidOperationException("user_pii_model_missing");
+            var revision = entity.FindProperty("_birthDateRevision")
+                ?? throw new InvalidOperationException("user_pii_revision_model_missing");
+            var literal = revision.FindAnnotation(RelationalAnnotationNames.DefaultValue);
+            string? expected = literal is null ? revision.GetDefaultValueSql()
+                : Convert.ToString(literal.Value, System.Globalization.CultureInfo.InvariantCulture);
+            await context.Database.OpenConnectionAsync();
+            await using var query = new NpgsqlCommand("""
+                SELECT pg_catalog.pg_get_expr(d.adbin,d.adrelid)
+                FROM pg_catalog.pg_attribute a
+                JOIN pg_catalog.pg_class c ON c.oid=a.attrelid
+                JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+                LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum
+                WHERE n.nspname=@schema AND c.relname=@table AND a.attname=@column
+                    AND a.attnum>0 AND NOT a.attisdropped
+                """, (NpgsqlConnection)context.Database.GetDbConnection());
+            query.Parameters.AddWithValue("schema", entity.GetSchema() ?? RelationalModelNamespace.DefaultSchema);
+            query.Parameters.AddWithValue("table", entity.GetTableName()!);
+            query.Parameters.AddWithValue("column", revision.GetColumnName(
+                StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema()))!);
+            await using var reader = await query.ExecuteReaderAsync();
+            await Assert.That(await reader.ReadAsync()).IsTrue();
+            string? actual = reader.IsDBNull(0) ? null : reader.GetString(0);
+            await Assert.That(actual).IsEqualTo(expected);
+        }
+        finally
+        {
+            await ExecuteAsync(administration, $"DROP DATABASE \"{databaseName}\" WITH (FORCE)");
+        }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task CoLocatedRecoveryUpgradePreservesExistingCounterAndNamespace(bool customSchema)
+    {
+        string suffix = Guid.CreateVersion7().ToString("N");
+        string databaseName = $"authority_upgrade_{suffix}";
+        string schema = customSchema ? $"authority_{suffix}" : RelationalModelNamespace.DefaultSchema;
+        var administrator = new NpgsqlConnectionStringBuilder(fixture.ConnectionString)
+        {
+            Database = "postgres",
+            Pooling = false
+        };
+        await using var administration = new NpgsqlConnection(administrator.ConnectionString);
+        await administration.OpenAsync();
+        await ExecuteAsync(administration, $"CREATE DATABASE \"{databaseName}\"");
+        try
+        {
+            var database = Options(administrator, databaseName,
+                administrator.Username!, administrator.Password!, PrimaryDatabaseRole.Migrator) with
+            {
+                Schema = schema
+            };
+            var options = TestDbContextOptions.Create<CoLocatedPrivacyErasureAuthorityDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(options, database);
+            await using var authority = new CoLocatedPrivacyErasureAuthorityDbContext(options.Options);
+            await authority.GetService<IMigrator>().MigrateAsync("20261002043813_RetainedExternalIdentityFences");
+            await using var connection = new NpgsqlConnection(
+                PrimaryDatabaseConfiguration.BuildConnectionString(database).ConnectionString);
+            await connection.OpenAsync();
+            // The predecessor model lacks recovery columns, so seed its physical shape.
+            await ExecuteAsync(connection, $"""
+                INSERT INTO "{schema}".authority_counter
+                    (singleton, last_sequence, retained_floor_sequence)
+                VALUES (true, 9, 4);
+                """);
+            await authority.Database.MigrateAsync();
+            var runtimeOptions = TestDbContextOptions.Create<CoLocatedPrivacyErasureAuthorityDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
+                runtimeOptions, database with { Role = PrimaryDatabaseRole.Runtime });
+            await using var runtime = new CoLocatedPrivacyErasureAuthorityDbContext(runtimeOptions.Options);
+            var counter = await runtime.AuthorityCounters.AsNoTracking().SingleAsync();
+            await Assert.That(counter.LastSequence).IsEqualTo(9);
+            await Assert.That(counter.RetainedFloorSequence).IsEqualTo(4);
+            await Assert.That(counter.Revision).IsEqualTo(1);
+            await Assert.That(counter.RecoveryGeneration).IsEqualTo(1);
+            await Assert.That(counter.StoreId.Version).IsEqualTo(7);
+            await authority.Database.MigrateAsync();
+            await using (var reopened = new CoLocatedPrivacyErasureAuthorityDbContext(runtimeOptions.Options))
+            {
+                await Assert.That((await reopened.AuthorityCounters.AsNoTracking().SingleAsync()).StoreId)
+                    .IsEqualTo(counter.StoreId);
+            }
+            foreach (string assignment in new[]
+            {
+                "revision = 0",
+                "recovery_generation = -1",
+                "store_id = '00000000-0000-4000-8000-000000000001'::uuid",
+                "store_id = '00000000-0000-7000-0000-000000000001'::uuid"
+            })
+            {
+                var rejected = await Assert.ThrowsAsync<PostgresException>(() =>
+                    ExecuteAsync(connection, $"UPDATE \"{schema}\".authority_counter SET {assignment}"));
+                await Assert.That(rejected!.SqlState).IsEqualTo(PostgresErrorCodes.CheckViolation);
+                await Assert.That(rejected.ConstraintName)
+                    .IsEqualTo("ck_privacy_erasure_authority_counter_recovery");
+            }
+            if (customSchema)
+            {
+                await using var query = new NpgsqlCommand(
+                    "SELECT to_regclass('islamu_event.authority_counter') IS NULL", connection);
+                await Assert.That((bool)(await query.ExecuteScalarAsync())!).IsTrue();
+            }
+        }
+        finally
+        {
+            await ExecuteAsync(administration, $"DROP DATABASE \"{databaseName}\" WITH (FORCE)");
+        }
+    }
+
     [Test]
     [TUnit.Core.Executors.TestExecutor<FreshEfProcessExecutor>]
     public async Task MigrateAndSeedUsesConfiguredNamespaceForPoliciesAndSeedWithoutRuntimeCredentialPromotion()
@@ -75,6 +211,137 @@ public sealed class PostgresMigrationAuthorityIsolationTests(PostgreSqlContainer
         {
             await ExecuteAsync(administration, $"DROP DATABASE \"{databaseName}\" WITH (FORCE)");
         }
+    }
+
+    [Test]
+    public async Task CanonicalMigrationOwnsItsExecutionLeaseWithoutBindingTheCaller()
+    {
+        var selected = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator);
+        await using var container = new PostgreSqlBuilder("postgres:18-alpine")
+            .WithDatabase("migration_lease_" + Guid.CreateVersion7().ToString("N"))
+            .WithUsername(selected.Username!)
+            .WithPassword(selected.Password!)
+            .Build();
+        await container.StartAsync();
+        var endpoint = new NpgsqlConnectionStringBuilder(container.GetConnectionString());
+        await using var migration = CreateContext(Options(endpoint, endpoint.Database!,
+            selected.Username!, selected.Password!, PrimaryDatabaseRole.Migrator));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Database:Migrator:Username"] = fixture.NativeQueueEnrollment.MigratorLogin,
+                ["Database:Global:Username"] = fixture.NativeQueueEnrollment.GlobalLogin,
+                ["Database:Runtime:Username"] = fixture.NativeQueueEnrollment.RuntimeLogin,
+                ["Database:EmailPolicyInstanceMutation:Username"] =
+                    fixture.NativeQueueEnrollment.EmailInstanceMutationLogin,
+                ["Database:EmailPolicyTenantMutation:Username"] =
+                    fixture.NativeQueueEnrollment.EmailTenantMutationLogin,
+                ["Database:InstanceKeyRead:Username"] =
+                    fixture.GetNativeQueueOptions(PrimaryDatabaseRole.InstanceKeyRead).Username,
+                ["Database:InstanceKeyWrite:Username"] =
+                    fixture.GetNativeQueueOptions(PrimaryDatabaseRole.InstanceKeyWrite).Username,
+                ["Database:InstanceKeyIssuance:Username"] =
+                    fixture.GetNativeQueueOptions(PrimaryDatabaseRole.InstanceKeyIssuance).Username,
+                ["Database:PlatformKeyReport:Username"] =
+                    fixture.GetNativeQueueOptions(PrimaryDatabaseRole.PlatformKeyReport).Username
+            }).Build();
+        await migration.Database.OpenConnectionAsync();
+        var connection = (NpgsqlConnection)migration.Database.GetDbConnection();
+        await AssertAuthorityAsync(connection, fixture.NativeQueueEnrollment.MigratorLogin, privileged: true);
+        // Native role ownership is cluster-wide; start without unrelated fixture grants.
+        foreach (var role in new[]
+        {
+            PrimaryDatabaseRole.Global, PrimaryDatabaseRole.Runtime,
+            PrimaryDatabaseRole.EmailPolicyInstanceMutation, PrimaryDatabaseRole.EmailPolicyTenantMutation,
+            PrimaryDatabaseRole.InstanceKeyRead, PrimaryDatabaseRole.InstanceKeyWrite,
+            PrimaryDatabaseRole.InstanceKeyIssuance, PrimaryDatabaseRole.PlatformKeyReport
+        })
+        {
+            var account = fixture.GetNativeQueueOptions(role);
+            string login = account.Username!.Replace("\"", "\"\"", StringComparison.Ordinal);
+            string password = account.Password!.Replace("'", "''", StringComparison.Ordinal);
+            await ExecuteAsync(connection, $"""
+                CREATE ROLE "{login}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+                    NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD '{password}';
+                """);
+        }
+
+        await ExploreDatabaseMigrator.MigrateAsync(migration, configuration);
+
+        await AssertMigrationHistoryAsync(migration);
+        await AssertAuthorityAsync(connection, fixture.NativeQueueEnrollment.MigratorLogin, privileged: true);
+        var unbound = Assert.Throws<InvalidOperationException>(() => migration.RequireBoundTenantLease());
+        await Assert.That(unbound.Message).IsEqualTo("tenant_lease_not_bound");
+        await Assert.That(migration.ChangeTracker.Entries()).IsEmpty();
+
+        PrimaryDatabaseConnectionOptions ApplicationOptions(PrimaryDatabaseRole role)
+        {
+            var account = fixture.GetNativeQueueOptions(role);
+            return Options(endpoint, endpoint.Database!, account.Username!, account.Password!, role);
+        }
+        var factories = new InstanceApiKeyDbContextFactories(
+            ApplicationOptions(PrimaryDatabaseRole.Runtime),
+            ApplicationOptions(PrimaryDatabaseRole.Global),
+            [
+                ApplicationOptions(PrimaryDatabaseRole.InstanceKeyRead),
+                ApplicationOptions(PrimaryDatabaseRole.InstanceKeyWrite),
+                ApplicationOptions(PrimaryDatabaseRole.InstanceKeyIssuance),
+                ApplicationOptions(PrimaryDatabaseRole.PlatformKeyReport)
+            ], PlatformApiKeySourceEnrollment.Bind(configuration));
+        await factories.RequireReadyAsync(TestContext.Current!.Execution.CancellationToken);
+        var globalFactory = new GlobalExploreDbContextFactory(ApplicationOptions(PrimaryDatabaseRole.Global));
+        var admission = new GenericOutboxAdmission(globalFactory, TimeProvider.System);
+        var claims = await admission.ClaimDueAsync(
+            1, DateTime.UtcNow, TestContext.Current.Execution.CancellationToken);
+        await Assert.That(claims).IsEmpty();
+        var notificationClaims = await new NotificationOutboxAdmission(globalFactory, TimeProvider.System)
+            .ClaimDueAsync(1, DateTime.UtcNow, TestContext.Current.Execution.CancellationToken);
+        await Assert.That(notificationClaims).IsEmpty();
+        var fanout = new NotificationFanoutAdmission(globalFactory,
+            new TenantExploreDbContextFactory(ApplicationOptions(PrimaryDatabaseRole.Runtime)));
+        var fanoutRound = await fanout.ClaimDueRoundAsync(
+            new("migration-enrollment", DateTime.UtcNow, TimeSpan.FromMinutes(1), 1, 1, 1, 2, 1),
+            TestContext.Current.Execution.CancellationToken);
+        await Assert.That(fanoutRound.Claims).IsEmpty();
+        await Assert.That(fanoutRound.CandidateCount).IsEqualTo(0);
+        var fanoutSnapshot = await fanout.GetProcessorSnapshotAsync(
+            DateTime.UtcNow, TestContext.Current.Execution.CancellationToken);
+        await Assert.That(fanoutSnapshot.DueOccurrenceCount).IsEqualTo(0);
+        await Assert.That(fanoutSnapshot.ActiveClaimCount).IsEqualTo(0);
+        await Assert.That(fanoutSnapshot.OldestDueAt).IsNull();
+        var queueHealth = await new QueueDrainHealthRepository(globalFactory).GetSnapshotAsync(
+            DateTime.UtcNow, DateTime.UtcNow.AddMinutes(-5), TestContext.Current.Execution.CancellationToken);
+        await Assert.That(queueHealth.IntegrationDue).IsEqualTo(0);
+        await Assert.That(queueHealth.IncomingDue).IsEqualTo(0);
+        await Assert.That(queueHealth.PdsDue).IsEqualTo(0);
+        int reviewDepth = await new EventLocationPrivacyReviewReader(globalFactory)
+            .CountNeedingPrivacyReviewAsync(TestContext.Current.Execution.CancellationToken);
+        await Assert.That(reviewDepth).IsEqualTo(0);
+        var effectHealth = await new IncomingWebhookEffectHealthReader(globalFactory, fixture.NativeQueueEnrollment)
+            .ReadAsync(DateTime.UtcNow, TestContext.Current.Execution.CancellationToken);
+        await Assert.That(effectHealth.DueEffects).IsEqualTo(0);
+        await Assert.That(effectHealth.StaleLeases).IsEqualTo(0);
+        var fairReturnHealth = await new FairReturnOrchestrationHealthReader(globalFactory, fixture.NativeQueueEnrollment)
+            .ReadAsync(DateTime.UtcNow, TestContext.Current.Execution.CancellationToken);
+        await Assert.That(fairReturnHealth.Pending).IsEqualTo(0);
+        await Assert.That(fairReturnHealth.Processing).IsEqualTo(0);
+        await Assert.That(fairReturnHealth.Unknown).IsEqualTo(0);
+        await Assert.That(fairReturnHealth.DeadLettered).IsEqualTo(0);
+        await Assert.That(fairReturnHealth.OldestPendingAt).IsNull();
+        var pointers = await new EmailDispatchPointerPublicationStore(globalFactory, fixture.NativeQueueEnrollment)
+            .GetPublishBatchAsync(1, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(-30),
+                TestContext.Current.Execution.CancellationToken);
+        await Assert.That(pointers).IsEmpty();
+        var directory = new TenantLookupSource(globalFactory);
+        await Assert.That(await directory.GetTenantLookupsAsync(
+            TestContext.Current.Execution.CancellationToken)).IsEmpty();
+        DateTime healthAt = DateTime.UtcNow;
+        var emailHealth = await new EmailDispatchHealthSnapshotReader(globalFactory).ReadAsync(
+            healthAt, healthAt.AddMinutes(-5), 5, TestContext.Current.Execution.CancellationToken);
+        await Assert.That(emailHealth.DueDispatchCount).IsEqualTo(0);
+        await Assert.That(emailHealth.TenantBacklogSample).IsEmpty();
+        await AssertAuthorityAsync(connection, fixture.NativeQueueEnrollment.MigratorLogin, privileged: true);
+        await Assert.That(migration.ChangeTracker.Entries()).IsEmpty();
     }
 
     [Test]

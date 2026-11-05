@@ -6,6 +6,21 @@ description: Deploy and operate the single-container standalone distribution wit
 
 The standalone image (`Event.Standalone`) is the simplest and lowest-overhead operational topology for ISLAMU Event. It packages the API, background workers, Blazor WebAssembly BFF/UI, health endpoints, and in-process database migrations into **a single non-root container process**.
 
+The SQLite distribution applies its own migrations before serving HTTP. If you
+host Standalone with PostgreSQL and a separate MigrationService, complete that
+service before starting the application; the application does not repeat
+migration or require its Migrator password. Configuration-manifest validation and
+privacy replay remain startup gates in either deployment.
+
+For an instance whose bootstrap is not completed, startup validates bootstrap
+configuration before exposing setup or HTTP authority. Interactive mode does not
+provision a configured administrator; invalid mode values block startup.
+A completed bootstrap remains final.
+
+Use an image rebuilt with the pinned Blazor `10.0.14` security packages for
+`GHSA-g27p-qf6j-c96c`. A shared-runtime update alone does not replace packaged
+dependencies; source builds must use the matching project dependency locks.
+
 You can complete Local administrator setup and use the core without SMTP,
 Mailpit or a credential email address. Public operator contact and legal identity
 are not required to finish setup; configure them before dependent disclosure,

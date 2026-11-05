@@ -124,7 +124,7 @@ public sealed partial class ModerationRecognitionErasureRepository : IModeration
     public async Task BindLawfulDispositionAsync(PrivacyErasureIntent fact, CancellationToken token)
     {
         RequireTransaction();
-        await RequireRetainedDispositionFactAsync(fact, token);
+        await RequireRetainedFactAsync(fact, token);
         var request = PrivacyErasureRequest.Create(fact.IntentId, fact.SubjectKind, fact.SubjectId, fact.ReasonCode, fact.PolicyVersion);
         _ = await identity.IsSubjectFencedAsync(request.SubjectId, token);
         await RelationalEntityRowFence.AcquireGlobalAsync<User>(context, request.SubjectId, token);
@@ -159,7 +159,7 @@ public sealed partial class ModerationRecognitionErasureRepository : IModeration
     public async Task<bool> VerifyLawfulDispositionAsync(PrivacyErasureIntent fact, CancellationToken token)
     {
         RequireTransaction();
-        await RequireRetainedDispositionFactAsync(fact, token);
+        await RequireRetainedFactAsync(fact, token);
         _ = await identity.IsSubjectFencedAsync(fact.SubjectId, token);
         await RelationalEntityRowFence.AcquireGlobalAsync<User>(context, fact.SubjectId, token);
         await RelationalEntityRowFence.AcquireGlobalAsync<ModerationRecognitionPending>(context, fact.IntentId, token);
@@ -351,7 +351,7 @@ public sealed partial class ModerationRecognitionErasureRepository : IModeration
         return (source, adoption);
     }
 
-    private async Task RequireRetainedDispositionFactAsync(PrivacyErasureIntent fact, CancellationToken token)
+    private async Task RequireRetainedFactAsync(PrivacyErasureIntent fact, CancellationToken token)
     {
         var retained = (await erasure.ReadAfterAsync(fact.AuthoritySequence - 1, 1, token)).SingleOrDefault();
         if (retained is null || retained.AuthoritySequence != fact.AuthoritySequence || retained.IntentId != fact.IntentId

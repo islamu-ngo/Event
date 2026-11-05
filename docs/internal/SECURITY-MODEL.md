@@ -3,6 +3,15 @@
 
 # Security
 
+## Blazor framework security patch
+
+The central package baseline pins `Microsoft.AspNetCore.Components.Web`,
+`Microsoft.AspNetCore.Components.WebAssembly` and
+`Microsoft.AspNetCore.Components.WebAssembly.Server` to `10.0.14` for
+`GHSA-g27p-qf6j-c96c`. The regenerated project locks carry the matching
+transitive framework packages. Restore and publish from these pins and locks;
+an installed shared runtime does not replace a packaged NuGet dependency.
+
 ## Application authority and database defence
 
 C# Domain/Application workflows own authorization, business rules, concurrency
@@ -38,8 +47,9 @@ queue identifiers or payloads. The function owner has only the predicate-column
 reads required for these counts and purpose-specific RLS policies; the Global
 executor has no direct table reads or writes. Routine ACL checks run during
 installation and invocation. Other providers retain the existing count predicates.
-The application migrator installs the function; operators separately enroll the
-configured Global login in the health executor group, not its owner or migrator.
+The canonical application migrator installs the function and enrolls the
+configured Global login in its health executor group with inheritance enabled
+and SET/ADMIN disabled. It does not enroll the serving login as owner or migrator.
 This contract does not attest every other capability sharing the Global pool.
 
 ## Tenant deletion reservation and owner
@@ -273,6 +283,15 @@ Account-specific remedies require the independently verified recovery channel
 or the existing authorized administrative process, never the public failure
 detail. See [Authentication](AUTHENTICATION.md#local-verification-email-change-and-password-recovery)
 for the native ownership flow and delivery uncertainty rules.
+
+Lifecycle delivery resolves its callback address after mirror repair in a
+separate ordinary Runtime scope. The hierarchical read is instance-only and
+authoritative; that scope is disposed before the LocalIdentityWriter delivery
+scope is selected. The writer receives the validated HTTPS origin and does not
+read a full SystemSetting entity. Invalid explicit overrides never fall back to
+stored addresses, and address failures do not undo completed mirror repair.
+SMTP admission, ordered settings locks and uncertain-completion rules retain
+their existing writer ownership.
 
 ### Event resource authority boundary
 
@@ -528,6 +547,58 @@ gaps or checkpoint mismatch, reapplies uncaptured policy versions, and leaves a
 fresh application database at sequence zero. A repeated replay is a no-op once
 the checkpoint matches the retained authority.
 
+Recognition receipt retention and recovery also execute through C# repositories
+before replay completes. `PostgresPrivacyReplayStoragePermissions` installs
+their fixed recognition-state reads and writes for the deployment's declared
+Global login. The production migrator and native fixture use the same installer;
+tests must not substitute handwritten grants for that enrollment. Installation
+requires the original Migrator login and uses EF model identifiers quoted by the
+provider. `PrivacyErasureService` selects the Global operation owner before
+resolving `RetainedAuthorityPrivacyErasureWorkflow`, so the checkpoint writer
+receives Global SELECT/INSERT. Runtime receives checkpoint SELECT for readiness;
+its former INSERT grant is revoked. Neither purpose receives checkpoint UPDATE
+or DELETE. Runtime receives no recognition-state rights from this installer;
+additional health reads expose only provider-work Status/NextAttemptAtUtc and
+outbox EventType/Status, matching the readiness counters. These credentials confer those fixed
+storage permissions; C# owns authorization and replay sequencing. The installer
+grants neither owner membership nor RLS bypass. Applying it does not change retained-authority
+checks, identity fences, transactions or replay completion rules.
+
+The BFF treats public Keycloak endpoint, realm and client ID metadata without a
+confidential-client secret as an unconfigured optional provider. Every present
+value must still be valid; a configured secret requires the complete group.
+Authority errors, unresolved placeholders and invalid values fail startup.
+Credential mappings and acquisition receipts publish only after all groups
+validate, for both Split BFF and Combined hosts.
+AppHost preserves explicitly projected public Keycloak coordinates for an
+Environment BFF consumer even though their registry defaults belong to the API
+folder. This does not admit API credentials or change Infisical folder ownership;
+an Infisical BFF still acquires its metadata from its own selected authority.
+
+Public resolver bootstrap uses `ResolverConfigService` with
+`IInstanceSystemSettingsReader` to observe its seven stored routing settings
+under an independent Global owner. The existing resolver projection supplies
+defaults and normalization; its public DTO cache still returns isolated copies
+and clears only after acknowledged mutation settlement. This read does not
+acquire resolver mutation custody or grant Runtime direct settings-table access.
+
+Canonical migration also enrolls the configured Global login in the existing
+`PostgresTenantLookupContract.GlobalRole` with inheritance enabled and SET/ADMIN
+disabled, matching the native fixture's fixed read purpose. The cross-tenant
+disclosure primitive exposes only active tenant IDs/slugs and public domain
+coordinates; its owner, routine ACL and private-table isolation remain unchanged.
+The serving login receives no new table rights or migration authority. Fresh
+canonical migration tests invoke the actual directory reader rather than relying
+on fixture-only role membership.
+
+The configured Global login is also enrolled in the existing email admission
+purpose, with inheritance enabled and SET/ADMIN disabled. Its established
+capability includes bounded batch admission, stale recovery and operational
+health aggregates; it is not a health-only role. Canonical startup must supply
+the same application purpose used by `EmailDispatchHealthSnapshotReader` and
+`EmailDispatchAdmission`. This enrollment adds no Runtime or direct table grants,
+new routine or business rule.
+
 Provider work claims use serializable lease fences and a monotonic fence token.
 Stale claims cannot settle a newer claim, and unknown work can only be moved by
 explicit reconciliation to completed or retry-scheduled state. Expired provider
@@ -568,6 +639,33 @@ Current security gates:
 5. Embedded control-plane routes use the same BFF session; their actions remain authorized by API/Application policies and advertised through HAL links.
 
 ## JWT Bearer Configuration (API)
+
+`DynamicJwtConfigurationService` observes only the stored primary-provider ID,
+Keycloak authority and client ID through `IInstanceSystemSettingsReader`, using
+an independent Global read owner. `AuthProviderConfigurationService` supplies
+the shared pure projection, preserving deployment primary-provider precedence
+and deployment-managed metadata. This public JWT observation does not resolve
+the administrative provider DTO or acquire confidential-client secrets.
+Runtime retains no direct `secret_bindings` read grant. A new configuration
+manager still prefetches OIDC metadata and signing keys before replacing the
+current manager; failed prefetch retains the prior state.
+
+Private operational listener admission compares the physical local port and
+address. Dual-stack sockets may report an IPv4 peer-facing local address as an
+IPv4-mapped IPv6 value; the guard normalizes that representation to IPv4 before
+the exact comparison. It still rejects a different private address, public
+listener port or undeclared host, and does not use forwarded headers to select
+the listener.
+
+Split BFF health and metrics requests retain their original connection through
+the middleware pipeline instead of redirecting to the public HTTPS listener.
+The operational endpoint's physical address/port guard still runs on both
+public and private requests; a public listener receives 404. Other public
+requests retain HTTPS redirection.
+Operational responses also bypass UI error-page re-execution, preserving the
+health check's own 503 body and the guard's public-listener 404. Their cache
+policy requires `no-store`; additional `no-cache`/`must-revalidate` directives
+do not weaken that policy.
 
 - Authority: Keycloak OIDC metadata endpoint.
 - Resource audience: only `Keycloak:Audience`, default `islamu-event-api`.
@@ -1738,6 +1836,17 @@ Non-interactive callers (direct API consumers, integrations, automation) authent
 
 ### Bounded Issuance Commit And Recovery Authority
 
+Canonical PostgreSQL migration enrolls the configured `InstanceKeyIssuance`
+login in `event_instance_key_issuance_executor` with `INHERIT TRUE, SET FALSE,
+ADMIN FALSE`, alongside the source contract's read/write/report enrollment.
+The migrator binds only the declared username for this grant; application
+credential pairs remain isolated. A fresh-cluster regression opens all four
+production factories without relying on fixture-only membership grants.
+`RuntimeSecretEnvironment` forwards the issuance username in flat or canonical
+form for Environment enrollment, including Migration, while preserving canonical
+precedence and masking. It does not forward that purpose's password to Migration
+or BFF; Infisical consumers retain their own selected-authority acquisition.
+
 The native creation handler derives the platform actor through
 `IAdminContext.ResolveUserIdAsync`; an authenticated but unbound identity fails
 `401`. Neither actor nor current tenant is chosen by the DTO. Before issuance
@@ -1916,6 +2025,13 @@ they never promote or retarget an existing request lease. Preliminary API
 tenant-routing reads finish in a disposed independent service scope before
 binding the request tenant.
 
+Moderation owners share `PostgresTenantSessionProbe` for the provider session
+read, passing the original EF transaction explicitly. It grants no authority:
+each caller retains its own frozen tenant, lease, provenance and completion
+checks. Absent tenant identity is accepted only by owners already admitting an
+instance scope. `PostgresTenantSessionInterceptor` remains responsible for
+connection binding, readiness and command identity checks.
+
 Migration-owned `SECURITY DEFINER` functions use fixed search paths and
 separate NOLOGIN owners, migration installers and execution groups. PUBLIC
 execution is revoked. API-key/scanner authentication exposes exact credential
@@ -1932,12 +2048,96 @@ PostgreSQL instance/cluster without the obsolete capability roles. A new databas
 inside a cluster retaining those roles is insufficient because roles are cluster-wide.
 The application never automatically removes those objects or deletes data.
 
+Canonical migration explicitly enrolls the configured Global login in the
+generic outbox, notification outbox and notification fanout admission groups.
+Membership inherits execution rights without role switching or membership
+administration. Runtime does not receive these Global groups. Fresh-cluster
+qualification invokes the production admission services after canonical
+migration; shared-fixture-only memberships cannot establish that proof.
+The queue-drain and location-privacy-review aggregate health groups are also
+explicitly enrolled to the configured Global login. Those memberships expose
+the existing aggregate functions, without private-table reads or role switching.
+
+Effect readiness uses independent Global aggregate observers rather than the
+tenant mutation repositories. PostgreSQL grants exactly status/retry/lease
+columns for incoming webhook effects and status/failure-code/creation-time
+columns for fair-return effects. EF computes the aggregates; no new routine owns
+the workflow. Paired SELECT policies require the original Global login with an
+empty tenant session, while forced tenant RLS and its fingerprint remain intact.
+The complete Global application catalogue includes both relations and their
+exact non-grantable column ACLs. Added table rights, inherited authority, changed
+policies or a tenant-bound session reject readiness instead of returning zero.
+
+Authorization-provider observation uses `IInstanceSystemSettingsReader`, which
+owns an independent Global context and the existing ordinary-settings read
+primitive. It returns only requested detached stored rows; it does not merge
+hierarchy defaults, acquire mutation custody or promote the caller's Runtime
+connection. Original connection and native readiness checks surround observation.
+Prepared provider mutations continue to read their original captured
+`ProviderConfigurationState`. No new database grant or routine is required.
+The selected provider compiler still verifies the proposed endpoint and rechecks
+it before completion. `ICerbosEndpointHealthProbe` owns that external gRPC
+exchange, retaining the existing channel/TLS options, five-second deadline and
+cancellation handling. Tests replace only this transport input on the original
+scoped owner; they do not bypass compilation, native custody or rechecks.
+
+RabbitMQ pointer publication uses its own `IEmailDispatchPointerPublicationStore`.
+An independent Global owner projects pointer identifiers and reads only the
+pause, eligibility, ordering and retry facts needed to select a batch. Its only
+writes are the four RabbitMQ producer markers and `UpdatedAt`; SMTP status,
+leases, delivery attempts and message content remain excluded. Markers retain
+the exact candidate tenant/outbox and Pending/RetryScheduled predicates.
+The retention manifest accepts this fixed permission union only when the complete
+publication manifest is valid. Installation and the closed Global catalogue
+attest both purposes together, including their exact policies and ACLs.
+The existing Global credential retains its cumulative admission authority;
+purpose separation does not introduce a separate credential-compromise boundary.
+Confirmation precedes marker persistence, so uncertain marker completion can
+produce another pointer, while SMTP admission continues to own processing claims.
+
+Jetstream readiness observes stored deployment mode through
+`IInstanceSystemSettingsReader`. Active tenant identifiers come from the
+independent Global federation reader, which projects IDs through the existing
+tenant/status grants and retains read admission before and after the query.
+The ordinary background Runtime context acquires neither read authority nor
+mutation custody. Dedicated capability and override rows still determine
+enablement, with inactive tenants excluded and instance locks preserved.
+
+Ordinary-settings attestation reuses its generated guard and body-hash SQL text
+within the same immutable EF model, exact SQL renderer, schema and declared login
+enrollment. Weak model/renderer ownership and synchronous construction retain
+neither a context nor a connection. Current tenant selection stays in the
+per-call wrapper. Every call still executes the complete live catalogue, grant,
+role and routine-body checks; no authorization or readiness outcome is cached.
+
 Operators provision the selected Runtime, Migrator and Global logins and only
 the capability groups required by each consumer; see [SECRETS.md](SECRETS.md)
 and the [public database configuration guide](../public/documentation/readme/configuration-and-operations/environment-variables.md).
 Missing privileges or stale policies reject admission rather than falling
 back to another credential source. These are PostgreSQL guarantees; other
 providers retain EF filters and their native relational constraints.
+
+### Application-owned domain discovery and report health reads
+
+`ManagedTenantDomainQuery` and `EventReportOperationsRepository` use EF queries
+through the independently selected Global pool. Migration-owned capability
+groups `event_managed_domain_global` and `event_report_operations_global`
+receive fixed column reads; neither receives writes, owner membership or an
+ability to change tenant identity. Domain discovery's SELECT policy exposes
+only `domains.tenant_subdomain` and `domains.tenant_custom_domain`. Report health
+reads expose link status/time/parent coordinates and parent deletion metadata,
+excluding report content. EF retains the parent soft-delete filter and the
+strictly-before timestamp predicate. These grants intentionally permit the
+selected application purpose to read that metadata across tenants; compromise
+of its Global credential has the same bounded read access.
+
+The installers retire `managed_tenant_domain_find` and
+`event_report_operations_count`, revoke their former owner's table rights and
+remove its migration-role membership. Runtime readiness recognizes only the
+matching stamped SELECT policies for the enrolled Global login. Ordinary
+Runtime sessions retain tenant RLS; missing capabilities remain denied.
+Quiesce these consumers, apply the migrator's storage contract, then restart
+the matching application. Runtime never repairs grants or policies.
 
 ## Ticketing Recovery Trust Boundary
 

@@ -20,7 +20,7 @@ Workflow YAML defines what runs; repository settings define which checks are req
 ## Native build and test selection
 
 `Build & Test` consumes `select-build-test-changes` from the existing release
-engineering executable. The workflow accepts exactly eight unique boolean
+engineering executable. The workflow accepts exactly seven unique boolean
 decisions and rejects malformed, missing or inconsistent output before exporting
 job outputs. The native selector independently chooses Architecture for both
 configuration schema artifacts and their generator; only root README and public
@@ -32,7 +32,22 @@ can change. The fast reusable workflow runs the distributed project's pure
 `Harness` category; real `Distributed` and browser execution require their
 separate runtime evidence and are never inferred from Harness results.
 
+SetupLive routing is verified by passing all 37 governed input families through
+the native command and requiring both Architecture and Setup selection.
+Workflow architecture checks verify the native command wiring, read-only
+authority, fork-safe secret handling and serial Setup execution. They do not
+require the retired inline path-glob list to remain in the workflow shell script.
+
 ## Security integration fixture execution
+
+The browser prerequisite uses `eng/tools/InstallAssuranceBrowser.cs` with its
+own generated lock at `eng/tools/InstallAssuranceBrowser/packages.lock.json`.
+The installer requires locked restore and retains the approved Playwright
+version. It must not reuse or overwrite `eng/tools/packages.lock.json`, which
+belongs to other tools: disabling lock generation does not bypass an existing
+lock and causes `NU1005`. Verify the ordinary installer command against its
+committed lock before interpreting a prerequisite failure as a browser or
+runtime regression. Installation alone is not browser execution evidence.
 
 The existing `security-execution.v1.json` packet is governed by the embedded
 `executionRequirements` in `eng/security/security-control-register.json`.
@@ -43,6 +58,16 @@ every registered lane and its exact native result variants, with no
 missing/skipped results or reused report/execution identities. Candidate,
 run/attempt and retained artifact byte hashes must agree.
 Provider, database role and authentication remain `not-attested`.
+
+The daemon control client excludes ambient trace headers and baggage through its
+own handler. Wire-level context-isolation checks and the explicit read-only
+daemon probe remain prerequisite diagnostics, not registered-lane admission.
+
+Establish uncached engine readiness on the selected socket before bounded
+assurance requests; cached Desktop proxy responses do not prove a running VM.
+Retain the asynchronous client's five-second request budget and separate
+readiness evidence. A canceled DELETE with no accepted response has an unknown
+outcome, not successful cleanup.
 
 The API lanes require their registered key witnesses within the complete
 category report. Owned lanes require equality between registered and observed

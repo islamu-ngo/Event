@@ -80,10 +80,12 @@ When the plan claims to follow `implementation-plan`, verify these concrete thin
 - `Last Updated: YYYY-MM-DD Europe/Brussels` exists in each file;
 - `plan.md` includes current state, future state, constraints, decisions, phases, testing, docs/internal/ops/security/multi-tenancy/risk/success sections;
 - `context.md` includes session progress, quick resume, key files, decisions, constraints, validation baseline, risks, and handoff notes;
-- `tasks.md` includes implementation-maintenance rules, phase breakdown, one build plus at most one selected project test at each phase end, and remaining/deferred work;
+- `tasks.md` includes implementation-maintenance rules, phase breakdown, one build plus at most one selected project test at each phase end, and remaining required work assigned to later phases;
 - plan/context/tasks agree on current status and next step.
 - plan/context/tasks agree on I-VSD path, reviewed-input revision, status/disposition, CTO-review state, and user approval.
 - the report is current for the reviewed plan/tasks and every material `IVSD-*` mapping resolves.
+
+Every original requested outcome must map to a phase/task or an explicit user-authorized scope change. A large phase count is not permission to defer scope to backlog.
 
 If they do not align, treat that as a planning quality issue, not a formatting nit.
 

@@ -33,7 +33,7 @@ Questions:
 - Is this the right layer of the system for the capability?
 - Does it reduce future complexity or create a new permanent burden?
 - Is the plan aligned with self-hostable and enterprise expectations?
-- Is the workstream narrow enough to execute without turning into an unreviewable mega-PR?
+- Is each implementation increment reviewable while the complete multiphase plan retains every requested outcome?
 
 ## 2. Islamic Value-Sensitive Design
 
@@ -199,17 +199,23 @@ Check:
 
 | Score | Meaning |
 |---|---|
-| 5 | Work is split into reviewable, independently verifiable slices; satisfies all 4 right-sizing checks |
+| 5 | All requested scope remains in one plan with reviewable, independently verifiable phases and increments |
 | 3 | Sequence is plausible but risks large PRs or late discovery |
 | 1 | Big-bang plan with mixed concerns, oversized scope ("and also"), and no rollback |
 
 Check:
 
-- **The 4-Point "Right-Sizing" Rule** (Mandate **"Split before approval"** if 2+ match):
-  1. *Multi-Intent Scope*: The proposal or goals read like a list of distinct capabilities joined by "and also".
-  2. *Excessive Task Capacity*: The plan contains more than 8-10 major actionable tasks, making single-PR review exhausting.
-  3. *Big-Bang Layer Mixing*: Data migration, domain logic, API contract churn, and UI enablement are combined into a single phase instead of decoupled slices.
-  4. *Independent Shipping Value*: The backend application/API slice could safely ship and be verified before any UI enablement.
+- **The 4-Point "Right-Sizing" Rule** (restructure implementation when 2+ match; preserve plan scope):
+  1. *Independent concerns*: Multiple capabilities need distinct ownership and acceptance boundaries.
+  2. *Oversized increment*: One proposed phase/PR contains more than 8-10 major tasks; the total across a multiphase plan is not itself a failure.
+  3. *Big-bang layer mixing*: Coupled state, contract and consumer changes lack safe intermediate boundaries.
+  4. *Independent shipping value*: A coherent increment can be verified before its dependent consumer.
+
+  Retain all requested outcomes in the same triad and sequence them into later
+  phases with dependencies, owned paths, acceptance, verification and atomic
+  commit/PR contracts. Do not narrow the active plan or move required scope to
+  backlog. Only explicit user direction can remove a requested outcome.
+
 - Migration and model changes happen before UI reliance.
 - Contract stabilization happens before client/UI churn.
 - Security/tenant tests land before feature expansion.
@@ -244,13 +250,13 @@ Check:
 - Status across all artifacts agrees.
 - Another implementation agent could resume without re-asking the user for core context.
 - The reviewer edits the exact requested triad in place without creating worktrees, creating or switching branches, relocating planning artifacts, or executing implementation.
-- Knowledge Graduation: Out-of-scope, follow-up, or deferred items are explicitly identified for promotion to `dev/backlog/<slug>.md` (and durable architecture to `docs/internal/adr/`), rather than being left as dead text in an ephemeral plan.
+- Knowledge Graduation: Keep required outcomes in later phases of this triad, not backlog. Graduate architectural decisions and reusable lessons only to their target-owned locations. Explicit user direction, not size thresholds, governs any scope removal.
 
 ## CTO Decisions & Direct Triad Actions
 
 The CTO decides the path forward and applies it directly to the triad without creating review files:
 
 - **Approved as Refined** — The plan's architecture is sound or has been directly refined to be execution-ready; update metadata to `Applied & Aligned` in `plan.md`, synchronize `context.md`, and ensure `tasks.md` has complete Red/Green sequences and atomic commit contracts.
-- **Split Applied** — Scope exceeded right-sizing limits (2+ conditions met); directly restructure the active triad to scope strictly to the primary slice, and graduate deferred scope to `dev/backlog/<slug>.md`.
-- **Scope Pruned & Re-Aligned** — Direction was viable but contained bloat or backward-compatibility shims; directly excise the legacy shims from `plan.md` and `tasks.md`.
-- **Reject / Defer** — Fundamental architectural flaw or missing foundational prerequisite; update `context.md` with explicit blockers and explain the rationale in the chat summary.
+- **Multiphase Refinement Applied** — Preserve the entire requested scope and restructure implementation into dependency-ordered phases with atomic commit/PR outcomes. Keep UI, integration and qualification in their later owning phases; do not move required work to backlog.
+- **Scope Preserved & Aligned** — Remove duplicate or obsolete mechanisms under target policy without dropping requested capabilities, acceptance criteria or mitigation ownership.
+- **Changes Required** — Record fundamental flaws or missing prerequisites as blockers in the same triad, with owning phases and concrete repairs. Do not silently remove the blocked outcome or manufacture approval.

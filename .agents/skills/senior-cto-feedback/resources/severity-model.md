@@ -32,7 +32,7 @@ Use for:
 - background processing without idempotency when side effects matter,
 - missing I-VSD analysis or failure to trace provider-controlled moral risks,
 - post-hoc test sequencing ("The Ugly Mirror"),
-- un-split oversized workstream matching 2+ symptoms of the 4-Point Right-Sizing Rule,
+- an oversized implementation increment lacking reviewable phase/commit boundaries despite 2+ right-sizing signals,
 - a `/dev-docs` workstream too incomplete to execute safely.
 
 Required wording:
@@ -80,7 +80,7 @@ Use for:
 Required wording:
 
 ```text
-Major — should be corrected before merge or split into a follow-up with owner/date.
+Major — correct in its owning implementation phase before that increment merges; retain required repairs in the same plan.
 ```
 
 ### Moderate
@@ -161,7 +161,7 @@ Use strong language when warranted:
 
 - “I would not approve this.”
 - “This is a platform integrity issue, not a polish issue.”
-- “This must be split.”
+- “Divide this implementation into reviewable phases while retaining all requested scope.”
 - “This is the wrong layer for this responsibility.”
 - “Because breaking changes are allowed, keeping this compatibility layer is unjustified.”
 - “This is acceptable for a prototype, not for an enterprise self-hostable platform.”

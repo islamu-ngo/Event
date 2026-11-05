@@ -116,8 +116,10 @@ Then explain the core technical approach and its important constraint.>
 ### Potential Risks & Hardest Unknowns
 <Short evidence-grounded paragraph naming the hardest unresolved area or edge case.>
 
-### Recommended Next Step & Approval Request
-<Explicit call for approval or specific direction to proceed with Phase 1, with options if applicable.>
+### Recommended Next Action
+
+Run /senior-cto-feedback in a fresh session if you want an adversarial Senior CTO architectural audit of the plan triad first, or
+Run /implement-tasks to begin executing Phase 1 (TASK-1.1) directly.
 ```
 
 Do not say implementation started. If re-baselining, summarize what materially changed in the planning artifacts.

@@ -12,7 +12,7 @@ Edit the triad at the exact path requested by the user. Do not create worktrees,
 
 A better implementation plan should be:
 
-- smaller,
+- reviewable in bounded implementation increments,
 - sequenced,
 - testable,
 - migration-aware,
@@ -24,6 +24,8 @@ A better implementation plan should be:
 - explicit about which exact files each phase owns and commits,
 - explicit about each phase's exact default commit message and rare override conditions,
 - explicit about what future agents must keep updating.
+
+Preserve the complete requested scope in the same plan/context/tasks triad. Organize large work into dependency-ordered phases with explicit prerequisites, owned paths, acceptance criteria, verification and atomic commit/PR outcomes. A multiphase plan is not a single PR: retain later UI, integration, packaging and qualification work in later phases. Do not create or populate backlog files to satisfy a size threshold. Only explicit user direction can remove a requested outcome; completion still requires every retained outcome.
 
 ## Rewrite The Whole Workstream
 
@@ -203,7 +205,7 @@ Last Updated: YYYY-MM-DD Europe/Brussels
 #### Commit Tasks
 - During implementation, stage exact phase-owned paths using `git add -- <paths>` and execute the declarative commit contract. Preserve unrelated work.
 - Load `conventional-commit` only when a permitted material divergence override replaces the default contract.
-## Remaining / Deferred Work
+## Remaining Required Work By Phase
 ```
 
 Rewrite rules:
@@ -247,9 +249,14 @@ Docs:
 - Update `<doc files>`.
 ```
 
-## PR Split Guidance
+## Multiphase Delivery Guidance
 
-Prefer splitting by risk boundary:
+Preserve the complete requested scope in the same plan/context/tasks triad. Organize large work into dependency-ordered phases with explicit prerequisites, owned paths, acceptance criteria, verification and atomic commit/PR outcomes. A multiphase plan is not a single PR: retain later UI, integration, packaging and qualification work in later phases. Do not create or populate backlog files to satisfy a size threshold. Only explicit user direction can remove a requested outcome; completion still requires every retained outcome.
+
+The following are possible commit/PR increments inside one implementation plan,
+not separate workstreams or instructions to remove later scope. Use boundaries
+appropriate to the target and keep source/caller/test/docs slices coherent:
+
 
 1. PR 1 — data/foundation
    - domain entities,

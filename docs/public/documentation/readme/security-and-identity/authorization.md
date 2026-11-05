@@ -367,6 +367,12 @@ administrator grant within its transaction, after the selected authorization
 provider allows the operation. Listing remains self-owned; an exact-key
 administrative read or mutation may target another administrator's key.
 
+Background queue admission uses the separately configured Global database login.
+Canonical PostgreSQL migration enrolls it for generic outbox, notification outbox
+and notification fanout admission. Those memberships allow the bounded admission
+operations without role switching, membership administration or arbitrary private
+table reads; they do not promote the ordinary Runtime login.
+
 Webhook-effect and fair-return readiness use separate Global aggregate readers.
 Their database rights cover only the status and timing fields needed for counts,
 not retained messages, effect ownership, or writes. Readiness rejects altered
@@ -382,6 +388,11 @@ PostgreSQL startup also enrolls the Global connection in the fixed public
 tenant-directory read capability. This supplies active tenant IDs, slugs and
 public domain coordinates without granting private tenant-table access or
 migration authority to serving hosts.
+
+The Global connection also receives the existing bounded email admission,
+stale-recovery and aggregate-health capability during canonical migration.
+Readiness must use that application purpose rather than granting email-function
+execution to the ordinary Runtime connection.
 
 RabbitMQ publication reads pointer metadata without loading email content or
 claiming SMTP delivery. Its database writes cover only publication markers.

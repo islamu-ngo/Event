@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
@@ -287,9 +288,33 @@ public sealed class PostgresMigrationAuthorityIsolationTests(PostgreSqlContainer
             ], PlatformApiKeySourceEnrollment.Bind(configuration));
         await factories.RequireReadyAsync(TestContext.Current!.Execution.CancellationToken);
         var globalFactory = new GlobalExploreDbContextFactory(ApplicationOptions(PrimaryDatabaseRole.Global));
+        var admission = new GenericOutboxAdmission(globalFactory, TimeProvider.System);
+        var claims = await admission.ClaimDueAsync(
+            1, DateTime.UtcNow, TestContext.Current.Execution.CancellationToken);
+        await Assert.That(claims).IsEmpty();
+        var notificationClaims = await new NotificationOutboxAdmission(globalFactory, TimeProvider.System)
+            .ClaimDueAsync(1, DateTime.UtcNow, TestContext.Current.Execution.CancellationToken);
+        await Assert.That(notificationClaims).IsEmpty();
+        var fanout = new NotificationFanoutAdmission(globalFactory,
+            new TenantExploreDbContextFactory(ApplicationOptions(PrimaryDatabaseRole.Runtime)));
+        var fanoutRound = await fanout.ClaimDueRoundAsync(
+            new("migration-enrollment", DateTime.UtcNow, TimeSpan.FromMinutes(1), 1, 1, 1, 2, 1),
+            TestContext.Current.Execution.CancellationToken);
+        await Assert.That(fanoutRound.Claims).IsEmpty();
+        await Assert.That(fanoutRound.CandidateCount).IsEqualTo(0);
+        var fanoutSnapshot = await fanout.GetProcessorSnapshotAsync(
+            DateTime.UtcNow, TestContext.Current.Execution.CancellationToken);
+        await Assert.That(fanoutSnapshot.DueOccurrenceCount).IsEqualTo(0);
+        await Assert.That(fanoutSnapshot.ActiveClaimCount).IsEqualTo(0);
+        await Assert.That(fanoutSnapshot.OldestDueAt).IsNull();
         var directory = new TenantLookupSource(globalFactory);
         await Assert.That(await directory.GetTenantLookupsAsync(
             TestContext.Current.Execution.CancellationToken)).IsEmpty();
+        DateTime healthAt = DateTime.UtcNow;
+        var emailHealth = await new EmailDispatchHealthSnapshotReader(globalFactory).ReadAsync(
+            healthAt, healthAt.AddMinutes(-5), 5, TestContext.Current.Execution.CancellationToken);
+        await Assert.That(emailHealth.DueDispatchCount).IsEqualTo(0);
+        await Assert.That(emailHealth.TenantBacklogSample).IsEmpty();
         await AssertAuthorityAsync(connection, fixture.NativeQueueEnrollment.MigratorLogin, privileged: true);
         await Assert.That(migration.ChangeTracker.Entries()).IsEmpty();
     }

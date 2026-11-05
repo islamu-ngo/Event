@@ -207,6 +207,15 @@ public static class ExploreDatabaseMigrator
         await PostgresGenericOutboxAdmissionContract.ApplyAsync(executionDatabase, cancellationToken);
         if (queueEnrollment is not null)
         {
+            await executionDatabase.Database.ExecuteSqlRawAsync(
+                $"""
+                GRANT "{PostgresNotificationFanoutAdmissionContract.GlobalRole}",
+                    "{PostgresNotificationOutboxAdmissionContract.GlobalRole}",
+                    "{PostgresGenericOutboxAdmissionContract.GlobalRole}",
+                    "{PostgresEmailDispatchAdmissionContract.GlobalRole}"
+                TO "{queueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                """, cancellationToken);
             await PostgresOutboxExecutionContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresPublicationFanoutExecutionContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
         }

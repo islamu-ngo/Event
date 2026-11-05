@@ -555,6 +555,14 @@ The serving login receives no new table rights or migration authority. Fresh
 canonical migration tests invoke the actual directory reader rather than relying
 on fixture-only role membership.
 
+The configured Global login is also enrolled in the existing email admission
+purpose, with inheritance enabled and SET/ADMIN disabled. Its established
+capability includes bounded batch admission, stale recovery and operational
+health aggregates; it is not a health-only role. Canonical startup must supply
+the same application purpose used by `EmailDispatchHealthSnapshotReader` and
+`EmailDispatchAdmission`. This enrollment adds no Runtime or direct table grants,
+new routine or business rule.
+
 Provider work claims use serializable lease fences and a monotonic fence token.
 Stale claims cannot settle a newer claim, and unknown work can only be moved by
 explicit reconciliation to completed or retry-scheduled state. Expired provider
@@ -2003,6 +2011,13 @@ are rejected and require an explicitly provisioned fresh isolated development
 PostgreSQL instance/cluster without the obsolete capability roles. A new database
 inside a cluster retaining those roles is insufficient because roles are cluster-wide.
 The application never automatically removes those objects or deletes data.
+
+Canonical migration explicitly enrolls the configured Global login in the
+generic outbox, notification outbox and notification fanout admission groups.
+Membership inherits execution rights without role switching or membership
+administration. Runtime does not receive these Global groups. Fresh-cluster
+qualification invokes the production admission services after canonical
+migration; shared-fixture-only memberships cannot establish that proof.
 
 Effect readiness uses independent Global aggregate observers rather than the
 tenant mutation repositories. PostgreSQL grants exactly status/retry/lease

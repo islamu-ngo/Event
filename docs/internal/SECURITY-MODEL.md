@@ -528,6 +528,23 @@ gaps or checkpoint mismatch, reapplies uncaptured policy versions, and leaves a
 fresh application database at sequence zero. A repeated replay is a no-op once
 the checkpoint matches the retained authority.
 
+Recognition receipt retention and recovery also execute through C# repositories
+before replay completes. `PostgresPrivacyReplayStoragePermissions` installs
+their fixed recognition-state reads and writes for the deployment's declared
+Global login. The production migrator and native fixture use the same installer;
+tests must not substitute handwritten grants for that enrollment. Installation
+requires the original Migrator login and uses EF model identifiers quoted by the
+provider. `PrivacyErasureService` selects the Global operation owner before
+resolving `RetainedAuthorityPrivacyErasureWorkflow`, so the checkpoint writer
+receives Global SELECT/INSERT. Runtime receives checkpoint SELECT for readiness;
+its former INSERT grant is revoked. Neither purpose receives checkpoint UPDATE
+or DELETE. Runtime receives no recognition-state rights from this installer;
+additional health reads expose only provider-work Status/NextAttemptAtUtc and
+outbox EventType/Status, matching the readiness counters. These credentials confer those fixed
+storage permissions; C# owns authorization and replay sequencing. The installer
+grants neither owner membership nor RLS bypass. Applying it does not change retained-authority
+checks, identity fences, transactions or replay completion rules.
+
 The BFF treats public Keycloak endpoint, realm and client ID metadata without a
 confidential-client secret as an unconfigured optional provider. Every present
 value must still be valid; a configured secret requires the complete group.

@@ -36,6 +36,23 @@ Apply the matching Migrator before restarting upgraded application hosts.
 A missing bootstrap storage grant blocks startup; the application does not
 repair database permissions or skip convergence to become healthy.
 
+## PostgreSQL Privacy Replay Storage
+
+Startup privacy replay uses the configured Global login for recognition receipt
+retention and recovery. Run the matching application Migrator before restarting
+the application: it installs the fixed recognition-state storage permissions
+needed by those C# workflows. Global owns checkpoint reads and appends. The
+separate Runtime login can read checkpoints and the metadata needed by readiness
+counters, but cannot append checkpoints. Neither can update or delete checkpoint
+history through these grants.
+Runtime credentials remain separate, and this
+installation does not grant superuser, BYPASSRLS or schema-owner privileges.
+
+A permission denial during replay leaves startup blocked. Repair the deployment
+through its selected Migrator rather than disabling replay or granting broad
+rights manually. Retained erasure facts, identity fences and replay checkpoints
+continue to determine whether startup may complete.
+
 ## Authorization Pipeline Flow
 
 Every mutation and sensitive query passes through a multi-stage, fail-closed authorization pipeline before reaching business logic:

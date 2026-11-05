@@ -42,6 +42,94 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
     private readonly string _authoritySchema = $"erasure_fact_{Guid.CreateVersion7():N}";
 
     [Test]
+    public async Task EnrolledGlobalOwnerCanRunStartupRecognitionReceiptCleanup()
+    {
+        var factory = new GlobalExploreDbContextFactory(
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+        await using var application = await factory.CreateDbContextAsync();
+        await using var authority = new CoLocatedPrivacyErasureAuthorityDbContext(
+            AuthorityOptions(PrimaryDatabaseRole.Runtime));
+        var retained = new CoLocatedPostgresPrivacyErasureAuthorityRepository(
+            authority, TimeProvider.System, Options.Create(new PrivacyErasureOptions()));
+        using var replicaOwner = new ModerationRecognitionKeyLifecycleReplicaOwner();
+        var lifecycle = new ModerationRecognitionKeyLifecycleRepository(application,
+            retained, retained, replicaOwner, TimeProvider.System);
+
+        var result = await lifecycle.ForgetExpiredReceiptsAsync(null, 1,
+            TestContext.Current!.Execution.CancellationToken);
+
+        await Assert.That(result.LastInspectedIntentId).IsNull();
+        await Assert.That(result.ReceiptsRemoved).IsEqualTo(0);
+        await Assert.That(result.ObligationsRemoved).IsEqualTo(0);
+
+        await using var runtime = fixture.CreateEnrolledTenantlessDbContext();
+        runtime.BindTenantLease();
+        await AssertOrdinaryAsync(runtime, fixture.NativeQueueEnrollment.RuntimeLogin);
+        var denial = await Assert.ThrowsAsync<PostgresException>(() =>
+            runtime.Set<ModerationRecognitionKeyLifecyclePurge>().AsNoTracking()
+                .Select(receipt => receipt.IntentId).FirstOrDefaultAsync());
+        await Assert.That(denial!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            PostgresPrivacyReplayStoragePermissions.ApplyAsync(
+                runtime, fixture.NativeQueueEnrollment));
+    }
+
+    [Test]
+    public async Task EnrolledGlobalOwnerCanReadAndAppendReplayCheckpointChain()
+    {
+        var token = TestContext.Current!.Execution.CancellationToken;
+        var factory = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+        await using var application = await factory.CreateDbContextAsync(token);
+        await AssertOrdinaryAsync(application, fixture.NativeQueueEnrollment.GlobalLogin);
+        var checkpoints = new PrivacyErasureReplayCheckpointRepository(application);
+        await Assert.That(await checkpoints.GetLatestAsync(token)).IsNull();
+        var now = DateTime.UtcNow;
+        var firstIntent = PrivacyErasureIntent.Record(Guid.CreateVersion7(), 1,
+            PrivacyErasureSubjectKind.User, Guid.CreateVersion7(),
+            PrivacyErasureReasonCode.AccountDeletion, 1, now, now);
+        var first = PrivacyErasureReplayCheckpoint.Start(firstIntent, now);
+        await checkpoints.AppendAsync(first, token);
+        var secondIntent = PrivacyErasureIntent.Record(Guid.CreateVersion7(), 2,
+            PrivacyErasureSubjectKind.User, Guid.CreateVersion7(),
+            PrivacyErasureReasonCode.AccountDeletion, 1, now, now);
+        var second = PrivacyErasureReplayCheckpoint.Advance(first, secondIntent, now);
+        await checkpoints.AppendAsync(second, token);
+        var latest = await checkpoints.GetLatestAsync(token);
+        await Assert.That(latest!.Id).IsEqualTo(second.Id);
+        await Assert.That(latest.PreviousCheckpointId).IsEqualTo(first.Id);
+        await Assert.That(latest.AuthoritySequence).IsEqualTo(2);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => checkpoints.AppendAsync(second, token));
+        var original = application.PrivacyErasureReplayCheckpoints.Where(checkpoint => checkpoint.Id == first.Id);
+        var updateDenial = await Assert.ThrowsAsync<PostgresException>(() =>
+            original.ExecuteUpdateAsync(setters => setters.SetProperty(checkpoint => checkpoint.PolicyVersion, 2), token));
+        await Assert.That(updateDenial!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+        var deleteDenial = await Assert.ThrowsAsync<PostgresException>(() => original.ExecuteDeleteAsync(token));
+        await Assert.That(deleteDenial!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+
+        await using var runtime = fixture.CreateEnrolledTenantlessDbContext();
+        runtime.BindTenantLease();
+        await AssertOrdinaryAsync(runtime, fixture.NativeQueueEnrollment.RuntimeLogin);
+        var reader = new PrivacyErasureReplayCheckpointRepository(runtime);
+        await Assert.That((await reader.GetLatestAsync(token))!.Id).IsEqualTo(second.Id);
+        var thirdIntent = PrivacyErasureIntent.Record(Guid.CreateVersion7(), 3,
+            PrivacyErasureSubjectKind.User, Guid.CreateVersion7(),
+            PrivacyErasureReasonCode.AccountDeletion, 1, now, now);
+        var third = PrivacyErasureReplayCheckpoint.Advance(second, thirdIntent, now);
+        var appendDenial = await Assert.ThrowsAsync<DbUpdateException>(() => reader.AppendAsync(third, token));
+        await Assert.That(appendDenial!.InnerException is PostgresException postgres
+            && postgres.SqlState == PostgresErrorCodes.InsufficientPrivilege).IsTrue();
+        var work = new PrivacyErasureProviderWorkRepository(runtime);
+        await Assert.That(await work.CountDueAsync(now, token)).IsEqualTo(0);
+        await Assert.That(await work.CountUnknownAsync(token)).IsEqualTo(0);
+        await Assert.That(await work.CountDeadLetteredAsync(token)).IsEqualTo(0);
+        var outbox = new OutboxRepository(runtime);
+        await Assert.That(await outbox.CountIncompleteByEventTypeAsync(
+            PrivacyErasureCacheInvalidationOutboxMessageFactory.EventType, token)).IsEqualTo(0);
+        await Assert.That(await outbox.CountDeadLetteredByEventTypeAsync(
+            PrivacyErasureCacheInvalidationOutboxMessageFactory.EventType, token)).IsEqualTo(0);
+    }
+
+    [Test]
     [Arguments("none", false)]
     [Arguments("primary-before", false)]
     [Arguments("primary-after", false)]

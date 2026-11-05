@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6P2WHWS63HJXVKFGMKTEN3J
+Title: "Install storage permissions for the selected privacy replay owners"
+Type: fix
+Scope: self-hosting
+Summary: "Supply fixed Global recognition recovery and checkpoint append rights while keeping Runtime limited to readiness reads."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "The selected Global workflow owns recognition recovery and checkpoint appends; Runtime retains only checkpoint and bounded counter reads, with no owner membership or RLS bypass."
+  Migration:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "The canonical Migrator installs fixed storage permissions and revokes Runtime checkpoint INSERT; neither purpose receives checkpoint UPDATE or DELETE."
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: "Run matching migration before application hosts; permission failures block privacy replay instead of bypassing retained authority."

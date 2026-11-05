@@ -342,6 +342,8 @@ public static class ExploreDatabaseMigrator
                 executionDatabase, queueEnrollment, cancellationToken);
             await PostgresManagedTenantWorkerCreationPermissions.ApplyAsync(executionDatabase, queueEnrollment,
                 IdentityDatabaseConfiguration.GetTopology(configuration), cancellationToken);
+            await PostgresPrivacyReplayStoragePermissions.ApplyAsync(
+                executionDatabase, queueEnrollment, cancellationToken);
         }
         await EventDiscoveryRankBackfill.ApplyAsync(executionDatabase, cancellationToken);
     }

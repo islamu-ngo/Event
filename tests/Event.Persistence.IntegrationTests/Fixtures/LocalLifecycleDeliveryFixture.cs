@@ -159,9 +159,6 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
                 ? new LocalIdentityLifecycleSmtpTransport(new SmtpEmailService(new SmtpConfigResolver(capabilities, this, settings),
                     NullLogger<SmtpEmailService>.Instance)) : fixture.Smtp;
             Processor = new(Lifecycle, Deliveries, MutationLock, settings, capabilities, transport,
-                new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(
-                    new Dictionary<string, string?> { ["PublicBaseUrl"] = "https://instance.test" }).Build(),
-                SystemSettingRepository.CreateReadOnly(Application, MutationLock),
                 Options.Create(new EmailDispatchProcessorSettings()));
             executionScope = fixture.executionProvider.CreateAsyncScope();
             Router = new(new UserExternalLoginRepository(Application),

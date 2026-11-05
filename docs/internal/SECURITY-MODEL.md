@@ -283,6 +283,15 @@ or the existing authorized administrative process, never the public failure
 detail. See [Authentication](AUTHENTICATION.md#local-verification-email-change-and-password-recovery)
 for the native ownership flow and delivery uncertainty rules.
 
+Lifecycle delivery resolves its callback address after mirror repair in a
+separate ordinary Runtime scope. The hierarchical read is instance-only and
+authoritative; that scope is disposed before the LocalIdentityWriter delivery
+scope is selected. The writer receives the validated HTTPS origin and does not
+read a full SystemSetting entity. Invalid explicit overrides never fall back to
+stored addresses, and address failures do not undo completed mirror repair.
+SMTP admission, ordered settings locks and uncertain-completion rules retain
+their existing writer ownership.
+
 ### Event resource authority boundary
 
 Event resource policy authority uses a separate frozen-input protocol. Generic

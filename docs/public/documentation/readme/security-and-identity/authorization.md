@@ -372,6 +372,15 @@ inside the same transaction as projection rows, dirty markers and status
 changes. A posted tenant ID cannot select another tenant. These source changes
 and native regression cases are authored; execution remains pending.
 
+## Local lifecycle callback authority
+
+Local account lifecycle delivery reads the instance callback address through
+the ordinary settings purpose before selecting its identity writer. An invalid
+deployment override or a non-HTTPS address prevents sending; it cannot fall back
+to another host. Identity mirror repair still runs independently of delivery
+availability. No additional settings-table privileges are required for the
+identity writer.
+
 ## Current authority for API-key management
 
 Tenant-bound key details, policy changes and revocation use the current execution

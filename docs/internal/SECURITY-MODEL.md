@@ -546,6 +546,15 @@ defaults and normalization; its public DTO cache still returns isolated copies
 and clears only after acknowledged mutation settlement. This read does not
 acquire resolver mutation custody or grant Runtime direct settings-table access.
 
+Canonical migration also enrolls the configured Global login in the existing
+`PostgresTenantLookupContract.GlobalRole` with inheritance enabled and SET/ADMIN
+disabled, matching the native fixture's fixed read purpose. The cross-tenant
+disclosure primitive exposes only active tenant IDs/slugs and public domain
+coordinates; its owner, routine ACL and private-table isolation remain unchanged.
+The serving login receives no new table rights or migration authority. Fresh
+canonical migration tests invoke the actual directory reader rather than relying
+on fixture-only role membership.
+
 Provider work claims use serializable lease fences and a monotonic fence token.
 Stale claims cannot settle a newer claim, and unknown work can only be moved by
 explicit reconciliation to completed or retry-scheduled state. Expired provider

@@ -213,6 +213,15 @@ public static class ExploreDatabaseMigrator
         await PostgresWebPushDispatchAdmissionContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresQueueDrainHealthContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresLocationPrivacyReviewContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+        {
+            await executionDatabase.Database.ExecuteSqlRawAsync(
+                $"""
+                GRANT "{PostgresTenantLookupContract.GlobalRole}"
+                TO "{queueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                """, cancellationToken);
+        }
         await PostgresLocationPrivacyGovernanceContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresManifestReplayContract.ApplyAsync(executionDatabase, cancellationToken);
         if (queueEnrollment is not null)

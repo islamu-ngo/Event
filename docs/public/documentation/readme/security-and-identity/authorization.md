@@ -378,6 +378,11 @@ separate read owner. Ordinary application connections retain their existing
 restrictions. Missing saved settings remain distinguishable from defaults, and
 readiness does not acquire permission to change the configuration.
 
+PostgreSQL startup also enrolls the Global connection in the fixed public
+tenant-directory read capability. This supplies active tenant IDs, slugs and
+public domain coordinates without granting private tenant-table access or
+migration authority to serving hosts.
+
 RabbitMQ publication reads pointer metadata without loading email content or
 claiming SMTP delivery. Its database writes cover only publication markers.
 Global and tenant pauses, retry timing, redaction and soft deletion still govern

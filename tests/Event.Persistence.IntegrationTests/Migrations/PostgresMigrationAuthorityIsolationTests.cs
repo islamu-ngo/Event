@@ -286,6 +286,10 @@ public sealed class PostgresMigrationAuthorityIsolationTests(PostgreSqlContainer
                 ApplicationOptions(PrimaryDatabaseRole.PlatformKeyReport)
             ], PlatformApiKeySourceEnrollment.Bind(configuration));
         await factories.RequireReadyAsync(TestContext.Current!.Execution.CancellationToken);
+        var globalFactory = new GlobalExploreDbContextFactory(ApplicationOptions(PrimaryDatabaseRole.Global));
+        var directory = new TenantLookupSource(globalFactory);
+        await Assert.That(await directory.GetTenantLookupsAsync(
+            TestContext.Current.Execution.CancellationToken)).IsEmpty();
         await AssertAuthorityAsync(connection, fixture.NativeQueueEnrollment.MigratorLogin, privileged: true);
         await Assert.That(migration.ChangeTracker.Entries()).IsEmpty();
     }

@@ -213,6 +213,21 @@ fences. A stolen writer credential can enumerate that metadata. Reprovision a
 fresh development permission profile when adopting this inventory; readiness
 rejects an older partial profile instead of silently expanding its permissions.
 
+Credential creation must also read pending recognition and its captured material
+before admitting enrollment. The application-store writer has fixed read-only
+access to that continuity inventory, including pending state and receipt hashes;
+it cannot insert, update or delete those records. A stolen writer credential can
+read this material. This does not grant Runtime or Global the writer's authority,
+or give the writer private erasure-saga payloads or secret bindings. Provision a
+fresh development writer profile for the expanded read inventory; a partial old
+profile remains rejected.
+
+Creating the initial actor does not grant this writer event-table access.
+Classification stamping avoids existing-event lookups for a newly inserted
+actor; changes to existing actors retain their normal classification checks.
+The writer can read the generated profile concurrency revision, but cannot read
+the private birth date or its collection receipt.
+
 Only the migration service receives migration credentials; API runtime does not
 inherit them. Provision real database roles/grants separately: setup readiness
 is not proof of permission separation. Runtime must not have DDL, superuser or

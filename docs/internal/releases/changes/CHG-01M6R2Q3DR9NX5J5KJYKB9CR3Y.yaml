@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6R2Q3DR9NX5J5KJYKB9CR3Y
+Title: "keep Local credential creation within its selected storage purpose"
+Type: fix
+Scope: access
+Summary: "Give the selected Local identity writer fixed continuity and generated profile-revision reads, and avoid impossible event-ancestor queries for newly inserted actors without exposing private birth-date material or widening event privileges."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: "The closed inventory admits fixed continuity SELECT columns and the generated profile concurrency revision without private birth-date, receipt, continuity mutation, saga payload or secret-binding rights. Newly inserted actors require no event ancestor reads; existing-actor and tracked-descendant stamp propagation remains."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: "Provision a fresh development writer profile for the expanded read inventory. Existing partial profiles remain rejected; do not reuse Runtime, Global or Migrator credentials."

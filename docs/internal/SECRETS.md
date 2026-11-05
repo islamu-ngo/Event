@@ -471,6 +471,31 @@ enumerate this metadata and erased-subject IDs; it still cannot read those
 private payloads. Existing partial profiles fail readiness rather than receiving
 an inferred union of grants; use a freshly provisioned development profile.
 
+Local credential creation also runs `GuardExistingSubjectAsync` on its original
+selected writer and Serializable transaction. The closed application-store
+inventory therefore includes SELECT on the fixed mapped columns of
+`ModerationRecognitionPending` and `ModerationRecognitionCaptureItem`. The guard
+must validate settlement state and complete original material before enrollment;
+it cannot substitute a different Global snapshot or ignore unavailable storage.
+These sources receive no INSERT, UPDATE or DELETE rights. Writer credential
+compromise can expose pending-recognition state, receipt hashes and captured
+recognition material within this read inventory; it still grants no saga payload
+or secret-binding access. Model/catalogue drift rejects admission.
+
+Initial actor creation does not require event-table access for classification
+stamping. A newly added actor cannot have persisted event or speaker ancestors;
+the stamp collector excludes those new actor IDs from persisted ancestor queries.
+Tracked event/session changes retain their own ancestry collection, and changes
+to existing actors or newly added profiles for existing actors retain lookup and
+stamp advancement. Do not widen the identity writer's event privileges to support
+an impossible ancestor read.
+
+The writer's `UserPii` SELECT inventory includes `_birthDateRevision`, the
+database-generated concurrency value returned by an initial profile insert.
+It does not include `_dateOfBirth` or `_birthDateCollectionReceiptId`. Reading
+the revision preserves EF's original concurrency contract without exposing the
+private birth-date value or collection receipt.
+
 ## Instance Onboarding Keys
 
 The eight `INSTANCE_BOOTSTRAP_*` keys follow the same single-authority rule as

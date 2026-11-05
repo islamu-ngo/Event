@@ -4,6 +4,12 @@ description: Operate Local Identity, Keycloak, or passwordless AT Protocol authe
 
 # Authentication Architecture
 
+In Split deployments, AppHost preserves the public Keycloak endpoint, realm and
+client ID it supplies to the browser host. Public metadata alone leaves the
+optional confidential client unconfigured; a configured client secret still
+requires a complete, valid credential group. No database permission changes are
+needed for this startup projection.
+
 Each deployment has exactly one **primary authentication provider**:
 
 * **Local Identity** uses ASP.NET Core Identity inside ISLAMU Event. It is the

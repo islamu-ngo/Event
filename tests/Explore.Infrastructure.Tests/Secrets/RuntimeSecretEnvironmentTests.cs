@@ -10,6 +10,28 @@ public sealed class RuntimeSecretEnvironmentTests
     private static readonly SecretAcquisitionEntry[] Entries = SecretDefinitionRegistry.All.Values.Select(definition =>
         new SecretAcquisitionEntry(definition.DefaultInfisicalPath,
             definition.DefaultInfisicalKey, definition.DefaultEnvironmentVariableName)).ToArray();
+
+    [Test]
+    [Arguments(SecretConsumerRole.Bff)]
+    [Arguments(SecretConsumerRole.Combined)]
+    public async Task NativeKeycloakPublicMetadataSurvivesWithoutOptionalClientCredential(
+        SecretConsumerRole consumer)
+    {
+        var metadata = new Dictionary<string, object>
+        {
+            ["KEYCLOAK_ENDPOINT"] = "http://127.0.0.1:18080/auth",
+            ["KEYCLOAK_REALM"] = "assurance",
+            ["KEYCLOAK_CLIENT_ID"] = "assurance-browser"
+        };
+        var target = new Dictionary<string, object>(metadata);
+        RuntimeSecretEnvironment.Apply(target, Configuration(new()), [], consumer,
+            SecretAuthorityKind.Environment, Entries);
+
+        foreach (var entry in metadata)
+            await Assert.That(target[entry.Key]).IsEqualTo(entry.Value);
+        await Assert.That(target.ContainsKey("KEYCLOAK_BLAZOR_CLIENT_SECRET")).IsFalse();
+    }
+
     [Test]
     [Arguments(SecretConsumerRole.Api)]
     [Arguments(SecretConsumerRole.Bff)]

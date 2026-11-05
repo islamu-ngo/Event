@@ -528,6 +528,17 @@ gaps or checkpoint mismatch, reapplies uncaptured policy versions, and leaves a
 fresh application database at sequence zero. A repeated replay is a no-op once
 the checkpoint matches the retained authority.
 
+The BFF treats public Keycloak endpoint, realm and client ID metadata without a
+confidential-client secret as an unconfigured optional provider. Every present
+value must still be valid; a configured secret requires the complete group.
+Authority errors, unresolved placeholders and invalid values fail startup.
+Credential mappings and acquisition receipts publish only after all groups
+validate, for both Split BFF and Combined hosts.
+AppHost preserves explicitly projected public Keycloak coordinates for an
+Environment BFF consumer even though their registry defaults belong to the API
+folder. This does not admit API credentials or change Infisical folder ownership;
+an Infisical BFF still acquires its metadata from its own selected authority.
+
 Provider work claims use serializable lease fences and a monotonic fence token.
 Stale claims cannot settle a newer claim, and unknown work can only be moved by
 explicit reconciliation to completed or retry-scheduled state. Expired provider

@@ -34,7 +34,11 @@ public static class RuntimeSecretEnvironment
         foreach (SecretAcquisitionEntry entry in entries)
         {
             string name = entry.ConfigurationKey;
-            if (!SecretAcquisitionPolicy.AllowsRoot(consumer, entry.Folder)
+            // Native BFF endpoints share public Keycloak coordinates with the API registry.
+            bool bffMetadata = consumer == SecretConsumerRole.Bff
+                && entry.Folder == "/runtime/api/authentication/keycloak"
+                && name is "KEYCLOAK_ENDPOINT" or "KEYCLOAK_REALM" or "KEYCLOAK_CLIENT_ID";
+            if (!SecretAcquisitionPolicy.AllowsRoot(consumer, entry.Folder) && !bffMetadata
                 || Forbidden(entry.ConfigurationKey, consumer))
             {
                 target[name] = string.Empty;

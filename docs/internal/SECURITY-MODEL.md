@@ -3,6 +3,15 @@
 
 # Security
 
+## Blazor framework security patch
+
+The central package baseline pins `Microsoft.AspNetCore.Components.Web`,
+`Microsoft.AspNetCore.Components.WebAssembly` and
+`Microsoft.AspNetCore.Components.WebAssembly.Server` to `10.0.14` for
+`GHSA-g27p-qf6j-c96c`. The regenerated project locks carry the matching
+transitive framework packages. Restore and publish from these pins and locks;
+an installed shared runtime does not replace a packaged NuGet dependency.
+
 ## Application authority and database defence
 
 C# Domain/Application workflows own authorization, business rules, concurrency

@@ -7,6 +7,7 @@ using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -1066,10 +1067,10 @@ public static partial class SecurityExecutionEvidence
                     }
                     else if (labels.TryGetProperty("islamu.assurance.resource", out _)) return false;
                 }
-                bool retiredForeign = owner != inputs.Owner && item.TryGetProperty("State", out var foreignState)
+                bool foreignWithKnownState = owner != inputs.Owner && item.TryGetProperty("State", out var foreignState)
                     && foreignState.ValueKind == JsonValueKind.String
-                    && foreignState.GetString() is "exited" or "dead";
-                if (!TryReadRuntimeMounts(item, out var mounts, allowEmptyForeignVolumeSource: retiredForeign))
+                    && foreignState.GetString() is "exited" or "dead" or "running" or "paused" or "created" or "restarting" or "removing";
+                if (!TryReadRuntimeMounts(item, out var mounts, allowEmptyForeignVolumeSource: foreignWithKnownState))
                     return false;
                 if (owner != inputs.Owner)
                 {
@@ -1121,6 +1122,61 @@ public static partial class SecurityExecutionEvidence
         }
         catch (Exception exception) when (exception is JsonException or InvalidDataException or InvalidOperationException
             or ArgumentException or FormatException or OverflowException or KeyNotFoundException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    internal static bool VolumeConsumersAbsent(JsonElement inventory, IReadOnlyDictionary<string, string> volumes)
+    {
+        if (volumes.Count == 0) return true;
+        foreach (JsonElement row in inventory.EnumerateArray())
+        {
+            // Listings may omit volume paths; names identify volume consumers, while bind paths must remain complete.
+            if (!TryReadRuntimeMounts(row, out var mounts, allowEmptyForeignVolumeSource: true)) return false;
+            foreach (ObservedContainerMount mount in mounts)
+                if (mount.Type == "volume" && volumes.ContainsKey(mount.Name)
+                    || mount.Type == "bind" && volumes.Values.Any(path => ObservedMountPathsOverlap(path, mount.Source))) return false;
+        }
+        return true;
+    }
+
+    internal static bool SameVolumeIncarnation(JsonElement original, JsonElement current) =>
+        new[] { "CreatedAt", "Driver", "Scope", "Labels", "Options" }.All(property =>
+            original.TryGetProperty(property, out JsonElement expected)
+            && current.TryGetProperty(property, out JsonElement actual)
+            && JsonElement.DeepEquals(expected, actual));
+
+    internal static bool TryJoinContainerMountInspection(JsonElement summary, JsonElement inspection, out JsonElement joined)
+    {
+        joined = default;
+        try
+        {
+            string id = Text(summary, "Id"), image = Text(summary, "ImageID");
+            if (id.Length != 64 || !LowerHex(id) || !FullLocalImageId(image)
+                || Text(inspection, "Id") != id || Text(inspection, "Image") != image
+                || !UniqueProperties(summary) || !UniqueProperties(inspection)
+                || !TryReadRuntimeMounts(summary, out var summaryMounts, allowEmptyForeignVolumeSource: true)
+                || !TryReadRuntimeMounts(inspection, out var inspectedMounts)
+                || summaryMounts.Count != inspectedMounts.Count) return false;
+            var byTarget = inspectedMounts.ToDictionary(mount => mount.Destination, StringComparer.Ordinal);
+            foreach (ObservedContainerMount mount in summaryMounts)
+                if (!byTarget.TryGetValue(mount.Destination, out var inspected)
+                    || mount.Type != inspected.Type || mount.Name != inspected.Name
+                    || mount.ReadWrite != inspected.ReadWrite
+                    || mount.Source != inspected.Source && !(mount.Type == "volume" && mount.Source.Length == 0))
+                    return false;
+            JsonObject row = JsonNode.Parse(summary.GetRawText())!.AsObject();
+            foreach (JsonNode? value in row["Mounts"]!.AsArray())
+            {
+                JsonObject mount = value!.AsObject();
+                mount["Source"] = byTarget[mount["Destination"]!.GetValue<string>()].Source;
+            }
+            joined = JsonSerializer.SerializeToElement(row);
+            return true;
+        }
+        catch (Exception failure) when (failure is JsonException or InvalidOperationException or ArgumentException
+            or InvalidDataException or FormatException or OverflowException or KeyNotFoundException or NotSupportedException)
         {
             return false;
         }

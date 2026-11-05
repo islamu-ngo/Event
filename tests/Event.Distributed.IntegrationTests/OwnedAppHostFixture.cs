@@ -346,6 +346,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                 (phase, reason, requested) => managedLaunchObservation?.RecordStartupFailure(phase, reason, requested,
                     cancellationToken.IsCancellationRequested, lifetime.IsCancellationRequested), startup,
                 () => CompleteCleanupProofBeforeStopAsync());
+            await CompleteCleanupProofBeforeStopAsync(cancellationToken);
         }
         catch (Exception exception) { startupFailure = exception; }
         if (startupFailure is not null)
@@ -554,7 +555,17 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             lock (containerIdentityLock)
                 pending = cleanupCandidates.Where(candidate => !attempted.Any(previous =>
                     ReferenceEquals(previous.Resource, candidate.Resource) && previous.Instance == candidate.Instance)).ToArray();
-            if (pending.Length == 0) break;
+            if (pending.Length == 0)
+            {
+                lock (containerIdentityLock)
+                {
+                    if (cleanupResources.All(resource => containerIdentities.Values.Any(identity => ReferenceEquals(identity.Resource, resource))))
+                        break;
+                }
+                try { await Task.Delay(50, deadline.Token); }
+                catch (OperationCanceledException) { break; }
+                continue;
+            }
             foreach (var candidate in pending)
             {
                 attempted.Add(candidate);
@@ -1264,6 +1275,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             observations = new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<ContainerResource, Dictionary<(string Instance, string Id), ManagedContainerAssociation>>
             containers = new(ReferenceEqualityComparer.Instance);
+        private readonly List<FileStream> heldStreams = [];
         private int records;
         internal IReadOnlyList<ManagedLaunchHint> Rows
         {
@@ -1806,26 +1818,53 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             { throw new InvalidOperationException("test_managed_launch_write_failed"); }
         }
 
-        private static async Task WritePrivateJsonAsync<T>(string path, T value, CancellationToken token)
+        private async Task WritePrivateJsonAsync<T>(string path, T value, CancellationToken token)
         {
             if (!OperatingSystem.IsLinux()) throw new InvalidOperationException("test_managed_launch_platform_unsupported");
             byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(value);
             if (bytes.Length > 1_048_576) throw new InvalidOperationException("test_managed_launch_record_limit");
+            FileStream? output = null;
             try
             {
-                await using var output = new FileStream(path, new FileStreamOptions
+                output = new FileStream(path, new FileStreamOptions
                 {
                     Mode = FileMode.CreateNew,
-                    Access = FileAccess.Write,
-                    Share = FileShare.None,
-                    Options = FileOptions.Asynchronous,
+                    Access = FileAccess.ReadWrite,
+                    Share = FileShare.Read,
+                    Options = FileOptions.Asynchronous | FileOptions.WriteThrough,
                     UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
                 });
                 await output.WriteAsync(bytes, token);
+                await output.FlushAsync(token);
+                output.Flush(flushToDisk: true);
+                lock (observationLock)
+                    heldStreams.Add(output);
             }
-            catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                if (output is not null) await output.DisposeAsync();
+                throw;
+            }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
-            { throw new InvalidOperationException("test_managed_launch_write_failed"); }
+            {
+                if (output is not null) await output.DisposeAsync();
+                throw new InvalidOperationException("test_managed_launch_write_failed");
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            List<FileStream> streams;
+            lock (observationLock)
+            {
+                streams = [.. heldStreams];
+                heldStreams.Clear();
+            }
+            foreach (var stream in streams)
+            {
+                try { await stream.DisposeAsync(); }
+                catch { }
+            }
         }
     }
 
@@ -2075,6 +2114,11 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             var containers = await RunDockerAsync(["ps", "--no-trunc", "-aq"], token);
             var currentVolumes = await RunDockerAsync(["volume", "ls", "--format", "{{.Name}}"], token);
             return new(containers.ExitCode, containers.Output, currentVolumes.ExitCode, currentVolumes.Output);
+        }
+        if (managedLaunchObservation is not null)
+        {
+            try { await managedLaunchObservation.DisposeAsync(); }
+            catch (Exception exception) { failures.Add(exception); }
         }
         try
         {

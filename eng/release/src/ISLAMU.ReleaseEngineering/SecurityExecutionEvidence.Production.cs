@@ -825,6 +825,61 @@ public static partial class SecurityExecutionEvidence
         return new(process ?? throw new OwnedExecutionFailure("native_process_missing"), report, evidence, owner, admitted, removed);
     }
 
+    /// <summary>
+    /// Runs a candidate-qualified child while retaining forced termination behind
+    /// its native owner's verified process custody.
+    /// </summary>
+    internal static async Task<(OwnedNativeProcessResult Process, bool Admitted, bool ResourceCleanupComplete)> RunManagedCleanupProbeAsync(
+        string repository, string candidate, string socketPath, string project, string assemblyPath, string selectedUid, string privateRoot,
+        Func<IReadOnlyList<ConfiguredOwnedResource>, Func<Task>, CancellationToken, Task> afterQualifiedInventory,
+        CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(afterQualifiedInventory);
+        Dictionary<string, OwningManagedTarget> targets = CaptureOwningManagedTargets(repository, candidate, [project]);
+        if (!TryCaptureProjectManagedInputs(Path.GetDirectoryName(assemblyPath)!, candidate,
+            [Path.GetFileName(assemblyPath)], out _, out _))
+            throw new OwnedExecutionFailure("selected_test_inputs_invalid");
+        string owner = Guid.NewGuid().ToString("N");
+        string temporary = PrivateChildDirectory(privateRoot, "m-" + owner);
+        string root = PrivateChildDirectory(PrivateChildDirectory(temporary, "islamu-assurance"), owner);
+        WritePrivateBytes(Path.Combine(root, ".islamu-test-owner"), Encoding.ASCII.GetBytes(owner));
+        string results = PrivateChildDirectory(temporary, "results");
+        ProcessStartInfo command = NativeTestStartInfo(assemblyPath, [selectedUid], results,
+            temporary, "cleanup-probe.trx", 600);
+        command.Environment["ISLAMU_TEST_RUN_ID"] = owner;
+        command.Environment["ISLAMU_TEST_ROOT"] = root;
+        command.Environment["DOTNET_ENVIRONMENT"] = "Testing";
+        command.Environment["ASPNETCORE_ENVIRONMENT"] = "Testing";
+        command.Environment["DOCKER_CONFIG"] = CreateOwnedDockerConfiguration(temporary);
+        command.Environment["DOCKER_HOST"] = "unix://" + socketPath;
+        command.Environment.Remove("DOCKER_CONTEXT");
+        command.Environment.Remove("DOCKER_TLS_VERIFY");
+        command.Environment.Remove("DOCKER_CERT_PATH");
+        using var daemon = new SelectedDaemon(socketPath);
+        bool qualified = false;
+        var result = await daemon.RunManagedAsync(owner, temporary, root, command, TimeSpan.FromMinutes(10),
+            repository, candidate, targets, null, null, null, token, async (context, resources, stop) =>
+            {
+                qualified = true;
+                await afterQualifiedInventory(resources, async () =>
+                {
+                    NativeProcessIdentity? identity = ReadNativeProcessIdentity(context.Pid);
+                    if (identity is null || identity.Start != context.Start || identity.Group != context.Group
+                        || identity.Session != context.Session || identity.State is 'Z' or 'X')
+                        throw new OwnedExecutionFailure("cleanup_probe_native_custody_changed");
+                    await SignalNativeGroupAsync(context.Group, identity, "-KILL").ConfigureAwait(false);
+                }, stop).ConfigureAwait(false);
+            }).ConfigureAwait(false);
+        WritePrivateBytes(Path.Combine(privateRoot, "native-observation.json"), result.Evidence);
+        WritePrivateBytes(Path.Combine(privateRoot, "native-observer-failures.json"),
+            JsonSerializer.SerializeToUtf8Bytes(result.Process.ObserverFailures
+                .Select(failure => failure is OwnedExecutionFailure owned ? owned.Code : failure.GetType().Name).ToArray()));
+        WritePrivateBytes(Path.Combine(privateRoot, "native-child.stdout"), result.Process.StandardOutput);
+        WritePrivateBytes(Path.Combine(privateRoot, "native-child.stderr"), result.Process.StandardError);
+        _ = TryRemoveOwnedChildTemporary(temporary, result.Process, qualified && result.ResourceCleanupComplete);
+        return (result.Process, result.Admitted, result.ResourceCleanupComplete);
+    }
+
     internal static bool TryRemoveOwnedChildTemporary(string temporary, OwnedNativeProcessResult? process,
         bool resourceCleanupComplete)
     {
@@ -1811,19 +1866,6 @@ public static partial class SecurityExecutionEvidence
             return true;
         }
 
-        private static bool VolumeConsumersAbsent(JsonElement inventory, IReadOnlyDictionary<string, string> volumes)
-        {
-            if (volumes.Count == 0) return true;
-            foreach (JsonElement row in inventory.EnumerateArray())
-            {
-                if (!TryReadRuntimeMounts(row, out var mounts)) return false;
-                foreach (ObservedContainerMount mount in mounts)
-                    if (mount.Type == "volume" && volumes.ContainsKey(mount.Name)
-                        || mount.Type == "bind" && volumes.Values.Any(path => ObservedMountPathsOverlap(path, mount.Source))) return false;
-            }
-            return true;
-        }
-
         private async Task<IReadOnlySet<string>> ImageVolumeTargetsAsync(string image, CancellationToken token)
         {
             using JsonDocument document = await GetAsync("/v1.40/images/" + Uri.EscapeDataString(image) + "/json", token).ConfigureAwait(false);
@@ -1839,7 +1881,7 @@ public static partial class SecurityExecutionEvidence
             return result;
         }
 
-        private async Task<Dictionary<string, string>> VolumeMountpointsAsync(CancellationToken token)
+        private async Task<(Dictionary<string, string> Mountpoints, Dictionary<string, JsonElement> Volumes)> VolumeInventoriesAsync(CancellationToken token)
         {
             using JsonDocument document = await GetAsync("/v1.40/volumes", token).ConfigureAwait(false);
             JsonElement root = document.RootElement;
@@ -1847,19 +1889,24 @@ public static partial class SecurityExecutionEvidence
                 && (warnings.ValueKind != JsonValueKind.Array || warnings.GetArrayLength() != 0))
                 throw new OwnedExecutionFailure("volume_inventory_incomplete");
             JsonElement volumes = root.GetProperty("Volumes");
-            var result = new Dictionary<string, string>(StringComparer.Ordinal);
-            if (volumes.ValueKind == JsonValueKind.Null) return result;
+            var mountpoints = new Dictionary<string, string>(StringComparer.Ordinal);
+            var items = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+            if (volumes.ValueKind == JsonValueKind.Null) return (mountpoints, items);
             if (volumes.ValueKind != JsonValueKind.Array || volumes.GetArrayLength() > 65_536)
                 throw new OwnedExecutionFailure("volume_inventory_invalid");
             foreach (JsonElement volume in volumes.EnumerateArray())
             {
                 string name = Text(volume, "Name"), mountpoint = Text(volume, "Mountpoint");
                 if (!RuntimeVolumeName(name) || !CanonicalObservedMountPath(mountpoint)
-                    || !BoundedIdentity(Text(volume, "Driver"), 128) || !result.TryAdd(name, mountpoint))
+                    || !BoundedIdentity(Text(volume, "Driver"), 128) || !mountpoints.TryAdd(name, mountpoint))
                     throw new OwnedExecutionFailure("volume_inventory_invalid");
+                items[name] = volume.Clone();
             }
-            return result;
+            return (mountpoints, items);
         }
+
+        private async Task<Dictionary<string, string>> VolumeMountpointsAsync(CancellationToken token) =>
+            (await VolumeInventoriesAsync(token).ConfigureAwait(false)).Mountpoints;
 
         private async Task DeleteVolumeAsync(string name, CancellationToken token)
         {
@@ -1917,7 +1964,8 @@ public static partial class SecurityExecutionEvidence
         internal async Task<(OwnedNativeProcessResult Process, bool Admitted, byte[] Evidence, bool ResourceCleanupComplete)> RunManagedAsync(
             string owner, string temporary, string root, ProcessStartInfo command, TimeSpan timeout, string repository,
             string candidate, IReadOnlyDictionary<string, OwningManagedTarget> targets, LoadToolInputs? loadTool, SecurityControlRegister.LoadPurpose? loadPurpose,
-            SecurityControlRegister.RuntimeLifecycle? lifecycle, CancellationToken token)
+            SecurityControlRegister.RuntimeLifecycle? lifecycle, CancellationToken token,
+            Func<OwnedNativeProcessContext, IReadOnlyList<ConfiguredOwnedResource>, CancellationToken, Task>? afterQualifiedInventory = null)
         {
             byte[] before = await IdentityAsync(token).ConfigureAwait(false);
             HashSet<string> initialIds = await InitialContainersAsync(owner, token).ConfigureAwait(false);
@@ -1936,6 +1984,7 @@ public static partial class SecurityExecutionEvidence
             var pendingDirectHints = new HashSet<string>(StringComparer.Ordinal);
             var directResources = new Dictionary<string, ConfiguredOwnedResource>(StringComparer.Ordinal);
             var directVolumes = new Dictionary<string, string>(StringComparer.Ordinal);
+            var witnessedVolumeIdentities = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
             var newIds = new HashSet<string>(StringComparer.Ordinal);
             var failures = new List<Exception>();
             ManagedProcessIdentity? native = null;
@@ -2082,7 +2131,8 @@ public static partial class SecurityExecutionEvidence
                 foreach (JsonElement item in inventory.RootElement.EnumerateArray())
                     if (!initialIds.Contains(Text(item, "Id"))) newIds.Add(Text(item, "Id"));
                 if (newIds.Count > 65_536) throw new OwnedExecutionFailure("native_resource_inventory_limit");
-                Dictionary<string, string> mountpoints = await VolumeMountpointsAsync(CancellationToken.None).ConfigureAwait(false);
+                var (mountpoints, currentVolumes) = await VolumeInventoriesAsync(CancellationToken.None).ConfigureAwait(false);
+                foreach (var pair in currentVolumes) witnessedVolumeIdentities.TryAdd(pair.Key, pair.Value);
                 Dictionary<string, string[]> candidates = ReadApiCreationCandidates(root, "direct");
                 foreach (string id in candidates.Keys)
                 {
@@ -2183,6 +2233,18 @@ public static partial class SecurityExecutionEvidence
                             eligible.Add(row);
                         }
                     }
+                    for (int index = 0; index < eligible.Count; index++)
+                    {
+                        JsonElement row = eligible[index];
+                        if (ContainerOwner(row) != runId || !TryReadRuntimeMounts(row, out var mounts, allowEmptyForeignVolumeSource: true)
+                            || !mounts.Any(mount => mount.Type == "volume" && mount.Source.Length == 0))
+                            continue;
+                        using JsonDocument inspection = await GetAsync(
+                            "/v1.40/containers/" + Text(row, "Id") + "/json", CancellationToken.None).ConfigureAwait(false);
+                        if (!TryJoinContainerMountInspection(row, inspection.RootElement, out var joined))
+                            throw new OwnedExecutionFailure("sdk_container_mount_inspection_changed");
+                        eligible[index] = joined;
+                    }
                     var selectedMounts = new Dictionary<string, string>(fixture.Volumes, StringComparer.Ordinal);
                     foreach (string name in model.Containers.SelectMany(item => item.Mounts).Where(mount => mount.Type == "Volume").Select(mount => mount.Source))
                         if (mountpoints.TryGetValue(name, out string? path)) selectedMounts[name] = path;
@@ -2231,6 +2293,7 @@ public static partial class SecurityExecutionEvidence
                 foreach (ConfiguredOwnedResource item in directObserved!) directResources[item.Container.ContainerId] = item;
             }
 
+            bool inventoryNotified = false;
             OwnedNativeProcessResult process = await RunOwnedNativeProcessAsync(command, timeout, token, async (context, stop) =>
             {
                 native = ReadManagedProcessIdentity(context.Pid);
@@ -2239,6 +2302,18 @@ public static partial class SecurityExecutionEvidence
                 while (!stop.IsCancellationRequested)
                 {
                     await ObserveAsync(context).ConfigureAwait(false);
+                    if (!inventoryNotified && afterQualifiedInventory is not null && fixtures.Count != 0
+                        && fixtures.Values.All(fixture => fixture.Resources.Count != 0 && fixture.Model.Projects.Count != 0
+                            && fixture.Model.Containers.All(declaration => fixture.Resources.Values.Any(resource =>
+                                resource.Container.Resource == declaration.Name))
+                            && fixture.Model.Projects.All(project => fixture.Leads.Values.Any(lead =>
+                                lead.Resource == project.Name && fixture.Hosts.ContainsKey(ManagedLeadKey(lead))))))
+                    {
+                        inventoryNotified = true;
+                        var snapshot = Array.AsReadOnly(fixtures.Values.SelectMany(fixture => fixture.Resources.Values)
+                            .Select(resource => resource with { Mounts = Array.AsReadOnly(resource.Mounts.ToArray()) }).ToArray());
+                        await afterQualifiedInventory(context, snapshot, stop).ConfigureAwait(false);
+                    }
                     try { await Task.Delay(50, stop).ConfigureAwait(false); }
                     catch (OperationCanceledException) when (stop.IsCancellationRequested) { break; }
                 }
@@ -2319,9 +2394,35 @@ public static partial class SecurityExecutionEvidence
                 var volumes = fixtures.Values.SelectMany(fixture => fixture.Volumes).ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
                 foreach (ConfiguredOwnedResource resource in directResources.Values)
                     foreach (ObservedContainerMount mount in resource.Mounts.Where(mount => mount.Type == "volume")) volumes[mount.Name] = mount.Source;
+
+                foreach (string id in finalIds.Intersect(knownIds))
+                {
+                    try { await DeleteAsync(id, CancellationToken.None).ConfigureAwait(false); }
+                    catch (Exception deleteFailure) { failures.Add(deleteFailure); }
+                }
+
+                using JsonDocument afterContainers = await GetAsync("/v1.40/containers/json?all=true", CancellationToken.None).ConfigureAwait(false);
+                finalIds = ReadAllContainerIds(afterContainers.RootElement, owner, true);
+
+                var (finalMountpoints, currentVolumeMap) = await VolumeInventoriesAsync(CancellationToken.None).ConfigureAwait(false);
+                foreach (var volume in volumes)
+                {
+                    if (!currentVolumeMap.TryGetValue(volume.Key, out JsonElement currentVolume))
+                        continue;
+                    bool consumersAbsent = VolumeConsumersAbsent(afterContainers.RootElement,
+                        new Dictionary<string, string>(StringComparer.Ordinal) { [volume.Key] = volume.Value });
+                    if (!consumersAbsent)
+                        continue;
+                    if (witnessedVolumeIdentities.TryGetValue(volume.Key, out JsonElement originalVolume)
+                        && !SameVolumeIncarnation(originalVolume, currentVolume))
+                        continue;
+                    try { await DeleteVolumeAsync(volume.Key, CancellationToken.None).ConfigureAwait(false); }
+                    catch (Exception volumeFailure) { failures.Add(volumeFailure); }
+                }
+
                 Dictionary<string, string> finalVolumes = await VolumeMountpointsAsync(CancellationToken.None).ConfigureAwait(false);
                 cleanup = !finalIds.Overlaps(knownIds) && !finalVolumes.Keys.Intersect(volumes.Keys, StringComparer.Ordinal).Any()
-                    && !finalIds.Except(initialIds).Any() && VolumeConsumersAbsent(final.RootElement, volumes)
+                    && !finalIds.Except(initialIds).Any() && VolumeConsumersAbsent(afterContainers.RootElement, volumes)
                     && newIds.IsSubsetOf(knownIds);
                 after = await IdentityAsync(CancellationToken.None).ConfigureAwait(false);
                 RequireSameApiDaemonIdentity(before, after);

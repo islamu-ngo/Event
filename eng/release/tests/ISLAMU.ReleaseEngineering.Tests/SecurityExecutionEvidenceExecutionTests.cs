@@ -269,6 +269,56 @@ public sealed class SecurityExecutionEvidenceManagedHintTests
 public sealed class SecurityExecutionEvidenceParentModelTests
 {
     [Test]
+    [Arguments("unrelated", "/unrelated", true)]
+    [Arguments("owned", "/unrelated", false)]
+    [Arguments("unrelated", "/volumes", false)]
+    [Arguments("unrelated", "/volumes/owned/data/child", false)]
+    [Arguments("unrelated", "relative", false)]
+    [Arguments("", "/unrelated", false)]
+    public async Task VolumeCleanupUsesNamedVolumeIdentityAndRuntimeBindPaths(string name, string bindSource, bool absent)
+    {
+        var mounts = new JsonArray(
+            new JsonObject { ["Type"] = "volume", ["Name"] = name, ["Source"] = "", ["Destination"] = "/data", ["RW"] = true },
+            new JsonObject { ["Type"] = "bind", ["Source"] = bindSource, ["Destination"] = "/config", ["RW"] = false });
+        var inventory = JsonSerializer.SerializeToElement(new[] { new JsonObject { ["State"] = "exited", ["Mounts"] = mounts } });
+        await Assert.That(SecurityExecutionEvidence.VolumeConsumersAbsent(inventory,
+            new Dictionary<string, string> { ["owned"] = "/volumes/owned/data" })).IsEqualTo(absent);
+    }
+
+    [Test]
+    [Arguments("tmpfs", "", true)]
+    [Arguments("npipe", "", true)]
+    [Arguments("bind", "/unrelated", true)]
+    [Arguments("bind", "/volumes", false)]
+    [Arguments("bind", "/volumes/owned/data", false)]
+    [Arguments("bind", "/volumes/owned/data/child", false)]
+    [Arguments("bind", "/volumes/owned/./data", false)]
+    [Arguments("bind", "relative", false)]
+    public async Task VolumeCleanupRequiresValidatedNonoverlappingConsumers(string type, string source, bool absent)
+    {
+        var inventory = JsonSerializer.SerializeToElement(new[]
+        {
+            new { Mounts = new[] { new { Type = type, Source = source, Destination = "/witness", RW = true } } }
+        });
+        await Assert.That(SecurityExecutionEvidence.VolumeConsumersAbsent(inventory,
+            new Dictionary<string, string> { ["owned"] = "/volumes/owned/data" })).IsEqualTo(absent);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task VolumeCleanupRefusesMissingOrNullBindSources(bool missing)
+    {
+        var mount = new JsonObject { ["Type"] = "bind", ["Destination"] = "/witness", ["RW"] = true };
+        if (!missing) mount["Source"] = null;
+        var inventory = JsonSerializer.SerializeToElement(new[] { new JsonObject { ["Mounts"] = new JsonArray(mount) } });
+        Task ReadAsync() => Task.FromResult(SecurityExecutionEvidence.VolumeConsumersAbsent(inventory,
+            new Dictionary<string, string> { ["owned"] = "/volumes/owned/data" }));
+        if (missing) await Assert.ThrowsAsync<KeyNotFoundException>(ReadAsync);
+        else await Assert.ThrowsAsync<InvalidDataException>(ReadAsync);
+    }
+
+    [Test]
     public async Task ReplacedEntryPathCannotQualifyWhileTheOriginalAssemblyRemainsMapped()
     {
         if (!OperatingSystem.IsLinux()) return;
@@ -1031,6 +1081,48 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             new SecurityExecutionEvidence.ObservedOwnedResource(containerId, imageId, "native-model-control", true));
         await Assert.That(exactObserved.Single().Mounts.Single()).IsEqualTo(
             new SecurityExecutionEvidence.ObservedContainerMount("volume", source, mountpoint, "/native-data", true));
+        JsonObject abbreviated = RuntimeContainer();
+        abbreviated["Mounts"]![0]!["Source"] = string.Empty;
+        JsonObject inspection = new()
+        {
+            ["Id"] = containerId, ["Image"] = imageId,
+            ["Mounts"] = RuntimeContainer()["Mounts"]!.DeepClone()
+        };
+        await Assert.That(SecurityExecutionEvidence.TryJoinContainerMountInspection(
+            JsonSerializer.SerializeToElement(abbreviated), JsonSerializer.SerializeToElement(inspection),
+            out var inspectedSummary)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+            JsonSerializer.SerializeToUtf8Bytes(new[] { inspectedSummary }), expected, out var inspectedResources)).IsTrue();
+        var inspectedControl = inspectedResources ?? throw new InvalidDataException("native_control_inspection_missing");
+        await Assert.That(inspectedControl.Single().Container).IsEqualTo(exactObserved.Single().Container);
+        await Assert.That(inspectedControl.Single().Mounts.Single()).IsEqualTo(exactObserved.Single().Mounts.Single());
+        foreach (string defect in new[] { "id", "image", "type", "name", "target", "writable",
+            "empty-source", "missing-source", "null-source", "extra-mount", "summary-source" })
+        {
+            JsonObject changed = inspection.DeepClone().AsObject();
+            JsonObject summary = abbreviated.DeepClone().AsObject();
+            JsonObject mount = changed["Mounts"]![0]!.AsObject();
+            switch (defect)
+            {
+                case "id": changed["Id"] = new string('4', 64); break;
+                case "image": changed["Image"] = "sha256:" + new string('8', 64); break;
+                case "type": mount["Type"] = "bind"; mount.Remove("Name"); break;
+                case "name": mount["Name"] = "other-volume"; break;
+                case "target": mount["Destination"] = "/other"; break;
+                case "writable": mount["RW"] = false; break;
+                case "empty-source": mount["Source"] = string.Empty; break;
+                case "missing-source": mount.Remove("Source"); break;
+                case "null-source": mount["Source"] = null; break;
+                case "extra-mount":
+                    JsonObject extra = mount.DeepClone().AsObject();
+                    extra["Destination"] = "/extra";
+                    changed["Mounts"]!.AsArray().Add(extra);
+                    break;
+                case "summary-source": summary["Mounts"]![0]!["Source"] = mountpoint + "-changed"; break;
+            }
+            await Assert.That(SecurityExecutionEvidence.TryJoinContainerMountInspection(
+                JsonSerializer.SerializeToElement(summary), JsonSerializer.SerializeToElement(changed), out _)).IsFalse();
+        }
         string pendingForeignId = new('6', 64), pendingCreationId = "01929b87c1d070009a01f3b20d6e0a11";
         JsonObject pendingForeign = RuntimeContainer();
         pendingForeign["Id"] = pendingForeignId;
@@ -1256,7 +1348,8 @@ public sealed class SecurityExecutionEvidenceParentModelTests
                 changedState["State"] = state;
                 await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
                     JsonSerializer.SerializeToUtf8Bytes(new JsonArray(changedState)), expected,
-                    out var stateResources)).IsEqualTo(state is "exited" or "dead");
+                    out var stateResources)).IsEqualTo(state is "exited" or "dead" or "running" or "paused"
+                        or "created" or "restarting" or "removing");
                 if (stateResources is not null) await Assert.That(stateResources.Count).IsEqualTo(0);
             }
             foreach (string bindSource in new[] { mountpoint, mountpoint + "/child", "/native-volumes",

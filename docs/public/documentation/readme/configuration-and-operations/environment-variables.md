@@ -14,6 +14,18 @@ ISLAMU Event follows **Convention over Configuration**. The platform includes se
 
 ---
 
+## Address geocoding retry budget
+
+`GEOCODING_RETRY_DELAYS_MILLISECONDS` is a comma-separated retry schedule.
+An explicit schedule replaces the built-in `200,500` delays; it is not appended
+to them. Leaving the schedule unconfigured retains those defaults.
+
+The number of delays must match `GEOCODING_MAXIMUM_RETRY_COUNT` (default `2`),
+and their sum must be strictly below `GEOCODING_TOTAL_TIMEOUT_MILLISECONDS`
+(default and maximum `5000`). For example, `150,400` is valid with two retries
+and a total budget of `4500`. Invalid budgets block startup even when the
+provider is `None`; disabling geocoding does not bypass configuration validation.
+
 ## Shared browser session authority
 
 These inputs are required for browser sign-in in BFF and Standalone hosts,

@@ -360,7 +360,9 @@ for the selected-authority configuration.
 
 On PostgreSQL, migration-owned functions expose only those operations. Startup
 rejects missing or mismatched capability grants instead of promoting Runtime or
-Global privileges. Each operation rechecks the canonical actor and current
+Global privileges. Canonical migration enrolls the four declared purpose logins,
+including issuance, with inherited executor rights and no role-switching or
+membership-administration rights. Each operation rechecks the canonical actor and current
 administrator grant within its transaction, after the selected authorization
 provider allows the operation. Listing remains self-owned; an exact-key
 administrative read or mutation may target another administrator's key.

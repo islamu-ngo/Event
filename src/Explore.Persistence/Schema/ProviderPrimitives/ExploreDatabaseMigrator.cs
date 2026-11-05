@@ -266,6 +266,14 @@ public static class ExploreDatabaseMigrator
             await PostgresHumanEmailSourceContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresPlatformApiKeySourceContract.ApplyAsync(
                 executionDatabase, PlatformApiKeySourceEnrollment.Bind(configuration), cancellationToken);
+            string issuanceLogin = PrimaryDatabaseConfiguration.BindUsername(
+                configuration, PrimaryDatabaseRole.InstanceKeyIssuance);
+            await executionDatabase.Database.ExecuteSqlRawAsync(
+                $"""
+                GRANT "{PostgresInstanceApiKeyIssuanceContract.ExecutorRole}"
+                TO "{issuanceLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                """, cancellationToken);
             await PostgresHumanWebhookResourceSourceContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresHumanEventProviderSourceContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresRegistrationFinalizationQueueContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);

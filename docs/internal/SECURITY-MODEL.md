@@ -1783,6 +1783,17 @@ Non-interactive callers (direct API consumers, integrations, automation) authent
 
 ### Bounded Issuance Commit And Recovery Authority
 
+Canonical PostgreSQL migration enrolls the configured `InstanceKeyIssuance`
+login in `event_instance_key_issuance_executor` with `INHERIT TRUE, SET FALSE,
+ADMIN FALSE`, alongside the source contract's read/write/report enrollment.
+The migrator binds only the declared username for this grant; application
+credential pairs remain isolated. A fresh-cluster regression opens all four
+production factories without relying on fixture-only membership grants.
+`RuntimeSecretEnvironment` forwards the issuance username in flat or canonical
+form for Environment enrollment, including Migration, while preserving canonical
+precedence and masking. It does not forward that purpose's password to Migration
+or BFF; Infisical consumers retain their own selected-authority acquisition.
+
 The native creation handler derives the platform actor through
 `IAdminContext.ResolveUserIdAsync`; an authenticated but unbound identity fails
 `401`. Neither actor nor current tenant is chosen by the DTO. Before issuance

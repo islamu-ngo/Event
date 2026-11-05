@@ -237,6 +237,8 @@ public sealed class PostgresMigrationAuthorityIsolationTests(PostgreSqlContainer
                     fixture.GetNativeQueueOptions(PrimaryDatabaseRole.InstanceKeyRead).Username,
                 ["Database:InstanceKeyWrite:Username"] =
                     fixture.GetNativeQueueOptions(PrimaryDatabaseRole.InstanceKeyWrite).Username,
+                ["Database:InstanceKeyIssuance:Username"] =
+                    fixture.GetNativeQueueOptions(PrimaryDatabaseRole.InstanceKeyIssuance).Username,
                 ["Database:PlatformKeyReport:Username"] =
                     fixture.GetNativeQueueOptions(PrimaryDatabaseRole.PlatformKeyReport).Username
             }).Build();
@@ -249,7 +251,7 @@ public sealed class PostgresMigrationAuthorityIsolationTests(PostgreSqlContainer
             PrimaryDatabaseRole.Global, PrimaryDatabaseRole.Runtime,
             PrimaryDatabaseRole.EmailPolicyInstanceMutation, PrimaryDatabaseRole.EmailPolicyTenantMutation,
             PrimaryDatabaseRole.InstanceKeyRead, PrimaryDatabaseRole.InstanceKeyWrite,
-            PrimaryDatabaseRole.PlatformKeyReport
+            PrimaryDatabaseRole.InstanceKeyIssuance, PrimaryDatabaseRole.PlatformKeyReport
         })
         {
             var account = fixture.GetNativeQueueOptions(role);
@@ -267,6 +269,24 @@ public sealed class PostgresMigrationAuthorityIsolationTests(PostgreSqlContainer
         await AssertAuthorityAsync(connection, fixture.NativeQueueEnrollment.MigratorLogin, privileged: true);
         var unbound = Assert.Throws<InvalidOperationException>(() => migration.RequireBoundTenantLease());
         await Assert.That(unbound.Message).IsEqualTo("tenant_lease_not_bound");
+        await Assert.That(migration.ChangeTracker.Entries()).IsEmpty();
+
+        PrimaryDatabaseConnectionOptions ApplicationOptions(PrimaryDatabaseRole role)
+        {
+            var account = fixture.GetNativeQueueOptions(role);
+            return Options(endpoint, endpoint.Database!, account.Username!, account.Password!, role);
+        }
+        var factories = new InstanceApiKeyDbContextFactories(
+            ApplicationOptions(PrimaryDatabaseRole.Runtime),
+            ApplicationOptions(PrimaryDatabaseRole.Global),
+            [
+                ApplicationOptions(PrimaryDatabaseRole.InstanceKeyRead),
+                ApplicationOptions(PrimaryDatabaseRole.InstanceKeyWrite),
+                ApplicationOptions(PrimaryDatabaseRole.InstanceKeyIssuance),
+                ApplicationOptions(PrimaryDatabaseRole.PlatformKeyReport)
+            ], PlatformApiKeySourceEnrollment.Bind(configuration));
+        await factories.RequireReadyAsync(TestContext.Current!.Execution.CancellationToken);
+        await AssertAuthorityAsync(connection, fixture.NativeQueueEnrollment.MigratorLogin, privileged: true);
         await Assert.That(migration.ChangeTracker.Entries()).IsEmpty();
     }
 

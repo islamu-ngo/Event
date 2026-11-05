@@ -374,7 +374,15 @@ internal static class K6LoadRunner
         }
         return definitions.Where(definition => definition.Value.Kind is not null)
             .Select(definition => new K6MetricDefinition(definition.Key, definition.Value.Kind!,
-                definition.Value.Unit is "seconds" or "bytes" ? definition.Value.Unit : null)).ToArray();
+                definition.Value.Unit switch
+                {
+                    "seconds" or "bytes" => definition.Value.Unit,
+                    null when definition.Key == "dotnet_process_cpu_time_seconds_total"
+                        && definition.Value.Kind == "counter" => "seconds",
+                    null when definition.Key == "dotnet_process_memory_working_set_bytes"
+                        && definition.Value.Kind == "gauge" => "bytes",
+                    _ => null
+                })).ToArray();
     }
 
     internal static Task WriteRuntimeMetricInventoryAsync(string path, K6MetricInventoryStatus status,

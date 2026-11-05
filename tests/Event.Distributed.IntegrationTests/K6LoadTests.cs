@@ -141,6 +141,27 @@ public sealed class K6LoadProfileHarnessTests
         """;
 
     [Test]
+    [Arguments("dotnet_process_cpu_time_seconds_total", "counter", null, "seconds")]
+    [Arguments("dotnet_process_memory_working_set_bytes", "gauge", null, "bytes")]
+    [Arguments("dotnet_process_cpu_time_seconds_total", "gauge", null, null)]
+    [Arguments("dotnet_process_memory_working_set_bytes", "counter", null, null)]
+    [Arguments("dotnet_process_cpu_time_seconds_total", "counter", "milliseconds", null)]
+    [Arguments("dotnet_process_cpu_time_seconds_total", "counter", "bytes", "bytes")]
+    [Arguments("dotnet_process_cpu_time_seconds_total", "counter", "seconds", "seconds")]
+    [Arguments("process_memory_usage_bytes", "gauge", null, null)]
+    public async Task KnownExporterFamiliesQualifyUnitsWithoutOverridingDeclarations(
+        string name, string kind, string? declaredUnit, string? expectedUnit)
+    {
+        string exposition = $"# TYPE {name} {kind}\n"
+            + (declaredUnit is null ? string.Empty : $"# UNIT {name} {declaredUnit}\n");
+
+        var definitions = K6LoadRunner.ParseRuntimeMetricInventory(exposition);
+
+        await Assert.That(definitions.Length).IsEqualTo(1);
+        await Assert.That(definitions[0].Unit).IsEqualTo(expectedUnit);
+    }
+
+    [Test]
     public async Task NumericCandidatesNeverInventAnEmittingProcessOrResetIdentity()
     {
         var observation = K6LoadRunner.ParseRuntimePressure(RuntimeSample,
@@ -473,6 +494,7 @@ public sealed class K6LoadProfileHarnessTests
                 # UNIT dotnet_process_cpu_time_seconds_total seconds
                 dotnet_process_cpu_time_seconds_total{cpu_mode="user",customer="{{canary}}"} 123456789
                 # TYPE dotnet_process_memory_working_set_bytes gauge
+                # UNIT dotnet_process_memory_working_set_bytes {{canary}}
                 dotnet_process_memory_working_set_bytes{customer="{{canary}}"} 987654321
                 # TYPE private_{{canary}} gauge
                 # TYPE dotnet_private_{{canary}} gauge

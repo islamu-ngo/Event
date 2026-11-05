@@ -1243,6 +1243,16 @@ public sealed partial class AppHostRuntimeTests
             using var client = owner.CreateHttpClient(topology == "Split" ? "explore-api" : "event-standalone", "operations");
             using var response = await client.GetAsync("/health", deadline.Token);
             await Assert.That(response.IsSuccessStatusCode).IsTrue();
+            using var metrics = await client.GetAsync("/metrics", deadline.Token);
+            await Assert.That(metrics.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            await Assert.That(metrics.Content.Headers.ContentType?.MediaType is
+                "text/plain" or "application/openmetrics-text").IsTrue();
+            string exposition = await metrics.Content.ReadAsStringAsync(deadline.Token);
+            var definitions = K6LoadRunner.ParseRuntimeMetricInventory(exposition);
+            await Assert.That(definitions.Count(metric => metric.Name == "dotnet_process_cpu_time_seconds_total"
+                && metric.Kind == "counter" && metric.Unit == "seconds")).IsEqualTo(1);
+            await Assert.That(definitions.Count(metric => metric.Name == "dotnet_process_memory_working_set_bytes"
+                && metric.Kind == "gauge" && metric.Unit == "bytes")).IsEqualTo(1);
         }
         catch (Exception exception) { failure = exception; }
         using var evidenceDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));

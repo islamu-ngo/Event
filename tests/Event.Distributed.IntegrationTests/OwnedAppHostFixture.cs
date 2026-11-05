@@ -171,6 +171,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                     "SECRET_PROVIDER=Environment", "SecretProvider:Provider=Environment",
                     "DATABASE_PROVIDER=PostgreSql", "DATABASE_NAME=islamu_assurance",
                     "DATABASE_SCHEMA=assurance", "DATABASE_HOST=localhost",
+                    "Scheduler:Quartz:Enabled=false", "Scheduler:Quartz:ApplySchemaOnStartup=false",
                     $"IDENTITY_DATABASE_TOPOLOGY={(profile == OwnedAppHostProfile.ExternalIdentitySharedBff ? "External" : "CoLocated")}",
                     .. (profile == OwnedAppHostProfile.ExternalIdentitySharedBff
                         ? new[] { "IDENTITY_DATABASE_PROVIDER=Sqlite", $"IDENTITY_DATABASE_NAME={Path.Combine(owner.Root, "identity.sqlite")}" }
@@ -228,7 +229,9 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             {
                 builder.CreateResourceBuilder(project)
                     .WithEnvironment("AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH", blocklist)
-                    .WithEnvironment("AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256", Convert.ToHexString(SHA256.HashData(blocklistBytes)));
+                    .WithEnvironment("AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256", Convert.ToHexString(SHA256.HashData(blocklistBytes)))
+                    .WithEnvironment("Scheduler__Quartz__ApplySchemaOnStartup", "false")
+                    .WithEnvironment("Scheduler__Quartz__Enabled", "false");
                 if (configuredAdministrator)
                     builder.CreateResourceBuilder(project).WithEnvironment("Authentication__Local__AccessTokenLifetimeMinutes", "5");
             }
@@ -1830,7 +1833,11 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     private async Task WaitForReadyAsync(CancellationToken cancellationToken)
     {
         await Application.ResourceNotifications.WaitForResourceAsync(
-            "event-migrationservice", KnownResourceStates.Exited, cancellationToken);
+            "event-migrationservice",
+            update => update.Snapshot.ExitCode == 0
+                && (update.Snapshot.State?.Text == KnownResourceStates.Finished
+                    || update.Snapshot.State?.Text == KnownResourceStates.Exited),
+            cancellationToken);
         List<string> services = topology == "Split" ? ["explore-api", "explore-blazor"] : ["event-standalone"];
         if (profile == OwnedAppHostProfile.ExternalIdentitySharedBff)
             services.Add("explore-blazor-peer");

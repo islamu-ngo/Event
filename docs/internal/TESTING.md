@@ -165,6 +165,16 @@ from actual host execution and measurement. The integrated project owns all
 four categories; neither discovery nor a passing host-free selection admits
 an unexecuted browser, enabled worker, load or recovery profile.
 
+Native test projects declare the operations endpoint target host as `127.0.0.1`,
+matching `OperationalEndpoints:Address`. Leaving the target host as `localhost`
+can send probes through `::1`; the exact private-listener guard then correctly
+returns 404 despite a matching port. Keep the explicit binding rather than
+broadening the address guard or increasing readiness budgets.
+The owned test topology also explicitly declares that IPv4 target in
+`EffectiveHostAuthority:InstanceHosts`: the earlier host-authority guard otherwise
+rejects it before the private-listener check. Neither guard accepts an undeclared
+host or a mismatched local listener.
+
 `AppHostCompositionContractTests` uses
 `OwnedAppHostFixture.InspectCompositionAsync` to inspect the real AppHost resource
 registration without starting the graph. Its internal

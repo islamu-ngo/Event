@@ -24,6 +24,18 @@ Do not run mixed application versions. Missing rights or changed policies leave
 the consumer unavailable; repair them through the migrator rather than granting
 superuser, BYPASSRLS or owner access to Runtime or Global logins.
 
+## PostgreSQL Bootstrap Storage
+
+Bootstrap convergence uses the deployment's Global login to read and lock
+bootstrap state, create a configured pending generation, and supersede an older
+generation. The selected Migrator installs fixed column permissions for that
+workflow; it does not grant deletion, table-wide access, ownership or RLS bypass.
+Keep Runtime, Global and Migrator credentials separate.
+
+Apply the matching Migrator before restarting upgraded application hosts.
+A missing bootstrap storage grant blocks startup; the application does not
+repair database permissions or skip convergence to become healthy.
+
 ## Authorization Pipeline Flow
 
 Every mutation and sensitive query passes through a multi-stage, fail-closed authorization pipeline before reaching business logic:

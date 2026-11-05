@@ -169,6 +169,24 @@ repeat that work. Both paths still run configuration-manifest bootstrap before
 administrator preparation, privacy admission and HTTP startup; manifest failure
 blocks later authority.
 
+Both serving roots invoke bootstrap convergence before setup and HTTP authority
+instead of selecting it with a raw configured-mode string comparison. The
+selected owner first observes persisted bootstrap state, retaining completed-state
+precedence; missing or pending state then validates the deployment configuration.
+Interactive convergence creates no configured-administrator state. Invalid
+configuration cannot bypass validation by failing that string comparison.
+
+PostgreSQL convergence uses the enrolled Global login.
+`PostgresSetupLiveStoragePermissions` installs column SELECT/INSERT/UPDATE for
+the declared `InstanceBootstrapState` fields: the repository locks and reads
+current state, inserts a pending generation, and supersedes earlier generations
+inside the EF transaction. Its generic update writes the mapped non-key fields,
+including unchanged values. No DELETE or table-level grant is installed.
+Tenant creation, managed-worker creation and operator-editor admission recognize
+this source-owned column intersection as optional shared authority while still
+rejecting table-wide writes, undeclared grants, REFERENCES, PUBLIC access and
+grant options. They do not infer allowed authority from live ACLs.
+
 ### 4. `Event.MigrationService` (One-Shot Database Migrator)
 * **Assembly**: `src/Event.MigrationService/`
 * **Entrypoint**: `Program.cs`

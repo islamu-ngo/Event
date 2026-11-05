@@ -1,9 +1,6 @@
-using System.Collections.Immutable;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Settings;
-using Explore.Domain;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -23,46 +20,13 @@ internal static class IdentityWriterHumanSourceQueries
             subject, local, owner.RequireCurrent, cancellationToken);
     }
 
-    internal static async Task<HumanAuthorizationRouteFacts> ReadRouteAsync(
+    internal static Task<HumanAuthorizationRouteFacts> ReadRouteAsync(
         LocalIdentityExecutionLease execution, HumanCommitSubject subject,
         CancellationToken cancellationToken = default)
     {
         var owner = new OriginalRead(execution, includeIdentity: false);
-        if (subject.PrincipalId == Guid.Empty)
-            throw new UnauthorizedAccessException("The original principal is required.");
-        string[] keys = HumanAuthorizationRouteFacts.Keys.ToArray();
-        var system = await owner.Rows(owner.Application.SystemSettings.AsNoTracking()
-            .Where(row => keys.Contains(row.SettingKey))
-            .Select(row => new
-            {
-                row.SettingKey,
-                row.Value,
-                row.SettingValueTypeId,
-                row.IsLocked,
-                row.Description,
-                row.Category,
-                row.AllowedValues
-            }), cancellationToken);
-        var systemByKey = system.ToDictionary(row => row.SettingKey, StringComparer.Ordinal);
-        Guid? tenant = owner.Application.TenantFilterTenantId;
-        var tenantByKey = new Dictionary<string, TenantSettingFacts>(StringComparer.Ordinal);
-        if (tenant is { } selected)
-        {
-            var overrides = await owner.Rows(owner.Application.Set<TenantSetting>().AsNoTracking()
-                .Where(row => row.TenantId == selected && keys.Contains(row.SettingKey))
-                .Select(row => new { row.SettingKey, row.Value, row.IsLocked }), cancellationToken);
-            tenantByKey = overrides.ToDictionary(row => row.SettingKey,
-                row => new TenantSettingFacts(row.Value, row.IsLocked), StringComparer.Ordinal);
-        }
-        owner.RequireCurrent();
-        return new(subject.PrincipalId, tenant, keys.Select(key =>
-        {
-            systemByKey.TryGetValue(key, out var instance);
-            tenantByKey.TryGetValue(key, out var scoped);
-            return new HumanAuthorizationRouteSettingFact(key, instance is null ? null :
-                new SystemSettingFacts(instance.Value, (SettingValueType)instance.SettingValueTypeId, instance.IsLocked,
-                    instance.Description, instance.Category, instance.AllowedValues), scoped);
-        }).ToImmutableArray());
+        return HumanAuthorizationRouteProjection.ReadAsync(owner.Application, subject,
+            owner.Application.TenantFilterTenantId, owner.RequireCurrent, cancellationToken);
     }
 
     private sealed class OriginalRead
@@ -96,12 +60,5 @@ internal static class IdentityWriterHumanSourceQueries
                 throw new UnauthorizedAccessException("The original human source transaction changed.");
         }
 
-        internal async Task<ImmutableArray<T>> Rows<T>(IQueryable<T> query, CancellationToken cancellationToken)
-        {
-            RequireCurrent();
-            T[] rows = await query.ToArrayAsync(cancellationToken);
-            RequireCurrent();
-            return rows.ToImmutableArray();
-        }
     }
 }

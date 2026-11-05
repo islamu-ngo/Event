@@ -44,6 +44,19 @@ ordinary co-located Local boundary. PostgreSQL source contracts remain live
 until their dependent source families and replacement permissions migrate;
 these SQLite cases do not qualify their retirement or other providers' locks.
 
+`HumanAuthorizationRouteProjection` and `HumanSupportAccessSourceProjection`
+likewise supply typed facts to portable source owners and the SQLite email
+protocol. They retain the fixed setting keys, selected tenant and original
+subject/session predicates. Email composes these with the principal facts on
+its original dedicated owner. Its retained model-derived no-op update is a
+storage primitive: EF has no API to upgrade a borrowed deferred SQLite
+transaction to a writer reservation. The authenticated public-protocol test
+`SourceAcquisitionReservesBorrowedDeferredTransactionUntilRollback` isolates
+that reservation before any settings write and checks release after rollback.
+This is a proof-owner mapping; consult the candidate's execution evidence for
+actual results. PostgreSQL JSON source functions remain live pending the
+coupled source and permission cutover.
+
 ## Workflow ownership
 
 Raw persistence diagnostics belong to the actual workflow owner and its complete

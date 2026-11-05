@@ -111,4 +111,90 @@ public sealed class AuthorizationConfigurationReadOwnershipTests(PostgreSqlConta
     private InstanceSystemSettingsReader CreateReader() =>
         new(new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)),
             fixture.NativeQueueEnrollment);
+
+    [Test]
+    public async Task ReusedAttestationRejectsNewWritePrivilegesOnOriginalBackendAndRecovers()
+    {
+        await fixture.ResetAsync();
+        var factory = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+        await using var original = await factory.CreateDbContextAsync();
+        await original.Database.OpenConnectionAsync();
+        await PostgresOrdinarySettingsContract.RequireReadyAsync(original, fixture.NativeQueueEnrollment);
+        await using var migration = fixture.CreateDbContext();
+        migration.BindTenantLease();
+        var names = migration.GetService<ISqlGenerationHelper>();
+        var source = new HumanPrincipalSourceSql(migration);
+        string table = source.Table(typeof(SystemSetting));
+        string column = source.Column(typeof(SystemSetting), nameof(SystemSetting.Value));
+        string global = names.DelimitIdentifier(fixture.NativeQueueEnrollment.GlobalLogin);
+
+        await migration.Database.ExecuteSqlRawAsync($"GRANT UPDATE ({column}) ON {table} TO {global}");
+        try
+        {
+            var denial = await Assert.ThrowsAsync<PostgresException>(async () =>
+                await PostgresOrdinarySettingsContract.RequireReadyAsync(original, fixture.NativeQueueEnrollment));
+            await Assert.That(denial.SqlState).IsEqualTo(PostgresErrorCodes.ObjectNotInPrerequisiteState);
+            await Assert.That(denial.MessageText).IsEqualTo("ordinary_settings_global_ambient_write");
+        }
+        finally
+        {
+            await migration.Database.ExecuteSqlRawAsync($"REVOKE UPDATE ({column}) ON {table} FROM {global}");
+        }
+        await PostgresOrdinarySettingsContract.RequireReadyAsync(original, fixture.NativeQueueEnrollment);
+    }
+
+    [Test]
+    public async Task ReusedAttestationCannotBorrowAnotherDeclaredGlobalEnrollment()
+    {
+        await fixture.ResetAsync();
+        string key = GovernanceSettingKeys.Security.AuthorizationProvider;
+        await Assert.That(await CreateReader().ReadAsync([key])).IsEmpty();
+        var different = fixture.NativeQueueEnrollment with
+        {
+            GlobalLogin = "missing_global_" + Guid.CreateVersion7().ToString("N")
+        };
+        var reader = new InstanceSystemSettingsReader(
+            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)), different);
+
+        await Assert.ThrowsAsync<PostgresException>(async () => await reader.ReadAsync([key]));
+
+        await Assert.That(await CreateReader().ReadAsync([key])).IsEmpty();
+    }
+
+    [Test]
+    public async Task ConcurrentInstanceObservationsReturnStoredPolicyWithoutSharingTrackedState()
+    {
+        await fixture.ResetAsync();
+        string key = "instance.concurrent.observation." + Guid.CreateVersion7().ToString("N");
+        await using (var migration = fixture.CreateDbContext())
+        {
+            migration.BindTenantLease();
+            migration.SystemSettings.Add(new SystemSetting
+            {
+                Id = Guid.CreateVersion7(),
+                SettingKey = key,
+                Value = "\"https://pdp.example.test:443\"",
+                ValueType = SettingValueType.String,
+                CreatedAt = DateTime.UtcNow
+            });
+            await migration.SaveChangesAsync();
+        }
+
+        var reader = CreateReader();
+        var results = await Task.WhenAll(
+            reader.ReadAsync([key], TestContext.Current!.Execution.CancellationToken),
+            reader.ReadAsync([key], TestContext.Current.Execution.CancellationToken));
+
+        await Assert.That(results.All(rows => rows.Count == 1 && rows[0].SettingKey == key
+            && rows[0].Value == "\"https://pdp.example.test:443\"")).IsTrue();
+        await Assert.That(ReferenceEquals(results[0][0], results[1][0])).IsFalse();
+        results[0][0].Value = "\"changed-observation\"";
+        await Assert.That(results[1][0].Value).IsEqualTo("\"https://pdp.example.test:443\"");
+        using var readiness = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
+        readiness.CancelAfter(TimeSpan.FromSeconds(5));
+        var warmed = await Task.WhenAll(Enumerable.Range(3, 4)
+            .Select(_ => reader.ReadAsync([key], readiness.Token)));
+        await Assert.That(warmed.All(rows => rows.Count == 1
+            && rows[0].Value == "\"https://pdp.example.test:443\"")).IsTrue();
+    }
 }

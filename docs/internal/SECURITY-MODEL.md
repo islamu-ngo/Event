@@ -1997,6 +1997,13 @@ exchange, retaining the existing channel/TLS options, five-second deadline and
 cancellation handling. Tests replace only this transport input on the original
 scoped owner; they do not bypass compilation, native custody or rechecks.
 
+Ordinary-settings attestation reuses its generated guard and body-hash SQL text
+within the same immutable EF model, exact SQL renderer, schema and declared login
+enrollment. Weak model/renderer ownership and synchronous construction retain
+neither a context nor a connection. Current tenant selection stays in the
+per-call wrapper. Every call still executes the complete live catalogue, grant,
+role and routine-body checks; no authorization or readiness outcome is cached.
+
 Operators provision the selected Runtime, Migrator and Global logins and only
 the capability groups required by each consumer; see [SECRETS.md](SECRETS.md)
 and the [public database configuration guide](../public/documentation/readme/configuration-and-operations/environment-variables.md).

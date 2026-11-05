@@ -15,6 +15,11 @@ configuration reader. It does not need permission to read confidential-client
 bindings. Deployment-managed settings retain precedence, and a new signing-key
 configuration replaces the current one only after metadata retrieval succeeds.
 
+The browser host also obtains public tenant-routing configuration through the
+API's independent settings reader. Saved routing values and existing defaults
+remain authoritative; this bootstrap read requires no administrator credential
+or direct settings-table access for the ordinary API database identity.
+
 Private health and metrics checks support dual-stack listeners that represent
 IPv4 addresses in mapped IPv6 form. The physical address and port must still
 match the declared private listener; forwarded headers do not grant access.

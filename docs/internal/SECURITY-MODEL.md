@@ -539,6 +539,13 @@ Environment BFF consumer even though their registry defaults belong to the API
 folder. This does not admit API credentials or change Infisical folder ownership;
 an Infisical BFF still acquires its metadata from its own selected authority.
 
+Public resolver bootstrap uses `ResolverConfigService` with
+`IInstanceSystemSettingsReader` to observe its seven stored routing settings
+under an independent Global owner. The existing resolver projection supplies
+defaults and normalization; its public DTO cache still returns isolated copies
+and clears only after acknowledged mutation settlement. This read does not
+acquire resolver mutation custody or grant Runtime direct settings-table access.
+
 Provider work claims use serializable lease fences and a monotonic fence token.
 Stale claims cannot settle a newer claim, and unknown work can only be moved by
 explicit reconciliation to completed or retry-scheduled state. Expired provider

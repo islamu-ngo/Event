@@ -10,6 +10,10 @@ optional confidential client unconfigured; a configured client secret still
 requires a complete, valid credential group. No database permission changes are
 needed for this startup projection.
 
+Private health and metrics checks support dual-stack listeners that represent
+IPv4 addresses in mapped IPv6 form. The physical address and port must still
+match the declared private listener; forwarded headers do not grant access.
+
 Each deployment has exactly one **primary authentication provider**:
 
 * **Local Identity** uses ASP.NET Core Identity inside ISLAMU Event. It is the

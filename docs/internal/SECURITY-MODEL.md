@@ -580,6 +580,13 @@ Current security gates:
 
 ## JWT Bearer Configuration (API)
 
+Private operational listener admission compares the physical local port and
+address. Dual-stack sockets may report an IPv4 peer-facing local address as an
+IPv4-mapped IPv6 value; the guard normalizes that representation to IPv4 before
+the exact comparison. It still rejects a different private address, public
+listener port or undeclared host, and does not use forwarded headers to select
+the listener.
+
 - Authority: Keycloak OIDC metadata endpoint.
 - Resource audience: only `Keycloak:Audience`, default `islamu-event-api`.
   The BFF client ID is not an API resource audience; `azp` never substitutes for `aud`.

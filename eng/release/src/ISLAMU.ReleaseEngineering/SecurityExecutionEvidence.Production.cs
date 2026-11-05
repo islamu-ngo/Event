@@ -845,7 +845,7 @@ public static partial class SecurityExecutionEvidence
         WritePrivateBytes(Path.Combine(root, ".islamu-test-owner"), Encoding.ASCII.GetBytes(owner));
         string results = PrivateChildDirectory(temporary, "results");
         ProcessStartInfo command = NativeTestStartInfo(assemblyPath, [selectedUid], results,
-            temporary, "cleanup-probe.trx", 600);
+            temporary, "cleanup-probe.trx", 900);
         command.Environment["ISLAMU_TEST_RUN_ID"] = owner;
         command.Environment["ISLAMU_TEST_ROOT"] = root;
         command.Environment["DOTNET_ENVIRONMENT"] = "Testing";
@@ -857,7 +857,7 @@ public static partial class SecurityExecutionEvidence
         command.Environment.Remove("DOCKER_CERT_PATH");
         using var daemon = new SelectedDaemon(socketPath);
         bool qualified = false;
-        var result = await daemon.RunManagedAsync(owner, temporary, root, command, TimeSpan.FromMinutes(10),
+        var result = await daemon.RunManagedAsync(owner, temporary, root, command, TimeSpan.FromMinutes(15),
             repository, candidate, targets, null, null, null, token, async (context, resources, stop) =>
             {
                 qualified = true;

@@ -90,7 +90,7 @@ public sealed class SecurityExecutionEvidenceManagedCleanupTests
         string privateRoot = Directory.CreateTempSubdirectory("mc-").FullName;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(
             TestContext.Current!.Execution.CancellationToken);
-        deadline.CancelAfter(TimeSpan.FromMinutes(12));
+        deadline.CancelAfter(TimeSpan.FromMinutes(20));
         using var docker = CreateDockerClient(socketPath);
         IReadOnlyList<ConfiguredOwnedResource> witnessed = [];
         var volumeIdentities = new Dictionary<string, JsonElement>(StringComparer.Ordinal);

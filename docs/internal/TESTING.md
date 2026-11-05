@@ -221,6 +221,16 @@ cleanup. `ReleaseCandidateVerificationTests` exercise the actual admission
 decision and deterministic manifest digest. Their synthetic report inputs prove
 protocol invariants, not execution of API security lanes.
 
+The explicit `SecurityExecutionEvidenceManagedCleanupTests` run a genuine
+compiled child and terminate its native owner only after all declared containers
+and managed project hosts have qualified. The child uses the same fifteen-minute
+cold-start allowance as `RealTopologyCompletesMigrationAndBecomesHealthy`; its
+native test command and process watchdog use the same 900-second limit. The
+parent has a twenty-minute deadline for setup and owner-death checks, with
+separately bounded teardown operations. These fixture lifetimes do not change
+product readiness deadlines or capacity thresholds. Model-only tests do not
+replace the real foreign-consumer and replaced-volume probes.
+
 `SecurityControlRegisterTests` consume the shipped machine catalogue and reject
 missing/duplicate identities, invalid ownership, missing mitigation pairs,
 mixed ASVS versions and source-only closure claims. None is a prose/source-text

@@ -389,3 +389,56 @@ timeout --signal=INT --kill-after=15s 1680s dotnet tests/Event.Persistence.Integ
 
 **Promotion Consideration**:
 - [x] Stays in the testing journal; this is an observed fixture-lifetime failure, not a new product authorization or transaction policy.
+
+---
+
+[2026-11-05 Europe/Brussels] — Test private listeners through real dual-stack sockets
+
+**Context**: Split Blazor was running but its private readiness endpoint returned 404. Earlier synthetic listener tests supplied ordinary IPv4 connection metadata.
+
+**Symptom / Observation**: Real dual-stack Kestrel reported the IPv4 loopback local address in IPv4-mapped IPv6 form. Direct `IPAddress.Equals` against configured `127.0.0.1` rejected the equivalent physical address.
+
+**Root Cause**: Synthetic connection metadata omitted a representation produced by the real server socket. The access boundary was correct, but its address comparison assumed matching address families.
+
+**Resolution**: Normalize only an IPv4-mapped physical local address before the existing exact private-address and local-port checks. Two real-socket cases passed for matching and different private addresses. Four existing host, wrong-port and liveness cases also passed:
+
+```bash
+dotnet run --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --no-restore -- --treenode-filter '/*/*/OperationalEndpointListenerTests/*' --minimum-expected-tests 2 --maximum-parallel-tests 1
+dotnet run --project tests/Event.Standalone.IntegrationTests/Event.Standalone.IntegrationTests.csproj --configuration Release --no-restore -- --treenode-filter '/*/*/EffectiveHostSecurityTests/(PrivateIpv4ProbeRequiresDeclaredHostAndExactListener|OperationalReportsRequireTheActualPrivateListenerWhileLivenessHasNoBody)' --minimum-expected-tests 4 --maximum-parallel-tests 1
+```
+
+**Why This Matters for Future Work**: Real listener tests complement TestServer metadata tests. Normalize equivalent socket representations without substituting forwarded headers, relaxing the declared address, or accepting a public listener port.
+
+**References**:
+- `src/Explore.ServiceDefaults/OperationalEndpointAccess.cs:28`
+- `tests/Explore.Infrastructure.Tests/Infrastructure/OperationalEndpointListenerTests.cs`
+- `tests/Event.Standalone.IntegrationTests/EffectiveHostSecurityTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in the journal; the physical listener contract is documented in the security model.
+
+---
+
+[2026-11-05 Europe/Brussels] — Operational probes must retain their original listener
+
+**Context**: Correcting mapped IPv4 comparison passed real-socket tests but did not qualify the full Split BFF pipeline.
+
+**Symptom / Observation**: Temporary rejection-coordinate logging showed a configured private listener at `127.0.0.1:45293`, while health reached public `::1:40287`. Complete BFF host tests reproduced HTTPS redirects for health and metrics. Removing their first redirect exposed another: UI error-page re-execution redirected the guard's public-listener 404.
+
+**Root Cause**: Generic browser middleware moved operational requests away from the physical connection their access policy needed to check. A handler-only wire test did not exercise HTTPS redirection or UI error rendering.
+
+**Resolution**: Keep exact health/metrics requests out of HTTPS redirection and UI error-page re-execution, retaining the existing physical-listener guard. Preserve public UI HTTPS redirection. Remove temporary diagnostics. Five complete-host cases passed, covering private responses, public denial, parsed no-store policy and the ordinary public HTTPS control:
+
+```bash
+dotnet run --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration Release --no-restore -- --treenode-filter '/*/*/BffOperationalListenerTests/*' --minimum-expected-tests 5 --maximum-parallel-tests 1
+```
+
+**Why This Matters for Future Work**: Readiness must not become a browser redirect or rendered UI error. Preserve health's 503 response and the listener guard's 404. Check the semantic no-store directive rather than rejecting additional no-cache/must-revalidate directives. These focused cases do not certify native startup.
+
+**References**:
+- `src/Explore.Blazor/Hosting/BlazorHostApplicationExtensions.cs`, `UseBlazorHostMiddlewareCore`
+- `src/Explore.ServiceDefaults/OperationalEndpointAccess.cs`
+- `tests/Explore.Blazor.IntegrationTests/Endpoints/BffOperationalListenerTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in the journal; security documentation records the operational response boundary.

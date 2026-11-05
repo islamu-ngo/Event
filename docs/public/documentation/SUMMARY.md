@@ -11,6 +11,7 @@
     * [Operator Identity Portability](../self-hosting/operator-identity-portability.md)
     * [Deployment Tiers & Sizing](readme/self-hosting/deployment-tiers.md)
     * [Docker Standalone](readme/self-hosting/docker-standalone.md)
+    * [Scaling & Migration (Standalone ↔ Split)](readme/self-hosting/topology-and-database-migration.md)
     * [Docker Compose](readme/self-hosting/docker-compose.md)
     * [Coolify with Cerbos & Traefik](readme/self-hosting/coolify-cerbos-traefik.md)
     * [.NET Aspire & Cloud](readme/self-hosting/dotnet-aspire-and-cloud.md)

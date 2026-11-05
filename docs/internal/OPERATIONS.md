@@ -3182,6 +3182,15 @@ continuation. See [the public guide](../public/documentation/readme/events-and-t
 
 #### Upgrade note — maintenance sweeps moved to the scheduler
 
+`Event.Standalone/appsettings.json` enables Quartz, outbox, notification fanout,
+hosted email dispatch and MCP. Scheduled maintenance and durable work should run
+without extra enablement switches. Email dispatch retains `Mode=HostedService`;
+Quartz handles the other scheduled jobs rather than duplicating the email drain.
+RabbitMQ remains opt-in; webhooks remain disabled pending their SQLite readiness
+query correction. Actual SMTP delivery is separately disabled by default through
+persisted email policy. Split API defaults are unchanged. See
+[Standalone defaults](SELF_HOSTING.md#bounded-sqlite-operational-profile).
+
 The eight maintenance sweeps above previously ran as in-process `BackgroundService` timer loops. They now run as
 Quartz jobs. **No configuration key changed**: each sweep still reads the same section, the same `Enabled`
 flag, and the same interval value, so an existing `appsettings` or environment configuration keeps working

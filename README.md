@@ -35,8 +35,6 @@ ISLAMU Event is a **self-hostable event discovery and management platform** for 
 
 The public ISLAMU instance is Islamic-focused, but the software itself is **purpose-agnostic, white-label, and designed to be rebranded for any event ecosystem**.
 
-- **Application-owned logic, EF-first persistence:** C# Domain/Application workflows own authorization, business rules and concurrency; EF Core handles ordinary storage. The database provides transactions, constraints and tenant-isolation safeguards—not a competing business application. See the [architecture guide](docs/public/documentation/readme/getting-started/architecture-and-request-flows.md#application-authority-and-database-storage) and [accepted engineering decision](docs/internal/adr/ADR-application-owned-persistence.md). The SQL-to-EF cutover is ongoing.
-
 ## ✨ Who It Serves
 
 ### Event Seekers
@@ -67,8 +65,8 @@ The public ISLAMU instance is Islamic-focused, but the software itself is **purp
 ### Platform Owners & Self-Hosters
 
 - **🆓 100% Free & Open Source:** No feature paywalls, telemetry traps, or enterprise tiers. Licensed under AGPL-3.0-or-later
-- **🛡️ Absolute Data Sovereignty:** Self-host on your own infrastructure (Docker, Coolify, Aspire, On-Prem) with total control over user and attendee data — see [Self-Hosting Overview](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting)
-- **🐳 Flexible Deployment Topologies:** Deploy as a single lightweight container ([Docker Standalone](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/docker-standalone)) with embedded SQLite, a split [Docker Compose](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/docker-compose) topology, or across [Deployment Tiers](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers)
+- **⚡ Lightweight Standalone Deployment:** Deploy the entire platform—API, Blazor WebAssembly UI, background workers, and embedded SQLite—in **a single lightweight container**. Requires zero external database configuration, and runs smoothly on the most budget-friendly VPS (1 vCPU, 1.5–2 GB RAM estimation only, will be benchmarking in near future!) — see [Docker Standalone](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/docker-standalone)
+- **🔄 Enormous Elastic Scalability (The Zero-Lock-In Guarantee):** Start lean with Standalone without fear of hitting a dead end. When your community surges, promote your deployment to a multi-container Split Topology (BFF + API + PostgreSQL cluster) in ~15 minutes with **zero data loss**. Downscale right back to Standalone on a budget VPS when peak traffic concludes — see [Scaling & Migration Guide](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/topology-and-database-migration)
 - **💼 Multi-Tenancy:** Run as a dedicated single-tenant instance or a multi-tenant platform with isolated domains and branding at runtime without code changes — see [Multi-Tenancy](https://islamu.gitbook.io/islamu-event/documentation/readme/security-and-identity/multi-tenancy)
 - **🛠️ White-Label Control:** Fully customizable branding, domains, logos, navigation links, and policies per tenant — see [White-Labeling & Branding](https://islamu.gitbook.io/islamu-event/documentation/readme/administration-and-branding/white-labeling)
 - **💳 Zero-Custody Payments & Legal Protection:** Stripe Connect handles all payment processing, compliance, and payouts directly between attendees and organizers. The legal transaction is strictly between attendee and organizer—the operator never touches card data (zero PCI liability) nor holds attendee funds. Operators simply supply platform legal terms (Terms of Service, privacy policy) and can disable paid ticketing entirely at any time — see [Paid Events & Payouts](https://islamu.gitbook.io/islamu-event/documentation/readme/events-and-ticketing/paid-events-and-payouts)
@@ -95,21 +93,10 @@ ISLAMU Event is architected for sovereign self-hosting across diverse hardware r
 | **[Tier 1: Standalone / Masjid](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers#tier-1-standalone--masjid-community)** | Single container with embedded SQLite; ideal for 1 vCPU / 2 GB RAM servers. | 📖 **[Docker Standalone Runbook](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/docker-standalone)** |
 | **[Tier 2: Production Multi-Service Split](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers#tier-2-production-split-docker-compose)** | High-reliability split topology: API, Blazor UI, PostgreSQL, Keycloak, and Redis. | 📖 **[Docker Compose Runbook](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/docker-compose)** |
 | **[PaaS Deployment (Coolify)](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/coolify-cerbos-traefik)** | Self-hosted PaaS deployment behind Traefik with an external Cerbos PDP container. | 📖 **[Coolify with Cerbos & Traefik](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/coolify-cerbos-traefik)** |
+| **[Scaling & Elastic Migration](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/topology-and-database-migration)** | Zero-data-loss runbook to promote from Standalone to Split (or downscale back to Standalone). | 📖 **[Scaling & Migration Guide](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/topology-and-database-migration)** |
 | **[Developer Orchestration](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/dotnet-aspire-and-cloud)** | Local development and cloud-native adaptation via .NET Aspire AppHost. | 📖 **[.NET Aspire & Cloud](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/dotnet-aspire-and-cloud)** |
 
 For hardware sizing recommendations, reference architecture blueprints, and capacity planning, consult the **[Deployment Tiers & Sizing Guide](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers)** and the master **[Environment Variables Reference](https://islamu.gitbook.io/islamu-event/documentation/readme/configuration-and-operations/environment-variables)**.
-
-[ISLAMU Configurator](https://github.com/ISLAMU/Configurator) is the external
-offline configuration preparation utility. Event publishes its own declarative
-definitions and public workflow choices; on a deployed Configurator origin,
-`/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf` selects this target without contacting
-Event. The browser accepts public choices only, not secrets or administration.
-Install Configurator separately and supply the matching
-`configurator/definitions/islamu-event/definition.json`; Event backend validation
-and authorization remain authoritative. The generic CLI has no `event-setup`
-aliases and prepares answer workspaces with explicit artifact IDs. Bundled offline
-sources, test projects and release targets are removed from Event. See the
-[handoff and command migration](docs/public/self-hosting/setup-assistant.md#external-configurator-handoff).
 
 ---
 
@@ -304,45 +291,7 @@ I am deeply grateful to all our amazing contributors.
 
 Support ISLAMU Event's ongoing development, infrastructure, and open-source mission by becoming a financial sponsor.
 
-> ℹ️ **Recognition Policy:** Active tiers display ongoing monthly recurring sponsors. One-time contributions and sponsors who have stopped their monthly support are recognized under **Old Sponsors**.
-
-### 🥇 Gold Sponsors
-
-*No active Gold sponsors yet.*
-
-* **Monthly Support (€250+/mo):** [👉 Support Monthly via Stripe][stripe-monthly-link]
-
-#### Old Sponsors
-
-* **One-Time Contribution:** [👉 Donate Once via Stripe][stripe-oneoff-link]
-
-### 🥈 Silver Sponsors
-
-*No active Silver sponsors yet.*
-
-* **Monthly Support (€100+/mo):** [👉 Support Monthly via Stripe][stripe-monthly-link]
-
-#### Old Sponsors
-
-* **One-Time Contribution:** [👉 Donate Once via Stripe][stripe-oneoff-link]
-
-### 🥉 Bronze Sponsors
-
-*No active Bronze sponsors yet.*
-
-* **Monthly Support (€25+/mo):** [👉 Support Monthly via Stripe][stripe-monthly-link]
-
-#### Old Sponsors
-
-* **One-Time Contribution:** [👉 Donate Once via Stripe][stripe-oneoff-link]
-
-### ☕ Community Sponsors
-
-*No active Community sponsors yet.*
-
-* **Monthly Support (€5+/mo):** [👉 Support Monthly via Stripe][stripe-monthly-link]
-
-#### Old Sponsors
+* **Monthly Support :** [👉 Support Monthly via Stripe][stripe-monthly-link]
 
 * **One-Time Contribution:** [👉 Donate Once via Stripe][stripe-oneoff-link]
 

@@ -238,11 +238,12 @@ secrets remain provider-owned.
 ### Bounded SQLite Operational Profile
 
 The public [Standalone recipe](../public/documentation/readme/self-hosting/docker-standalone.md#bounded-sqlite-processing-profile)
-explicitly selects the optional-processing bounds exercised by
-`NativeEmailOptionalStandaloneFixture`: Webhooks, outbox and notification fanout
-processing, Quartz execution, email dispatch/RabbitMQ and MCP are disabled through
-their existing options. This is an explicit configuration, not new defaults or
-another authority over persisted email intent.
+uses the optional-processing defaults in `src/Event.Standalone/appsettings.json`:
+Outbox processing, notification fanout, Quartz maintenance, the hosted email
+dispatcher and MCP are enabled. RabbitMQ is disabled because the hosted email
+dispatcher needs no broker. Webhooks remain disabled pending the SQLite query
+correction below. Explicit environment configuration can override each default;
+Split API defaults and persisted email intent are unchanged.
 
 The bound matters: `WebhookLocalTargetRepository.CountDueAsync` and
 `CountStaleDeliveringAsync` retain SQLite-unsupported `DateTimeOffset` comparisons.
@@ -251,14 +252,36 @@ the query failure as Unhealthy. The directory's connection-local instant
 collation does not cover those queries. The retained native failure and passing
 bounded configuration establish this distinction; readiness must not be falsified.
 
-Directory/admin HTTP, optional SMTP health and three-host credential/bootstrap/
-Data Protection/disable continuity are verified within this profile. Disabled
-dispatchers and Quartz do not execute queued work or scheduled cleanup, so these
-checks do not establish dependent asynchronous workflows, physical erasure
-completion or default optional-worker topology. Operators must verify and enable
-the required processors before relying on those features. The public recipe owns
-the exact environment projection; do not duplicate it as another configuration
-source here.
+The earlier bounded optional-email fixture explicitly disables workers to isolate
+its checks; those overrides do not define product defaults. Enabling processors
+restores execution of durable work and scheduled maintenance, but does not certify
+every job, physical erasure completion, or a full Standalone startup. The local
+SQLite migration and browser-session blockers remain separate. SMTP delivery
+still defaults disabled through persisted settings, so an enabled email worker
+does not require SMTP provisioning. See the decision evidence below.
+
+### Worker Default Decision (2026-11-04)
+
+| Standalone setting | Default | Reason and native evidence |
+|---|---|---|
+| `OutboxProcessor:Enabled` | `true` | Committed work needs retry/settlement; `OutboxProcessor` uses the database admission/dispatch path without requiring a broker. Individual dispatchers retain their integration checks. |
+| `NotificationFanoutProcessor:Enabled` | `true` | Database-backed recipient fanout is core background work; `NotificationFanoutProcessor.ProcessRoundAsync` has no SMTP or broker prerequisite. |
+| `Scheduler:Quartz:Enabled` | `true` | Maintenance/reconciliation must run; the existing composition selects Microsoft SQLite and startup-owned scheduler schema. |
+| `EmailDispatchProcessor:Enabled` | `true` | The existing hosted runner executes the shared durable drain in-process. Persisted email capability determines whether transport use is allowed. |
+| `EmailDispatchProcessor:Mode` | `HostedService` | Preserve Standalone's existing mode; no RabbitMQ or separate worker process is needed, and the Quartz registration avoids a duplicate email trigger. |
+| `EmailDispatchRabbitMq:Enabled` | `false` | External broker transport is optional. |
+| `Webhooks:Enabled` | `false` | Temporary SQLite timestamp-query compatibility limitation documented above. |
+| `Api:McpEnabled` | `true` | Restore the normal API adapter default; it needs no broker. Runtime governance still controls effective enablement through `McpRuntimeGateMiddleware`. |
+
+Research used Tavily MCP on 2026-11-04 to search and confirm official
+[Microsoft hosted-service documentation](https://learn.microsoft.com/en-us/dotnet/architecture/microservices/multi-container-microservice-net-applications/background-tasks-with-ihostedservice)
+and [Quartz 3.x job-store documentation](https://www.quartz-scheduler.net/documentation/quartz-3.x/tutorial/job-stores.html).
+Functional conclusions: background work can run within the host; persistent
+scheduling does not imply a message broker; SQLite concurrency limits still
+matter. Repository-native registration, capability policy and tests determine
+the actual defaults. No external implementation or dependency was imported.
+The change only adjusts existing options and documentation; names, structure,
+and control flow remain repository-owned (AFC/SSO: configuration facts only).
 
 ### Delivery Authority And Core Health
 

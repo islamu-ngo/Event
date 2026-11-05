@@ -28,6 +28,7 @@ internal static class PostgresTenantRuntimeReadiness
                 OR ({PostgresManagedTenantWorkerCreationPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresUserTenantMembershipReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresEmailRetentionReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
+                OR ({PostgresEmailPointerPublicationPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresEventResourceAuditReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresEffectAggregateHealthReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresInventoryHoldExpiryReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})

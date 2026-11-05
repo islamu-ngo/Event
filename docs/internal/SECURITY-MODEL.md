@@ -2007,6 +2007,20 @@ exchange, retaining the existing channel/TLS options, five-second deadline and
 cancellation handling. Tests replace only this transport input on the original
 scoped owner; they do not bypass compilation, native custody or rechecks.
 
+RabbitMQ pointer publication uses its own `IEmailDispatchPointerPublicationStore`.
+An independent Global owner projects pointer identifiers and reads only the
+pause, eligibility, ordering and retry facts needed to select a batch. Its only
+writes are the four RabbitMQ producer markers and `UpdatedAt`; SMTP status,
+leases, delivery attempts and message content remain excluded. Markers retain
+the exact candidate tenant/outbox and Pending/RetryScheduled predicates.
+The retention manifest accepts this fixed permission union only when the complete
+publication manifest is valid. Installation and the closed Global catalogue
+attest both purposes together, including their exact policies and ACLs.
+The existing Global credential retains its cumulative admission authority;
+purpose separation does not introduce a separate credential-compromise boundary.
+Confirmation precedes marker persistence, so uncertain marker completion can
+produce another pointer, while SMTP admission continues to own processing claims.
+
 Ordinary-settings attestation reuses its generated guard and body-hash SQL text
 within the same immutable EF model, exact SQL renderer, schema and declared login
 enrollment. Weak model/renderer ownership and synchronous construction retain

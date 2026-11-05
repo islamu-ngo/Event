@@ -297,6 +297,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresIncomingWebhookQueueContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresEventReportOperationsContract.ApplyAsync(migratorContext);
             await PostgresEmailRetentionReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresEmailPointerPublicationPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresEventResourceAuditReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresEffectAggregateHealthReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresWebhookLocalDeliveryAdmissionContract.ApplyAsync(migratorContext, NativeQueueEnrollment);

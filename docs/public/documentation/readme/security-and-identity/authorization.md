@@ -376,6 +376,12 @@ separate read owner. Ordinary application connections retain their existing
 restrictions. Missing saved settings remain distinguishable from defaults, and
 readiness does not acquire permission to change the configuration.
 
+RabbitMQ publication reads pointer metadata without loading email content or
+claiming SMTP delivery. Its database writes cover only publication markers.
+Global and tenant pauses, retry timing, redaction and soft deletion still govern
+selection. Repeated pointers remain possible after uncertain marker persistence;
+the SMTP worker's claim determines whether delivery work can proceed.
+
 Creation reveals a secret only in its initial successful response. Recovery
 returns digest-bound metadata, never a stored secret or credential hash.
 Historical reports include inactive tenants and instance-scoped keys but do not

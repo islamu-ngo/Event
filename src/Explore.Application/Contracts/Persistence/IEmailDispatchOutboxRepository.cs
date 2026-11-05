@@ -15,12 +15,6 @@ public interface IEmailDispatchOutboxRepository : IEmailDispatchAdmission
         EventReminderRescheduleRequest request,
         CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<EmailDispatchOutbox>> GetRabbitMqPublishBatch(
-        int batchSize,
-        DateTime now,
-        DateTime retryAttemptsBefore,
-        CancellationToken cancellationToken);
-
     Task<int> CountDueDispatchAsync(
         DateTime now,
         CancellationToken cancellationToken);
@@ -144,17 +138,6 @@ public interface IEmailDispatchOutboxRepository : IEmailDispatchAdmission
 
     Task<EmailDispatchPreHandoffReleaseOutcome> ReleaseClaimBeforeProviderHandoff(
         EmailDispatchPreHandoffRelease request,
-        CancellationToken cancellationToken);
-
-    Task MarkRabbitMqPublishSucceeded(
-        Guid id,
-        DateTime publishedAt,
-        CancellationToken cancellationToken);
-
-    Task MarkRabbitMqPublishFailed(
-        Guid id,
-        string failureCategory,
-        DateTime attemptedAt,
         CancellationToken cancellationToken);
 
     Task SettleProviderAccepted(

@@ -580,6 +580,16 @@ Current security gates:
 
 ## JWT Bearer Configuration (API)
 
+`DynamicJwtConfigurationService` observes only the stored primary-provider ID,
+Keycloak authority and client ID through `IInstanceSystemSettingsReader`, using
+an independent Global read owner. `AuthProviderConfigurationService` supplies
+the shared pure projection, preserving deployment primary-provider precedence
+and deployment-managed metadata. This public JWT observation does not resolve
+the administrative provider DTO or acquire confidential-client secrets.
+Runtime retains no direct `secret_bindings` read grant. A new configuration
+manager still prefetches OIDC metadata and signing keys before replacing the
+current manager; failed prefetch retains the prior state.
+
 Private operational listener admission compares the physical local port and
 address. Dual-stack sockets may report an IPv4 peer-facing local address as an
 IPv4-mapped IPv6 value; the guard normalizes that representation to IPv4 before

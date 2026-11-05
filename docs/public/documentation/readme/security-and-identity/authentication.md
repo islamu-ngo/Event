@@ -10,6 +10,11 @@ optional confidential client unconfigured; a configured client secret still
 requires a complete, valid credential group. No database permission changes are
 needed for this startup projection.
 
+API JWT refresh reads saved public provider metadata through a separate
+configuration reader. It does not need permission to read confidential-client
+bindings. Deployment-managed settings retain precedence, and a new signing-key
+configuration replaces the current one only after metadata retrieval succeeds.
+
 Private health and metrics checks support dual-stack listeners that represent
 IPv4 addresses in mapped IPv6 form. The physical address and port must still
 match the declared private listener; forwarded headers do not grant access.

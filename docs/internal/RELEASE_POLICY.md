@@ -135,6 +135,14 @@ locks. A restored or installed prerequisite does not attest execution of a
 registered profile; the exact-candidate requirements in the
 [release checklist](RELEASE_CHECKLIST.md#code-and-test-gates) remain separate.
 
+Ambient tracing context is not daemon authority and is not forwarded by the
+dedicated daemon handler. A successful read-only probe is not execution evidence.
+
+Actual selected-engine readiness precedes bounded asynchronous daemon requests.
+Cached proxy metadata does not prove a running VM. Readiness evidence is separate
+from runtime admission and does not extend request deadlines or authorize replay
+after an uncertain mutation.
+
 - The renderer MUST run from the trusted bundle with explicit configuration,
   `--offline`, and `--no-exec`; it MUST NOT use provider APIs, network configuration,
   or command processors.

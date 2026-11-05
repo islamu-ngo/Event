@@ -59,6 +59,16 @@ missing/skipped results or reused report/execution identities. Candidate,
 run/attempt and retained artifact byte hashes must agree.
 Provider, database role and authentication remain `not-attested`.
 
+The daemon control client excludes ambient trace headers and baggage through its
+own handler. Wire-level context-isolation checks and the explicit read-only
+daemon probe remain prerequisite diagnostics, not registered-lane admission.
+
+Establish uncached engine readiness on the selected socket before bounded
+assurance requests; cached Desktop proxy responses do not prove a running VM.
+Retain the asynchronous client's five-second request budget and separate
+readiness evidence. A canceled DELETE with no accepted response has an unknown
+outcome, not successful cleanup.
+
 The API lanes require their registered key witnesses within the complete
 category report. Owned lanes require equality between registered and observed
 named variants, so adding an unregistered passing case also rejects admission

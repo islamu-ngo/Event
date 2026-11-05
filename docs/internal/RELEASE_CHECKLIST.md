@@ -231,6 +231,15 @@ Use `Not applicable` only when the change has no release-impact category. If the
 
 ## CI/CD Evidence Contract
 
+- [ ] Native daemon transport changes retain the wire-level context-isolation
+  result and the selected daemon read-only result without diagnostic runtime
+  overrides, separately from actual workload and owned cleanup evidence.
+
+- [ ] Retain uncached selected-engine readiness evidence separately from the
+  actual production acquisition sequence and real-peer cancellation checks.
+  Cached proxy responses, blocking diagnostic passes or a longer readiness
+  allowance do not extend the client's request deadline or admit a runtime lane.
+
 - [ ] API-key issuance changes retain the five provider `Issuance.trx` reports,
   each with at least 14 executed cases and no failed or skipped issuance cases;
   general provider smoke results do not substitute for native contention evidence.

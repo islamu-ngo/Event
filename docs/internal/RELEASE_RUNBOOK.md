@@ -259,6 +259,18 @@ execution sidecar and referenced reports have also been supplied:
    duplicated, skipped, zero-test or digest-inconsistent evidence rejects
    candidate verification before a manifest is written.
 
+When acquisition fails before child launch, distinguish the selected daemon's
+read-only transport result from workload and cleanup evidence. Do not use
+diagnostic socket-completion or global tracing overrides to qualify the final
+candidate; the dedicated handler's context isolation must work normally.
+
+Establish actual engine readiness with a separate bounded read-only uncached
+inventory request on the selected socket. Desktop proxy cache responses can
+precede VM startup; retain startup/readiness evidence separately. Preserve the
+asynchronous client's five-second request and three-second connection allowances.
+A lost mutation response is an unknown outcome: inspect the qualified resource
+and preserve the error instead of adding retries or declaring cleanup complete.
+
 ```sh
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
   verify-candidate docs/internal/releases/<version> <full-B-oid>

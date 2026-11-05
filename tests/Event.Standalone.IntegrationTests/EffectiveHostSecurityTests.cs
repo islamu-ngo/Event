@@ -98,6 +98,43 @@ public sealed class EffectiveHostSecurityTests
     }
 
     [Test]
+    [Arguments(false, true, HttpStatusCode.BadRequest)]
+    [Arguments(true, false, HttpStatusCode.NotFound)]
+    [Arguments(true, true, HttpStatusCode.OK)]
+    public async Task PrivateIpv4ProbeRequiresDeclaredHostAndExactListener(
+        bool declaredHost, bool exactListener, HttpStatusCode expected)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["OperationalEndpoints:Address"] = "127.0.0.1",
+            ["OperationalEndpoints:Port"] = "8089"
+        });
+        builder.Services.AddEarlyRequestAdmission(builder.Configuration, builder.Environment);
+        builder.Services.Configure<EffectiveHostAuthorityOptions>(options =>
+        {
+            options.CanonicalOrigin = "https://localhost";
+            options.InstanceHosts = declaredHost ? ["127.0.0.1"] : [];
+        });
+        builder.Services.Configure<ForwardedHeadersOptions>(_ => { });
+        await using var app = builder.Build();
+        app.Use((context, next) =>
+        {
+            context.Connection.LocalIpAddress = IPAddress.Loopback;
+            context.Connection.LocalPort = exactListener ? 8089 : 8090;
+            return next(context);
+        });
+        app.UseEffectiveHostAuthority();
+        app.MapGet("/health", () => Results.Ok()).RequirePrivateOperationalListener();
+        await app.StartAsync();
+        using var client = app.GetTestClient();
+        using var response = await client.GetAsync("http://127.0.0.1:8089/health");
+        await Assert.That(response.StatusCode).IsEqualTo(expected);
+        await Assert.That(response.Headers.Location).IsNull();
+    }
+
+    [Test]
     public async Task OwnershipAttestationsExpireAndBindExactTenantAndHost()
     {
         var now = new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero);

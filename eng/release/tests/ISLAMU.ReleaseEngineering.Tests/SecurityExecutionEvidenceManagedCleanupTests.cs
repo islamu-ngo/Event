@@ -177,7 +177,8 @@ public sealed class SecurityExecutionEvidenceManagedCleanupTests
                         volumeIdentities[volume.Name] = await RequireVolumeAsync(docker, volume, token);
                     if (foreignMountType is not null)
                     {
-                        ConfiguredOwnedResource resource = resources.First(item => live.Contains(item.Container.ContainerId)
+                        ConfiguredOwnedResource resource = resources.Single(item => item.Container.Resource == "postgres"
+                            && live.Contains(item.Container.ContainerId)
                             && item.Mounts.Any(mount => mount.Type == "volume"));
                         consumed = resource.Mounts.First(mount => mount.Type == "volume");
                         using var created = await SendAsync(docker, HttpMethod.Post, "containers/create", new

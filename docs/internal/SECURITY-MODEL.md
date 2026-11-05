@@ -1967,6 +1967,19 @@ PostgreSQL instance/cluster without the obsolete capability roles. A new databas
 inside a cluster retaining those roles is insufficient because roles are cluster-wide.
 The application never automatically removes those objects or deletes data.
 
+Authorization-provider observation uses `IInstanceSystemSettingsReader`, which
+owns an independent Global context and the existing ordinary-settings read
+primitive. It returns only requested detached stored rows; it does not merge
+hierarchy defaults, acquire mutation custody or promote the caller's Runtime
+connection. Original connection and native readiness checks surround observation.
+Prepared provider mutations continue to read their original captured
+`ProviderConfigurationState`. No new database grant or routine is required.
+The selected provider compiler still verifies the proposed endpoint and rechecks
+it before completion. `ICerbosEndpointHealthProbe` owns that external gRPC
+exchange, retaining the existing channel/TLS options, five-second deadline and
+cancellation handling. Tests replace only this transport input on the original
+scoped owner; they do not bypass compilation, native custody or rechecks.
+
 Operators provision the selected Runtime, Migrator and Global logins and only
 the capability groups required by each consumer; see [SECRETS.md](SECRETS.md)
 and the [public database configuration guide](../public/documentation/readme/configuration-and-operations/environment-variables.md).

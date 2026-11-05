@@ -564,6 +564,7 @@ public static class InfrastructureServicesRegistration
         // Configuration audit logging
         services.AddScoped<IConfigurationChangeLogService, ConfigurationChangeLogService>();
         services.AddScoped<IAuthorizationProviderConfigurationService, AuthorizationProviderConfigurationService>();
+        services.AddSingleton<ICerbosEndpointHealthProbe, CerbosEndpointHealthProbe>();
         services.AddHttpClient<IKeycloakAdminClient, KeycloakAdminClient>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);

@@ -1090,6 +1090,7 @@ public static class PersistenceServicesRegistration
                 provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
                 provider.GetService<PostgresNativeQueueEnrollment>()));
         services.AddScoped<IInstanceTenantSettingsReader, InstanceTenantSettingsReader>();
+        services.AddScoped<IInstanceSystemSettingsReader, InstanceSystemSettingsReader>();
         services.AddScoped<HumanSettingsDataBoundary>();
         services.AddScoped<ICoordinatedSettingMutationStore, CoordinatedSettingMutationRepository>();
         services.AddScoped<IOrdinarySettingsMutationStore, OrdinarySettingsMutationStore>();

@@ -365,6 +365,11 @@ administrator grant within its transaction, after the selected authorization
 provider allows the operation. Listing remains self-owned; an exact-key
 administrative read or mutation may target another administrator's key.
 
+Authorization-provider readiness reads saved instance configuration through a
+separate read owner. Ordinary application connections retain their existing
+restrictions. Missing saved settings remain distinguishable from defaults, and
+readiness does not acquire permission to change the configuration.
+
 Creation reveals a secret only in its initial successful response. Recovery
 returns digest-bound metadata, never a stored secret or credential hash.
 Historical reports include inactive tenants and instance-scoped keys but do not

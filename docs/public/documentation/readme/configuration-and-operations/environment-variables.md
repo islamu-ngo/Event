@@ -1049,6 +1049,10 @@ The same `ERASURE_DATABASE_*` names are used inside the Infisical `/database/era
 
 For Local bootstrap, use the configured UUIDv7 subject as the username. Bootstrap
 creates the account and administrator linkage without requiring email delivery.
+The initial password is read directly from its registered reference in the
+selected secret authority, independently of database binding metadata. Database
+bindings cannot redirect that reference or replace a missing bootstrap password;
+do not grant Runtime access to `secret_bindings` to make bootstrap succeed.
 After setup completes, changing or leaving the bootstrap password configured
 does not reset the account. Use the credential-administration flow instead.
 

@@ -486,6 +486,14 @@ claim. Configured Local bootstrap additionally resolves
 `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` (Infisical `/api/bootstrap` or `/api`); it is instance-only,
 bootstrap-classified and has no live-rotation path or source default.
 
+`SecretResolver.ResolveBindingAsync` resolves every `IsBootstrapSecret` definition
+through its registry reference before querying binding storage. Bootstrap
+credentials must remain available before persistence is ready; persisted binding
+metadata cannot redirect them. Resolution still uses only the selected authority
+and rejects material after its owner retires. Ordinary runtime secrets retain the
+tenant-to-instance binding hierarchy. This boundary requires no Runtime grant on
+`secret_bindings`.
+
 That secret creates only the initial temporary credential during incomplete
 setup. The native receipt coordinates Identity creation with application
 linkage, administrator grants and setup completion. Private first-use

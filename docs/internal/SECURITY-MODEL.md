@@ -2094,6 +2094,14 @@ purpose separation does not introduce a separate credential-compromise boundary.
 Confirmation precedes marker persistence, so uncertain marker completion can
 produce another pointer, while SMTP admission continues to own processing claims.
 
+Jetstream readiness observes stored deployment mode through
+`IInstanceSystemSettingsReader`. Active tenant identifiers come from the
+independent Global federation reader, which projects IDs through the existing
+tenant/status grants and retains read admission before and after the query.
+The ordinary background Runtime context acquires neither read authority nor
+mutation custody. Dedicated capability and override rows still determine
+enablement, with inactive tenants excluded and instance locks preserved.
+
 Ordinary-settings attestation reuses its generated guard and body-hash SQL text
 within the same immutable EF model, exact SQL renderer, schema and declared login
 enrollment. Weak model/renderer ownership and synchronous construction retain

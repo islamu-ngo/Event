@@ -12,6 +12,23 @@ public sealed class AtprotoFederationGlobalReadRepository(
     IGlobalExploreDbContextFactory factory, PostgresNativeQueueEnrollment? enrollment)
     : IAtprotoFederationGlobalReadRepository
 {
+    public async Task<IReadOnlyList<Guid>> GetActiveTenantIdsAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var admission = await AtprotoFederationReadAdmission.OpenGlobalAsync(
+                context, enrollment, cancellationToken);
+            var ids = await context.Tenants.AsNoTracking()
+                .Where(tenant => tenant.TenantStatus.IsActiveState)
+                .Select(tenant => tenant.Id)
+                .ToArrayAsync(cancellationToken);
+            await admission.ValidateAsync(cancellationToken);
+            return ids;
+        });
+    }
+
     public async Task<IReadOnlyList<AtprotoFederationInstanceSetting>> GetInstanceAsync(
         IReadOnlyCollection<string> keys, CancellationToken cancellationToken = default)
     {

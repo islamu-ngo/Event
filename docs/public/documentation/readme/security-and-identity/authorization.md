@@ -440,6 +440,11 @@ Global and tenant pauses, retry timing, redaction and soft deletion still govern
 selection. Repeated pointers remain possible after uncertain marker persistence;
 the SMTP worker's claim determines whether delivery work can proceed.
 
+Jetstream readiness uses independent instance-policy reads to determine which
+active tenants enable ingestion. Tenant overrides and instance locks remain
+authoritative; reading readiness does not promote the background caller's
+database permissions.
+
 Creation reveals a secret only in its initial successful response. Recovery
 returns digest-bound metadata, never a stored secret or credential hash.
 Historical reports include inactive tenants and instance-scoped keys but do not

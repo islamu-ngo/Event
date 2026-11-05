@@ -587,6 +587,16 @@ the exact comparison. It still rejects a different private address, public
 listener port or undeclared host, and does not use forwarded headers to select
 the listener.
 
+Split BFF health and metrics requests retain their original connection through
+the middleware pipeline instead of redirecting to the public HTTPS listener.
+The operational endpoint's physical address/port guard still runs on both
+public and private requests; a public listener receives 404. Other public
+requests retain HTTPS redirection.
+Operational responses also bypass UI error-page re-execution, preserving the
+health check's own 503 body and the guard's public-listener 404. Their cache
+policy requires `no-store`; additional `no-cache`/`must-revalidate` directives
+do not weaken that policy.
+
 - Authority: Keycloak OIDC metadata endpoint.
 - Resource audience: only `Keycloak:Audience`, default `islamu-event-api`.
   The BFF client ID is not an API resource audience; `azp` never substitutes for `aud`.

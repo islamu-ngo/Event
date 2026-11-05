@@ -13,6 +13,9 @@ needed for this startup projection.
 Private health and metrics checks support dual-stack listeners that represent
 IPv4 addresses in mapped IPv6 form. The physical address and port must still
 match the declared private listener; forwarded headers do not grant access.
+Private health and metrics probes stay on that listener without following a
+redirect to the public HTTPS endpoint. Ordinary public requests retain HTTPS
+redirection, and public listeners cannot serve the operational responses.
 
 Each deployment has exactly one **primary authentication provider**:
 

@@ -37,17 +37,15 @@ try
             new SecretAuthorityLoginAttempt(), cancellationToken: shutdownCts.Token);
     if (secretAuthority is not null)
         await secretAuthority.StartAuthenticationMaintenanceAsync(shutdownCts.Token);
-    if (!builder.Environment.IsEnvironment("Testing"))
+    await builder.PrepareApiHostSecretsAsync(secretAuthority, SecretConsumerRole.Combined, shutdownCts.Token);
+    bool ownsLocalMigrations = !builder.Environment.IsEnvironment("Testing")
+        && PrimaryDatabaseConfiguration.BindRuntime(builder.Configuration).Provider == PrimaryDatabaseProvider.Sqlite;
+    if (ownsLocalMigrations)
     {
         foreach (var migrationAssembly in Directory.EnumerateFiles(
-                     AppContext.BaseDirectory,
-                     "Explore.Persistence*.Migrations.*.dll"))
-        {
+                     AppContext.BaseDirectory, "Explore.Persistence*.Migrations.*.dll"))
             AssemblyLoadContext.Default.LoadFromAssemblyPath(migrationAssembly);
-        }
     }
-
-    await builder.PrepareApiHostSecretsAsync(secretAuthority, SecretConsumerRole.Combined, shutdownCts.Token);
     var apiHost = builder.AddApiHostServices(
         () => shutdownState.IsShuttingDown,
         ownsDevelopmentMigrations: false,
@@ -72,33 +70,38 @@ try
 
     app = builder.Build();
 
-    await ExternalIdentityDatabaseMigrator.MigrateIfExternalAsync(
-        app.Configuration,
-        app.Logger,
-        shutdownCts.Token);
+    if (ownsLocalMigrations)
+    {
+        await ExternalIdentityDatabaseMigrator.MigrateIfExternalAsync(
+            app.Configuration, app.Logger, shutdownCts.Token);
+    }
 
     await using (var scope = app.Services.CreateAsyncScope())
     {
-        var startupSequence = scope.ServiceProvider
-            .GetRequiredService<IConfigurationManifestPostMigrationSequence>();
-        await startupSequence.RunAsync(
-            async cancellationToken =>
-            {
-                if (app.Environment.IsEnvironment("Testing"))
+        if (app.Environment.IsEnvironment("Testing"))
+        {
+            await scope.ServiceProvider.GetRequiredService<IConfigurationManifestPostMigrationSequence>()
+                .RunAsync(async cancellationToken =>
                 {
                     var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
                     await SqliteDatabaseInitializer.InitializeAsync(database, cancellationToken);
-                    return;
-                }
-
-                await ExploreDatabaseMigrator.MigrateAndSeedAsync(
-                    app.Environment,
-                    app.Configuration,
+                }, shutdownCts.Token);
+        }
+        else if (ownsLocalMigrations)
+        {
+            await scope.ServiceProvider.GetRequiredService<IConfigurationManifestPostMigrationSequence>()
+                .RunAsync(cancellationToken => ExploreDatabaseMigrator.MigrateAndSeedAsync(
+                    app.Environment, app.Configuration,
                     PrimaryDatabaseConfiguration.BindMigrator(app.Configuration),
-                    app.Logger,
-                    cancellationToken: cancellationToken);
-            },
-            shutdownCts.Token);
+                    app.Logger, cancellationToken: cancellationToken), shutdownCts.Token);
+        }
+        else
+        {
+            // MigrationService completes application and identity migration before this host starts.
+            // Manifest bootstrap still runs with this host's application authority.
+            await scope.ServiceProvider.GetRequiredService<IConfigurationManifestStartupRunner>()
+                .RunAsync(shutdownCts.Token);
+        }
     }
 
     if (!app.Environment.IsEnvironment("Testing") && !apiHost.IsOpenApiGeneration)

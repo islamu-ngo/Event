@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6NXD1NJZ54Q69F12DMP0TB4
+Title: "leave server database migrations to the dedicated owner"
+Type: fix
+Scope: self-hosting
+Summary: "Start Standalone with application credentials after the dedicated migration service completes server database setup; retain local SQLite initialization and application-authority manifest bootstrap."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/HOSTING_ARCHITECTURE.md
+    Disposition: documented
+    Detail: "Serving hosts use application authority after dedicated server-database migration; they do not acquire Migrator credentials. Manifest bootstrap remains a startup gate."
+  Migration:
+    Reference: docs/internal/HOSTING_ARCHITECTURE.md
+    Disposition: documented
+    Detail: "Server database and external identity migration completes through MigrationService before Standalone starts. Embedded SQLite startup migration and testing initialization remain local."
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: "Complete the separate migration service before starting a PostgreSQL Standalone host. SQLite continues to initialize its own database."

@@ -161,6 +161,14 @@ graph TD
 * **Entrypoint**: `Program.cs`
 * **Role**: Unifies `Explore.API` endpoints and `Explore.Blazor` BFF server into a **single .NET process**. Uses SQLite (`Data Source=/app/data/islamu.db`) and embedded migrations, enabling single-container deployments on resource-constrained servers (1 vCPU, 2 GB RAM).
 
+SQLite retains application-owned startup migration and seeding, including its
+embedded migration assemblies. When Standalone uses PostgreSQL behind
+MigrationService, the external migration dependency owns primary and external
+identity migration. The application host does not bind Migrator credentials or
+repeat that work. Both paths still run configuration-manifest bootstrap before
+administrator preparation, privacy admission and HTTP startup; manifest failure
+blocks later authority.
+
 ### 4. `Event.MigrationService` (One-Shot Database Migrator)
 * **Assembly**: `src/Event.MigrationService/`
 * **Entrypoint**: `Program.cs`

@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6P0S24R1ZJD1MTEGX9Y9MDJ
+Title: "Publish RabbitMQ email pointers through bounded Global storage"
+Type: fix
+Scope: notifications
+Summary: "Separate pointer publication from SMTP claims and message content while preserving pauses, retry eligibility and producer marker settlement."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Independent Global publication reads pointer metadata and updates only producer markers; SMTP claims and message content remain excluded."
+  Migration:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Canonical migration installs the fixed pointer permissions and attests their exact union with retention reads."
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: "Pauses and retry eligibility remain authoritative; uncertain marker settlement may repeat a pointer without claiming SMTP delivery."

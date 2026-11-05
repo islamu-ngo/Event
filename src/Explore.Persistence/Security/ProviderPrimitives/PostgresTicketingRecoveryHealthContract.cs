@@ -89,7 +89,11 @@ public static class PostgresTicketingRecoveryHealthContract
         string tables = string.Join(", ", sources.Select(source => Text(Table(context, source.Type)) + "::regclass"));
         var installation = new FleetHealthInstallationSql(
             contract, enrollment, OwnerRole, MigratorRole, ExecutorRole, PolicyName, "ticketing_recovery_health");
-        string sourceGuard = installation.SourceGuard(tables);
+        string effectRead = $"""
+            relation.oid=pg_catalog.to_regclass({Text(Table(context, typeof(FairReturnOrchestrationEffect)))})
+            AND ({Explore.Persistence.Schema.PostgresEffectAggregateHealthReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment)})
+            """;
+        string sourceGuard = installation.SourceGuard(tables, effectRead);
         string observationGuard = installation.ObservationGuard(sourceGuard, tables, signature);
         string grants = string.Join("\n", relations.Select(relation => FleetHealthInstallationSql.ReadPolicy(
             sql.DelimitIdentifier(relation.Name, schemaName),

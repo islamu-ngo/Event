@@ -9,6 +9,7 @@ using Explore.Application.Services.Moderation;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using ISLAMU.Moderation.Application;
 using ISLAMU.Moderation.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -386,12 +387,7 @@ public sealed class ModerationEffectLeaseRepository(
             || context.Database.ProviderName is not (RelationalNamedLock.PostgreSqlProvider
                 or RelationalNamedLock.SqlServerProvider or RelationalNamedLock.SqliteProvider or RelationalNamedLock.MySqlProvider))
             return false;
-        if (context.Database.ProviderName != RelationalNamedLock.PostgreSqlProvider) return true;
-        await using var command = context.Database.GetDbConnection().CreateCommand();
-        command.Transaction = transaction.GetDbTransaction();
-        command.CommandText = "SELECT current_setting('app.current_tenant_id', true)";
-        var value = await command.ExecuteScalarAsync(token);
-        return value is string setting && Guid.TryParse(setting, out var actual) && actual == tenantId;
+        return await PostgresTenantSessionProbe.MatchesAsync(context, transaction, tenantId, token);
     }
 
     private static ModerationEffectLeaseResult Unavailable(ModerationEffectLeaseUnavailableReason reason) =>

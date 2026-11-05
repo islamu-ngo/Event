@@ -39,7 +39,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
         if (!Enum.IsDefined(identityTopology)) throw new ArgumentOutOfRangeException(nameof(identityTopology));
         enrollment.Validate();
         var sources = Sources(context);
-        string absent = AbsentPredicate(sources, enrollment);
+        string absent = AbsentPredicate(context, sources, enrollment);
         string complete = CataloguePredicate(context, sources, enrollment, true);
         var mechanics = ProvisioningSharedWriterAssertions.ManagedTenantWorkerCreationInventory(context, enrollment, identityTopology);
         await using var owned = context.Database.CurrentTransaction is null
@@ -156,7 +156,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
     {
         enrollment.Validate();
         var sources = Sources(context);
-        return $"(({AbsentPredicate(sources, enrollment)}) OR ({CataloguePredicate(context, sources, enrollment, true)}))";
+        return $"(({AbsentPredicate(context, sources, enrollment)}) OR ({CataloguePredicate(context, sources, enrollment, true)}))";
     }
 
     internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
@@ -173,7 +173,10 @@ public static class PostgresManagedTenantWorkerCreationPermissions
             .Concat(PostgresAtprotoFederationSettingPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresIntegrationSyncReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresEmailRetentionReadPermissions.GlobalCatalogueRelations(context))
+            .Concat(PostgresEmailPointerPublicationPermissions.GlobalCatalogueRelations(context))
+            .Concat(PostgresWebhookCataloguePermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresEventResourceAuditReadPermissions.GlobalCatalogueRelations(context))
+            .Concat(PostgresEffectAggregateHealthReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresInventoryHoldExpiryReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresLocalizationSecretStatusReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresExternalApiKeyAuthenticationContract.GlobalCatalogueRelations(context))
@@ -185,7 +188,10 @@ public static class PostgresManagedTenantWorkerCreationPermissions
             PostgresAtprotoFederationSettingPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresIntegrationSyncReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresEmailRetentionReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresEmailPointerPublicationPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresWebhookCataloguePermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresEventResourceAuditReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresEffectAggregateHealthReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresInventoryHoldExpiryReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresLocalizationSecretStatusReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresExternalApiKeyAuthenticationContract.CompleteGlobalCataloguePredicate(context, enrollment),
@@ -233,10 +239,15 @@ public static class PostgresManagedTenantWorkerCreationPermissions
         PostgresNativeQueueEnrollment enrollment, bool complete)
     {
         string login = Text(enrollment.GlobalLogin), owner = Text(enrollment.MigratorLogin);
-        string expected = "VALUES " + string.Join(',', sources.SelectMany(source => source.Allowed
-            .Select(grant => $"({Text(source.Table)},{Text(grant.Column)},{Text(grant.Privilege)})")));
+        var requiredGrants = sources.SelectMany(source => source.Allowed
+            .Select(grant => $"({Text(source.Table)},{Text(grant.Column)},{Text(grant.Privilege)},true)"));
+        var bootstrapGrants = sources.SelectMany(source =>
+            PostgresSetupLiveStoragePermissions.GlobalBootstrapColumns(context, source.Type)
+                .SelectMany(column => new[] { "SELECT", "INSERT", "UPDATE" }
+                    .Select(privilege => $"({Text(source.Table)},{Text(column)},{Text(privilege)},false)")));
+        string expected = "VALUES " + string.Join(',', requiredGrants.Concat(bootstrapGrants));
         string required = complete ? $"""
-            AND NOT EXISTS (SELECT 1 FROM expected e WHERE NOT EXISTS (
+            AND NOT EXISTS (SELECT 1 FROM expected e WHERE e.required AND NOT EXISTS (
                 SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl
                 WHERE a.attrelid=pg_catalog.to_regclass(e.relation) AND a.attname=e.column_name
                     AND acl.grantee=(SELECT oid FROM pg_catalog.pg_roles WHERE rolname={login})
@@ -246,7 +257,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
         string tables = "ARRAY[" + string.Join(',', sources.Select(source => Text(source.Table))) + "]::text[]";
         string federation = Text(sources.Single(source => source.Type == typeof(AtprotoFederationTenantSetting)).Table);
         return $"""
-            (WITH expected(relation,column_name,privilege) AS ({expected}),
+            (WITH expected(relation,column_name,privilege,required) AS ({expected}),
             members AS (SELECT r.* FROM pg_catalog.pg_roles r WHERE pg_catalog.pg_has_role({login},r.oid,'MEMBER'))
             SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname={login} AND rolcanlogin)
                 AND EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname={owner} AND rolcanlogin)
@@ -279,11 +290,14 @@ public static class PostgresManagedTenantWorkerCreationPermissions
             """;
     }
 
-    private static string AbsentPredicate(Source[] sources, PostgresNativeQueueEnrollment enrollment) =>
+    private static string AbsentPredicate(ExploreDbContext context, Source[] sources, PostgresNativeQueueEnrollment enrollment) =>
         string.Join(" AND ", sources.Select(source =>
         {
             string baseline = string.Join(" OR ", source.Baseline.Select(grant =>
-                $"(a.attname={Text(grant.Column)} AND acl.privilege_type={Text(grant.Privilege)})"));
+                $"(a.attname={Text(grant.Column)} AND acl.privilege_type={Text(grant.Privilege)})")
+                .Concat(PostgresSetupLiveStoragePermissions.GlobalBootstrapColumns(context, source.Type)
+                    .SelectMany(column => new[] { "SELECT", "INSERT", "UPDATE" }
+                        .Select(privilege => $"(a.attname={Text(column)} AND acl.privilege_type={Text(privilege)})"))));
             return $"""
                 NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class t CROSS JOIN pg_catalog.pg_roles r
                     WHERE t.oid=pg_catalog.to_regclass({Text(source.Table)})
@@ -549,6 +563,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
         if (literal is null && string.Equals(sql, "uuidv7()", StringComparison.Ordinal) && property.ClrType == typeof(Guid)) return "uuidv7()";
         if (sql is null && literal?.Value is bool boolean) return boolean ? "true" : "false";
         if (sql is null && literal?.Value is int integer) return integer.ToString(CultureInfo.InvariantCulture);
+        if (sql is null && literal?.Value is long longInteger) return longInteger.ToString(CultureInfo.InvariantCulture);
         throw new InvalidOperationException("managed_tenant_worker_default_model_drift");
     }
 

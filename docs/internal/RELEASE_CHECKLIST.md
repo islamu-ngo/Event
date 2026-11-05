@@ -180,6 +180,9 @@ Use `Not applicable` only when the change has no release-impact category. If the
   ```
 
 - [ ] Required per-project tests pass; do not run solution-level `dotnet test`.
+- [ ] Browser prerequisites restore against the installer's own committed lock
+  without changing the shared tools lock; actual named browser cases still run
+  for the candidate. See [fixture prerequisites](CI_CD_GOVERNANCE.md#security-integration-fixture-execution).
 - [ ] Architecture tests pass:
 
   ```bash
@@ -227,6 +230,15 @@ Use `Not applicable` only when the change has no release-impact category. If the
 - [ ] Secret scanning, push protection, Dependabot security updates, dependency graph, and CodeQL alerts are enabled or explicitly waived at repository/organization level. Current credential rotation status is documented as restart-based when that is the proven behavior; do not imply live reload or zero-downtime rotation unless it is separately proven.
 
 ## CI/CD Evidence Contract
+
+- [ ] Native daemon transport changes retain the wire-level context-isolation
+  result and the selected daemon read-only result without diagnostic runtime
+  overrides, separately from actual workload and owned cleanup evidence.
+
+- [ ] Retain uncached selected-engine readiness evidence separately from the
+  actual production acquisition sequence and real-peer cancellation checks.
+  Cached proxy responses, blocking diagnostic passes or a longer readiness
+  allowance do not extend the client's request deadline or admit a runtime lane.
 
 - [ ] API-key issuance changes retain the five provider `Issuance.trx` reports,
   each with at least 14 executed cases and no failed or skipped issuance cases;

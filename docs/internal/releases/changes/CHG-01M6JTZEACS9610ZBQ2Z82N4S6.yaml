@@ -1,0 +1,44 @@
+Change-Id: CHG-01M6JTZEACS9610ZBQ2Z82N4S6
+Title: "admit EF reads with purpose-bound storage permissions"
+Type: fix
+Scope: access
+Summary: "Managed-domain discovery and report health counts currently require privileged reader functions."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: >-
+      Managed-domain and report-health consumers use fixed EF read permissions
+      instead of the retired privileged reader functions. Stop participating
+      consumers, apply the selected Migrator storage contract, and restart the
+      matching application; mixed versions are unsupported.
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Managed-domain discovery uses fixed reads limited to the two public
+      domain-setting keys. Report health reads only synchronization and parent
+      deletion metadata. Runtime tenant isolation and denial without the
+      selected Global capability remain required.
+  Migration:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: >-
+      The selected migrator replaces the two privileged reader functions with
+      column grants and stamped SELECT policies and retires the old owner's
+      table rights and migration-role membership. No entity schema changes.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: >-
+      Stop participating consumers, apply the selected storage contract with
+      Migrator authority, then restart the matching application. Mixed versions
+      are unsupported. Do not elevate Runtime or Global to repair admission.

@@ -2,6 +2,12 @@ namespace Explore.Persistence.QueryFilters;
 
 public static class TenantFilterBypassReasons
 {
+    public const string EmailPointerPublication =
+        "Independent Global publication selects only pointer and pause metadata; SMTP claims remain tenant-owned.";
+
+    public const string OperationalEffectAggregateHealth =
+        "Independent Global operational readiness reads only aggregate effect status and timing facts.";
+
     public const string IdempotencyCleanupTenantDiscovery =
         "Global idempotency cleanup discovers tenants from a bounded eligible receipt identity page.";
 

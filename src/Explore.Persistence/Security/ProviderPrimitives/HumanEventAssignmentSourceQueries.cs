@@ -7,6 +7,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -52,6 +53,17 @@ internal sealed class HumanEventAssignmentSourceQueries(
     internal async Task<HumanEventAssignmentSourceFacts> ReadAsync(
         DbTransaction? transaction, Action requireSelection, CancellationToken ct)
     {
+        if (!_context.Database.IsNpgsql())
+        {
+            void RequireOriginal()
+            {
+                requireSelection();
+                if (!ReferenceEquals(transaction, _context.Database.CurrentTransaction?.GetDbTransaction()))
+                    throw new InvalidOperationException("human_assignment_original_transaction_changed");
+            }
+            return await HumanEventAssignmentSourceProjection.ReadAsync(_context, _tenant, _human,
+                _events, RequireOriginal, ct);
+        }
         JsonDocument? native = null;
         try
         {
@@ -70,53 +82,21 @@ internal sealed class HumanEventAssignmentSourceQueries(
                 command.CommandText = PostgresHumanEventAssignmentSourceContract.AdmissionSql(_context, _enrollment!);
                 await command.ExecuteNonQueryAsync(ct);
             }
-            bool current = transaction is not null && _context.Database.ProviderName == RelationalNamedLock.MySqlProvider;
-            string[] queries = new HumanEventAssignmentSourceSql(_context, _events.Length, current).Queries;
-            async Task<ImmutableArray<T>> Rows<T>(int index) => native is not null
-                ? native.RootElement.GetProperty($"q{index}").Deserialize<ImmutableArray<T>>(Json)
-                : await ReadRowsAsync<T>(queries[index] + (current ? " FOR UPDATE" : ""), transaction, ct);
-            var events = await Rows<HumanAssignmentEventFact>(0);
-            var assignments = await Rows<HumanEventAssignmentFact>(1);
-            var roles = await Rows<HumanAssignmentRoleFact>(2);
-            var permissions = await Rows<HumanAssignmentPermissionFact>(3);
-            var actors = await Rows<HumanAssignmentActorFact>(4);
-            var members = await Rows<HumanAssignmentTenantMemberFact>(5);
-            var organizations = await Rows<HumanAssignmentOwnerMemberFact>(6);
-            var groups = await Rows<HumanAssignmentOwnerMemberFact>(7);
-            var provenance = await Rows<HumanAssignmentProvenanceFact>(8);
+            ImmutableArray<T> Rows<T>(int index) => native!.RootElement.GetProperty($"q{index}").Deserialize<ImmutableArray<T>>(Json);
+            var events = Rows<HumanAssignmentEventFact>(0);
+            var assignments = Rows<HumanEventAssignmentFact>(1);
+            var roles = Rows<HumanAssignmentRoleFact>(2);
+            var permissions = Rows<HumanAssignmentPermissionFact>(3);
+            var actors = Rows<HumanAssignmentActorFact>(4);
+            var members = Rows<HumanAssignmentTenantMemberFact>(5);
+            var organizations = Rows<HumanAssignmentOwnerMemberFact>(6);
+            var groups = Rows<HumanAssignmentOwnerMemberFact>(7);
+            var provenance = Rows<HumanAssignmentProvenanceFact>(8);
             requireSelection();
             return new(_human, _tenant, _events, events, assignments, roles, permissions,
                 actors, members, organizations, groups, provenance);
         }
         finally { native?.Dispose(); }
-    }
-
-    private async Task<ImmutableArray<T>> ReadRowsAsync<T>(string sql, DbTransaction? transaction, CancellationToken ct)
-    {
-        await using var command = Command(transaction);
-        command.CommandText = sql;
-        Parameters(command);
-        await using var reader = await command.ExecuteReaderAsync(ct);
-        var result = ImmutableArray.CreateBuilder<T>();
-        while (await reader.ReadAsync(ct))
-        {
-            var row = new Dictionary<string, object?>(StringComparer.Ordinal);
-            for (int index = 0; index < reader.FieldCount; index++)
-                row.Add(reader.GetName(index), await reader.IsDBNullAsync(index, ct) ? null : reader.GetValue(index));
-            foreach (var property in typeof(T).GetProperties())
-            {
-                if (!row.TryGetValue(property.Name, out object? value) || value is null) continue;
-                if (property.PropertyType == typeof(bool)) row[property.Name] = Convert.ToBoolean(value, CultureInfo.InvariantCulture);
-                if (property.PropertyType == typeof(Guid) || property.PropertyType == typeof(Guid?))
-                    row[property.Name] = value is Guid guid ? guid : Guid.Parse((string)value);
-                if (property.PropertyType == typeof(DateTime) || property.PropertyType == typeof(DateTime?))
-                    row[property.Name] = DateTime.SpecifyKind(value is DateTime date ? date
-                        : DateTime.Parse((string)value, CultureInfo.InvariantCulture), DateTimeKind.Utc);
-            }
-            result.Add(JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(row), Json)
-                ?? throw new InvalidOperationException("human_assignment_row_invalid"));
-        }
-        return result.ToImmutable();
     }
 
     internal async Task LockPortableAsync(DbTransaction transaction, CancellationToken ct)

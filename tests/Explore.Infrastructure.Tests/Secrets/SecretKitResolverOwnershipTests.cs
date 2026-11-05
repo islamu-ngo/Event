@@ -16,6 +16,49 @@ namespace Explore.Infrastructure.Tests.Secrets;
 public sealed class SecretKitResolverOwnershipTests
 {
     [Test]
+    [Arguments(SecretAuthorityKind.Environment)]
+    [Arguments(SecretAuthorityKind.UserSecrets)]
+    public async Task BootstrapCredentialResolvesWithoutBindingStorageAndCannotOutliveItsAuthority(
+        SecretAuthorityKind provider)
+    {
+        await using var fixture = new Fixture(provider);
+        fixture.Repository.GetByKeyAndScopeAsync(Arg.Any<string>(), Arg.Any<SecretScope>(),
+            Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(_ =>
+                Task.FromException<SecretBinding?>(new InvalidOperationException("binding_storage_unavailable")));
+
+        var resolved = await fixture.Resolver.ResolveAsync(
+            SecretDefinitionRegistry.Keys.Authentication.LocalBootstrapPassword, null);
+
+        await Assert.That(resolved.IsResolved).IsTrue();
+        await Assert.That(resolved.Value).IsEqualTo(fixture.Bootstrap);
+        await fixture.Owner.DisposeAsync();
+        var retired = await fixture.Resolver.ResolveAsync(
+            SecretDefinitionRegistry.Keys.Authentication.LocalBootstrapPassword, null);
+        await Assert.That(retired.Status).IsEqualTo(SecretResolutionStatus.Unavailable);
+        await Assert.That(retired.Value).IsNull();
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task BootstrapCredentialCannotBeRedirectedByPersistedMetadata(bool canonicalAvailable)
+    {
+        await using var fixture = new Fixture(bootstrapAvailable: canonicalAvailable);
+        string key = SecretDefinitionRegistry.Keys.Authentication.LocalBootstrapPassword;
+        var redirected = SecretBinding.CreateEnvironmentVariable(
+            key, SecretScope.Instance, null, "TENANT_MAIL_PASSWORD");
+        redirected.Id = Guid.CreateVersion7();
+        fixture.Repository.GetByKeyAndScopeAsync(key, SecretScope.Instance, null,
+            Arg.Any<CancellationToken>()).Returns(redirected);
+
+        var resolved = await fixture.Resolver.ResolveAsync(key, null);
+
+        await Assert.That(resolved.Status).IsEqualTo(canonicalAvailable
+            ? SecretResolutionStatus.Resolved : SecretResolutionStatus.Unconfigured);
+        await Assert.That(resolved.Value).IsEqualTo(canonicalAvailable ? fixture.Bootstrap : null);
+    }
+
+    [Test]
     public async Task NativeRegistrationSharesTheCacheAcrossScopedRepositoriesWithoutOwningTheAuthority()
     {
         using var configuration = (ConfigurationRoot)new ConfigurationBuilder().AddInMemoryCollection(
@@ -115,21 +158,23 @@ public sealed class SecretKitResolverOwnershipTests
         private readonly ServiceProvider _services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         private readonly SecretResolverMetrics _metrics;
         internal string Alternate { get; } = Guid.NewGuid().ToString("N");
+        internal string Bootstrap { get; } = Guid.NewGuid().ToString("N");
         internal ISecretBindingRepository Repository { get; } = Substitute.For<ISecretBindingRepository>();
         internal SecretAuthorityAcquisition Owner { get; }
         internal EnvironmentSecretSource Source { get; }
         internal SecretResolver Resolver { get; }
 
-        internal Fixture()
+        internal Fixture(SecretAuthorityKind provider = SecretAuthorityKind.Environment, bool bootstrapAvailable = true)
         {
             _configuration = (ConfigurationRoot)new ConfigurationBuilder().AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
                     ["MAIL_SMTP_PASSWORD"] = Guid.NewGuid().ToString("N"),
-                    ["TENANT_MAIL_PASSWORD"] = Alternate
+                    ["TENANT_MAIL_PASSWORD"] = Alternate,
+                    ["INSTANCE_BOOTSTRAP_LOCAL_PASSWORD"] = bootstrapAvailable ? Bootstrap : null
                 }).Build();
             Owner = SecretAuthorityAcquisition.OpenLocal(
-                new(SecretAuthorityKind.Environment, "Testing", SecretConsumerRole.Api), _configuration);
+                new(provider, "Testing", SecretConsumerRole.Api), _configuration);
             Source = new EnvironmentSecretSource(Owner);
             _metrics = new SecretResolverMetrics(_services.GetRequiredService<IMeterFactory>());
             Resolver = new SecretResolver(Repository, [Source], new SecretResolverCacheState(_cache),

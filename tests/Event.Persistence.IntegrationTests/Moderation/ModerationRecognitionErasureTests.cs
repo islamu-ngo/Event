@@ -96,10 +96,11 @@ public sealed partial class ModerationPolicyPublicationTests
     [Arguments("missing-row")]
     [Arguments("changed-tag")]
     [Arguments("changed-generation")]
+    [Arguments("restore-floor")]
     public async Task ModerationErasureWorstBreak_IncompleteOrChangedOriginalMaterialCannotAppend(string defect)
     {
         await using var fixture = await RecognitionErasureFixture.CreateAsync();
-        await using var context = fixture.Database.Context();
+        await using var context = fixture.Database.MaintenanceContext();
         var repository = fixture.Repository(context);
         await repository.ReceiveAsync(fixture.Request, fixture.ReceiptHash, Now.AddHours(2), CancellationToken.None);
         if (defect == "key") fixture.Keys.Available = false;
@@ -109,6 +110,9 @@ public sealed partial class ModerationPolicyPublicationTests
                 .Where(row => row.IntentId == fixture.Request.IntentId).ExecuteDeleteAsync();
         if (defect == "changed-tag") fixture.Keys.ReplaceMaterial();
         if (defect == "changed-generation") fixture.Keys.Generation++;
+        if (defect == "restore-floor")
+            await fixture.Retained.Repository.AppendAsync(PrivacyErasureRequest.Create(Guid.CreateVersion7(),
+                PrivacyErasureSubjectKind.User, fixture.Database.AdminId, PrivacyErasureReasonCode.AccountDeletion, 1));
         await fixture.Retained.Repository.ExecuteSerializedAsync(async ct =>
         {
             await using var lease = await repository.AcquireAppendAsync(fixture.Request, ct);
@@ -382,8 +386,9 @@ public sealed partial class ModerationPolicyPublicationTests
                     ? SecretResolutionResult.Resolved(keys.Selection(database.Scope.TrustDomainId))
                     : SecretResolutionResult.Unavailable);
             var lifecycleFixture = new ModerationRecognitionKeyLifecycleFixture(secrets, clock);
-            await lifecycleFixture.Bind(context, retained.Repository, retained.Repository).Lifecycle
-                .InitializeAsync(database.Scope.TrustDomainId, CancellationToken.None);
+            await using (var maintenance = database.MaintenanceContext())
+                await lifecycleFixture.Bind(maintenance, retained.Repository, retained.Repository).Lifecycle
+                    .InitializeAsync(database.Scope.TrustDomainId, CancellationToken.None);
             return new()
             {
                 Database = database,

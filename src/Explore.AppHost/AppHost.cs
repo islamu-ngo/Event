@@ -1973,6 +1973,16 @@ static IResourceBuilder<ProjectResource> WithProfileSecretMode(
         .WithEnvironment("DOTNET_ENVIRONMENT", "Development")
         .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development");
 
+    if (Environment.GetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER") is { Length: > 0 } polling)
+    {
+        project = project.WithEnvironment("DOTNET_USE_POLLING_FILE_WATCHER", polling);
+    }
+
+    if (Environment.GetEnvironmentVariable("DOTNET_SYSTEM_IO_DISABLEFILEWATCHING") is { Length: > 0 } disableWatching)
+    {
+        project = project.WithEnvironment("DOTNET_SYSTEM_IO_DISABLEFILEWATCHING", disableWatching);
+    }
+
     if (runMode == AspireRunMode.AgentBrowser)
     {
         project = WithAgentBrowserEnvironment(project, AgentBrowserProfileSettings.Create());

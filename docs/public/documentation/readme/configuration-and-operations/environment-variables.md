@@ -14,6 +14,18 @@ ISLAMU Event follows **Convention over Configuration**. The platform includes se
 
 ---
 
+## Address geocoding retry budget
+
+`GEOCODING_RETRY_DELAYS_MILLISECONDS` is a comma-separated retry schedule.
+An explicit schedule replaces the built-in `200,500` delays; it is not appended
+to them. Leaving the schedule unconfigured retains those defaults.
+
+The number of delays must match `GEOCODING_MAXIMUM_RETRY_COUNT` (default `2`),
+and their sum must be strictly below `GEOCODING_TOTAL_TIMEOUT_MILLISECONDS`
+(default and maximum `5000`). For example, `150,400` is valid with two retries
+and a total budget of `4500`. Invalid budgets block startup even when the
+provider is `None`; disabling geocoding does not bypass configuration validation.
+
 ## Shared browser session authority
 
 These inputs are required for browser sign-in in BFF and Standalone hosts,
@@ -1037,6 +1049,10 @@ The same `ERASURE_DATABASE_*` names are used inside the Infisical `/database/era
 
 For Local bootstrap, use the configured UUIDv7 subject as the username. Bootstrap
 creates the account and administrator linkage without requiring email delivery.
+The initial password is read directly from its registered reference in the
+selected secret authority, independently of database binding metadata. Database
+bindings cannot redirect that reference or replace a missing bootstrap password;
+do not grant Runtime access to `secret_bindings` to make bootstrap succeed.
 After setup completes, changing or leaving the bootstrap password configured
 does not reset the account. Use the credential-administration flow instead.
 

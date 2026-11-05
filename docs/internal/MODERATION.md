@@ -5631,6 +5631,12 @@ per tenant/caller/operation and per receipt. Reissued existing material receives
 its own immutable reporter acceptance without duplicate evidence, extended
 narrative custody or resurrection after physical purge. Replay digests use
 `moderation.case.intake.v3`; old development request coordinates are not accepted.
+The retained narrative floor selects the earliest UTC acceptance, then its
+acknowledgement ID for equal instants. `ModerationNarrativeTemporalQuery` orders
+SQLite's persisted UTC timestamp text because its provider cannot order the
+`DateTimeOffset` CLR value directly; other providers retain typed ordering.
+The original tenant/case/material predicates and the selected acknowledgement's
+transaction fence and final equality check still apply.
 Hidden-content occurrence coordinates are stable across independently qualified
 material sources; their source generations and material remain separately bound.
 Current actor enforcement is retained until the approved complete cutover.
@@ -5730,6 +5736,27 @@ finite expiry before commit. A database failure is settled inside the strategy
 without reminting. Lost commit acknowledgement withholds the token even if the
 receipt reached storage. Owned material and failed bearer buffers are zeroed;
 caller-owned transaction/work is not cleared on entry rejection.
+
+The issuance write set includes only its original receipt, any original tracked
+source, and the recovery advancement created by that save. The context lease,
+physical connection and original transaction wrapper remain pinned through the
+final recheck. Recovery admission requires the same native object, unchanged
+coordinates and singleton installation slot; its original object must remain
+tracked even when detachment would remove it from tracker enumeration. Replaced
+or detached receipt/source objects and lost recovery ownership withhold the
+bearer; a still-live owned transaction is rolled back. Reusing a persisted source that was
+not tracked by this issuance remains valid; matching an identifier alone never
+admits a substituted tracked object.
+The recovery save projects the persisted shadow `InstallationSlot` alongside
+the untracked entity and restores that value when attaching it. Attaching the
+entity alone loses shadow state; its CLR sentinel is not the persisted singleton
+slot and cannot serve as an ownership witness.
+
+After commit acknowledgement, publication independently checks cancellation, the
+original context and connection, caller/tenant/machine selection and the token's
+clock window. A failed publication check withholds and zeroes the bearer even
+when the receipt has committed. It neither replays minting nor reopens the
+transaction or claims that committed history was rolled back.
 
 `ModerationCaseReadGrantController` separates administrative read-purpose intent
 from receipt minting. Authenticated

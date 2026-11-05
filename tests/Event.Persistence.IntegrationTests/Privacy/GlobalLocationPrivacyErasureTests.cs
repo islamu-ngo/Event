@@ -1760,18 +1760,18 @@ public sealed class ExternalDatabasePrivacyErasurePostgreSqlFixture : IAsyncInit
 {
     private const string ApplicationDatabaseName = "global_location_privacy_test";
     private const string AuthorityRuntimeUsername = "global_erasure_runtime";
-    private const string AuthorityRuntimePassword = "global-erasure-runtime-password";
+    private readonly string _authorityRuntimePassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
     private readonly Guid _fixtureId = Guid.NewGuid();
     private readonly HashSet<string> _restoredDatabases = new(StringComparer.Ordinal);
     private readonly PostgreSqlContainer _applicationContainer = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase(ApplicationDatabaseName)
         .WithUsername("postgres")
-        .WithPassword("postgres")
+        .WithPassword(global::Event.Testing.PostgreSql.PostgresTestRoleBootstrap.ReadBootstrapPassword())
         .Build();
     private readonly PostgreSqlContainer _authorityContainer = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("privacy_erasure_authority_test")
         .WithUsername("postgres")
-        .WithPassword("postgres")
+        .WithPassword(global::Event.Testing.PostgreSql.PostgresTestRoleBootstrap.ReadBootstrapPassword())
         .Build();
     private string _authorityRuntimeConnectionString = string.Empty;
 
@@ -1794,7 +1794,7 @@ public sealed class ExternalDatabasePrivacyErasurePostgreSqlFixture : IAsyncInit
             await using var roleCommand = connection.CreateCommand();
             roleCommand.CommandText =
                 $"""
-                CREATE ROLE {AuthorityRuntimeUsername} LOGIN PASSWORD '{AuthorityRuntimePassword}';
+                CREATE ROLE {AuthorityRuntimeUsername} LOGIN PASSWORD '{_authorityRuntimePassword}';
                 GRANT privacy_erasure_authority_runtime TO {AuthorityRuntimeUsername};
                 """;
             await roleCommand.ExecuteNonQueryAsync();
@@ -1803,7 +1803,7 @@ public sealed class ExternalDatabasePrivacyErasurePostgreSqlFixture : IAsyncInit
             _authorityContainer.GetConnectionString())
         {
             Username = AuthorityRuntimeUsername,
-            Password = AuthorityRuntimePassword,
+            Password = _authorityRuntimePassword,
         }.ConnectionString;
 
         await using var context = CreateDbContext();

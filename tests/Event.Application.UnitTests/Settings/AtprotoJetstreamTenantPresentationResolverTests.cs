@@ -120,15 +120,17 @@ internal sealed class FederationReaderFixture : IDisposable
     private static readonly DateTime ObservedAt = new(2026, 10, 18, 12, 0, 0, DateTimeKind.Utc);
     private readonly List<Tenant> _tenants = [];
     private readonly LegacySettingsStore _legacy = new();
-    private readonly DedicatedSettingsStore _dedicated = new();
+    private readonly DedicatedSettingsStore _dedicated;
     private readonly ServiceProvider _services;
 
     internal FederationReaderFixture()
     {
+        _dedicated = new DedicatedSettingsStore(_tenants);
         DeploymentMode("MultiTenant");
         var services = new ServiceCollection();
         services.AddSingleton<ITenantRepository>(new TenantDirectory(_tenants));
         services.AddSingleton<ISystemSettingRepository>(_legacy);
+        services.AddSingleton<IInstanceSystemSettingsReader>(_legacy);
         services.AddSingleton<IAtprotoFederationGlobalReadRepository>(_dedicated);
         services.AddTransient<AtprotoJetstreamTenantPresentationResolver>();
         services.AddTransient<AtprotoPdsRecoveryPolicyResolver>();
@@ -214,8 +216,15 @@ internal sealed class FederationReaderFixture : IDisposable
 
     public void Dispose() => _services.Dispose();
 
-    private sealed class DedicatedSettingsStore : IAtprotoFederationGlobalReadRepository
+    private sealed class DedicatedSettingsStore(List<Tenant> tenants) : IAtprotoFederationGlobalReadRepository
     {
+        public Task<IReadOnlyList<Guid>> GetActiveTenantIdsAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<IReadOnlyList<Guid>>(tenants
+                .Where(tenant => tenant.TenantStatus.IsActiveState).Select(tenant => tenant.Id).ToArray());
+        }
+
         internal List<AtprotoFederationInstanceSetting> Instance { get; } = [];
         internal List<AtprotoFederationTenantSetting> Overrides { get; } = [];
         internal List<AtprotoFederationTenantSetting>? AfterObservation { get; set; }
@@ -244,9 +253,17 @@ internal sealed class FederationReaderFixture : IDisposable
         }
     }
 
-    private sealed class LegacySettingsStore : ISystemSettingRepository
+    private sealed class LegacySettingsStore : ISystemSettingRepository, IInstanceSystemSettingsReader
     {
         internal List<SystemSetting> Instance { get; } = [];
+
+        public Task<IReadOnlyList<SystemSetting>> ReadAsync(
+            IReadOnlyCollection<string> keys, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<IReadOnlyList<SystemSetting>>(Instance
+                .Where(row => keys.Contains(row.SettingKey, StringComparer.Ordinal)).ToArray());
+        }
 
         public Task<SystemSetting?> GetByKey(string key, CancellationToken cancellationToken = default)
         {

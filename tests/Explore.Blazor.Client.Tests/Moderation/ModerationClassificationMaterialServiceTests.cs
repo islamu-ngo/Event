@@ -396,8 +396,8 @@ public sealed class ModerationClassificationMaterialServiceTests
                 "target":{"kind":"Tenant","id":"{{Id}}"},"expectedQualificationRevision":23,
                 "eventGenerationId":"{{Id}}","taxonomyId":"{{Id}}","expectedTaxonomySourceId":"{{Id}}",
                 "expectedTaxonomyAdoptionId":"{{Id}}",
-                "components":[{"kind":"Event","nativeId":"{{NativeStamp}}","nativeStamp":{{(NullComponentStamp ? "null" : JsonSerializer.Serialize(NativeStamp))}},"digest":"original"}],
-                "categories":[{"versionId":"{{Id}}","categoryId":1,"revision":2,"code":"general","kind":"General",
+                "components":[{"kind":1,"nativeId":"{{NativeStamp}}","nativeStamp":{{(NullComponentStamp ? "null" : JsonSerializer.Serialize(NativeStamp))}},"digest":"original"}],
+                "categories":[{"versionId":"{{Id}}","categoryId":1,"revision":2,"code":"general","kind":1,
                 "minimumAge":0,"meaning":"General","reviewRationale":"Native rationale"}],
                 "validUntil":"2026-11-01T00:00:00Z","_links":{{link}}
                 """;

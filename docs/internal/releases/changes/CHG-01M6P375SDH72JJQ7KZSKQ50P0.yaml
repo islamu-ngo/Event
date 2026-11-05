@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6P375SDH72JJQ7KZSKQ50P0
+Title: "Update Blazor framework packages to the security patch"
+Type: fix
+Scope: access
+Summary: "Update the three Blazor framework package pins and regenerated dependency locks to 10.0.14 for GHSA-g27p-qf6j-c96c."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Pin the three Blazor framework packages to 10.0.14 for GHSA-g27p-qf6j-c96c and retain matching generated transitive locks."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: "Deploy a rebuilt image or publish from the patched pins and locks; updating only the shared runtime does not replace packaged dependencies."

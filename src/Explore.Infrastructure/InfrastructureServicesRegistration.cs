@@ -87,6 +87,12 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<IConfigurationTransferDestinationResolver,
             ConfigurationTransferDestinationResolver>();
         services.AddOptions<PhotonGeocodingOptions>()
+            .Configure(options =>
+            {
+                // An explicit schedule replaces defaults rather than extending them during binding.
+                if (configuration.GetSection($"{PhotonGeocodingOptions.SectionName}:RetryDelaysMilliseconds").Exists())
+                    options.RetryDelaysMilliseconds = [];
+            })
             .Bind(configuration.GetSection(PhotonGeocodingOptions.SectionName))
             .ValidateOnStart();
         services.AddSingleton<
@@ -564,6 +570,7 @@ public static class InfrastructureServicesRegistration
         // Configuration audit logging
         services.AddScoped<IConfigurationChangeLogService, ConfigurationChangeLogService>();
         services.AddScoped<IAuthorizationProviderConfigurationService, AuthorizationProviderConfigurationService>();
+        services.AddSingleton<ICerbosEndpointHealthProbe, CerbosEndpointHealthProbe>();
         services.AddHttpClient<IKeycloakAdminClient, KeycloakAdminClient>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);

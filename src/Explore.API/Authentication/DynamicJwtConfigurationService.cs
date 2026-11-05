@@ -3,7 +3,9 @@ using System.Net.Http;
 using System.Net.Security;
 using System.Net.Sockets;
 using Explore.Application.Contracts.Services;
-using Explore.Domain.Enums;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Services;
+using Explore.Domain.Constants;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols;
@@ -97,22 +99,24 @@ public sealed class DynamicJwtConfigurationService : IJwtAuthorityRefreshNotifie
         try
         {
             using var scope = _scopeFactory.CreateScope();
-            var configService = scope.ServiceProvider.GetService<IAuthProviderConfigurationService>();
-            if (configService is null)
+            var settingsReader = scope.ServiceProvider.GetService<IInstanceSystemSettingsReader>();
+            if (settingsReader is null)
             {
                 return null;
             }
 
-            var dto = await configService.ReadConfigurationAsync();
-            if (dto.PrimaryProviderId != (int)AuthenticationProviderKind.Keycloak
-                || string.IsNullOrWhiteSpace(dto.KeycloakAuthority)
-                || string.IsNullOrWhiteSpace(dto.KeycloakClientId))
+            var settings = await settingsReader.ReadAsync(
+                [GovernanceSettingKeys.Authentication.PrimaryProviderId,
+                 GovernanceSettingKeys.Authentication.KeycloakAuthority,
+                 GovernanceSettingKeys.Authentication.KeycloakClientId], ct);
+            string? authority = AuthProviderConfigurationService.ProjectKeycloakJwtAuthority(
+                settings.ToDictionary(setting => setting.SettingKey, StringComparer.Ordinal), _configuration);
+            if (string.IsNullOrWhiteSpace(authority))
             {
                 return null;
             }
 
-            var authority = dto.KeycloakAuthority.TrimEnd('/');
-            return BuildState(authority, source: "Database");
+            return BuildState(authority.TrimEnd('/'), source: "Database");
         }
         catch (Exception)
         {

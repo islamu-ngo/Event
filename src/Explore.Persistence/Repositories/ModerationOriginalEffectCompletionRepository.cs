@@ -11,6 +11,7 @@ using Explore.Application.Services.Moderation;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -166,15 +167,7 @@ public sealed partial class ModerationOriginalEffectCompletionRepository(
         if (!CurrentTransaction(transaction, authority.Tenant.Id) || machine.Current != principal
             || context.ModerationTrustDomainId != authority.Binding.TrustDomainId)
             return false;
-        if (context.Database.ProviderName == RelationalNamedLock.PostgreSqlProvider)
-        {
-            await using var command = context.Database.GetDbConnection().CreateCommand();
-            command.Transaction = transaction.GetDbTransaction();
-            command.CommandText = "SELECT current_setting('app.current_tenant_id', true)";
-            if (await command.ExecuteScalarAsync(token) is not string setting
-                || !Guid.TryParse(setting, out var actualTenant) || actualTenant != authority.Tenant.Id)
-                return false;
-        }
+        if (!await PostgresTenantSessionProbe.MatchesAsync(context, transaction, authority.Tenant.Id, token)) return false;
         var current = await bindings.ReadCurrentAsync(
             principal.KeyId, ModerationMachineCredentialSource.Persisted, token);
         if (current is null || current.Id != credential.Id || current.Revision != credential.Revision

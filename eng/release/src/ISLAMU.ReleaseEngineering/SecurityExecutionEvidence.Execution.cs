@@ -7,6 +7,7 @@ using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -489,19 +490,22 @@ public static partial class SecurityExecutionEvidence
     }
 
     internal static async Task<LiveNativeTool?> CaptureLiveNativeToolAsync(OwnedNativeProcessContext invocation,
-        int pid, CancellationToken token)
+        int pid, CancellationToken token, Func<Task>? afterExecutableLinked = null)
     {
+        ManagedProcessIdentity? process = null;
         try
         {
             if (!OperatingSystem.IsLinux() || invocation.Pid <= 0 || invocation.Start == 0
                 || invocation.Group != invocation.Pid || invocation.Session != invocation.Pid) return null;
-            ManagedProcessIdentity? owner = ReadManagedProcessIdentity(invocation.Pid), process = ReadManagedProcessIdentity(pid);
+            ManagedProcessIdentity? owner = ReadManagedProcessIdentity(invocation.Pid);
+            process = ReadManagedProcessIdentity(pid);
             if (owner is null || process is null || owner.Start != invocation.Start || owner.Group != invocation.Group
                 || owner.Session != invocation.Session || owner.State is 'Z' or 'X') return null;
             List<ManagedProcessIdentity>? chain = ReadLiveHostAncestorChain(process, owner, token);
             if (chain is null) return null;
             string executable = "/proc/" + pid.ToString(CultureInfo.InvariantCulture) + "/exe";
             string path = new FileInfo(executable).LinkTarget ?? throw new InvalidDataException("native_tool_unavailable");
+            if (afterExecutableLinked is not null) await afterExecutableLinked().ConfigureAwait(false);
             LiveFileIdentity identity = await ReadLiveMetadataAsync(executable, true, token).ConfigureAwait(false);
             if (!Path.IsPathFullyQualified(path) || path.Length > 8192 || path.Any(char.IsControl)
                 || (identity.Bits & 0xf000) != 0x8000 || identity.Bytes is < 1 or > 1_073_741_824) return null;
@@ -557,6 +561,10 @@ public static partial class SecurityExecutionEvidence
             return new(pid, process.Start, path, identity.Device, identity.Inode, identity.Bytes, hash,
                 script, scriptHash, chain.Select(item => item.Pid).ToArray(), workloadRun, config, configHash, loadOrigin);
         }
+        catch (AggregateException failure) when (!token.IsCancellationRequested && process is not null
+            && failure.InnerExceptions is [InvalidDataException { Message: "managed_metadata_unavailable" }]
+            && !SameLiveProcess(ReadManagedProcessIdentity(pid), process))
+        { return null; }
         catch (Exception failure) when (failure is IOException or UnauthorizedAccessException or InvalidDataException
             or InvalidOperationException or ArgumentException or OverflowException or FormatException or NotSupportedException)
         { return null; }
@@ -1047,8 +1055,7 @@ public static partial class SecurityExecutionEvidence
             {
                 if (item.ValueKind != JsonValueKind.Object) return false;
                 string id = Text(item, "Id");
-                if (id.Length != 64 || !LowerHex(id) || !allIds.Add(id)
-                    || !TryReadRuntimeMounts(item, out var mounts)) return false;
+                if (id.Length != 64 || !LowerHex(id) || !allIds.Add(id)) return false;
                 string owner = string.Empty;
                 if (item.TryGetProperty("Labels", out JsonElement labels) && labels.ValueKind != JsonValueKind.Null)
                 {
@@ -1060,6 +1067,11 @@ public static partial class SecurityExecutionEvidence
                     }
                     else if (labels.TryGetProperty("islamu.assurance.resource", out _)) return false;
                 }
+                bool foreignWithKnownState = owner != inputs.Owner && item.TryGetProperty("State", out var foreignState)
+                    && foreignState.ValueKind == JsonValueKind.String
+                    && foreignState.GetString() is "exited" or "dead" or "running" or "paused" or "created" or "restarting" or "removing";
+                if (!TryReadRuntimeMounts(item, out var mounts, allowEmptyForeignVolumeSource: foreignWithKnownState))
+                    return false;
                 if (owner != inputs.Owner)
                 {
                     foreignMounts.AddRange(mounts);
@@ -1115,6 +1127,61 @@ public static partial class SecurityExecutionEvidence
         }
     }
 
+    internal static bool VolumeConsumersAbsent(JsonElement inventory, IReadOnlyDictionary<string, string> volumes)
+    {
+        if (volumes.Count == 0) return true;
+        foreach (JsonElement row in inventory.EnumerateArray())
+        {
+            // Listings may omit volume paths; names identify volume consumers, while bind paths must remain complete.
+            if (!TryReadRuntimeMounts(row, out var mounts, allowEmptyForeignVolumeSource: true)) return false;
+            foreach (ObservedContainerMount mount in mounts)
+                if (mount.Type == "volume" && volumes.ContainsKey(mount.Name)
+                    || mount.Type == "bind" && volumes.Values.Any(path => ObservedMountPathsOverlap(path, mount.Source))) return false;
+        }
+        return true;
+    }
+
+    internal static bool SameVolumeIncarnation(JsonElement original, JsonElement current) =>
+        new[] { "CreatedAt", "Driver", "Scope", "Labels", "Options" }.All(property =>
+            original.TryGetProperty(property, out JsonElement expected)
+            && current.TryGetProperty(property, out JsonElement actual)
+            && JsonElement.DeepEquals(expected, actual));
+
+    internal static bool TryJoinContainerMountInspection(JsonElement summary, JsonElement inspection, out JsonElement joined)
+    {
+        joined = default;
+        try
+        {
+            string id = Text(summary, "Id"), image = Text(summary, "ImageID");
+            if (id.Length != 64 || !LowerHex(id) || !FullLocalImageId(image)
+                || Text(inspection, "Id") != id || Text(inspection, "Image") != image
+                || !UniqueProperties(summary) || !UniqueProperties(inspection)
+                || !TryReadRuntimeMounts(summary, out var summaryMounts, allowEmptyForeignVolumeSource: true)
+                || !TryReadRuntimeMounts(inspection, out var inspectedMounts)
+                || summaryMounts.Count != inspectedMounts.Count) return false;
+            var byTarget = inspectedMounts.ToDictionary(mount => mount.Destination, StringComparer.Ordinal);
+            foreach (ObservedContainerMount mount in summaryMounts)
+                if (!byTarget.TryGetValue(mount.Destination, out var inspected)
+                    || mount.Type != inspected.Type || mount.Name != inspected.Name
+                    || mount.ReadWrite != inspected.ReadWrite
+                    || mount.Source != inspected.Source && !(mount.Type == "volume" && mount.Source.Length == 0))
+                    return false;
+            JsonObject row = JsonNode.Parse(summary.GetRawText())!.AsObject();
+            foreach (JsonNode? value in row["Mounts"]!.AsArray())
+            {
+                JsonObject mount = value!.AsObject();
+                mount["Source"] = byTarget[mount["Destination"]!.GetValue<string>()].Source;
+            }
+            joined = JsonSerializer.SerializeToElement(row);
+            return true;
+        }
+        catch (Exception failure) when (failure is JsonException or InvalidOperationException or ArgumentException
+            or InvalidDataException or FormatException or OverflowException or KeyNotFoundException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
     private static bool RuntimeVolumeName(string name) => name.Length is >= 1 and <= 255
         && name.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.');
 
@@ -1124,7 +1191,8 @@ public static partial class SecurityExecutionEvidence
     private static bool ObservedMountPathsOverlap(string left, string right) => left == right || left == "/" || right == "/"
         || InputWithin(left, right) || InputWithin(right, left);
 
-    private static bool TryReadRuntimeMounts(JsonElement container, out IReadOnlyList<ObservedContainerMount> result)
+    private static bool TryReadRuntimeMounts(JsonElement container, out IReadOnlyList<ObservedContainerMount> result,
+        bool allowEmptyForeignVolumeSource = false)
     {
         result = [];
         if (!container.TryGetProperty("Mounts", out JsonElement mounts) || mounts.ValueKind != JsonValueKind.Array
@@ -1139,7 +1207,8 @@ public static partial class SecurityExecutionEvidence
                 || !mount.TryGetProperty("RW", out JsonElement writable)
                 || writable.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
             string name = mount.TryGetProperty("Name", out _) ? Text(mount, "Name") : string.Empty;
-            if (type == "volume" && (!RuntimeVolumeName(name) || !CanonicalObservedMountPath(source))
+            if (type == "volume" && (!RuntimeVolumeName(name)
+                    || !CanonicalObservedMountPath(source) && !(allowEmptyForeignVolumeSource && source.Length == 0))
                 || type == "bind" && !CanonicalObservedMountPath(source)
                 || type != "volume" && name.Length != 0) return false;
             observed.Add(new(type, name, source, target, writable.GetBoolean()));
@@ -1459,8 +1528,8 @@ public static partial class SecurityExecutionEvidence
             }
             else
             {
-                actualEntry = Path.ChangeExtension(executable, ".dll");
-                if (Path.GetFileNameWithoutExtension(executable) != Path.GetFileNameWithoutExtension(expectedEntry)) return null;
+                actualEntry = executable + ".dll";
+                if (Path.GetFileName(executable) != Path.GetFileNameWithoutExtension(expectedEntry)) return null;
             }
             if (actualEntry != expectedEntry) return null;
             string[] primaryPaths = [expectedEntry, Path.ChangeExtension(expectedEntry, ".deps.json"),
@@ -2748,7 +2817,7 @@ public static partial class SecurityExecutionEvidence
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         using var image = new PEReader(stream);
         if (!image.HasMetadata) return null;
-        if (image.PEHeaders.CorHeader?.MetadataDirectory.Size is not (>= 1 and <= 8_388_608))
+        if (image.PEHeaders.CorHeader?.MetadataDirectory.Size is not (>= 1 and <= 33_554_432))
             throw new InvalidDataException("own_build_metadata_limit");
         MetadataReader reader = image.GetMetadataReader();
         if (!reader.IsAssembly) return null;
@@ -2829,6 +2898,7 @@ public static partial class SecurityExecutionEvidence
         var targets = new Dictionary<string, OwningManagedTarget>(StringComparer.Ordinal);
         var generatedRoots = new HashSet<string>(StringComparer.Ordinal);
         var restoreIndexes = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var projectReferences = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         int visitedEntries = 0;
         while (pending.TryPop(out string? project))
         {
@@ -2855,6 +2925,7 @@ public static partial class SecurityExecutionEvidence
                         throw new InvalidDataException("own_project_graph_invalid");
                     pending.Push(relative);
                 }
+                projectReferences.Add(project, edges);
             }
             string intermediate = Path.Combine(Path.GetDirectoryName(projectPath)!, "obj");
             if (!Directory.Exists(intermediate)) continue;
@@ -2915,7 +2986,7 @@ public static partial class SecurityExecutionEvidence
             string runtime = Path.Combine(Path.GetDirectoryName(target.AssemblyPath)!, target.Build.RuntimeManifestFileName);
             string endpoints = Path.Combine(Path.GetDirectoryName(target.AssemblyPath)!, target.Build.EndpointManifestFileName!);
             var packages = ReadServedLockedPackageRoots(repository, project, runtime,
-                restoreIndexes[project], tracked, out string restoreDigest);
+                restoreIndexes, projectReferences, tracked, out string restoreDigest);
             string[] generated = generatedRoots.Order(StringComparer.Ordinal).ToArray();
             if (!TryCaptureLocalServedAssets(repository, candidate, [runtime], generated, packages,
                 out var served, out _, new Dictionary<string, string>(StringComparer.Ordinal) { [runtime] = endpoints }))
@@ -2931,68 +3002,85 @@ public static partial class SecurityExecutionEvidence
         return targets;
     }
 
-    private static IReadOnlyList<string> ReadServedLockedPackageRoots(string repository, string project,
-        string runtimeManifest, IReadOnlyList<string> restoreIndexes, IReadOnlyDictionary<string, string> tracked,
+    internal static IReadOnlyList<string> ReadServedLockedPackageRoots(string repository, string project,
+        string runtimeManifest, IReadOnlyDictionary<string, List<string>> restoreIndexes,
+        IReadOnlyDictionary<string, HashSet<string>> projectReferences, IReadOnlyDictionary<string, string> tracked,
         out string restoreDigest)
     {
-        string projectPath = Path.Combine(repository, project);
-        string lockRelative = Path.Combine(Path.GetDirectoryName(project)!, "packages.lock.json");
-        if (!tracked.ContainsKey(lockRelative)) throw new InvalidDataException("own_restore_lock_missing");
-        byte[] lockedBytes = ReadBoundedFile(Path.Combine(repository, lockRelative), MaximumReportBytes);
-        using JsonDocument locked = JsonDocument.Parse(lockedBytes, DocumentOptions);
-        var packages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (JsonProperty framework in locked.RootElement.GetProperty("dependencies").EnumerateObject())
-            foreach (JsonProperty package in framework.Value.EnumerateObject())
-            {
-                if (!package.Value.TryGetProperty("resolved", out JsonElement resolved)) continue;
-                string key = package.Name + "/" + resolved.GetString(), hash = Text(package.Value, "contentHash");
-                if (hash.Length is < 1 or > 1024 || packages.Count >= 16_384
-                    || packages.TryGetValue(key, out string? previous) && previous != hash)
-                    throw new InvalidDataException("own_restore_lock_invalid");
-                packages[key] = hash;
-            }
-        byte[]? selected = null;
-        foreach (string index in restoreIndexes)
-        {
-            byte[] bytes = ReadBoundedFile(index, MaximumReportBytes);
-            using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
-            if (Text(document.RootElement.GetProperty("project").GetProperty("restore"), "projectPath") != projectPath) continue;
-            if (selected is not null) throw new InvalidDataException("own_restore_index_ambiguous");
-            selected = bytes;
-        }
-        if (selected is null) throw new InvalidDataException("own_restore_index_missing");
-        using JsonDocument assets = JsonDocument.Parse(selected, DocumentOptions);
         using JsonDocument runtime = JsonDocument.Parse(ReadBoundedFile(runtimeManifest, MaximumReportBytes), DocumentOptions);
-        var roots = new HashSet<string>(StringComparer.Ordinal);
-        string[] packageFolders = assets.RootElement.GetProperty("packageFolders").EnumerateObject()
-            .Select(folder => InputDirectory(folder.Name)).Take(9).ToArray();
-        if (packageFolders.Length is < 1 or > 8) throw new InvalidDataException("own_restore_index_invalid");
-        JsonProperty[] libraries = assets.RootElement.GetProperty("libraries").EnumerateObject().Take(16_385).ToArray();
-        if (libraries.Length > 16_384) throw new InvalidDataException("own_restore_index_limit");
+        var matches = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         foreach (JsonElement element in runtime.RootElement.GetProperty("ContentRoots").EnumerateArray())
         {
             string root = InputDirectory(element.GetString()!);
             if (root == repository || InputWithin(root, repository)) continue;
-            var matches = new HashSet<string>(StringComparer.Ordinal);
-            foreach (JsonProperty library in libraries)
-            {
-                if (Text(library.Value, "type") != "package") continue;
-                string relative = Text(library.Value, "path");
-                if (!SafeInputRelativePath(relative) || !packages.TryGetValue(library.Name, out string? hash)
-                    || Text(library.Value, "sha512") != hash) continue;
-                foreach (string folder in packageFolders)
-                {
-                    string candidateRoot = Path.Combine(folder, relative);
-                    if ((root == candidateRoot || InputWithin(root, candidateRoot)) && Directory.Exists(candidateRoot))
-                        matches.Add(InputDirectory(candidateRoot));
-                }
-            }
-            if (matches.Count != 1 || roots.Count >= 128) throw new InvalidDataException("own_served_package_unlocked");
-            roots.Add(matches.Single());
+            if (matches.Count >= 128) throw new InvalidDataException("own_served_package_unlocked");
+            matches.TryAdd(root, new(StringComparer.Ordinal));
         }
-        restoreDigest = DigestBytes(JsonSerializer.SerializeToUtf8Bytes(new
-        { lockSha256 = DigestBytes(lockedBytes), assetsSha256 = DigestBytes(selected) }));
-        return roots.Order(StringComparer.Ordinal).ToArray();
+        var closure = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Stack<string>([project]);
+        while (pending.TryPop(out string? owner))
+        {
+            if (!closure.Add(owner)) continue;
+            if (closure.Count > 128 || !projectReferences.TryGetValue(owner, out var references))
+                throw new InvalidDataException("own_project_graph_invalid");
+            foreach (string reference in references) pending.Push(reference);
+        }
+        var restoreInputs = new List<object>();
+        foreach (string owner in closure.Order(StringComparer.Ordinal))
+        {
+            string projectPath = Path.Combine(repository, owner);
+            string lockRelative = Path.Combine(Path.GetDirectoryName(owner)!, "packages.lock.json");
+            if (!tracked.ContainsKey(lockRelative)) throw new InvalidDataException("own_restore_lock_missing");
+            byte[] lockedBytes = ReadBoundedFile(Path.Combine(repository, lockRelative), MaximumReportBytes);
+            using JsonDocument locked = JsonDocument.Parse(lockedBytes, DocumentOptions);
+            var packages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (JsonProperty framework in locked.RootElement.GetProperty("dependencies").EnumerateObject())
+                foreach (JsonProperty package in framework.Value.EnumerateObject())
+                {
+                    if (!package.Value.TryGetProperty("resolved", out JsonElement resolved)) continue;
+                    string key = package.Name + "/" + resolved.GetString(), hash = Text(package.Value, "contentHash");
+                    if (hash.Length is < 1 or > 1024 || packages.Count >= 16_384
+                        || packages.TryGetValue(key, out string? previous) && previous != hash)
+                        throw new InvalidDataException("own_restore_lock_invalid");
+                    packages[key] = hash;
+                }
+            byte[]? selected = null;
+            if (!restoreIndexes.TryGetValue(owner, out var indexes))
+                throw new InvalidDataException("own_restore_index_missing");
+            foreach (string index in indexes)
+            {
+                byte[] bytes = ReadBoundedFile(index, MaximumReportBytes);
+                using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
+                if (Text(document.RootElement.GetProperty("project").GetProperty("restore"), "projectPath") != projectPath) continue;
+                if (selected is not null) throw new InvalidDataException("own_restore_index_ambiguous");
+                selected = bytes;
+            }
+            if (selected is null) throw new InvalidDataException("own_restore_index_missing");
+            using JsonDocument assets = JsonDocument.Parse(selected, DocumentOptions);
+            string[] packageFolders = assets.RootElement.GetProperty("packageFolders").EnumerateObject()
+                .Select(folder => InputDirectory(folder.Name)).Take(9).ToArray();
+            if (packageFolders.Length is < 1 or > 8) throw new InvalidDataException("own_restore_index_invalid");
+            JsonProperty[] libraries = assets.RootElement.GetProperty("libraries").EnumerateObject().Take(16_385).ToArray();
+            if (libraries.Length > 16_384) throw new InvalidDataException("own_restore_index_limit");
+            foreach (var root in matches)
+                foreach (JsonProperty library in libraries)
+                {
+                    if (Text(library.Value, "type") != "package") continue;
+                    string relative = Text(library.Value, "path");
+                    if (!SafeInputRelativePath(relative) || !packages.TryGetValue(library.Name, out string? hash)
+                        || Text(library.Value, "sha512") != hash) continue;
+                    foreach (string folder in packageFolders)
+                    {
+                        string candidateRoot = Path.Combine(folder, relative);
+                        if ((root.Key == candidateRoot || InputWithin(root.Key, candidateRoot)) && Directory.Exists(candidateRoot))
+                            root.Value.Add(InputDirectory(candidateRoot));
+                    }
+                }
+            restoreInputs.Add(new { project = owner, lockSha256 = DigestBytes(lockedBytes), assetsSha256 = DigestBytes(selected) });
+        }
+        if (matches.Values.Any(roots => roots.Count != 1)) throw new InvalidDataException("own_served_package_unlocked");
+        restoreDigest = DigestBytes(JsonSerializer.SerializeToUtf8Bytes(restoreInputs));
+        return matches.Values.Select(roots => roots.Single()).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
     }
 
     private static bool SafeInputRelativePath(string path) => path.Length is > 0 and <= 4096 &&

@@ -321,6 +321,10 @@ is required. See the [operator procedure](../public/self-hosting/operator-identi
 
 ## Environment Variables & Secrets Authority
 
+The default database schema does not require a special tenant configuration for
+migration. `ExploreDatabaseMigrator` binds its own absent-tenant execution lease;
+changing `Database:Schema` is not a remedy for a missing migration lease.
+
 The authoritative reference catalogue of all deployment, identity, database, and integration environment variables is maintained in the **public documentation**:
 
 👉 **[Environment Variables Reference (Public Documentation)](../public/documentation/readme/configuration-and-operations/environment-variables.md)**
@@ -2405,7 +2409,11 @@ restore evidence belong to the operator deployment manifest described in
 The API compatibility projection maps every documented `GEOCODING_*` key to
 the authoritative `Geocoding:*` options section. Comma-separated country codes and
 retry delays become indexed configuration values. Explicit structured
-`Geocoding:*` values take precedence. Aspire forwards the same contract to both
+`Geocoding:*` values take precedence. Infrastructure clears the initialized retry
+schedule before binding an explicit collection, so configured delays replace
+`200,500` rather than being appended to it. An absent schedule retains those
+defaults; retry-count and total-timeout validation still applies.
+Aspire forwards the same contract to both
 split API and standalone topologies; Compose forwards it through the
 `geocoding-env` anchor.
 

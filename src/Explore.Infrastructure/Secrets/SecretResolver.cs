@@ -215,7 +215,8 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
     }
 
     /// <summary>
-    /// Walks Tenant -> Instance -> authoritative registry default. A null return means
+    /// Resolves bootstrap keys directly from the registry; otherwise walks
+    /// Tenant -> Instance -> authoritative registry default. A null return means
     /// the key is unknown or unavailable for instance scope.
     /// </summary>
     private async Task<SecretBinding?> ResolveBindingAsync(
@@ -223,6 +224,11 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
         Guid? tenantId,
         CancellationToken cancellationToken)
     {
+        if (SecretDefinitionRegistry.TryGet(settingKey)?.IsBootstrapSecret == true)
+        {
+            return CreateDefaultInstanceBinding(settingKey);
+        }
+
         if (tenantId.HasValue && tenantId.Value != Guid.Empty)
         {
             var tenantBinding = await _bindings.GetByKeyAndScopeAsync(

@@ -11,6 +11,21 @@ The standalone image (`Event.Standalone`) is the simplest and lowest-overhead op
 > We strongly recommend starting with **Standalone**. It deploys in seconds, runs effortlessly on budget hardware (1 vCPU, 2 GB RAM at ~$4/mo), and requires zero external database configuration.  
 > **Worried about future scaling?** Standalone uses the exact same domain logic and database schema as our clustered enterprise stack. If your community outgrows a single server, you can promote your deployment to a **Split Topology with PostgreSQL in ~15 minutes with zero data loss**. See our comprehensive [Scaling & Migration Guide (Standalone ↔ Split)](topology-and-database-migration.md).
 
+The SQLite distribution applies its own migrations before serving HTTP. If you
+host Standalone with PostgreSQL and a separate MigrationService, complete that
+service before starting the application; the application does not repeat
+migration or require its Migrator password. Configuration-manifest validation and
+privacy replay remain startup gates in either deployment.
+
+For an instance whose bootstrap is not completed, startup validates bootstrap
+configuration before exposing setup or HTTP authority. Interactive mode does not
+provision a configured administrator; invalid mode values block startup.
+A completed bootstrap remains final.
+
+Use an image rebuilt with the pinned Blazor `10.0.14` security packages for
+`GHSA-g27p-qf6j-c96c`. A shared-runtime update alone does not replace packaged
+dependencies; source builds must use the matching project dependency locks.
+
 You can complete Local administrator setup and use the core without SMTP,
 Mailpit or a credential email address. Public operator contact and legal identity
 are not required to finish setup; configure them before dependent disclosure,

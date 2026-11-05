@@ -2018,6 +2018,9 @@ Membership inherits execution rights without role switching or membership
 administration. Runtime does not receive these Global groups. Fresh-cluster
 qualification invokes the production admission services after canonical
 migration; shared-fixture-only memberships cannot establish that proof.
+The queue-drain and location-privacy-review aggregate health groups are also
+explicitly enrolled to the configured Global login. Those memberships expose
+the existing aggregate functions, without private-table reads or role switching.
 
 Effect readiness uses independent Global aggregate observers rather than the
 tenant mutation repositories. PostgreSQL grants exactly status/retry/lease

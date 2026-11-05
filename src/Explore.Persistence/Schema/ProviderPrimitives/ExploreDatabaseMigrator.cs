@@ -226,7 +226,9 @@ public static class ExploreDatabaseMigrator
         {
             await executionDatabase.Database.ExecuteSqlRawAsync(
                 $"""
-                GRANT "{PostgresTenantLookupContract.GlobalRole}"
+                GRANT "{PostgresQueueDrainHealthContract.GlobalRole}",
+                    "{PostgresLocationPrivacyReviewContract.GlobalRole}",
+                    "{PostgresTenantLookupContract.GlobalRole}"
                 TO "{queueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
                 WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
                 """, cancellationToken);

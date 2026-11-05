@@ -6,8 +6,10 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Privacy.ErasureAuthority;
+using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -307,6 +309,29 @@ public sealed class PostgresMigrationAuthorityIsolationTests(PostgreSqlContainer
         await Assert.That(fanoutSnapshot.DueOccurrenceCount).IsEqualTo(0);
         await Assert.That(fanoutSnapshot.ActiveClaimCount).IsEqualTo(0);
         await Assert.That(fanoutSnapshot.OldestDueAt).IsNull();
+        var queueHealth = await new QueueDrainHealthRepository(globalFactory).GetSnapshotAsync(
+            DateTime.UtcNow, DateTime.UtcNow.AddMinutes(-5), TestContext.Current.Execution.CancellationToken);
+        await Assert.That(queueHealth.IntegrationDue).IsEqualTo(0);
+        await Assert.That(queueHealth.IncomingDue).IsEqualTo(0);
+        await Assert.That(queueHealth.PdsDue).IsEqualTo(0);
+        int reviewDepth = await new EventLocationPrivacyReviewReader(globalFactory)
+            .CountNeedingPrivacyReviewAsync(TestContext.Current.Execution.CancellationToken);
+        await Assert.That(reviewDepth).IsEqualTo(0);
+        var effectHealth = await new IncomingWebhookEffectHealthReader(globalFactory, fixture.NativeQueueEnrollment)
+            .ReadAsync(DateTime.UtcNow, TestContext.Current.Execution.CancellationToken);
+        await Assert.That(effectHealth.DueEffects).IsEqualTo(0);
+        await Assert.That(effectHealth.StaleLeases).IsEqualTo(0);
+        var fairReturnHealth = await new FairReturnOrchestrationHealthReader(globalFactory, fixture.NativeQueueEnrollment)
+            .ReadAsync(DateTime.UtcNow, TestContext.Current.Execution.CancellationToken);
+        await Assert.That(fairReturnHealth.Pending).IsEqualTo(0);
+        await Assert.That(fairReturnHealth.Processing).IsEqualTo(0);
+        await Assert.That(fairReturnHealth.Unknown).IsEqualTo(0);
+        await Assert.That(fairReturnHealth.DeadLettered).IsEqualTo(0);
+        await Assert.That(fairReturnHealth.OldestPendingAt).IsNull();
+        var pointers = await new EmailDispatchPointerPublicationStore(globalFactory, fixture.NativeQueueEnrollment)
+            .GetPublishBatchAsync(1, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(-30),
+                TestContext.Current.Execution.CancellationToken);
+        await Assert.That(pointers).IsEmpty();
         var directory = new TenantLookupSource(globalFactory);
         await Assert.That(await directory.GetTenantLookupsAsync(
             TestContext.Current.Execution.CancellationToken)).IsEmpty();

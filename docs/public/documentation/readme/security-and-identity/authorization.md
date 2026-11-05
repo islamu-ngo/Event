@@ -372,6 +372,8 @@ Canonical PostgreSQL migration enrolls it for generic outbox, notification outbo
 and notification fanout admission. Those memberships allow the bounded admission
 operations without role switching, membership administration or arbitrary private
 table reads; they do not promote the ordinary Runtime login.
+Canonical migration likewise enrolls Global for bounded queue-drain and
+location-review health counts; those checks do not gain private record access.
 
 Webhook-effect and fair-return readiness use separate Global aggregate readers.
 Their database rights cover only the status and timing fields needed for counts,

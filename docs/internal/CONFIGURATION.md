@@ -1145,6 +1145,16 @@ Browser/admin DTOs expose only `ApiUsernameConfigured` and `ApiKeyConfigured`
 flags, never raw credential values. Rotate credentials through the authorized
 Listmonk integration API.
 
+The `listmonk-integration` process health check has no selected tenant. It reads
+the five ordinary instance keys through `IInstanceSystemSettingsReader`, using
+the existing independent Global context, shared merge defaults and setting
+serializer. Credential references and values stay with `ISecretResolver` at
+instance scope. Ordinary Runtime still requires a selected tenant; tenant
+settings endpoints, connection tests and synchronization retain their existing
+tenant resolution. Disabled instance integration is Healthy; enabled but
+incompletely configured integration is Degraded. Health exposes configuration
+flags and secret-resolution states, never provider URLs or credential values.
+
 Quartz `integration-sync-drain` uses the existing `IntegrationSyncProcessor` section; the name is retained to avoid a configuration rename, not because a hosted processor still exists. `Enabled` registers or removes the owned job, `PollingIntervalSeconds` controls its interval, `BatchSize` bounds one pass, `ProcessingLeaseTimeoutSeconds` controls stale-claim recovery, and the retry-delay/max-attempt keys remain Infrastructure state-machine controls. An unkeyed Listmonk request with an uncertain outcome is parked and requires evidence-based operator recovery; changing retry settings never makes it eligible for blind replay.
 
 `IntegrationSyncProcessor:HealthDueWarningThreshold` defaults to `1000`; `HealthStaleWarningThreshold` and `HealthAmbiguousWarningThreshold` default to `1`. These positive bounded thresholds drive the aggregate `queue-drains` readiness check and never expose tenant, subscriber, or provider identity.

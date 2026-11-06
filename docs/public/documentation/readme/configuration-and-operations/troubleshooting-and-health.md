@@ -1800,6 +1800,14 @@ Startup-disabled or instance-disabled MCP is `Degraded`; enabled MCP is
 `Healthy`. This does not certify each tenant's overrides. Legacy SSE remains
 unavailable even when requested. No new credential or configuration is needed.
 
+The `listmonk-integration` entry observes instance configuration independently
+of tenant overrides. Disabled instance integration is `Healthy`; enabled
+integration with missing configuration is `Degraded`. The check uses the
+existing instance read capability and secret authority, with no new credential
+or expanded Runtime permission. Its output contains configuration flags and
+secret-resolution states, not provider URLs or credentials. Tenant-specific
+connection tests remain available through the authorized integration API.
+
 ### Optional Email Readiness
 
 | Situation | Health result | Operator action |

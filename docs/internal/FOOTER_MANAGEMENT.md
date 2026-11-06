@@ -9,7 +9,7 @@ Tenants customize their site footer through an admin interface. Instance admins 
 
 Footer templates remain cosmetic tenant configuration. After template
 composition, the public footer renders two server-authored accountability
-resources from `PublicExperienceShellDto`:
+resources from the independent `FooterConfigDto`:
 
 - **Directory operator**: tenant public/legal name, jurisdiction, optional
   registration identifier, contact, legal notice, optional terms, and privacy;
@@ -17,10 +17,29 @@ resources from `PublicExperienceShellDto`:
   status, jurisdiction, contact, website, legal notice, terms, and privacy.
 
 These roles are intentionally not merged or deduplicated even when facts happen
-to match. The public shell is unavailable when the tenant directory identity is
-not ready for `PublicDisclosure`; the API returns non-cacheable RFC 7807 `503`
-with stable code `tenant_identity_unavailable`. No tenant brand name or prose
-directory disclaimer is rendered as a fallback.
+to match. Each disclosure is projected only after its own `PublicDisclosure`
+readiness assessment. Missing identity omits that role while preserving the
+other role, safe display branding and cookie controls. Display branding comes
+from the typed branding document; it never substitutes for legal identity.
+The separate PublicExperience settings/shell still require their existing
+legal readiness and can return `tenant_identity_unavailable`.
+
+`GET /api/footer/config` is an exact anonymous bootstrap exception with
+`Cache-Control: no-store`. Its Application query checks fresh visitor read
+admission before resolving any tenant settings, branding, links or directory
+disclosure. Denied or unavailable tenant admission returns a minimal response
+with only independently ready instance disclosure. The response revision is a
+SHA-256 digest of its public projection, including settings and legal roles.
+
+`FooterPresentationService` uses the generated Footer client. It clears its
+cache on navigation, authentication and settings resets, keys requests by
+selected tenant and generation, shares current in-flight loading and discards
+late responses from earlier generations or a disposed scope. `Footer.razor`
+clears displayed content before awaiting a replacement. A localized footer
+landmark and working cookie-settings action are available during loading,
+transport failure and missing configuration. `Enabled=false` suppresses
+optional template columns; neither it nor the template cookie-link setting
+removes the minimum cookie control. Event subscriptions are removed on disposal.
 
 ## Data Model
 
@@ -91,7 +110,7 @@ Omitted groups and leaves preserve their stored values. `socialLinks.items` is a
 | `minimal` | Single row, horizontal links | Compact footers |
 | `community` | Social cards + link groups | Community-focused sites |
 
-All templates receive identical parameters from `Footer.razor` via `PublicExperienceService`. Template selection is a setting, not a code change.
+All templates receive identical parameters from `Footer.razor` via `FooterPresentationService`. Template selection is a setting, not a code change.
 
 ## Social Platforms
 

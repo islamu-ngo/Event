@@ -727,6 +727,17 @@ Tenant administrators manage their community experience via `/settings/admin`:
 - Choose footer layouts, social links, and copyright notices.
 - Built-in governance locks prevent tenants from removing legally required disclosures (such as Terms of Service and Privacy Policy).
 
+Disabling the optional footer layout leaves a minimum footer and Cookie
+Settings control available. The control also works while footer configuration
+is loading or unavailable. A missing directory or platform operator identity
+omits only that operator's disclosure; branding never replaces legal identity.
+Correct the missing identity through its own administration section.
+
+Anonymous visitors to an authenticated-only tenant receive a minimal footer,
+without private tenant links, branding or directory disclosure. Footer content
+clears when browser context changes, so a delayed response from another tenant
+cannot replace the current footer.
+
 ### Custom Registration Properties
 - Define custom questions and fields for events and attendee registrations (see [Custom Properties Governance](../events-and-ticketing/custom-properties.md)).
 - Set exposure levels: `Public` (visible on listing), `Private` (visible to organizers only), or `System`.

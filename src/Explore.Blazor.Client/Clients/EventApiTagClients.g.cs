@@ -193118,6 +193118,27 @@ namespace Explore.Blazor.Client.Clients
     public partial record class FooterConfigDto
     {
 
+        [System.Text.Json.Serialization.JsonPropertyName("tenantId")]
+        public System.Guid? TenantId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("revision")]
+        public string? Revision { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("brandDisplayName")]
+        public string? BrandDisplayName { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("brandLogoUrl")]
+        public string? BrandLogoUrl { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("showCommunityGuidelinesLink")]
+        public bool? ShowCommunityGuidelinesLink { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("directoryOperator")]
+        public TenantDirectoryOperatorPublicDto? DirectoryOperator { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("instanceOperator")]
+        public InstanceOperatorPublicDto? InstanceOperator { get; init; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("settings")]
         public FooterSettingsDto? Settings { get; init; } = default!;
 
@@ -250408,6 +250429,27 @@ namespace Explore.Blazor.Client.Clients
     public partial record class FooterConfig
     {
 
+        [System.Text.Json.Serialization.JsonPropertyName("tenantId")]
+        public System.Guid? TenantId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("revision")]
+        public string? Revision { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("brandDisplayName")]
+        public string? BrandDisplayName { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("brandLogoUrl")]
+        public string? BrandLogoUrl { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("showCommunityGuidelinesLink")]
+        public bool? ShowCommunityGuidelinesLink { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("directoryOperator")]
+        public DirectoryOperator2? DirectoryOperator { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("instanceOperator")]
+        public InstanceOperator2? InstanceOperator { get; init; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("settings")]
         public Settings? Settings { get; init; } = default!;
 
@@ -254832,6 +254874,134 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("toolbar")]
         public bool? Toolbar { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class DirectoryOperator2
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("documentRevision")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid DocumentRevision { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("publicName")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PublicName { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("legalName")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string LegalName { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("operatorKindCode")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string OperatorKindCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("jurisdictionCountryCode")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string JurisdictionCountryCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("registrationIdentifier")]
+        public string? RegistrationIdentifier { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("publicContactEmail")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PublicContactEmail { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("legalNoticeUrl")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string LegalNoticeUrl { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("termsUrl")]
+        public string? TermsUrl { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("privacyUrl")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PrivacyUrl { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class InstanceOperator2
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("operatorId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid OperatorId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("publicName")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PublicName { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("legalName")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string LegalName { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("isOfficialInstance")]
+        public bool IsOfficialInstance { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("officialOrigin")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string OfficialOrigin { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("operatorKindCode")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string OperatorKindCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("jurisdictionCountryCode")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string JurisdictionCountryCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("registrationIdentifier")]
+        public string? RegistrationIdentifier { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("publicContactEmail")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PublicContactEmail { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("websiteUrl")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string WebsiteUrl { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("legalNoticeUrl")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string LegalNoticeUrl { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("termsUrl")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string TermsUrl { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("privacyUrl")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PrivacyUrl { get; init; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

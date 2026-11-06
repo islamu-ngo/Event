@@ -181,9 +181,9 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
             IsAvailable = true,
             VisitorAccess = VisitorAccessCapabilityDto.From(
                 await _visitorAccessCapabilityResolver.ResolveAsync(tenantId, cancellationToken)),
-            DirectoryOperator = MapDirectoryOperator(directoryAssessment.Identity, documentRevision),
+            DirectoryOperator = PublicOperatorIdentityMapper.MapDirectoryOperator(directoryAssessment.Identity, documentRevision),
             InstanceOperator = instanceAssessment.IsReady && instanceAssessment.Identity is not null
-                ? MapInstanceOperator(instanceAssessment.Identity)
+                ? PublicOperatorIdentityMapper.MapInstanceOperator(instanceAssessment.Identity)
                 : null,
             Mode = Explore.Application.Models.PublicExperienceMode.DiscoveryCentric,
             DeploymentMode = deploymentMode,
@@ -243,41 +243,6 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
             ClientPickerEnabled = translationConfiguration.ClientPickerEnabled,
         };
     }
-
-    private static TenantDirectoryOperatorPublicDto MapDirectoryOperator(
-        TenantDirectoryOperatorIdentity identity,
-        Guid documentRevision) =>
-        new()
-        {
-            DocumentRevision = documentRevision,
-            PublicName = identity.PublicName,
-            LegalName = identity.LegalName,
-            OperatorKindCode = identity.OperatorKindCode,
-            JurisdictionCountryCode = identity.JurisdictionCountryCode,
-            RegistrationIdentifier = identity.RegistrationIdentifier,
-            PublicContactEmail = identity.PublicContactEmail,
-            LegalNoticeUrl = identity.LegalNoticeUrl,
-            TermsUrl = identity.TermsUrl,
-            PrivacyUrl = identity.PrivacyUrl
-        };
-
-    private static InstanceOperatorPublicDto MapInstanceOperator(IInstanceOperatorIdentity identity) =>
-        new()
-        {
-            OperatorId = identity.OperatorId,
-            PublicName = identity.PublicName,
-            LegalName = identity.LegalName,
-            IsOfficialInstance = identity.IsOfficialInstance,
-            OfficialOrigin = identity.OfficialOrigin,
-            OperatorKindCode = identity.OperatorKindCode,
-            JurisdictionCountryCode = identity.JurisdictionCountryCode,
-            RegistrationIdentifier = identity.RegistrationIdentifier,
-            PublicContactEmail = identity.PublicContactEmail,
-            WebsiteUrl = identity.WebsiteUrl,
-            LegalNoticeUrl = identity.LegalNoticeUrl,
-            TermsUrl = identity.TermsUrl ?? string.Empty,
-            PrivacyUrl = identity.PrivacyUrl
-        };
 
     private Task<ResolvedSettingsDocument<BrandingSettings>?> ResolveTypedBrandingAsync(
         Guid tenantId,

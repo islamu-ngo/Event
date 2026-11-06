@@ -157315,6 +157315,45 @@
       "FooterConfigDto": {
         "type": "object",
         "properties": {
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "brandDisplayName": {
+            "type": "string"
+          },
+          "brandLogoUrl": {
+            "type": "string"
+          },
+          "showCommunityGuidelinesLink": {
+            "type": "boolean"
+          },
+          "directoryOperator": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TenantDirectoryOperatorPublicDto"
+              }
+            ]
+          },
+          "instanceOperator": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/InstanceOperatorPublicDto"
+              }
+            ]
+          },
           "settings": {
             "$ref": "#/components/schemas/FooterSettingsDto"
           },
@@ -180316,6 +180355,139 @@
           "footerConfig": {
             "type": "object",
             "properties": {
+              "tenantId": {
+                "type": [
+                  "null",
+                  "string"
+                ],
+                "format": "uuid"
+              },
+              "revision": {
+                "type": "string"
+              },
+              "brandDisplayName": {
+                "type": "string"
+              },
+              "brandLogoUrl": {
+                "type": "string"
+              },
+              "showCommunityGuidelinesLink": {
+                "type": "boolean"
+              },
+              "directoryOperator": {
+                "required": [
+                  "documentRevision",
+                  "publicName",
+                  "legalName",
+                  "operatorKindCode",
+                  "jurisdictionCountryCode",
+                  "publicContactEmail",
+                  "legalNoticeUrl",
+                  "privacyUrl"
+                ],
+                "type": "object",
+                "properties": {
+                  "documentRevision": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "publicName": {
+                    "type": "string"
+                  },
+                  "legalName": {
+                    "type": "string"
+                  },
+                  "operatorKindCode": {
+                    "type": "string"
+                  },
+                  "jurisdictionCountryCode": {
+                    "type": "string"
+                  },
+                  "registrationIdentifier": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "publicContactEmail": {
+                    "type": "string"
+                  },
+                  "legalNoticeUrl": {
+                    "type": "string"
+                  },
+                  "termsUrl": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "privacyUrl": {
+                    "type": "string"
+                  }
+                }
+              },
+              "instanceOperator": {
+                "required": [
+                  "operatorId",
+                  "publicName",
+                  "legalName",
+                  "isOfficialInstance",
+                  "officialOrigin",
+                  "operatorKindCode",
+                  "jurisdictionCountryCode",
+                  "publicContactEmail",
+                  "websiteUrl",
+                  "legalNoticeUrl",
+                  "termsUrl",
+                  "privacyUrl"
+                ],
+                "type": "object",
+                "properties": {
+                  "operatorId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "publicName": {
+                    "type": "string"
+                  },
+                  "legalName": {
+                    "type": "string"
+                  },
+                  "isOfficialInstance": {
+                    "type": "boolean"
+                  },
+                  "officialOrigin": {
+                    "type": "string"
+                  },
+                  "operatorKindCode": {
+                    "type": "string"
+                  },
+                  "jurisdictionCountryCode": {
+                    "type": "string"
+                  },
+                  "registrationIdentifier": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "publicContactEmail": {
+                    "type": "string"
+                  },
+                  "websiteUrl": {
+                    "type": "string"
+                  },
+                  "legalNoticeUrl": {
+                    "type": "string"
+                  },
+                  "termsUrl": {
+                    "type": "string"
+                  },
+                  "privacyUrl": {
+                    "type": "string"
+                  }
+                }
+              },
               "settings": {
                 "type": "object",
                 "properties": {

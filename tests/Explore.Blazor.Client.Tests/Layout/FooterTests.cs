@@ -48,13 +48,13 @@ public sealed class FooterTests : IDisposable
             ["TermsUrl"] = "https://events.example/terms",
             ["PrivacyUrl"] = "https://events.example/privacy"
         });
-        var publicExperience = Substitute.For<IPublicExperienceService>();
-        publicExperience.GetCachedSettingsAsync().Returns(new PublicExperienceSettingsDto
+        AddFooter(_ctx, Task.FromResult(new FooterConfigDto
         {
-            BrandDisplayName = "White-label Events"
-        });
-        publicExperience.GetCachedShellAsync().Returns(shell);
-        _ctx.Services.AddSingleton(publicExperience);
+            BrandDisplayName = "White-label Events",
+            DirectoryOperator = shell.DirectoryOperator,
+            InstanceOperator = shell.InstanceOperator,
+            Settings = new FooterSettingsDto { Enabled = true }
+        }));
         _ctx.Services.AddSingleton(new CookieConsentStateService());
 
         var cut = _ctx.RenderMudComponent<Footer>();
@@ -87,31 +87,105 @@ public sealed class FooterTests : IDisposable
     }
 
     [Test]
-    public async Task MissingShellOrEitherMandatoryIdentity_RendersOnlyAccessibleFailClosedFooter()
+    [Arguments(0)]
+    [Arguments(1)]
+    [Arguments(2)]
+    [Arguments(3)]
+    [Arguments(4)]
+    public async Task MissingIdentityOrDisabledOptionalTemplate_PreservesFooterAndCookieInteraction(int missing)
     {
-        foreach (int missing in new[] { 0, 1, 2 })
+        using var context = new BlazorTestContext();
+        var footer = new FooterConfigDto
         {
-            using var context = new BlazorTestContext();
-            var service = Substitute.For<IPublicExperienceService>();
-            service.GetCachedSettingsAsync().Returns(new PublicExperienceSettingsDto { BrandDisplayName = "Hidden brand" });
-            PublicExperienceShellDto? shell = missing == 0 ? null : new PublicExperienceShellDto();
-            if (shell is not null)
-            {
-                PropertyInfo directory = typeof(PublicExperienceShellDto).GetProperty("DirectoryOperator")!;
-                PropertyInfo instance = typeof(PublicExperienceShellDto).GetProperty("InstanceOperator")!;
-                if (missing != 1) SetOperator(shell, directory, new Dictionary<string, object?> { ["PublicName"] = "Directory", ["LegalName"] = "Directory legal" });
-                if (missing != 2) SetOperator(shell, instance, new Dictionary<string, object?> { ["PublicName"] = "Instance", ["LegalName"] = "Instance legal" });
-            }
-            service.GetCachedShellAsync().Returns(shell);
-            context.Services.AddSingleton(service);
-            context.Services.AddSingleton(new CookieConsentStateService());
-
-            var cut = context.RenderMudComponent<Footer>();
-
-            await Assert.That(cut.FindAll("[data-testid='footer-identity-unavailable'][role]").Count).IsEqualTo(0);
-            await Assert.That(cut.FindAll("[data-testid='footer-identity-unavailable'] [role='status'][aria-live='polite']")).HasSingleItem();
-            await Assert.That(cut.Markup).DoesNotContain("Hidden brand");
+            BrandDisplayName = "Safe display brand",
+            Settings = new FooterSettingsDto { Enabled = missing != 4, ShowCookieSettingsLink = false }
+        };
+        PublicExperienceShellDto? shell = missing == 0 ? null : new PublicExperienceShellDto();
+        if (shell is not null)
+        {
+            PropertyInfo directory = typeof(PublicExperienceShellDto).GetProperty("DirectoryOperator")!;
+            PropertyInfo instance = typeof(PublicExperienceShellDto).GetProperty("InstanceOperator")!;
+            if (missing is not (1 or 3)) SetOperator(shell, directory, new Dictionary<string, object?> { ["PublicName"] = "Directory", ["LegalName"] = "Directory legal" });
+            if (missing is not (2 or 3)) SetOperator(shell, instance, new Dictionary<string, object?> { ["PublicName"] = "Instance", ["LegalName"] = "Instance legal" });
         }
+        AddFooter(context, Task.FromResult(footer with
+        {
+            DirectoryOperator = shell?.DirectoryOperator,
+            InstanceOperator = shell?.InstanceOperator
+        }));
+        var consent = new CookieConsentStateService();
+        bool reopened = false;
+        consent.OnReopenRequested += () =>
+        {
+            reopened = true;
+            return Task.CompletedTask;
+        };
+        context.Services.AddSingleton(consent);
+
+        var cut = context.RenderMudComponent<Footer>();
+
+        await Assert.That(cut.FindAll("footer")).HasSingleItem();
+        await cut.Find("footer button").ClickAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        await Assert.That(reopened).IsTrue();
+        if (missing < 4)
+        {
+            await Assert.That(cut.FindAll("[data-testid='footer-directory-operator']").Count)
+                .IsEqualTo(missing == 2 ? 1 : 0);
+            await Assert.That(cut.FindAll("[data-testid='footer-instance-operator']").Count)
+                .IsEqualTo(missing == 1 ? 1 : 0);
+        }
+    }
+
+    [Test]
+    public async Task FailedFooterTransportPreservesCookieInteraction()
+    {
+        AddFooter(_ctx, Task.FromException<FooterConfigDto>(new HttpRequestException()));
+        var consent = new CookieConsentStateService();
+        bool reopened = false;
+        consent.OnReopenRequested += () =>
+        {
+            reopened = true;
+            return Task.CompletedTask;
+        };
+        _ctx.Services.AddSingleton(consent);
+        var cut = _ctx.RenderMudComponent<Footer>();
+        await Assert.That(cut.FindAll("footer")).HasSingleItem();
+        await cut.Find("footer button").ClickAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        await Assert.That(reopened).IsTrue();
+        await Assert.That(cut.FindAll("[data-testid='footer-directory-operator']")).IsEmpty();
+        await Assert.That(cut.FindAll("[data-testid='footer-instance-operator']")).IsEmpty();
+    }
+
+    [Test]
+    public async Task PendingPublicResource_KeepsMinimumFooterInteractive()
+    {
+        var pending = new TaskCompletionSource<FooterConfigDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        AddFooter(_ctx, pending.Task);
+        var consent = new CookieConsentStateService();
+        bool reopened = false;
+        consent.OnReopenRequested += () =>
+        {
+            reopened = true;
+            return Task.CompletedTask;
+        };
+        _ctx.Services.AddSingleton(consent);
+        try
+        {
+            var cut = _ctx.RenderMudComponent<Footer>();
+            await Assert.That(cut.FindAll("footer")).HasSingleItem();
+            await cut.Find("footer button").ClickAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+            await Assert.That(reopened).IsTrue();
+        }
+        finally { pending.TrySetResult(new FooterConfigDto()); }
+    }
+
+    private static void AddFooter(BlazorTestContext context, Task<FooterConfigDto> response)
+    {
+        var client = Substitute.For<IFooterClient>();
+        client.GetFooterConfigAsync(cancellationToken: Arg.Any<CancellationToken>()).Returns(response);
+        context.Services.AddSingleton(client);
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddScoped<FooterPresentationService>();
     }
 
     private static void SetOperator(object owner, PropertyInfo ownerProperty, IReadOnlyDictionary<string, object?> values)

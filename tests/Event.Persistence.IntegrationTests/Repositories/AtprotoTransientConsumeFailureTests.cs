@@ -1,5 +1,6 @@
 using System.Data.Common;
 using Explore.Domain;
+using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.Data.Sqlite;
@@ -24,7 +25,7 @@ public sealed class AtprotoTransientConsumeFailureTests
         var record = AtprotoTransientRecord.Create(
             AtprotoTransientPurpose.OAuthState,
             Digest,
-            Guid.CreateVersion7(),
+            AtprotoAuthenticationFlowTarget.Targeted(Guid.CreateVersion7()),
             "opaque-protected-test-payload",
             Now.AddMinutes(1).ToUnixTimeMilliseconds());
 
@@ -70,7 +71,7 @@ public sealed class AtprotoTransientConsumeFailureTests
         var record = AtprotoTransientRecord.Create(
             AtprotoTransientPurpose.OAuthState,
             Digest,
-            Guid.CreateVersion7(),
+            AtprotoAuthenticationFlowTarget.Targeted(Guid.CreateVersion7()),
             "opaque-protected-test-payload",
             expiresAt);
         context.Add(record);

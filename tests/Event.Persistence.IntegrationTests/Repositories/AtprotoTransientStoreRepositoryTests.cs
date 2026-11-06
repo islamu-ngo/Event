@@ -1,6 +1,7 @@
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
+using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +21,7 @@ public sealed class AtprotoTransientStoreRepositoryTests(PostgreSqlContainerFixt
         await fixture.ResetAsync();
         DateTimeOffset now = DateTimeOffset.UtcNow;
         Guid tenant = Guid.CreateVersion7();
-        AtprotoTransientRecord record = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest, tenant, "winner", now.AddMinutes(1).ToUnixTimeMilliseconds());
+        AtprotoTransientRecord record = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest, AtprotoAuthenticationFlowTarget.Targeted(tenant), "winner", now.AddMinutes(1).ToUnixTimeMilliseconds());
         await using (ExploreDbContext writer = fixture.CreateDbContext())
             await Assert.That(await new AtprotoTransientStoreRepository(writer, new FixedTimeProvider(now)).TryCreateAsync(record)).IsTrue();
         ExploreDbContext[] contexts = Enumerable.Range(0, 16).Select(_ => fixture.CreateDbContext()).ToArray();
@@ -57,7 +58,7 @@ public sealed class AtprotoTransientStoreRepositoryTests(PostgreSqlContainerFixt
         await fixture.ResetAsync();
         DateTimeOffset now = DateTimeOffset.UtcNow;
         Guid tenant = Guid.CreateVersion7();
-        AtprotoTransientRecord original = AtprotoTransientRecord.Create(AtprotoTransientPurpose.TenantHandoff, Digest, tenant, "old", now.AddMinutes(1).ToUnixTimeMilliseconds());
+        AtprotoTransientRecord original = AtprotoTransientRecord.Create(AtprotoTransientPurpose.TenantHandoff, Digest, AtprotoAuthenticationFlowTarget.Targeted(tenant), "old", now.AddMinutes(1).ToUnixTimeMilliseconds());
         await using (ExploreDbContext writer = fixture.CreateDbContext())
             await new AtprotoTransientStoreRepository(writer, new FixedTimeProvider(now)).TryCreateAsync(original);
         var interceptor = new ReplaceBeforeDeleteInterceptor(fixture, original, now);
@@ -76,7 +77,7 @@ public sealed class AtprotoTransientStoreRepositoryTests(PostgreSqlContainerFixt
         await fixture.ResetAsync();
         DateTimeOffset now = DateTimeOffset.UtcNow;
         Guid tenant = Guid.CreateVersion7();
-        AtprotoTransientRecord record = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest, tenant, "must-not-escape", now.AddMinutes(1).ToUnixTimeMilliseconds());
+        AtprotoTransientRecord record = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest, AtprotoAuthenticationFlowTarget.Targeted(tenant), "must-not-escape", now.AddMinutes(1).ToUnixTimeMilliseconds());
         await using (ExploreDbContext writer = fixture.CreateDbContext())
             await new AtprotoTransientStoreRepository(writer, new FixedTimeProvider(now)).TryCreateAsync(record);
         var interceptor = new AmbiguousDeleteFaultInterceptor();
@@ -114,7 +115,7 @@ public sealed class AtprotoTransientStoreRepositoryTests(PostgreSqlContainerFixt
             {
                 await using ExploreDbContext replacementContext = fixture.CreateDbContext();
                 await replacementContext.AtprotoTransientRecords.Where(record => record.Id == original.Id).ExecuteDeleteAsync(cancellationToken);
-                AtprotoTransientRecord replacement = AtprotoTransientRecord.Create(original.Purpose, original.TokenDigest, original.TenantId!.Value, "replacement", now.AddMinutes(1).ToUnixTimeMilliseconds());
+                AtprotoTransientRecord replacement = AtprotoTransientRecord.Create(original.Purpose, original.TokenDigest, AtprotoAuthenticationFlowTarget.Targeted(original.TenantId!.Value), "replacement", now.AddMinutes(1).ToUnixTimeMilliseconds());
                 await new AtprotoTransientStoreRepository(replacementContext, new FixedTimeProvider(now)).TryCreateAsync(replacement, cancellationToken);
             }
             return result;

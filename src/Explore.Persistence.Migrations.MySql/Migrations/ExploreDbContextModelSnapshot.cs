@@ -3469,6 +3469,10 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("expires_at_unix_milliseconds");
 
+                    b.Property<int?>("FlowKind")
+                        .HasColumnType("int")
+                        .HasColumnName("flow_kind");
+
                     b.Property<string>("ProtectedPayload")
                         .IsRequired()
                         .HasColumnType("longtext")
@@ -3501,7 +3505,7 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
 
                     b.ToTable("ie_atproto_transient_records", null, t =>
                         {
-                            t.HasCheckConstraint("ck_atproto_transients_tenant_purpose", "(purpose = 3 AND tenant_id IS NULL) OR (purpose IN (1, 2) AND tenant_id IS NOT NULL)");
+                            t.HasCheckConstraint("ck_atproto_transients_tenant_purpose", "(purpose = 3 AND tenant_id IS NULL AND flow_kind IS NULL) OR (purpose IN (1, 2) AND tenant_id IS NOT NULL AND flow_kind IS NOT NULL AND flow_kind = 1) OR (purpose = 1 AND tenant_id IS NULL AND flow_kind IS NOT NULL AND flow_kind = 2)");
                         });
                 });
 

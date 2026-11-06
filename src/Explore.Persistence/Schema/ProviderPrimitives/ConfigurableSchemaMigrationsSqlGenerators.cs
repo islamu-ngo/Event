@@ -66,6 +66,7 @@ internal sealed class ConfigurableNpgsqlMigrationsSqlGenerator(
             operations, Dependencies.SqlGenerationHelper, sqlite: false);
         operations = StorageSourceUriCutoverGuard.Prepare(
             operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "OCTET_LENGTH");
+        operations = AtprotoFlowKindMigrationOperations.Prepare(operations, Dependencies.SqlGenerationHelper, sqlite: false);
         using var visitor = LocalVisitorDowngradeGuard.Prepare(operations, Dependencies.SqlGenerationHelper, sqlite: false);
         operations = visitor.Operations;
         ConfigurableSchemaMigrationOperations.Rewrite(operations, Dependencies.CurrentContext.Context);
@@ -123,6 +124,7 @@ internal sealed class ConfigurableSqlServerMigrationsSqlGenerator(
             operations, Dependencies.SqlGenerationHelper, sqlite: false);
         operations = StorageSourceUriCutoverGuard.Prepare(
             operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "DATALENGTH");
+        operations = AtprotoFlowKindMigrationOperations.Prepare(operations, Dependencies.SqlGenerationHelper, sqlite: false);
         using var visitor = LocalVisitorDowngradeGuard.Prepare(operations, Dependencies.SqlGenerationHelper, sqlite: false);
         operations = visitor.Operations;
         ConfigurableSchemaMigrationOperations.Rewrite(operations, Dependencies.CurrentContext.Context);
@@ -169,6 +171,8 @@ internal sealed class ConfigurableSqliteMigrationsSqlGenerator(
             executableOperations, Dependencies.SqlGenerationHelper, sqlite: true);
         executableOperations = StorageSourceUriCutoverGuard.Prepare(
             executableOperations, Dependencies.SqlGenerationHelper, sqlite: true, byteLengthFunction: "LENGTH");
+        executableOperations = AtprotoFlowKindMigrationOperations.Prepare(
+            executableOperations, Dependencies.SqlGenerationHelper, sqlite: true);
         using var visitor = LocalVisitorDowngradeGuard.Prepare(
             executableOperations, Dependencies.SqlGenerationHelper, sqlite: true);
         executableOperations = visitor.Operations;
@@ -271,6 +275,7 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
         operations = StorageSourceUriCutoverGuard.Prepare(
             operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "OCTET_LENGTH");
         operations = PrepareForeignKeyIndexReplacements(operations);
+        operations = AtprotoFlowKindMigrationOperations.Prepare(operations, Dependencies.SqlGenerationHelper, sqlite: false);
         using var visitor = LocalVisitorDowngradeGuard.Prepare(operations, Dependencies.SqlGenerationHelper, sqlite: false);
         operations = visitor.Operations;
         var executableOperations = new List<MigrationOperation>(operations.Count);

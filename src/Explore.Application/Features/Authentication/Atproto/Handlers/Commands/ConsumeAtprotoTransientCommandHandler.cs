@@ -4,6 +4,7 @@ using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
 using Explore.Application.Features.Authentication.Atproto.Validators;
 using Explore.Application.Responses;
+using Explore.Domain.ValueObjects;
 
 namespace Explore.Application.Features.Authentication.Atproto.Handlers.Commands;
 
@@ -20,6 +21,6 @@ public sealed class ConsumeAtprotoTransientCommandHandler(IAtprotoTransientStore
         return row is null
             ? AtprotoTransientCommandResult.Failure(BaseCommandResponse.NotFound<Guid>())
             : AtprotoTransientCommandResult.Success(new(row.Id, row.Purpose, row.TokenDigest, request.ExpectedTenantId,
-                row.ProtectedPayload, row.ExpiresAtUnixMilliseconds));
+                row.ProtectedPayload, row.ExpiresAtUnixMilliseconds, AtprotoAuthenticationFlowKind.Targeted));
     }
 }

@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Domain.ValueObjects;
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -16,15 +17,18 @@ public sealed class AtprotoTransientStoreRepository(ExploreDbContext dbContext, 
     public Task<bool> TryCreateAsync(AtprotoTransientRecord record, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(record);
-        if (record.Purpose == AtprotoTransientPurpose.HealthProbe || !record.TenantId.HasValue || record.TenantId == Guid.Empty)
-            throw new ArgumentException("Ordinary transient creation requires an authentication purpose and tenant.", nameof(record));
+        if (record.Purpose is not (AtprotoTransientPurpose.OAuthState or AtprotoTransientPurpose.TenantHandoff)
+            || !(record.FlowKind == AtprotoAuthenticationFlowKind.Targeted && record.TenantId.HasValue && record.TenantId != Guid.Empty
+                || record.FlowKind == AtprotoAuthenticationFlowKind.UnscopedVerification
+                    && record.Purpose == AtprotoTransientPurpose.OAuthState && record.TenantId is null))
+            throw new ArgumentException("Transient creation requires an explicit valid authentication target.", nameof(record));
         return TryInsertAsync(record, cancellationToken);
     }
 
     public Task<bool> TryCreateHealthProbeAsync(AtprotoTransientRecord record, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(record);
-        if (record.Purpose != AtprotoTransientPurpose.HealthProbe || record.TenantId.HasValue)
+        if (record.Purpose != AtprotoTransientPurpose.HealthProbe || record.TenantId.HasValue || record.FlowKind is not null)
             throw new ArgumentException("Only a dedicated tenantless health-probe record is accepted.", nameof(record));
         return TryInsertAsync(record, cancellationToken);
     }
@@ -36,7 +40,9 @@ public sealed class AtprotoTransientStoreRepository(ExploreDbContext dbContext, 
         long now = Now();
         return await dbContext.AtprotoTransientRecords.AsNoTracking().SingleOrDefaultAsync(record =>
             record.Purpose == AtprotoTransientPurpose.OAuthState && record.TokenDigest == tokenDigest &&
-            record.TenantId != null && record.ExpiresAtUnixMilliseconds > now, cancellationToken).ConfigureAwait(false);
+            (record.FlowKind == AtprotoAuthenticationFlowKind.Targeted && record.TenantId != null && record.TenantId != Guid.Empty
+                || record.FlowKind == AtprotoAuthenticationFlowKind.UnscopedVerification && record.TenantId == null)
+            && record.ExpiresAtUnixMilliseconds > now, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<AtprotoTransientRecord?> ReadAsync(AtprotoTransientPurpose purpose, string tokenDigest, Guid tenantId, CancellationToken cancellationToken = default)
@@ -45,6 +51,7 @@ public sealed class AtprotoTransientStoreRepository(ExploreDbContext dbContext, 
         long now = Now();
         return await dbContext.AtprotoTransientRecords.AsNoTracking().SingleOrDefaultAsync(record =>
             record.Purpose == purpose && record.TokenDigest == tokenDigest && record.TenantId == tenantId &&
+            record.FlowKind == AtprotoAuthenticationFlowKind.Targeted &&
             record.ExpiresAtUnixMilliseconds > now, cancellationToken).ConfigureAwait(false);
     }
 
@@ -56,7 +63,8 @@ public sealed class AtprotoTransientStoreRepository(ExploreDbContext dbContext, 
         long readAt = Now();
         AtprotoTransientRecord? candidate = await dbContext.AtprotoTransientRecords.AsNoTracking().SingleOrDefaultAsync(record =>
             record.Id == candidateId && record.Purpose == purpose && record.TokenDigest == tokenDigest &&
-            record.TenantId == tenantId && record.ExpiresAtUnixMilliseconds > readAt, cancellationToken).ConfigureAwait(false);
+            record.TenantId == tenantId && record.FlowKind == AtprotoAuthenticationFlowKind.Targeted
+            && record.ExpiresAtUnixMilliseconds > readAt, cancellationToken).ConfigureAwait(false);
         if (candidate is null) return null;
 
         int deleted = await ExecuteConditionalDeleteAsync(
@@ -78,6 +86,7 @@ public sealed class AtprotoTransientStoreRepository(ExploreDbContext dbContext, 
         return await dbContext.AtprotoTransientRecords.AsNoTracking().SingleOrDefaultAsync(record =>
             record.Id == candidateId && record.Purpose == AtprotoTransientPurpose.HealthProbe
             && record.TokenDigest == tokenDigest && record.TenantId == null
+            && record.FlowKind == null
             && record.ExpiresAtUnixMilliseconds > now, cancellationToken).ConfigureAwait(false);
     }
 
@@ -149,12 +158,16 @@ public sealed class AtprotoTransientStoreRepository(ExploreDbContext dbContext, 
         string tenantPredicate = tenantId.HasValue
             ? $"{Column(nameof(AtprotoTransientRecord.TenantId))} = {{3}}"
             : $"{Column(nameof(AtprotoTransientRecord.TenantId))} IS NULL";
+        string flowPredicate = tenantId.HasValue
+            ? $"{Column(nameof(AtprotoTransientRecord.FlowKind))} = {(int)AtprotoAuthenticationFlowKind.Targeted}"
+            : $"{Column(nameof(AtprotoTransientRecord.FlowKind))} IS NULL";
         string commandText =
             $"DELETE FROM {Table()} " +
             $"WHERE {Column(nameof(AtprotoTransientRecord.Id))} = {{0}} " +
             $"AND {Column(nameof(AtprotoTransientRecord.Purpose))} = {{1}} " +
             $"AND {Column(nameof(AtprotoTransientRecord.TokenDigest))} = {{2}} " +
             $"AND {tenantPredicate} " +
+            $"AND {flowPredicate} " +
             $"AND {Column(nameof(AtprotoTransientRecord.ExpiresAtUnixMilliseconds))} > {{{(tenantId.HasValue ? 4 : 3)}}}";
         object[] values = tenantId.HasValue
             ? [candidateId, (int)purpose, tokenDigest, tenantId.Value, expiresAfter]

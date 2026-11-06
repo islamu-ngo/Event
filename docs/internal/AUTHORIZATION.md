@@ -83,6 +83,27 @@ Per [ADR-027](adr/ADR-027-first-class-authentication-provider-matrix.md) and [AD
 -   **Authentication** (Local Identity / Keycloak / AT Protocol): The process of verifying who a user is. Exactly one provider is primary for new sign-ins. The Blazor BFF owns browser challenges and HttpOnly cookies; raw provider and platform tokens remain server-side.
 -   **Authorization** (Cerbos / Fallback): The process of determining whether an authenticated user has the permission to perform a specific action on a specific resource. Cerbos acts as the policy decision point (PDP), evaluating fine-grained business resource policies against principal, resource, action, and tenant context.
 
+Local login retains its selected `LocalIdentityWriter` application context during
+account synchronization. `IdentityAccountResolver` reads the bound account through
+`IUserRepository.GetLocalIdentityProfileAsync`: the tracked `User`, email/name
+mirror and revision needed for optimistic concurrency. The projection does not
+load the private birth declaration or collection receipt. The native inventory
+permits revision metadata reads without granting either private value. The
+existing `SaveIdentityProfileAsync` fence still permits only the email mirror and
+verification updates in the original account transaction. Ordinary Global and
+Runtime permissions do not expand. Authentication closes its credential attempt
+before synchronization opens recognition enrollment; lifecycle callbacks alone
+join a transaction through their original lifecycle receipt.
+
+The Local writer also has read-only access to recognition-erasure pending
+receipts and their immutable capture metadata. The existing recognition guard
+loads the exact subject's receipt and validates its complete material before
+allowing synchronization; missing storage permission remains a closed failure.
+This capability permits no recognition insert, update or deletion and supplies
+no recognition key material. C# owns the subject selection, transaction boundary
+and settlement decision. A compromised writer credential can read that stored
+metadata; it cannot use these grants to rewrite settlement or acquire private
+birth declarations.
 
 ATProto does not introduce a second authorization model. The API independently restores the submitted CarpaNet OAuth session and verifies `com.atproto.server.getSession` against the expected DID and PDS. When AT Protocol is primary, the verified DID may JIT-create one passwordless platform `User`, personal `Actor`, and global `UserExternalLogin`; the subsequent purpose-separated ES256 session JWT uses that internal user `Guid` as `sub`. Existing operation authorization, tenant isolation, Cerbos/local fallback policies, and HAL affordance filtering operate unchanged. A DID, handle, or PDS response never authorizes a resource or grants a role by itself.
 

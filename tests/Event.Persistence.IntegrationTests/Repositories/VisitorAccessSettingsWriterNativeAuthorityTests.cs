@@ -11,6 +11,7 @@ using Explore.Domain.Settings;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
@@ -263,6 +264,84 @@ public sealed class VisitorAccessSettingsWriterNativeAuthorityTests(PostgreSqlCo
             rows.Authentication.UserId);
         await Assert.That(result.Success).IsTrue();
         await Assert.That(result.DeferredNotifications.Length).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task LocalLoginKeepsPrivateBirthDataUnreadable()
+    {
+        await PrepareColocatedAuthorityAsync();
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(OpenInstanceMigrator, fixture);
+        await using var inspect = OpenInstanceMigrator();
+        string login = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.LocalIdentityWriter).Username!;
+        var pii = inspect.Model.FindEntityType(typeof(UserPii))!;
+        var table = Microsoft.EntityFrameworkCore.Metadata.StoreObjectIdentifier.Table(
+            pii.GetTableName()!, pii.GetSchema());
+        using var identifiers = new NpgsqlCommandBuilder();
+        string relation = identifiers.QuoteIdentifier(pii.GetSchema()!) + "."
+            + identifiers.QuoteIdentifier(pii.GetTableName()!);
+        foreach (string property in new[] { "_dateOfBirth", "_birthDateCollectionReceiptId" })
+        {
+            bool readable = await inspect.Database.SqlQueryRaw<bool>(
+                """SELECT pg_catalog.has_column_privilege({0}, {1}, {2}, 'SELECT') AS "Value" """,
+                login, relation, pii.FindProperty(property)!.GetColumnName(table)!).SingleAsync();
+            await Assert.That(readable).IsFalse();
+        }
+        bool revisionReadable = await inspect.Database.SqlQueryRaw<bool>(
+            """SELECT pg_catalog.has_column_privilege({0}, {1}, {2}, 'SELECT') AS "Value" """,
+            login, relation, pii.FindProperty("_birthDateRevision")!.GetColumnName(table)!).SingleAsync();
+        await Assert.That(revisionReadable).IsTrue();
+        foreach (Type type in new[] { typeof(ModerationRecognitionPending), typeof(ModerationRecognitionCaptureItem) })
+        {
+            var entity = inspect.Model.FindEntityType(type)!;
+            string metadata = identifiers.QuoteIdentifier(entity.GetSchema()!) + "."
+                + identifiers.QuoteIdentifier(entity.GetTableName()!);
+            bool writable = await inspect.Database.SqlQueryRaw<bool>(
+                """
+                SELECT (pg_catalog.has_any_column_privilege({0}, {1}, 'INSERT,UPDATE')
+                    OR pg_catalog.has_table_privilege({0}, {1}, 'DELETE')) AS "Value"
+                """, login, metadata).SingleAsync();
+            await Assert.That(writable).IsFalse();
+        }
+    }
+
+    private async Task PrepareColocatedAuthorityAsync()
+    {
+        var options = TestDbContextOptions.Create<CoLocatedPrivacyErasureAuthorityDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(options,
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        await using var authority = new CoLocatedPrivacyErasureAuthorityDbContext(options.Options);
+        await using var seed = OpenInstanceMigrator();
+        var first = authority.Model.GetEntityTypes().First();
+        bool exists = await seed.Database.SqlQueryRaw<int>(
+            """SELECT COUNT(*)::integer AS "Value" FROM information_schema.tables WHERE table_schema = {0} AND table_name = {1}""",
+            first.GetSchema()!, first.GetTableName()!).SingleAsync() != 0;
+        if (!exists)
+            await seed.Database.ExecuteSqlRawAsync(authority.Database.GenerateCreateScript());
+
+        // This topology executes the authority's C# repository through the declared Runtime
+        // connection. Provision its fixed model rights before creating a real Local account.
+        using var identifiers = new NpgsqlCommandBuilder();
+        string runtime = identifiers.QuoteIdentifier(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime).Username!);
+        await seed.Database.OpenConnectionAsync();
+        foreach (var table in authority.Model.GetRelationalModel().Tables)
+        {
+            string schema = identifiers.QuoteIdentifier(table.Schema!);
+            string relation = schema + "." + identifiers.QuoteIdentifier(table.Name);
+            await using var grant = seed.Database.GetDbConnection().CreateCommand();
+            grant.CommandText = $"GRANT USAGE ON SCHEMA {schema} TO {runtime}; "
+                + $"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE {relation} TO {runtime};";
+            await grant.ExecuteNonQueryAsync();
+        }
+    }
+
+    private ExploreDbContext OpenInstanceMigrator()
+    {
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options,
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        var context = new ExploreDbContext(options.Options);
+        context.BindTenantLease();
+        return context;
     }
 
     private static VisitorAccessSettingsWriter CreateWriter(ExploreDbContext context)

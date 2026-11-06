@@ -233,6 +233,16 @@ Login failures use bounded machine-readable error codes. Do not include login
 request bodies or successful token responses in support logs. Their ordinary
 diagnostic text omits credentials, but explicit JSON body capture does not.
 
+Local account synchronization reads the email/name mirror and its concurrency
+revision without reading a private birth declaration or collection receipt.
+Do not broaden ordinary database-role permissions to resolve a synchronization
+failure. Use the supported native-purpose enrollment and its permission checks;
+the Local writer's required revision metadata is separate from private birth data.
+Local sign-in also checks recognition-erasure settlement. Its native writer needs
+read-only access to pending receipts and captured settlement metadata so the
+application can reject unsettled subjects. Those grants do not allow changes to
+recognition records and do not include cryptographic keys.
+
 A correct password is not sufficient when credential setup is incomplete. Local sign-in also requires an explicit ready state in the selected Identity database. Missing, invalid, or unfinished credential state blocks sign-in even for a verified email address; disabling email delivery does not bypass this check. Records without state are not automatically treated as ready. This sign-in check alone does not revoke existing sessions.
 
 When instance email delivery is enabled, Local sign-in requires the stored Local verification flag. Supervised bootstrap can establish that flag as administrative provenance; this does not invent an address or prove mailbox delivery. Missing SMTP configuration or a delivery outage does not bypass the gate. Tenant email settings cannot override the instance sign-in policy. When instance delivery is disabled, unverified Local accounts may sign in, but their addresses remain unverified; disabling delivery never proves mailbox ownership. An invalid or unreadable instance policy blocks unverified sign-in until the configuration is repaired.

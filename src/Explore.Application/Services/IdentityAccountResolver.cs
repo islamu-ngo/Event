@@ -29,7 +29,9 @@ public sealed class IdentityAccountResolver(
         UserExternalLogin? binding = await logins.GetByProviderAndKey(accountKey);
         cancellationToken.ThrowIfCancellationRequested();
         bool conflictingEvidence = evidence is not null && evidence.AccountKey != accountKey;
-        User? user = binding is null ? null : await users.GetById(binding.UserId);
+        User? user = binding is null ? null : accountKey.ProviderKind == AuthenticationProviderKind.Local
+            ? await users.GetLocalIdentityProfileAsync(binding.UserId, cancellationToken)
+            : await users.GetById(binding.UserId);
         bool bindingConflict = conflictingEvidence || (binding is not null && user is null);
         string? issuer = evidence?.Issuer;
         bool verifiedEmail = evidence is { EmailVerified: true }

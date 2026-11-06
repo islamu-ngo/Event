@@ -51,7 +51,7 @@ internal static class LocalIdentityWriterInventory
             ["ConcurrencyStamp", "EmailVerified", "UpdatedAt", "UpdatedBy"]),
         new(Store.Application, typeof(UserPii),
             ["UserId", "Email", "FirstName", "LastName", "_dateOfBirth", "_birthDateCollectionReceiptId", "_birthDateRevision"],
-            ["UserId", "Email", "FirstName", "LastName"],
+            ["UserId", "Email", "FirstName", "LastName", "_birthDateRevision"],
             ["UserId", "Email", "FirstName", "LastName", "_dateOfBirth", "_birthDateCollectionReceiptId", "_birthDateRevision"],
             ["Email", "FirstName", "LastName"]),
         Application<Actor>(
@@ -74,7 +74,21 @@ internal static class LocalIdentityWriterInventory
         new(Store.Application, typeof(PrivacyErasureSaga),
             ["IntentId", "SubjectKind", "SubjectId", "PolicyVersion", "FenceToken", "ReceiptHash", "ReceiptExpiresAtUtc",
                 "FencedAtUtc", "ConcurrencyToken", "Status", "ProviderWorkCount", "CompletedProviderWorkCount",
-                "LocalSettledAtUtc", "CompletedAtUtc", "UpdatedAtUtc"], ["SubjectId"], [], [])
+                "LocalSettledAtUtc", "CompletedAtUtc", "UpdatedAtUtc"], ["SubjectId"], [], []),
+        ReadOnly<ModerationRecognitionPending>(
+            ["IntentId", "SubjectId", "PolicyVersion", "ReasonCode", "PrivacyOwnerHumanId", "RecoveryOwnerHumanId",
+                "ReceivedAt", "SettleBy", "EscalateAt", "ReceiptHash", "ReceiptExpiresAt", "Revision", "State",
+                "Failure", "MaterialCount", "MaterialReceipt", "ComputedAt", "AuthoritySequence"]),
+        ReadOnly<ModerationRecognitionCaptureItem>(
+            ["Id", "IntentId", "ErasureSubjectId", "SubjectId", "SubjectSolutionId", "SubjectInstanceId",
+                "SourceId", "SourceRevision", "SourceGeneration", "AdoptionId", "AdoptionRevision", "AdoptionGeneration",
+                "RingGeneration", "TrustDomainId", "ProviderKind", "Purpose", "KeyId", "KeyGeneration",
+                "SerializationVersion", "Digest", "KeyVerificationTag", "SanctionId", "SanctionRevision",
+                "DecisionId", "DecisionRevision", "FindingId", "ParentCaptureItemId", "ContinuityBindingId",
+                "RuleOwnerId", "RuleCode", "RuleRevision", "OriginalCapabilityMask", "PurposeCapabilityMask",
+                "ScopeKind", "ScopeSolutionId", "ScopeInstanceId", "ScopeTenantId", "ScopeCommunityId",
+                "ScopeResourceId", "ScopeEventId", "StartsAt", "EndsAt", "ReviewAt", "CapturedAt",
+                "OriginalCapturedAt", "RetainUntil", "DroppedAt"])
     ];
 
     internal static void RequireModel(DbContext context, Source source)
@@ -91,6 +105,9 @@ internal static class LocalIdentityWriterInventory
 
     private static Source Identity<T>(ImmutableArray<string> properties, ImmutableArray<string> update) =>
         new(Store.Identity, typeof(T), properties, properties, properties, update);
+
+    private static Source ReadOnly<T>(ImmutableArray<string> properties) =>
+        new(Store.Application, typeof(T), properties, properties, [], []);
 
     private static Source Application<T>(ImmutableArray<string> properties, ImmutableArray<string> update,
         bool allowDelete = false) => new(Store.Application, typeof(T), properties, properties, properties, update, allowDelete);

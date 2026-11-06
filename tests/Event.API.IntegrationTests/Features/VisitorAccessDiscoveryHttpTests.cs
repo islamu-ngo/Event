@@ -14,6 +14,7 @@ using Explore.Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Explore.Persistence;
 using Explore.Persistence.Identity;
 using Explore.Application.DTOs.Instance;
@@ -50,8 +51,10 @@ public sealed class VisitorAccessDiscoveryHttpTests
             await Assert.That(visitor.GetProperty("mode").GetString()).IsEqualTo(mode.ToString());
             await Assert.That(visitor.GetProperty("allowsNewNativeAllocation").GetBoolean()).IsEqualTo(allocation);
             await Assert.That(visitor.GetProperty("allowsAnonymousParticipation").GetBoolean()).IsEqualTo(allocation);
-            await Assert.That(visitor.GetProperty("allowsAccountRequiredParticipation").GetBoolean()).IsFalse();
-            await Assert.That(visitor.GetProperty("allowsExistingAccountLogin").GetBoolean()).IsFalse();
+            await Assert.That(visitor.GetProperty("allowsAccountRequiredParticipation").GetBoolean())
+                .IsEqualTo(mode == VisitorAccessMode.FullRegistrationAndAuth);
+            await Assert.That(visitor.GetProperty("allowsExistingAccountLogin").GetBoolean())
+                .IsEqualTo(mode == VisitorAccessMode.FullRegistrationAndAuth);
             await Assert.That(visitor.GetProperty("signupDestinations").GetArrayLength()).IsEqualTo(0);
             if (path == ProviderPath)
             {
@@ -97,7 +100,7 @@ public sealed class VisitorAccessDiscoveryHttpTests
         using (var guest = await GetEventAsync(client, guestEvent))
             await Assert.That(guest.RootElement.GetProperty("_links").TryGetProperty("start-guest-registration", out _)).IsTrue();
         using (var account = await GetEventAsync(client, accountEvent))
-            await Assert.That(account.RootElement.GetProperty("_links").TryGetProperty("sign-in-to-register", out _)).IsFalse();
+            await Assert.That(account.RootElement.GetProperty("_links").TryGetProperty("sign-in-to-register", out _)).IsTrue();
 
         await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.AtprotoLoginEnabled, true);
         await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.AtprotoPublicUrl, "https://events.example.test");
@@ -144,7 +147,7 @@ public sealed class VisitorAccessDiscoveryHttpTests
     [Arguments("tenant-batch")]
     [Arguments("control-plane")]
     [Arguments("provider")]
-    public async Task VisitorMutationsReturnExplicitConflictWithoutChangingAccountRequiredEvents(string surface)
+    public async Task VisitorMutationsPreserveAccountRequiredEventsWithExactPolicyOutcomes(string surface)
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         var credentials = await factory.SeedLocalUserAsync(emailConfirmed: true);
@@ -188,20 +191,121 @@ public sealed class VisitorAccessDiscoveryHttpTests
             }, Token),
             _ => throw new ArgumentOutOfRangeException(nameof(surface))
         };
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict)
-            .Because(await response.Content.ReadAsStringAsync(Token));
-        // Control-plane's existing class-level Produces contract uses ordinary JSON for ProblemDetails too.
-        await Assert.That(response.Content.Headers.ContentType?.MediaType)
-            .IsEqualTo(surface == "control-plane" ? "application/json" : "application/problem+json");
-        using var problem = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(Token), cancellationToken: Token);
-        await Assert.That(problem.RootElement.GetProperty("status").GetInt32()).IsEqualTo(409);
-        await Assert.That(problem.RootElement.GetProperty("code").GetString()).IsEqualTo("visitor_access_account_required_conflict");
+        if (surface == "provider")
+        {
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK)
+                .Because(await response.Content.ReadAsStringAsync(Token));
+            using var state = await client.GetAsync(ProviderPath, Token);
+            using var body = await JsonDocument.ParseAsync(await state.Content.ReadAsStreamAsync(Token), cancellationToken: Token);
+            var visitor = body.RootElement.GetProperty("visitorAccess");
+            await Assert.That(visitor.GetProperty("allowsExistingAccountLogin").GetBoolean()).IsTrue();
+            await Assert.That(visitor.GetProperty("allowsAccountRequiredParticipation").GetBoolean()).IsTrue();
+            await Assert.That(visitor.GetProperty("signupDestinations").GetArrayLength()).IsEqualTo(0);
+        }
+        else
+        {
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict)
+                .Because(await response.Content.ReadAsStringAsync(Token));
+            // Control-plane's existing class-level Produces contract uses ordinary JSON for ProblemDetails too.
+            await Assert.That(response.Content.Headers.ContentType?.MediaType)
+                .IsEqualTo(surface == "control-plane" ? "application/json" : "application/problem+json");
+            using var problem = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(Token), cancellationToken: Token);
+            await Assert.That(problem.RootElement.GetProperty("status").GetInt32()).IsEqualTo(409);
+            await Assert.That(problem.RootElement.GetProperty("code").GetString()).IsEqualTo("visitor_access_account_required_conflict");
+        }
         await using var scope = factory.Services.CreateAsyncScope();
         var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var participation = await database.Set<EventParticipationConfiguration>().SingleAsync(row => row.Id == eventId, Token);
         await Assert.That(participation.IdentityAccessModeId).IsEqualTo((int)IdentityAccessModeEnum.AccountRequired);
         await Assert.That(await database.Set<TenantSetting>().AnyAsync(row => row.SettingKey == key || row.SettingKey == GovernanceSettingKeys.PublicExperience.EventCatalogLabel, Token)).IsFalse();
         await Assert.That((await database.SystemSettings.SingleAsync(row => row.SettingKey == GovernanceSettingKeys.Authentication.GoogleSsoEnabled, Token)).Value).IsEqualTo("true");
+    }
+
+    [Test]
+    [Arguments(VisitorAccessMode.FullRegistrationAndAuth)]
+    [Arguments(VisitorAccessMode.AuthenticatedOnly)]
+    public async Task ClosingEnrollmentPreservesLocalParticipationAndUsesAdministratorHal(VisitorAccessMode mode)
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        var credentials = await factory.SeedLocalUserAsync(emailConfirmed: true);
+        await GrantAdministratorAsync(factory, credentials.Identifier);
+        Guid eventId = await SeedEventAsync(factory, ParticipationHandlingModeEnum.PlatformManaged, IdentityAccessModeEnum.AccountRequired);
+        using var client = CreateClient(factory);
+        client.DefaultRequestHeaders.Add("X-Tenant-Slug", "local-admission");
+        using var login = await client.PostAsJsonAsync("/api/auth/local/login", credentials, Token);
+        await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var session = await JsonDocument.ParseAsync(await login.Content.ReadAsStreamAsync(Token), cancellationToken: Token);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", session.RootElement.GetProperty("token").GetString());
+        await SetSettingAsync(factory, GovernanceSettingKeys.PublicExperience.VisitorAccessMode, mode.ToString());
+
+        using var settings = await client.GetAsync("/api/settings/tenant/Tenant", Token);
+        await Assert.That(settings.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var category = await JsonDocument.ParseAsync(await settings.Content.ReadAsStreamAsync(Token), cancellationToken: Token);
+        await Assert.That(category.RootElement.GetProperty("_links").TryGetProperty("edit", out _)).IsTrue();
+        var enrollment = category.RootElement.GetProperty("settings").EnumerateArray()
+            .Single(setting => setting.GetProperty("key").GetString() == GovernanceSettingKeys.Tenants.UserRegistrationEnabled);
+        await Assert.That(enrollment.GetProperty("canEdit").GetBoolean()).IsTrue();
+        using var closed = await client.PutAsJsonAsync(
+            "/api/settings/tenant/keys/" + GovernanceSettingKeys.Tenants.UserRegistrationEnabled,
+            new { value = "false" }, Token);
+        await Assert.That(closed.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(await closed.Content.ReadAsStringAsync(Token));
+
+        using var provider = await client.GetAsync(ProviderPath, Token);
+        await Assert.That(provider.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var configuration = await JsonDocument.ParseAsync(await provider.Content.ReadAsStreamAsync(Token), cancellationToken: Token);
+        var visitor = configuration.RootElement.GetProperty("visitorAccess");
+        await Assert.That(visitor.GetProperty("userRegistrationEnabled").GetBoolean()).IsFalse();
+        await Assert.That(visitor.GetProperty("allowsExistingAccountLogin").GetBoolean()).IsTrue();
+        await Assert.That(visitor.GetProperty("allowsAccountRequiredParticipation").GetBoolean()).IsTrue();
+        await Assert.That(visitor.GetProperty("signupDestinations").GetArrayLength()).IsEqualTo(0);
+        using var details = await GetEventAsync(client, eventId);
+        await Assert.That(details.RootElement.GetProperty("_links").TryGetProperty("start-registration", out _)).IsTrue();
+        using var retained = await client.GetAsync("/api/user", Token);
+        await Assert.That(retained.StatusCode).IsEqualTo(HttpStatusCode.OK);
+    }
+
+    [Test]
+    public async Task PrivateModeWithoutUsableLoginIsRejectedEvenWithoutAccountRequiredEvents()
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        var credentials = await factory.SeedLocalUserAsync(emailConfirmed: true);
+        await GrantAdministratorAsync(factory, credentials.Identifier);
+        using var client = CreateClient(factory);
+        client.DefaultRequestHeaders.Add("X-Tenant-Slug", "local-admission");
+        using var login = await client.PostAsJsonAsync("/api/auth/local/login", credentials, Token);
+        await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var session = await JsonDocument.ParseAsync(await login.Content.ReadAsStreamAsync(Token), cancellationToken: Token);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", session.RootElement.GetProperty("token").GetString());
+        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.PrimaryProviderId, (int)AuthenticationProviderKind.Keycloak);
+        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.KeycloakAuthority, string.Empty);
+        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.KeycloakClientId, string.Empty);
+        factory.Services.GetRequiredService<IConfiguration>()["Authentication:Provider"] = "keycloak";
+        factory.Services.GetRequiredService<IConfiguration>()["Keycloak:ClientId"] = string.Empty;
+        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.AtprotoLoginEnabled, false);
+        using var before = await client.GetAsync(ProviderPath, Token);
+        await Assert.That(before.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var facts = await JsonDocument.ParseAsync(await before.Content.ReadAsStreamAsync(Token), cancellationToken: Token);
+        await Assert.That(facts.RootElement.GetProperty("visitorAccess")
+            .GetProperty("allowsExistingAccountLogin").GetBoolean()).IsFalse();
+        using var operatorSession = await client.GetAsync("/api/user", Token);
+        await Assert.That(operatorSession.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var response = await client.PutAsJsonAsync(
+            "/api/settings/tenant/keys/" + GovernanceSettingKeys.PublicExperience.VisitorAccessMode,
+            new { value = "AuthenticatedOnly" }, Token);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict)
+            .Because(await response.Content.ReadAsStringAsync(Token));
+        using var problem = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(Token), cancellationToken: Token);
+        await Assert.That(problem.RootElement.GetProperty("code").GetString()).IsEqualTo("visitor_access_account_required_conflict");
+        using var inspect = factory.Services.CreateScope();
+        var database = inspect.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await Assert.That(await database.EventParticipationConfigurations.AnyAsync(row =>
+            row.IdentityAccessModeId == (int)IdentityAccessModeEnum.AccountRequired && !row.IsDeleted, Token)).IsFalse();
+        var mode = await database.TenantSettingOverrides.SingleOrDefaultAsync(row =>
+            row.TenantId == PlatformDefaults.DefaultTenantId
+            && row.SettingKey == GovernanceSettingKeys.PublicExperience.VisitorAccessMode, Token);
+        await Assert.That(mode?.Value).IsNotEqualTo("\"AuthenticatedOnly\"");
     }
 
     private static async Task GrantAdministratorAsync(LocalAdmissionWebApplicationFactory factory, string identifier)

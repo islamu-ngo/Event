@@ -9,7 +9,7 @@ public static class PublicExperienceSettingDefinitions
         valueType: SettingValueType.String,
         defaultValue: "\"FullRegistrationAndAuth\"",
         description: "Public visitor access; full mode exposes only actually available account-provider capabilities",
-        allowedValues: ["FullRegistrationAndAuth", "AnonymousOnly", "DirectoryListingOnly"]);
+        allowedValues: ["FullRegistrationAndAuth", "AnonymousOnly", "DirectoryListingOnly", "AuthenticatedOnly"]);
 
     public static readonly SettingDefinition Mode = PublicExperienceDefinition(
         key: GovernanceSettingKeys.PublicExperience.Mode,

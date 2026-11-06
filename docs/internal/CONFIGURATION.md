@@ -109,6 +109,30 @@ source of requirement categories and remediation authority. Value-free operator
 form metadata supplies authoritative choices; persisted identity and revision remain
 in the existing document. See [SELF_HOSTING.md](SELF_HOSTING.md#2-operator-identity-governance--readiness-gate).
 
+## Tenant user enrollment
+
+`tenants.user_registration_enabled` is a lockable Boolean policy from instance
+to tenant scope, defaulting to `true` when a successful authoritative snapshot
+contains no value. A locked instance value wins over a tenant override.
+`TenantUserRegistrationPolicy` accepts JSON Boolean values only; malformed or
+unavailable configuration cannot be treated as an open-registration default.
+This controls users joining an existing tenant and is independent of
+`tenants.self_service_registration`, which controls creating tenants.
+
+The complete visitor authority group includes enrollment, visitor mode and
+provider facts. Current capability resolution and final native settings writes
+resolve the same inherited scalar. Closing enrollment removes signup destinations
+while preserving usable Local, Keycloak and AT Protocol sign-in and
+account-required participation. Local signup is not advertised until its callable
+registration endpoint is available. `AuthenticatedOnly` governs read privacy;
+enrollment remains a separate policy.
+
+Tenant administrators edit enrollment through the `Tenant` settings category.
+The browser requires the server's category edit link and the setting's editable
+state. Public-experience and enrollment category saves are separate requests;
+rejection refreshes authoritative settings and does not pretend earlier category
+writes were rolled back.
+
 ## Anonymous Registration Intake Controls
 
 `AnonymousRegistrationRateLimiting` resolves final host configuration from

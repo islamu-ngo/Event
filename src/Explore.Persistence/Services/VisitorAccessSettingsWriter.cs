@@ -13,6 +13,7 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Domain.Services;
 using Explore.Domain.Settings;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Security;
@@ -407,14 +408,30 @@ public sealed class VisitorAccessSettingsWriter : IVisitorAccessSettingsWriter
         {
             return Rejected("visitor_access_policy_invalid");
         }
-        foreach (Guid tenantId in affected
-                     .Where(id => instanceChanged || affectedTenantIds.Contains(id)))
+        var accountRequiredTenants = affected.ToHashSet();
+        var policyScopes = affectedTenantIds.Select(id => (Guid?)id).ToHashSet();
+        if (instanceChanged)
+        {
+            policyScopes.Add(null);
+            policyScopes.UnionWith(tenantRows.Keys.Select(row => (Guid?)row.TenantId));
+            policyScopes.UnionWith(affected.Select(id => (Guid?)id));
+        }
+        foreach (Guid? tenantId in policyScopes)
         {
             VisitorAccessMode mode = VisitorAccessCapabilityResolver.ResolveMode(
                 systems.GetValueOrDefault(GovernanceSettingKeys.PublicExperience.VisitorAccessMode),
-                tenantRows.GetValueOrDefault((tenantId, GovernanceSettingKeys.PublicExperience.VisitorAccessMode)));
-            VisitorAccessCapability capability = VisitorAccessCapabilityResolver.EvaluateProposedState(new VisitorAccessPolicyState(mode, providers));
-            if (!capability.AllowsAccountRequiredParticipation)
+                tenantId is { } modeTenant
+                    ? tenantRows.GetValueOrDefault((modeTenant, GovernanceSettingKeys.PublicExperience.VisitorAccessMode)) : null);
+            var registration = systems.GetValueOrDefault(GovernanceSettingKeys.Tenants.UserRegistrationEnabled);
+            bool registrationEnabled = TenantUserRegistrationPolicy.ResolveEnabled(
+                registration?.Value, registration?.IsLocked == true,
+                tenantId is { } registrationTenant
+                    ? tenantRows.GetValueOrDefault((registrationTenant, GovernanceSettingKeys.Tenants.UserRegistrationEnabled))?.Value : null);
+            VisitorAccessCapability capability = VisitorAccessCapabilityResolver.EvaluateProposedState(
+                new VisitorAccessPolicyState(mode, providers, registrationEnabled));
+            if (mode == VisitorAccessMode.AuthenticatedOnly && !capability.AllowsExistingAccountLogin
+                || tenantId is { } participantTenant && accountRequiredTenants.Contains(participantTenant)
+                    && !capability.AllowsAccountRequiredParticipation)
                 return Rejected("visitor_access_account_required_conflict");
         }
 

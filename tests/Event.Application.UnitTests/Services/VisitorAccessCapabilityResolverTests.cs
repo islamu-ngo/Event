@@ -15,6 +15,25 @@ namespace Event.Application.UnitTests.Services;
 public sealed class VisitorAccessCapabilityResolverTests
 {
     [Test]
+    [Arguments(AuthenticationProviderKind.Local, VisitorAccessMode.FullRegistrationAndAuth)]
+    [Arguments(AuthenticationProviderKind.Keycloak, VisitorAccessMode.FullRegistrationAndAuth)]
+    [Arguments(AuthenticationProviderKind.Atproto, VisitorAccessMode.FullRegistrationAndAuth)]
+    [Arguments(AuthenticationProviderKind.Local, VisitorAccessMode.AuthenticatedOnly)]
+    [Arguments(AuthenticationProviderKind.Keycloak, VisitorAccessMode.AuthenticatedOnly)]
+    [Arguments(AuthenticationProviderKind.Atproto, VisitorAccessMode.AuthenticatedOnly)]
+    public async Task ClosedRegistrationPreservesSupportedExistingAccountAccess(
+        AuthenticationProviderKind provider, VisitorAccessMode mode)
+    {
+        var capability = VisitorAccessCapabilityResolver.EvaluateProposedState(new(
+            mode, [new(provider, true, true, PublicOnboardingPolicy.Allowed, "https://identity.example.test/signup")],
+            userRegistrationEnabled: false));
+
+        await Assert.That(capability.AllowsExistingAccountLogin).IsTrue();
+        await Assert.That(capability.AllowsAccountRequiredParticipation).IsTrue();
+        await Assert.That(capability.SignupDestinations).IsEmpty();
+    }
+
+    [Test]
     public async Task ResolverUsesOneCoherentSnapshotAndObservesTheNextSnapshotOnTheNextResolution()
     {
         Guid tenantId = Guid.CreateVersion7();
@@ -27,6 +46,8 @@ public sealed class VisitorAccessCapabilityResolverTests
             {
                 SystemSetting[] rows =
                 [
+                    new() { SettingKey = GovernanceSettingKeys.Authentication.PrimaryProviderId,
+                        Value = JsonSerializer.Serialize((int)AuthenticationProviderKind.Keycloak) },
                     new() { SettingKey = GovernanceSettingKeys.PublicExperience.VisitorAccessMode,
                         Value = "\"FullRegistrationAndAuth\"" },
                     new() { SettingKey = GovernanceSettingKeys.Authentication.AtprotoLoginEnabled,
@@ -51,14 +72,14 @@ public sealed class VisitorAccessCapabilityResolverTests
     }
 
     [Test]
-    public async Task LocalOnlyNeverCreatesPublicSignupEvenWhenDeclaredAllowed()
+    public async Task LocalExistingAccountAccessDoesNotInventAnUnimplementedSignupRoute()
     {
         var capability = Evaluate(Provider(AuthenticationProviderKind.Local, PublicOnboardingPolicy.Allowed));
 
         await Assert.That(capability.AllowsNewNativeAllocation).IsTrue();
         await Assert.That(capability.AllowsAnonymousParticipation).IsTrue();
-        await Assert.That(capability.AllowsAccountRequiredParticipation).IsFalse();
-        await Assert.That(capability.AllowsExistingAccountLogin).IsFalse();
+        await Assert.That(capability.AllowsAccountRequiredParticipation).IsTrue();
+        await Assert.That(capability.AllowsExistingAccountLogin).IsTrue();
         await Assert.That(capability.SignupDestinations).IsEmpty();
     }
 
@@ -84,7 +105,7 @@ public sealed class VisitorAccessCapabilityResolverTests
     {
         var capability = Evaluate(Provider(AuthenticationProviderKind.Keycloak, policy));
 
-        await Assert.That(capability.AllowsAccountRequiredParticipation).IsFalse();
+        await Assert.That(capability.AllowsAccountRequiredParticipation).IsTrue();
         await Assert.That(capability.AllowsExistingAccountLogin).IsTrue();
         await Assert.That(capability.SignupDestinations).IsEmpty();
     }
@@ -110,7 +131,7 @@ public sealed class VisitorAccessCapabilityResolverTests
     {
         var capability = Evaluate(Provider(AuthenticationProviderKind.Keycloak, PublicOnboardingPolicy.Allowed) with { SignupUrl = url });
 
-        await Assert.That(capability.AllowsAccountRequiredParticipation).IsFalse();
+        await Assert.That(capability.AllowsAccountRequiredParticipation).IsTrue();
         await Assert.That(capability.AllowsExistingAccountLogin).IsTrue();
         await Assert.That(capability.SignupDestinations).IsEmpty();
     }

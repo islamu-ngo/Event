@@ -116,6 +116,24 @@ Keep this catalog installation current when deploying the application update.
 
 ### Registration provider connections
 
+Tenant public-experience settings include **Allow new users to enroll**.
+Enrollment defaults to enabled. An instance administrator can lock the setting,
+in which case tenant administrators see a disabled control. Closing enrollment
+removes public signup choices while existing accounts can continue signing in
+and participating in events that require an account. It does not revoke
+memberships or change event authorization.
+
+The setting key is `tenants.user_registration_enabled`; it governs users joining
+an existing tenant. It is separate from allowing new tenants to self-register.
+Authenticated-only visitor access controls who may read tenant content and can
+be selected independently. Only functioning provider signup flows are offered;
+enabling enrollment does not invent a Local signup endpoint.
+
+If enrollment cannot be loaded, reload settings before changing it. Public display
+and enrollment changes use separate settings categories. If a later save is
+rejected, earlier successful category writes can remain; the page reloads the
+authoritative values rather than claiming the whole operation rolled back.
+
 Creating or updating a provider connection, replacing approved origins and
 deleting an unused connection retain the original administrator's authority
 through the same transaction. Late credential expiration or grant revocation

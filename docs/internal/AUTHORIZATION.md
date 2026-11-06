@@ -1014,10 +1014,21 @@ The API uses a Hypermedia as the Engine of Application State (HATEOAS) model. HA
 
 Visitor participation adds a capability condition, not a new permission or an
 administrator bypass. `VisitorAccessCapabilityResolver` combines effective visitor
-mode with all enabled, tenant-usable account providers. Local credentials do not
-provide public signup. Configurable external providers contribute onboarding only
+mode and inherited tenant enrollment with all enabled, tenant-usable account
+providers. Existing Local, Keycloak and AT Protocol accounts remain eligible for
+account-required participation when enrollment is closed. That eligibility
+depends on usable login, not a signup destination. Local credentials do not
+provide public signup until a callable registration flow is available.
+Configurable external providers contribute onboarding only
 with an explicit `Allowed` policy and a trusted configured HTTPS destination;
 unknown policy or a successful discovery probe cannot substitute.
+The `tenants.user_registration_enabled` scalar defaults open only on a successful
+missing-value read; malformed or unavailable facts fail closed. The complete
+ordered authority fence includes that scalar for native writes, imports,
+provider changes and new participation. Proposed instance locks are applied
+before interpreting tenant overrides. Tenant administration requires the
+server-produced edit link and per-setting editability; it does not infer authority
+from browser claims.
 
 Public settings, shell, provider configuration and event-detail responses project
 the same immutable `visitorAccess` facts. Provider HAL exposes `signup:<provider>`

@@ -13,14 +13,17 @@ public sealed record VisitorAccessProviderState(
 
 public sealed record VisitorAccessPolicyState
 {
-    public VisitorAccessPolicyState(VisitorAccessMode mode, IEnumerable<VisitorAccessProviderState> providers)
+    public VisitorAccessPolicyState(VisitorAccessMode mode, IEnumerable<VisitorAccessProviderState> providers,
+        bool userRegistrationEnabled = true)
     {
         Mode = mode;
         Providers = providers.ToImmutableArray();
+        UserRegistrationEnabled = userRegistrationEnabled;
     }
 
     public VisitorAccessMode Mode { get; }
     public ImmutableArray<VisitorAccessProviderState> Providers { get; }
+    public bool UserRegistrationEnabled { get; }
 }
 
 public sealed record VisitorSignupDestination(AuthenticationProviderKind Provider, string Url);
@@ -34,11 +37,13 @@ public sealed record VisitorAccessCapability
     internal VisitorAccessCapability(
         VisitorAccessMode mode,
         bool allowsExistingAccountLogin,
-        IEnumerable<VisitorSignupDestination> signupDestinations)
+        IEnumerable<VisitorSignupDestination> signupDestinations,
+        bool userRegistrationEnabled = true)
     {
         Mode = mode;
         AllowsExistingAccountLogin = allowsExistingAccountLogin;
         SignupDestinations = signupDestinations.ToImmutableArray();
+        UserRegistrationEnabled = userRegistrationEnabled;
     }
 
     public VisitorAccessMode Mode { get; }
@@ -46,7 +51,9 @@ public sealed record VisitorAccessCapability
     public bool AllowsAnonymousParticipation =>
         Mode is VisitorAccessMode.FullRegistrationAndAuth or VisitorAccessMode.AnonymousOnly;
     public bool AllowsAccountRequiredParticipation =>
-        Mode == VisitorAccessMode.FullRegistrationAndAuth && !SignupDestinations.IsEmpty;
+        (Mode is VisitorAccessMode.FullRegistrationAndAuth or VisitorAccessMode.AuthenticatedOnly)
+        && AllowsExistingAccountLogin;
     public bool AllowsExistingAccountLogin { get; }
+    public bool UserRegistrationEnabled { get; }
     public ImmutableArray<VisitorSignupDestination> SignupDestinations { get; }
 }

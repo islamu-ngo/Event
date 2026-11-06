@@ -211750,6 +211750,9 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("allowsExistingAccountLogin")]
         public bool? AllowsExistingAccountLogin { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("userRegistrationEnabled")]
+        public bool? UserRegistrationEnabled { get; set; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("signupDestinations")]
         public System.Collections.Generic.ICollection<VisitorSignupDestinationDto>? SignupDestinations { get; set; } = default!;
 
@@ -244526,6 +244529,9 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("allowsExistingAccountLogin")]
         public bool? AllowsExistingAccountLogin { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("userRegistrationEnabled")]
+        public bool? UserRegistrationEnabled { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("signupDestinations")]
         public System.Collections.Generic.ICollection<VisitorSignupDestinationDto>? SignupDestinations { get; init; } = default!;

@@ -240,6 +240,24 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 settings["PublicBaseUrl"] = "https://example.test";
             }
 
+            if (_measurementDatabaseSettings is null && _postgreSqlConnectionString is null)
+            {
+                foreach (var role in Enum.GetValues<PrimaryDatabaseRole>())
+                {
+                    string prefix = $"Database:{role}:";
+                    settings[prefix + "Provider"] = "Sqlite";
+                    settings[prefix + "Name"] = _databasePath;
+                    settings[prefix + "Database"] = _databasePath;
+                    settings[prefix + "Host"] = null;
+                    settings[prefix + "Port"] = null;
+                    settings[prefix + "TlsMode"] = "Prefer";
+                    settings[prefix + "TrustServerCertificate"] = "false";
+                    settings[$"DATABASE_{role.ToString().ToUpperInvariant()}_HOST"] = null;
+                    settings[$"DATABASE_{role.ToString().ToUpperInvariant()}_PORT"] = null;
+                }
+                settings["DATABASE_HOST"] = null;
+                settings["DATABASE_PORT"] = null;
+            }
             if (_measurementDatabaseSettings is not null)
                 foreach (var setting in _measurementDatabaseSettings)
                     settings[setting.Key] = setting.Value;

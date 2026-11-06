@@ -185106,6 +185106,9 @@
           "allowsExistingAccountLogin": {
             "type": "boolean"
           },
+          "userRegistrationEnabled": {
+            "type": "boolean"
+          },
           "signupDestinations": {
             "type": "array",
             "items": {
@@ -221173,6 +221176,9 @@
             "type": "boolean"
           },
           "allowsExistingAccountLogin": {
+            "type": "boolean"
+          },
+          "userRegistrationEnabled": {
             "type": "boolean"
           },
           "signupDestinations": {

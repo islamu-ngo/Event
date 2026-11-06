@@ -113,6 +113,7 @@ public static partial class PostgresProviderConfigurationContract
         string C(string name) => sql.Column(typeof(SystemSetting), name);
         var authenticationKeys = VisitorAccessCapabilityResolver.AuthoritySettingKeys
             .Where(key => key != GovernanceSettingKeys.PublicExperience.VisitorAccessMode
+                && key != GovernanceSettingKeys.Tenants.UserRegistrationEnabled
                 && key != GovernanceSettingKeys.Authentication.GoogleSsoEnabled
                 && key != GovernanceSettingKeys.Authentication.GoogleClientId
                 && key != GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy

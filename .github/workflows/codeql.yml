@@ -76,7 +76,7 @@ jobs:
             base_sha="HEAD~1"
           fi
 
-          changed_files="$(git diff --name-only "$base_sha" "$GITHUB_SHA" || true)"
+          changed_files="$(git diff --no-renames --name-only "$base_sha" "$GITHUB_SHA" || true)"
           if [[ -z "$changed_files" ]]; then
             echo "run-analysis=true" >> "$GITHUB_OUTPUT"
             {

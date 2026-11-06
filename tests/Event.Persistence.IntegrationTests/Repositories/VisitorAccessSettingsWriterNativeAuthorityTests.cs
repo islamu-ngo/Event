@@ -126,6 +126,33 @@ public sealed class VisitorAccessSettingsWriterNativeAuthorityTests(PostgreSqlCo
     }
 
     [Test]
+    public async Task PreparedVisitorUpdatesExistingJsonValueWithoutReplacingItsRow()
+    {
+        await PrepareColocatedAuthorityAsync();
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(OpenInstanceMigrator, fixture);
+        var first = await authenticated.RunAsync(null, session =>
+            session.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyAsync(
+                [new(null, ModeKey, VisitorAccessSettingMutationKind.SetValue, "\"AuthenticatedOnly\"")],
+                session.Services.GetRequiredService<IHumanCommitScopePreparation>().Subject!,
+                SettingsMutationOperation.InstanceSettings, session.ActorId));
+        await Assert.That(first.Success).IsTrue();
+        await using var inspect = OpenInstanceMigrator();
+        var original = await inspect.SystemSettings.AsNoTracking().SingleAsync(row => row.SettingKey == ModeKey);
+        await Assert.That(original.Value).IsEqualTo("\"AuthenticatedOnly\"");
+
+        var second = await authenticated.RunAsync(null, session =>
+            session.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyAsync(
+                [new(null, ModeKey, VisitorAccessSettingMutationKind.SetValue, "\"FullRegistrationAndAuth\"")],
+                session.Services.GetRequiredService<IHumanCommitScopePreparation>().Subject!,
+                SettingsMutationOperation.InstanceSettings, session.ActorId));
+        await Assert.That(second.Success).IsTrue();
+        await Assert.That(second.FailureCode).IsNull();
+        var updated = await inspect.SystemSettings.AsNoTracking().SingleAsync(row => row.SettingKey == ModeKey);
+        await Assert.That(updated.Id).IsEqualTo(original.Id);
+        await Assert.That(updated.Value).IsEqualTo("\"FullRegistrationAndAuth\"");
+    }
+
+    [Test]
     public async Task PreparedVisitorCannotReplayAfterItsPhysicalAttempt()
     {
         await PrepareColocatedAuthorityAsync();

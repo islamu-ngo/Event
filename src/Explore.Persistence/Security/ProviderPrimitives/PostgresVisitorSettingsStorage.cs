@@ -217,7 +217,7 @@ public static class PostgresVisitorSettingsStorage
             string relation = Table(context, type);
             string row(string parameter) => $"pg_catalog.jsonb_populate_record(NULL::{relation},{Map(parameter)})";
             string predicate = string.Join(" AND ", properties.Select(property =>
-                property.ClrType == typeof(string)
+                property.ClrType == typeof(string) && property.GetColumnType() != "jsonb"
                     ? $"t.{Col(property)} COLLATE \"C\" IS NOT DISTINCT FROM old.{Col(property)} COLLATE \"C\""
                     : $"t.{Col(property)} IS NOT DISTINCT FROM old.{Col(property)}"));
             string columns = string.Join(",", properties.Select(Col));

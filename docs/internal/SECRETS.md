@@ -515,6 +515,16 @@ state for its anti-resurrection check. Saga writes, identity-email UPDATE,
 platform-role UPDATE/DELETE, private profile reads and grant options remain
 excluded. Ordinary Runtime receives no new rights.
 
+The Global worker-creation inventory also reads `_birthDateRevision` on `UserPii`.
+EF returns this database-generated concurrency value from the initial profile
+INSERT; INSERT permission alone cannot authorize PostgreSQL's RETURNING read.
+The fixed read inventory excludes `_dateOfBirth`, `_birthDateCollectionReceiptId`
+and all other profile fields. The original Global connector, source leases and
+Serializable transaction remain in force. A Global credential can observe these
+revision counters, but receives no additional Runtime or Local authority.
+Provision a fresh development profile through the native migration workflow;
+an older incomplete worker profile remains rejected rather than silently widened.
+
 The completion proof checks the actual Migrator grantor, exact non-grantable
 column/table privileges, membership reach, mapped shape and disabled RLS on
 these instance relations. Existing native readers retain their dormant policies;

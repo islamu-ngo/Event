@@ -26,6 +26,92 @@ namespace Event.Persistence.IntegrationTests.Onboarding;
 public sealed class PostgresBootstrapStartupStorageTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
+    public async Task GlobalSetupCreatesUserWithGeneratedRevisionWithoutPrivateBirthDateReads()
+    {
+        var token = TestContext.Current!.Execution.CancellationToken;
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options,
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        await using var migrator = new ExploreDbContext(options.Options);
+        migrator.BindTenantLease();
+        Guid userId = Guid.CreateVersion7();
+        try
+        {
+            string runtimeBefore = await ReadRuntimeBootstrapPrivileges(migrator, token);
+            await migrator.Database.OpenConnectionAsync(token);
+            await ManagedTenantWorkerCreationPermissionsNativeTests.EnsurePolicyProjectionAsync(migrator);
+            await PostgresProvisioningPolicyPermissions.ApplyAsync(migrator, fixture.NativeQueueEnrollment, token);
+            await PostgresTenantCreationPermissions.ApplyAsync(
+                migrator, fixture.NativeQueueEnrollment, IdentityDatabaseTopology.Colocated, token);
+            await PostgresManagedTenantWorkerCreationPermissions.ApplyAsync(
+                migrator, fixture.NativeQueueEnrollment, IdentityDatabaseTopology.Colocated, token);
+            await Assert.That(await ReadRuntimeBootstrapPrivileges(migrator, token)).IsEqualTo(runtimeBefore);
+            var factory = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+            await using var original = await factory.CreateDbContextAsync(token);
+            await original.Database.OpenConnectionAsync(token);
+            var connector = (NpgsqlConnection)original.Database.GetDbConnection();
+            int backend = connector.ProcessID;
+            var contextId = original.ContextId;
+            await original.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+                await using var humanGate = new HumanSecuritySourceGate(original);
+                await using var humanLease = await humanGate.AcquireAsync(token);
+                await using var enrollmentGate = new EventDiscoveryEnrollmentGate(original);
+                await using var enrollmentLease = await enrollmentGate.AcquireAsync(token);
+                await using var transaction = await original.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable, token);
+                var physical = transaction.GetDbTransaction();
+                var user = new User
+                {
+                    Id = userId,
+                    Pii = new UserPii
+                    {
+                        Email = $"setup-{userId:N}@example.test", FirstName = "Setup", LastName = "Administrator"
+                    },
+                    ConcurrencyStamp = Guid.CreateVersion7(),
+                    CreatedAt = DateTime.UtcNow
+                };
+                await new UserRepository(original).Create(user);
+                await Assert.That(user.Pii.ReadBirthDateRevision()).IsEqualTo(0L);
+
+                await DeniedAsync(() => original.UserPii.AsNoTracking()
+                    .Select(row => EF.Property<DateOnly?>(row, "_dateOfBirth")).Take(1).ToListAsync(token));
+                await DeniedAsync(() => original.UserPii.AsNoTracking()
+                    .Select(row => EF.Property<Guid?>(row, "_birthDateCollectionReceiptId")).Take(1).ToListAsync(token));
+                humanGate.RequireCurrent();
+                enrollmentGate.RequireCurrent();
+                await Assert.That(original.ContextId).IsEqualTo(contextId);
+                await Assert.That(connector.ProcessID).IsEqualTo(backend);
+                await Assert.That(original.Database.CurrentTransaction).IsSameReferenceAs(transaction);
+                await Assert.That(transaction.GetDbTransaction()).IsSameReferenceAs(physical);
+                await Assert.That(physical.Connection).IsSameReferenceAs(connector);
+                await transaction.RollbackAsync(CancellationToken.None);
+
+                async Task DeniedAsync(Func<Task> operation)
+                {
+                    await transaction.CreateSavepointAsync("private_birth_date_read", token);
+                    try
+                    {
+                        var error = await Assert.ThrowsAsync<PostgresException>(operation);
+                        await Assert.That(error!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+                    }
+                    finally
+                    {
+                        await transaction.RollbackToSavepointAsync("private_birth_date_read", CancellationToken.None);
+                    }
+                }
+            });
+            await Assert.That(await ReadRuntimeBootstrapPrivileges(migrator, token)).IsEqualTo(runtimeBefore);
+            await Assert.That(await migrator.Users.IgnoreAutoIncludes().AsNoTracking()
+                .AnyAsync(row => row.Id == userId, token)).IsFalse();
+        }
+        finally
+        {
+            await migrator.Users.Where(row => row.Id == userId).ExecuteDeleteAsync(CancellationToken.None);
+        }
+    }
+
+    [Test]
     public async Task GlobalSetupRefusesPartialCompletionPermissionsInsteadOfRepairingDrift()
     {
         var token = TestContext.Current!.Execution.CancellationToken;

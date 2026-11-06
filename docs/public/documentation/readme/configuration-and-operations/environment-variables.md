@@ -245,6 +245,14 @@ Protect Global against direct changes to its admitted email-evidence and
 platform-role records as well as instance settings. No new connection credential
 or environment variable is required.
 
+Initial application-profile creation also returns a database-generated
+concurrency revision. Global can read this counter so the insert can complete;
+the person's birth date, collection receipt and other private profile fields
+remain unreadable through that grant. Protect Global credentials against
+revision-counter observation. Provision a fresh development worker permission
+profile through the native migration workflow; readiness rejects an older
+incomplete profile instead of expanding its rights during a request.
+
 The migration service also installs fixed storage access for setup's twelve
 settings: deployment mode, branding, public/admin addresses, default language,
 public-experience content, default public home page and operator identity.

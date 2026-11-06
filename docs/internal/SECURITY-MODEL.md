@@ -708,7 +708,7 @@ ownership; unauthenticated or purpose-bound identities cannot supply ambient
 verification authority. `GetProviderIdentity` and instance onboarding use this
 same reader, with no provider-specific default or compatibility overload.
 
-This is separate from authentication: a valid Keycloak/Google identity may remain
+This is separate from authentication: a valid Keycloak identity, including a brokered Google identity, may remain
 unverified, and AT Protocol bootstrap/JIT retains its dedicated DID-verification
 path without inventing an email claim. Event email-delivery settings never
 manufacture provider verification or transfer provider-owned recovery to Local.

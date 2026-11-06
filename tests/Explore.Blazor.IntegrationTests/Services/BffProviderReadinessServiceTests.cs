@@ -32,14 +32,49 @@ public sealed class BffProviderReadinessServiceTests : IDisposable
 {
     private readonly MemoryCache cache = new(new MemoryCacheOptions());
     public void Dispose() => cache.Dispose();
+
+    [Test]
+    [Arguments("google")]
+    [Arguments("Google")]
+    [Arguments("GOOGLE")]
+    public async Task DirectGoogleCannotResolveToAnAuthenticationScheme(string provider)
+    {
+        using var service = CreateService();
+
+        await Assert.That(service.ResolveProviderScheme(provider)).IsNull();
+    }
+
+    [Test]
+    public async Task RetiredGoogleSchemeCannotProduceAnAuthenticationDestination()
+    {
+        using var service = CreateService();
+
+        await Assert.That(service.MapSchemeToProviderQueryValue("Google")).IsNull();
+    }
+
+    [Test]
+    [Arguments("Google")]
+    [Arguments("unsupported-provider")]
+    public async Task UnsupportedSchemeReadinessFailsClosedWithActionableDiagnostic(string scheme)
+    {
+        var optionsMonitor = Substitute.For<IOptionsMonitor<OpenIdConnectOptions>>();
+        optionsMonitor.Get(Arg.Any<string>()).Returns(new OpenIdConnectOptions());
+        using var service = CreateService(optionsMonitor: optionsMonitor);
+
+        var readiness = await service.GetProviderReadinessAsync(scheme, CancellationToken.None);
+
+        await Assert.That(readiness.IsReady).IsFalse();
+        await Assert.That(readiness.FailureCode).IsEqualTo("unsupported_provider");
+    }
+
     [Test]
     public async Task ResolveProviderScheme_WithKnownProvider_ReturnsAuthSchemeName()
     {
         using var service = CreateService();
 
-        var scheme = service.ResolveProviderScheme("Google");
+        var scheme = service.ResolveProviderScheme("Keycloak");
 
-        await Assert.That(scheme).IsEqualTo(AuthSchemeNames.Google);
+        await Assert.That(scheme).IsEqualTo(AuthSchemeNames.Keycloak);
     }
 
     [Test]
@@ -104,17 +139,16 @@ public sealed class BffProviderReadinessServiceTests : IDisposable
     }
 
     [Test]
-    public async Task IsProviderReadyAsync_WithInvalidGoogleClientId_ReturnsFalse()
+    public async Task IsProviderReadyAsync_WithMissingKeycloakClientId_ReturnsFalse()
     {
         var optionsMonitor = Substitute.For<IOptionsMonitor<OpenIdConnectOptions>>();
-        optionsMonitor.Get(AuthSchemeNames.Google).Returns(new OpenIdConnectOptions
+        optionsMonitor.Get(AuthSchemeNames.Keycloak).Returns(new OpenIdConnectOptions
         {
-            ClientId = "not-a-google-client-id",
-            ClientSecret = "present"
+            Authority = "https://idp.example.test/realms/islamu"
         });
         using var service = CreateService(optionsMonitor: optionsMonitor);
 
-        var ready = await service.IsProviderReadyAsync(AuthSchemeNames.Google, CancellationToken.None);
+        var ready = await service.IsProviderReadyAsync(AuthSchemeNames.Keycloak, CancellationToken.None);
 
         await Assert.That(ready).IsFalse();
     }

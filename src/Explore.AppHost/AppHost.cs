@@ -92,7 +92,10 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 {
     ["SecretProvider:Provider"] = configuredSecretProvider.ToString()
 });
-var runtimeSecretEntries = SecretDefinitionRegistry.All.Values.Select(definition =>
+var runtimeSecretEntries = SecretDefinitionRegistry.All.Values
+    .Where(definition => definition.DefaultInfisicalPath != "/runtime/bff/oidc/google"
+        || definition.DefaultInfisicalKey != "GOOGLE_CLIENT_SECRET")
+    .Select(definition =>
     new SecretAcquisitionEntry(definition.DefaultInfisicalPath,
         definition.DefaultInfisicalKey, definition.DefaultEnvironmentVariableName)).ToArray();
 IResourceBuilder<ParameterResource>? agentPostgresUsername = null;
@@ -755,7 +758,7 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
                 "DATABASE_INSTANCE_KEY_WRITE_USERNAME", "DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME",
                 "DATABASE_PLATFORM_KEY_REPORT_USERNAME", "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME",
                 "DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME", "DATABASE_MIGRATOR_USERNAME", "DATABASE_TLS_MODE",
-                "AUTHENTICATION_PROVIDER", "AUTHENTICATION_CREDENTIAL_PROFILE_REVISION", "GOOGLE_CLIENT_ID",
+                "AUTHENTICATION_PROVIDER", "AUTHENTICATION_CREDENTIAL_PROFILE_REVISION",
                 "IDENTITYCORRELATION__TRUSTEDISSUERS__0", "ATPROTO_LOGIN_ENABLED",
                 "INSTANCE_BOOTSTRAP_ADMIN_PROVIDER", "INSTANCE_BOOTSTRAP_BINDING_GENERATION",
                 "INSTANCE_BOOTSTRAP_ADMIN_SUBJECT", "INSTANCE_BOOTSTRAP_ADMIN_EMAIL",

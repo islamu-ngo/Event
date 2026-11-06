@@ -75,8 +75,7 @@ public sealed class KeycloakConnectionOwnershipPersistenceTests
             SystemSettingRepository.CreateReadOnly(fixture.Context, mutationLock),
             configuration,
             fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.IPolicyMutationExecutionScopeFactory>(),
-            new KeycloakConnectionResolver(secretResolver, configuration),
-            secretResolver);
+            new KeycloakConnectionResolver(secretResolver, configuration));
     }
 
     private sealed class StaticSecretResolver(

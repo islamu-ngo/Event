@@ -119,7 +119,7 @@ public sealed class VisitorAccessSettingsWriterTests
             ProviderService(fixture).ApplyConfigurationAsync(ProviderCommand(fixture,
                 new() { PrimaryProviderId = (int)AuthenticationProviderKind.Local })));
         await Assert.That((await fixture.Services.GetRequiredService<ISystemSettingRepository>()
-            .GetByKey(GovernanceSettingKeys.Authentication.GoogleSsoEnabled))!.Value).IsEqualTo("true");
+            .GetByKey(GovernanceSettingKeys.Authentication.AtprotoLoginEnabled))!.Value).IsEqualTo("true");
         await Assert.That(await fixture.Services.GetRequiredService<ITenantSettingRepository>().GetAllForTenant(otherTenantId)).IsEmpty();
     }
 
@@ -173,7 +173,7 @@ public sealed class VisitorAccessSettingsWriterTests
         Task<VisitorAccessSettingsWriteResult> Remove() => writerLock.ExecuteOrderedGroupsAsync(
             [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
             token => writer.ApplyAsync(
-                [new(null, GovernanceSettingKeys.Authentication.GoogleSsoEnabled, VisitorAccessSettingMutationKind.SetValue, "false")],
+                [new(null, GovernanceSettingKeys.Authentication.AtprotoLoginEnabled, VisitorAccessSettingMutationKind.SetValue, "false")],
                 subject, SettingsMutationOperation.InstanceSettings, fixture.UserId, token), timeout.Token);
         Task<BaseCommandResponse<Guid>>? publishing = null;
         Task<VisitorAccessSettingsWriteResult>? removing = null;
@@ -198,7 +198,7 @@ public sealed class VisitorAccessSettingsWriterTests
         var persisted = await fixture.Services.GetRequiredService<IEventRepository>().GetById(entity.Id);
         await Assert.That(persisted!.EventStatusId).IsEqualTo((int)EventStatusEnum.Published);
         await Assert.That((await fixture.Services.GetRequiredService<ISystemSettingRepository>()
-            .GetByKey(GovernanceSettingKeys.Authentication.GoogleSsoEnabled))!.Value).IsEqualTo("true");
+            .GetByKey(GovernanceSettingKeys.Authentication.AtprotoLoginEnabled))!.Value).IsEqualTo("true");
     }
 
     [Test]
@@ -320,6 +320,11 @@ public sealed class VisitorAccessSettingsWriterTests
     {
         await using var fixture = await ReadyAsync();
         await GrantAdministratorAsync(fixture);
+        await ProviderService(fixture).ApplyConfigurationAsync(ProviderCommand(fixture, new()
+        {
+            PrimaryProviderId = (int)AuthenticationProviderKind.Atproto,
+            AtprotoPublicUrl = "https://original.example.test"
+        }));
         await fixture.SeedEventAsync(accountRequired: true);
         await ProviderService(fixture).ApplyConfigurationAsync(ProviderCommand(fixture, new()
         {
@@ -332,6 +337,8 @@ public sealed class VisitorAccessSettingsWriterTests
         await Assert.That(capability.SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Atproto);
         var authentication = await fixture.Services.GetRequiredService<IAuthProviderConfigurationService>().ReadConfigurationAsync();
         await Assert.That(authentication.PrimaryProviderId).IsEqualTo((int)AuthenticationProviderKind.Local);
+        await Assert.That(authentication.AtprotoLoginEnabled).IsTrue();
+        await Assert.That(authentication.AtprotoPublicUrl).IsEqualTo("https://events.example.test");
     }
 
     [Test]
@@ -457,6 +464,19 @@ public sealed class VisitorAccessSettingsWriterTests
         await fixture.SeedEventAsync(accountRequired: true);
         var service = ProviderService(fixture);
         AuthProviderConfigurationDto previous = await service.ReadConfigurationAsync();
+        await Assert.That(previous.PrimaryProviderId).IsEqualTo((int)AuthenticationProviderKind.Local);
+        await Assert.That((await fixture.Services.GetRequiredService<IVisitorAccessCapabilityResolver>()
+            .ResolveAsync(fixture.TenantId)).SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Atproto);
+        var groupRows = fixture.Context.SystemSettings.AsNoTracking()
+            .Where(row => VisitorAccessCapabilityResolver.AuthoritySettingKeys.Contains(row.SettingKey))
+            .OrderBy(row => row.SettingKey)
+            .Select(row => new
+            {
+                row.Id, row.SettingKey, row.Value, row.SettingValueTypeId, row.IsLocked,
+                row.AllowedValues, row.Description, row.Category, row.DisplayOrder,
+                row.CreatedAt, row.CreatedBy, row.UpdatedAt, row.UpdatedBy
+            });
+        var beforeRows = await groupRows.ToListAsync();
         var configuration = new AuthProviderConfigurationWriteDto
         {
             PrimaryProviderId = previous.PrimaryProviderId,
@@ -465,26 +485,29 @@ public sealed class VisitorAccessSettingsWriterTests
             KeycloakClientId = previous.KeycloakClientId,
             AtprotoLoginEnabled = previous.AtprotoLoginEnabled,
             AtprotoPublicUrl = previous.AtprotoPublicUrl,
-            GoogleSsoEnabled = previous.GoogleSsoEnabled,
-            GoogleClientId = previous.GoogleClientId,
             LockAtprotoLoginEnabled = previous.LockAtprotoLoginEnabled,
-            LockGoogleSsoEnabled = previous.LockGoogleSsoEnabled,
             KeycloakPublicOnboardingPolicy = previous.KeycloakPublicOnboardingPolicy,
-            KeycloakPublicSignupUrl = previous.KeycloakPublicSignupUrl,
-            GooglePublicOnboardingPolicy = previous.GooglePublicOnboardingPolicy,
-            GooglePublicSignupUrl = previous.GooglePublicSignupUrl
+            KeycloakPublicSignupUrl = previous.KeycloakPublicSignupUrl
         };
         await Assert.ThrowsAsync<Explore.Application.Exceptions.ConcurrencyConflictException>(() =>
             service.ApplyConfigurationAsync(ProviderCommand(fixture, configuration with
-            { GoogleSsoEnabled = false, KeycloakAuthority = "https://uncommitted.example.test" })));
+            { AtprotoLoginEnabled = false, KeycloakAuthority = "https://uncommitted.example.test" })));
         await Assert.That(await fixture.Services.GetRequiredService<ISystemSettingRepository>()
             .GetByKey(GovernanceSettingKeys.Authentication.KeycloakAuthority)).IsNull();
+        await Assert.That((await groupRows.ToListAsync()).SequenceEqual(beforeRows)).IsTrue();
+        await Assert.That((await fixture.Services.GetRequiredService<IVisitorAccessCapabilityResolver>()
+            .ResolveAsync(fixture.TenantId)).AllowsAccountRequiredParticipation).IsTrue();
         await service.ApplyConfigurationAsync(ProviderCommand(fixture, configuration with
         { KeycloakAuthority = "https://configured.example.test" }));
         AuthProviderConfigurationDto after = await service.ReadConfigurationAsync();
-        await Assert.That(after.GoogleSsoEnabled).IsTrue();
-        await Assert.That(after.GooglePublicOnboardingPolicy).IsEqualTo(PublicOnboardingPolicy.Allowed);
-        await Assert.That(after.GooglePublicSignupUrl).IsEqualTo(previous.GooglePublicSignupUrl);
+        await Assert.That(after.AtprotoLoginEnabled).IsTrue();
+        await Assert.That(after.AtprotoPublicUrl).IsEqualTo(previous.AtprotoPublicUrl);
+        await Assert.That(after.LockAtprotoLoginEnabled).IsEqualTo(previous.LockAtprotoLoginEnabled);
+        await Assert.That(after.PrimaryProviderId).IsEqualTo(previous.PrimaryProviderId);
+        await Assert.That(after.LockPrimaryProvider).IsEqualTo(previous.LockPrimaryProvider);
+        await Assert.That(after.KeycloakClientId).IsEqualTo(previous.KeycloakClientId);
+        await Assert.That(after.KeycloakPublicOnboardingPolicy).IsEqualTo(previous.KeycloakPublicOnboardingPolicy);
+        await Assert.That(after.KeycloakPublicSignupUrl).IsEqualTo(previous.KeycloakPublicSignupUrl);
         await Assert.That(after.KeycloakAuthority).IsEqualTo("https://configured.example.test");
     }
 
@@ -560,8 +583,7 @@ public sealed class VisitorAccessSettingsWriterTests
         var mutationLock = new RelationalSettingMutationLock(fixture.Context, unitOfWork);
         return new AuthProviderConfigurationService(SystemSettingRepository.CreateReadOnly(fixture.Context, mutationLock), configuration,
             fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.IPolicyMutationExecutionScopeFactory>(),
-            new KeycloakConnectionResolver(fixture.Services.GetRequiredService<ISecretResolver>(), configuration),
-            fixture.Services.GetRequiredService<ISecretResolver>());
+            new KeycloakConnectionResolver(fixture.Services.GetRequiredService<ISecretResolver>(), configuration));
     }
 
     private static UpdateAuthProviderConfigurationCommand ProviderCommand(
@@ -581,10 +603,8 @@ public sealed class VisitorAccessSettingsWriterTests
         {
             foreach (var (key, value, type) in new[]
             {
-                (GovernanceSettingKeys.Authentication.GoogleSsoEnabled, "true", SettingValueType.Boolean),
-                (GovernanceSettingKeys.Authentication.GoogleClientId, "\"public-client\"", SettingValueType.String),
-                (GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy, "\"Allowed\"", SettingValueType.String),
-                (GovernanceSettingKeys.Authentication.GooglePublicSignupUrl, "\"https://accounts.example.test/signup\"", SettingValueType.String)
+                (GovernanceSettingKeys.Authentication.AtprotoLoginEnabled, "true", SettingValueType.Boolean),
+                (GovernanceSettingKeys.Authentication.AtprotoPublicUrl, "\"https://events.example.test\"", SettingValueType.String)
             })
             {
                 fixture.Context.SystemSettings.Add(new SystemSetting

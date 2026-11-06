@@ -180453,14 +180453,8 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("atprotoPublicUrl")]
         public string? AtprotoPublicUrl { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("googleSsoEnabled")]
-        public bool? GoogleSsoEnabled { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("googleClientId")]
-        public string? GoogleClientId { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("googleClientSecretOwnership")]
-        public SecretOwnershipDto? GoogleClientSecretOwnership { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("unsupportedProviderMessage")]
+        public string? UnsupportedProviderMessage { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("keycloakPublicOnboardingPolicy")]
         [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PublicOnboardingPolicy>))]
@@ -180469,18 +180463,8 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("keycloakPublicSignupUrl")]
         public string? KeycloakPublicSignupUrl { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("googlePublicOnboardingPolicy")]
-        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PublicOnboardingPolicy>))]
-        public PublicOnboardingPolicy? GooglePublicOnboardingPolicy { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("googlePublicSignupUrl")]
-        public string? GooglePublicSignupUrl { get; set; } = default!;
-
         [System.Text.Json.Serialization.JsonPropertyName("lockAtprotoLoginEnabled")]
         public bool? LockAtprotoLoginEnabled { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("lockGoogleSsoEnabled")]
-        public bool? LockGoogleSsoEnabled { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -180516,17 +180500,8 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("atprotoPublicUrl")]
         public string? AtprotoPublicUrl { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("googleSsoEnabled")]
-        public bool? GoogleSsoEnabled { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("googleClientId")]
-        public string? GoogleClientId { get; set; } = default!;
-
         [System.Text.Json.Serialization.JsonPropertyName("lockAtprotoLoginEnabled")]
         public bool? LockAtprotoLoginEnabled { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("lockGoogleSsoEnabled")]
-        public bool? LockGoogleSsoEnabled { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("keycloakPublicOnboardingPolicy")]
         [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PublicOnboardingPolicy>))]
@@ -180534,13 +180509,6 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("keycloakPublicSignupUrl")]
         public string? KeycloakPublicSignupUrl { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("googlePublicOnboardingPolicy")]
-        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PublicOnboardingPolicy>))]
-        public PublicOnboardingPolicy? GooglePublicOnboardingPolicy { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("googlePublicSignupUrl")]
-        public string? GooglePublicSignupUrl { get; set; } = default!;
 
     }
 
@@ -199683,14 +199651,8 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("atprotoPublicUrl")]
         public string? AtprotoPublicUrl { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("googleSsoEnabled")]
-        public bool? GoogleSsoEnabled { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("googleClientId")]
-        public string? GoogleClientId { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("googleClientSecretOwnership")]
-        public GoogleClientSecretOwnership? GoogleClientSecretOwnership { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("unsupportedProviderMessage")]
+        public string? UnsupportedProviderMessage { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("keycloakPublicOnboardingPolicy")]
         [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PublicOnboardingPolicy>))]
@@ -199699,18 +199661,8 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("keycloakPublicSignupUrl")]
         public string? KeycloakPublicSignupUrl { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("googlePublicOnboardingPolicy")]
-        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PublicOnboardingPolicy>))]
-        public PublicOnboardingPolicy? GooglePublicOnboardingPolicy { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("googlePublicSignupUrl")]
-        public string? GooglePublicSignupUrl { get; set; } = default!;
-
         [System.Text.Json.Serialization.JsonPropertyName("lockAtprotoLoginEnabled")]
         public bool? LockAtprotoLoginEnabled { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("lockGoogleSsoEnabled")]
-        public bool? LockGoogleSsoEnabled { get; set; } = default!;
 
         /// <summary>
         /// HAL hypermedia links
@@ -247602,50 +247554,6 @@ namespace Explore.Blazor.Client.Clients
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial record class KeycloakClientSecretOwnership
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("mode")]
-        public string? Mode { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("source")]
-        public string? Source { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("badge")]
-        public string? Badge { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("description")]
-        public string? Description { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("editable")]
-        public bool? Editable { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("configured")]
-        public bool? Configured { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("resolutionStatus")]
-        public string? ResolutionStatus { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("bootstrapAvailable")]
-        public bool? BootstrapAvailable { get; init; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-        // Generated record values are intentionally omitted from diagnostic text.
-        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
-        {
-            return false;
-        }
-}
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial record class GoogleClientSecretOwnership
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("mode")]

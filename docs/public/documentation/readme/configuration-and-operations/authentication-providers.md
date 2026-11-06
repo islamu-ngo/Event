@@ -142,7 +142,8 @@ observation when a change is still needed; an attempted observation cannot repla
 
 `AUTHENTICATION_PROVIDER=atproto` requires
 `ATPROTO_LOGIN_ENABLED=true`. The application rejects the contradictory
-`false` combination. Google SSO is disabled in AT Protocol-only mode.
+`false` combination. Direct Google authentication is unsupported in every mode;
+use Keycloak's identity broker for Google sign-in.
 
 ## Development-only agent browser profile
 
@@ -392,10 +393,17 @@ browser.
 
 Provision confidential-client credentials through the deployment's explicitly
 selected secret authority, not the authentication settings form. With Infisical,
-the BFF reads Google at `/runtime/bff/oidc/google` and Keycloak at
-`/runtime/bff/oidc/keycloak`; with Environment or Development/Testing User Secrets,
+the BFF reads Keycloak at `/runtime/bff/oidc/keycloak`; with Environment or Development/Testing User Secrets,
 use the corresponding documented deployment inputs. There is no fallback to
 another authority when the selected one fails.
+
+Direct Google schemes and acquisition are removed. Do not forward
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` or their structured aliases; configure
+Google through Keycloak instead. Retained Google settings can produce an
+unsupported-provider message, but cannot create login/signup links or a handler.
+Historical bindings and their audit/custody metadata remain intact. This
+retirement does not delete credentials, relink by email or turn a direct Google
+subject into a Keycloak subject.
 
 Public Keycloak endpoint, realm and client ID metadata may be present while
 Local Identity is selected. Without a confidential-client secret, that metadata
@@ -459,7 +467,7 @@ In AT Protocol-only mode:
 - unlinked verified DIDs are provisioned without a local password;
 - repeated or concurrent first login converges on one account.
 
-Existing sessions continue under the provider that issued them until normal
+Supported-provider sessions continue under the provider that issued them until normal
 expiry. Changing the primary provider controls new sign-in admission; it does
 not reinterpret an existing cookie as a different authority.
 
@@ -468,7 +476,7 @@ not reinterpret an existing cookie as a different authority.
 A successful provider sign-in does not by itself verify an email address.
 ISLAMU Event records provider verification only when the authenticated identity
 explicitly supplies `email_verified=true`. Missing, malformed, and false claims
-remain unverified, including for Keycloak and Google. Configure the provider's
+remain unverified, including Google identities brokered through Keycloak. Configure the provider's
 claim mapping if applications need its verified-mailbox evidence; do not replace
 missing evidence with a blanket verified default.
 

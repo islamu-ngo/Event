@@ -413,7 +413,12 @@ not silently repair stale database authority.
 Deploy regenerated clients with the matching API version. Provider credentials
 belong in the selected deployment secret authority, not administrative JSON:
 AI model creation and instance AI patches no longer accept `apiKey`, and
-authentication-provider patches no longer accept `googleClientSecret`.
+authentication-provider patches reject all retired Google configuration fields,
+including `googleSsoEnabled`, `googleClientId`, `lockGoogleSsoEnabled`,
+`googlePublicOnboardingPolicy`, `googlePublicSignupUrl` and `googleClientSecret`.
+Configure Google through Keycloak's broker. The settings response may show
+`unsupportedProviderMessage` for retained configuration; it is advisory metadata,
+not a new provider or permission to acquire/delete old credentials.
 Tenant onboarding settings and completion no longer carry `aiAssistantApiKey`.
 Settings and onboarding reads no longer disclose the removed plaintext
 authentication secrets or the former AI/Cerbos credential-status properties;

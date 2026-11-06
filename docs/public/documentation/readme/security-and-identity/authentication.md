@@ -172,7 +172,13 @@ The browser communicates strictly with `Explore.Blazor` over HTTPS regardless of
 * Authentication state is tracked via an encrypted `SameSite=Lax` session cookie managed by the BFF.
 * Local login posts through an antiforgery-protected BFF endpoint. The BFF stores the returned bearer token only in server-side authentication properties. Public Local registration is not available.
 * The API validates Local and Keycloak tokens with isolated bearer schemes. A token signed or issued for one authority cannot authenticate through the other.
-* Direct Google sign-in and Google sign-in brokered by Keycloak use separate provider account namespaces. A brokered login remains bound to the Keycloak issuer and subject; a provider hint does not turn it into a direct Google account. Keep the configured issuer stable when diagnosing account-linking failures.
+* Direct Google sign-in is unsupported. Configure Google through Keycloak's identity broker; its login remains bound to the Keycloak issuer and subject. Existing direct-Google bindings are retained and are not reinterpreted or linked by email during this change.
+
+Remove the former Google runtime inputs from deployment configuration and deploy
+the regenerated API clients with the matching server. Provider settings no longer
+offer direct Google controls, and old Google JSON fields are rejected. Retained
+configuration produces broker guidance rather than a usable provider. The server
+does not acquire the old Google credential or delete its stored binding.
 
 During single-tenant configured-administrator setup, the default tenant remains unpublished
 until activation. Only the authenticated account matching the configured
@@ -467,11 +473,11 @@ Instance administrators can switch among Local Identity, Keycloak, and AT Protoc
 2. Configure the target provider and confirm that it can authenticate.
 3. Select it as the primary provider and save.
 
-The server rejects a switch that would leave the administrator without usable target credentials. New login discovery and challenges use only the selected primary provider. Existing sessions continue through their original validation/refresh scheme until normal expiry. This is session continuity, not dual-primary authentication.
+The server rejects a switch that would leave the administrator without usable target credentials. New login discovery and challenges use only supported providers. Supported-provider sessions continue through their original validation/refresh scheme until normal expiry. Direct Google is not a supported session authority.
 
 AT Protocol remains independently enabled or disabled when Local Identity or
-Keycloak is primary. It is forced on, and Google SSO is forced off, when AT
-Protocol is primary.
+Keycloak is primary. It is forced on when AT Protocol is primary. Google sign-in
+is available through Keycloak rather than a separate Google provider.
 
 ---
 

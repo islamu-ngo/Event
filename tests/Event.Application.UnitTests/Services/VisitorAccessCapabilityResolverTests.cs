@@ -133,7 +133,7 @@ public sealed class VisitorAccessCapabilityResolverTests
     }
 
     [Test]
-    public async Task AggregatesAllUsableProvidersRatherThanChoosingFirstOrPrimary()
+    public async Task AggregatesSupportedProvidersAndIgnoresRetiredGoogle()
     {
         var capability = Evaluate(
             Provider(AuthenticationProviderKind.Local),
@@ -141,11 +141,21 @@ public sealed class VisitorAccessCapabilityResolverTests
             Provider(AuthenticationProviderKind.Atproto),
             Provider(AuthenticationProviderKind.Google, PublicOnboardingPolicy.Allowed));
 
-        await Assert.That(capability.SignupDestinations.Length).IsEqualTo(2);
+        await Assert.That(capability.SignupDestinations.Length).IsEqualTo(1);
         await Assert.That(capability.SignupDestinations.Select(destination => destination.Provider))
             .Contains(AuthenticationProviderKind.Atproto);
         await Assert.That(capability.SignupDestinations.Select(destination => destination.Provider))
-            .Contains(AuthenticationProviderKind.Google);
+            .DoesNotContain(AuthenticationProviderKind.Google);
+    }
+
+    [Test]
+    public async Task RetiredGoogleCannotProvideLoginOrSignupEvenWhenStoredPolicyAllowsIt()
+    {
+        var capability = Evaluate(Provider(AuthenticationProviderKind.Google, PublicOnboardingPolicy.Allowed));
+
+        await Assert.That(capability.AllowsExistingAccountLogin).IsFalse();
+        await Assert.That(capability.AllowsAccountRequiredParticipation).IsFalse();
+        await Assert.That(capability.SignupDestinations).IsEmpty();
     }
 
     [Test]
@@ -283,13 +293,13 @@ public sealed class VisitorAccessCapabilityResolverTests
         var proposedProviders = new[]
         {
             Provider(AuthenticationProviderKind.Keycloak, PublicOnboardingPolicy.Denied),
-            Provider(AuthenticationProviderKind.Google, PublicOnboardingPolicy.Allowed)
+            Provider(AuthenticationProviderKind.Atproto, PublicOnboardingPolicy.Allowed)
         };
         var after = Evaluate(proposedProviders);
 
         await Assert.That(before.AllowsAccountRequiredParticipation).IsTrue();
         await Assert.That(after.AllowsAccountRequiredParticipation).IsTrue();
-        await Assert.That(after.SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Google);
+        await Assert.That(after.SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Atproto);
         await Assert.That(before.SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Keycloak);
     }
 

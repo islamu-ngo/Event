@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Explore.Blazor.Constants;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Options;
@@ -40,9 +39,6 @@ public sealed class BffProviderReadinessService(
     private readonly SemaphoreSlim atprotoReadinessGate = new(1, 1);
     private static readonly object AtprotoReadinessCacheKey = new();
     private static readonly TimeSpan AtprotoReadinessCacheTtl = TimeSpan.FromSeconds(10);
-    private static readonly Regex GoogleClientIdPattern = new(
-        @"^[0-9]+-[a-zA-Z0-9\-]+\.apps\.googleusercontent\.com$",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public string? ResolveProviderScheme(string? provider)
     {
@@ -54,7 +50,6 @@ public sealed class BffProviderReadinessService(
         return provider.ToLowerInvariant() switch
         {
             "keycloak" => AuthSchemeNames.Keycloak,
-            "google" => AuthSchemeNames.Google,
             "atproto" => AuthSchemeNames.Atproto,
             _ => null
         };
@@ -65,7 +60,6 @@ public sealed class BffProviderReadinessService(
         return scheme switch
         {
             AuthSchemeNames.Keycloak => "keycloak",
-            AuthSchemeNames.Google => "google",
             AuthSchemeNames.Atproto => "atproto",
             _ => null
         };
@@ -80,7 +74,7 @@ public sealed class BffProviderReadinessService(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (scheme is not (AuthSchemeNames.Keycloak or AuthSchemeNames.Google))
+            if (scheme != AuthSchemeNames.Keycloak)
             {
                 continue;
             }
@@ -119,6 +113,11 @@ public sealed class BffProviderReadinessService(
             return new(readiness.IsReady, readiness.FailureCode);
         }
 
+        if (scheme != AuthSchemeNames.Keycloak)
+        {
+            return new(false, "unsupported_provider");
+        }
+
         OpenIdConnectOptions options;
 
         try
@@ -131,42 +130,17 @@ public sealed class BffProviderReadinessService(
             return new(false, "options_unavailable");
         }
 
-        if (scheme == AuthSchemeNames.Keycloak)
+        if (string.IsNullOrWhiteSpace(options.Authority) || string.IsNullOrWhiteSpace(options.ClientId))
         {
-            if (string.IsNullOrWhiteSpace(options.Authority) || string.IsNullOrWhiteSpace(options.ClientId))
-            {
-                return new(false, "configuration_incomplete");
-            }
-
-            var metadataAddress = string.IsNullOrWhiteSpace(options.MetadataAddress)
-                ? $"{options.Authority.TrimEnd('/')}/.well-known/openid-configuration"
-                : options.MetadataAddress;
-
-            var ready = await HasRequiredOidcMetadataAsync(metadataAddress, "keycloak", requireGoogleIssuer: false, cancellationToken);
-            return new(ready, ready ? null : "metadata_unavailable");
+            return new(false, "configuration_incomplete");
         }
 
-        if (scheme == AuthSchemeNames.Google)
-        {
-            if (string.IsNullOrWhiteSpace(options.ClientId) || !GoogleClientIdPattern.IsMatch(options.ClientId))
-            {
-                return new(false, "invalid_client_id");
-            }
+        var metadataAddress = string.IsNullOrWhiteSpace(options.MetadataAddress)
+            ? $"{options.Authority.TrimEnd('/')}/.well-known/openid-configuration"
+            : options.MetadataAddress;
 
-            if (string.IsNullOrWhiteSpace(options.ClientSecret))
-            {
-                return new(false, "client_secret_unavailable");
-            }
-
-            var ready = await HasRequiredOidcMetadataAsync(
-                "https://accounts.google.com/.well-known/openid-configuration",
-                "google",
-                requireGoogleIssuer: true,
-                cancellationToken);
-            return new(ready, ready ? null : "metadata_unavailable");
-        }
-
-        return new(true, null);
+        var ready = await HasRequiredOidcMetadataAsync(metadataAddress, "keycloak", cancellationToken);
+        return new(ready, ready ? null : "metadata_unavailable");
     }
 
     private async Task<AtprotoOAuthReadiness> GetAtprotoReadinessAsync(CancellationToken cancellationToken)
@@ -212,6 +186,11 @@ public sealed class BffProviderReadinessService(
             return atprotoFactory?.GetReadiness().IsReady == true;
         }
 
+        if (scheme != AuthSchemeNames.Keycloak)
+        {
+            return false;
+        }
+
         try
         {
             var options = optionsMonitor.Get(scheme);
@@ -227,7 +206,6 @@ public sealed class BffProviderReadinessService(
     private async Task<bool> HasRequiredOidcMetadataAsync(
         string metadataAddress,
         string provider,
-        bool requireGoogleIssuer,
         CancellationToken cancellationToken)
     {
         try
@@ -287,20 +265,13 @@ public sealed class BffProviderReadinessService(
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: timeoutCts.Token);
             var root = document.RootElement;
 
-            if (!TryGetNonEmptyString(root, "issuer", out var issuer)
+            if (!TryGetNonEmptyString(root, "issuer", out _)
                 || !TryGetNonEmptyString(root, "authorization_endpoint", out _)
                 || !TryGetNonEmptyString(root, "token_endpoint", out _))
             {
                 logger.LogWarning(
                     "[AuthEndpoints] {Provider} discovery document is missing required fields",
                     provider);
-                return false;
-            }
-
-            if (requireGoogleIssuer
-                && !string.Equals(issuer, "https://accounts.google.com", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(issuer, "accounts.google.com", StringComparison.OrdinalIgnoreCase))
-            {
                 return false;
             }
 

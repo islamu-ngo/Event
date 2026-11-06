@@ -90,7 +90,6 @@ public sealed class VisitorAccessCapabilityResolver(
                     destinations.Add(new(provider.Provider, "/login?provider=atproto"));
                     break;
                 case AuthenticationProviderKind.Keycloak:
-                case AuthenticationProviderKind.Google:
                     allowsExistingAccountLogin = true;
                     if (provider.PublicOnboardingPolicy == PublicOnboardingPolicy.Allowed
                         && Uri.TryCreate(provider.SignupUrl, UriKind.Absolute, out var destination)

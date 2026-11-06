@@ -928,7 +928,21 @@ fencing.
 
 ## Provider Switching
 
-The administrator UI requires confirmation and target configuration before changing `PrimaryProviderId`. Application validation performs the authoritative lockout-prevention check: an administrator must already have a usable account with the target provider. The write persists the integer lookup ID, enforces three-way primary-provider exclusivity, forces AT Protocol on and Google off in sole mode, and invalidates runtime provider caches.
+The administrator UI requires confirmation and target configuration before changing `PrimaryProviderId`. Application validation performs the authoritative lockout-prevention check: an administrator must already have a usable account with the target provider. The write persists the integer lookup ID, enforces three-way primary-provider exclusivity, forces AT Protocol on in sole mode, and invalidates runtime provider caches.
+
+Direct Google authentication is retired. Supported runtime providers are Local
+Identity, Keycloak and AT Protocol; Google authentication uses Keycloak's broker.
+The BFF neither registers a Google scheme nor acquires Google client credentials.
+Unknown or retired explicit provider intent is rejected, including after retry,
+rather than selecting another provider.
+
+Authentication configuration read/write DTOs omit the retired Google controls.
+The strict write contract rejects their old JSON members. When a retained
+Google-enabled setting exists, metadata returns `UnsupportedProviderMessage`
+with broker guidance without resolving its secret. Stored identity bindings,
+canonical secret references and their custody/audit fences remain unchanged.
+Retirement does not relink accounts by email or reinterpret a Google subject as
+the Keycloak issuer/subject pair.
 
 Never delete the inactive provider's validation metadata merely because primary selection changed. Remove it only when its configuration is intentionally removed or invalidated after its session-continuity obligation ends.
 

@@ -96,8 +96,8 @@ consumer's credentials.
 `SecretAcquisitionPolicy` admits the compiled consumer's exact roots before
 authentication. API composition selects `Api`; Standalone explicitly selects
 `Combined`; the migration service selects `Migration`. Combined admits the API
-and BFF union, not provider administration. The separate BFF loader admits four
-exact frontend roots: Keycloak, Google, AT Protocol signing and `/runtime/bff/session`.
+and BFF union, not provider administration. The separate BFF loader admits three
+exact frontend roots: Keycloak, AT Protocol signing and `/runtime/bff/session`.
 The session root maps only `BFF_SESSION_REDIS_PASSWORD` to
 `Bff:SessionAuthority:Password`; it is unavailable to the API consumer.
 Runtime source options preserve the consumer selected
@@ -425,28 +425,29 @@ programme gate; these are authored tests, not passing receipts.
 ## Authentication Configuration Is Not Credential Custody
 
 `AuthProviderConfigurationDto` returns nonsecret provider configuration and
-deployment-owned credential metadata only. It has no Google or Keycloak
-client-secret value member. Google ownership comes from the instance-only
-`ISecretResolver` outcome; Keycloak ownership uses the existing bounded connection
+deployment-owned credential metadata only. It has no Google configuration or
+client-secret value members. Keycloak ownership uses the existing bounded connection
 resolution. `ResolutionStatus` distinguishes resolved, unconfigured, unavailable,
 unauthorized and invalid outcomes without provider diagnostics or values. Other
 ownership capabilities may omit this optional status.
 
-Ordinary authentication PATCH cannot accept a Google credential. Its write
-contract rejects unmapped members and the configuration service no longer writes
+Ordinary authentication PATCH cannot accept retired Google configuration or credentials. Its write
+contract rejects unmapped members and the configuration service never resolves Google material or writes
 `auth.google_client_secret` into SystemSetting. The retired internal credential
 readback endpoint and service method are removed; onboarding HAL points to the
 public metadata endpoint. The BFF reads that metadata at startup and refresh,
 using only its own selected-authority credential projection. It has no
 last-known-secret fallback or setup-secret-triggered credential reader.
 
-Runtime Google, Keycloak BFF and ATProto frontend bindings must use the registry's
+Runtime Keycloak BFF and ATProto frontend bindings must use the registry's
 exact instance coordinates and selected environment. Admission happens before
 the credential cache or source dispatch, so a mutated reference cannot recover
 an older cached value. This does not delete legacy settings/bindings: removal
 requires the maintenance cutover and exact cleanup transaction. A resolved
 credential proves acquisition, not a successful user sign-in or completed
-multi-process convergence.
+multi-process convergence. Historical Google definitions and canonical-binding
+custody remain for retained data and authorized maintenance; they grant no active
+acquisition, receipt, installed handler or public configuration capability.
 
 ## Local Identity Signing Authority
 
@@ -1626,8 +1627,9 @@ backup/restore/reset policy before intentionally changing topology. This repair
 performs no automatic authority migration or database schema change.
 
 The isolated Blazor Infisical provider validates exact requested roots before
-authenticating: `/runtime/bff/oidc/keycloak`, `/runtime/bff/oidc/google`, and the
-separate ATProto consumer `/runtime/bff/atproto/oauth`. Descendants and legacy
+authenticating: `/runtime/bff/oidc/keycloak`, the separate ATProto consumer
+`/runtime/bff/atproto/oauth`, and `/runtime/bff/session`. The retired
+`/runtime/bff/oidc/google`, descendants and legacy
 `/keycloak`, `/blazor`, `/atproto` requests are rejected. Every acquisition sets
 `recursive=false` and `expandSecretReferences=false`. Returned `secretPath` must
 equal the requested root; missing provenance, unresolved `${...}` references,
@@ -1635,7 +1637,7 @@ duplicate configuration keys and keys outside the consumer's closed mapping
 fail startup. There is no load-failure suppression mode.
 
 The Keycloak mapping permits endpoint, realm, client ID and the BFF client secret;
-Google permits its client ID and secret; ATProto permits only
+ATProto permits only
 `ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS`. Restrict the BFF machine identity to these
 exact roots independently of API/provisioning identities. Supply database,
 session-encryption and session-JWT credentials only to their owning backend.
@@ -1676,14 +1678,15 @@ through their service overrides; it is not a secret or an Infisical-returned key
 input and the validated selected provider locally, without credential acquisition
 or health HTTP. Transaction owners must compare both fields with the persisted
 approved operation; a request field cannot substitute for this independent read.
-For the Environment authority, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
-are optional BFF runtime inputs. The catalogue classifies the client ID as public
-and the credential as Secret; its secret-binding projection includes the actual
-Google registry definition. Explicitly forward only to the owning processes.
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and their structured aliases are retired
+runtime inputs and are masked by process projection for every consumer. AppHost
+omits the retained Google definition from active acquisition entries. The
+definition and canonical-reference predicates remain to protect stored bindings
+from unintended cleanup; Google sign-in must be configured through Keycloak.
 
 `AuthenticationCredentialAcquisitionReceipts` records successful BFF acquisition
 with a fresh process boot identity and a random identity for each acquired
-Google/Keycloak consumer. Named OIDC installation is recorded separately:
+Keycloak consumer. Named OIDC installation is recorded separately:
 an existing options-cache or scheme entry is not proof that the newly acquired
 credential was installed. Metadata refresh reuses the process acquisition;
 it does not obtain a new credential or invent a new generation.
@@ -1945,7 +1948,7 @@ Infisical uses `SCREAMING_SNAKE_CASE` with path-based sections. The provider map
 | `/keycloak/REALM_NAME` | `Keycloak:RealmName` |
 | `/keycloak/KEYCLOAK_CLIENT_ID` | Nonsecret browser/BFF client metadata mapped to `Keycloak:ClientId` for API onboarding detection. |
 | `/runtime/bff/oidc/keycloak/KEYCLOAK_BLAZOR_CLIENT_SECRET` | Deployment-owned Blazor BFF runtime credential resolved through the selected authority; Event never persists or rotates it |
-| `/runtime/bff/oidc/google/GOOGLE_CLIENT_SECRET` | `auth.google_client_secret`; instance-only deployment-owned Google BFF runtime binding |
+| `/runtime/bff/oidc/google/GOOGLE_CLIENT_SECRET` | `auth.google_client_secret`; retained historical binding/custody only, excluded from runtime acquisition |
 | `/api/CONTROL_PLANE_REGISTRATION_CREDENTIALS` | `management.control_plane_registration_credentials` | Directional managed control-plane registration credentials. This key is instance-only and its binding stores only deployment-owned source metadata. |
 | `/api` or `/cerbos` + `AUTHORIZATION_PROVIDER` | Non-secret `Authorization:Provider` deployment intent. Blank keeps manual Local-first onboarding; `local` or `cerbos` makes the provider deployment-owned and skips the choice page. |
 | root or AI path + `AI_TOOL_PROPOSALS_ENABLED` | `AiProvider:ToolProposalsEnabled` |

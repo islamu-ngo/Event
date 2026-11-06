@@ -63,10 +63,10 @@ public sealed class VisitorAccessDiscoveryHttpTests
     }
 
     [Test]
-    [Arguments(PublicOnboardingPolicy.Unknown, false)]
-    [Arguments(PublicOnboardingPolicy.Denied, false)]
-    [Arguments(PublicOnboardingPolicy.Allowed, true)]
-    public async Task SecondaryConfigurableProviderRequiresDeclaredSignupButRetainsExistingLogin(PublicOnboardingPolicy policy, bool signup)
+    [Arguments(PublicOnboardingPolicy.Unknown)]
+    [Arguments(PublicOnboardingPolicy.Denied)]
+    [Arguments(PublicOnboardingPolicy.Allowed)]
+    public async Task RetiredGoogleCannotAdvertiseSignupRegardlessOfStoredPolicy(PublicOnboardingPolicy policy)
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.GoogleSsoEnabled, true);
@@ -78,17 +78,11 @@ public sealed class VisitorAccessDiscoveryHttpTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var body = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(Token), cancellationToken: Token);
         JsonElement visitor = body.RootElement.GetProperty("visitorAccess");
-        await Assert.That(visitor.GetProperty("allowsExistingAccountLogin").GetBoolean()).IsTrue();
-        await Assert.That(visitor.GetProperty("allowsAccountRequiredParticipation").GetBoolean()).IsEqualTo(signup);
-        await Assert.That(visitor.GetProperty("signupDestinations").GetArrayLength()).IsEqualTo(signup ? 1 : 0);
+        await Assert.That(visitor.GetProperty("signupDestinations").EnumerateArray()
+            .Any(destination => destination.GetProperty("provider").GetString() == "Google")).IsFalse();
         JsonElement links = body.RootElement.GetProperty("_links");
-        await Assert.That(links.TryGetProperty("signup:google", out var signupLink)).IsEqualTo(signup);
-        if (signup)
-        {
-            await Assert.That(signupLink.GetProperty("href").GetString()).IsEqualTo("https://accounts.example.test/create-account");
-            await Assert.That(signupLink.TryGetProperty("method", out var method) ? method.GetString() : "GET").IsEqualTo("GET");
-            await Assert.That(visitor.GetProperty("signupDestinations")[0].GetProperty("provider").GetString()).IsEqualTo("Google");
-        }
+        await Assert.That(links.TryGetProperty("signup:google", out _)).IsFalse();
+        await Assert.That(body.RootElement.GetProperty("unsupportedProviderMessage").GetString()).Contains("Keycloak");
     }
 
     [Test]
@@ -105,10 +99,8 @@ public sealed class VisitorAccessDiscoveryHttpTests
         using (var account = await GetEventAsync(client, accountEvent))
             await Assert.That(account.RootElement.GetProperty("_links").TryGetProperty("sign-in-to-register", out _)).IsFalse();
 
-        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.GoogleSsoEnabled, true);
-        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.GoogleClientId, "native-public-client");
-        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy, "Allowed");
-        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.GooglePublicSignupUrl, "https://accounts.example.test/create-account");
+        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.AtprotoLoginEnabled, true);
+        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.AtprotoPublicUrl, "https://events.example.test");
         using (var account = await GetEventAsync(client, accountEvent))
             await Assert.That(account.RootElement.GetProperty("_links").TryGetProperty("sign-in-to-register", out _)).IsTrue();
 
@@ -158,9 +150,8 @@ public sealed class VisitorAccessDiscoveryHttpTests
         var credentials = await factory.SeedLocalUserAsync(emailConfirmed: true);
         await GrantAdministratorAsync(factory, credentials.Identifier);
         await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.GoogleSsoEnabled, true);
-        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.GoogleClientId, "native-public-client");
-        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy, "Allowed");
-        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.GooglePublicSignupUrl, "https://accounts.example.test/create-account");
+        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.AtprotoLoginEnabled, true);
+        await SetSettingAsync(factory, GovernanceSettingKeys.Authentication.AtprotoPublicUrl, "https://events.example.test");
         Guid eventId = await SeedEventAsync(factory, ParticipationHandlingModeEnum.PlatformManaged, IdentityAccessModeEnum.AccountRequired);
         if (surface == "control-plane")
         {
@@ -191,10 +182,8 @@ public sealed class VisitorAccessDiscoveryHttpTests
                 Configuration = OptionalUpdate<AuthProviderConfigurationWriteDto>.Set(new()
                 {
                     PrimaryProviderId = (int)AuthenticationProviderKind.Local,
-                    GoogleSsoEnabled = false,
-                    GoogleClientId = "native-public-client",
-                    GooglePublicOnboardingPolicy = PublicOnboardingPolicy.Allowed,
-                    GooglePublicSignupUrl = "https://accounts.example.test/create-account"
+                    AtprotoLoginEnabled = false,
+                    AtprotoPublicUrl = "https://events.example.test"
                 })
             }, Token),
             _ => throw new ArgumentOutOfRangeException(nameof(surface))
@@ -263,6 +252,7 @@ public sealed class VisitorAccessDiscoveryHttpTests
     private static async Task SetSettingAsync<T>(LocalAdmissionWebApplicationFactory factory, string key, T value)
     {
         await using var database = factory.CreateDatabase();
+        database.BindTenantLease();
         var setting = await database.SystemSettings.SingleOrDefaultAsync(row => row.SettingKey == key, Token);
         if (setting is null)
         {
@@ -277,6 +267,7 @@ public sealed class VisitorAccessDiscoveryHttpTests
     private static async Task SeedIdentityAsync(LocalAdmissionWebApplicationFactory factory)
     {
         await using var database = factory.CreateDatabase();
+        database.BindTenantLease();
         database.Add(TenantDirectoryOperatorIdentityDocumentDefaults.Create(PlatformDefaults.DefaultTenantId, new TenantDirectoryOperatorIdentitySettings
         {
             PublicName = "Native public operator",

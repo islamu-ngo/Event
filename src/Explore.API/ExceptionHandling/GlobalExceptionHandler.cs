@@ -82,6 +82,11 @@ internal sealed class GlobalExceptionHandler(
                 "Configuration manifest export too large",
                 "The configuration manifest export exceeds the maximum supported size.",
                 tooLargeException.FailureCode),
+            ConcurrencyConflictException { Code: CommandResponseResultMapper.VisitorAccessAccountRequiredConflict } => (
+                StatusCodes.Status409Conflict,
+                "Visitor policy conflict",
+                "The visitor policy change conflicts with the current participation configuration.",
+                CommandResponseResultMapper.VisitorAccessAccountRequiredConflict),
             ConcurrencyConflictException concurrencyConflictException => (
                 StatusCodes.Status409Conflict,
                 "Concurrency conflict",

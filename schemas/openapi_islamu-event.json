@@ -141434,14 +141434,11 @@
           "atprotoPublicUrl": {
             "type": "string"
           },
-          "googleSsoEnabled": {
-            "type": "boolean"
-          },
-          "googleClientId": {
-            "type": "string"
-          },
-          "googleClientSecretOwnership": {
-            "$ref": "#/components/schemas/SecretOwnershipDto"
+          "unsupportedProviderMessage": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "keycloakPublicOnboardingPolicy": {
             "$ref": "#/components/schemas/PublicOnboardingPolicy"
@@ -141449,16 +141446,7 @@
           "keycloakPublicSignupUrl": {
             "type": "string"
           },
-          "googlePublicOnboardingPolicy": {
-            "$ref": "#/components/schemas/PublicOnboardingPolicy"
-          },
-          "googlePublicSignupUrl": {
-            "type": "string"
-          },
           "lockAtprotoLoginEnabled": {
-            "type": "boolean"
-          },
-          "lockGoogleSsoEnabled": {
             "type": "boolean"
           }
         }
@@ -141489,28 +141477,13 @@
           "atprotoPublicUrl": {
             "type": "string"
           },
-          "googleSsoEnabled": {
-            "type": "boolean"
-          },
-          "googleClientId": {
-            "type": "string"
-          },
           "lockAtprotoLoginEnabled": {
-            "type": "boolean"
-          },
-          "lockGoogleSsoEnabled": {
             "type": "boolean"
           },
           "keycloakPublicOnboardingPolicy": {
             "$ref": "#/components/schemas/PublicOnboardingPolicy"
           },
           "keycloakPublicSignupUrl": {
-            "type": "string"
-          },
-          "googlePublicOnboardingPolicy": {
-            "$ref": "#/components/schemas/PublicOnboardingPolicy"
-          },
-          "googlePublicSignupUrl": {
             "type": "string"
           }
         },
@@ -164747,43 +164720,11 @@
           "atprotoPublicUrl": {
             "type": "string"
           },
-          "googleSsoEnabled": {
-            "type": "boolean"
-          },
-          "googleClientId": {
-            "type": "string"
-          },
-          "googleClientSecretOwnership": {
-            "type": "object",
-            "properties": {
-              "mode": {
-                "type": "string"
-              },
-              "source": {
-                "type": "string"
-              },
-              "badge": {
-                "type": "string"
-              },
-              "description": {
-                "type": "string"
-              },
-              "editable": {
-                "type": "boolean"
-              },
-              "configured": {
-                "type": "boolean"
-              },
-              "resolutionStatus": {
-                "type": [
-                  "null",
-                  "string"
-                ]
-              },
-              "bootstrapAvailable": {
-                "type": "boolean"
-              }
-            }
+          "unsupportedProviderMessage": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "keycloakPublicOnboardingPolicy": {
             "$ref": "#/components/schemas/PublicOnboardingPolicy"
@@ -164791,16 +164732,7 @@
           "keycloakPublicSignupUrl": {
             "type": "string"
           },
-          "googlePublicOnboardingPolicy": {
-            "$ref": "#/components/schemas/PublicOnboardingPolicy"
-          },
-          "googlePublicSignupUrl": {
-            "type": "string"
-          },
           "lockAtprotoLoginEnabled": {
-            "type": "boolean"
-          },
-          "lockGoogleSsoEnabled": {
             "type": "boolean"
           },
           "_links": {

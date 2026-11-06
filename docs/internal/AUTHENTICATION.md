@@ -13,7 +13,7 @@
 6. Switching the primary provider changes only new-login admission. Existing sessions retain their originating validation and refresh scheme until normal expiry.
 7. Administrator bootstrap and provider switching match the normalized `(provider_kind, provider_account_key)` identity. Ordinary email correlation additionally requires a verified address from an explicitly trusted exact issuer; neither email nor correlation trust grants administrator authority.
 8. `UserExternalLogin` is instance-global identity authority. Tenant participation exists only through `TenantUser`; a provider binding never derives authorization from a tenant ID.
-9. Public Local enrollment is closed. Instance email-delivery intent governs unverified Local token issuance, independently of SMTP availability and tenant overrides. It never changes provider-owned verification facts.
+9. Public Local enrollment is closed. Eligible Local credentials can authenticate and validate their ordinary sessions independently of email-delivery configuration. An absent or unverified email never becomes a verified-contact claim through sign-in.
 
 ## Keycloak API Access Context
 
@@ -337,9 +337,21 @@ stamp-less token is accepted. These are admission-time reads, not a distributed
 snapshot or a lock over subsequent business mutations; handlers still enforce
 their own transactional authorization invariants.
 
-For Ready but unverified credentials, the service then reads uncached instance `email.delivery_enabled` through `ISystemSettingRepository`. Missing intent uses the disabled default; strict JSON `false` permits issuance without changing `EmailConfirmed` or the resulting `email_verified=false` claim. Strict JSON `true` refuses issuance with `email_verification_required`/401, even if SMTP is missing or unhealthy. Malformed intent or a repository failure returns bounded `authentication_failed`/503; cancellation propagates. Tenant settings and transport/secret resolution do not participate in this decision. Already-verified credentials do not need the intent read, but still require Ready credential state.
+Ordinary Local login and bearer validation depend on current Ready credential
+state, exact primary identity binding, security stamp and the stored verification
+fact. They do not read `email.delivery_enabled` or resolve SMTP configuration.
+Missing, enabled, disabled, malformed or unavailable delivery configuration
+cannot change an otherwise eligible account's session eligibility. Cancellation
+and failures reading credential authority retain their existing fail-closed
+behavior.
 
-The same fresh instance intent gates unverified ordinary bearer admission. The BFF exposes only the allowlisted verification-required reason to the login UI; other provider error bodies remain hidden. Administrative enrollment remains separate from the Local lifecycle operations below. Keycloak and AT Protocol retain their own authentication and verification authority regardless of Event email-delivery intent.
+An absent address is omitted from the JWT; an unverified address retains
+`email_verified=false`. Login does not confirm the address or grant verified
+email correlation, recovery or ownership authority. Local verification and
+email-based recovery retain their delivery and verified-contact requirements.
+Administrative enrollment remains separate from those lifecycle operations.
+Keycloak and AT Protocol retain their own authentication and verification
+authority.
 
 ### Local browser session authority
 

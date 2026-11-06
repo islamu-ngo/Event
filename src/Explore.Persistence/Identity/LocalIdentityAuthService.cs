@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Runtime.ExceptionServices;
-using System.Text.Json;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Authentication.Local.Models;
@@ -219,15 +218,6 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
             if (user is null)
             {
                 return (User: null, Failure: LocalAuthFailure.InvalidCredentials);
-            }
-            if (!user.EmailConfirmed)
-            {
-                string? intent = await _credentialStates.ReadEmailDeliveryEnabledValueAsync(cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-                if (intent is not null && JsonSerializer.Deserialize<bool>(intent))
-                {
-                    return (User: null, Failure: LocalAuthFailure.EmailVerificationRequired);
-                }
             }
             cancellationToken.ThrowIfCancellationRequested();
             return (User: user, Failure: null);

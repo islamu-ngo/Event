@@ -3,7 +3,6 @@ using System.Runtime.ExceptionServices;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
-using Explore.Domain.Constants;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -69,14 +68,6 @@ internal sealed partial class LocalIdentityCredentialStateStore
                 throw new UnauthorizedAccessException("The current Local eligibility binding differs from its operation.");
             row.SetLockout(row.Generation, operation.Id, deadline, timeProvider.GetUtcNow().UtcDateTime);
         }, token).ConfigureAwait(false);
-    }
-
-    internal async Task<string?> ReadEmailDeliveryEnabledValueAsync(CancellationToken token)
-    {
-        applicationDbContext.RequireBoundTenantLease();
-        return await applicationDbContext.SystemSettings.AsNoTracking()
-            .Where(value => value.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled)
-            .Select(value => value.Value).SingleOrDefaultAsync(token).ConfigureAwait(false);
     }
 
     internal sealed class AuthenticationAttempt(LocalIdentityCredentialStateStore owner,

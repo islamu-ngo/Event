@@ -243,9 +243,18 @@ read-only access to pending receipts and captured settlement metadata so the
 application can reject unsettled subjects. Those grants do not allow changes to
 recognition records and do not include cryptographic keys.
 
-A correct password is not sufficient when credential setup is incomplete. Local sign-in also requires an explicit ready state in the selected Identity database. Missing, invalid, or unfinished credential state blocks sign-in even for a verified email address; disabling email delivery does not bypass this check. Records without state are not automatically treated as ready. This sign-in check alone does not revoke existing sessions.
+A correct password is not sufficient when credential setup is incomplete. Local sign-in also requires an explicit ready state in the selected Identity database. Missing, invalid, or unfinished credential state blocks sign-in even for a verified email address. Records without state are not automatically treated as ready. Ordinary bearer validation also checks the current credential and identity binding.
 
-When instance email delivery is enabled, Local sign-in requires the stored Local verification flag. Supervised bootstrap can establish that flag as administrative provenance; this does not invent an address or prove mailbox delivery. Missing SMTP configuration or a delivery outage does not bypass the gate. Tenant email settings cannot override the instance sign-in policy. When instance delivery is disabled, unverified Local accounts may sign in, but their addresses remain unverified; disabling delivery never proves mailbox ownership. An invalid or unreadable instance policy blocks unverified sign-in until the configuration is repaired.
+An eligible Local account can sign in and keep using its ordinary session
+without an email address or SMTP service. Enabling, disabling or repairing
+email delivery does not change that eligibility; unavailable or malformed
+delivery settings do not block ordinary sign-in. Credential setup, lockout,
+current identity binding and session security checks still apply.
+
+An unverified address stays unverified after login. An absent address is not
+added to the session token. Supervised bootstrap can establish a verification
+flag as administrative provenance; that does not invent an address or prove
+mailbox delivery. Changing delivery settings never proves mailbox ownership.
 
 Event's delivery setting does not control Keycloak or AT Protocol verification, password recovery, or sign-in. Lifecycle actions follow the account's actual linked provider, not the instance's default provider. Local enrollment remains an administrator or setup operation; recovery never creates an account.
 
@@ -257,8 +266,8 @@ defaults when no profile override is supplied, just as external-provider setup d
 Use the verification, recovery or password-change action offered by the server in
 sign-in or account security settings. Local verification and recovery require
 usable instance email delivery; a tenant mail server does not replace it.
-Disabling delivery or an SMTP outage never verifies an address or bypasses the
-existing sign-in gate. Keycloak and AT Protocol recovery remain with their provider.
+Disabling delivery or an SMTP outage never verifies an address or bypasses
+credential eligibility or verified-contact requirements. Keycloak and AT Protocol recovery remain with their provider.
 
 Verification and email-change links expire after 30 minutes, and password-recovery
 links after 15 minutes. Repeating a request while its operation remains live reuses

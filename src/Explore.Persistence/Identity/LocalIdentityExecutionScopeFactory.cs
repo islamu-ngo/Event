@@ -1,6 +1,7 @@
 using System.Runtime.ExceptionServices;
 using System.Transactions;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Exceptions;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
@@ -12,7 +13,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Explore.Persistence.Identity;
 
 /// <summary>Selects both original writer contexts before resolving the Local workflow graph.</summary>
-internal sealed class LocalIdentityExecutionScopeFactory : ILocalIdentityExecutionScopeFactory
+internal sealed class LocalIdentityExecutionScopeFactory :
+    ILocalIdentityExecutionScopeFactory, ILocalVisitorEnrollmentRecoveryScopeFactory
 {
     private readonly IServiceProvider original;
     private readonly IServiceScopeFactory scopes;
@@ -49,6 +51,28 @@ internal sealed class LocalIdentityExecutionScopeFactory : ILocalIdentityExecuti
         if (EventDiscoveryEnrollmentGate.TryRequireCurrent(parent))
             throw new InvalidOperationException("Fresh Local selection cannot borrow another connector's retained Discovery custody.");
 
+        return await CreateOwnedAsync(parent.TenantFilterTenantId, parent.CurrentUserService, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    ValueTask<ILocalIdentityExecutionScope> ILocalVisitorEnrollmentRecoveryScopeFactory.CreateAsync(
+        Guid tenantId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("Visitor recovery requires an exact persisted tenant.", nameof(tenantId));
+        if (Transaction.Current is not null)
+            throw new InvalidOperationException("Visitor recovery selection must precede its owning transaction.");
+        var existing = original.GetRequiredService<LocalIdentityExecutionLease>();
+        if (existing.Application is not null || existing.Identity is not null
+            || original.GetRequiredService<ExploreDbContextExecutionLease>().Context is not null)
+            throw new InvalidOperationException("Visitor recovery requires a fresh scope without retained writer custody.");
+        return CreateOwnedAsync(tenantId, null, cancellationToken);
+    }
+
+    private async ValueTask<ILocalIdentityExecutionScope> CreateOwnedAsync(
+        Guid? tenantId, ICurrentUserService? currentUser, CancellationToken cancellationToken)
+    {
         var child = scopes.CreateAsyncScope();
         LocalIdentityWriterDbContextFactory.Contexts? pair = null;
         HumanSecuritySourceGate? human = null;
@@ -56,8 +80,8 @@ internal sealed class LocalIdentityExecutionScopeFactory : ILocalIdentityExecuti
         LocalIdentityLifecycleGateCustody? lifecycle = null;
         try
         {
-            pair = await contexts.CreateAsync(parent.TenantFilterTenantId, cancellationToken).ConfigureAwait(false);
-            pair.Application.CurrentUserService = parent.CurrentUserService;
+            pair = await contexts.CreateAsync(tenantId, cancellationToken).ConfigureAwait(false);
+            pair.Application.CurrentUserService = currentUser;
             child.ServiceProvider.GetRequiredService<LocalIdentityExecutionLease>().Bind(pair.Application, pair.Identity);
             child.ServiceProvider.GetRequiredService<ExploreDbContextExecutionLease>()
                 .Bind(pair.Application, pair.Application.TenantFilterTenantId);

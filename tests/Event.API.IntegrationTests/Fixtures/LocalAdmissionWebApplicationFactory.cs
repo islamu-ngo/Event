@@ -22,6 +22,7 @@ using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Seed;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.TestHost;
@@ -65,6 +66,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     private string? _connectionString;
     private IInterceptor? _persistenceInterceptor;
     private ILoggerProvider? _logCapture;
+    private IExceptionHandler? _exceptionObserver;
     private IdentityDatabaseTopology _identityTopology = IdentityDatabaseTopology.Colocated;
     private string? _identityConnectionString;
     private bool _incompleteSetup;
@@ -134,12 +136,14 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         bool enableRateLimiting = false,
         bool enableAtproto = false,
         string? postgreSqlConnectionString = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        IExceptionHandler? exceptionObserver = null)
     {
         var factory = new LocalAdmissionWebApplicationFactory(primaryProvider, enableAtproto, timeProvider)
         {
             _persistenceInterceptor = persistenceInterceptor,
             _logCapture = logCapture,
+            _exceptionObserver = exceptionObserver,
             _identityTopology = identityTopology,
             _incompleteSetup = incompleteSetup,
             _enableRateLimiting = enableRateLimiting,
@@ -267,6 +271,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         });
         builder.ConfigureTestServices(services =>
         {
+            if (_exceptionObserver is not null)
+                services.Insert(0, ServiceDescriptor.Singleton(_exceptionObserver));
             if (_timeProvider is not null)
             {
                 services.RemoveAll<TimeProvider>();

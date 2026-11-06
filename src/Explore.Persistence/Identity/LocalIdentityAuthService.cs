@@ -76,12 +76,23 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
             : await _userManager.FindByNameAsync(identifier).ConfigureAwait(false);
         _credentialStates.RequireSelectedLifecycleCurrent();
         cancellationToken.ThrowIfCancellationRequested();
-        if (user is null)
+        if (user is null || string.IsNullOrWhiteSpace(user.SecurityStamp))
         {
             _ = _userManager.PasswordHasher.VerifyHashedPassword(
                 _dummyUser,
                 _dummyPasswordHash,
                 request.Password);
+            cancellationToken.ThrowIfCancellationRequested();
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
+        }
+
+        LocalCredentialStateMetadata? initialState = await _credentialStates.ReadAsync(
+            user.Id, user.SecurityStamp, cancellationToken).ConfigureAwait(false);
+        _credentialStates.RequireSelectedLifecycleCurrent();
+        cancellationToken.ThrowIfCancellationRequested();
+        if (initialState?.State == LocalCredentialState.RegistrationPending)
+        {
+            _ = _userManager.PasswordHasher.VerifyHashedPassword(_dummyUser, _dummyPasswordHash, request.Password);
             cancellationToken.ThrowIfCancellationRequested();
             return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
         }

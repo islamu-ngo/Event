@@ -396,7 +396,7 @@ public sealed class LocalCredentialFirstUseTests
         await using Fixture fixture = await Fixture.CreateAsync(topology);
         Snapshot before = await fixture.ReadAsync();
         var request = new LocalCredentialResetRequest(
-            operationId: Guid.CreateVersion7(), initiatingApplicationUserId: fixture.Receipt.InitiatingApplicationUserId,
+            operationId: Guid.CreateVersion7(), initiatingApplicationUserId: fixture.AdministratorId,
             localSubjectId: fixture.Receipt.LocalSubjectId, expectedCurrentOperationId: fixture.Receipt.OperationId,
             expectedCurrentOperationConcurrencyStamp: before.OperationStamp, reason: "Supervised credential recovery");
         Task<LocalAuthResponseDto> authentication = Task.Run(() => fixture.AuthenticateAsync(
@@ -494,7 +494,7 @@ public sealed class LocalCredentialFirstUseTests
                 case SessionMutation.Reset:
                     Snapshot current = await fixture.ReadAsync();
                     LocalCredentialResetResult reset = await fixture.StateStore(scope).ResetAsync(new LocalCredentialResetRequest(
-                        operationId: Guid.CreateVersion7(), initiatingApplicationUserId: fixture.Receipt.InitiatingApplicationUserId,
+                        operationId: Guid.CreateVersion7(), initiatingApplicationUserId: fixture.AdministratorId,
                         localSubjectId: fixture.Receipt.LocalSubjectId, expectedCurrentOperationId: fixture.Receipt.OperationId,
                         expectedCurrentOperationConcurrencyStamp: current.OperationStamp, reason: "Supervised session revocation"), fixture.CancellationToken);
                     await Assert.That(reset.Outcome).IsEqualTo(LocalCredentialResetOutcome.Reset);
@@ -595,7 +595,7 @@ public sealed class LocalCredentialFirstUseTests
         await using (AsyncServiceScope reset = fixture.Provider.CreateAsyncScope())
         {
             LocalCredentialResetResult result = await fixture.StateStore(reset).ResetAsync(new LocalCredentialResetRequest(
-                operationId: Guid.CreateVersion7(), initiatingApplicationUserId: fixture.Receipt.InitiatingApplicationUserId,
+                operationId: Guid.CreateVersion7(), initiatingApplicationUserId: fixture.AdministratorId,
                 localSubjectId: authority.LocalSubjectId, expectedCurrentOperationId: fixture.Receipt.OperationId,
                 expectedCurrentOperationConcurrencyStamp: before.OperationStamp, reason: "Supervised freshness check"), fixture.CancellationToken);
             await Assert.That(result.Outcome).IsEqualTo(LocalCredentialResetOutcome.Reset);
@@ -670,6 +670,8 @@ public sealed class LocalCredentialFirstUseTests
         internal ServiceProvider Provider => _provider!;
         internal CancellationToken CancellationToken => _timeout.Token;
         internal LocalCredentialOperationReceipt Receipt { get; private set; } = null!;
+        internal Guid AdministratorId => Receipt.InitiatingApplicationUserId
+            ?? throw new InvalidOperationException("The administrator fixture requires its original initiating user.");
         internal string TemporaryPassword { get; private set; } = string.Empty;
         internal string BlockedPassword { get; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(48));
         internal ControlledClock Clock { get; } = new();

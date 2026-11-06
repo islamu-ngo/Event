@@ -11,6 +11,9 @@ public static class TenantFilterBypassReasons
     public const string IdempotencyCleanupTenantDiscovery =
         "Global idempotency cleanup discovers tenants from a bounded eligible receipt identity page.";
 
+    public const string VisitorEnrollmentRecoveryDiscovery =
+        "Global visitor recovery reads only bounded receipt identifiers, tenant targets, stage, generation and deadline; settlement uses fresh tenant-bound Local writers.";
+
     public const string WebhookLocalDeliveryHealth =
         "Independent Global readiness observes Local webhook due/stale counts only.";
 

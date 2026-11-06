@@ -66,9 +66,15 @@ internal sealed class ConfigurableNpgsqlMigrationsSqlGenerator(
             operations, Dependencies.SqlGenerationHelper, sqlite: false);
         operations = StorageSourceUriCutoverGuard.Prepare(
             operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "OCTET_LENGTH");
+        using var visitor = LocalVisitorDowngradeGuard.Prepare(operations, Dependencies.SqlGenerationHelper, sqlite: false);
+        operations = visitor.Operations;
         ConfigurableSchemaMigrationOperations.Rewrite(operations, Dependencies.CurrentContext.Context);
+        ConfigurableSchemaMigrationOperations.Rewrite(visitor.PreflightOperations, Dependencies.CurrentContext.Context);
+        var commands = base.Generate(operations, model, options);
+        if (visitor.PreflightOperations.Count != 0)
+            commands = base.Generate(visitor.PreflightOperations, model, options).Concat(commands).ToArray();
         return ConfigurableSchemaMigrationOperations.RewriteCommands(
-            base.Generate(operations, model, options),
+            commands,
             Dependencies);
     }
 }
@@ -117,9 +123,15 @@ internal sealed class ConfigurableSqlServerMigrationsSqlGenerator(
             operations, Dependencies.SqlGenerationHelper, sqlite: false);
         operations = StorageSourceUriCutoverGuard.Prepare(
             operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "DATALENGTH");
+        using var visitor = LocalVisitorDowngradeGuard.Prepare(operations, Dependencies.SqlGenerationHelper, sqlite: false);
+        operations = visitor.Operations;
         ConfigurableSchemaMigrationOperations.Rewrite(operations, Dependencies.CurrentContext.Context);
+        ConfigurableSchemaMigrationOperations.Rewrite(visitor.PreflightOperations, Dependencies.CurrentContext.Context);
+        var commands = base.Generate(operations, model, options);
+        if (visitor.PreflightOperations.Count != 0)
+            commands = base.Generate(visitor.PreflightOperations, model, options).Concat(commands).ToArray();
         return ConfigurableSchemaMigrationOperations.RewriteCommands(
-            base.Generate(operations, model, options),
+            commands,
             Dependencies);
     }
 }
@@ -157,6 +169,9 @@ internal sealed class ConfigurableSqliteMigrationsSqlGenerator(
             executableOperations, Dependencies.SqlGenerationHelper, sqlite: true);
         executableOperations = StorageSourceUriCutoverGuard.Prepare(
             executableOperations, Dependencies.SqlGenerationHelper, sqlite: true, byteLengthFunction: "LENGTH");
+        using var visitor = LocalVisitorDowngradeGuard.Prepare(
+            executableOperations, Dependencies.SqlGenerationHelper, sqlite: true);
+        executableOperations = visitor.Operations;
         executableOperations =
             ConfigurableSchemaMigrationOperations.RemoveRedundantForeignKeyDrops(executableOperations);
         if (executableOperations.Any(operation => operation is RenameIndexOperation))
@@ -209,6 +224,9 @@ internal sealed class ConfigurableSqliteMigrationsSqlGenerator(
             commands = commands.Concat(base.Generate(publicationDrops, model, options)).ToArray();
         if (resourceHistory.PreflightOperations.Count != 0)
             commands = base.Generate(resourceHistory.PreflightOperations, model, options).Concat(commands).ToArray();
+        ConfigurableSchemaMigrationOperations.Rewrite(visitor.PreflightOperations, Dependencies.CurrentContext.Context);
+        if (visitor.PreflightOperations.Count != 0)
+            commands = base.Generate(visitor.PreflightOperations, model, options).Concat(commands).ToArray();
         return ConfigurableSchemaMigrationOperations.AppendPromotionCodeBackfill(
             commands,
             executableOperations,
@@ -253,6 +271,8 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
         operations = StorageSourceUriCutoverGuard.Prepare(
             operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "OCTET_LENGTH");
         operations = PrepareForeignKeyIndexReplacements(operations);
+        using var visitor = LocalVisitorDowngradeGuard.Prepare(operations, Dependencies.SqlGenerationHelper, sqlite: false);
+        operations = visitor.Operations;
         var executableOperations = new List<MigrationOperation>(operations.Count);
         foreach (MigrationOperation operation in operations)
         {
@@ -285,8 +305,11 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
         }
         IReadOnlyList<MigrationOperation> guardedOperations = MySqlVarcharNarrowingGuard.Prepare(
             executableOperations, Dependencies.SqlGenerationHelper);
+        var commands = base.Generate(guardedOperations, model, sqlOptions);
+        if (visitor.PreflightOperations.Count != 0)
+            commands = base.Generate(visitor.PreflightOperations, model, sqlOptions).Concat(commands).ToArray();
         return ConfigurableSchemaMigrationOperations.AppendPromotionCodeBackfill(
-            base.Generate(guardedOperations, model, sqlOptions),
+            commands,
             executableOperations,
             Dependencies);
     }

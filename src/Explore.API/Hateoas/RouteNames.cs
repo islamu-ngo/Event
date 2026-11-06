@@ -85,6 +85,8 @@ public static class RouteNames
     public const string ReconcileInstanceKeycloakOperation = nameof(ReconcileInstanceKeycloakOperation);
     public const string CancelInstanceKeycloakOperation = nameof(CancelInstanceKeycloakOperation);
     public const string LoginLocalIdentity = nameof(LoginLocalIdentity);
+    public const string ReserveLocalVisitorEnrollment = nameof(ReserveLocalVisitorEnrollment);
+    public const string RegisterLocalVisitor = nameof(RegisterLocalVisitor);
     public const string RequestLocalEmailVerification = nameof(RequestLocalEmailVerification);
     public const string ConfirmLocalEmail = nameof(ConfirmLocalEmail);
     public const string RequestLocalPasswordRecovery = nameof(RequestLocalPasswordRecovery);

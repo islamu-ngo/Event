@@ -461,7 +461,7 @@ public sealed class LocalIdentityTokenPurposeTests
         {
             await entered.Task.WaitAsync(fixture.CancellationToken);
             reset = Task.Run(() => fixture.StateStore(resetScope).ResetAsync(new LocalCredentialResetRequest(
-                Guid.CreateVersion7(), fixture.Receipt.InitiatingApplicationUserId, fixture.Receipt.LocalSubjectId,
+                Guid.CreateVersion7(), fixture.AdministratorId, fixture.Receipt.LocalSubjectId,
                 fixture.Receipt.OperationId, consumed.OperationStamp, "Serialized mirror reset"), fixture.CancellationToken), fixture.CancellationToken);
             await observer.Started.WaitAsync(fixture.CancellationToken);
         }
@@ -561,7 +561,7 @@ public sealed class LocalIdentityTokenPurposeTests
             LocalIdentityCredentialStateStore store = fixture.StateStore(scope);
             readyReset.SetResult();
             await start.Task.WaitAsync(fixture.CancellationToken);
-            return await store.ResetAsync(new LocalCredentialResetRequest(Guid.CreateVersion7(), fixture.Receipt.InitiatingApplicationUserId,
+            return await store.ResetAsync(new LocalCredentialResetRequest(Guid.CreateVersion7(), fixture.AdministratorId,
                 fixture.Receipt.LocalSubjectId, fixture.Receipt.OperationId, before.OperationStamp, "Recovery versus supervised reset"), fixture.CancellationToken);
         }, fixture.CancellationToken);
         await Task.WhenAll(readyConsume.Task, readyReset.Task).WaitAsync(fixture.CancellationToken);
@@ -606,7 +606,7 @@ public sealed class LocalIdentityTokenPurposeTests
         var before = await fixture.ReadAsync();
         await using AsyncServiceScope scope = fixture.Provider.CreateAsyncScope();
         LocalCredentialResetResult reset = await fixture.StateStore(scope).ResetAsync(new LocalCredentialResetRequest(
-            Guid.CreateVersion7(), fixture.Receipt.InitiatingApplicationUserId, fixture.Receipt.LocalSubjectId,
+            Guid.CreateVersion7(), fixture.AdministratorId, fixture.Receipt.LocalSubjectId,
             fixture.Receipt.OperationId, before.OperationStamp, "Native lifecycle race"), fixture.CancellationToken);
         await Assert.That(reset.Outcome).IsEqualTo(LocalCredentialResetOutcome.Reset);
     }

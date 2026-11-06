@@ -307,6 +307,8 @@ public static class ApplicationServicesRegistration
             provider.GetRequiredService<AuthProviderConfigurationService>());
         services.AddScoped<IVisitorAccessProviderReader, VisitorAccessProviderReader>();
         services.AddScoped<IVisitorAccessCapabilityResolver, VisitorAccessCapabilityResolver>();
+        services.AddScoped<ILocalVisitorEnrollmentService, LocalVisitorEnrollmentService>();
+        services.AddScoped<ILocalVisitorEnrollmentRecoveryService, LocalVisitorEnrollmentRecoveryService>();
         services.AddScoped<IVisitorTenantReadAccessPolicy, VisitorTenantReadAccessPolicy>();
         services.AddScoped<IAccountAuthorityLifecycleEmailService, DefaultAccountAuthorityLifecycleEmailService>();
         services.AddScoped<IAnalyticsGovernanceService, AnalyticsGovernanceService>();

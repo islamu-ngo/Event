@@ -57,7 +57,8 @@ internal sealed partial class LocalIdentityCredentialStateStore
         {
             LocalIdentityEligibilityState expectedState = metadata.State switch
             {
-                LocalCredentialState.ProvisioningPending => LocalIdentityEligibilityState.ProvisioningPending,
+                LocalCredentialState.ProvisioningPending or LocalCredentialState.RegistrationPending
+                    => LocalIdentityEligibilityState.ProvisioningPending,
                 LocalCredentialState.ChangeRequired => LocalIdentityEligibilityState.ChangeRequired,
                 LocalCredentialState.Ready => LocalIdentityEligibilityState.Ready,
                 _ => throw new UnauthorizedAccessException("The authenticating Local credential state is unsupported.")

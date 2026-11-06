@@ -107,6 +107,13 @@ catalog or missing grant blocks the operation; repairing the installation
 does not require giving the application direct settings-table write access.
 Authorization and policy decisions remain in Event.
 
+The same transaction keeps the nonsecret provisioning-policy projection aligned
+with visitor-setting changes, including instance locks. This allows later
+administrative edits to verify their original policy state. The installer grants
+the selected Global application purpose the projection read and update columns
+needed for that maintenance; it does not require direct settings-table writes.
+Keep this catalog installation current when deploying the application update.
+
 ### Registration provider connections
 
 Creating or updating a provider connection, replacing approved origins and

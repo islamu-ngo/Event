@@ -126,6 +126,36 @@ public sealed class VisitorAccessSettingsWriterNativeAuthorityTests(PostgreSqlCo
     }
 
     [Test]
+    public async Task NativeVisitorLockPreservesProvisioningSourceForTheNextOrdinaryWrite()
+    {
+        await PrepareColocatedAuthorityAsync();
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(OpenInstanceMigrator, fixture);
+        var initialized = await authenticated.RunAsync(null, session =>
+            session.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyAsync(
+                [new(null, ModeKey, VisitorAccessSettingMutationKind.SetValue, "\"FullRegistrationAndAuth\"")],
+                session.Services.GetRequiredService<IHumanCommitScopePreparation>().Subject!,
+                SettingsMutationOperation.InstanceSettings, session.ActorId));
+        await Assert.That(initialized.Success).IsTrue();
+        var locked = await authenticated.RunAsync(null, session =>
+            session.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyAsync(
+                [new(null, ModeKey, VisitorAccessSettingMutationKind.SetLock, null, true)],
+                session.Services.GetRequiredService<IHumanCommitScopePreparation>().Subject!,
+                SettingsMutationOperation.InstanceSettings, session.ActorId));
+        await Assert.That(locked.Success).IsTrue();
+
+        await using var ordinary = OpenInstanceMigrator();
+        var setting = await ordinary.SystemSettings.SingleAsync(row => row.SettingKey == ModeKey);
+        await Assert.That(setting.IsLocked).IsTrue();
+        Guid id = setting.Id;
+        setting.IsLocked = false;
+        await ordinary.SaveChangesAsync();
+        var persisted = await ordinary.SystemSettings.AsNoTracking().SingleAsync(row => row.SettingKey == ModeKey);
+        await Assert.That(persisted.Id).IsEqualTo(id);
+        await Assert.That(persisted.IsLocked).IsFalse();
+        await Assert.That(persisted.Value).IsEqualTo("\"FullRegistrationAndAuth\"");
+    }
+
+    [Test]
     public async Task PreparedVisitorUpdatesExistingJsonValueWithoutReplacingItsRow()
     {
         await PrepareColocatedAuthorityAsync();

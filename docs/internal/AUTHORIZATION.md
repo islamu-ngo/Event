@@ -548,10 +548,21 @@ selected Runtime/Global connection.
 The privileged installer creates the PostgreSQL catalog and grants its two
 function entry points directly to the enrolled application logins, retaining
 the purpose marker roles and their non-inheriting boundaries. It does not grant
-those logins direct table DML. Catalog shape is checked before use. These
+those logins direct settings-table DML. Catalog shape is checked before use. These
 database credentials can invoke the fixed storage ports; credential-only
 compromise is therefore a separate trust boundary from C# authorization, as
 accepted in the application-owned persistence decision.
+
+Native instance-setting transitions also maintain the fixed nonsecret
+`ManagedTenantProvisioningPolicySetting` projection. Before writing the source,
+C# checks the captured original against the projection and retains its revision;
+after writing, C# projects the accepted image using that revision on the same
+retained transaction. A failed projection update rolls back the source mutation.
+This preserves the original-source checks used by later ordinary EF writes.
+The installer grants only the enrolled Global login SELECT over the projection's
+fixed columns and UPDATE over `IsPresent`, `IsLocked`, `Value` and `Revision`.
+It adds no Runtime projection privileges. Policy, authorization and completion
+remain application-owned.
 
 ### Current human Cerbos principal inputs
 

@@ -128,6 +128,10 @@ public static class PostgresVisitorSettingsStorage
             .Select(property => Column(context, typeof(EventParticipationConfiguration), property)));
         string eventColumns = string.Join(",", new[] { "Id", "TenantId", "IsDeleted" }
             .Select(property => Column(context, typeof(Explore.Domain.Event), property)));
+        string projectionColumns = string.Join(",", context.Model.FindEntityType(typeof(ManagedTenantProvisioningPolicySetting))!
+            .GetProperties().Select(property => Column(context, typeof(ManagedTenantProvisioningPolicySetting), property.Name)));
+        string projectionUpdates = string.Join(",", new[] { "IsPresent", "IsLocked", "Value", "Revision" }
+            .Select(property => Column(context, typeof(ManagedTenantProvisioningPolicySetting), property)));
         return $$"""
             DO $roles$ DECLARE selected text; BEGIN
                 FOREACH selected IN ARRAY ARRAY[{{Text(OwnerRole)}},{{Text(RuntimeRole)}},{{Text(GlobalRole)}}] LOOP
@@ -152,6 +156,8 @@ public static class PostgresVisitorSettingsStorage
             {{settingRights}}
             GRANT SELECT ({{participationColumns}}) ON {{Table(context,typeof(EventParticipationConfiguration))}} TO {{OwnerRole}};
             GRANT SELECT ({{eventColumns}}) ON {{Table(context,typeof(Explore.Domain.Event))}} TO {{OwnerRole}};
+            GRANT SELECT ({{projectionColumns}}), UPDATE ({{projectionUpdates}})
+                ON {{Table(context,typeof(ManagedTenantProvisioningPolicySetting))}} TO {{Identifier(enrollment.GlobalLogin)}};
             {{policies}}
             DO $install$ DECLARE previous text := pg_catalog.current_setting('role'); BEGIN
                 PERFORM pg_catalog.set_config('role',{{Text(OwnerRole)}},true);

@@ -123,12 +123,26 @@ public sealed class VisitorSettingsOriginalStore(
         {
             RequireActive(request);
             actual.RequireOriginalValidated(request);
+            string? projectionKey = transition.Type == typeof(SystemSetting)
+                ? transition.Candidate[nameof(SystemSetting.SettingKey)]!.GetValue<string>() : null;
+            long? projectionRevision = projectionKey is not null
+                && ManagedTenantProvisioningPolicyInventory.Keys.Contains(projectionKey, StringComparer.Ordinal)
+                ? await ManagedTenantProvisioningPolicyProjection.RequireOriginalSourceAsync(context, projectionKey,
+                    transition.Before is null ? null : Entity<SystemSetting>(transition.Before), token)
+                : null;
             await VisitorSettingsStorage.WriteAsync(context, request.TenantId, transition.Type,
                 transition.Before, transition.After, () =>
                 {
                     RequireActive(request);
                     actual.RequireOriginalValidated(request);
                 }, token);
+            if (projectionRevision.HasValue && projectionKey is not null)
+            {
+                RequireActive(request);
+                actual.RequireOriginalValidated(request);
+                await ManagedTenantProvisioningPolicyProjection.RecordAsync(context, projectionKey,
+                    transition.After is null ? null : Entity<SystemSetting>(transition.After), token, projectionRevision);
+            }
             var rows = expected![transition.Type.Name]!.AsArray();
             if (transition.Before is not null)
                 rows.Remove(rows.Single(row => row!["Id"]!.GetValue<string>()

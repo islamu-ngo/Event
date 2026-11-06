@@ -164,6 +164,8 @@ public static class PostgresLookupCatalogueReadPermissions
             if (!PostgresTenantCreationPermissions.TryGetGlobalColumns(context, lookup.Type, out var columns, out _))
                 return Array.Empty<string>();
             var source = Mapping(context, lookup.Type, lookup.Properties);
+            columns = columns.Concat(PostgresSetupLiveStoragePermissions.GlobalCompletionColumns(context, lookup.Type)
+                .Where(grant => grant.Privilege == "SELECT").Select(grant => grant.Column)).Distinct(StringComparer.Ordinal).ToArray();
             return columns.Where(column => source.Columns.Contains(column, StringComparer.Ordinal))
                 .Select(column => $"(source.table_name={Text(source.Table)} AND a.attname={Text(column)})");
         }).ToArray();

@@ -161,7 +161,7 @@ public static partial class PostgresSetupLiveStoragePermissions
         {
             RequireOriginal();
             if (await SettingsScalar(context,
-                $"SELECT ({SettingsSession(enrollment.GlobalLogin)}) AND ({GlobalSettingsCataloguePredicate(context, enrollment)})",
+                $"SELECT ({SettingsSession(enrollment.GlobalLogin)}) AND ({GlobalSettingsCataloguePredicate(context, enrollment)}) AND ({GlobalCompletionCataloguePredicate(context, enrollment)})",
                 cancellationToken) is not true)
                 throw new UnauthorizedAccessException(SettingsDrift);
             RequireOriginal();

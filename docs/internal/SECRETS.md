@@ -504,6 +504,31 @@ columns and related navigation graphs. They fit the existing fixed Global
 column inventory; no grants are added. The coordinator still checks the exact
 Local receipt, actor and external-login binding before completing setup.
 
+Absent-user setup completion also needs its existing application identity
+effects on that same Global transaction. `ApplyAsync` installs a closed
+completion inventory before the worker permissions: saga SELECT is limited to
+`SubjectId`; identity-email claims and evidence admit their mapped SELECT,
+INSERT and DELETE operations; platform-role assignments admit SELECT and
+INSERT; the public Role lookup admits its six mapped properties. The
+coordinator uses `ExistsBySubjectAsync` and never loads saga receipts or workflow
+state for its anti-resurrection check. Saga writes, identity-email UPDATE,
+platform-role UPDATE/DELETE, private profile reads and grant options remain
+excluded. Ordinary Runtime receives no new rights.
+
+The completion proof checks the actual Migrator grantor, exact non-grantable
+column/table privileges, membership reach, mapped shape and disabled RLS on
+these instance relations. Existing native readers retain their dormant policies;
+they do not change Global access while RLS remains disabled. Tenant and worker catalogue
+composition accepts the old baseline or the complete fixed profile; partial
+additional permissions are not an alternate readiness state. The trusted
+settings writer includes this proof in its original-owner completion checks.
+Pending credentials still precede the atomic application metadata/settings/
+administrator commit, followed by credential activation. This preserves the
+existing crash-recovery ordering rather than adding a separate identity-binding
+commit. Global's fixed credential reach includes these identity-email and
+platform-assignment operations; the accepted credential-compromise distinction
+remains the one documented in the application-owned persistence decision.
+
 `PostgresSetupLiveStoragePermissions.ApplyTrustedSettingsAsync` installs the
 setup settings storage profile after native source owners and the declared
 Local writer have been installed. The existing Global login receives column

@@ -234,6 +234,17 @@ private user or actor profiles. This fits the existing permission profile and
 does not require granting Global full user/actor table access. Receipt and
 binding conflicts still stop completion.
 
+The same setup transaction can create the administrator's application identity,
+reconcile its verified email evidence and assign its platform role. Migrations
+install the fixed Global permissions for those operations. The erasure check
+reads only a subject identifier; it cannot expose private erasure receipts or
+change erasure state. This does not enable private profile reads or add ordinary
+Runtime permissions. Credentials remain inactive until authoritative setup
+completion commits and activation reconciles, including after a restart.
+Protect Global against direct changes to its admitted email-evidence and
+platform-role records as well as instance settings. No new connection credential
+or environment variable is required.
+
 The migration service also installs fixed storage access for setup's twelve
 settings: deployment mode, branding, public/admin addresses, default language,
 public-experience content, default public home page and operator identity.

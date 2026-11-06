@@ -235,6 +235,9 @@ public static class PostgresTenantCreationPermissions
             PostgresSetupLiveStoragePermissions.GlobalBootstrapColumns(context, source.Type)
                 .SelectMany(column => new[] { "SELECT", "INSERT", "UPDATE" }
                     .Select(privilege => $"({global},{Text(source.Table)},{Text(column)},{Text(privilege)},false)")));
+        bootstrapGrants = bootstrapGrants.Concat(sources.SelectMany(source =>
+            PostgresSetupLiveStoragePermissions.GlobalCompletionColumns(context, source.Type)
+                .Select(grant => $"({global},{Text(source.Table)},{Text(grant.Column)},{Text(grant.Privilege)},false)")));
         // Role already belongs to Runtime's fixed public catalogue. Recognize that direct
         // source intersection without installing it or admitting an inherited role union.
         var role = sources.Single(source => source.Type == typeof(Role));
@@ -280,7 +283,8 @@ public static class PostgresTenantCreationPermissions
                                             AND acl.grantor=t.relowner AND acl.privilege_type=permission.privilege AND NOT acl.is_grantable)
                                         AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=0 AND acl.privilege_type=permission.privilege))))))
                 AND ({sourceProofs}) AND ({PostgresManagedTenantWorkerCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment)})
-                AND ({PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment)}) {required})
+                AND ({PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment)})
+                AND ({PostgresSetupLiveStoragePermissions.OptionalGlobalCompletionCataloguePredicate(context, enrollment)}) {required})
             """;
     }
 
@@ -508,7 +512,9 @@ public static class PostgresTenantCreationPermissions
                     .Select(column => $"a.attname={Text(column)} AND acl.privilege_type='UPDATE'"))
                 .Concat(PostgresSetupLiveStoragePermissions.GlobalBootstrapColumns(context, source.Type)
                     .SelectMany(column => new[] { "SELECT", "INSERT", "UPDATE" }
-                        .Select(privilege => $"a.attname={Text(column)} AND acl.privilege_type={Text(privilege)}"))));
+                        .Select(privilege => $"a.attname={Text(column)} AND acl.privilege_type={Text(privilege)}")))
+                .Concat(PostgresSetupLiveStoragePermissions.GlobalCompletionColumns(context, source.Type)
+                    .Select(grant => $"a.attname={Text(grant.Column)} AND acl.privilege_type={Text(grant.Privilege)}")));
             return $"""
                 NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl
                     WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)})

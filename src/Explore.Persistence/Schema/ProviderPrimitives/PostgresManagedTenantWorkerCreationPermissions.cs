@@ -156,7 +156,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
     {
         enrollment.Validate();
         var sources = Sources(context);
-        return $"(({AbsentPredicate(context, sources, enrollment)}) OR ({CataloguePredicate(context, sources, enrollment, true)}))";
+        return $"(({PostgresSetupLiveStoragePermissions.OptionalGlobalCompletionCataloguePredicate(context, enrollment)}) AND (({AbsentPredicate(context, sources, enrollment)}) OR ({CataloguePredicate(context, sources, enrollment, true)})))";
     }
 
     internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
@@ -181,6 +181,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
             .Concat(PostgresLocalizationSecretStatusReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresExternalApiKeyAuthenticationContract.GlobalCatalogueRelations(context))
             .Concat(PostgresAdmissionScannerAuthenticationContract.GlobalCatalogueRelations(context))
+            .Concat(PostgresSetupLiveStoragePermissions.GlobalCompletionRelations(context))
             .Distinct(StringComparer.Ordinal).ToArray();
         string[] proofs =
         [
@@ -195,7 +196,8 @@ public static class PostgresManagedTenantWorkerCreationPermissions
             PostgresInventoryHoldExpiryReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresLocalizationSecretStatusReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresExternalApiKeyAuthenticationContract.CompleteGlobalCataloguePredicate(context, enrollment),
-            PostgresAdmissionScannerAuthenticationContract.CompleteGlobalCataloguePredicate(context, enrollment)
+            PostgresAdmissionScannerAuthenticationContract.CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresSetupLiveStoragePermissions.OptionalGlobalCompletionCataloguePredicate(context, enrollment)
         ];
         return $"""
             COALESCE((WITH application_global_members AS MATERIALIZED (
@@ -286,6 +288,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
                                         AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=r.oid AND acl.grantor=t.relowner AND acl.privilege_type=permission.privilege AND NOT acl.is_grantable)
                                         AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=0 AND acl.privilege_type=permission.privilege))))))
                 AND ({string.Join(" AND ", sources.Select(source => SourcePredicate(context, source, enrollment, complete)))})
+                AND ({PostgresSetupLiveStoragePermissions.OptionalGlobalCompletionCataloguePredicate(context, enrollment)})
                 {required})
             """;
     }
@@ -430,6 +433,8 @@ public static class PostgresManagedTenantWorkerCreationPermissions
                     : throw new InvalidOperationException("worker_creation_property_missing"), privilege)).ToArray();
             Grant[] worker = [.. Grants(item.Read, "SELECT"), .. Grants(item.Insert, "INSERT"), .. Grants(item.Update, "UPDATE")];
             var baseline = new List<Grant>();
+            baseline.AddRange(PostgresSetupLiveStoragePermissions.GlobalCompletionColumns(context, item.Entity)
+                .Select(grant => new Grant(grant.Column, grant.Privilege)));
             bool core = PostgresTenantCreationPermissions.TryGetGlobalColumns(context, item.Entity, out var coreRead, out var coreInsert);
             baseline.AddRange(coreRead.Select(column => new Grant(column, "SELECT")));
             baseline.AddRange(coreInsert.Select(column => new Grant(column, "INSERT")));

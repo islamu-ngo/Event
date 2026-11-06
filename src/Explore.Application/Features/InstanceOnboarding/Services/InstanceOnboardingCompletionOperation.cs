@@ -579,7 +579,7 @@ public sealed class InstanceOnboardingCompletionOperation(
             emailVerified = evidence?.EmailVerified ?? input.EmailVerified ?? false;
         }
 
-        if (await privacyErasure.GetBySubjectAsync(input.UserId, cancellationToken) is not null)
+        if (await privacyErasure.ExistsBySubjectAsync(input.UserId, cancellationToken))
             throw new InvalidOperationException("Erased identity metadata cannot be recreated.");
         var account = new ProviderAccountKey(providerKind, providerKey);
         bool canClaim = providerKind == AuthenticationProviderKind.Local;

@@ -24,8 +24,8 @@ public static partial class PostgresHumanPrincipalSourceContract
     private const string Write = "human_principal_source_write";
     private const string SettingWrite = "human_principal_source_setting_write";
     private const string Anchor = "human_principal_source_epoch";
-    private const string ReadPolicy = "human_principal_source_read";
-    private const string UpdatePolicy = "human_principal_source_update";
+    internal const string ReadPolicy = "human_principal_source_read";
+    internal const string UpdatePolicy = "human_principal_source_update";
     private const string Signature = "uuid,integer,text,integer,uuid,text";
     private const string Arguments = "p_actor uuid,p_provider integer,p_account text,p_purpose integer,p_tenant uuid,p_stamp text";
     private const string Stamp = "human-principal-source:v1:";

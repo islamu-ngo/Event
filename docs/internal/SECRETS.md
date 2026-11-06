@@ -504,6 +504,36 @@ columns and related navigation graphs. They fit the existing fixed Global
 column inventory; no grants are added. The coordinator still checks the exact
 Local receipt, actor and external-login binding before completing setup.
 
+`PostgresSetupLiveStoragePermissions.ApplyTrustedSettingsAsync` installs the
+setup settings storage profile after native source owners and the declared
+Local writer have been installed. The existing Global login receives column
+SELECT and INSERT on the thirteen mapped `SystemSetting` properties, with
+UPDATE on the nine value/metadata/update-audit properties. Identity, key and
+creation audit cannot be updated; table privileges, DELETE, REFERENCES and
+grant options remain denied. Forced RLS admits only the twelve compiled keys
+in `TrustedSetupSettingsWriter.Keys`, using byte-exact UTF-8 comparisons and
+the original null-tenant Global session. Paired permissive/restrictive policies
+retain that boundary without changing existing native owners' access.
+
+The coordinator observes operator-document presence through its trusted writer,
+not a full settings repository projection. Observation and effects retain the
+same context, backend, connection and Serializable transaction. PostgreSQL
+catalogue checks prove the exact column inventory, role footprint, owner and
+policy expressions before and after use; installation rejects partial or
+drifting profiles instead of repairing them. The source/receipt lease,
+create-only operator document check and completion fences remain C# authority.
+Database permission is data access, not an authenticated setup grant. A
+compromised Global credential can read or change these twelve settings directly;
+it does not gain access to unrelated private settings through this profile.
+The same fixed profile enrolls Global in the existing execute-only discovery
+disclosure role, with inheritance but no role switching or administration.
+Instance-setting saves already capture tenant dependencies and advance disclosure
+epochs on the original owner; this supplies the storage operations they require.
+No disclosure source-table privileges or owner-role membership are added.
+Catalogue admission proves the exact direct executor binding. Ordinary Runtime
+remains excluded. A compromised Global credential can also invoke those bounded
+dependency and epoch operations.
+
 ## Instance Onboarding Keys
 
 The eight `INSTANCE_BOOTSTRAP_*` keys follow the same single-authority rule as

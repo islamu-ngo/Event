@@ -234,6 +234,26 @@ private user or actor profiles. This fits the existing permission profile and
 does not require granting Global full user/actor table access. Receipt and
 binding conflicts still stop completion.
 
+The migration service also installs fixed storage access for setup's twelve
+settings: deployment mode, branding, public/admin addresses, default language,
+public-experience content, default public home page and operator identity.
+Global can read and create these rows and update their values and descriptive
+metadata. It cannot rename or delete them, alter creation audit, or read unrelated
+private settings through this access. PostgreSQL row policies preserve that
+boundary; existing native settings editors retain their separate permissions.
+Setup still requires its real credential receipt and source checks. A stolen
+Global database credential could change these twelve settings directly, so
+protect and rotate it as an application credential.
+Global also receives the existing execute-only discovery operations needed to
+refresh tenant disclosure after an instance-setting change. This does not grant
+access to discovery source tables or admit ordinary Runtime to those operations.
+Protecting Global also protects those dependency and epoch operations.
+
+Migrations and setup refuse an incomplete or modified settings permission
+profile. Investigate permission drift rather than granting Global blanket
+settings-table access. No additional credential or environment variable is
+required.
+
 Only the migration service receives migration credentials; API runtime does not
 inherit them. Provision real database roles/grants separately: setup readiness
 is not proof of permission separation. Runtime must not have DDL, superuser or

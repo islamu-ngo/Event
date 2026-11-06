@@ -36,7 +36,6 @@ public sealed class InstanceOnboardingCompletionOperation(
     IPrivacyErasureStateRepository privacyErasure,
     Explore.Application.Contracts.Identity.IIdentityAccountResolver identityResolver,
     Explore.Application.Services.IdentityEmailSynchronizationOperation identityEmailSynchronization,
-    ISystemSettingRepository systemSettingRepository,
     IEnumerable<IConfiguredAdministratorBootstrapProvider> configuredProviders,
     ISetupSecretProvider setupSecretProvider,
     IInstanceBootstrapAuditLogger auditLogger,
@@ -210,15 +209,15 @@ public sealed class InstanceOnboardingCompletionOperation(
         }
 
         var writes = new List<SystemSetting>();
+        var writer = setupSettingsWriter
+            ?? throw new InvalidOperationException("Setup completion requires its trusted settings writer.");
+        bool hasOperatorIdentity = await writer.HasOperatorIdentityAsync(unitOfWork, cancellationToken);
         if (input.IsConfigured && operatorIdentityOptions?.Value is { } options)
         {
             var (configuredIdentity, _) = InstanceOperatorIdentity.TryCreate(options, InstanceOperatorIdentityCapability.PaidCommerce);
             if (configuredIdentity is not null)
             {
-                SystemSetting? existingIdentitySetting = await systemSettingRepository.GetByKey(
-                    InstanceOperatorIdentitySettingKeys.OperatorIdentity,
-                    cancellationToken);
-                if (existingIdentitySetting is null)
+                if (!hasOperatorIdentity)
                 {
                     var settingsPayload = new InstanceOperatorIdentitySettings
                     {
@@ -250,8 +249,7 @@ public sealed class InstanceOnboardingCompletionOperation(
             }
         }
 
-        if (writes.Count == 0
-            && await systemSettingRepository.GetByKey(InstanceOperatorIdentitySettingKeys.OperatorIdentity, cancellationToken) is null)
+        if (writes.Count == 0 && !hasOperatorIdentity)
         {
             var draft = new InstanceOperatorIdentitySettings
             {
@@ -292,9 +290,7 @@ public sealed class InstanceOnboardingCompletionOperation(
                             || completed.CompletedIdentityFingerprint != admission.Binding.IdentityFingerprint))
                         throw new UnauthorizedAccessException("Setup completion lost its original terminal receipt.");
                 }, singleTenant ? PrepareDefaultTenant(admission.SiteProfile!.SiteName, input.UserId, input.CompletedAt) : null);
-        return await (setupSettingsWriter
-            ?? throw new InvalidOperationException("Setup completion requires its trusted settings writer."))
-            .ExecuteAsync(apply, cancellationToken);
+        return await writer.ExecuteAsync(apply, cancellationToken);
     }
 
     private async Task<PersistenceOutcome> PersistAdmittedAsync(

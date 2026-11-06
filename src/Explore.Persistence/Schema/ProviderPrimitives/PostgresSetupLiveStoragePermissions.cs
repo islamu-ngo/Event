@@ -13,7 +13,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace Explore.Persistence.Schema;
 
 /// <summary>Fixed setup and bootstrap storage rights; admission, lifecycle and dispatch remain application-owned.</summary>
-public static class PostgresSetupLiveStoragePermissions
+public static partial class PostgresSetupLiveStoragePermissions
 {
     private static readonly string[] BootstrapProperties =
     [

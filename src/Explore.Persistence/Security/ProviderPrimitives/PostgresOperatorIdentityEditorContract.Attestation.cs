@@ -118,6 +118,13 @@ public static partial class PostgresOperatorIdentityEditorContract
             string sharedWrites = bootstrap ? "INSERT,UPDATE" : "INSERT";
             string deniedWrites = bootstrap ? "REFERENCES" : "UPDATE,REFERENCES";
             string insertDenial = $"pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},pg_catalog.to_regclass({Text(sql.Table(source.Type))}),{Text(sharedWrites)})";
+            string updateDenial = $"pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},pg_catalog.to_regclass({Text(sql.Table(source.Type))}),{Text(deniedWrites)})";
+            if (source.Type == typeof(SystemSetting))
+            {
+                string profile = PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(context, enrollment);
+                insertDenial += $" AND ({profile}) IS NOT TRUE";
+                updateDenial += $" AND ({profile}) IS NOT TRUE";
+            }
             if (bootstrap)
                 insertDenial += $" AND ({PostgresSetupLiveStoragePermissions.GlobalBootstrapCataloguePredicate(context, enrollment)}) IS NOT TRUE";
             else if (PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, source.Type, out _, out var insert, out _)
@@ -126,8 +133,7 @@ public static partial class PostgresOperatorIdentityEditorContract
             return $"""
             pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},
                 pg_catalog.to_regclass({Text(sql.Table(source.Type))}),'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-            OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},
-                pg_catalog.to_regclass({Text(sql.Table(source.Type))}),{Text(deniedWrites)})
+            OR ({updateDenial})
             OR ({insertDenial})
             """;
         }));

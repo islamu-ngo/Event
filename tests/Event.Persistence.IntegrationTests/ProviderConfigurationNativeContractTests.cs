@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Constants;
+using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Persistence;

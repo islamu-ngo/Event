@@ -7,6 +7,7 @@ using Explore.Application.Exceptions;
 using Explore.Application.Features.Events.Discovery;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Services;
+using Explore.Application.Specifications.Events;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;

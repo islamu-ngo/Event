@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6RH19P2KCGH7Y4W0QZEHJK4
+Title: "read MCP instance governance for process health"
+Type: fix
+Scope: self-hosting
+Summary: "Restore MCP process readiness without a selected tenant by using the existing explicit Global instance reader while retaining tenant request controls."
+Group: mcp-instance-health
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MCP_DEBUGGING.md
+    Disposition: documented
+    Detail: "Process health reads only MCP instance governance through the existing explicit Global instance-reader capability. The ordinary Runtime tenant guard, tenant request delegation and grants are unchanged. Shared merge defaults and safe health metadata remain in force."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: "The MCP readiness entry reports startup and instance governance without requiring a tenant. Disabled MCP remains Degraded and legacy SSE remains unavailable. No new credential, configuration or migration is required."

@@ -1793,6 +1793,13 @@ The platform exposes standardized, sanitized health endpoints:
 
 Both `Healthy` and `Degraded` readiness return HTTP 200. `Unhealthy` returns HTTP 503. Inspect the individual checks to distinguish an optional email incident from a core dependency failure.
 
+The `mcp-adapter` entry reports the process's startup ceiling and instance MCP
+governance. It reads instance settings through the existing Global read
+capability without requiring a selected tenant or expanding Runtime access.
+Startup-disabled or instance-disabled MCP is `Degraded`; enabled MCP is
+`Healthy`. This does not certify each tenant's overrides. Legacy SSE remains
+unavailable even when requested. No new credential or configuration is needed.
+
 ### Optional Email Readiness
 
 | Situation | Health result | Operator action |

@@ -177,7 +177,7 @@ public sealed class AtprotoOAuthSecurityGatewayTests
                 Substitute.For<Explore.Application.Contracts.Moderation.IModerationRecognitionContinuity>(),
                 TimeProvider.System, externalLogins,
                 () => throw new InvalidOperationException("A rejected DID cannot settle human enrollment.")),
-            null!); // DID mismatch fails before a native membership participant can be acquired.
+            null!, Substitute.For<ITenantUserRepository>()); // DID mismatch fails before a native membership participant can be acquired.
         var payload = JsonSerializer.SerializeToUtf8Bytes(CreateSession());
 
         var result = await handler.ExecuteAsync(new BootstrapAtprotoSessionCommand(

@@ -29,6 +29,18 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
             .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.UserId == userId, cancellationToken);
     }
 
+    public async Task<TenantUser> CreateForExistingAccountAsync(TenantUser membership, CancellationToken cancellationToken = default)
+    {
+        membership.Tenant = await _dbContext.Tenants.AsTracking()
+            .SingleAsync(tenant => tenant.Id == membership.TenantId, cancellationToken);
+        membership.User = await _dbContext.Users.AsTracking()
+            .SingleAsync(user => user.Id == membership.UserId, cancellationToken);
+        membership.Actor = membership.ActorId is Guid actorId
+            ? await _dbContext.Actors.AsTracking().SingleAsync(actor => actor.Id == actorId, cancellationToken)
+            : null;
+        return await Create(membership);
+    }
+
     public async Task<TenantUser?> GetByTenantAndActorAsync(Guid tenantId, Guid actorId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.TenantUsers

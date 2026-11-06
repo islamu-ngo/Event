@@ -4,6 +4,8 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface ITenantUserRepository : IGenericRepository<TenantUser, Guid>
 {
+    /// <summary>Creates a membership using existing principal references tracked by the committing context.</summary>
+    Task<TenantUser> CreateForExistingAccountAsync(TenantUser membership, CancellationToken cancellationToken = default);
     Task<TenantUser?> GetByTenantAndUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
     Task<TenantUser?> GetByTenantAndActorAsync(Guid tenantId, Guid actorId, CancellationToken cancellationToken = default);
     Task<bool> IsActiveTenantUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default);

@@ -1555,7 +1555,7 @@ internal static class K6LoadRunner
         }, owner.StandardInput.BaseStream);
         Task errors = owner.StandardError.BaseStream.CopyToAsync(Stream.Null, CancellationToken.None);
         Exception? failure = null;
-        OwnedProcessObservation? observation = null;
+        OwnedProcessObservation observation;
         try
         {
             using var ready = await ReadOwnerMessageAsync(owner.StandardOutput.BaseStream, deadline.Token);
@@ -1626,7 +1626,11 @@ internal static class K6LoadRunner
                     result.GetProperty("output").GetString() ?? string.Empty);
             }
         }
-        catch (Exception primaryFailure) { failure = primaryFailure; }
+        catch (Exception primaryFailure)
+        {
+            failure = primaryFailure;
+            throw;
+        }
         finally
         {
             try { owner.StandardInput.BaseStream.Dispose(); }
@@ -1649,9 +1653,9 @@ internal static class K6LoadRunner
             {
                 failure = failure is null ? drainFailure : new AggregateException(failure, drainFailure);
             }
+            if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
         }
-        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
-        return observation ?? throw new InvalidOperationException("load_owner_observation_missing");
+        return observation;
     }
 
     private static async Task<JsonDocument> ReadOwnerMessageAsync(Stream stream, CancellationToken token)

@@ -35,6 +35,7 @@ public sealed class PostgresBootstrapStartupStorageTests(PostgreSqlContainerFixt
         await using var migrator = new ExploreDbContext(options.Options);
         migrator.BindTenantLease();
         Guid userId = Guid.CreateVersion7();
+        Guid actorId = Guid.CreateVersion7();
         try
         {
             string runtimeBefore = await ReadRuntimeBootstrapPrivileges(migrator, token);
@@ -73,6 +74,12 @@ public sealed class PostgresBootstrapStartupStorageTests(PostgreSqlContainerFixt
                 };
                 await new UserRepository(original).Create(user);
                 await Assert.That(user.Pii.ReadBirthDateRevision()).IsEqualTo(0L);
+                await CreateActorAsync(actorId);
+                await Assert.That(await original.Actors.IgnoreAutoIncludes().AsNoTracking()
+                    .Where(row => row.Id == actorId).Select(row => row.UserId).SingleAsync(token))
+                    .IsEqualTo(userId);
+                await DeniedAsync(() => original.Users.Where(row => row.Id == userId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.Id, row => row.Id), token));
 
                 await DeniedAsync(() => original.UserPii.AsNoTracking()
                     .Select(row => EF.Property<DateOnly?>(row, "_dateOfBirth")).Take(1).ToListAsync(token));
@@ -85,7 +92,25 @@ public sealed class PostgresBootstrapStartupStorageTests(PostgreSqlContainerFixt
                 await Assert.That(original.Database.CurrentTransaction).IsSameReferenceAs(transaction);
                 await Assert.That(transaction.GetDbTransaction()).IsSameReferenceAs(physical);
                 await Assert.That(physical.Connection).IsSameReferenceAs(connector);
+                await DeniedAsync(() => CreateActorAsync(Guid.CreateVersion7()));
                 await transaction.RollbackAsync(CancellationToken.None);
+                original.ChangeTracker.Clear();
+                await using var replacement = await original.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable, token);
+                var replacementError = await Assert.ThrowsAsync<PostgresException>(() =>
+                    CreateActorAsync(Guid.CreateVersion7()));
+                await Assert.That(replacementError!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+                await replacement.RollbackAsync(CancellationToken.None);
+
+                Task<Actor> CreateActorAsync(Guid id) => new ActorRepository(original).Create(new Actor
+                {
+                    Id = id,
+                    UserId = user.Id,
+                    ActorTypeId = (int)ActorTypeEnum.User,
+                    ActorType = null!,
+                    Pii = new ActorPii { DisplayName = "Setup Administrator" },
+                    Description = null
+                });
 
                 async Task DeniedAsync(Func<Task> operation)
                 {
@@ -104,11 +129,111 @@ public sealed class PostgresBootstrapStartupStorageTests(PostgreSqlContainerFixt
             await Assert.That(await ReadRuntimeBootstrapPrivileges(migrator, token)).IsEqualTo(runtimeBefore);
             await Assert.That(await migrator.Users.IgnoreAutoIncludes().AsNoTracking()
                 .AnyAsync(row => row.Id == userId, token)).IsFalse();
+            await Assert.That(await migrator.Actors.IgnoreAutoIncludes().AsNoTracking()
+                .AnyAsync(row => row.Id == actorId, token)).IsFalse();
         }
         finally
         {
             await migrator.Users.Where(row => row.Id == userId).ExecuteDeleteAsync(CancellationToken.None);
         }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task GlobalUserCreationEvidenceDoesNotCrossRollbackAfterSuccessOrFailedInsert(bool failInsert)
+    {
+        var token = TestContext.Current!.Execution.CancellationToken;
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options,
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        await using var migrator = new ExploreDbContext(options.Options);
+        migrator.BindTenantLease();
+        Guid userId = Guid.CreateVersion7();
+        Guid actorId = Guid.CreateVersion7();
+        try
+        {
+            string runtimeBefore = await ReadRuntimeBootstrapPrivileges(migrator, token);
+            await migrator.Database.OpenConnectionAsync(token);
+            await ManagedTenantWorkerCreationPermissionsNativeTests.EnsurePolicyProjectionAsync(migrator);
+            await PostgresProvisioningPolicyPermissions.ApplyAsync(migrator, fixture.NativeQueueEnrollment, token);
+            await PostgresTenantCreationPermissions.ApplyAsync(
+                migrator, fixture.NativeQueueEnrollment, IdentityDatabaseTopology.Colocated, token);
+            await PostgresManagedTenantWorkerCreationPermissions.ApplyAsync(
+                migrator, fixture.NativeQueueEnrollment, IdentityDatabaseTopology.Colocated, token);
+            if (failInsert)
+                await new UserRepository(migrator).Create(NewUser());
+            var factory = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+            await using var original = await factory.CreateDbContextAsync(token);
+            await original.Database.OpenConnectionAsync(token);
+            var connector = (NpgsqlConnection)original.Database.GetDbConnection();
+            int backend = connector.ProcessID;
+            await original.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+                await using var humanGate = new HumanSecuritySourceGate(original);
+                await using var humanLease = await humanGate.AcquireAsync(token);
+                await using var enrollmentGate = new EventDiscoveryEnrollmentGate(original);
+                await using var enrollmentLease = await enrollmentGate.AcquireAsync(token);
+                await using (var first = await original.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable, token))
+                {
+                    if (failInsert)
+                    {
+                        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                            new UserRepository(original).Create(NewUser()));
+                        await Assert.That(failure!.InnerException).IsTypeOf<DbUpdateException>();
+                        var update = (DbUpdateException)failure.InnerException!;
+                        await Assert.That(((PostgresException)update.InnerException!).SqlState)
+                            .IsEqualTo(PostgresErrorCodes.UniqueViolation);
+                    }
+                    else
+                    {
+                        await new UserRepository(original).Create(NewUser());
+                    }
+                    // No savepoint rollback or denied probe clears a successful receipt first.
+                    await first.RollbackAsync(CancellationToken.None);
+                }
+                original.ChangeTracker.Clear();
+                await using var replacement = await original.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable, token);
+                var denied = await Assert.ThrowsAsync<PostgresException>(() =>
+                    new ActorRepository(original).Create(new Actor
+                    {
+                        Id = actorId,
+                        UserId = userId,
+                        ActorTypeId = (int)ActorTypeEnum.User,
+                        ActorType = null!,
+                        Pii = new ActorPii { DisplayName = "Setup Administrator" },
+                        Description = null
+                    }));
+                await Assert.That(denied!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+                humanGate.RequireCurrent();
+                enrollmentGate.RequireCurrent();
+                await Assert.That(connector.ProcessID).IsEqualTo(backend);
+                await Assert.That(replacement.GetDbTransaction().Connection).IsSameReferenceAs(connector);
+                await replacement.RollbackAsync(CancellationToken.None);
+            });
+            await Assert.That(await migrator.Users.IgnoreAutoIncludes().AsNoTracking()
+                .AnyAsync(row => row.Id == userId, token)).IsEqualTo(failInsert);
+            await Assert.That(await migrator.Actors.IgnoreAutoIncludes().AsNoTracking()
+                .AnyAsync(row => row.Id == actorId, token)).IsFalse();
+            await Assert.That(await ReadRuntimeBootstrapPrivileges(migrator, token)).IsEqualTo(runtimeBefore);
+        }
+        finally
+        {
+            await migrator.Users.Where(row => row.Id == userId).ExecuteDeleteAsync(CancellationToken.None);
+        }
+
+        User NewUser() => new()
+        {
+            Id = userId,
+            Pii = new UserPii
+            {
+                Email = $"receipt-{userId:N}@example.test", FirstName = "Setup", LastName = "Administrator"
+            },
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            CreatedAt = DateTime.UtcNow
+        };
     }
 
     [Test]

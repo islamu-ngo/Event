@@ -253,6 +253,13 @@ revision-counter observation. Provision a fresh development worker permission
 profile through the native migration workflow; readiness rejects an older
 incomplete profile instead of expanding its rights during a request.
 
+Creating the administrator and its personal actor remains atomic even though
+the repositories save them separately. The later save recognizes the User row
+inserted successfully by the same transaction; Global does not need permission
+to update the User identifier. A save failure, savepoint rollback or replacement
+transaction invalidates that creation evidence. Existing-account fences remain
+required, and no additional credential or environment setting is needed.
+
 The migration service also installs fixed storage access for setup's twelve
 settings: deployment mode, branding, public/admin addresses, default language,
 public-experience content, default public home page and operator identity.

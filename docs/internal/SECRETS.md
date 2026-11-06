@@ -525,6 +525,15 @@ revision counters, but receives no additional Runtime or Local authority.
 Provision a fresh development profile through the native migration workflow;
 an older incomplete worker profile remains rejected rather than silently widened.
 
+User creation and personal-actor creation use separate repository saves within
+that original transaction. Disclosure capture records a User creation only after
+successful persistence and renewed source custody. The evidence retains the
+entity ID, connection and physical transaction; the later Actor save uses the
+insert's existing row lock instead of requesting a User primary-key UPDATE.
+Save failure or EF savepoint rollback invalidates the evidence, and a replacement
+transaction clears it. Existing-user dependency fences and explicit User
+mutation fences remain effective. Global receives no additional UPDATE rights.
+
 The completion proof checks the actual Migrator grantor, exact non-grantable
 column/table privileges, membership reach, mapped shape and disabled RLS on
 these instance relations. Existing native readers retain their dormant policies;

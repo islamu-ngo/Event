@@ -182,7 +182,7 @@ public sealed class InstanceOnboardingCompletionOperation(
 
         ConfiguredAdministratorProfile? administratorProfile =
             admission.Binding?.AdministratorProfile;
-        User? user = await userRepository.GetById(input.UserId);
+        User? user = await userRepository.GetForIdentityEnrollmentAsync(input.UserId, cancellationToken);
         if (user is null && !input.IsConfigured && input.LocalCredential is null
             && string.IsNullOrWhiteSpace(administratorProfile?.Email ?? input.Email))
         {
@@ -198,7 +198,7 @@ public sealed class InstanceOnboardingCompletionOperation(
 
         if (input.LocalCredential is { } local)
         {
-            Actor? actor = await actorRepository.GetActorByUserId(input.UserId);
+            Actor? actor = await actorRepository.GetForIdentityEnrollmentAsync(input.UserId, cancellationToken);
             UserExternalLogin? login = await externalLoginRepository.GetByProviderAndKey(
                 new ProviderAccountKey(AuthenticationProviderKind.Local, input.UserId.ToString("D")));
             bool exact = user is { IsDeleted: false } && actor is { IsDeleted: false, IsSuspended: false }

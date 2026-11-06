@@ -228,6 +228,12 @@ actor; changes to existing actors retain their normal classification checks.
 The writer can read the generated profile concurrency revision, but cannot read
 the private birth date or its collection receipt.
 
+Configured administrator completion uses its existing Global enrollment owner
+to read only user existence and personal actor binding/state. It does not load
+private user or actor profiles. This fits the existing permission profile and
+does not require granting Global full user/actor table access. Receipt and
+binding conflicts still stop completion.
+
 Only the migration service receives migration credentials; API runtime does not
 inherit them. Provision real database roles/grants separately: setup readiness
 is not proof of permission separation. Runtime must not have DDL, superuser or

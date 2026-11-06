@@ -496,6 +496,14 @@ It does not include `_dateOfBirth` or `_birthDateCollectionReceiptId`. Reading
 the revision preserves EF's original concurrency contract without exposing the
 private birth-date value or collection receipt.
 
+Onboarding completion retains its original Global enrollment owner and reads
+only the subject ID/deletion state and personal actor ID, user binding, type,
+deletion and suspension state through `GetForIdentityEnrollmentAsync`. These
+detached, scalar-only repository projections exclude private profiles, audit
+columns and related navigation graphs. They fit the existing fixed Global
+column inventory; no grants are added. The coordinator still checks the exact
+Local receipt, actor and external-login binding before completing setup.
+
 ## Instance Onboarding Keys
 
 The eight `INSTANCE_BOOTSTRAP_*` keys follow the same single-authority rule as

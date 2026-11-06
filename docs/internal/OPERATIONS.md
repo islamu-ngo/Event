@@ -13,6 +13,14 @@ A workflow correction on a PR branch does not replace the trusted-base version
 used by `pull_request_target`; arrange an independently reviewed base update
 before relying on its rerun.
 
+The source build pins SDK `10.0.403` and runtime/WASM `10.0.14`; all four
+application image recipes retain verified immutable Microsoft image digests.
+This replaces the SDK-selected vulnerable `Microsoft.DotNet.ILCompiler 10.0.10`
+reported by GHSA-p3jp-9v83-76w9. Regenerate affected locks through native restore
+and keep audit enabled. A trusted-base Release Impact run still uses the base
+branch SDK even when the PR head is patched; qualify an independently reviewed
+base update before treating that gate as repaired.
+
 ## Native browser prerequisites
 
 For native browser prerequisite failures, first distinguish installer restore

@@ -16,9 +16,11 @@ internal static class ActorPublisherCatalogProof
     internal static string CallerPrivilegeGuard(ExploreDbContext context, HumanPrincipalSourceSql names, IReadOnlyCollection<Type> sources,
         PostgresNativeQueueEnrollment enrollment, string diagnosticPrefix, bool allowRuntimeCatalogueRoleRead = false)
     {
-        if (allowRuntimeCatalogueRoleRead && sources.Contains(typeof(Role))
+        if (sources.Contains(typeof(SystemSetting))
+            || allowRuntimeCatalogueRoleRead && sources.Contains(typeof(Role))
             || sources.Any(type => PostgresTenantCreationPermissions.TryGetGlobalColumns(context, type, out _, out _)
                 || PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, type, out _, out _, out _)
+                || PostgresSetupLiveStoragePermissions.GlobalCompletionColumns(context, type).Length != 0
                 || PostgresTenantMembershipMutationPermissions.TryGetRuntimeColumns(context, type, out _, out _, out _)
                 || PostgresActorOwnershipReadPermissions.TryGetRuntimeReadColumns(context, type, out _)))
             return CatalogueAwareCallerPrivilegeGuard(context, names, sources, enrollment, diagnosticPrefix, allowRuntimeCatalogueRoleRead);
@@ -67,6 +69,9 @@ internal static class ActorPublisherCatalogProof
                 .Concat(update.Select(column => (column, Privilege: "UPDATE")))
                 .Select(grant => $"(t.oid={Text(names.Table(type))}::regclass AND a.attname={Text(grant.column)} AND permission.privilege={Text(grant.Privilege)})");
         }).ToArray();
+        string[] completionGrants = sources.SelectMany(type =>
+            PostgresSetupLiveStoragePermissions.GlobalCompletionColumns(context, type)
+                .Select(grant => $"(t.oid={Text(names.Table(type))}::regclass AND a.attname={Text(grant.Column)} AND permission.privilege={Text(grant.Privilege)})")).ToArray();
         string[] membershipReads = sources.SelectMany(type =>
         {
             PostgresUserTenantMembershipReadPermissions.TryGetGlobalReadColumns(context, type, out var read);
@@ -103,6 +108,21 @@ internal static class ActorPublisherCatalogProof
             string delete = login == enrollment.RuntimeLogin && sources.Contains(typeof(TenantUserProfile))
                 ? PostgresTenantMembershipMutationPermissions.RuntimeDeletePredicate(context, enrollment, "r.oid", "t.oid")
                 : "false";
+            bool completionIntersection = login == enrollment.GlobalLogin && completionGrants.Length != 0;
+            string completionGrant = completionIntersection ? $"""
+                r.rolname={Text(enrollment.GlobalLogin)} AND a.attnum>0
+                AND ({string.Join(" OR ", completionGrants)})
+                AND ({PostgresSetupLiveStoragePermissions.GlobalCompletionCataloguePredicate(context, enrollment)}) IS TRUE
+                """ : "false";
+            string[] completionDeletes = sources
+                .Where(type => type == typeof(UserIdentityEmailClaim) || type == typeof(UserIdentityEmailEvidence))
+                .Select(type => $"t.oid={Text(names.Table(type))}::regclass").ToArray();
+            if (completionIntersection && completionDeletes.Length != 0)
+                delete = $"""
+                    ({delete}) OR (r.rolname={Text(enrollment.GlobalLogin)}
+                        AND ({string.Join(" OR ", completionDeletes)})
+                        AND ({PostgresSetupLiveStoragePermissions.GlobalCompletionCataloguePredicate(context, enrollment)}) IS TRUE)
+                    """;
             string referenceRead = login == enrollment.RuntimeLogin && allowRuntimeCatalogueRoleRead && sources.Contains(typeof(Role)) ? $"""
                 t.oid = {role} AND r.rolname = {runtime} AND a.attnum > 0 AND a.attname = ANY({columns})
                 AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
@@ -166,6 +186,11 @@ internal static class ActorPublisherCatalogProof
                 """ : "false";
             string preferenceProof = preferenceIntersection
                 ? PostgresTenantPreferencePermissions.OptionalGlobalCataloguePredicate(context, enrollment) : "true";
+            string settingsGrant = login == enrollment.GlobalLogin && sources.Contains(typeof(SystemSetting)) ? $"""
+                r.rolname={Text(enrollment.GlobalLogin)} AND t.oid={Text(names.Table(typeof(SystemSetting)))}::regclass
+                AND a.attnum>0 AND permission.privilege IN ('SELECT','INSERT','UPDATE')
+                AND ({PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(context, enrollment)}) IS TRUE
+                """ : "false";
             return $"""
                 IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                     WHERE pg_catalog.pg_has_role({Text(login)},r.oid,'MEMBER')
@@ -181,7 +206,7 @@ internal static class ActorPublisherCatalogProof
                                     WHERE a.attrelid = t.oid AND a.attnum <> 0 AND NOT a.attisdropped
                                         AND (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege || ' WITH GRANT OPTION')
                                             OR (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege)
-                                                AND NOT ((permission.privilege='SELECT' AND ({referenceRead})) OR ({creatorGrant}) OR ({workerGrant}) OR ({membershipRead}) OR ({mutationGrant}) OR ({preferenceGrant})))))))
+                                                AND NOT ((permission.privilege='SELECT' AND ({referenceRead})) OR ({creatorGrant}) OR ({workerGrant}) OR ({completionGrant}) OR ({membershipRead}) OR ({mutationGrant}) OR ({preferenceGrant}) OR ({settingsGrant})))))))
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                         WHERE pg_catalog.pg_has_role({Text(login)},r.oid,'MEMBER')
                             AND pg_catalog.has_schema_privilege(r.oid,pg_catalog.to_regnamespace({Text(names.Schema)}),'CREATE'))
@@ -234,7 +259,8 @@ internal static class ActorPublisherCatalogProof
                 IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class t WHERE t.oid = pg_catalog.to_regclass({table})
                     AND t.relkind = 'r' AND t.relpersistence = 'p' AND NOT t.relispartition
                     AND t.relowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid
-                    AND t.relrowsecurity = {Boolean(tenant is not null)} AND t.relforcerowsecurity = {Boolean(tenant is not null)})
+                    AND ((t.relrowsecurity = {Boolean(tenant is not null)} AND t.relforcerowsecurity = {Boolean(tenant is not null)})
+                        {(type == typeof(SystemSetting) ? $"OR ({PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(context, enrollment)}) IS TRUE" : "")}))
                     OR (SELECT count(*) FROM pg_catalog.pg_attribute a WHERE a.attrelid = {table}::regclass
                         AND a.attnum > 0 AND NOT a.attisdropped) <> {entity.GetProperties().Count()}
                     OR {columns}

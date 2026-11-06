@@ -472,6 +472,104 @@ enumerate this metadata and erased-subject IDs; it still cannot read those
 private payloads. Existing partial profiles fail readiness rather than receiving
 an inferred union of grants; use a freshly provisioned development profile.
 
+Local credential creation also runs `GuardExistingSubjectAsync` on its original
+selected writer and Serializable transaction. The closed application-store
+inventory therefore includes SELECT on the fixed mapped columns of
+`ModerationRecognitionPending` and `ModerationRecognitionCaptureItem`. The guard
+must validate settlement state and complete original material before enrollment;
+it cannot substitute a different Global snapshot or ignore unavailable storage.
+These sources receive no INSERT, UPDATE or DELETE rights. Writer credential
+compromise can expose pending-recognition state, receipt hashes and captured
+recognition material within this read inventory; it still grants no saga payload
+or secret-binding access. Model/catalogue drift rejects admission.
+
+Initial actor creation does not require event-table access for classification
+stamping. A newly added actor cannot have persisted event or speaker ancestors;
+the stamp collector excludes those new actor IDs from persisted ancestor queries.
+Tracked event/session changes retain their own ancestry collection, and changes
+to existing actors or newly added profiles for existing actors retain lookup and
+stamp advancement. Do not widen the identity writer's event privileges to support
+an impossible ancestor read.
+
+The writer's `UserPii` SELECT inventory includes `_birthDateRevision`, the
+database-generated concurrency value returned by an initial profile insert.
+It does not include `_dateOfBirth` or `_birthDateCollectionReceiptId`. Reading
+the revision preserves EF's original concurrency contract without exposing the
+private birth-date value or collection receipt.
+
+Onboarding completion retains its original Global enrollment owner and reads
+only the subject ID/deletion state and personal actor ID, user binding, type,
+deletion and suspension state through `GetForIdentityEnrollmentAsync`. These
+detached, scalar-only repository projections exclude private profiles, audit
+columns and related navigation graphs. They fit the existing fixed Global
+column inventory; no grants are added. The coordinator still checks the exact
+Local receipt, actor and external-login binding before completing setup.
+
+Absent-user setup completion also needs its existing application identity
+effects on that same Global transaction. `ApplyAsync` installs a closed
+completion inventory before the worker permissions: saga SELECT is limited to
+`SubjectId`; identity-email claims and evidence admit their mapped SELECT,
+INSERT and DELETE operations; platform-role assignments admit SELECT and
+INSERT; the public Role lookup admits its six mapped properties. The
+coordinator uses `ExistsBySubjectAsync` and never loads saga receipts or workflow
+state for its anti-resurrection check. Saga writes, identity-email UPDATE,
+platform-role UPDATE/DELETE, private profile reads and grant options remain
+excluded. Ordinary Runtime receives no new rights.
+
+The Global worker-creation inventory also reads `_birthDateRevision` on `UserPii`.
+EF returns this database-generated concurrency value from the initial profile
+INSERT; INSERT permission alone cannot authorize PostgreSQL's RETURNING read.
+The fixed read inventory excludes `_dateOfBirth`, `_birthDateCollectionReceiptId`
+and all other profile fields. The original Global connector, source leases and
+Serializable transaction remain in force. A Global credential can observe these
+revision counters, but receives no additional Runtime or Local authority.
+Provision a fresh development profile through the native migration workflow;
+an older incomplete worker profile remains rejected rather than silently widened.
+
+The completion proof checks the actual Migrator grantor, exact non-grantable
+column/table privileges, membership reach, mapped shape and disabled RLS on
+these instance relations. Existing native readers retain their dormant policies;
+they do not change Global access while RLS remains disabled. Tenant and worker catalogue
+composition accepts the old baseline or the complete fixed profile; partial
+additional permissions are not an alternate readiness state. The trusted
+settings writer includes this proof in its original-owner completion checks.
+Pending credentials still precede the atomic application metadata/settings/
+administrator commit, followed by credential activation. This preserves the
+existing crash-recovery ordering rather than adding a separate identity-binding
+commit. Global's fixed credential reach includes these identity-email and
+platform-assignment operations; the accepted credential-compromise distinction
+remains the one documented in the application-owned persistence decision.
+
+`PostgresSetupLiveStoragePermissions.ApplyTrustedSettingsAsync` installs the
+setup settings storage profile after native source owners and the declared
+Local writer have been installed. The existing Global login receives column
+SELECT and INSERT on the thirteen mapped `SystemSetting` properties, with
+UPDATE on the nine value/metadata/update-audit properties. Identity, key and
+creation audit cannot be updated; table privileges, DELETE, REFERENCES and
+grant options remain denied. Forced RLS admits only the twelve compiled keys
+in `TrustedSetupSettingsWriter.Keys`, using byte-exact UTF-8 comparisons and
+the original null-tenant Global session. Paired permissive/restrictive policies
+retain that boundary without changing existing native owners' access.
+
+The coordinator observes operator-document presence through its trusted writer,
+not a full settings repository projection. Observation and effects retain the
+same context, backend, connection and Serializable transaction. PostgreSQL
+catalogue checks prove the exact column inventory, role footprint, owner and
+policy expressions before and after use; installation rejects partial or
+drifting profiles instead of repairing them. The source/receipt lease,
+create-only operator document check and completion fences remain C# authority.
+Database permission is data access, not an authenticated setup grant. A
+compromised Global credential can read or change these twelve settings directly;
+it does not gain access to unrelated private settings through this profile.
+The same fixed profile enrolls Global in the existing execute-only discovery
+disclosure role, with inheritance but no role switching or administration.
+Instance-setting saves already capture tenant dependencies and advance disclosure
+epochs on the original owner; this supplies the storage operations they require.
+No disclosure source-table privileges or owner-role membership are added.
+Catalogue admission proves the exact direct executor binding. Ordinary Runtime
+remains excluded. A compromised Global credential can also invoke those bounded
+dependency and epoch operations.
+
 ## Instance Onboarding Keys
 
 The eight `INSTANCE_BOOTSTRAP_*` keys follow the same single-authority rule as

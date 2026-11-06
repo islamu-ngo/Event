@@ -77,8 +77,9 @@ internal static class PostgresLocalIdentityWriterPermissions
                         await ExecuteAsync(context, $"GRANT DELETE ON {source.Table} TO {names.DelimitIdentifier(enrollment.WriterLogin)}", cancellationToken);
                     if (source.Type == typeof(SystemSetting))
                     {
-                        await PostgresLocalIdentitySystemSettingPolicies.InstallAsync(context, source.Table,
-                            enrollment.MigratorLogin, cancellationToken);
+                        if (await ScalarAsync(context, $"SELECT {PostgresLocalIdentitySystemSettingPolicies.Complete(source.Table, enrollment.MigratorLogin)}", cancellationToken) is not true)
+                            await PostgresLocalIdentitySystemSettingPolicies.InstallAsync(context, source.Table,
+                                enrollment.MigratorLogin, cancellationToken);
                         await ExecuteAsync(context, $"ALTER TABLE {source.Table} ENABLE ROW LEVEL SECURITY; ALTER TABLE {source.Table} FORCE ROW LEVEL SECURITY", cancellationToken);
                     }
                     if (source.RowSecurity)
@@ -277,6 +278,9 @@ internal static class PostgresLocalIdentityWriterPermissions
         string rowSecurity = source.Type == typeof(SystemSetting)
             ? complete ? "c.relrowsecurity AND c.relforcerowsecurity" : "NOT c.relrowsecurity AND NOT c.relforcerowsecurity"
             : source.RowSecurity ? "c.relrowsecurity AND c.relforcerowsecurity" : "NOT c.relrowsecurity AND NOT c.relforcerowsecurity";
+        if (!complete && source.Type == typeof(SystemSetting) && context is ExploreDbContext application
+            && enrollment.ApplicationGlobalLogin is { } global)
+            rowSecurity = $"({rowSecurity}) OR ({PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(application, global, enrollment.MigratorLogin)})";
         string policies = source.RowSecurity && complete
             ? string.Join(" AND ", new[] { ReadPolicy, ReadRestriction }.Select(policy =>
                 $"EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE {PolicyPredicate(context, source, enrollment.WriterLogin, policy)})"))

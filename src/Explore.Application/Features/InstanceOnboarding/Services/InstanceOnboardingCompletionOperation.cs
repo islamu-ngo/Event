@@ -36,7 +36,6 @@ public sealed class InstanceOnboardingCompletionOperation(
     IPrivacyErasureStateRepository privacyErasure,
     Explore.Application.Contracts.Identity.IIdentityAccountResolver identityResolver,
     Explore.Application.Services.IdentityEmailSynchronizationOperation identityEmailSynchronization,
-    ISystemSettingRepository systemSettingRepository,
     IEnumerable<IConfiguredAdministratorBootstrapProvider> configuredProviders,
     ISetupSecretProvider setupSecretProvider,
     IInstanceBootstrapAuditLogger auditLogger,
@@ -182,7 +181,7 @@ public sealed class InstanceOnboardingCompletionOperation(
 
         ConfiguredAdministratorProfile? administratorProfile =
             admission.Binding?.AdministratorProfile;
-        User? user = await userRepository.GetById(input.UserId);
+        User? user = await userRepository.GetForIdentityEnrollmentAsync(input.UserId, cancellationToken);
         if (user is null && !input.IsConfigured && input.LocalCredential is null
             && string.IsNullOrWhiteSpace(administratorProfile?.Email ?? input.Email))
         {
@@ -198,7 +197,7 @@ public sealed class InstanceOnboardingCompletionOperation(
 
         if (input.LocalCredential is { } local)
         {
-            Actor? actor = await actorRepository.GetActorByUserId(input.UserId);
+            Actor? actor = await actorRepository.GetForIdentityEnrollmentAsync(input.UserId, cancellationToken);
             UserExternalLogin? login = await externalLoginRepository.GetByProviderAndKey(
                 new ProviderAccountKey(AuthenticationProviderKind.Local, input.UserId.ToString("D")));
             bool exact = user is { IsDeleted: false } && actor is { IsDeleted: false, IsSuspended: false }
@@ -210,15 +209,15 @@ public sealed class InstanceOnboardingCompletionOperation(
         }
 
         var writes = new List<SystemSetting>();
+        var writer = setupSettingsWriter
+            ?? throw new InvalidOperationException("Setup completion requires its trusted settings writer.");
+        bool hasOperatorIdentity = await writer.HasOperatorIdentityAsync(unitOfWork, cancellationToken);
         if (input.IsConfigured && operatorIdentityOptions?.Value is { } options)
         {
             var (configuredIdentity, _) = InstanceOperatorIdentity.TryCreate(options, InstanceOperatorIdentityCapability.PaidCommerce);
             if (configuredIdentity is not null)
             {
-                SystemSetting? existingIdentitySetting = await systemSettingRepository.GetByKey(
-                    InstanceOperatorIdentitySettingKeys.OperatorIdentity,
-                    cancellationToken);
-                if (existingIdentitySetting is null)
+                if (!hasOperatorIdentity)
                 {
                     var settingsPayload = new InstanceOperatorIdentitySettings
                     {
@@ -250,8 +249,7 @@ public sealed class InstanceOnboardingCompletionOperation(
             }
         }
 
-        if (writes.Count == 0
-            && await systemSettingRepository.GetByKey(InstanceOperatorIdentitySettingKeys.OperatorIdentity, cancellationToken) is null)
+        if (writes.Count == 0 && !hasOperatorIdentity)
         {
             var draft = new InstanceOperatorIdentitySettings
             {
@@ -292,9 +290,7 @@ public sealed class InstanceOnboardingCompletionOperation(
                             || completed.CompletedIdentityFingerprint != admission.Binding.IdentityFingerprint))
                         throw new UnauthorizedAccessException("Setup completion lost its original terminal receipt.");
                 }, singleTenant ? PrepareDefaultTenant(admission.SiteProfile!.SiteName, input.UserId, input.CompletedAt) : null);
-        return await (setupSettingsWriter
-            ?? throw new InvalidOperationException("Setup completion requires its trusted settings writer."))
-            .ExecuteAsync(apply, cancellationToken);
+        return await writer.ExecuteAsync(apply, cancellationToken);
     }
 
     private async Task<PersistenceOutcome> PersistAdmittedAsync(
@@ -583,7 +579,7 @@ public sealed class InstanceOnboardingCompletionOperation(
             emailVerified = evidence?.EmailVerified ?? input.EmailVerified ?? false;
         }
 
-        if (await privacyErasure.GetBySubjectAsync(input.UserId, cancellationToken) is not null)
+        if (await privacyErasure.ExistsBySubjectAsync(input.UserId, cancellationToken))
             throw new InvalidOperationException("Erased identity metadata cannot be recreated.");
         var account = new ProviderAccountKey(providerKind, providerKey);
         bool canClaim = providerKind == AuthenticationProviderKind.Local;

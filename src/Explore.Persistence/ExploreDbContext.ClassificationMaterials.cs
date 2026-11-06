@@ -255,7 +255,12 @@ public partial class ExploreDbContext
                 bindingIds.UnionWith(Keys(entry, "RegistrationProviderBindingId"));
             else if (entry.Entity is Actor or Explore.Domain.ActorPii)
             {
-                var ids = Keys(entry, entry.Entity is Actor ? nameof(Actor.Id) : nameof(Explore.Domain.ActorPii.ActorId));
+                // Persisted descendants cannot reference an actor being inserted for the first time.
+                // Tracked event/session changes already contribute their own ancestry above.
+                var ids = Keys(entry, entry.Entity is Actor ? nameof(Actor.Id) : nameof(Explore.Domain.ActorPii.ActorId))
+                    .Where(id => !changed.Any(candidate => candidate.State == EntityState.Added
+                        && candidate.Entity is Actor actor && actor.Id == id)).ToArray();
+                if (ids.Length == 0) continue;
                 eventIds.UnionWith(Events.Where(row => ids.Contains(row.ActorId) || row.OrganizerActorId != null
                     && ids.Contains(row.OrganizerActorId.Value)).Select(row => row.Id));
                 sessionIds.UnionWith(Set<EventSessionSpeaker>().Where(row => ids.Contains(row.ActorId)).Select(row => row.EventSessionId));

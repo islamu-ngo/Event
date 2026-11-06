@@ -13,7 +13,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace Explore.Persistence.Schema;
 
 /// <summary>Fixed setup and bootstrap storage rights; admission, lifecycle and dispatch remain application-owned.</summary>
-public static class PostgresSetupLiveStoragePermissions
+public static partial class PostgresSetupLiveStoragePermissions
 {
     private static readonly string[] BootstrapProperties =
     [
@@ -178,6 +178,7 @@ public static class PostgresSetupLiveStoragePermissions
                 ];
                 string identityColumns = string.Join(',', identityProperties.Select(property =>
                     names.DelimitIdentifier(binding.FindProperty(property)!.GetColumnName(bindingStore)!)));
+                await ApplyGlobalCompletionAsync(context, enrollment, RequireOriginal, cancellationToken);
                 RequireOriginal();
                 await context.Database.ExecuteSqlRawAsync(
                     $"GRANT USAGE ON SCHEMA {names.DelimitIdentifier(bindingSchema)} TO {grantee}; GRANT SELECT ({identityColumns}) ON {names.DelimitIdentifier(bindingStore.Name, bindingSchema)} TO {grantee}",

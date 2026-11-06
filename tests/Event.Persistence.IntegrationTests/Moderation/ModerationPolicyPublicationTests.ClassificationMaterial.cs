@@ -124,7 +124,7 @@ public sealed partial class ModerationPolicyPublicationTests
         Func<ClassificationMaterialFixture, Task>? classificationControl, bool publicCalendar,
         params IInterceptor[] classificationControlObservers)
     {
-        await using var database = await Database.CreateAsync();
+        await using var database = await Database.CreateAsync(physicalFile: true);
         var clock = new DeploymentClock();
         var finalFlush = new MaterialFinalFlush();
         var flush = new MaterialFlushObserver { FinalFlush = finalFlush };
@@ -494,10 +494,12 @@ public sealed partial class ModerationPolicyPublicationTests
         ModerationClassificationMaterialSourceOwner Reader(ExploreDbContext db) => new(db,
             new ModerationPolicyDefinitionSourceOwner(db, admin, machine, database.Inventory, clock), clock);
         RecordModerationClassificationMaterialSource record;
+        (admin, machine) = DeploymentIdentity(context, database.AdminId);
         await using (var acquisition = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable))
         {
             var authority = await new ModerationQualificationAuthority(context, admin, machine)
                 .AcquireAsync(database.Scope, constitution.PublicationId, default);
+            await Assert.That(authority).IsNotNull();
             using var evidence = publications.BorrowConsumerEvidence(authority!, policy);
             var inventory = await Reader(context).AcquireInventoryAsync(evidence, acquisition.TransactionId,
                 eventGeneration.SourceId, taxonomy.TaxonomyId, constitution.ProfileId, constitution.Mode, mandate, Now, default);
@@ -805,9 +807,11 @@ public sealed partial class ModerationPolicyPublicationTests
             await Assert.That((await Writer(adopter).ExecuteAsync(end)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         }
         context.ChangeTracker.Clear();
+        (admin, machine) = DeploymentIdentity(context, database.AdminId);
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var currentAuthority = await new ModerationQualificationAuthority(context, admin, machine)
             .AcquireAsync(database.Scope, constitution.PublicationId, default);
+        await Assert.That(currentAuthority).IsNotNull();
         using var currentSession = publications.BorrowConsumerEvidence(currentAuthority!, policy);
         if (change == MaterialChange.DisposedSession) currentSession.Dispose();
         if (change == MaterialChange.RolledBackTransaction) await transaction.RollbackAsync();

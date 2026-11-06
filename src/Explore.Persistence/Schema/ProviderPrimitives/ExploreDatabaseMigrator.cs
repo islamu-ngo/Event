@@ -89,6 +89,8 @@ public static class ExploreDatabaseMigrator
                     IdentityDatabaseConfiguration.GetTopology(configuration),
                     LocalIdentityWriterInventory.Store.Application, cancellationToken);
             }
+            await PostgresSetupLiveStoragePermissions.ApplyTrustedSettingsAsync(executionDatabase,
+                PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
         }
         logger.LogInformation("Database migration operation {Operation} completed.", "ProviderAdjustments");
 

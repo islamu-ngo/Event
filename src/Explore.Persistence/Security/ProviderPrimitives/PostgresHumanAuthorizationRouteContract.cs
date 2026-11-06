@@ -20,7 +20,7 @@ public static class PostgresHumanAuthorizationRouteContract
     private const string Observe = "human_authorization_route_observe";
     private const string Acquire = "human_authorization_route_acquire";
     private const string Signature = "integer,uuid";
-    private const string ReadPolicy = "human_authorization_route_read";
+    internal const string ReadPolicy = "human_authorization_route_read";
     private const string Stamp = "human-authorization-route:v1:";
     private static readonly string[] Roles = [OwnerRole, MigratorRole, RuntimeRole, GlobalRole];
 

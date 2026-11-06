@@ -300,7 +300,7 @@ public sealed partial class LocalBootstrapConvergenceTests
                 logins, emails, privacyState,
                 new IdentityAccountResolver(Users, logins, emails, privacyState, Options.Create(new IdentityCorrelationOptions())),
                 new IdentityEmailSynchronizationOperation(emails),
-                Settings, [provider], setup, new ObservedAudit(events), deployment, metadata,
+                [provider], setup, new ObservedAudit(events), deployment, metadata,
                 NullLogger<InstanceOnboardingCompletionOperation>.Instance, owner, Generation, Configuration,
                 fence, new Explore.Persistence.Services.EventDiscoveryEnrollmentGate(Context), receipts, operatorOptions, writer);
             SaveProfile = new SaveInstanceOnboardingProfileCommandHandler(BootstrapRepository, Settings,

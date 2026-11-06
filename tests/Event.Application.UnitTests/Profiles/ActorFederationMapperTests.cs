@@ -668,6 +668,7 @@ public sealed class ActorFederationMapperTests
     private sealed class ActorStore(List<Actor> items) : Store<Actor, Guid>, IActorRepository
     {
         public List<Actor> Items { get; } = items;
+        public Task<Actor?> GetForIdentityEnrollmentAsync(Guid userId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Actor?> GetForModerationAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public override Task<Actor> Create(Actor entity)
         {
@@ -745,6 +746,7 @@ public sealed class ActorFederationMapperTests
 
     private sealed class UserStore : Store<User, Guid>, IUserRepository
     {
+        public Task<User?> GetForIdentityEnrollmentAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public override Task<bool> Exists(Guid id) => Task.FromResult(id == OwnerId);
         public Task<User?> GetLocalIdentityBindingAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<User?> GetLocalIdentityProfileAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();

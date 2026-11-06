@@ -111,4 +111,5 @@ internal static class LocalIdentityWriterInventory
 
     private static Source Application<T>(ImmutableArray<string> properties, ImmutableArray<string> update,
         bool allowDelete = false) => new(Store.Application, typeof(T), properties, properties, properties, update, allowDelete);
+
 }

@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6QZMRAS0JBDTVAQY519DHB4
+Title: "retain Global ownership through identity completion"
+Type: fix
+Scope: onboarding
+Summary: "Complete bootstrap identity-email synchronization and administrator assignment within the original Global transaction, using subject-only erasure checks and fixed storage rights without exposing private erasure state."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: "Permit subject-only erasure existence checks, identity-email synchronization, public role reads and administrator assignment inserts. Exact catalogue proofs reject excess privileges and partial-profile repair. Private saga and PII reads, saga mutations, administrator assignment updates/deletes and additional Runtime rights remain denied."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: "Run the native migrator to install the fixed Global completion profile. Investigate partial or modified permissions instead of widening grants. Global credentials retain the documented instance-wide identity-email and administrator-assignment storage reach; completion authority and recovery remain application-owned."

@@ -213,6 +213,66 @@ fences. A stolen writer credential can enumerate that metadata. Reprovision a
 fresh development permission profile when adopting this inventory; readiness
 rejects an older partial profile instead of silently expanding its permissions.
 
+Credential creation must also read pending recognition and its captured material
+before admitting enrollment. The application-store writer has fixed read-only
+access to that continuity inventory, including pending state and receipt hashes;
+it cannot insert, update or delete those records. A stolen writer credential can
+read this material. This does not grant Runtime or Global the writer's authority,
+or give the writer private erasure-saga payloads or secret bindings. Provision a
+fresh development writer profile for the expanded read inventory; a partial old
+profile remains rejected.
+
+Creating the initial actor does not grant this writer event-table access.
+Classification stamping avoids existing-event lookups for a newly inserted
+actor; changes to existing actors retain their normal classification checks.
+The writer can read the generated profile concurrency revision, but cannot read
+the private birth date or its collection receipt.
+
+Configured administrator completion uses its existing Global enrollment owner
+to read only user existence and personal actor binding/state. It does not load
+private user or actor profiles. This fits the existing permission profile and
+does not require granting Global full user/actor table access. Receipt and
+binding conflicts still stop completion.
+
+The same setup transaction can create the administrator's application identity,
+reconcile its verified email evidence and assign its platform role. Migrations
+install the fixed Global permissions for those operations. The erasure check
+reads only a subject identifier; it cannot expose private erasure receipts or
+change erasure state. This does not enable private profile reads or add ordinary
+Runtime permissions. Credentials remain inactive until authoritative setup
+completion commits and activation reconciles, including after a restart.
+Protect Global against direct changes to its admitted email-evidence and
+platform-role records as well as instance settings. No new connection credential
+or environment variable is required.
+
+Initial application-profile creation also returns a database-generated
+concurrency revision. Global can read this counter so the insert can complete;
+the person's birth date, collection receipt and other private profile fields
+remain unreadable through that grant. Protect Global credentials against
+revision-counter observation. Provision a fresh development worker permission
+profile through the native migration workflow; readiness rejects an older
+incomplete profile instead of expanding its rights during a request.
+
+The migration service also installs fixed storage access for setup's twelve
+settings: deployment mode, branding, public/admin addresses, default language,
+public-experience content, default public home page and operator identity.
+Global can read and create these rows and update their values and descriptive
+metadata. It cannot rename or delete them, alter creation audit, or read unrelated
+private settings through this access. PostgreSQL row policies preserve that
+boundary; existing native settings editors retain their separate permissions.
+Setup still requires its real credential receipt and source checks. A stolen
+Global database credential could change these twelve settings directly, so
+protect and rotate it as an application credential.
+Global also receives the existing execute-only discovery operations needed to
+refresh tenant disclosure after an instance-setting change. This does not grant
+access to discovery source tables or admit ordinary Runtime to those operations.
+Protecting Global also protects those dependency and epoch operations.
+
+Migrations and setup refuse an incomplete or modified settings permission
+profile. Investigate permission drift rather than granting Global blanket
+settings-table access. No additional credential or environment variable is
+required.
+
 Only the migration service receives migration credentials; API runtime does not
 inherit them. Provision real database roles/grants separately: setup readiness
 is not proof of permission separation. Runtime must not have DDL, superuser or

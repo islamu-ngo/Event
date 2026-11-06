@@ -1,7 +1,11 @@
 using System.Data;
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Event.Persistence.IntegrationTests.TenantIsolation;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Services;
 using Explore.Domain;
@@ -17,6 +21,7 @@ using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 
 namespace Event.Persistence.IntegrationTests.Repositories;
@@ -27,6 +32,137 @@ public sealed class VisitorAccessSettingsWriterNativeAuthorityTests(PostgreSqlCo
 {
     private const string ModeKey = GovernanceSettingKeys.PublicExperience.VisitorAccessMode;
     private const string Conflict = "visitor_access_account_required_conflict";
+
+    [Test]
+    public async Task PreparedVisitorCannotBorrowCallerTransactionOrWrite()
+    {
+        await PrepareColocatedAuthorityAsync();
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(OpenInstanceMigrator, fixture);
+        await authenticated.RunAsync(null, async session =>
+        {
+            var preparation = session.Services.GetRequiredService<IHumanSettingsMutationPreparation>();
+            var prepared = await preparation.PrepareVisitorAsync(
+                [new(null, ModeKey, VisitorAccessSettingMutationKind.SetValue, "\"AnonymousOnly\"")],
+                SettingsMutationOperation.InstanceSettings, session.ActorId);
+            bool entered = false;
+            var context = session.Services.GetRequiredService<ExploreDbContext>();
+            try
+            {
+                return await session.Services.GetRequiredService<ISettingMutationLock>()
+                    .ExecuteOrderedGroupsAsync([VisitorAccessCapabilityResolver.AuthoritySettingKeys], async token =>
+                {
+                    await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, token);
+                    await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                        preparation.ExecutePreparedAsync(prepared, (_, _) =>
+                        {
+                            entered = true;
+                            return Task.FromResult(true);
+                        }, token));
+                    await Assert.That(entered).IsFalse();
+                    await Assert.That(context.Database.CurrentTransaction).IsEqualTo(transaction);
+                    await transaction.RollbackAsync(token);
+                    return true;
+                });
+            }
+            finally { await preparation.CloseAsync(prepared, null); }
+        });
+    }
+
+    [Test]
+    public async Task PreparedVisitorRejectsSubstitutedEffectsWithoutWriting()
+    {
+        await PrepareColocatedAuthorityAsync();
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(OpenInstanceMigrator, fixture);
+        await authenticated.RunAsync(PlatformDefaults.DefaultTenantId, async session =>
+        {
+            var preparation = session.Services.GetRequiredService<IHumanSettingsMutationPreparation>();
+            var mutations = ImmutableArray.Create(new VisitorAccessSettingMutation(
+                PlatformDefaults.DefaultTenantId, ModeKey, VisitorAccessSettingMutationKind.SetValue,
+                "\"FullRegistrationAndAuth\""));
+            var prepared = await preparation.PrepareVisitorAsync(mutations,
+                SettingsMutationOperation.TenantSettings, session.ActorId);
+            try
+            {
+                return await session.Services.GetRequiredService<ISettingMutationLock>()
+                    .ExecuteOrderedGroupsAsync([VisitorAccessCapabilityResolver.AuthoritySettingKeys], lockToken =>
+                    preparation.ExecutePreparedAsync(prepared, async (_, token) =>
+                {
+                    var visitor = (IHumanVisitorSettingsPreparation)preparation;
+                    var original = visitor.CurrentVisitorOriginal!;
+                    var store = visitor.CurrentVisitorStore!;
+                    var substituted = new VisitorSettingsOriginal(original.Command, original.Effects,
+                        original.Subject, original.TenantId, original.AuditActor, original.OccurredAt);
+                    await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                        store.ReadSnapshotAsync(substituted, token));
+                    var anotherTenant = new VisitorSettingsOriginal(original.Command, original.Effects,
+                        original.Subject, Guid.CreateVersion7(), original.AuditActor, original.OccurredAt);
+                    await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                        store.ReadSnapshotAsync(anotherTenant, token));
+                    await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                        session.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyAsync(
+                            [mutations[0] with { Value = "\"AnonymousOnly\"" }],
+                            session.Services.GetRequiredService<IHumanCommitScopePreparation>().Subject!,
+                            SettingsMutationOperation.TenantSettings, session.ActorId, token));
+                    var accepted = await session.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyAsync(
+                        mutations, session.Services.GetRequiredService<IHumanCommitScopePreparation>().Subject!,
+                        SettingsMutationOperation.TenantSettings, session.ActorId, token);
+                    await Assert.That(accepted.Success).IsTrue();
+                    return true;
+                }, lockToken));
+            }
+            finally { await preparation.CloseAsync(prepared, null); }
+        });
+        var inspectOptions = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(inspectOptions,
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        await using var inspect = new ExploreDbContext(inspectOptions.Options)
+        {
+            TenantContext = new NativeTenant(PlatformDefaults.DefaultTenantId)
+        };
+        inspect.BindTenantLease();
+        await Assert.That((await inspect.TenantSettingOverrides.SingleAsync(row =>
+            row.TenantId == PlatformDefaults.DefaultTenantId && row.SettingKey == ModeKey)).Value)
+            .IsEqualTo("\"FullRegistrationAndAuth\"");
+    }
+
+    [Test]
+    public async Task PreparedVisitorCannotReplayAfterItsPhysicalAttempt()
+    {
+        await PrepareColocatedAuthorityAsync();
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(OpenInstanceMigrator, fixture);
+        await authenticated.RunAsync(null, async session =>
+        {
+            var preparation = session.Services.GetRequiredService<IHumanSettingsMutationPreparation>();
+            var mutations = ImmutableArray.Create(new VisitorAccessSettingMutation(
+                null, ModeKey, VisitorAccessSettingMutationKind.SetValue, "\"FullRegistrationAndAuth\""));
+            var prepared = await preparation.PrepareVisitorAsync(mutations,
+                SettingsMutationOperation.InstanceSettings, session.ActorId);
+            VisitorSettingsOriginal? retainedOriginal = null;
+            IVisitorSettingsOriginalStore? retainedStore = null;
+            try
+            {
+                await session.Services.GetRequiredService<ISettingMutationLock>()
+                    .ExecuteOrderedGroupsAsync([VisitorAccessCapabilityResolver.AuthoritySettingKeys], lockToken =>
+                    preparation.ExecutePreparedAsync(prepared, async (_, token) =>
+                {
+                    var visitor = (IHumanVisitorSettingsPreparation)preparation;
+                    retainedOriginal = visitor.CurrentVisitorOriginal!;
+                    retainedStore = visitor.CurrentVisitorStore!;
+                    var result = await session.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyAsync(
+                        mutations, session.Services.GetRequiredService<IHumanCommitScopePreparation>().Subject!,
+                        SettingsMutationOperation.InstanceSettings, session.ActorId, token);
+                    await Assert.That(result.Success).IsTrue();
+                    return true;
+                }, lockToken));
+                await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    preparation.ExecutePreparedAsync(prepared, (_, _) => Task.FromResult(true)));
+                await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                    retainedStore!.ReadSnapshotAsync(retainedOriginal!, CancellationToken.None));
+                return true;
+            }
+            finally { await preparation.CloseAsync(prepared, null); }
+        });
+    }
 
     [Test]
     [Arguments("FullRegistrationAndAuth", false, true)]
@@ -303,6 +439,8 @@ public sealed class VisitorAccessSettingsWriterNativeAuthorityTests(PostgreSqlCo
             await Assert.That(writable).IsFalse();
         }
     }
+
+    private sealed record NativeTenant(Guid TenantId) : Explore.Application.Contracts.Infrastructure.ITenantContext;
 
     private async Task PrepareColocatedAuthorityAsync()
     {

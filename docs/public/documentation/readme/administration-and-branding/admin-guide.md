@@ -97,6 +97,16 @@ together; late grant, binding or credential changes roll both back and retain
 other tenants. Slug-cache refresh occurs after acknowledged deletion.
 These authored controls await executable security-programme assurance.
 
+### Native visitor settings storage
+
+Visitor-policy changes use their original authorized settings transaction.
+The PostgreSQL migration installer also installs the fixed storage catalog
+and application execution grants needed by this path. Run the normal migration
+process with the selected Migrator authority during an upgrade. An incomplete
+catalog or missing grant blocks the operation; repairing the installation
+does not require giving the application direct settings-table write access.
+Authorization and policy decisions remain in Event.
+
 ### Registration provider connections
 
 Creating or updating a provider connection, replacing approved origins and

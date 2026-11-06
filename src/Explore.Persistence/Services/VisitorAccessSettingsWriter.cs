@@ -36,6 +36,13 @@ public sealed class VisitorAccessSettingsWriter : IVisitorAccessSettingsWriter
     private readonly IHumanSettingsMutationPreparation? settingsPreparation;
     private readonly IHumanConfigurationImportAdmission? importAdmission;
     private ProviderConfigurationSettingsWriter.ProviderHandoff? validatedProvider;
+    private VisitorSettingsOriginal? validatedOriginal;
+
+    internal void RequireOriginalValidated(VisitorSettingsOriginal original)
+    {
+        if (!ReferenceEquals(validatedOriginal, original))
+            throw new UnauthorizedAccessException("The actual visitor validator must admit its original data callback.");
+    }
 
     internal async Task<VisitorAccessSettingsWriteResult> ApplyPlanAsync(
         TypedSettingsOriginalStore plan, CancellationToken token)
@@ -137,18 +144,29 @@ public sealed class VisitorAccessSettingsWriter : IVisitorAccessSettingsWriter
             }, mutation.Value, mutation.IsLocked)).ToImmutableArray();
         if (context.Database.CurrentTransaction is not null)
             return await preparation.ExecuteCurrentJoinedAsync(effects,
-                (_, token) => ApplyCoreAsync(mutations, subject, operation, actorUserId, token), cancellationToken);
+                (_, token) => ApplyPreparedCoreAsync(mutations, subject, operation, actorUserId, token), cancellationToken);
         var prepared = await preparation.PrepareVisitorAsync(mutations, operation, actorUserId, cancellationToken);
         Exception? primaryFailure = null;
         try
         {
             return await mutationLock.ExecuteOrderedGroupsAsync([VisitorAccessCapabilityResolver.AuthoritySettingKeys],
                 token => preparation.ExecutePreparedAsync(prepared,
-                    (_, inner) => ApplyCoreAsync(mutations, subject, operation, actorUserId, inner), token),
+                    (_, inner) => ApplyPreparedCoreAsync(mutations, subject, operation, actorUserId, inner), token),
                 cancellationToken);
         }
         catch (Exception failure) { primaryFailure = failure; throw; }
         finally { await preparation.CloseAsync(prepared, primaryFailure); }
+    }
+
+    private async Task<VisitorAccessSettingsWriteResult> ApplyPreparedCoreAsync(
+        ImmutableArray<VisitorAccessSettingMutation> mutations, HumanCommitSubject subject,
+        SettingsMutationOperation operation, Guid? actor, CancellationToken token)
+    {
+        var result = await ApplyCoreAsync(mutations, subject, operation, actor, token);
+        if (!result.Success && settingsPreparation is IHumanVisitorSettingsPreparation
+            { CurrentVisitorOriginal: { } original, CurrentVisitorStore: { } store })
+            await store.RefuseAsync(original, token);
+        return result;
     }
 
     public async Task<VisitorAccessSettingsWriteResult> ApplyInternalAsync(
@@ -241,6 +259,15 @@ public sealed class VisitorAccessSettingsWriter : IVisitorAccessSettingsWriter
             return new(true, null, []);
         var providerHandoff = mixed is null && plan is null
             ? ProviderConfigurationSettingsWriter.GetHandoff(context, mutations, subject, actorUserId) : null;
+        var visitorPreparation = settingsPreparation as IHumanVisitorSettingsPreparation;
+        var visitorOriginal = mixed is null && plan is null && providerHandoff is null
+            ? visitorPreparation?.CurrentVisitorOriginal : null;
+        var visitorStore = visitorOriginal is null ? null : visitorPreparation!.CurrentVisitorStore
+            ?? throw new UnauthorizedAccessException("The original visitor data store is required.");
+        if (subject is not null && mixed is null && plan is null && providerHandoff is null
+            && operation != SettingsMutationOperation.ConfigurationTenantImport && visitorOriginal is null)
+            throw new UnauthorizedAccessException("A human visitor mutation requires its original data producer.");
+        var visitorSnapshot = visitorOriginal is null ? null : await visitorStore!.ReadSnapshotAsync(visitorOriginal, token);
         string[] keys = VisitorAccessCapabilityResolver.AuthoritySettingKeys.ToArray();
         bool instanceChanged = mutations.Any(mutation => mutation.TenantId is null);
         if (context.ChangeTracker.Entries<SystemSetting>().Any(entry => keys.Contains(entry.Entity.SettingKey)
@@ -255,6 +282,7 @@ public sealed class VisitorAccessSettingsWriter : IVisitorAccessSettingsWriter
             ? mixed.Rows<SystemSetting>().Where(row => keys.Contains(row.SettingKey))
                 .ToDictionary(row => row.SettingKey, StringComparer.Ordinal)
             : providerHandoff is not null ? providerHandoff.Systems
+            : visitorSnapshot is not null ? visitorSnapshot.Systems.ToDictionary(row => row.SettingKey, StringComparer.Ordinal)
             : await context.SystemSettings.AsNoTracking()
                 .Where(row => keys.Contains(row.SettingKey)).ToDictionaryAsync(row => row.SettingKey, token);
         var overrides = (RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql) && instanceChanged
@@ -264,13 +292,17 @@ public sealed class VisitorAccessSettingsWriter : IVisitorAccessSettingsWriter
             ? plan.PlanRows<TenantSetting>().Where(row => keys.Contains(row.SettingKey)).ToList()
             : mixed is not null
             ? mixed.Rows<TenantSetting>().Where(row => keys.Contains(row.SettingKey)).ToList()
-            : providerHandoff is not null ? providerHandoff.Tenants : await overrides
+            : providerHandoff is not null ? providerHandoff.Tenants
+            : visitorSnapshot is not null ? visitorSnapshot.Tenants.ToList() : await overrides
             .IgnoreTenantFilter(TenantFilterBypassReasons.VisitorPolicyAuthorityInheritanceSafetyRead)
             .AsNoTracking().Where(row => keys.Contains(row.SettingKey)).ToListAsync(token);
         var tenantRows = tenants.ToDictionary(row => (row.TenantId, row.SettingKey));
         var writes = new List<(object Entity, EntityState State)>();
         var notifications = ImmutableArray.CreateBuilder<SettingChangedNotification>();
-        DateTime now = plan?.PlanOccurredAt ?? mixed?.OccurredAt ?? providerHandoff?.Mutation.OccurredAt ?? DateTime.UtcNow;
+        DateTime now = plan?.PlanOccurredAt ?? mixed?.OccurredAt ?? providerHandoff?.Mutation.OccurredAt
+            ?? visitorOriginal?.OccurredAt ?? DateTime.UtcNow;
+        if (visitorOriginal is not null)
+            actorUserId = visitorOriginal.AuditActor;
         foreach (var mutation in mutations.OrderBy(mutation => mutation.TenantId.HasValue))
         {
             SettingDefinition definition = SettingRegistry.Get(mutation.Key)!;
@@ -290,7 +322,7 @@ public sealed class VisitorAccessSettingsWriter : IVisitorAccessSettingsWriter
                 bool created = row is null;
                 row ??= new TenantSetting
                 {
-                    Id = Guid.CreateVersion7(),
+                    Id = visitorOriginal?.NewIds[mutation.Key] ?? Guid.CreateVersion7(),
                     TenantId = tenantId,
                     Tenant = null!,
                     SettingKey = mutation.Key,
@@ -325,7 +357,7 @@ public sealed class VisitorAccessSettingsWriter : IVisitorAccessSettingsWriter
                 bool created = row is null;
                 row ??= providerHandoff?.Canonical(mutation.Key) ?? new SystemSetting
                 {
-                    Id = Guid.CreateVersion7(),
+                    Id = visitorOriginal?.NewIds[mutation.Key] ?? Guid.CreateVersion7(),
                     SettingKey = mutation.Key,
                     Value = definition.DefaultValue,
                     ValueType = definition.ValueType,
@@ -357,7 +389,9 @@ public sealed class VisitorAccessSettingsWriter : IVisitorAccessSettingsWriter
         // Global validation stays on the owning serializable transaction, including caller-owned writes.
         var affected = plan is not null ? plan.PlanAccountRequiredTenants()
             : mixed is not null ? mixed.AccountRequiredTenants()
-            : providerHandoff is not null ? providerHandoff.Affected : (RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql) && instanceChanged
+            : providerHandoff is not null ? providerHandoff.Affected
+            : visitorSnapshot is not null ? visitorSnapshot.AccountRequiredTenantIds.ToList()
+            : (RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql) && instanceChanged
             ? await VisitorPolicyAuthorityQueries.AccountRequiredTenantsAsync(context, token)
             : (await participation.GetAccountRequiredAsync(
                 !instanceChanged && affectedTenantIds.Count == 1 ? affectedTenantIds.Single() : null, token))
@@ -366,7 +400,8 @@ public sealed class VisitorAccessSettingsWriter : IVisitorAccessSettingsWriter
         try
         {
             providers = AuthProviderConfigurationService.ProjectVisitorProviders(systems,
-                plan?.PlanDeployment ?? mixed?.Deployment ?? providerHandoff?.Mutation.Source.Deployment ?? configuration);
+                plan?.PlanDeployment ?? mixed?.Deployment ?? providerHandoff?.Mutation.Source.Deployment
+                    ?? visitorSnapshot?.Deployment ?? configuration);
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException)
         {
@@ -399,6 +434,17 @@ public sealed class VisitorAccessSettingsWriter : IVisitorAccessSettingsWriter
             validatedProvider = providerHandoff;
             try { return await providerHandoff.ApplyValidatedAsync(this, systems, notifications.ToImmutable(), token); }
             finally { validatedProvider = null; }
+        }
+        if (visitorOriginal is not null)
+        {
+            validatedOriginal = visitorOriginal;
+            try
+            {
+                await visitorStore!.ApplyValidatedAsync(visitorOriginal, this,
+                    writes.Select(write => (write.Entity, write.State == EntityState.Deleted)).ToImmutableArray(), token);
+            }
+            finally { validatedOriginal = null; }
+            return new(true, null, notifications.ToImmutable());
         }
 
         // No persistent or tracked state is changed until every affected scope has passed.

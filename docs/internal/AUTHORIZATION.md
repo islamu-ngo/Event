@@ -526,6 +526,33 @@ remain separate storage effects: resource value upsert does not implicitly
 unlock a row. Fixture migrations exercise actual producers and rollback rather
 than authorizing a write by naming an import operation.
 
+`HumanSettingsMutationPreparation` observes a distinct `VisitorSettingsOriginal`
+for the actual scalar command or standalone visitor envelope while idle.
+`VisitorSettingsOriginalStore` retains that command, its immutable effects,
+subject, tenant, audit actor, canonical IDs and occurrence time. Acquisition
+keeps the original context lease, connector, credential lifetime and
+Serializable transaction. The detached snapshot includes authority settings,
+applicable tenant overrides, live account-required participation and nonsecret
+provider deployment inputs. Mixed, plan, provider and import producers retain
+their own originals.
+
+After C# policy validation, the store independently compiles and compares the
+canonical row changes before persistence. Terminal validation requires either
+those exact changes or an unchanged refusal. Source replacement, replay,
+transaction substitution and closed lifetimes cannot supply another original.
+The row port avoids `SaveChanges` flushing unrelated tracked state. It uses EF
+provider parameter mappings for ordinary relational commands; PostgreSQL's
+fixed read/write functions supply the storage privileges unavailable to its
+selected Runtime/Global connection.
+
+The privileged installer creates the PostgreSQL catalog and grants its two
+function entry points directly to the enrolled application logins, retaining
+the purpose marker roles and their non-inheriting boundaries. It does not grant
+those logins direct table DML. Catalog shape is checked before use. These
+database credentials can invoke the fixed storage ports; credential-only
+compromise is therefore a separate trust boundary from C# authorization, as
+accepted in the application-owned persistence decision.
+
 ### Current human Cerbos principal inputs
 
 `CerbosPrincipalBuilder` obtains human policy inputs through

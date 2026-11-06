@@ -318,6 +318,7 @@ public static class ExploreDatabaseMigrator
             await PostgresProviderConfigurationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresMixedSettingsContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresOrdinarySettingsContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresVisitorSettingsStorage.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresLocalizationSecretStatusReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresTenantPreferencePermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresUserTenantNavigationReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);

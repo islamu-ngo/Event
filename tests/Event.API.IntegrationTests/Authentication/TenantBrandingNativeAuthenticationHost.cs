@@ -265,6 +265,13 @@ internal sealed class TenantBrandingNativeAuthenticationHost(
             CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         // No external storage credential is provisioned by this Local signing authority.
+        public Task<RetainedSecretReference?> CaptureInstanceAsync(
+            string settingKey, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<RetainedSecretReference?>(null);
+        }
+
         public Task<RetainedSecretReference> CaptureAsync(
             string settingKey, Guid tenantId, CancellationToken cancellationToken) =>
             throw new InvalidOperationException("storage_secret_unavailable");

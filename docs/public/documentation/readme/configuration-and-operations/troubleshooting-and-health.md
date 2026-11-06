@@ -1808,6 +1808,14 @@ or expanded Runtime permission. Its output contains configuration flags and
 secret-resolution states, not provider URLs or credentials. Tenant-specific
 connection tests remain available through the authorized integration API.
 
+The `storage` entry resolves the instance storage policy without a selected
+request tenant. Instance locks, upload ceilings and provider selection remain
+effective. When the default provider uses S3 autodetection, only instance S3
+settings and instance-owned credentials determine that result; a tenant's S3
+configuration cannot change instance readiness. No new credential or Runtime
+database permission is required. Tenant storage operations continue to apply
+their permitted overrides.
+
 ### Optional Email Readiness
 
 | Situation | Health result | Operator action |

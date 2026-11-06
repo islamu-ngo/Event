@@ -81,6 +81,22 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
         return RetainedSecretReference.Capture(binding, _provider.ToString(), _authorityEndpoint, _authorityProject);
     }
 
+    public async Task<RetainedSecretReference?> CaptureInstanceAsync(
+        string settingKey, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingKey);
+        cancellationToken.ThrowIfCancellationRequested();
+        var binding = await ResolveBindingAsync(settingKey, null, cancellationToken).ConfigureAwait(false);
+        if (binding is null)
+            return null;
+        if (binding.Scope != SecretScope.Instance || binding.ScopeId is not null
+            || SelectedSourceType() != binding.SourceType
+            || !SecretBindingAdmission.AllowsBinding(binding, SecretAcquisitionPolicy.Roots(_consumer), _infisicalEnvironment))
+            throw new InvalidOperationException("storage_secret_unavailable");
+
+        return RetainedSecretReference.Capture(binding, _provider.ToString(), _authorityEndpoint, _authorityProject);
+    }
+
     public async Task<SecretResolutionResult> ResolveAsync(
         RetainedSecretReference reference, CancellationToken cancellationToken)
     {

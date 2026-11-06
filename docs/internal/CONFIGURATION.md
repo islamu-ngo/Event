@@ -1384,6 +1384,33 @@ Admin-host classification runs after trusted forwarded-header processing. Revers
 
 ### Storage Static Configuration
 
+`StoragePolicyResolver` reads the instance policy image through
+`IInstanceSystemSettingsReader` on its independent Global context. The shared
+settings merge preserves defaults, locks, delegation and the instance upload
+ceiling; permitted tenant overrides still use the selected Runtime tenant reader.
+The `storage` process health check can therefore resolve instance policy without
+selecting a request tenant or expanding Runtime permissions.
+
+Default-provider S3 detection uses the explicit `IInstanceS3ConfigResolver`
+capability. It resolves ordinary instance S3 fields through the same instance
+reader and credentials through `ISecretResolver` with a null tenant owner.
+It cannot adopt the requesting tenant's S3 configuration or cache entry.
+`S3ConfigResolver` is shared by the two scoped ports; its instance cache entry
+is separate from tenant entries, and instance invalidation clears all entries
+while generation checks prevent stale in-flight publication. Existing tenant
+S3 resolution and retained storage bindings keep their original scope.
+
+Storage probes retain separate instance-readiness and tenant-transport evidence.
+`IRetainedSecretResolver.CaptureInstanceAsync` captures only an instance reference
+and authority coordinates; it performs no external secret read while the native
+source owner holds locks. After that owner returns idle, the probe resolves both
+retained reference pairs without selecting current bindings or using the S3
+configuration cache. Its captured instance rows and instance readiness feed the
+policy resolver; only the original tenant configuration reaches the transport.
+Each handoff rechecks both credential material/revision witnesses and the original
+source image. An unconfigured instance value remains a captured unconfigured
+observation; invalid or unavailable resolution fails closed.
+
 Local-first storage is deployment-managed. The filesystem root is bound from static configuration and is not a tenant/admin database setting.
 
 | Key | Default | Description |

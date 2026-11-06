@@ -38,6 +38,37 @@ public sealed class StorageProbeNativeAuthenticationTests(PostgreSqlContainerFix
     }
 
     [Test]
+    [Arguments("material")]
+    [Arguments("revision")]
+    public async Task InstanceReadinessDriftCannotBeHiddenByUnchangedTenantTransport(string change)
+    {
+        await using var fixture = await StorageProbeNativeFixture.CreateAsync(postgres, "instance");
+        await using (var seed = postgres.CreateDbContext())
+        {
+            seed.SecretBindings.AddRange(
+                SecretBinding.CreateEnvironmentVariable(SecretDefinitionRegistry.Keys.Storage.AccessKeyId,
+                    SecretScope.Tenant, fixture.Tenant, "PROBE_TENANT_ACCESS"),
+                SecretBinding.CreateEnvironmentVariable(SecretDefinitionRegistry.Keys.Storage.SecretAccessKey,
+                    SecretScope.Tenant, fixture.Tenant, "PROBE_TENANT_SECRET"));
+            await seed.SaveChangesAsync();
+        }
+        fixture.Remote.InstanceCredential = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        fixture.Remote.InstanceRevision = Guid.CreateVersion7().ToString("N");
+        fixture.Remote.AfterVersioning = () =>
+        {
+            if (change == "material")
+                fixture.Remote.InstanceCredential = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            else
+                fixture.Remote.InstanceRevision = Guid.CreateVersion7().ToString("N");
+            return Task.CompletedTask;
+        };
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => ExecuteAsync(fixture, "instance"));
+        await Assert.That(fixture.Remote.Puts).IsEqualTo(0);
+        await Assert.That(fixture.Remote.Deletes).IsEqualTo(0);
+    }
+
+    [Test]
     [Arguments("setting-metadata")]
     [Arguments("setting-replacement")]
     [Arguments("absent-binding")]

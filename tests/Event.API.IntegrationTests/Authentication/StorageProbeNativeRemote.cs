@@ -22,6 +22,8 @@ internal sealed class StorageProbeNativeRemote(PostgreSqlContainerFixture postgr
     internal ExploreDbContext? Owner { get; set; }
     internal string Credential { get; set; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     internal string Revision { get; set; } = Guid.CreateVersion7().ToString("N");
+    internal string? InstanceCredential { get; set; }
+    internal string? InstanceRevision { get; set; }
     internal Func<Task>? AfterVersioning { get; set; }
     internal Func<Task>? AfterPut { get; set; }
     internal Func<Task>? AfterDelete { get; set; }
@@ -53,8 +55,10 @@ internal sealed class StorageProbeNativeRemote(PostgreSqlContainerFixture postgr
         await RequireReleasedAsync();
         SecretReads++;
         if (DuringSecretResolution is { } callback) await callback();
-        return SecretResolutionResult.Resolved(new ResolvedSecret(binding.SettingKey, Credential,
-            SourceType, binding.Scope, binding.ScopeId, DateTimeOffset.UtcNow, Revision));
+        return SecretResolutionResult.Resolved(new ResolvedSecret(binding.SettingKey,
+            binding.Scope == SecretScope.Instance ? InstanceCredential ?? Credential : Credential,
+            SourceType, binding.Scope, binding.ScopeId, DateTimeOffset.UtcNow,
+            binding.Scope == SecretScope.Instance ? InstanceRevision ?? Revision : Revision));
     }
 
     public async Task<bool> ValidateAsync(SecretBinding binding, CancellationToken cancellationToken = default) =>

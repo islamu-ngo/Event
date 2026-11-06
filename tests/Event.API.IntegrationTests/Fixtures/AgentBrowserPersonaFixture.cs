@@ -403,6 +403,13 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
         public Task InvalidateAsync(string settingKey, SecretScope scope, Guid? scopeId, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         // This fixture provisions local storage only, with no external storage credential binding.
+        public Task<RetainedSecretReference?> CaptureInstanceAsync(
+            string settingKey, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<RetainedSecretReference?>(null);
+        }
+
         public Task<RetainedSecretReference> CaptureAsync(string settingKey, Guid tenantId, CancellationToken cancellationToken) =>
             throw new InvalidOperationException("storage_secret_unavailable");
 

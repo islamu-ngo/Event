@@ -20,6 +20,7 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Onboarding;
 using Explore.Application.Responses;
+using Explore.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -381,6 +382,14 @@ public class InstanceOnboardingController : EventControllerBase
         {
             links.Add(LinkRelations.VisitorSignupPrefix + destination.Provider.ToString().ToLowerInvariant(),
                 HalLink.Create(destination.Url));
+            if (destination.Provider == AuthenticationProviderKind.Local)
+                links.Add("local-register", new HalLink
+                {
+                    Href = Url.RouteUrl(RouteNames.RegisterLocalVisitor)
+                        ?? throw new InvalidOperationException("The Local registration route is not registered."),
+                    Method = HttpMethods.Post,
+                    Title = "Create a Local account"
+                });
         }
         return Ok(new HalResource<AuthProviderConfigurationDto>(configuration, links));
     }

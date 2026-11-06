@@ -72,7 +72,7 @@ public sealed class VisitorAccessCapabilityResolverTests
     }
 
     [Test]
-    public async Task LocalExistingAccountAccessDoesNotInventAnUnimplementedSignupRoute()
+    public async Task LocalExistingAccountAccessIncludesTheCallableBrowserSignup()
     {
         var capability = Evaluate(Provider(AuthenticationProviderKind.Local, PublicOnboardingPolicy.Allowed));
 
@@ -80,7 +80,8 @@ public sealed class VisitorAccessCapabilityResolverTests
         await Assert.That(capability.AllowsAnonymousParticipation).IsTrue();
         await Assert.That(capability.AllowsAccountRequiredParticipation).IsTrue();
         await Assert.That(capability.AllowsExistingAccountLogin).IsTrue();
-        await Assert.That(capability.SignupDestinations).IsEmpty();
+        await Assert.That(capability.SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Local);
+        await Assert.That(capability.SignupDestinations.Single().Url).IsEqualTo("/auth/local/register");
     }
 
     [Test]
@@ -93,8 +94,11 @@ public sealed class VisitorAccessCapabilityResolverTests
         await Assert.That(capability.AllowsAnonymousParticipation).IsTrue();
         await Assert.That(capability.AllowsAccountRequiredParticipation).IsTrue();
         await Assert.That(capability.AllowsExistingAccountLogin).IsTrue();
-        await Assert.That(capability.SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Atproto);
-        await Assert.That(capability.SignupDestinations.Single().Url).IsEqualTo("/login?provider=atproto");
+        await Assert.That(capability.SignupDestinations.Length).IsEqualTo(2);
+        await Assert.That(capability.SignupDestinations.Single(destination => destination.Provider == AuthenticationProviderKind.Local).Url)
+            .IsEqualTo("/auth/local/register");
+        await Assert.That(capability.SignupDestinations.Single(destination => destination.Provider == AuthenticationProviderKind.Atproto).Url)
+            .IsEqualTo("/login?provider=atproto");
     }
 
     [Test]
@@ -143,6 +147,8 @@ public sealed class VisitorAccessCapabilityResolverTests
     [Arguments(AuthenticationProviderKind.Keycloak, true, false)]
     [Arguments(AuthenticationProviderKind.Google, false, true)]
     [Arguments(AuthenticationProviderKind.Google, true, false)]
+    [Arguments(AuthenticationProviderKind.Local, false, true)]
+    [Arguments(AuthenticationProviderKind.Local, true, false)]
     public async Task DisabledOrTenantUnusableProvidersContributeNeitherLoginNorOnboarding(
         AuthenticationProviderKind provider, bool enabled, bool tenantUsable)
     {
@@ -162,7 +168,9 @@ public sealed class VisitorAccessCapabilityResolverTests
             Provider(AuthenticationProviderKind.Atproto),
             Provider(AuthenticationProviderKind.Google, PublicOnboardingPolicy.Allowed));
 
-        await Assert.That(capability.SignupDestinations.Length).IsEqualTo(1);
+        await Assert.That(capability.SignupDestinations.Length).IsEqualTo(2);
+        await Assert.That(capability.SignupDestinations.Select(destination => destination.Provider))
+            .Contains(AuthenticationProviderKind.Local);
         await Assert.That(capability.SignupDestinations.Select(destination => destination.Provider))
             .Contains(AuthenticationProviderKind.Atproto);
         await Assert.That(capability.SignupDestinations.Select(destination => destination.Provider))

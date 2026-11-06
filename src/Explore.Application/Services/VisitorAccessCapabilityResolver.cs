@@ -92,6 +92,8 @@ public sealed class VisitorAccessCapabilityResolver(
             {
                 case AuthenticationProviderKind.Local:
                     allowsExistingAccountLogin = true;
+                    if (proposedState.UserRegistrationEnabled)
+                        destinations.Add(new(provider.Provider, "/auth/local/register"));
                     break;
                 case AuthenticationProviderKind.Atproto:
                     // Provider-selected handle authorization leads to passwordless platform

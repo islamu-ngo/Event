@@ -15,7 +15,7 @@ Use this page for the shortest safe local path. For production-style hosting, st
 
 | Tool | Version | Purpose |
 |---|---|---|
-| .NET SDK | `10.0.302` or compatible SDK from `global.json` | Build and run the solution. |
+| .NET SDK | `10.0.403` selected by `global.json` | Build and run the solution. |
 | Docker / Docker Compose v2 | Current | Local Aspire infrastructure and self-hosting stack. |
 | .NET Aspire CLI | Current compatible CLI | Preferred local development loop; `dotnet run --project Explore.AppHost` remains the fallback/IDE launch path. |
 

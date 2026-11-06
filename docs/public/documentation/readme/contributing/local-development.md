@@ -12,13 +12,20 @@ This guide helps developers set up a local development workstation to contribute
 
 To build and run the complete solution from source, install:
 
-- **.NET 10 SDK** (v10.0.302 or compatible)
+- **.NET 10 SDK** (v10.0.403, matching `global.json`)
 - **Docker Engine / Docker Desktop** (v24+ with Compose v2)
 - **.NET Aspire CLI**:
   ```bash
   dotnet tool install -g Aspire.Cli
   ```
 - **Git**
+
+Use the pinned SDK and patched runtime/WASM `10.0.14` together. The repository
+and its four application container recipes select these versions to replace
+the vulnerable SDK-selected compiler/runtime reported by
+`GHSA-p3jp-9v83-76w9`. Preserve dependency auditing and update lockfiles through
+native restore when changing this toolchain; do not bypass an audit failure.
+This pin does not update an SDK or runtime already installed on your host.
 
 ---
 

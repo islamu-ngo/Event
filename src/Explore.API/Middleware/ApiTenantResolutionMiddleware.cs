@@ -42,6 +42,14 @@ public sealed class ApiTenantResolutionMiddleware
             return;
         }
 
+        if (TenantLifecycleAccessMiddleware.IsVerifiedAccountContinuation(context))
+        {
+            // This authenticated action resolves only explicit routing facts and
+            // exact-account memberships; no incidental tenant is needed to verify it.
+            await _next(context);
+            return;
+        }
+
         if (tenantContextAccessor.IsResolved)
         {
             await _next(context);

@@ -69,6 +69,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     private string? _identityConnectionString;
     private bool _incompleteSetup;
     private bool _enableRateLimiting;
+    private DeploymentMode _deploymentMode = DeploymentMode.SingleTenant;
     private string? _postgreSqlConnectionString;
     private readonly PrimaryDatabaseConnectionOptions? _measurementDatabase;
     private readonly Dictionary<string, string?>? _measurementDatabaseSettings;
@@ -134,7 +135,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         bool enableRateLimiting = false,
         bool enableAtproto = false,
         string? postgreSqlConnectionString = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        DeploymentMode deploymentMode = DeploymentMode.SingleTenant)
     {
         var factory = new LocalAdmissionWebApplicationFactory(primaryProvider, enableAtproto, timeProvider)
         {
@@ -143,7 +145,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             _identityTopology = identityTopology,
             _incompleteSetup = incompleteSetup,
             _enableRateLimiting = enableRateLimiting,
-            _postgreSqlConnectionString = postgreSqlConnectionString
+            _postgreSqlConnectionString = postgreSqlConnectionString,
+            _deploymentMode = deploymentMode
         };
         try
         {
@@ -697,7 +700,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         });
         var bootstrap = InstanceBootstrapState.CreateInteractivePending(
             id: Guid.CreateVersion7(),
-            deploymentMode: DeploymentMode.SingleTenant,
+            deploymentMode: _deploymentMode,
             createdAt: now);
         if (!_incompleteSetup)
         {

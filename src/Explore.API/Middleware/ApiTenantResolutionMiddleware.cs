@@ -161,6 +161,8 @@ public sealed class ApiTenantResolutionMiddleware
         PathString path = request.Path;
         return AtprotoTransientAuthenticationDefaults.IsPrivatePath(path)
             || path.Equals(new PathString("/api/auth/local/login"), StringComparison.OrdinalIgnoreCase)
+            || HttpMethods.IsPost(request.Method)
+                && path.Equals(new PathString("/api/auth/local/credential-replacement"), StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/InstanceOnboarding", StringComparison.OrdinalIgnoreCase)
             || path.Equals(new PathString("/api/operator-identity-metadata"), StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/System", StringComparison.OrdinalIgnoreCase)

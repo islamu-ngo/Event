@@ -17,6 +17,7 @@ using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -329,9 +330,14 @@ public sealed class LocalCredentialReplacementHttpTests
     }
 
     [Test]
-    public async Task ReplacementReturnsNoSessionAndCannotReplayThroughIdempotencyStorage()
+    [Arguments(DeploymentMode.SingleTenant)]
+    [Arguments(DeploymentMode.MultiTenant)]
+    public async Task ReplacementReturnsNoSessionAndCannotReplayThroughIdempotencyStorage(DeploymentMode deploymentMode)
     {
-        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(deploymentMode: deploymentMode);
+        var modes = factory.Services.GetRequiredService<IDeploymentModeProvider>();
+        await modes.InvalidateCacheAsync();
+        await Assert.That(await modes.GetCurrentModeAsync(CancellationToken)).IsEqualTo(deploymentMode);
         using HttpClient client = CreateClient(factory);
         Credential credential = await SeedChangeRequiredAsync(factory);
         string challenge = await IssueChallengeAsync(client, credential);
@@ -339,6 +345,15 @@ public sealed class LocalCredentialReplacementHttpTests
         string replayPassword = NewPassword();
         string key = Guid.CreateVersion7().ToString("N");
         Snapshot before = await ReadAsync(factory, credential);
+
+        using (var synchronization = new HttpRequestMessage(HttpMethod.Post, "/api/User/sync"))
+        {
+            synchronization.Headers.Authorization = new AuthenticationHeaderValue("Bearer", challenge);
+            synchronization.Headers.Add(TenantHeaderNames.TenantSlug, "local-admission");
+            using HttpResponseMessage rejected = await client.SendAsync(synchronization, CancellationToken);
+            await Assert.That(rejected.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        }
+        await AssertUnchangedAsync(factory, credential, before);
 
         using HttpResponseMessage response = await ReplaceAsync(client: client, token: challenge, password: replacement, idempotencyKey: key);
 
@@ -358,6 +373,13 @@ public sealed class LocalCredentialReplacementHttpTests
         await Assert.That(string.IsNullOrEmpty(accessToken)).IsFalse();
         Snapshot beforeReplay = await ReadAsync(factory, credential);
 
+        using (HttpResponseMessage ordinaryBearer = await ReplaceAsync(
+            client: client, token: accessToken, password: replayPassword))
+        {
+            await Assert.That(ordinaryBearer.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        }
+        await AssertUnchangedAsync(factory, credential, beforeReplay);
+
         using HttpResponseMessage replay = await ReplaceAsync(client: client, token: challenge, password: replayPassword, idempotencyKey: key);
 
         await Assert.That(replay.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
@@ -367,6 +389,51 @@ public sealed class LocalCredentialReplacementHttpTests
         await Assert.That(await PasswordIsValidAsync(factory, credential, credential.Login.Password)).IsFalse();
         await using ExploreDbContext stored = factory.CreateDatabase();
         await Assert.That(await stored.Set<IdempotencyRecord>().AnyAsync(record => record.Key == key, CancellationToken)).IsFalse();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task MultiTenantRootReplacementRejectsMissingOrMalformedChallenge(bool malformedChallenge)
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(
+            deploymentMode: DeploymentMode.MultiTenant);
+        var modes = factory.Services.GetRequiredService<IDeploymentModeProvider>();
+        await modes.InvalidateCacheAsync();
+        await Assert.That(await modes.GetCurrentModeAsync(CancellationToken)).IsEqualTo(DeploymentMode.MultiTenant);
+        using HttpClient client = CreateClient(factory);
+        using var request = new HttpRequestMessage(HttpMethod.Post, ReplacementPath)
+        {
+            Content = JsonContent.Create(new { newPassword = NewPassword() })
+        };
+        if (malformedChallenge)
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "invalid-challenge");
+
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        await Assert.That(response.Headers.Contains("Set-Cookie")).IsFalse();
+    }
+
+    [Test]
+    [Arguments("GET", "/api/auth/local/credential-replacement")]
+    [Arguments("PUT", "/api/auth/local/credential-replacement")]
+    [Arguments("DELETE", "/api/auth/local/credential-replacement")]
+    [Arguments("POST", "/api/auth/local/credential-replacement/child")]
+    [Arguments("GET", "/api/Event")]
+    public async Task MultiTenantRootReplacementExemptionDoesNotResolveUnrelatedRequests(string method, string path)
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(
+            deploymentMode: DeploymentMode.MultiTenant);
+        var modes = factory.Services.GetRequiredService<IDeploymentModeProvider>();
+        await modes.InvalidateCacheAsync();
+        await Assert.That(await modes.GetCurrentModeAsync(CancellationToken)).IsEqualTo(DeploymentMode.MultiTenant);
+        using HttpClient client = CreateClient(factory);
+
+        using var request = new HttpRequestMessage(new HttpMethod(method), path);
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }
 
     [Test]
@@ -644,6 +711,7 @@ public sealed class LocalCredentialReplacementHttpTests
         LocalCredentialOperationReceipt receipt = created.Receipt!;
         await using (ExploreDbContext bind = factory.CreateDatabase())
         {
+            await Assert.That(bind.BindTenantLease()).IsNull();
             var user = new User
             {
                 Id = receipt.LocalSubjectId,

@@ -17,27 +17,11 @@ public sealed class GetUserRequestHandlerPrivacyErasureTests
     public async Task FencedUser_ReturnsNoProfileWithoutReadingCache()
     {
         Guid userId = Guid.CreateVersion7();
-        DateTime nowUtc = DateTime.UtcNow;
-        PrivacyErasureIntent intent = PrivacyErasureIntent.Record(
-            Guid.CreateVersion7(),
-            1,
-            PrivacyErasureSubjectKind.User,
-            userId,
-            PrivacyErasureReasonCode.AccountDeletion,
-            1,
-            nowUtc,
-            nowUtc);
-        PrivacyErasureSaga saga = PrivacyErasureSaga.Start(
-            intent,
-            1,
-            new byte[32],
-            nowUtc.AddMinutes(5),
-            nowUtc);
         IPrivacyErasureStateRepository stateRepository = Substitute.For<IPrivacyErasureStateRepository>();
-        stateRepository.GetBySubjectAsync(userId, Arg.Any<CancellationToken>()).Returns(saga);
+        stateRepository.ExistsBySubjectAsync(userId, Arg.Any<CancellationToken>()).Returns(true);
         var cache = new RecordingHybridCache();
         IQueryHandler<GetUserRequest, UserDto?> handler = new GetUserRequestHandler(
-            Substitute.For<IUserRepository>(),
+            Substitute.For<IUserProfileReader>(),
             Substitute.For<IObjectStorageService>(),
             Substitute.For<ILogger<GetUserRequestHandler>>(),
             cache,
@@ -53,27 +37,11 @@ public sealed class GetUserRequestHandlerPrivacyErasureTests
     public async Task FenceEstablishedDuringCacheRead_RemovesEntryAndReturnsNoProfile()
     {
         Guid userId = Guid.CreateVersion7();
-        DateTime nowUtc = DateTime.UtcNow;
-        PrivacyErasureIntent intent = PrivacyErasureIntent.Record(
-            Guid.CreateVersion7(),
-            1,
-            PrivacyErasureSubjectKind.User,
-            userId,
-            PrivacyErasureReasonCode.AccountDeletion,
-            1,
-            nowUtc,
-            nowUtc);
-        PrivacyErasureSaga saga = PrivacyErasureSaga.Start(
-            intent,
-            1,
-            new byte[32],
-            nowUtc.AddMinutes(5),
-            nowUtc);
         IPrivacyErasureStateRepository stateRepository = Substitute.For<IPrivacyErasureStateRepository>();
-        stateRepository.GetBySubjectAsync(userId, Arg.Any<CancellationToken>())
-            .Returns((PrivacyErasureSaga?)null, saga);
-        IUserRepository userRepository = Substitute.For<IUserRepository>();
-        userRepository.GetUserWithDetails(userId, Arg.Any<CancellationToken>())
+        stateRepository.ExistsBySubjectAsync(userId, Arg.Any<CancellationToken>())
+            .Returns(false, true);
+        IUserProfileReader userRepository = Substitute.For<IUserProfileReader>();
+        userRepository.GetAsync(userId, Arg.Any<CancellationToken>())
             .Returns(new User
             {
                 Id = userId,

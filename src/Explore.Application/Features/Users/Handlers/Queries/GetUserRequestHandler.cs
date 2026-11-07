@@ -15,29 +15,29 @@ namespace Explore.Application.Features.Users.Handlers.Queries;
 
 public class GetUserRequestHandler : IQueryHandler<GetUserRequest, UserDto?>
 {
-    private readonly IUserRepository _userRepository;
+    private readonly IUserProfileReader _profileReader;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<GetUserRequestHandler> _logger;
     private readonly HybridCache _cache;
-    private readonly IPrivacyErasureStateRepository _privacyErasureStateRepository;
+    private readonly IPrivacyErasurePresenceReader _privacyErasurePresence;
 
     public GetUserRequestHandler(
-        IUserRepository userRepository,
+        IUserProfileReader profileReader,
         IObjectStorageService objectStorageService,
         ILogger<GetUserRequestHandler> logger,
         HybridCache cache,
-        IPrivacyErasureStateRepository privacyErasureStateRepository)
+        IPrivacyErasurePresenceReader privacyErasurePresence)
     {
-        _userRepository = userRepository;
+        _profileReader = profileReader;
         _objectStorageService = objectStorageService;
         _logger = logger;
         _cache = cache;
-        _privacyErasureStateRepository = privacyErasureStateRepository;
+        _privacyErasurePresence = privacyErasurePresence;
     }
 
     public async Task<UserDto?> QueryAsync(GetUserRequest request, CancellationToken cancellationToken = default)
     {
-        if (await _privacyErasureStateRepository.GetBySubjectAsync(request.UserId, cancellationToken) is not null)
+        if (await _privacyErasurePresence.ExistsBySubjectAsync(request.UserId, cancellationToken))
         {
             return null;
         }
@@ -48,7 +48,7 @@ public class GetUserRequestHandler : IQueryHandler<GetUserRequest, UserDto?>
             cacheKey,
             async _ =>
             {
-                var user = await _userRepository.GetUserWithDetails(request.UserId, _);
+                var user = await _profileReader.GetAsync(request.UserId, _);
                 if (user == null)
                 {
                     return null;
@@ -65,7 +65,7 @@ public class GetUserRequestHandler : IQueryHandler<GetUserRequest, UserDto?>
             },
             cancellationToken: cancellationToken);
 
-        if (await _privacyErasureStateRepository.GetBySubjectAsync(request.UserId, cancellationToken) is not null)
+        if (await _privacyErasurePresence.ExistsBySubjectAsync(request.UserId, cancellationToken))
         {
             await _cache.RemoveAsync(cacheKey, cancellationToken);
             return null;
@@ -75,7 +75,7 @@ public class GetUserRequestHandler : IQueryHandler<GetUserRequest, UserDto?>
         {
             // The account cache is global; managed media is tenant-filtered and can be revoked independently.
             // Re-project media from the current entity graph rather than caching image publication authority.
-            var currentUser = await _userRepository.GetUserWithDetails(request.UserId, cancellationToken);
+            var currentUser = await _profileReader.GetAsync(request.UserId, cancellationToken);
             if (currentUser is null)
                 return null;
             userDto = userDto with

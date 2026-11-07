@@ -948,6 +948,8 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IEventLocationExactReadAuditRepository, EventLocationExactReadAuditRepository>();
         services.AddScoped<IPrivacyErasureReplayCheckpointRepository, PrivacyErasureReplayCheckpointRepository>();
         services.AddScoped<IPrivacyErasureStateRepository, PrivacyErasureStateRepository>();
+        services.AddScoped<IPrivacyErasurePresenceReader, PrivacyErasurePresenceReader>();
+        services.AddScoped<IUserProfileReader, UserProfileReader>();
         services.AddScoped<IPrivacyErasureProviderWorkRepository, PrivacyErasureProviderWorkRepository>();
         services.AddScoped<IUserLocationPrivacyErasureRepository, UserLocationPrivacyErasureRepository>();
         services.AddScoped<IUserPrivacyErasureRepository, UserLocationPrivacyErasureRepository>();

@@ -45,6 +45,21 @@ the purge from the retained intent; it does not treat an uncommitted checkpoint
 as a completed deletion. Provider cleanup continues through the protected outbox
 after local settlement.
 
+Profile reads continue to withhold an account once its erasure fence is present,
+including when a profile was cached before the request. Checking that fence uses
+the existing Global database purpose to read presence only; ordinary profile
+requests receive no access to private erasure receipts or workflow details.
+This requires no additional permission grant or migration.
+
+The profile itself uses a separate bounded account read. Its declared Global
+permissions include name, email and actor presentation fields; birth-date
+declarations and private collection receipts remain outside that read.
+Managed images are checked against the current request's tenant and publication
+state rather than trusting a cached URL. This expands the fixed pre-release
+Global permission manifest: use fresh development enrollment when validating
+this version. Existing partial manifests fail closed; manual grants are not an
+installation procedure. No database schema migration is needed.
+
 ---
 
 ## Verified Identity Addresses

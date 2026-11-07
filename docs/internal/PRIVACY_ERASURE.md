@@ -56,6 +56,30 @@ pre-enrollment state. Reused reads neither commit nor dispose the writer;
 outside enrollment they retain independently owned read contexts. An aborted
 enrollment rolls back its facts and counters together.
 
+User-detail reads check `IPrivacyErasurePresenceReader` before cache access and
+again after the awaited cache read. Its persistence adapter uses the existing
+independent Global factory and only the saga's subject column to answer presence;
+it cannot materialize receipt hashes or workflow state. The original Runtime
+profile owner and the workflow repository's transaction ownership remain intact.
+A detected saga withholds the profile, and a fence observed after cache access
+also evicts that cached entry. No new database grant or migration is required.
+
+Profile materialization uses `IUserProfileReader`, not the transactional
+`IUserRepository.GetUserWithDetails` aggregate query. Its Global projection reads
+only identity names/email/verification/stamp and actor presentation scalars.
+The fixed Global read manifest adds the required name and presentation columns;
+it does not add birth-date or collection-receipt reads, email-evidence graphs,
+or Runtime account privileges. Global credentials can read these declared
+profile columns across accounts; application authorization controls disclosure.
+Managed storage is resolved separately through the original Runtime
+`IStorageObjectRepository.GetForGenericAccessAsync`, retaining the request's
+tenant filters and publication checks on every live re-projection.
+
+The expanded fixed manifest is a pre-release installation change. Old partial
+enrollments remain rejected by the existing native catalogue checks; validate
+against fresh development enrollment rather than adding ad-hoc grants or
+relaxing attestation. No EF schema migration is introduced.
+
 `PrivacyErasureService` establishes the sanctioned instance execution scope before
 constructing the mutation workflow. It acquires Human security custody before
 Discovery disclosure custody and holds both through settlement. An already

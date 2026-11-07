@@ -16,7 +16,8 @@ namespace Explore.Infrastructure.Mail;
 public sealed class EmailDeliveryCapabilityResolver(
     IHierarchicalSettingsReader settings,
     ISecretResolver secrets,
-    ISecretBindingRepository bindings) : IEmailDeliveryCapabilityResolver
+    ISecretBindingRepository bindings,
+    IInstanceSystemSettingsReader instanceSettings) : IEmailDeliveryCapabilityResolver
 {
     public async Task<EmailDeliveryCapability> ResolveAsync(Guid? tenantId, CancellationToken cancellationToken = default) =>
         (await ResolveTransportAsync(tenantId, cancellationToken)).Capability;
@@ -27,9 +28,13 @@ public sealed class EmailDeliveryCapabilityResolver(
         if (tenantId == Guid.Empty)
             throw new ArgumentException("A tenant identifier must be nonempty.", nameof(tenantId));
 
-        var instance = (await settings.ResolveBatchAsync(
-            EmailSettingGroup.SettingKeys.Append(GovernanceSettingKeys.TenantDelegation.LockSmtp),
-            new SettingContext(), cancellationToken)).ToDictionary(value => value.Key);
+        var instanceKeys = EmailSettingGroup.SettingKeys
+            .Append(GovernanceSettingKeys.TenantDelegation.LockSmtp).ToArray();
+        var stored = (await instanceSettings.ReadAsync(instanceKeys, cancellationToken))
+            .ToDictionary(row => row.SettingKey, StringComparer.Ordinal);
+        var instance = instanceKeys.Select(key => HierarchicalSettingMerge.Resolve(key, stored))
+            .OfType<ResolvedSetting>()
+            .ToDictionary(value => value.Key, StringComparer.Ordinal);
         var locked = !instance.TryGetValue(GovernanceSettingKeys.TenantDelegation.LockSmtp, out var delegation)
             || SettingValueSerializer.Deserialize(delegation.Value, true);
         var effective = tenantId.HasValue && !locked

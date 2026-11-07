@@ -1220,8 +1220,14 @@ enable Event delivery or relay to external inboxes. See
 anchors and the separate optional-image licensing boundary.
 
 `EmailDeliveryPolicy` owns pure state and credential-scope rules. The Infrastructure
-`EmailDeliveryCapabilityResolver` uses the existing hierarchical settings resolver and
-selected secret authority. The SMTP adapter builds a fresh transport configuration on
+`EmailDeliveryCapabilityResolver` reads its instance policy through
+`IInstanceSystemSettingsReader`, then applies the shared hierarchy defaults.
+This independent instance capability preserves Global read ownership when the
+caller is a tenantless Runtime health scope. Delegated tenant policy still uses
+the ordinary hierarchical reader with the requested tenant; locks, enablement
+and credential-scope rules are unchanged. This adds no Runtime table grants.
+The resolver continues to use the selected secret authority.
+The SMTP adapter builds a fresh transport configuration on
 each resolution; it no longer caches plaintext SMTP configurations. Existing settings
 and secret-authority cache lifetimes still apply across replicas.
 

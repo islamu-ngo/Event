@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -52,7 +53,7 @@ public sealed partial class LocalIdentityWriterPermissionsNativeTests
 
     private static async Task ExerciseConfiguredAuthenticationAsync(bool failAfterBookkeeping,
         bool failDuringCleanup = false, bool requireContinuityReadOnly = false,
-        bool requireProfileReadBoundary = false)
+        bool requireProfileReadBoundary = false, DispatchSourceBeforeBeginProbe? dispatchSource = null)
     {
         await using var fixture = new NativeFixture(IdentityDatabaseTopology.Colocated);
         // Admission failures here remain fixture prerequisites, not evidence about authentication.
@@ -95,8 +96,9 @@ public sealed partial class LocalIdentityWriterPermissionsNativeTests
 
         var services = new ServiceCollection();
         services.AddLogging();
+        dispatchSource?.Configure(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
         services.AddSingleton(new LocalIdentityWriterDbContextFactory(writerOptions, poolSize: 1,
-            applicationEnrollment: enrollment));
+            applicationEnrollment: enrollment, interceptors: dispatchSource is null ? null : [dispatchSource]));
         var runtime = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime);
         services.AddPooledDbContextFactory<ExploreDbContext>(options =>
         {
@@ -213,6 +215,63 @@ public sealed partial class LocalIdentityWriterPermissionsNativeTests
             int beforeAttempts = await application.LocalIdentityUsers.AsNoTracking().Where(row => row.Id == receipt.LocalSubjectId)
                 .Select(row => row.AccessFailedCount).SingleAsync(token);
             await Assert.That(before.State).IsEqualTo(LocalIdentityEligibilityState.ChangeRequired);
+
+            if (dispatchSource is not null)
+            {
+                var account = await application.LocalIdentityUsers.AsNoTracking()
+                    .SingleAsync(row => row.Id == receipt.LocalSubjectId, token);
+                DateTimeOffset now = DateTimeOffset.UtcNow;
+                string password = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}";
+                dispatchSource.Arm(application);
+                var replacement = new LocalCredentialReplacementRequest(
+                    new LocalCredentialReplacementAuthority(new LocalCredentialReplacementSubject(
+                        receipt.LocalSubjectId, receipt.OperationId, account.SecurityStamp!), now, now.AddMinutes(5)),
+                    password);
+                if (dispatchSource.Failure is { } expected)
+                {
+                    var observed = await Assert.ThrowsAsync<OperationCanceledException>(() => states.ReplaceAsync(replacement, token));
+                    await Assert.That(observed).IsSameReferenceAs(expected);
+                }
+                else
+                {
+                    var replaced = await states.ReplaceAsync(replacement, token);
+                    await Assert.That(replaced).IsEqualTo(LocalCredentialReplacementOutcome.Replaced);
+                }
+                await Assert.That(dispatchSource.BeforeBeginObserved).IsTrue();
+                await Assert.That(dispatchSource.BeforeCommitObserved)
+                    .IsEqualTo(dispatchSource.Failure is null || dispatchSource.FailBeforeCommit);
+                await dispatchSource.RequireAvailableAsync(token);
+                var committed = await application.LocalIdentityUsers.AsNoTracking()
+                    .SingleAsync(row => row.Id == receipt.LocalSubjectId, token);
+                if (dispatchSource.Failure is null)
+                {
+                    await Assert.That(committed.SecurityStamp).IsNotEqualTo(account.SecurityStamp);
+                    await Assert.That(manager.PasswordHasher.VerifyHashedPassword(committed, committed.PasswordHash!, password))
+                        .IsNotEqualTo(PasswordVerificationResult.Failed);
+                }
+                else
+                {
+                    await Assert.That(committed.PasswordHash).IsEqualTo(account.PasswordHash);
+                    await Assert.That(committed.SecurityStamp).IsEqualTo(account.SecurityStamp);
+                    await Assert.That(committed.ConcurrencyStamp).IsEqualTo(account.ConcurrencyStamp);
+                    await Assert.That((await application.Set<LocalIdentityCredentialOperation>().AsNoTracking()
+                        .SingleAsync(row => row.Id == receipt.OperationId, token)).Stage)
+                        .IsEqualTo(LocalCredentialOperationStage.ChangeRequired);
+                }
+                await Assert.That((await application.Set<LocalIdentityEligibility>().AsNoTracking()
+                    .SingleAsync(row => row.LocalSubjectId == receipt.LocalSubjectId, token)).State)
+                    .IsEqualTo(dispatchSource.Failure is null
+                        ? LocalIdentityEligibilityState.Ready : LocalIdentityEligibilityState.ChangeRequired);
+                await Assert.That(application.Database.CurrentTransaction).IsNull();
+                await Assert.That(application.ContextId).IsEqualTo(contextId);
+                await Assert.That(application.Database.GetDbConnection()).IsSameReferenceAs(connector);
+                await Assert.That(connector.ProcessID).IsEqualTo(backend);
+                await RequireSessionAsync(application, enrollment.WriterLogin);
+                execution.RequireCurrent(application, application);
+                HumanSecuritySourceGate.RequireCurrent(application);
+                LocalIdentityLifecycleGateCustody.RequireHeld(application);
+                return;
+            }
 
             var signer = new LocalJwtTokenGenerator(Options.Create(new LocalIdentityOptions
             { JwtKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)) }), TimeProvider.System);

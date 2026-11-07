@@ -766,6 +766,18 @@ for source ownership, snapshot custody/readiness and hash calibration.
 Completion returns no token: log in afresh with the privately
 chosen password. Consumed or superseded authority cannot replace it again.
 
+For an owned PostgreSQL Local mutation, `LocalIdentityMutationTransaction` retains
+the existing SMTP claim resource on the original application connector before
+opening its Serializable transaction. Recognition and retained privacy
+coordination remain outside that boundary. This prevents background claim
+statements from advancing the shared settings revision between the mutation's
+observations and credential writes. Exclusion remains through settlement and
+transaction disposal, then releases without retiring the selected writer.
+Adopted transactions retain their original owner's coordination; this late
+boundary does not certify an already-established snapshot. SQLite and other
+provider transaction contracts are unchanged. Acquisition and cleanup failures
+remain observable, and cleanup continues across the remaining acquired resources.
+
 `POST /api/auth/local/credential-replacement` accepts the challenge as a Bearer
 token and only `newPassword` in its JSON body. This exact POST is exempt from
 tenant resolution and tenant lifecycle gating so first-use replacement can run

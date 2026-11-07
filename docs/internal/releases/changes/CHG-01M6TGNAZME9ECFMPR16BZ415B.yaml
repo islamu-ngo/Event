@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6TGNAZME9ECFMPR16BZ415B
+Title: "Keep Local password replacement stable during email polling"
+Type: fix
+Scope: access
+Summary: "Protect owned PostgreSQL Local credential transactions from background email claim revision changes while preserving original custody, rollback and challenge boundaries."
+Group: local-credential-dispatch-settlement
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Detail: "Retain the existing dispatch claim resource on the original application connector before owned PostgreSQL Serializable transactions, after recognition and privacy coordination. Preserve adopted transaction custody, revision checks, rollback and challenge deadlines without broader privileges or weaker isolation."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Background email claim polling cannot invalidate an owned PostgreSQL Local password replacement snapshot. No new configuration, permission grant or migration is required; first-use replacement still requires a valid challenge and fresh login."

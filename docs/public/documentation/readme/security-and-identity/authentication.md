@@ -368,6 +368,11 @@ authority returns HTTP 401; a concurrent operation conflict returns HTTP 409.
 If the challenge expires during the database updates, replacement rolls back
 without changing the password. Sign in with the temporary password to obtain
 a fresh challenge rather than retrying the expired one.
+PostgreSQL password replacement coordinates with background email processing
+before starting its database transaction, so email claim polling cannot
+invalidate its earlier credential observations. This requires no new setting,
+permission grant or migration; the challenge deadline and fresh-login requirement
+remain unchanged.
 Do not log or persist challenges or password request bodies. Reusing an
 `Idempotency-Key` cannot replay successful replacement.
 

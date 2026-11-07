@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6TN3Z00PZ4QXYMSCJARTX13
+Title: "Restore Local administrator sign-in after completed setup"
+Type: fix
+Scope: access
+Summary: "Synchronize completed Local administrator accounts through their existing binding without reopening onboarding or expanding bootstrap privileges."
+Group: completed-local-administrator-synchronization
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Detail: "Preserve exact Local binding, lifecycle, privacy and enrollment checks while keeping completed administrator sign-in out of bootstrap mutation. No added database privileges or role grants."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "A configured administrator signs in with the existing Local account after setup completes. Fresh login does not repeat setup or require bootstrap storage write permission."

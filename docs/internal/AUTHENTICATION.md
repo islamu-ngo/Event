@@ -766,6 +766,16 @@ for source ownership, snapshot custody/readiness and hash calibration.
 Completion returns no token: log in afresh with the privately
 chosen password. Consumed or superseded authority cannot replace it again.
 
+Once configured onboarding is completed with a recorded administrator,
+`SyncUserCommandHandler` synchronizes every existing, valid Local binding,
+including that administrator, through the ordinary Local enrollment path.
+It still reads bootstrap status and validates the exact Local account, current
+external-login link and personal actor before and within synchronization.
+This path does not repeat the completed configured-administrator claim or lock
+bootstrap storage through `LocalIdentityWriter`; it grants no administrator
+role or additional database permission. Pending configured claims and external
+provider claim paths retain their existing admission rules.
+
 For an owned PostgreSQL Local mutation, `LocalIdentityMutationTransaction` retains
 the existing SMTP claim resource on the original application connector before
 opening its Serializable transaction. Recognition and retained privacy

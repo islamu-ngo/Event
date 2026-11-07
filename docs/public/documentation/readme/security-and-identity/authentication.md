@@ -373,6 +373,10 @@ before starting its database transaction, so email claim polling cannot
 invalidate its earlier credential observations. This requires no new setting,
 permission grant or migration; the challenge deadline and fresh-login requirement
 remain unchanged.
+After configured setup is complete, the administrator's fresh Local sign-in uses
+the existing account binding without repeating setup or assigning roles again.
+The current Local account, login link and personal actor must still be valid;
+no extra bootstrap database permission is required.
 Do not log or persist challenges or password request bodies. Reusing an
 `Idempotency-Key` cannot replay successful replacement.
 

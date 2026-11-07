@@ -7,6 +7,7 @@ using Explore.Application.Services;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
+using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Domain.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,7 +43,8 @@ internal sealed class StorageProbeBinding
 
     private StorageProbeBinding(Guid ambientTenant, SystemSetting[] instance, ResolvedSetting[] tenant,
         RetainedSecretReference? access, RetainedSecretReference? secret,
-        RetainedSecretReference? instanceAccess, RetainedSecretReference? instanceSecret, string localRoot)
+        RetainedSecretReference? instanceAccess, RetainedSecretReference? instanceSecret,
+        string bindingMetadata, string localRoot)
     {
         this.ambientTenant = ambientTenant;
         this.instance = instance;
@@ -51,21 +53,30 @@ internal sealed class StorageProbeBinding
         this.secret = secret;
         this.instanceAccess = instanceAccess;
         this.instanceSecret = instanceSecret;
-        snapshot = JsonSerializer.Serialize(new { ambientTenant, instance, tenant, access, secret, instanceAccess, instanceSecret, localRoot });
+        snapshot = JsonSerializer.Serialize(new { ambientTenant, instance, tenant, access, secret,
+            instanceAccess, instanceSecret, bindingMetadata, localRoot });
     }
 
     internal static async Task<StorageProbeBinding> CaptureAsync(IServiceProvider services, Guid ambientTenant, CancellationToken ct)
     {
-        var settings = services.GetRequiredService<IHierarchicalSettingsReader>();
         var instance = (await services.GetRequiredService<IInstanceSystemSettingsReader>()
             .ReadAsync(Keys, ct)).OrderBy(row => row.SettingKey, StringComparer.Ordinal).ToArray();
         // Provider readiness belongs to the instance; transport retains the original
         // request tenant's connection settings and external references.
-        var tenant = (await settings.ResolveBatchAsync(Keys,
-            new(TenantId: ambientTenant, RequireAuthoritativeReads: true), ct))
-            .OrderBy(row => row.Key, StringComparer.Ordinal).ToArray();
-        RetainedSecretReference? access = null, secret = null, instanceAccess = null, instanceSecret = null;
+        var overrides = await services.GetRequiredService<IStorageProbeTenantSettingsReader>()
+            .ReadAsync(ambientTenant, Keys, ct);
         var instanceSettings = instance.ToDictionary(row => row.SettingKey, StringComparer.Ordinal);
+        var tenantSettings = overrides.ToDictionary(row => row.SettingKey, StringComparer.Ordinal);
+        var tenant = Keys.Select(key => HierarchicalSettingMerge.Resolve(key, instanceSettings, tenantSettings))
+            .OfType<ResolvedSetting>().OrderBy(row => row.Key, StringComparer.Ordinal).ToArray();
+        var bindingImage = await services.GetRequiredService<IStorageProbeSecretBindingsReader>()
+            .ReadAsync(ambientTenant, ct);
+        SecretBinding? InstanceBinding(string key) => bindingImage.Bindings.SingleOrDefault(
+            row => row.SettingKey == key && row.Scope == SecretScope.Instance);
+        SecretBinding? TransportBinding(string key) => bindingImage.Bindings.SingleOrDefault(
+            row => row.SettingKey == key && row.Scope == SecretScope.Tenant && row.ScopeId == ambientTenant)
+            ?? InstanceBinding(key);
+        RetainedSecretReference? access = null, secret = null, instanceAccess = null, instanceSecret = null;
         string endpoint = SettingValueSerializer.DeserializeString(HierarchicalSettingMerge.Resolve(
             GovernanceSettingKeys.Storage.Endpoint, instanceSettings)?.Value, string.Empty);
         string bucket = SettingValueSerializer.DeserializeString(HierarchicalSettingMerge.Resolve(
@@ -73,17 +84,23 @@ internal sealed class StorageProbeBinding
         if (!string.IsNullOrWhiteSpace(endpoint) && !string.IsNullOrWhiteSpace(bucket))
         {
             var secrets = services.GetRequiredService<IRetainedSecretResolver>();
-            instanceAccess = await secrets.CaptureInstanceAsync(SecretDefinitionRegistry.Keys.Storage.AccessKeyId, ct);
-            instanceSecret = await secrets.CaptureInstanceAsync(SecretDefinitionRegistry.Keys.Storage.SecretAccessKey, ct);
+            instanceAccess = await secrets.CaptureAsync(SecretDefinitionRegistry.Keys.Storage.AccessKeyId,
+                null, InstanceBinding(SecretDefinitionRegistry.Keys.Storage.AccessKeyId), ct);
+            instanceSecret = await secrets.CaptureAsync(SecretDefinitionRegistry.Keys.Storage.SecretAccessKey,
+                null, InstanceBinding(SecretDefinitionRegistry.Keys.Storage.SecretAccessKey), ct);
         }
         if (!string.IsNullOrWhiteSpace(Text(tenant, GovernanceSettingKeys.Storage.Endpoint))
             && !string.IsNullOrWhiteSpace(Text(tenant, GovernanceSettingKeys.Storage.BucketName)))
         {
             var secrets = services.GetRequiredService<IRetainedSecretResolver>();
-            access = await secrets.CaptureAsync(SecretDefinitionRegistry.Keys.Storage.AccessKeyId, ambientTenant, ct);
-            secret = await secrets.CaptureAsync(SecretDefinitionRegistry.Keys.Storage.SecretAccessKey, ambientTenant, ct);
+            access = await secrets.CaptureAsync(SecretDefinitionRegistry.Keys.Storage.AccessKeyId,
+                ambientTenant, TransportBinding(SecretDefinitionRegistry.Keys.Storage.AccessKeyId), ct)
+                ?? throw new InvalidOperationException("storage_secret_unavailable");
+            secret = await secrets.CaptureAsync(SecretDefinitionRegistry.Keys.Storage.SecretAccessKey,
+                ambientTenant, TransportBinding(SecretDefinitionRegistry.Keys.Storage.SecretAccessKey), ct)
+                ?? throw new InvalidOperationException("storage_secret_unavailable");
         }
-        return new(ambientTenant, instance, tenant, access, secret, instanceAccess, instanceSecret,
+        return new(ambientTenant, instance, tenant, access, secret, instanceAccess, instanceSecret, bindingImage.Metadata,
             services.GetRequiredService<IOptions<LocalFileStorageOptions>>().Value.RootPath);
     }
 

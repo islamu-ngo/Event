@@ -560,6 +560,79 @@ public sealed class SecretResolverBindingTests : IAsyncDisposable
     }
 
     [Test]
+    public async Task DetachedCaptureRetainsSelectedReferenceWithoutAdoptingRepositoryReplacement()
+    {
+        string key = SecretDefinitionRegistry.Keys.Storage.AccessKeyId;
+        var selected = SecretBinding.CreateEnvironmentVariable(key, SecretScope.Instance, null, "CAPTURED_ACCESS");
+        selected.Id = Guid.CreateVersion7();
+        var replacement = SecretBinding.CreateEnvironmentVariable(key, SecretScope.Instance, null, "CURRENT_ACCESS");
+        var values = new Dictionary<string, string?>
+        {
+            ["CAPTURED_ACCESS"] = Guid.NewGuid().ToString("N"),
+            ["CURRENT_ACCESS"] = Guid.NewGuid().ToString("N")
+        };
+        var authority = LocalAuthority(values);
+        var resolver = new SecretResolver(new FakeSecretBindingRepository([replacement]), [authority.Source],
+            _cacheState, _metrics, NullLogger<SecretResolver>.Instance, authority.Owner);
+        var reference = await resolver.CaptureAsync(key, null, selected, CancellationToken.None)
+            ?? throw new InvalidOperationException("Detached reference was not captured.");
+        selected.SwitchToEnvironmentVariable("CURRENT_ACCESS");
+        var resolved = await resolver.ResolveAsync(reference, CancellationToken.None);
+        await Assert.That(reference.BindingId).IsEqualTo(selected.Id);
+        await Assert.That(reference.EnvironmentVariableName).IsEqualTo("CAPTURED_ACCESS");
+        await Assert.That(resolved.Value).IsEqualTo(values["CAPTURED_ACCESS"]);
+        await Assert.That(resolved.Scope).IsEqualTo(SecretScope.Instance);
+    }
+
+    [Test]
+    public async Task DetachedAbsenceUsesRegistryDefaultWithoutAdoptingStoredTenantBinding()
+    {
+        string key = SecretDefinitionRegistry.Keys.Storage.SecretAccessKey;
+        Guid tenantId = Guid.CreateVersion7();
+        var definition = SecretDefinitionRegistry.GetRequired(key);
+        var tenant = SecretBinding.CreateEnvironmentVariable(key, SecretScope.Tenant, tenantId, "LATER_TENANT_SECRET");
+        var values = new Dictionary<string, string?>
+        {
+            [definition.DefaultEnvironmentVariableName] = Guid.NewGuid().ToString("N"),
+            ["LATER_TENANT_SECRET"] = Guid.NewGuid().ToString("N")
+        };
+        var authority = LocalAuthority(values);
+        var resolver = new SecretResolver(new FakeSecretBindingRepository([tenant]), [authority.Source],
+            _cacheState, _metrics, NullLogger<SecretResolver>.Instance, authority.Owner);
+        var reference = await resolver.CaptureAsync(key, tenantId, null, CancellationToken.None)
+            ?? throw new InvalidOperationException("Registry reference was not captured.");
+        var resolved = await resolver.ResolveAsync(reference, CancellationToken.None);
+        await Assert.That(reference.Scope).IsEqualTo(SecretScope.Instance);
+        await Assert.That(reference.ScopeId).IsNull();
+        await Assert.That(resolved.Value).IsEqualTo(values[definition.DefaultEnvironmentVariableName]);
+    }
+
+    [Test]
+    [Arguments("tenant")]
+    [Arguments("qualifier")]
+    [Arguments("key")]
+    [Arguments("source")]
+    public async Task DetachedCaptureRejectsMismatchedSelectionWithoutFallback(string mismatch)
+    {
+        string key = SecretDefinitionRegistry.Keys.Storage.AccessKeyId;
+        Guid tenantId = Guid.CreateVersion7();
+        var selected = SecretBinding.CreateEnvironmentVariable(key, SecretScope.Instance, null, "SELECTED_ACCESS");
+        if (mismatch == "tenant")
+        {
+            selected.Scope = SecretScope.Tenant;
+            selected.ScopeId = Guid.CreateVersion7();
+        }
+        else if (mismatch == "qualifier") selected.Qualifier = "other";
+        else if (mismatch == "key") selected.SettingKey = SecretDefinitionRegistry.Keys.Storage.SecretAccessKey;
+        else selected.SourceType = (SecretSourceType)int.MaxValue;
+        var authority = LocalAuthority(new Dictionary<string, string?>());
+        var resolver = new SecretResolver(new FakeSecretBindingRepository([]), [authority.Source],
+            _cacheState, _metrics, NullLogger<SecretResolver>.Instance, authority.Owner);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            resolver.CaptureAsync(key, tenantId, selected, CancellationToken.None));
+    }
+
+    [Test]
     public async Task CaptureInstanceAsync_RetainsOriginalReferenceAcrossBindingReplacementAndTenantSelection()
     {
         string key = SecretDefinitionRegistry.Keys.Storage.AccessKeyId;

@@ -1,3 +1,4 @@
+using System.Data;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
@@ -150,6 +151,7 @@ public sealed class StorageProbeNativeAuthenticationTests(PostgreSqlContainerFix
         await using var fixture = await StorageProbeNativeFixture.CreateAsync(postgres, "instance");
         await using (var seed = postgres.CreateDbContext())
         {
+            seed.BindTenantLease();
             seed.SecretBindings.AddRange(
                 SecretBinding.CreateEnvironmentVariable(SecretDefinitionRegistry.Keys.Storage.AccessKeyId,
                     SecretScope.Tenant, fixture.Tenant, "PROBE_TENANT_ACCESS"),
@@ -195,6 +197,7 @@ public sealed class StorageProbeNativeAuthenticationTests(PostgreSqlContainerFix
         if (change == "binding-metadata")
         {
             await using var seed = postgres.CreateDbContext();
+            seed.BindTenantLease();
             seed.SecretBindings.Add(SecretBinding.CreateEnvironmentVariable(
                 SecretDefinitionRegistry.Keys.Storage.AccessKeyId, SecretScope.Instance, null, "PROBE_ORIGINAL_ACCESS"));
             await seed.SaveChangesAsync();
@@ -211,10 +214,18 @@ public sealed class StorageProbeNativeAuthenticationTests(PostgreSqlContainerFix
                 fixture.Owner.SystemSettings.Add(new() { SettingKey = $"probe.pending.{Guid.CreateVersion7():N}", Value = "false" });
             if (change is "connection-closed" or "connection-reopened")
             {
-                await fixture.Owner.Database.CloseConnectionAsync();
-                if (change == "connection-reopened") await fixture.Owner.Database.OpenConnectionAsync();
+                var connection = fixture.Owner.Database.GetDbConnection();
+                await Assert.That(connection.State).IsEqualTo(ConnectionState.Open);
+                await connection.CloseAsync();
+                await Assert.That(connection.State).IsEqualTo(ConnectionState.Closed);
+                if (change == "connection-reopened")
+                {
+                    await connection.OpenAsync(TestContext.Current!.Execution.CancellationToken);
+                    await Assert.That(connection.State).IsEqualTo(ConnectionState.Open);
+                }
             }
             await using var writer = postgres.CreateDbContext();
+            writer.BindTenantLease();
             if (change == "setting-metadata")
                 await writer.SystemSettings.Where(row => row.SettingKey == GovernanceSettingKeys.Storage.Endpoint)
                     .ExecuteUpdateAsync(set => set.SetProperty(row => row.Description, "Replacement validation metadata"));
@@ -244,7 +255,19 @@ public sealed class StorageProbeNativeAuthenticationTests(PostgreSqlContainerFix
                 await writer.SecretBindings.Where(row => row.SettingKey == SecretDefinitionRegistry.Keys.Storage.AccessKeyId)
                     .ExecuteUpdateAsync(set => set.SetProperty(row => row.LastValidationError, "Changed metadata only"));
             if (change == "principal-binding")
-                await writer.UserExternalLogins.Where(row => row.Id == fixture.Binding).ExecuteDeleteAsync();
+            {
+                var cancellationToken = TestContext.Current!.Execution.CancellationToken;
+                await writer.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+                {
+                    await using var transaction = await writer.Database.BeginTransactionAsync(cancellationToken);
+                    await writer.Set<UserIdentityEmailEvidence>()
+                        .Where(row => row.ExternalLoginId == fixture.Binding).ExecuteDeleteAsync(cancellationToken);
+                    int removed = await writer.UserExternalLogins
+                        .Where(row => row.Id == fixture.Binding).ExecuteDeleteAsync(cancellationToken);
+                    await Assert.That(removed).IsEqualTo(1);
+                    await transaction.CommitAsync(cancellationToken);
+                });
+            }
             if (change == "administrator")
                 await writer.PlatformUserRoles.Where(row => row.Id == fixture.Grant).ExecuteDeleteAsync();
         };
@@ -272,6 +295,7 @@ public sealed class StorageProbeNativeAuthenticationTests(PostgreSqlContainerFix
             if (change == "secret") fixture.Request.Request.Headers["X-Setup-Secret"] = Guid.CreateVersion7().ToString("N");
             if (change == "lock") fixture.Services.GetRequiredService<ISetupSecretProvider>().Lock();
             await using var writer = postgres.CreateDbContext();
+            writer.BindTenantLease();
             if (change == "tenant-binding")
             {
                 writer.SecretBindings.Add(SecretBinding.CreateEnvironmentVariable(

@@ -114,6 +114,14 @@ internal sealed class TenantBrandingNativeAuthenticationHost(
         builder.ConfigureTestServices(services =>
         {
             services.Insert(0, ServiceDescriptor.Singleton<IExceptionHandler>(new FailureObserver(this)));
+            services.RemoveAll<Explore.Persistence.Identity.LocalIdentityWriterDbContextFactory>();
+            services.AddSingleton(_ => new Explore.Persistence.Identity.LocalIdentityWriterDbContextFactory(
+                postgres.GetNativeQueueOptions(PrimaryDatabaseRole.LocalIdentityWriter),
+                applicationEnrollment: new Explore.Persistence.Schema.PostgresLocalIdentityWriterEnrollment(
+                    postgres.NativeQueueEnrollment.MigratorLogin, postgres.NativeQueueEnrollment.RuntimeLogin,
+                    postgres.GetNativeQueueOptions(PrimaryDatabaseRole.LocalIdentityWriter).Username!,
+                    postgres.NativeQueueEnrollment.GlobalLogin),
+                interceptors: [new DatabaseFailureObserver(this)]));
             services.RemoveAll<IExternalDataProtectionSource>();
             services.AddSingleton<IExternalDataProtectionSource>(new ExternalDataProtectionTestAuthority("api", clock));
             if (clock is not null)
@@ -267,6 +275,10 @@ internal sealed class TenantBrandingNativeAuthenticationHost(
             CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         // No external storage credential is provisioned by this Local signing authority.
+        public Task<RetainedSecretReference?> CaptureAsync(
+            string settingKey, Guid? tenantId, SecretBinding? selectedBinding, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("storage_secret_unavailable");
+
         public Task<RetainedSecretReference?> CaptureInstanceAsync(
             string settingKey, CancellationToken cancellationToken)
         {

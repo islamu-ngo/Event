@@ -15,5 +15,11 @@ public interface IRetainedSecretResolver
     /// locks to establish availability, including an unconfigured external value.
     /// </summary>
     Task<RetainedSecretReference?> CaptureInstanceAsync(string settingKey, CancellationToken cancellationToken);
+    /// <summary>
+    /// Admits an already selected detached binding without another repository read.
+    /// Null selects only the registry's instance default, never another stored row.
+    /// </summary>
+    Task<RetainedSecretReference?> CaptureAsync(string settingKey, Guid? tenantId,
+        SecretBinding? selectedBinding, CancellationToken cancellationToken);
     Task<SecretResolutionResult> ResolveAsync(RetainedSecretReference reference, CancellationToken cancellationToken);
 }

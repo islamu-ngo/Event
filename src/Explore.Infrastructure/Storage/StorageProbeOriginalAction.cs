@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Explore.Application.Authentication;
+using Explore.Application.Constants;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
@@ -52,6 +53,9 @@ public sealed class StorageProbeOriginalAction(
         if (tenant.HasValue && tenant != ambientTenant) throw Denied();
         string method = request.Request.Method;
         string? path = request.Request.Path.Value;
+        var supportHeaders = request.Request.Headers
+            .Where(header => SupportAccessHeaderNames.IsSupportAccessHeader(header.Key))
+            .ToDictionary(header => header.Key, header => header.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
         await human.PrepareAsync(token);
         var subject = human.Subject ?? throw Denied();
         bool setupBranch = original is TestInstanceStorageProviderDuringSetupQuery;
@@ -80,7 +84,10 @@ public sealed class StorageProbeOriginalAction(
             if (!ReferenceEquals(contexts.HttpContext, request) || !ReferenceEquals(request.User, principal)
                 || !ReferenceEquals(action, original)
                 || !ReferenceEquals(human.Subject, subject) || tenants.TenantId != ambientTenant
-                || request.Request.Method != method || request.Request.Path.Value != path)
+                || request.Request.Method != method || request.Request.Path.Value != path
+                || request.Request.Headers.Count(header => SupportAccessHeaderNames.IsSupportAccessHeader(header.Key))
+                    != supportHeaders.Count
+                || supportHeaders.Any(header => !request.Request.Headers[header.Key].SequenceEqual(header.Value)))
                 throw Denied();
         }
         void RequirePrincipal(HumanPrincipalSourceFacts facts)

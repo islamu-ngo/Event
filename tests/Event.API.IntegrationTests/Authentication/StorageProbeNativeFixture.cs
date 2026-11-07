@@ -14,7 +14,6 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
-using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
@@ -24,7 +23,6 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Event.Api.IntegrationTests.Authentication;
 
@@ -55,15 +53,13 @@ internal sealed class StorageProbeNativeFixture : IAsyncDisposable
     {
         this.postgres = postgres;
         Remote = new(postgres);
-        root = new(postgres, Tenant, []);
+        root = new(postgres, Tenant, [], Clock);
         host = root.WithWebHostBuilder(builder =>
         {
             builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?> { ["SETUP_SECRET"] = SetupSecret, ["SETUP_SECRET_REQUIRED"] = "true" }));
             builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<TimeProvider>();
-                services.AddSingleton<TimeProvider>(Clock);
                 Remote.Register(services);
             });
         });
@@ -78,9 +74,11 @@ internal sealed class StorageProbeNativeFixture : IAsyncDisposable
 
     private async Task InitializeAsync(string branch)
     {
+        await postgres.PrepareLocalIdentityWriterAsync();
         string slug = $"probe-{Tenant:N}";
         await using (var migration = postgres.CreateDbContext())
         {
+            migration.BindTenantLease();
             await PostgresStorageProbeSourceContract.ApplyAsync(migration, postgres.NativeQueueEnrollment);
             await Explore.Persistence.Schema.PostgresExternalLoginReadPermissions.ApplyAsync(
                 migration, postgres.NativeQueueEnrollment);
@@ -96,17 +94,12 @@ internal sealed class StorageProbeNativeFixture : IAsyncDisposable
             await migration.SaveChangesAsync();
         }
         client = host.CreateClient(new() { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
-        await using (var privacyScope = host.Services.CreateAsyncScope())
-        {
-            await privacyScope.ServiceProvider.GetRequiredService<EmbeddedPrivacyErasureAuthorityStorage>().EnsureReadyAsync();
-            await using var privacy = await privacyScope.ServiceProvider
-                .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>().CreateDbContextAsync();
-            await privacy.Database.MigrateAsync();
-        }
+        await root.EnsurePrivacyAuthorityReadyAsync();
         var credentials = await ProvisionAsync();
         client.DefaultRequestHeaders.Add("X-Tenant-Slug", slug);
         using var response = await client.PostAsJsonAsync("/api/auth/local/login", credentials);
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(root.RequestFailure?.ToString() ?? await response.Content.ReadAsStringAsync());
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         await Assert.That(body.RootElement.GetProperty("success").GetBoolean()).IsTrue();
         // The ticket is genuinely signed by ordinary login. Setup admission subsequently
@@ -214,6 +207,7 @@ internal sealed class StorageProbeNativeFixture : IAsyncDisposable
     private async Task SeedSourcesAsync(string branch)
     {
         await using var seed = postgres.CreateDbContext();
+        seed.BindTenantLease();
         if (branch.StartsWith("setup", StringComparison.Ordinal))
         {
             await seed.InstanceBootstrapStates.ExecuteDeleteAsync();

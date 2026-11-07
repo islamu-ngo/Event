@@ -7,6 +7,7 @@ using Explore.Application.Models;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Storage;
+using Explore.Infrastructure.Secrets;
 using Explore.Persistence;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,7 @@ using NSubstitute;
 namespace Event.Api.IntegrationTests.Authentication;
 
 /// <summary>Substitutes only external secret material and the remote storage provider.</summary>
-internal sealed class StorageProbeNativeRemote(PostgreSqlContainerFixture postgres) : ISecretSource
+internal sealed class StorageProbeNativeRemote(PostgreSqlContainerFixture postgres) : ISecretSource, ISecretRevisionOwner
 {
     internal ExploreDbContext? Owner { get; set; }
     internal string Credential { get; set; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -33,6 +34,10 @@ internal sealed class StorageProbeNativeRemote(PostgreSqlContainerFixture postgr
     internal int SecretReads { get; private set; }
     internal HashSet<(string Key, string Version)> Objects { get; } = [];
     public SecretSourceType SourceType => SecretSourceType.EnvironmentVariable;
+    public bool IsRevisionCurrent(SecretBinding binding, string? revision) =>
+        binding.SourceType == SourceType && string.Equals(revision,
+            binding.Scope == SecretScope.Instance ? InstanceRevision ?? Revision : Revision,
+            StringComparison.Ordinal);
 
     internal void Register(IServiceCollection services)
     {

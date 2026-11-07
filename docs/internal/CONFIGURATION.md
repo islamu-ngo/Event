@@ -1401,15 +1401,32 @@ while generation checks prevent stale in-flight publication. Existing tenant
 S3 resolution and retained storage bindings keep their original scope.
 
 Storage probes retain separate instance-readiness and tenant-transport evidence.
-`IRetainedSecretResolver.CaptureInstanceAsync` captures only an instance reference
-and authority coordinates; it performs no external secret read while the native
-source owner holds locks. After that owner returns idle, the probe resolves both
+`IStorageProbeTenantSettingsReader` opens an independent ordinary Runtime context
+through `ITenantExploreDbContextFactory`, sealed to the captured request tenant.
+This also applies when the probe's original source owner is tenantless Global.
+It does not rebind that owner or relax `PostgresOrdinarySettingsContract`'s
+selected-scope guard. Detached tenant overrides and the captured instance rows
+use the existing hierarchy merge; source-generation and snapshot checks still
+reject drift at each handoff.
+`IStorageProbeSecretBindingsReader` reads the fixed two-key binding image through
+the existing storage-configuration read capability on the original source owner.
+It never acquires the configuration writer or expands direct table access.
+Detached instance and tenant winners pass through
+`IRetainedSecretResolver.CaptureAsync`'s selected-binding overload, which retains
+authority admission without selecting repository rows again. Canonical mapped
+binding metadata joins the source snapshot, including nonwinning rows.
+Capture performs no external secret read while the native source owner holds
+locks. After that owner returns idle, the probe resolves both
 retained reference pairs without selecting current bindings or using the S3
 configuration cache. Its captured instance rows and instance readiness feed the
 policy resolver; only the original tenant configuration reaches the transport.
 Each handoff rechecks both credential material/revision witnesses and the original
 source image. An unconfigured instance value remains a captured unconfigured
 observation; invalid or unavailable resolution fails closed.
+The original support-forwarding header names and value sequences remain bound
+from before the first await. Changing them rejects the action even when its
+forwarding observation was already captured. Closing or breaking the retained
+physical connection permanently expires its custody; reopening cannot restore it.
 
 Local-first storage is deployment-managed. The filesystem root is bound from static configuration and is not a tenant/admin database setting.
 

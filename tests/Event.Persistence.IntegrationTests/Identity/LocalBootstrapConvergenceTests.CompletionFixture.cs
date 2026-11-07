@@ -330,7 +330,8 @@ public sealed partial class LocalBootstrapConvergenceTests
                 NullLogger<SyncUserCommandHandler>.Instance, fence, new EventDiscoveryEnrollmentGate(Context),
                 new Explore.Persistence.Security.HumanSecuritySourceGate(Context),
                 scope.ServiceProvider.GetRequiredService<IVisitorAccessCapabilityResolver>(),
-                new RelationalSettingMutationLock(Context, owner))
+                 new RelationalSettingMutationLock(Context, owner),
+                new Explore.Persistence.Identity.IdentityEmailMirrorWriter(Context, Users))
                 .ExecuteAsync(new SyncUserCommand
                 {
                     AccountKey = Account,

@@ -81,6 +81,45 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
         return RetainedSecretReference.Capture(binding, _provider.ToString(), _authorityEndpoint, _authorityProject);
     }
 
+    public async Task<RetainedSecretReference?> CaptureInstanceAsync(
+        string settingKey, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingKey);
+        cancellationToken.ThrowIfCancellationRequested();
+        var binding = await ResolveBindingAsync(settingKey, null, cancellationToken).ConfigureAwait(false);
+        if (binding is null)
+            return null;
+        if (binding.Scope != SecretScope.Instance || binding.ScopeId is not null
+            || SelectedSourceType() != binding.SourceType
+            || !SecretBindingAdmission.AllowsBinding(binding, SecretAcquisitionPolicy.Roots(_consumer), _infisicalEnvironment))
+            throw new InvalidOperationException("storage_secret_unavailable");
+
+        return RetainedSecretReference.Capture(binding, _provider.ToString(), _authorityEndpoint, _authorityProject);
+    }
+
+    public Task<RetainedSecretReference?> CaptureAsync(
+        string settingKey, Guid? tenantId, SecretBinding? selectedBinding, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingKey);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (tenantId == Guid.Empty)
+            throw new InvalidOperationException("storage_secret_unavailable");
+        var definition = SecretDefinitionRegistry.TryGet(settingKey);
+        var binding = selectedBinding ?? CreateDefaultInstanceBinding(settingKey);
+        if (binding is null)
+            return Task.FromResult<RetainedSecretReference?>(null);
+        if (definition is null || binding.SettingKey != settingKey || binding.Qualifier != string.Empty
+            || !definition.AllowedScopes.Contains(binding.Scope)
+            || (binding.Scope == SecretScope.Instance
+                ? binding.ScopeId is not null
+                : binding.Scope != SecretScope.Tenant || !tenantId.HasValue || binding.ScopeId != tenantId)
+            || SelectedSourceType() != binding.SourceType
+            || !SecretBindingAdmission.AllowsBinding(binding, SecretAcquisitionPolicy.Roots(_consumer), _infisicalEnvironment))
+            throw new InvalidOperationException("storage_secret_unavailable");
+        return Task.FromResult<RetainedSecretReference?>(
+            RetainedSecretReference.Capture(binding, _provider.ToString(), _authorityEndpoint, _authorityProject));
+    }
+
     public async Task<SecretResolutionResult> ResolveAsync(
         RetainedSecretReference reference, CancellationToken cancellationToken)
     {

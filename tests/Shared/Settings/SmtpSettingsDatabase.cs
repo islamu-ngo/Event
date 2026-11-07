@@ -27,7 +27,7 @@ using NSubstitute.Extensions;
 
 namespace Explore.Tests.Shared.Settings;
 
-internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
+internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext, IInstanceSystemSettingsReader
 {
     private readonly SqliteConnection _connection;
     private readonly ExploreDbContext _context;
@@ -67,6 +67,11 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
     public IHierarchicalSettingsReader Settings { get; }
     public EmailDeliveryCapabilityResolver Capabilities { get; }
     public ISmtpConfigResolver Smtp { get; }
+
+    async Task<IReadOnlyList<SystemSetting>> IInstanceSystemSettingsReader.ReadAsync(
+        IReadOnlyCollection<string> keys, CancellationToken cancellationToken)
+        => await _context.SystemSettings.AsNoTracking()
+            .Where(row => keys.Contains(row.SettingKey)).ToArrayAsync(cancellationToken);
 
     public static async Task<SmtpSettingsDatabase> CreateAsync()
     {

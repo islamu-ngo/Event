@@ -38,8 +38,7 @@ public sealed class SecurityExecutionEvidenceManagedCleanupTests
         using var docker = CreateDockerClient(SelectedDockerSocket());
         string name = "islamu-cleanup-replacement-" + Guid.NewGuid().ToString("N");
         JsonElement? owned = null;
-        Exception? primary = null;
-        var teardownFailures = new List<Exception>();
+        var failures = new List<Exception>();
         try
         {
             using var first = await SendAsync(docker, HttpMethod.Post, "volumes/create", new
@@ -67,17 +66,16 @@ public sealed class SecurityExecutionEvidenceManagedCleanupTests
         }
         catch (Exception failure)
         {
-            primary = failure;
+            failures.Add(failure);
         }
         finally
         {
             if (owned is { } current)
-                await CaptureTeardownAsync(() => RemoveWitnessedVolumeAsync(docker, name, current), teardownFailures);
+                await CaptureTeardownAsync(() => RemoveWitnessedVolumeAsync(docker, name, current), failures);
         }
-        if (teardownFailures.Count != 0)
-            throw new AggregateException("Volume replacement probe and teardown failures.",
-                primary is null ? teardownFailures : new[] { primary }.Concat(teardownFailures));
-        if (primary is not null) ExceptionDispatchInfo.Capture(primary).Throw();
+        if (failures.Count > 1)
+            throw new AggregateException("Volume replacement probe and teardown failures.", failures);
+        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
     }
 
     private static async Task RunAsync(string? foreignMountType, bool stopForeign = false, bool replaceVolume = false)

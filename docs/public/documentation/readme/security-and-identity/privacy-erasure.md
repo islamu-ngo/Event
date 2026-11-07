@@ -49,6 +49,12 @@ after local settlement.
 
 ## Verified Identity Addresses
 
+Sign-in synchronization reads the identity fields needed to correlate the
+account and update its email mirror. It does not load private birth-date
+declarations or collection receipts. Email proofs and the mirror share the
+account transaction; a changed account or private-data revision refuses the
+stale write instead of refreshing its captured values.
+
 Account erasure removes the account's verified identity address claims and all
 associated verification proofs, including proofs already invalidated. These
 are removed before the sign-in bindings and profile PII in the same local
@@ -216,6 +222,19 @@ preserve the recovery history established after adoption. Use the
 [Backup, Restore & Upgrade](../configuration-and-operations/backup-restore-upgrade.md)
 procedure for recovery instead of applying a live downgrade. This correction
 does not change the other authority storage topologies.
+
+The selected migration service also installs the fixed application Runtime
+permissions needed by the co-located authority. Run it before starting the
+application; a missing authority-table permission is not a reason to grant
+superuser, table ownership or access to the entire schema. Incomplete or
+unexpected authority rights fail validation and must be investigated before
+traffic is admitted.
+
+Co-location shares the application's database and credential boundary. Its
+ordinary Runtime rights exclude counter deletion and changes to the retained
+store identity or recovery generation. It does not provide independent
+protection against compromise of that Runtime credential; choose a separate
+authority topology when that separation is required.
 
 ## The Golden Rule of Disaster Recovery
 

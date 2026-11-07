@@ -350,7 +350,9 @@ public static class InfrastructureServicesRegistration
             sp.GetRequiredService<TimeProvider>()));
 
         // Legacy S3-compatible object storage service. New local-first flows use IFileStorageProvider.
-        services.AddScoped<IS3ConfigResolver, S3ConfigResolver>();
+        services.AddScoped<S3ConfigResolver>();
+        services.AddScoped<IS3ConfigResolver>(sp => sp.GetRequiredService<S3ConfigResolver>());
+        services.AddScoped<IInstanceS3ConfigResolver>(sp => sp.GetRequiredService<S3ConfigResolver>());
         services.AddHierarchicalSettingsReader();
         services.AddSingleton<S3ConfigCacheRegistry>();
         services.AddSingleton<IS3ClientFactory, S3ClientFactory>();

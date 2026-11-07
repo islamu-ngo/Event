@@ -1169,6 +1169,16 @@ Browser/admin DTOs expose only `ApiUsernameConfigured` and `ApiKeyConfigured`
 flags, never raw credential values. Rotate credentials through the authorized
 Listmonk integration API.
 
+The `listmonk-integration` process health check has no selected tenant. It reads
+the five ordinary instance keys through `IInstanceSystemSettingsReader`, using
+the existing independent Global context, shared merge defaults and setting
+serializer. Credential references and values stay with `ISecretResolver` at
+instance scope. Ordinary Runtime still requires a selected tenant; tenant
+settings endpoints, connection tests and synchronization retain their existing
+tenant resolution. Disabled instance integration is Healthy; enabled but
+incompletely configured integration is Degraded. Health exposes configuration
+flags and secret-resolution states, never provider URLs or credential values.
+
 Quartz `integration-sync-drain` uses the existing `IntegrationSyncProcessor` section; the name is retained to avoid a configuration rename, not because a hosted processor still exists. `Enabled` registers or removes the owned job, `PollingIntervalSeconds` controls its interval, `BatchSize` bounds one pass, `ProcessingLeaseTimeoutSeconds` controls stale-claim recovery, and the retry-delay/max-attempt keys remain Infrastructure state-machine controls. An unkeyed Listmonk request with an uncertain outcome is parked and requires evidence-based operator recovery; changing retry settings never makes it eligible for blind replay.
 
 `IntegrationSyncProcessor:HealthDueWarningThreshold` defaults to `1000`; `HealthStaleWarningThreshold` and `HealthAmbiguousWarningThreshold` default to `1`. These positive bounded thresholds drive the aggregate `queue-drains` readiness check and never expose tenant, subscriber, or provider identity.
@@ -1397,6 +1407,50 @@ The PDS worker calls CarpaNet only for committed outbox rows. Event creation/upd
 Admin-host classification runs after trusted forwarded-header processing. Reverse proxies must forward `X-Forwarded-Host`, `X-Forwarded-Proto`, and `X-Forwarded-For` so the BFF sees the browser-facing host, scheme, and client IP.
 
 ### Storage Static Configuration
+
+`StoragePolicyResolver` reads the instance policy image through
+`IInstanceSystemSettingsReader` on its independent Global context. The shared
+settings merge preserves defaults, locks, delegation and the instance upload
+ceiling; permitted tenant overrides still use the selected Runtime tenant reader.
+The `storage` process health check can therefore resolve instance policy without
+selecting a request tenant or expanding Runtime permissions.
+
+Default-provider S3 detection uses the explicit `IInstanceS3ConfigResolver`
+capability. It resolves ordinary instance S3 fields through the same instance
+reader and credentials through `ISecretResolver` with a null tenant owner.
+It cannot adopt the requesting tenant's S3 configuration or cache entry.
+`S3ConfigResolver` is shared by the two scoped ports; its instance cache entry
+is separate from tenant entries, and instance invalidation clears all entries
+while generation checks prevent stale in-flight publication. Existing tenant
+S3 resolution and retained storage bindings keep their original scope.
+
+Storage probes retain separate instance-readiness and tenant-transport evidence.
+`IStorageProbeTenantSettingsReader` opens an independent ordinary Runtime context
+through `ITenantExploreDbContextFactory`, sealed to the captured request tenant.
+This also applies when the probe's original source owner is tenantless Global.
+It does not rebind that owner or relax `PostgresOrdinarySettingsContract`'s
+selected-scope guard. Detached tenant overrides and the captured instance rows
+use the existing hierarchy merge; source-generation and snapshot checks still
+reject drift at each handoff.
+`IStorageProbeSecretBindingsReader` reads the fixed two-key binding image through
+the existing storage-configuration read capability on the original source owner.
+It never acquires the configuration writer or expands direct table access.
+Detached instance and tenant winners pass through
+`IRetainedSecretResolver.CaptureAsync`'s selected-binding overload, which retains
+authority admission without selecting repository rows again. Canonical mapped
+binding metadata joins the source snapshot, including nonwinning rows.
+Capture performs no external secret read while the native source owner holds
+locks. After that owner returns idle, the probe resolves both
+retained reference pairs without selecting current bindings or using the S3
+configuration cache. Its captured instance rows and instance readiness feed the
+policy resolver; only the original tenant configuration reaches the transport.
+Each handoff rechecks both credential material/revision witnesses and the original
+source image. An unconfigured instance value remains a captured unconfigured
+observation; invalid or unavailable resolution fails closed.
+The original support-forwarding header names and value sequences remain bound
+from before the first await. Changing them rejects the action even when its
+forwarding observation was already captured. Closing or breaking the retained
+physical connection permanently expires its custody; reopening cannot restore it.
 
 Local-first storage is deployment-managed. The filesystem root is bound from static configuration and is not a tenant/admin database setting.
 

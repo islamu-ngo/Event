@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Models.Storage;
 using Explore.Application.Services;
 using Explore.Application.Settings;
@@ -13,8 +14,9 @@ public sealed class StoragePolicyResolverTests
     private static readonly Guid TenantId = Guid.CreateVersion7();
 
     private readonly IHierarchicalSettingsResolver _settingsResolver = Substitute.For<IHierarchicalSettingsResolver>();
+    private readonly IInstanceSystemSettingsReader _instanceSettings = Substitute.For<IInstanceSystemSettingsReader>();
     private readonly IFileStorageProviderResolver _providerResolver = Substitute.For<IFileStorageProviderResolver>();
-    private readonly IS3ConfigResolver _s3ConfigResolver = Substitute.For<IS3ConfigResolver>();
+    private readonly IInstanceS3ConfigResolver _s3ConfigResolver = Substitute.For<IInstanceS3ConfigResolver>();
 
     [Test]
     public async Task ResolveAsync_WithoutTenant_UsesInstancePolicy()
@@ -114,7 +116,7 @@ public sealed class StoragePolicyResolverTests
     public async Task ResolveAsync_WhenProviderIsDefaultLocalAndS3Configured_UsesS3CompatibleProvider()
     {
         SetupInstanceSettings(CreateSettings(provider: StorageProviders.Local));
-        _s3ConfigResolver.IsConfiguredAsync(Arg.Any<CancellationToken>()).Returns(true);
+        _s3ConfigResolver.IsInstanceConfiguredAsync(Arg.Any<CancellationToken>()).Returns(true);
         var resolver = CreateResolver();
 
         var policy = await resolver.ResolveAsync(null);
@@ -138,7 +140,7 @@ public sealed class StoragePolicyResolverTests
         };
 
         SetupInstanceSettings(settings);
-        _s3ConfigResolver.IsConfiguredAsync(Arg.Any<CancellationToken>()).Returns(true);
+        _s3ConfigResolver.IsInstanceConfiguredAsync(Arg.Any<CancellationToken>()).Returns(true);
         var resolver = CreateResolver();
 
         var policy = await resolver.ResolveAsync(null);
@@ -150,7 +152,7 @@ public sealed class StoragePolicyResolverTests
     public async Task ResolveAsync_WhenProviderIsDefaultLocalAndS3Missing_KeepsLocalProvider()
     {
         SetupInstanceSettings(CreateSettings(provider: StorageProviders.Local));
-        _s3ConfigResolver.IsConfiguredAsync(Arg.Any<CancellationToken>()).Returns(false);
+        _s3ConfigResolver.IsInstanceConfiguredAsync(Arg.Any<CancellationToken>()).Returns(false);
         var resolver = CreateResolver();
 
         var policy = await resolver.ResolveAsync(null);
@@ -278,16 +280,18 @@ public sealed class StoragePolicyResolverTests
     }
 
     private StoragePolicyResolver CreateResolver()
-        => new(_settingsResolver, _providerResolver, _s3ConfigResolver);
+        => new(_settingsResolver, _instanceSettings, _providerResolver, _s3ConfigResolver);
 
     private void SetupInstanceSettings(IReadOnlyList<ResolvedSetting> settings)
     {
-        _settingsResolver
-            .ResolveBatchAsync(
-                Arg.Any<IEnumerable<string>>(),
-                Arg.Is<SettingContext>(context => context.TenantId == null),
-                Arg.Any<CancellationToken>())
-            .Returns(settings);
+        _instanceSettings.ReadAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(settings.Select(setting => new SystemSetting
+            {
+                SettingKey = setting.Key,
+                Value = setting.Value,
+                ValueType = setting.ValueType,
+                IsLocked = setting.IsLocked
+            }).ToArray());
     }
 
     private void SetupTenantSettings(IReadOnlyList<ResolvedSetting> settings)

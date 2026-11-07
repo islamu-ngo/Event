@@ -598,6 +598,8 @@ public static class PersistenceServicesRegistration
 
         // User & Authentication Repositories
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<Explore.Application.Contracts.Identity.IIdentityEmailMirrorWriter,
+            Explore.Persistence.Identity.IdentityEmailMirrorWriter>();
         services.AddScoped<IExternalApiKeyRepository, ExternalApiKeyRepository>();
         services.AddScoped<IInstanceApiKeyExecutionScopeFactory, InstanceApiKeyExecutionScopeFactory>();
         services.AddScoped<Explore.Application.Features.ExternalApiKeys.InstanceApiKeyOperations>();
@@ -1098,6 +1100,8 @@ public static class PersistenceServicesRegistration
                 provider.GetService<PostgresNativeQueueEnrollment>()));
         services.AddScoped<IInstanceTenantSettingsReader, InstanceTenantSettingsReader>();
         services.AddScoped<IInstanceSystemSettingsReader, InstanceSystemSettingsReader>();
+        services.AddScoped<IStorageProbeTenantSettingsReader, StorageProbeTenantSettingsReader>();
+        services.AddScoped<IStorageProbeSecretBindingsReader, StorageProbeSecretBindingsReader>();
         services.AddScoped<HumanSettingsDataBoundary>();
         services.AddScoped<ICoordinatedSettingMutationStore, CoordinatedSettingMutationRepository>();
         services.AddScoped<IOrdinarySettingsMutationStore, OrdinarySettingsMutationStore>();

@@ -129,6 +129,23 @@ transaction. External PostgreSQL retains function-only runtime privileges throug
 No fingerprint secret is resolved or validated by ordinary enrollment, erasure
 or startup replay.
 
+For co-located PostgreSQL, the application Runtime identity owns the authority
+connection. After migrating that model, the Migrator installs its fixed storage
+contract through `PostgresCoLocatedPrivacyAuthorityStoragePermissions`. The
+contract permits the mapped counter, retained intent and identity-fence
+operations used by the C# authority. It does not confer schema ownership,
+grant options or permissions on unrelated application tables. Counter deletion
+and updates to its singleton, store identity and recovery generation remain
+outside ordinary Runtime rights.
+
+Installation and readiness reject incomplete or excessive rights rather than
+repairing drift by silently expanding access. The original serialized authority
+transaction, recovery gate, final custody checks and actor authorization remain
+application responsibilities. Co-location shares the application credential
+boundary: protection against a stolen Runtime credential requires a separately
+selected authority topology, not a claim that column grants enforce C# workflow
+authorization.
+
 Recognition erasure checks subject existence with filtered `AnyAsync` after
 acquiring the ordered user fences under the original identity transaction.
 It does not materialize the unused `User` aggregate and its private profile.
@@ -236,6 +253,22 @@ accounts, but rejects provisioning of an identity deleted during an active ban.
 No banning or strike-history enforcement is activated by this correction.
 
 ### Verified Identity Email Ownership
+
+Account correlation returns an ID and its correlation decision through
+`IdentityAccountResolution`; it does not load a personal profile. Both subject
+observations use the filtered identity-enrollment projection, including the
+second observation inside synchronization's account transaction. Claim and
+binding checks still precede account admission.
+
+For an existing account, `IIdentityEmailMirrorWriter` prepares the email mirror
+before claim reconciliation. Persistence reads only the permitted identity
+fields and birth-date revision, retains their original snapshots, and exposes a
+single-use prepared owner rather than a partial `UserPii`. Applying that owner
+preserves the original context, tenant lease, physical connection and transaction.
+Email proof changes and the mirror save share that transaction; account-stamp or
+birth-date-revision conflicts refuse the save. The operation neither reads nor
+writes the declaration or its collection receipt, and conflicting address
+ownership preserves the existing email mirror.
 
 `UserIdentityEmailClaim` and `UserIdentityEmailEvidence` are subject-owned PII,
 not retained audit evidence. `PrivacyErasureApplier` invokes

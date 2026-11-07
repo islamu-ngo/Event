@@ -25,18 +25,18 @@ public enum IdentityEmailSynchronizationOutcome
 public sealed class IdentityEmailSynchronizationOperation(IUserIdentityEmailRepository identityEmails)
 {
     public async Task<IdentityEmailSynchronizationOutcome> ExecuteAsync(
-        User user,
+        Guid userId,
         UserExternalLogin binding,
         IdentityEmailObservation observation,
         CancellationToken cancellationToken)
     {
-        if (binding.UserId != user.Id)
+        if (binding.UserId != userId)
             throw new InvalidOperationException("Identity evidence requires its exact account binding.");
 
         UserIdentityEmailEvidence? previous = await identityEmails.GetEvidenceByBindingAsync(
             binding.Id, cancellationToken);
         IReadOnlyList<UserIdentityEmailClaim> supported = await identityEmails.GetByUserAsync(
-            user.Id, cancellationToken);
+            userId, cancellationToken);
         UserIdentityEmailClaim? previousClaim = previous is null
             ? null : supported.SingleOrDefault(claim => claim.Id == previous.ClaimId);
         if (observation.EmailVerified && previous is { IsActive: true } && previousClaim is not null
@@ -50,13 +50,13 @@ public sealed class IdentityEmailSynchronizationOperation(IUserIdentityEmailRepo
 
         UserIdentityEmailClaim? claim = await identityEmails.GetByNormalizedEmailAsync(
             observation.NormalizedEmail, cancellationToken);
-        if (claim is not null && claim.UserId != user.Id)
+        if (claim is not null && claim.UserId != userId)
             return IdentityEmailSynchronizationOutcome.ConflictingOwner;
 
         claim ??= await identityEmails.CreateClaimAsync(UserIdentityEmailClaim.Create(
-            user.Id, observation.NormalizedEmail, observation.ClaimId), cancellationToken);
+            userId, observation.NormalizedEmail, observation.ClaimId), cancellationToken);
         await identityEmails.CreateEvidenceAsync(UserIdentityEmailEvidence.Create(
-            user.Id, claim.Id, binding.Id, observation.ObservedAtUtc, observation.EvidenceId), cancellationToken);
+            userId, claim.Id, binding.Id, observation.ObservedAtUtc, observation.EvidenceId), cancellationToken);
         return IdentityEmailSynchronizationOutcome.Confirmed;
     }
 }

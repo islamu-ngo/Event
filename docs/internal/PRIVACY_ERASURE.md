@@ -237,6 +237,22 @@ No banning or strike-history enforcement is activated by this correction.
 
 ### Verified Identity Email Ownership
 
+Account correlation returns an ID and its correlation decision through
+`IdentityAccountResolution`; it does not load a personal profile. Both subject
+observations use the filtered identity-enrollment projection, including the
+second observation inside synchronization's account transaction. Claim and
+binding checks still precede account admission.
+
+For an existing account, `IIdentityEmailMirrorWriter` prepares the email mirror
+before claim reconciliation. Persistence reads only the permitted identity
+fields and birth-date revision, retains their original snapshots, and exposes a
+single-use prepared owner rather than a partial `UserPii`. Applying that owner
+preserves the original context, tenant lease, physical connection and transaction.
+Email proof changes and the mirror save share that transaction; account-stamp or
+birth-date-revision conflicts refuse the save. The operation neither reads nor
+writes the declaration or its collection receipt, and conflicting address
+ownership preserves the existing email mirror.
+
 `UserIdentityEmailClaim` and `UserIdentityEmailEvidence` are subject-owned PII,
 not retained audit evidence. `PrivacyErasureApplier` invokes
 `IUserPrivacyErasureRepository.EraseIdentityEmailOwnershipAsync` after protected

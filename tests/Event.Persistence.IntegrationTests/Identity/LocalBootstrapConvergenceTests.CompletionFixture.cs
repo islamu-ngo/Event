@@ -328,7 +328,8 @@ public sealed partial class LocalBootstrapConvergenceTests
                 emails, new IdentityEmailSynchronizationOperation(emails), new ActorRepository(Context),
                 tenantContext, lifecycle, new Explore.Persistence.Services.IdentitySynchronizationBootstrapReader(Context), operation, cache, owner,
                 NullLogger<SyncUserCommandHandler>.Instance, fence, new EventDiscoveryEnrollmentGate(Context),
-                new Explore.Persistence.Security.HumanSecuritySourceGate(Context))
+                new Explore.Persistence.Security.HumanSecuritySourceGate(Context),
+                new Explore.Persistence.Identity.IdentityEmailMirrorWriter(Context, Users))
                 .ExecuteAsync(new SyncUserCommand
                 {
                     AccountKey = Account,

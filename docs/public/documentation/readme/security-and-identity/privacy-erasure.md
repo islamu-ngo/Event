@@ -49,6 +49,12 @@ after local settlement.
 
 ## Verified Identity Addresses
 
+Sign-in synchronization reads the identity fields needed to correlate the
+account and update its email mirror. It does not load private birth-date
+declarations or collection receipts. Email proofs and the mirror share the
+account transaction; a changed account or private-data revision refuses the
+stale write instead of refreshing its captured values.
+
 Account erasure removes the account's verified identity address claims and all
 associated verification proofs, including proofs already invalidated. These
 are removed before the sign-in bindings and profile PII in the same local

@@ -595,6 +595,8 @@ public static class PersistenceServicesRegistration
 
         // User & Authentication Repositories
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<Explore.Application.Contracts.Identity.IIdentityEmailMirrorWriter,
+            Explore.Persistence.Identity.IdentityEmailMirrorWriter>();
         services.AddScoped<IExternalApiKeyRepository, ExternalApiKeyRepository>();
         services.AddScoped<IInstanceApiKeyExecutionScopeFactory, InstanceApiKeyExecutionScopeFactory>();
         services.AddScoped<Explore.Application.Features.ExternalApiKeys.InstanceApiKeyOperations>();

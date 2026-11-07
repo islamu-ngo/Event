@@ -628,7 +628,7 @@ public sealed class InstanceOnboardingCompletionOperation(
             ProviderKey = providerKey,
             ProviderDisplayName = provider
         });
-        await identityEmailSynchronization.ExecuteAsync(user, login,
+        await identityEmailSynchronization.ExecuteAsync(user.Id, login,
             new Explore.Application.Services.IdentityEmailObservation(identityEmail, emailVerified, canClaim,
                 input.IdentityClaimId, input.IdentityEvidenceId, input.CompletedAt), cancellationToken);
         return user;

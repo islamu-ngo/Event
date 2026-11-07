@@ -1,0 +1,29 @@
+Change-Id: CHG-01M6T3V9TQ10E9601N99Z744PJ
+Title: "Enroll co-located authority runtime storage"
+Type: fix
+Scope: privacy
+Summary: "Install and validate the fixed Runtime storage permissions needed by co-located privacy erasure without granting unrelated application access or authority ownership."
+Group: colocated-authority-storage
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Detail: "Give the selected co-located Runtime identity exactly the authority counter, intent and fence storage rights used by C# workflows. Refuse partial, excessive, grant-option and unrelated-role access. Counter deletion and updates to retained store identity or recovery generation remain denied; co-location still shares application credential compromise risk."
+  Migration:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Detail: "Run the selected native migrator to install the fixed co-located authority storage contract after model migration. No generated migration is changed. Installation refuses drift rather than silently expanding an existing partial profile."
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/privacy-erasure.md
+    Disposition: documented
+    Detail: "Complete the selected migration service before starting application traffic. Investigate missing or unexpected authority permissions instead of granting superuser, ownership or schema-wide access. Select a separate authority topology when independent credential isolation is required."

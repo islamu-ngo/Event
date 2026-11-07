@@ -220,6 +220,8 @@ internal sealed class TenantBrandingNativeAuthenticationHost(
             table.GetSchema()!, table.GetTableName()!).SingleAsync();
         if (existing == 0)
             await authority.Database.ExecuteSqlRawAsync(authority.Database.GenerateCreateScript());
+        await Explore.Persistence.Schema.PostgresCoLocatedPrivacyAuthorityStoragePermissions.ApplyAsync(
+            authority, postgres.NativeQueueEnrollment);
     }
 
     private sealed class NativeTenantFactory(PostgreSqlContainerFixture postgres, IInterceptor[] interceptors)

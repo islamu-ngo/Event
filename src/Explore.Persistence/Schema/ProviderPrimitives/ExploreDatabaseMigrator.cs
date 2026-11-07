@@ -445,6 +445,8 @@ public static class ExploreDatabaseMigrator
                 migrationDatabaseOptions);
             await using var postgresAuthorityDb = new CoLocatedPrivacyErasureAuthorityDbContext(postgresAuthorityOptions.Options);
             await postgresAuthorityDb.Database.MigrateAsync(cancellationToken);
+            await PostgresCoLocatedPrivacyAuthorityStoragePermissions.ApplyAsync(
+                postgresAuthorityDb, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
             logger.LogInformation(
                 "Database migration operation {Operation} completed.",
                 "AuthorityCoLocatedPostgreSql");

@@ -129,6 +129,23 @@ transaction. External PostgreSQL retains function-only runtime privileges throug
 No fingerprint secret is resolved or validated by ordinary enrollment, erasure
 or startup replay.
 
+For co-located PostgreSQL, the application Runtime identity owns the authority
+connection. After migrating that model, the Migrator installs its fixed storage
+contract through `PostgresCoLocatedPrivacyAuthorityStoragePermissions`. The
+contract permits the mapped counter, retained intent and identity-fence
+operations used by the C# authority. It does not confer schema ownership,
+grant options or permissions on unrelated application tables. Counter deletion
+and updates to its singleton, store identity and recovery generation remain
+outside ordinary Runtime rights.
+
+Installation and readiness reject incomplete or excessive rights rather than
+repairing drift by silently expanding access. The original serialized authority
+transaction, recovery gate, final custody checks and actor authorization remain
+application responsibilities. Co-location shares the application credential
+boundary: protection against a stolen Runtime credential requires a separately
+selected authority topology, not a claim that column grants enforce C# workflow
+authorization.
+
 Recognition erasure checks subject existence with filtered `AnyAsync` after
 acquiring the ordered user fences under the original identity transaction.
 It does not materialize the unused `User` aggregate and its private profile.

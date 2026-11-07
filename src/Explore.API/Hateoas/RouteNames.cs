@@ -7,6 +7,7 @@ namespace Explore.API.Hateoas;
 public static class RouteNames
 {
     public const string ResolveVerifiedAccountContinuation = nameof(ResolveVerifiedAccountContinuation);
+    public const string JoinVerifiedTenant = nameof(JoinVerifiedTenant);
     public const string GetModerationNoticeCorrection = nameof(GetModerationNoticeCorrection);
     public const string GrantModerationAdjudicatedCaseReadPurpose = nameof(GrantModerationAdjudicatedCaseReadPurpose);
     public const string RevokeModerationAdjudicatedCaseReadPurpose = nameof(RevokeModerationAdjudicatedCaseReadPurpose);

@@ -21,7 +21,7 @@ public sealed partial class VerifiedTenantJoinHttpTests
         await using var fixture = await JoinFixture.CreateAsync(keycloak);
         string identities = await fixture.ReadIdentitiesAsync();
         using var first = await fixture.JoinAsync();
-        await Assert.That(first.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(first.StatusCode).IsEqualTo(HttpStatusCode.OK).Because(fixture.Failure);
         Guid membership = await fixture.AssertJoinedAsync();
         await Assert.That(await fixture.ReadIdentitiesAsync()).IsEqualTo(identities);
         string committed = await fixture.ReadGraphAsync();
@@ -31,6 +31,22 @@ public sealed partial class VerifiedTenantJoinHttpTests
         await Assert.That(repeat.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(await fixture.AssertJoinedAsync()).IsEqualTo(membership);
         await Assert.That(await fixture.ReadGraphAsync()).IsEqualTo(committed);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ExistingActiveMembershipSurvivesClosedRegistrationWithoutGraphWrites(bool keycloak)
+    {
+        await using var fixture = await JoinFixture.CreateAsync(
+            keycloak, registrationOpen: false, membershipStatus: TenantUserStatusEnum.Active);
+        string before = await fixture.ReadGraphAsync();
+
+        using var response = await fixture.JoinAsync();
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await fixture.AssertJoinedAsync();
+        await Assert.That(await fixture.ReadGraphAsync()).IsEqualTo(before);
     }
 
     [Test]
@@ -98,7 +114,7 @@ public sealed partial class VerifiedTenantJoinHttpTests
             email = "forged@example.test", targetTenantId = fixture.DefaultTenantId
         });
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK).Because(fixture.Failure);
         await fixture.AssertJoinedAsync();
         await Assert.That(await fixture.ReadIdentitiesAsync()).IsEqualTo(identities);
     }

@@ -29,6 +29,21 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
             .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.UserId == userId, cancellationToken);
     }
 
+    public Task<TenantUser?> GetForEnrollmentAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken)
+    {
+        _dbContext.ValidateTenantLease();
+        if (_dbContext.TenantFilterTenantId != tenantId || _dbContext.IsTenantFilterBypassed)
+            throw new UnauthorizedAccessException("Enrollment requires its original selected tenant.");
+        return _dbContext.TenantUsers.IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.TenantId == tenantId && row.UserId == userId)
+            .Select(row => new TenantUser
+            {
+                Id = row.Id, TenantId = row.TenantId, Tenant = null!,
+                UserId = row.UserId, User = null!, ActorId = row.ActorId,
+                StatusId = row.StatusId, IsDeleted = row.IsDeleted
+            }).SingleOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<TenantUser> CreateForExistingAccountAsync(TenantUser membership, CancellationToken cancellationToken = default)
     {
         membership.Tenant = await _dbContext.Tenants.AsTracking()

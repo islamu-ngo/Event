@@ -9,17 +9,22 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.API.IntegrationTests.Authentication;
 
 public sealed partial class VerifiedTenantJoinHttpTests
 {
-    private sealed class JoinFixture : IAsyncDisposable
+    private sealed class JoinFixture : IAsyncDisposable, IExceptionHandler
     {
         internal const string TargetSlug = "join-selected";
+        private string _failure = "No request exception was observed.";
+        internal string Failure => Volatile.Read(ref _failure);
         internal LocalAdmissionWebApplicationFactory Native { get; private set; } = null!;
         private LocalIdentityLifecycleHttpFixture? _local;
         private WebApplicationFactory<Program>? _keycloakHost;
@@ -40,7 +45,7 @@ public sealed partial class VerifiedTenantJoinHttpTests
                 if (keycloak)
                 {
                     fixture.Native = await LocalAdmissionWebApplicationFactory.CreateAsync(
-                        primaryProvider: AuthenticationProviderKind.Keycloak);
+                        primaryProvider: AuthenticationProviderKind.Keycloak, exceptionObserver: fixture);
                     fixture._keycloakHost = fixture.Native.WithWebHostBuilder(builder =>
                         builder.ConfigureAppConfiguration((_, configuration) =>
                             configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -54,7 +59,9 @@ public sealed partial class VerifiedTenantJoinHttpTests
                 }
                 else
                 {
-                    fixture._local = await LocalIdentityLifecycleHttpFixture.CreateAsync();
+                    fixture._local = await LocalIdentityLifecycleHttpFixture.CreateAsync(
+                        configureServices: services =>
+                            services.Insert(0, ServiceDescriptor.Singleton<IExceptionHandler>(fixture)));
                     fixture.Native = fixture._local.Native;
                     fixture.Client = fixture._local.Client;
                     fixture.Token = await fixture._local.SignInAsync();
@@ -165,6 +172,16 @@ public sealed partial class VerifiedTenantJoinHttpTests
             if (body is not null)
                 request.Content = JsonContent.Create(body);
             return await Client.SendAsync(request);
+        }
+
+        public ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception,
+            CancellationToken cancellationToken)
+        {
+            var root = exception.GetBaseException();
+            Volatile.Write(ref _failure,
+                $"{exception.GetType().FullName}{Environment.NewLine}{exception.StackTrace}"
+                + $"{Environment.NewLine}Root: {root.GetType().FullName}{Environment.NewLine}{root.StackTrace}");
+            return ValueTask.FromResult(false);
         }
 
         internal async Task<Guid> AssertJoinedAsync()

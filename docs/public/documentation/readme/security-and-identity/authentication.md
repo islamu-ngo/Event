@@ -663,11 +663,24 @@ and the other 25 remediation phases remain launch blockers.
 
 ---
 
-## AT Protocol Sign-In
+## Explicit Tenant Joining
+
+An existing Local or Keycloak account can explicitly join an open tenant through
+`POST /api/auth/tenant-join`, authenticated with its verified bearer token. Select
+the tenant through `X-Tenant-Slug` or the verified tenant host; account and tenant
+values in a request body do not select either identity or destination. Closed
+registration refuses a new membership but preserves an existing active one.
+Suspended or removed memberships require their ordinary administrative recovery
+flow and cannot be revived by joining again. This operation does not register an
+account or sign the browser into another host.
+
+## Browser Session Storage
 
 When upgrading the BFF session storage format, existing browser sessions require
 sign-in again. Hosts participating in a browser-session transfer must share the
 configured Redis authority and compatible data-protection context.
+
+## AT Protocol Sign-In
 
 Apply the authentication-state migrations before starting the new executable.
 The upgrade preserves existing tenant-bound login records and leaves health

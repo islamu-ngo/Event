@@ -90,6 +90,19 @@ identities and identity assertions in request bodies cannot substitute for the
 validated provider principal. This endpoint does not create accounts,
 memberships or provider credentials.
 
+`POST /api/auth/tenant-join` is the separate authenticated write for an already
+linked Local or Keycloak account. Its target comes only from the explicit tenant
+slug header or verified host authority. Native CQS selects a `Standard` Runtime
+scope for that exact target before constructing the command handler, retaining
+the original principal and credential lifetime. The command holds human,
+discovery, ordered enrollment-policy and privacy/identity sources through the
+physical settlement receipt. An active membership is returned unchanged even
+when registration is closed; a retired membership is never revived. Only a
+missing membership passes current enrollment policy and creates a relation to
+the existing personal actor. No account, provider link, credential or affinity
+is created or updated. Unknown settlement returns an unavailable response and
+does not trigger mutation replay.
+
 ATProto authentication transients now carry an explicit flow kind. Targeted
 authentication requires its tenant; unscoped verification excludes a tenant;
 health flows carry neither authentication kind nor tenant. This changes the

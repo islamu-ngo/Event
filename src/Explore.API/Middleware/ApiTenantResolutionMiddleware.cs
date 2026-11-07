@@ -42,10 +42,10 @@ public sealed class ApiTenantResolutionMiddleware
             return;
         }
 
-        if (TenantLifecycleAccessMiddleware.IsVerifiedAccountContinuation(context))
+        if (TenantLifecycleAccessMiddleware.IsVerifiedAccountOperation(context))
         {
-            // This authenticated action resolves only explicit routing facts and
-            // exact-account memberships; no incidental tenant is needed to verify it.
+            // Account actions resolve explicit routing facts themselves. A join command
+            // selects its exact native Runtime owner without borrowing a default tenant.
             await _next(context);
             return;
         }

@@ -19,10 +19,10 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
         ITenantLifecycleAccessService lifecycle, IProblemDetailsService problems,
         IOptions<McpAdapterSettings> mcpOptions)
     {
-        if (IsVerifiedAccountContinuation(context) && context.User.Identity?.IsAuthenticated == true)
+        if (IsVerifiedAccountOperation(context) && context.User.Identity?.IsAuthenticated == true)
         {
-            // The query independently requires active membership and routing.
-            // Registration closure and a missing ambient tenant are not enrollment.
+            // These exact actions resolve their own active target and account.
+            // Joining selects a fresh ordinary owner and enforces admission at commit.
             context.Response.Headers.CacheControl = "private, no-store";
             await next(context);
             return;
@@ -108,6 +108,17 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
             && action is not null
             && action.ControllerTypeInfo.AsType() == typeof(VerifiedAccountContinuationController)
             && action.MethodInfo.Name == nameof(VerifiedAccountContinuationController.Resolve);
+    }
+
+    internal static bool IsVerifiedAccountOperation(HttpContext context)
+    {
+        if (IsVerifiedAccountContinuation(context))
+            return true;
+        var action = context.GetEndpoint()?.Metadata.GetMetadata<ControllerActionDescriptor>();
+        return HttpMethods.IsPost(context.Request.Method)
+            && action is not null
+            && action.ControllerTypeInfo.AsType() == typeof(VerifiedTenantJoinController)
+            && action.MethodInfo.Name == nameof(VerifiedTenantJoinController.Join);
     }
 
     internal static bool IsPrivateAdministratorSessionRead(Endpoint? endpoint)

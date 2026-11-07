@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Authentication.Continuation;
 using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Features.Localization.Requests.Commands;
 using Explore.Application.Contracts.Identity;
@@ -22,6 +23,7 @@ internal static class PolicyMutationCommandScope
 {
     internal static bool Handles(Type request) =>
         FooterOperationScope.Handles(request)
+        || request == typeof(JoinVerifiedTenantCommand)
         || request == typeof(UpdateLocalizationGovernanceCommand)
         || request == typeof(UpdateUserLastActiveTenantCommand)
         || request == typeof(UpdateSettingCommand) || request == typeof(UpdateSettingBatchCommand)
@@ -78,6 +80,8 @@ internal static class PolicyMutationCommandScope
 
     private static PolicyMutationScope? Select(object request, ITenantContextAccessor? tenantContext) => request switch
     {
+        JoinVerifiedTenantCommand command when command.TenantId != Guid.Empty => new(command.TenantId),
+        JoinVerifiedTenantCommand => throw new UnauthorizedAccessException("Tenant joining requires an explicit target."),
         UpdateLocalizationGovernanceCommand => PolicyMutationScope.Instance,
         UpdateUserLastActiveTenantCommand => PolicyMutationScope.Instance,
         CompleteInstanceOnboardingCommand => PolicyMutationScope.Instance,

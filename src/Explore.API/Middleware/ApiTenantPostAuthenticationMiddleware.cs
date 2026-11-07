@@ -79,7 +79,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
         if (!tenantContextAccessor.IsResolved)
         {
             if (apiKeyPrincipal is not null
-                && TenantLifecycleAccessMiddleware.IsVerifiedAccountContinuation(context))
+                && TenantLifecycleAccessMiddleware.IsVerifiedAccountOperation(context))
             {
                 // Let the concrete action reject machine credentials without
                 // manufacturing an account's tenant context from the key owner.

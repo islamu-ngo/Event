@@ -860,7 +860,11 @@ Completion returns no token: log in afresh with the privately
 chosen password. Consumed or superseded authority cannot replace it again.
 
 `POST /api/auth/local/credential-replacement` accepts the challenge as a Bearer
-token and only `newPassword` in its JSON body. Its dedicated native JWT bearer
+token and only `newPassword` in its JSON body. This exact POST is exempt from
+tenant resolution and tenant lifecycle gating so first-use replacement can run
+at the instance root in MultiTenant mode without selecting a tenant. The routing
+exemption grants no identity or mutation authority; other methods and child paths
+remain tenant-gated. Its dedicated native JWT bearer
 handler validates the signing key, issuer, audience, algorithm and token type,
 then rejects duplicate or extra envelope fields, non-authoritative identifiers and
 invalid timing. The authority adapter reads exactly one authenticated identity

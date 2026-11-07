@@ -446,7 +446,10 @@ and let you retry while the challenge is still current.
 
 Direct API clients can submit the short-lived challenge as a Bearer token to
 `POST /api/auth/local/credential-replacement`, with a JSON body containing only
-`newPassword`. An ordinary access token cannot replace the challenge. Successful
+`newPassword`. This request also works at the instance root in multi-tenant
+deployments; no tenant header is needed. The exception applies only to this
+exact POST, and a valid replacement challenge is still required. An ordinary
+access token cannot replace the challenge. Successful
 replacement returns an empty HTTP 204 response, not a signed-in session; sign in
 again using the new password. Password validation returns HTTP 400 and allows a
 corrected request while the challenge remains valid. Invalid, expired or consumed

@@ -67,6 +67,11 @@ every optional integration.
 Inspect the `smtp` and `email-dispatch` entries in `/health`. There is no
 `/health/email` endpoint. `/alive` checks process liveness, not delivery.
 
+Process readiness reads instance delivery policy independently of any tenant
+request. A disabled instance does not need a tenant selection or broader Runtime
+database permissions to report `smtp_disabled`. Tenant delegation and its
+credential boundaries still apply to tenant-owned transport.
+
 | SMTP condition | Expected readiness posture |
 |---|---|
 | Delivery disabled | Healthy (`smtp_disabled`); no SMTP probe or credential resolution |

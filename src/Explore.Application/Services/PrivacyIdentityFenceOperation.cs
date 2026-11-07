@@ -212,14 +212,30 @@ public sealed class PrivacyIdentityFenceOperation(
         IOriginalOwnerSettlementBoundary owner,
         Func<CancellationToken, Task<OriginalOwnerDecision<T>>> enrollment,
         CancellationToken cancellationToken) =>
+        ExecuteSettledEnrollmentAsync(account, invocation, owner, enrollment,
+            requireIdentityGate: false, cancellationToken);
+
+    /// <summary>
+    /// Existing-account membership admission retains the identity gate even for Local
+    /// accounts, whose credentials are not the selected membership transaction owner.
+    /// </summary>
+    public Task<T> ExecuteSettledEnrollmentAsync<T>(
+        ProviderAccountKey account,
+        object invocation,
+        IOriginalOwnerSettlementBoundary owner,
+        Func<CancellationToken, Task<OriginalOwnerDecision<T>>> enrollment,
+        bool requireIdentityGate,
+        CancellationToken cancellationToken) =>
         recognition.ExecuteWithRecognitionLockAsync(
-            token => ExecuteSettledEnrollmentCoreAsync(account, invocation, owner, enrollment, token), cancellationToken);
+            token => ExecuteSettledEnrollmentCoreAsync(
+                account, invocation, owner, enrollment, requireIdentityGate, token), cancellationToken);
 
     private async Task<T> ExecuteSettledEnrollmentCoreAsync<T>(
         ProviderAccountKey account,
         object invocation,
         IOriginalOwnerSettlementBoundary owner,
         Func<CancellationToken, Task<OriginalOwnerDecision<T>>> enrollment,
+        bool requireIdentityGate,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(invocation);
@@ -229,7 +245,7 @@ public sealed class PrivacyIdentityFenceOperation(
             throw new InvalidOperationException("Human enrollment cannot borrow or replay an active enrollment scope.");
 
         bool ownerIsIdentityGate = ReferenceEquals(owner, fenceAuthority);
-        bool requiresIdentityGate = account.ProviderKind != AuthenticationProviderKind.Local;
+        bool requiresIdentityGate = requireIdentityGate || account.ProviderKind != AuthenticationProviderKind.Local;
         var scope = new IdentityGateScope();
         IOriginalOwnerSettlement<T>? settlement = null;
         OriginalOwnerDisposition? proposedDisposition = null;

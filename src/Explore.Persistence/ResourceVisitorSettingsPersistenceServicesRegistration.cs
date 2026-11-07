@@ -13,6 +13,7 @@ public static class ResourceVisitorSettingsPersistenceServicesRegistration
     public static IServiceCollection AddResourceVisitorSettingsPersistence(this IServiceCollection services)
     {
         services.TryAddScoped<ExploreDbContextExecutionLease>();
+        services.TryAddScoped<IVisitorSettingsOriginalStore, VisitorSettingsOriginalStore>();
         services.Replace(ServiceDescriptor.Scoped<IEventResourceSettingsWriter, SelectedEventResourceSettingsWriter>());
         services.Replace(ServiceDescriptor.Scoped<IVisitorAccessSettingsWriter>(provider =>
         {

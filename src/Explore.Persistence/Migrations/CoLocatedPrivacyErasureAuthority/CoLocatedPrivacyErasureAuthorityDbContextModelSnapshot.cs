@@ -43,11 +43,30 @@ namespace Explore.Persistence.Migrations.CoLocatedPrivacyErasureAuthority
                         .HasColumnType("bigint")
                         .HasColumnName("last_sequence");
 
+                    b.Property<long>("RecoveryGeneration")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("recovery_generation");
+
                     b.Property<long>("RetainedFloorSequence")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint")
                         .HasDefaultValue(0L)
                         .HasColumnName("retained_floor_sequence");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("StoreId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_id")
+                        .HasDefaultValueSql("uuidv7()");
 
                     b.HasKey("Singleton")
                         .HasName("pk_authority_counter");
@@ -55,6 +74,8 @@ namespace Explore.Persistence.Migrations.CoLocatedPrivacyErasureAuthority
                     b.ToTable("authority_counter", "islamu_event", t =>
                         {
                             t.HasCheckConstraint("ck_privacy_erasure_authority_counter_nonnegative", "last_sequence >= 0");
+
+                            t.HasCheckConstraint("ck_privacy_erasure_authority_counter_recovery", "revision > 0 AND recovery_generation > 0 AND substring(store_id::text from 15 for 1) = '7' AND substring(store_id::text from 20 for 1) IN ('8', '9', 'a', 'b')");
 
                             t.HasCheckConstraint("ck_privacy_erasure_authority_counter_retained_floor", "retained_floor_sequence >= 0 AND retained_floor_sequence <= last_sequence");
 

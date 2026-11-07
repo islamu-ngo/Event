@@ -30,6 +30,7 @@ public class UserPiiConfiguration : IEntityTypeConfiguration<UserPii>
             .HasColumnName("birth_date_collection_receipt_id");
         builder.Property<long>("_birthDateRevision")
             .HasColumnName("birth_date_revision")
+            .HasDefaultValue(0L)
             .IsConcurrencyToken();
     }
 }

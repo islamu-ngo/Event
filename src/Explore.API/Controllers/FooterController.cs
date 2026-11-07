@@ -91,6 +91,8 @@ public class FooterController : EventControllerBase
     // ── Public / tenant-read endpoints ──────────────────────────────────────
 
     [AllowAnonymous]
+    [TenantReadBootstrap]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [EndpointClassification(EndpointClass.Public)]
     [HttpGet("config", Name = RouteNames.GetFooterConfig)]
     [ProducesResponseType(StatusCodes.Status200OK)]

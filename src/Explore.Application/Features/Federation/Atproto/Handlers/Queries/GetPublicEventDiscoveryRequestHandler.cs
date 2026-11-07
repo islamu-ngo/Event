@@ -27,13 +27,15 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
     Explore.Application.Contracts.Infrastructure.ITenantContext tenantContext,
     TimeProvider timeProvider,
     ITenantLifecycleAccessService lifecycle,
-    IEventDiscoveryIdentityRepository identities)
+    IEventDiscoveryIdentityRepository identities,
+    IVisitorTenantReadAccessPolicy visitorRead)
     : IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>>
 {
     public async Task<PaginatedResult<EventDiscoveryItemDto>> QueryAsync(
         GetPublicEventDiscoveryRequest request,
         CancellationToken cancellationToken = default)
     {
+        await visitorRead.RequireAsync(tenantContext.TenantId, cancellationToken);
         var validator = new GetPublicEventDiscoveryRequestValidator();
         await validator.ValidateAndThrowAsync(request, cancellationToken);
         GetPublicEventDiscoveryRequestValidator.TryGetWindow(request, out int window);

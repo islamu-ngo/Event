@@ -1,6 +1,7 @@
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 
 namespace Explore.Persistence.Privacy.ErasureAuthority;
@@ -61,6 +62,7 @@ public sealed class EmbeddedPrivacyErasureAuthorityDbContextFactory
                     .MigrationsAssembly(EmbeddedPrivacyErasureAuthorityDbContext.MigrationsAssembly)
                     .MigrationsHistoryTable(EmbeddedPrivacyErasureAuthorityDbContext.MigrationsHistoryTable))
             .UseSnakeCaseNamingConvention()
+            .ReplaceService<IMigrationsSqlGenerator, EmbeddedPrivacyErasureMigrationsSqlGenerator>()
             .AddInterceptors(EmbeddedPrivacyErasureAuthorityConnectionInterceptor.For(
                 busyTimeoutSeconds));
 }

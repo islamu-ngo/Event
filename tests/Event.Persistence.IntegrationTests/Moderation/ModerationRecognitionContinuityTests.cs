@@ -11,6 +11,8 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using ISLAMU.Moderation.Domain;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
@@ -282,7 +284,11 @@ public sealed partial class ModerationPolicyPublicationTests
         {
             var fixture = await RecognitionErasureFixture.CreateAsync(reviewWithin: reviewWithin,
                 actionScope: actionScope, capabilities: capabilities, sanctionDuration: sanctionDuration);
-            await using var context = fixture.Database.Context();
+            await using var context = fixture.Database.MaintenanceContext();
+            await using var securityGate = new HumanSecuritySourceGate(context);
+            await using var securityLease = await securityGate.AcquireAsync();
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(context);
+            await using var discoveryLease = await discoveryGate.AcquireAsync();
             var login = await context.UserExternalLogins.SingleAsync(row => row.UserId == fixture.Subject);
             var keys = new ContinuityKeys(fixture.Clock, fixture.Keys.CopyOriginalMaterial());
             fixture.SelectedSecrets.ResolveAsync(ModerationRecognitionKeyRing.SecretSettingKey, null, Arg.Any<CancellationToken>())
@@ -315,6 +321,7 @@ public sealed partial class ModerationPolicyPublicationTests
                 var old = await context.Users.SingleAsync(row => row.Id == fixture.Subject, ct);
                 old.IsDeleted = true;
                 old.DeletedAt = Now.UtcDateTime;
+                context.PrivacyErasureReplayCheckpoints.Add(PrivacyErasureReplayCheckpoint.Start(fact, Now.UtcDateTime));
                 await context.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
                 return true;

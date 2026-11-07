@@ -1,23 +1,14 @@
 @using Explore.Blazor.Client.Layout.FooterTemplates
-@inject IPublicExperienceService PublicExperienceService
+@implements IDisposable
+@inject FooterPresentationService Presentation
 @inject CookieConsentStateService CookieConsentState
 @inject ITranslationService Translation
 
-@if (_initialized && _identityUnavailable)
-{
-    <footer class="site-footer" data-testid="footer-identity-unavailable">
-        <MudContainer MaxWidth="MaxWidth.Large" Class="site-footer__container">
-            <div role="status" aria-live="polite">
-                @T("footer.identityUnavailable", "Operator information is unavailable. Footer links are hidden until both accountable identities can be verified.")
-            </div>
-        </MudContainer>
-    </footer>
-}
-else if (_initialized && _footerEnabled)
-{
     <div class="site-footer-root">
     <footer class="site-footer">
         <MudContainer MaxWidth="MaxWidth.Large" Class="site-footer__container">
+            @if (_initialized && _footerEnabled)
+            {
             @switch (_template)
             {
                 case "standard-2-col":
@@ -72,6 +63,21 @@ else if (_initialized && _footerEnabled)
                                                 ShowCommunityGuidelinesLink="@_showCommunityGuidelinesLink"
                                                 OnCookieSettingsClick="HandleCookieSettingsClick" />
                     break;
+            }
+            }
+            @if (!_initialized || !_footerEnabled || !_showCookieSettingsLink)
+            {
+                <div class="site-footer__bottom">
+                    <div class="site-footer__brand-text">
+                        @(string.IsNullOrWhiteSpace(_brandDisplayName)
+                            ? T("footer.siteInformation", "Site information") : _brandDisplayName)
+                    </div>
+                    <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Text"
+                               Size="Size.Small" Class="site-footer__link"
+                               OnClick="HandleCookieSettingsClick">
+                        @T("footer.cookieSettings", "Cookie Settings")
+                    </MudButton>
+                </div>
             }
 
             @if (_directoryOperator is not null || _instanceOperator is not null)
@@ -141,7 +147,6 @@ else if (_initialized && _footerEnabled)
         </MudContainer>
     </footer>
     </div>
-}
 
 @code {
     private string _brandDisplayName = string.Empty;
@@ -159,40 +164,43 @@ else if (_initialized && _footerEnabled)
     private TenantDirectoryOperatorPublicDto? _directoryOperator;
     private InstanceOperatorPublicDto? _instanceOperator;
     private bool _initialized;
-    private bool _identityUnavailable;
+    private long _loadGeneration;
+    private bool _disposed;
 
-    protected override async Task OnInitializedAsync()
+    [CascadingParameter(Name = "TenantContext")]
+    public Explore.Blazor.Client.Models.TenantContext? TenantContext { get; set; }
+
+    protected override void OnInitialized() => Presentation.Changed += OnPresentationChanged;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
     {
-        var settings = await PublicExperienceService.GetCachedSettingsAsync();
-        var shell = await PublicExperienceService.GetCachedShellAsync();
+        long generation = ++_loadGeneration;
+        Apply(null);
+        _initialized = false;
+        var footer = await Presentation.GetAsync(TenantContext?.TenantId);
+        if (_disposed || generation != _loadGeneration) return;
+        Apply(footer);
         _initialized = true;
-        if (settings is null || shell?.DirectoryOperator is null || shell.InstanceOperator is null)
-        {
-            _identityUnavailable = true;
-            return;
-        }
+    }
 
-        _identityUnavailable = false;
-        _brandDisplayName = settings.BrandDisplayName ?? string.Empty;
-        _brandLogoUrl = settings.BrandLogoUrl ?? string.Empty;
-        _directoryOperator = shell?.DirectoryOperator;
-        _instanceOperator = shell?.InstanceOperator;
-
-        var footer = settings.FooterConfig;
+    private void Apply(FooterConfigDto? footer)
+    {
+        _brandDisplayName = footer?.BrandDisplayName ?? string.Empty;
+        _brandLogoUrl = footer?.BrandLogoUrl ?? string.Empty;
+        _directoryOperator = footer?.DirectoryOperator;
+        _instanceOperator = footer?.InstanceOperator;
         var footerSettings = footer?.Settings;
-        _template = footerSettings?.Template ?? _template;
-        _footerEnabled = footerSettings?.Enabled ?? _footerEnabled;
-        _showDescription = footerSettings?.ShowDescription ?? _showDescription;
+        _template = footerSettings?.Template ?? "minimal";
+        _footerEnabled = footerSettings?.Enabled ?? false;
+        _showDescription = footerSettings?.ShowDescription ?? false;
         _descriptionText = footerSettings?.DescriptionText ?? string.Empty;
-        _showSocialLinks = footerSettings?.ShowSocialLinks ?? _showSocialLinks;
+        _showSocialLinks = footerSettings?.ShowSocialLinks ?? false;
         _socialLinks = footerSettings?.SocialLinks?.ToList() ?? [];
-        _showCookieSettingsLink = footerSettings?.ShowCookieSettingsLink ?? _showCookieSettingsLink;
+        _showCookieSettingsLink = footerSettings?.ShowCookieSettingsLink ?? true;
         _linkGroups = footer?.LinkGroups?.ToList() ?? [];
-
-        // Same rule as sidebar (MainLayout): show community guidelines when non-admin users can publish events
-        _showCommunityGuidelinesLink = settings.AllowUserSubmittedEvents == true
-            || settings.AllowOrganizationSubmittedEvents == true
-            || settings.AllowGroupSubmittedEvents == true;
+        _showCommunityGuidelinesLink = footer?.ShowCommunityGuidelinesLink == true;
 
         _copyrightText = string.IsNullOrWhiteSpace(footerSettings?.CopyrightText)
             ? $"© {DateTime.Now.Year} {_brandDisplayName}. All rights reserved."
@@ -205,4 +213,21 @@ else if (_initialized && _footerEnabled)
     }
 
     private string T(string key, string fallback) => Translation.T(key, fallback);
+
+    private void OnPresentationChanged() => _ = InvokeAsync(async () =>
+    {
+        if (_disposed) return;
+        var load = LoadAsync();
+        StateHasChanged();
+        await load;
+        if (!_disposed) StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _loadGeneration++;
+        Presentation.Changed -= OnPresentationChanged;
+        GC.SuppressFinalize(this);
+    }
 }

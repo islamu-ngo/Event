@@ -43,6 +43,14 @@ authentication inputs from process environment, never application JSON or
 vault-returned configuration. User Secrets remains a separately selected local
 authority rather than an Infisical bootstrap fallback.
 
+`MigrationDatabaseAcquisition` retains the complete alias map for null masks but
+excludes `Database:LocalIdentityWriter:Password` and
+`IdentityDatabase:LocalIdentityWriter:Password` from acquisition. It still acquires
+those roles' usernames for enrollment. Canonical and environment password aliases
+remain masked when this projection overlays lower-priority host configuration.
+An explicitly empty required migrator credential still rejects acquisition
+rather than selecting another alias.
+
 Native entrypoints require `SecretProvider:Infisical:TokenLifetime` to be
 `Finite` or `Periodic`. Periodic additionally requires `TokenPeriodSeconds` equal
 to the login's reported expiration; finite rejects that field. The native owner
@@ -88,8 +96,8 @@ consumer's credentials.
 `SecretAcquisitionPolicy` admits the compiled consumer's exact roots before
 authentication. API composition selects `Api`; Standalone explicitly selects
 `Combined`; the migration service selects `Migration`. Combined admits the API
-and BFF union, not provider administration. The separate BFF loader admits four
-exact frontend roots: Keycloak, Google, AT Protocol signing and `/runtime/bff/session`.
+and BFF union, not provider administration. The separate BFF loader admits three
+exact frontend roots: Keycloak, AT Protocol signing and `/runtime/bff/session`.
 The session root maps only `BFF_SESSION_REDIS_PASSWORD` to
 `Bff:SessionAuthority:Password`; it is unavailable to the API consumer.
 Runtime source options preserve the consumer selected
@@ -417,28 +425,29 @@ programme gate; these are authored tests, not passing receipts.
 ## Authentication Configuration Is Not Credential Custody
 
 `AuthProviderConfigurationDto` returns nonsecret provider configuration and
-deployment-owned credential metadata only. It has no Google or Keycloak
-client-secret value member. Google ownership comes from the instance-only
-`ISecretResolver` outcome; Keycloak ownership uses the existing bounded connection
+deployment-owned credential metadata only. It has no Google configuration or
+client-secret value members. Keycloak ownership uses the existing bounded connection
 resolution. `ResolutionStatus` distinguishes resolved, unconfigured, unavailable,
 unauthorized and invalid outcomes without provider diagnostics or values. Other
 ownership capabilities may omit this optional status.
 
-Ordinary authentication PATCH cannot accept a Google credential. Its write
-contract rejects unmapped members and the configuration service no longer writes
+Ordinary authentication PATCH cannot accept retired Google configuration or credentials. Its write
+contract rejects unmapped members and the configuration service never resolves Google material or writes
 `auth.google_client_secret` into SystemSetting. The retired internal credential
 readback endpoint and service method are removed; onboarding HAL points to the
 public metadata endpoint. The BFF reads that metadata at startup and refresh,
 using only its own selected-authority credential projection. It has no
 last-known-secret fallback or setup-secret-triggered credential reader.
 
-Runtime Google, Keycloak BFF and ATProto frontend bindings must use the registry's
+Runtime Keycloak BFF and ATProto frontend bindings must use the registry's
 exact instance coordinates and selected environment. Admission happens before
 the credential cache or source dispatch, so a mutated reference cannot recover
 an older cached value. This does not delete legacy settings/bindings: removal
 requires the maintenance cutover and exact cleanup transaction. A resolved
 credential proves acquisition, not a successful user sign-in or completed
-multi-process convergence.
+multi-process convergence. Historical Google definitions and canonical-binding
+custody remain for retained data and authorized maintenance; they grant no active
+acquisition, receipt, installed handler or public configuration capability.
 
 ## Local Identity Signing Authority
 
@@ -463,6 +472,113 @@ enumerate this metadata and erased-subject IDs; it still cannot read those
 private payloads. Existing partial profiles fail readiness rather than receiving
 an inferred union of grants; use a freshly provisioned development profile.
 
+Local credential creation also runs `GuardExistingSubjectAsync` on its original
+selected writer and Serializable transaction. The closed application-store
+inventory therefore includes SELECT on the fixed mapped columns of
+`ModerationRecognitionPending` and `ModerationRecognitionCaptureItem`. The guard
+must validate settlement state and complete original material before enrollment;
+it cannot substitute a different Global snapshot or ignore unavailable storage.
+These sources receive no INSERT, UPDATE or DELETE rights. Writer credential
+compromise can expose pending-recognition state, receipt hashes and captured
+recognition material within this read inventory; it still grants no saga payload
+or secret-binding access. Model/catalogue drift rejects admission.
+
+Initial actor creation does not require event-table access for classification
+stamping. A newly added actor cannot have persisted event or speaker ancestors;
+the stamp collector excludes those new actor IDs from persisted ancestor queries.
+Tracked event/session changes retain their own ancestry collection, and changes
+to existing actors or newly added profiles for existing actors retain lookup and
+stamp advancement. Do not widen the identity writer's event privileges to support
+an impossible ancestor read.
+
+The writer's `UserPii` SELECT inventory includes `_birthDateRevision`, the
+database-generated concurrency value returned by an initial profile insert.
+It does not include `_dateOfBirth` or `_birthDateCollectionReceiptId`. Reading
+the revision preserves EF's original concurrency contract without exposing the
+private birth-date value or collection receipt.
+
+Onboarding completion retains its original Global enrollment owner and reads
+only the subject ID/deletion state and personal actor ID, user binding, type,
+deletion and suspension state through `GetForIdentityEnrollmentAsync`. These
+detached, scalar-only repository projections exclude private profiles, audit
+columns and related navigation graphs. They fit the existing fixed Global
+column inventory; no grants are added. The coordinator still checks the exact
+Local receipt, actor and external-login binding before completing setup.
+
+Absent-user setup completion also needs its existing application identity
+effects on that same Global transaction. `ApplyAsync` installs a closed
+completion inventory before the worker permissions: saga SELECT is limited to
+`SubjectId`; identity-email claims and evidence admit their mapped SELECT,
+INSERT and DELETE operations; platform-role assignments admit SELECT and
+INSERT; the public Role lookup admits its six mapped properties. The
+coordinator uses `ExistsBySubjectAsync` and never loads saga receipts or workflow
+state for its anti-resurrection check. Saga writes, identity-email UPDATE,
+platform-role UPDATE/DELETE, private profile reads and grant options remain
+excluded. Ordinary Runtime receives no new rights.
+
+The Global worker-creation inventory also reads `_birthDateRevision` on `UserPii`.
+EF returns this database-generated concurrency value from the initial profile
+INSERT; INSERT permission alone cannot authorize PostgreSQL's RETURNING read.
+The fixed read inventory excludes `_dateOfBirth`, `_birthDateCollectionReceiptId`
+and all other profile fields. The original Global connector, source leases and
+Serializable transaction remain in force. A Global credential can observe these
+revision counters, but receives no additional Runtime or Local authority.
+Provision a fresh development profile through the native migration workflow;
+an older incomplete worker profile remains rejected rather than silently widened.
+
+User creation and personal-actor creation use separate repository saves within
+that original transaction. Disclosure capture records a User creation only after
+successful persistence and renewed source custody. The evidence retains the
+entity ID, connection and physical transaction; the later Actor save uses the
+insert's existing row lock instead of requesting a User primary-key UPDATE.
+Save failure or EF savepoint rollback invalidates the evidence, and a replacement
+transaction clears it. Existing-user dependency fences and explicit User
+mutation fences remain effective. Global receives no additional UPDATE rights.
+
+The completion proof checks the actual Migrator grantor, exact non-grantable
+column/table privileges, membership reach, mapped shape and disabled RLS on
+these instance relations. Existing native readers retain their dormant policies;
+they do not change Global access while RLS remains disabled. Tenant and worker catalogue
+composition accepts the old baseline or the complete fixed profile; partial
+additional permissions are not an alternate readiness state. The trusted
+settings writer includes this proof in its original-owner completion checks.
+Pending credentials still precede the atomic application metadata/settings/
+administrator commit, followed by credential activation. This preserves the
+existing crash-recovery ordering rather than adding a separate identity-binding
+commit. Global's fixed credential reach includes these identity-email and
+platform-assignment operations; the accepted credential-compromise distinction
+remains the one documented in the application-owned persistence decision.
+
+`PostgresSetupLiveStoragePermissions.ApplyTrustedSettingsAsync` installs the
+setup settings storage profile after native source owners and the declared
+Local writer have been installed. The existing Global login receives column
+SELECT and INSERT on the thirteen mapped `SystemSetting` properties, with
+UPDATE on the nine value/metadata/update-audit properties. Identity, key and
+creation audit cannot be updated; table privileges, DELETE, REFERENCES and
+grant options remain denied. Forced RLS admits only the twelve compiled keys
+in `TrustedSetupSettingsWriter.Keys`, using byte-exact UTF-8 comparisons and
+the original null-tenant Global session. Paired permissive/restrictive policies
+retain that boundary without changing existing native owners' access.
+
+The coordinator observes operator-document presence through its trusted writer,
+not a full settings repository projection. Observation and effects retain the
+same context, backend, connection and Serializable transaction. PostgreSQL
+catalogue checks prove the exact column inventory, role footprint, owner and
+policy expressions before and after use; installation rejects partial or
+drifting profiles instead of repairing them. The source/receipt lease,
+create-only operator document check and completion fences remain C# authority.
+Database permission is data access, not an authenticated setup grant. A
+compromised Global credential can read or change these twelve settings directly;
+it does not gain access to unrelated private settings through this profile.
+The same fixed profile enrolls Global in the existing execute-only discovery
+disclosure role, with inheritance but no role switching or administration.
+Instance-setting saves already capture tenant dependencies and advance disclosure
+epochs on the original owner; this supplies the storage operations they require.
+No disclosure source-table privileges or owner-role membership are added.
+Catalogue admission proves the exact direct executor binding. Ordinary Runtime
+remains excluded. A compromised Global credential can also invoke those bounded
+dependency and epoch operations.
+
 ## Instance Onboarding Keys
 
 The eight `INSTANCE_BOOTSTRAP_*` keys follow the same single-authority rule as
@@ -477,6 +593,14 @@ claim. Configured Local bootstrap additionally resolves
 `authentication.local.bootstrap_password` from
 `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` (Infisical `/api/bootstrap` or `/api`); it is instance-only,
 bootstrap-classified and has no live-rotation path or source default.
+
+`SecretResolver.ResolveBindingAsync` resolves every `IsBootstrapSecret` definition
+through its registry reference before querying binding storage. Bootstrap
+credentials must remain available before persistence is ready; persisted binding
+metadata cannot redirect them. Resolution still uses only the selected authority
+and rejects material after its owner retires. Ordinary runtime secrets retain the
+tenant-to-instance binding hierarchy. This boundary requires no Runtime grant on
+`secret_bindings`.
 
 That secret creates only the initial temporary credential during incomplete
 setup. The native receipt coordinates Identity creation with application
@@ -1610,8 +1734,9 @@ backup/restore/reset policy before intentionally changing topology. This repair
 performs no automatic authority migration or database schema change.
 
 The isolated Blazor Infisical provider validates exact requested roots before
-authenticating: `/runtime/bff/oidc/keycloak`, `/runtime/bff/oidc/google`, and the
-separate ATProto consumer `/runtime/bff/atproto/oauth`. Descendants and legacy
+authenticating: `/runtime/bff/oidc/keycloak`, the separate ATProto consumer
+`/runtime/bff/atproto/oauth`, and `/runtime/bff/session`. The retired
+`/runtime/bff/oidc/google`, descendants and legacy
 `/keycloak`, `/blazor`, `/atproto` requests are rejected. Every acquisition sets
 `recursive=false` and `expandSecretReferences=false`. Returned `secretPath` must
 equal the requested root; missing provenance, unresolved `${...}` references,
@@ -1619,7 +1744,7 @@ duplicate configuration keys and keys outside the consumer's closed mapping
 fail startup. There is no load-failure suppression mode.
 
 The Keycloak mapping permits endpoint, realm, client ID and the BFF client secret;
-Google permits its client ID and secret; ATProto permits only
+ATProto permits only
 `ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS`. Restrict the BFF machine identity to these
 exact roots independently of API/provisioning identities. Supply database,
 session-encryption and session-JWT credentials only to their owning backend.
@@ -1660,14 +1785,15 @@ through their service overrides; it is not a secret or an Infisical-returned key
 input and the validated selected provider locally, without credential acquisition
 or health HTTP. Transaction owners must compare both fields with the persisted
 approved operation; a request field cannot substitute for this independent read.
-For the Environment authority, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
-are optional BFF runtime inputs. The catalogue classifies the client ID as public
-and the credential as Secret; its secret-binding projection includes the actual
-Google registry definition. Explicitly forward only to the owning processes.
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and their structured aliases are retired
+runtime inputs and are masked by process projection for every consumer. AppHost
+omits the retained Google definition from active acquisition entries. The
+definition and canonical-reference predicates remain to protect stored bindings
+from unintended cleanup; Google sign-in must be configured through Keycloak.
 
 `AuthenticationCredentialAcquisitionReceipts` records successful BFF acquisition
 with a fresh process boot identity and a random identity for each acquired
-Google/Keycloak consumer. Named OIDC installation is recorded separately:
+Keycloak consumer. Named OIDC installation is recorded separately:
 an existing options-cache or scheme entry is not proof that the newly acquired
 credential was installed. Metadata refresh reuses the process acquisition;
 it does not obtain a new credential or invent a new generation.
@@ -1929,7 +2055,7 @@ Infisical uses `SCREAMING_SNAKE_CASE` with path-based sections. The provider map
 | `/keycloak/REALM_NAME` | `Keycloak:RealmName` |
 | `/keycloak/KEYCLOAK_CLIENT_ID` | Nonsecret browser/BFF client metadata mapped to `Keycloak:ClientId` for API onboarding detection. |
 | `/runtime/bff/oidc/keycloak/KEYCLOAK_BLAZOR_CLIENT_SECRET` | Deployment-owned Blazor BFF runtime credential resolved through the selected authority; Event never persists or rotates it |
-| `/runtime/bff/oidc/google/GOOGLE_CLIENT_SECRET` | `auth.google_client_secret`; instance-only deployment-owned Google BFF runtime binding |
+| `/runtime/bff/oidc/google/GOOGLE_CLIENT_SECRET` | `auth.google_client_secret`; retained historical binding/custody only, excluded from runtime acquisition |
 | `/api/CONTROL_PLANE_REGISTRATION_CREDENTIALS` | `management.control_plane_registration_credentials` | Directional managed control-plane registration credentials. This key is instance-only and its binding stores only deployment-owned source metadata. |
 | `/api` or `/cerbos` + `AUTHORIZATION_PROVIDER` | Non-secret `Authorization:Provider` deployment intent. Blank keeps manual Local-first onboarding; `local` or `cerbos` makes the provider deployment-owned and skips the choice page. |
 | root or AI path + `AI_TOOL_PROPOSALS_ENABLED` | `AiProvider:ToolProposalsEnabled` |

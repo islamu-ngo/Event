@@ -49,6 +49,13 @@ erasure request -> append authority fact (committed first)
 
 ### Serialized Enrollment And Erased-Subject Fencing
 
+Embedded authority state reads inside serialized enrollment reuse that
+enrollment's original context and transaction, as retained-fact reads do.
+Opening a second reader there can either block on the counter or observe its
+pre-enrollment state. Reused reads neither commit nor dispose the writer;
+outside enrollment they retain independently owned read contexts. An aborted
+enrollment rolls back its facts and counters together.
+
 `PrivacyErasureService` establishes the sanctioned instance execution scope before
 constructing the mutation workflow. It acquires Human security custody before
 Discovery disclosure custody and holds both through settlement. An already
@@ -122,6 +129,91 @@ transaction. External PostgreSQL retains function-only runtime privileges throug
 No fingerprint secret is resolved or validated by ordinary enrollment, erasure
 or startup replay.
 
+For co-located PostgreSQL, the application Runtime identity owns the authority
+connection. After migrating that model, the Migrator installs its fixed storage
+contract through `PostgresCoLocatedPrivacyAuthorityStoragePermissions`. The
+contract permits the mapped counter, retained intent and identity-fence
+operations used by the C# authority. It does not confer schema ownership,
+grant options or permissions on unrelated application tables. Counter deletion
+and updates to its singleton, store identity and recovery generation remain
+outside ordinary Runtime rights.
+
+Installation and readiness reject incomplete or excessive rights rather than
+repairing drift by silently expanding access. The original serialized authority
+transaction, recovery gate, final custody checks and actor authorization remain
+application responsibilities. Co-location shares the application credential
+boundary: protection against a stolen Runtime credential requires a separately
+selected authority topology, not a claim that column grants enforce C# workflow
+authorization.
+
+Recognition erasure checks subject existence with filtered `AnyAsync` after
+acquiring the ordered user fences under the original identity transaction.
+It does not materialize the unused `User` aggregate and its private profile.
+The subject predicate, query filters and missing-subject refusal are unchanged;
+the narrow erasure purpose receives no additional private-table permissions.
+
+After the original key-lifecycle enlistment succeeds, recognition capture
+explicitly adds its newly minted material rows to the EF context. Their assigned
+identities remain unchanged; attaching them through an existing pending aggregate
+must not turn them into updates of nonexistent rows. Completed material receipts
+still return through the existing early path without regenerating their children.
+The append lease verifies keys and the restore floor before the retained append.
+Binding then rereads the exact retained fact and rechecks canonical material
+under the same original transaction, without resolving keys against the new
+authority head that intentionally precedes replay. The original settlement
+deadline still applies; recovery of a previously committed fact remains separate.
+For an acknowledgement lost during the same invocation, the application retains
+the observed fact only as a lookup hint. Recognition reconciliation opens a fresh
+identity gate, authenticates that exact retained fact and committed recovery
+tuple, and commits its primary binding before releasing the gate. A sequence
+beyond the current head returns to full append qualification; retention loss,
+conflicting facts and changed recovery state fail closed. Borrowed SQLite
+transactions remain owned by the identity gate. This is not new startup-recovery
+proof; ordinary retained replay remains responsible for process restarts.
+Binding and recovery require the original key obligations to exist; they cannot
+reconstruct deleted custody from capture rows. A pending request whose qualified
+contributions have disappeared binds the exact fact without inventing an empty
+material receipt, using the same no-longer-required transition as normal append.
+
+Tenant enrollment may attach a newly qualified continuity binding to its hidden
+capture row without exposing that row to ordinary tenant queries. Qualification
+captures the original context, tenant, connection and serializable transaction
+before its first asynchronous read. An invocation-local permit belongs to the
+exact binding object, its complete scalar values and the original qualification
+deadline. Save validates those coordinates before considering an Added parent;
+copying the binding or staging its parent cannot confer authority. Failed staging
+revokes the invocation's permits and detaches its additions. This exception applies
+only to the new binding's capture reference; tenant filters and other references
+retain their existing checks.
+
+PostgreSQL's mixed-settings authority guard resolves its fixed routine signatures
+through an uncorrelated `VALUES` query in the two catalog exclusion predicates.
+This keeps signature resolution independent of the scanned catalog rows while
+preserving the same `NOT IN` null semantics, ownership and privilege checks.
+Earlier missing-routine checks remain mandatory. Authority is still checked
+within each statement; no result survives into a later statement. The normal
+native-contract installation path refreshes the routine body without changing
+tables, retained erasure facts, checkpoints, permissions or command timeouts.
+
+Recognition eligibility expiry enters a zero-retry execution strategy before
+acquiring either the retained identity gate or its independent primary
+transaction. It refuses an ambient replaying strategy without changing the
+provider's configured retry policy. Expiry reports its count only after both
+owners return successful completion; a lost commit acknowledgement does not
+authorize another attempt. Primary-operation and primary-disposal failures are
+retained together. On shared SQLite, the identity gate remains the transaction
+owner: expiry neither commits nor disposes that borrowed transaction, and a
+failed pass marks the enclosing identity transaction failed. This is not an
+atomic transaction across independent databases.
+
+Recognition key-lifecycle mutations and material pruning use the same
+non-replaying boundary before acquiring their identity and primary owners.
+Purge-receipt expiry also uses a zero-retry scope for its own primary transaction;
+it deliberately makes no external authority call, so an authority outage cannot
+extend an expired proof. The configured provider retry policy remains available
+to unrelated operations. Native completion failures propagate without replacing
+the original transaction or silently starting another pass.
+
 Replay validates retained floor, high-water, sequence continuity and checkpoint
 identity before purging old-subject records. It does not scan reusable provider
 identities and append erasure facts for a different fresh User UUID. After normal
@@ -137,6 +229,12 @@ or invalid restore sequence still fails closed; permitting a fresh account is no
 permission to bypass replay or restore erased old-subject data.
 
 ### Reserved Moderation Recognition Configuration
+
+Standalone SQLite recognition retains an exclusive handle on its physical
+primary database for the owner's lifetime and verifies exclusion with a competing open.
+Linux error 11 from that competing open is a contention result, alongside the
+existing sharing violation mapping. Other I/O failures still reject topology;
+the change does not admit a second writer or an in-memory recognition database.
 
 `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and
 `PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` remain optional reserved configuration for
@@ -155,6 +253,22 @@ accounts, but rejects provisioning of an identity deleted during an active ban.
 No banning or strike-history enforcement is activated by this correction.
 
 ### Verified Identity Email Ownership
+
+Account correlation returns an ID and its correlation decision through
+`IdentityAccountResolution`; it does not load a personal profile. Both subject
+observations use the filtered identity-enrollment projection, including the
+second observation inside synchronization's account transaction. Claim and
+binding checks still precede account admission.
+
+For an existing account, `IIdentityEmailMirrorWriter` prepares the email mirror
+before claim reconciliation. Persistence reads only the permitted identity
+fields and birth-date revision, retains their original snapshots, and exposes a
+single-use prepared owner rather than a partial `UserPii`. Applying that owner
+preserves the original context, tenant lease, physical connection and transaction.
+Email proof changes and the mirror save share that transaction; account-stamp or
+birth-date-revision conflicts refuse the save. The operation neither reads nor
+writes the declaration or its collection receipt, and conflicting address
+ownership preserves the existing email mirror.
 
 `UserIdentityEmailClaim` and `UserIdentityEmailEvidence` are subject-owned PII,
 not retained audit evidence. `PrivacyErasureApplier` invokes
@@ -316,6 +430,37 @@ Use this decision matrix to select the right topology for your environment:
 
 ## 5. Migration Ownership and History Separation
 
+The embedded SQLite authority's `PrepareEmbeddedAuthorityRecoveryCoordinates`
+and `RestoreEmbeddedAuthorityRecoveryCoordinates` corrections add its missing
+store identity, revision and recovery generation. Preparation adds a nullable
+identity column; restoration rebuilds the table with the final defaults and
+recovery constraint. This avoids SQLite's nonconstant `ADD COLUMN` default
+restriction. Startup must finish both steps before serving traffic; preparation
+alone is not a qualified runtime model.
+
+The authority-specific SQL generator fills only null store identities before
+the required-column rebuild: EF otherwise explicitly copies nulls and bypasses
+the expression default. Nonnull identities are never replaced; the final
+constraint still rejects invalid retained coordinates. This is a storage
+migration primitive; application authorization and recovery retain their existing owners.
+
+Model defaults initialize the two counters to `1` and create a UUIDv7 using
+SQLite built-ins, without a connection-registered function. Domain-created
+counters retain their explicit values. This requires SQLite 3.42 or newer for
+fractional Unix time. The generated rebuild must preserve retained sequence,
+floor and identity-key metadata; apply through the selected authority migrator.
+Reversing both generated migrations drops the new recovery coordinates, so it
+is not an operational rollback after those coordinates have been adopted.
+
+The primary `DeclareUserPiiBirthDateRevisionDefault` correction declares an
+explicit `long` zero default for `UserPii._birthDateRevision`. PostgreSQL native
+creation admission compares that model annotation with the exact stored default
+expression and dependencies; unsupported declarations or physical drift still
+fail closed. The revision remains a concurrency token, and existing private
+values and revisions are not rewritten. Four generated catalogs cover
+PostgreSQL, SQLite, SQL Server and the shared MySQL/MariaDB owner. They do not
+change the separate privacy-authority or Data Protection catalogs.
+
 For deployed installations, `Event.MigrationService` owns application, Data
 Protection, and **exactly one** authority migration path selected by the
 topology. Provider-native application and Data Protection migration assemblies
@@ -323,6 +468,27 @@ and their distinct history tables remain separate; they are not combined with
 each other or with the selected authority path. The documented standalone
 image is the in-process exception: it applies those same three migration
 responsibilities before binding HTTP.
+
+Application policy installation uses a separate namespace execution context with
+an explicitly bound, absent tenant lease for both canonical and remapped schemas.
+It retains the selected migration authority without binding or borrowing the
+caller's context; authority migration histories remain separate.
+
+The PostgreSQL `CoLocated` catalog includes the generated
+`20261031102545_RestoreCoLocatedAuthorityRecoveryCoordinates` correction.
+It brings `authority_counter` into agreement with `PrivacyErasureCounterConfiguration`:
+`recovery_generation` and concurrency-token `revision` start at `1`, and
+`store_id` receives a database-generated UUIDv7. The recovery constraint requires
+positive counters and a valid UUIDv7 store identity. Existing rows receive these
+defaults when the migration adds the columns; no erasure facts are rewritten.
+The canonical migration model remains `islamu_event`, including when the selected
+storage namespace differs. This correction does not change other authority catalogs.
+
+Apply it through the selected migration owner before serving traffic. Its generated
+`Down` reverses the schema by dropping the constraint and all three columns, but
+discards recovery coordinates and store identity. It is not a data-preserving
+operational rollback after adoption. Preserve matched primary/authority backups
+and use the documented recovery procedure rather than downgrading the live store.
 
 ## 6. Retained Floor, Holds, and Recovery
 

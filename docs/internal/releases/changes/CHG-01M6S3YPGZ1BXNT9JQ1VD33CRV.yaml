@@ -1,0 +1,26 @@
+Change-Id: CHG-01M6S3YPGZ1BXNT9JQ1VD33CRV
+Title: "Restore tenant administrator setting changes"
+Type: fix
+Scope: access
+Summary: "Tenant administrators can update, reset, lock and unlock tenant settings while the server retains the original authenticated tenant and command authority."
+Group: tenant-settings-owner-selection
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+  Migration:
+    Reference: schemas/islamu-event.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented

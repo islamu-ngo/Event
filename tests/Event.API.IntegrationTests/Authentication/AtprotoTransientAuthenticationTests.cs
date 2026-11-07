@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Domain.ValueObjects;
 using Explore.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
@@ -88,7 +89,7 @@ public sealed class AtprotoTransientAuthenticationTests(AtprotoTransientApiFixtu
     {
         Guid tenant = await fixture.SeedTenantAsync();
         string digest = AtprotoTransientApiFixture.NewDigest();
-        var row = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, digest, tenant,
+        var row = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, digest, AtprotoAuthenticationFlowTarget.Targeted(tenant),
             Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
             fixture.Clock.GetUtcNow().AddMinutes(1).ToUnixTimeMilliseconds());
         await using (var scope = fixture.Factory.Services.CreateAsyncScope())

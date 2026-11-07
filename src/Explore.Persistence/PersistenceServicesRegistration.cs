@@ -204,6 +204,7 @@ public static class PersistenceServicesRegistration
         IdentityDatabaseTopology identityTopology = IdentityDatabaseConfiguration.GetTopology(configuration);
         services.TryAddScoped<LocalIdentityExecutionLease>();
         services.TryAddScoped<ILocalIdentityExecutionScopeFactory, LocalIdentityExecutionScopeFactory>();
+        services.TryAddScoped<ILocalVisitorEnrollmentRecoveryScopeFactory, LocalIdentityExecutionScopeFactory>();
         services.AddSingleton(_ =>
         {
             var applicationWriter = PrimaryDatabaseConfiguration.Bind(configuration, PrimaryDatabaseRole.LocalIdentityWriter);
@@ -327,6 +328,8 @@ public static class PersistenceServicesRegistration
             identityFence: serviceProvider.GetRequiredService<Explore.Application.Services.PrivacyIdentityFenceOperation>()));
         services.AddScoped<ILocalIdentityAuthService, LocalIdentityAuthService>();
         services.AddScoped<ILocalCredentialAdministration>(serviceProvider =>
+            serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>());
+        services.AddScoped<ILocalVisitorEnrollmentStore>(serviceProvider =>
             serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>());
         Explore.Persistence.Identity.LocalAdministrationSourceRegistration
             .AddLocalAdministrationSources(services);
@@ -595,6 +598,8 @@ public static class PersistenceServicesRegistration
 
         // User & Authentication Repositories
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<Explore.Application.Contracts.Identity.IIdentityEmailMirrorWriter,
+            Explore.Persistence.Identity.IdentityEmailMirrorWriter>();
         services.AddScoped<IExternalApiKeyRepository, ExternalApiKeyRepository>();
         services.AddScoped<IInstanceApiKeyExecutionScopeFactory, InstanceApiKeyExecutionScopeFactory>();
         services.AddScoped<Explore.Application.Features.ExternalApiKeys.InstanceApiKeyOperations>();
@@ -875,6 +880,10 @@ public static class PersistenceServicesRegistration
                 provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
                 provider.GetService<PostgresNativeQueueEnrollment>()));
         services.AddScoped<IEmailRetentionExecutionScopeFactory, EmailRetentionExecutionScopeFactory>();
+        services.AddScoped<IVisitorEnrollmentRecoveryReader>(provider =>
+            new VisitorEnrollmentRecoveryReader(
+                provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+                provider.GetService<PostgresNativeQueueEnrollment>()));
         services.AddScoped<IEventResourceAuditRetentionExecutionScopeFactory, EventResourceAuditRetentionExecutionScopeFactory>();
         services.AddScoped<IEventResourceProviderActivationRepository, EventResourceProviderActivationRepository>();
         services.AddScoped<IEventReportDecisionExecutionRepository, EventReportDecisionExecutionRepository>();
@@ -1090,6 +1099,9 @@ public static class PersistenceServicesRegistration
                 provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
                 provider.GetService<PostgresNativeQueueEnrollment>()));
         services.AddScoped<IInstanceTenantSettingsReader, InstanceTenantSettingsReader>();
+        services.AddScoped<IInstanceSystemSettingsReader, InstanceSystemSettingsReader>();
+        services.AddScoped<IStorageProbeTenantSettingsReader, StorageProbeTenantSettingsReader>();
+        services.AddScoped<IStorageProbeSecretBindingsReader, StorageProbeSecretBindingsReader>();
         services.AddScoped<HumanSettingsDataBoundary>();
         services.AddScoped<ICoordinatedSettingMutationStore, CoordinatedSettingMutationRepository>();
         services.AddScoped<IOrdinarySettingsMutationStore, OrdinarySettingsMutationStore>();
@@ -1141,6 +1153,9 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IEmailDispatchOutboxRepository, EmailDispatchOutboxRepository>();
         services.AddScoped<IEmailDispatchAdmission, EmailDispatchAdmission>();
         services.AddScoped<IEmailDispatchHealthSnapshotReader, EmailDispatchHealthSnapshotReader>();
+        services.AddScoped<IEmailDispatchPointerPublicationStore, EmailDispatchPointerPublicationStore>();
+        services.AddScoped<IIncomingWebhookEffectHealthReader, IncomingWebhookEffectHealthReader>();
+        services.AddScoped<IFairReturnOrchestrationHealthReader, FairReturnOrchestrationHealthReader>();
         services.AddScoped<INotificationFanoutAdmission, NotificationFanoutAdmission>();
         services.AddScoped<INotificationOutboxAdmission, NotificationOutboxAdmission>();
         services.AddScoped<INotificationOutboxExecutionAuthority, NotificationOutboxExecutionAuthority>();
@@ -1260,6 +1275,7 @@ public static class PersistenceServicesRegistration
     {
         services.TryAddScoped<LocalIdentityExecutionLease>();
         services.TryAddScoped<ILocalIdentityExecutionScopeFactory, LocalIdentityExecutionScopeFactory>();
+        services.TryAddScoped<ILocalVisitorEnrollmentRecoveryScopeFactory, LocalIdentityExecutionScopeFactory>();
         services.AddScoped(provider =>
         {
             if (InventoryHoldExpiryExecutionScopeFactory.GetSelectedRuntimeContext(provider) is { } holdExpiry)

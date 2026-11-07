@@ -5,6 +5,7 @@ using Explore.Application.Constants;
 using Explore.Application.Contracts.Services;
 using Explore.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Options;
 
 namespace Explore.API.Middleware;
@@ -35,8 +36,16 @@ public sealed class ApiTenantResolutionMiddleware
         IServiceScopeFactory scopeFactory)
     {
         var isMcpPath = IsEnabledMcpPath(context, mcpAdapterOptions.Value);
-        if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase) && !isMcpPath)
+        if (!IsTenantSurface(context, mcpAdapterOptions.Value))
         {
+            await _next(context);
+            return;
+        }
+
+        if (TenantLifecycleAccessMiddleware.IsVerifiedAccountOperation(context))
+        {
+            // Account actions resolve explicit routing facts themselves. A join command
+            // selects its exact native Runtime owner without borrowing a default tenant.
             await _next(context);
             return;
         }
@@ -144,6 +153,12 @@ public sealed class ApiTenantResolutionMiddleware
             }
         });
     }
+
+    internal static bool IsTenantSurface(HttpContext context, McpAdapterSettings mcp) =>
+        context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+        || IsEnabledMcpPath(context, mcp)
+        || context.GetEndpoint()?.Metadata.GetMetadata<ControllerActionDescriptor>()
+            ?.ControllerTypeInfo.Assembly == typeof(ApiTenantResolutionMiddleware).Assembly;
 
     private static async Task<Guid?> ResolveFromSlugHeaderAsync(HttpContext context, ITenantSlugCache tenantSlugCache)
     {

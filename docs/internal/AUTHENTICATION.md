@@ -13,7 +13,7 @@
 6. Switching the primary provider changes only new-login admission. Existing sessions retain their originating validation and refresh scheme until normal expiry.
 7. Administrator bootstrap and provider switching match the normalized `(provider_kind, provider_account_key)` identity. Ordinary email correlation additionally requires a verified address from an explicitly trusted exact issuer; neither email nor correlation trust grants administrator authority.
 8. `UserExternalLogin` is instance-global identity authority. Tenant participation exists only through `TenantUser`; a provider binding never derives authorization from a tenant ID.
-9. Public Local enrollment is closed. Instance email-delivery intent governs unverified Local token issuance, independently of SMTP availability and tenant overrides. It never changes provider-owned verification facts.
+9. Public Local enrollment is closed. Eligible Local credentials can authenticate and validate their ordinary sessions independently of email-delivery configuration. An absent or unverified email never becomes a verified-contact claim through sign-in.
 
 ## Keycloak API Access Context
 
@@ -63,6 +63,87 @@ credential replacement and ATProto bootstrap/session/transient contracts
 remain separately owned. Dynamic issuer/JWKS refresh does not change this
 deployment-owned resource/client/purpose policy. Configuration changes take
 effect on process restart. Browser tokens remain server-owned by the BFF.
+
+### Explicit ATProto transient targets
+
+Authentication transient create/read contracts require `flowKind`: `Targeted`
+(`1`) retains an exact nonempty tenant; `UnscopedVerification` (`2`) permits a
+null tenant only for OAuth state. Health probes retain their separate purpose
+with null tenant and null flow kind. Ordinary tenant-session consumption requires
+`Targeted` and compares the kind in its final conditional delete.
+
+The source-owned migration generator classifies existing tenant-bound OAuth and
+handoff rows as `Targeted` before installing the new constraint. It never turns
+health probes into authentication state. SQLite materializes the new column and
+classifies rows before its deferred table rebuild copies them. Downgrade
+preflights reject retained unscoped verification state before removing the
+discriminator; operators must retain that evidence or allow expiry and supported
+cleanup rather than inventing a tenant. Generated migrations remain unedited.
+
+## Final Tenant Enrollment Admission
+
+`POST /api/auth/account-continuation` resolves the exact verified Local or
+Keycloak account independently of signup. It returns a closed result describing
+a destination, missing membership, unlinked identity or unavailable authority.
+An explicit target takes precedence over stored affinity. API keys, machine
+identities and identity assertions in request bodies cannot substitute for the
+validated provider principal. This endpoint does not create accounts,
+memberships or provider credentials.
+
+`POST /api/auth/tenant-join` is the separate authenticated write for an already
+linked Local or Keycloak account. Its target comes only from the explicit tenant
+slug header or verified host authority. Native CQS selects a `Standard` Runtime
+scope for that exact target before constructing the command handler, retaining
+the original principal and credential lifetime. The command holds human,
+discovery, ordered enrollment-policy and privacy/identity sources through the
+physical settlement receipt. An active membership is returned unchanged even
+when registration is closed; a retired membership is never revived. Only a
+missing membership passes current enrollment policy and creates a relation to
+the existing personal actor. No account, provider link, credential or affinity
+is created or updated. Unknown settlement returns an unavailable response and
+does not trigger mutation replay.
+
+ATProto authentication transients now carry an explicit flow kind. Targeted
+authentication requires its tenant; unscoped verification excludes a tenant;
+health flows carry neither authentication kind nor tenant. This changes the
+retained authentication contract. Generated migrations backfill existing
+tenant-bound authentication rows as targeted and retain health rows unchanged.
+Downgrade refuses unscoped rows before changing schema. The restricted
+verification and subsequent browser continuation workflow remains under
+implementation.
+
+Ordinary new-account and new-membership allocation share
+`TenantEnrollmentAdmissionOperation.IsOpenAsync`: the current tenant must permit
+registration and account-required participation. Local enrollment evaluates this
+decision within its selected writer callback. Targeted ATProto bootstrap
+evaluates it before allocating a missing membership for an exact linked account.
+Keycloak synchronization evaluates it before binding and allocating an ordinary
+new account, requiring a nonempty target tenant.
+
+Provider operations retain the ordered enrollment-setting groups before the
+identity fence and through the recognition transaction's commit. Existing active
+membership login and exact-account synchronization remain available when
+registration closes. Configured administrator setup retains its independently
+verified bootstrap path. Membership persistence binds existing principal
+references in the committing context through
+`TenantUserRepository.CreateForExistingAccountAsync`, so detached read results
+cannot cause EF to insert the existing tenant again.
+
+### Source-conditioned destination sessions
+
+The BFF cookie store accepts a server-owned `BffSessionTransferSource` feature
+only after the transfer producer has validated its original protected evidence.
+It compares source binding and revision in C#, then atomically compares the
+original protected Redis bytes, checks source/handoff/destination deadlines with
+Redis time, and creates fresh destination custody. Ordinary cookie storage keeps
+its separate fresh-login path. The transfer endpoints and persistence workflow
+remain separate consumers of this storage primitive.
+
+Source and destination require the same Redis authority, namespace and
+data-protection partition. Session keys now use a shared authority hash tag to
+keep the conditional source/destination write in one Redis Cluster slot. The
+changed key/protection prefix invalidates prior server-side session handles on
+upgrade; users sign in again. Independent authorities fail closed.
 
 ## Embedded Account Correlation
 
@@ -337,9 +418,21 @@ stamp-less token is accepted. These are admission-time reads, not a distributed
 snapshot or a lock over subsequent business mutations; handlers still enforce
 their own transactional authorization invariants.
 
-For Ready but unverified credentials, the service then reads uncached instance `email.delivery_enabled` through `ISystemSettingRepository`. Missing intent uses the disabled default; strict JSON `false` permits issuance without changing `EmailConfirmed` or the resulting `email_verified=false` claim. Strict JSON `true` refuses issuance with `email_verification_required`/401, even if SMTP is missing or unhealthy. Malformed intent or a repository failure returns bounded `authentication_failed`/503; cancellation propagates. Tenant settings and transport/secret resolution do not participate in this decision. Already-verified credentials do not need the intent read, but still require Ready credential state.
+Ordinary Local login and bearer validation depend on current Ready credential
+state, exact primary identity binding, security stamp and the stored verification
+fact. They do not read `email.delivery_enabled` or resolve SMTP configuration.
+Missing, enabled, disabled, malformed or unavailable delivery configuration
+cannot change an otherwise eligible account's session eligibility. Cancellation
+and failures reading credential authority retain their existing fail-closed
+behavior.
 
-The same fresh instance intent gates unverified ordinary bearer admission. The BFF exposes only the allowlisted verification-required reason to the login UI; other provider error bodies remain hidden. Administrative enrollment remains separate from the Local lifecycle operations below. Keycloak and AT Protocol retain their own authentication and verification authority regardless of Event email-delivery intent.
+An absent address is omitted from the JWT; an unverified address retains
+`email_verified=false`. Login does not confirm the address or grant verified
+email correlation, recovery or ownership authority. Local verification and
+email-based recovery retain their delivery and verified-contact requirements.
+Administrative enrollment remains separate from those lifecycle operations.
+Keycloak and AT Protocol retain their own authentication and verification
+authority.
 
 ### Local browser session authority
 
@@ -928,7 +1021,21 @@ fencing.
 
 ## Provider Switching
 
-The administrator UI requires confirmation and target configuration before changing `PrimaryProviderId`. Application validation performs the authoritative lockout-prevention check: an administrator must already have a usable account with the target provider. The write persists the integer lookup ID, enforces three-way primary-provider exclusivity, forces AT Protocol on and Google off in sole mode, and invalidates runtime provider caches.
+The administrator UI requires confirmation and target configuration before changing `PrimaryProviderId`. Application validation performs the authoritative lockout-prevention check: an administrator must already have a usable account with the target provider. The write persists the integer lookup ID, enforces three-way primary-provider exclusivity, forces AT Protocol on in sole mode, and invalidates runtime provider caches.
+
+Direct Google authentication is retired. Supported runtime providers are Local
+Identity, Keycloak and AT Protocol; Google authentication uses Keycloak's broker.
+The BFF neither registers a Google scheme nor acquires Google client credentials.
+Unknown or retired explicit provider intent is rejected, including after retry,
+rather than selecting another provider.
+
+Authentication configuration read/write DTOs omit the retired Google controls.
+The strict write contract rejects their old JSON members. When a retained
+Google-enabled setting exists, metadata returns `UnsupportedProviderMessage`
+with broker guidance without resolving its secret. Stored identity bindings,
+canonical secret references and their custody/audit fences remain unchanged.
+Retirement does not relink accounts by email or reinterpret a Google subject as
+the Keycloak issuer/subject pair.
 
 Never delete the inactive provider's validation metadata merely because primary selection changed. Remove it only when its configuration is intentionally removed or invalidated after its session-continuity obligation ends.
 

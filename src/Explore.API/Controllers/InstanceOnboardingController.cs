@@ -20,6 +20,7 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Onboarding;
 using Explore.Application.Responses;
+using Explore.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -123,6 +124,7 @@ public class InstanceOnboardingController : EventControllerBase
     [PrivateNoStore]
     [EndpointClassification(EndpointClass.Public)]
     [HttpGet("status", Name = RouteNames.GetInstanceOnboardingStatus)]
+    [TenantReadBootstrap]
     [EndpointSummary("Get Instance Onboarding Status")]
     [EndpointDescription("Returns whether first-run onboarding is completed and whether the current user is instance admin.")]
     [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
@@ -139,6 +141,7 @@ public class InstanceOnboardingController : EventControllerBase
     [PrivateNoStore]
     [EndpointClassification(EndpointClass.Admin)]
     [HttpGet("journey", Name = RouteNames.GetInstanceOnboardingJourney)]
+    [TenantReadBootstrap]
     [EndpointSummary("Get Instance Onboarding Journey")]
     [EndpointDescription("Returns one fail-closed setup snapshot with provider readiness, persisted profile, generation, checks and authorized HAL actions.")]
     [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
@@ -163,6 +166,7 @@ public class InstanceOnboardingController : EventControllerBase
     [EnableRateLimiting(RateLimitingExtensions.SetupSecretPolicy)]
     [EndpointClassification(EndpointClass.Admin)]
     [HttpPatch("profile", Name = RouteNames.SaveInstanceOnboardingProfile)]
+    [TenantReadBootstrap]
     [EndpointSummary("Save Instance Onboarding Profile")]
     [EndpointDescription("Saves the non-secret instance profile while first-run setup authority is active.")]
     [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
@@ -190,6 +194,7 @@ public class InstanceOnboardingController : EventControllerBase
     [EnableRateLimiting(RateLimitingExtensions.SetupSecretPolicy)]
     [EndpointClassification(EndpointClass.Admin)]
     [HttpPost("complete", Name = RouteNames.CompleteInstanceOnboarding)]
+    [TenantReadBootstrap]
     [EndpointSummary("Complete Instance Onboarding")]
     [EndpointDescription("Completes first-run onboarding, assigns the current user as instance admin, and persists deployment mode.")]
     [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
@@ -266,6 +271,7 @@ public class InstanceOnboardingController : EventControllerBase
     [SuppressIdempotencyResponseStorage]
     [EndpointClassification(EndpointClass.Admin)]
     [HttpPost("complete-local", Name = RouteNames.CompleteLocalInstanceOnboarding)]
+    [TenantReadBootstrap]
     [EndpointSummary("Complete Local Instance Onboarding")]
     [EndpointDescription("Enrolls the initial Local administrator under setup authority. Private credential replacement is required before ordinary sign-in.")]
     [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
@@ -308,6 +314,7 @@ public class InstanceOnboardingController : EventControllerBase
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
     [HttpPost("validate-secret", Name = RouteNames.ValidateInstanceSetupSecret)]
+    [TenantReadBootstrap]
     [EnableRateLimiting(RateLimitingExtensions.SetupSecretPolicy)]
     [EndpointSummary("Validate Setup Secret")]
     [EndpointDescription("Validates the provided setup secret. Returns whether the secret is correct. Rate limited to 5 attempts per minute.")]
@@ -346,6 +353,7 @@ public class InstanceOnboardingController : EventControllerBase
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
     [HttpGet("auth-provider-configuration", Name = RouteNames.GetInstanceOnboardingAuthProviderConfiguration)]
+    [TenantReadBootstrap]
     [EndpointSummary("Get Auth Provider Configuration (Public)")]
     [EndpointDescription("Returns auth provider configuration without secrets. Used by BFF at startup to discover configured providers.")]
     [PrivateNoStore]
@@ -374,6 +382,14 @@ public class InstanceOnboardingController : EventControllerBase
         {
             links.Add(LinkRelations.VisitorSignupPrefix + destination.Provider.ToString().ToLowerInvariant(),
                 HalLink.Create(destination.Url));
+            if (destination.Provider == AuthenticationProviderKind.Local)
+                links.Add("local-register", new HalLink
+                {
+                    Href = Url.RouteUrl(RouteNames.RegisterLocalVisitor)
+                        ?? throw new InvalidOperationException("The Local registration route is not registered."),
+                    Method = HttpMethods.Post,
+                    Title = "Create a Local account"
+                });
         }
         return Ok(new HalResource<AuthProviderConfigurationDto>(configuration, links));
     }
@@ -383,6 +399,7 @@ public class InstanceOnboardingController : EventControllerBase
     [EnableRateLimiting(RateLimitingExtensions.SetupSecretPolicy)]
     [EndpointClassification(EndpointClass.Admin)]
     [HttpGet("authz-provider-configuration/internal", Name = RouteNames.GetInstanceOnboardingAuthorizationProviderConfigurationInternal)]
+    [TenantReadBootstrap]
     [EndpointSummary("Get Authorization Provider Configuration (Internal)")]
     [EndpointDescription("Returns authorization provider configuration for setup flow. Protected by setup secret.")]
     [ProducesResponseType(typeof(AuthorizationProviderConfigurationDto), StatusCodes.Status200OK)]
@@ -402,6 +419,7 @@ public class InstanceOnboardingController : EventControllerBase
     [PrivateNoStore]
     [SuppressIdempotencyResponseStorage]
     [HttpPost("authz-provider-configuration/sync", Name = RouteNames.SyncInstanceOnboardingAuthorizationPolicyPackage)]
+    [TenantReadBootstrap]
     [EndpointSummary("Sync Authorization Policy Package (Setup)")]
     [EndpointDescription("Publishes the authorization policy package during instance setup. Protected by setup secret.")]
     [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
@@ -429,6 +447,7 @@ public class InstanceOnboardingController : EventControllerBase
     [EnableRateLimiting(RateLimitingExtensions.SetupSecretPolicy)]
     [EndpointClassification(EndpointClass.Admin)]
     [HttpGet("authz-provider-configuration/package", Name = RouteNames.DownloadInstanceOnboardingAuthorizationPolicyPackage)]
+    [TenantReadBootstrap]
     [EndpointSummary("Download Authorization Policy Package (Setup)")]
     [EndpointDescription("Downloads a ZIP archive containing the authorization policy package and manual cerbosctl instructions. Protected by setup secret.")]
     [Produces("application/zip")]
@@ -456,6 +475,7 @@ public class InstanceOnboardingController : EventControllerBase
     [EnableRateLimiting(RateLimitingExtensions.SetupSecretPolicy)]
     [EndpointClassification(EndpointClass.Admin)]
     [HttpPost("authz-provider-configuration/verify", Name = RouteNames.VerifyInstanceOnboardingAuthorizationProviderEndpoint)]
+    [TenantReadBootstrap]
     [EndpointSummary("Verify Cerbos Authorization Endpoint")]
     [EndpointDescription("Verifies a Cerbos gRPC endpoint by calling its gRPC health service. Protected by setup secret.")]
     [Consumes("application/json")]

@@ -1,7 +1,0 @@
-// ABOUTME: Synthetic repository classifier that duplicates a physical database constraint name.
-// ABOUTME: Proves exception classification must resolve finalized identifiers from EF metadata.
-
-internal static class ForbiddenConstraintClassifierFixture
-{
-    private const string ConstraintName = "ux_example_records_tenant_identity";
-}

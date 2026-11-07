@@ -75,8 +75,8 @@ public sealed class SetupSecretDurableRevocationTests
     {
         Configuration = OptionalUpdate<AuthProviderConfigurationWriteDto>.Set(new()
         {
-            GoogleSsoEnabled = true,
-            GoogleClientId = "client-id"
+            AtprotoLoginEnabled = true,
+            AtprotoPublicUrl = "https://events.example.test"
         })
     };
 

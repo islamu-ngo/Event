@@ -15,6 +15,9 @@ namespace Explore.Application.Features.InstanceOnboarding.Services;
 /// </summary>
 public interface ITrustedSetupSettingsWriter
 {
+    /// <summary>Reads only operator identity presence on the original enrollment owner; grants no write authority.</summary>
+    Task<bool> HasOperatorIdentityAsync(IUnitOfWork originalOwner, CancellationToken cancellationToken);
+
     Task<T> ExecuteAsync<T>(TrustedSetupSettingsApply<T> apply, CancellationToken cancellationToken);
 }
 

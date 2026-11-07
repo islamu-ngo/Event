@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NSubstitute;
 
 namespace Event.Api.IntegrationTests.Authentication;
@@ -22,20 +23,15 @@ public class AuthorizationProviderConfigurationServiceTests
     [Test]
     public async Task ReadConfigurationAsync_IgnoresLegacyStoredAdminCredentials()
     {
-        var repository = Substitute.For<ISystemSettingRepository>();
-        repository.GetByKey(GovernanceSettingKeys.Security.AuthorizationProvider)
-            .Returns(CreateSetting(GovernanceSettingKeys.Security.AuthorizationProvider, "cerbos"));
-        repository.GetByKey(GovernanceSettingKeys.Cerbos.GrpcEndpoint)
-            .Returns(CreateSetting(GovernanceSettingKeys.Cerbos.GrpcEndpoint, "https://cerbosgrpc.example.com:443"));
-        repository.GetByKey(GovernanceSettingKeys.Cerbos.CustomAdminEndpoint)
-            .Returns(CreateSetting(GovernanceSettingKeys.Cerbos.CustomAdminEndpoint, "https://tenant-cerbos.example.com:3592"));
         string retiredUsername = Guid.CreateVersion7().ToString("N");
         string retiredPassword = Guid.CreateVersion7().ToString("N");
-        repository.GetByKey(InfrastructureSecretSettingKeys.Cerbos.CustomAdminUsername)
-            .Returns(CreateSetting(InfrastructureSecretSettingKeys.Cerbos.CustomAdminUsername, retiredUsername));
-        repository.GetByKey(InfrastructureSecretSettingKeys.Cerbos.CustomAdminPassword)
-            .Returns(CreateSetting(InfrastructureSecretSettingKeys.Cerbos.CustomAdminPassword, retiredPassword));
-        var service = CreateService(repository);
+        var reader = new DetachedSettingsReader(
+            CreateSetting(GovernanceSettingKeys.Security.AuthorizationProvider, "cerbos"),
+            CreateSetting(GovernanceSettingKeys.Cerbos.GrpcEndpoint, "https://cerbosgrpc.example.com:443"),
+            CreateSetting(GovernanceSettingKeys.Cerbos.CustomAdminEndpoint, "https://tenant-cerbos.example.com:3592"),
+            CreateSetting(InfrastructureSecretSettingKeys.Cerbos.CustomAdminUsername, retiredUsername),
+            CreateSetting(InfrastructureSecretSettingKeys.Cerbos.CustomAdminPassword, retiredPassword));
+        var service = CreateService(reader);
 
         var configuration = await service.ReadConfigurationAsync();
 
@@ -57,14 +53,13 @@ public class AuthorizationProviderConfigurationServiceTests
     [Test]
     public async Task ReadConfigurationAsync_WhenEnvironmentEndpointExists_BootstrapsEditableApplicationManagedMetadata()
     {
-        var repository = Substitute.For<ISystemSettingRepository>();
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Cerbos:GrpcEndpoint"] = "cerbosgrpc.openislamu.org:443"
             })
             .Build();
-        var service = CreateService(repository, configuration: configuration);
+        var service = CreateService(configuration: configuration);
 
         var result = await service.ReadConfigurationAsync();
 
@@ -84,9 +79,8 @@ public class AuthorizationProviderConfigurationServiceTests
     [Test]
     public async Task ReadConfigurationAsync_WithExplicitLocalProvider_IsReadyWithoutCerbos()
     {
-        var repository = Substitute.For<ISystemSettingRepository>();
-        repository.GetByKey(GovernanceSettingKeys.Security.AuthorizationProvider)
-            .Returns(CreateSetting(GovernanceSettingKeys.Security.AuthorizationProvider, "cerbos"));
+        var reader = new DetachedSettingsReader(
+            CreateSetting(GovernanceSettingKeys.Security.AuthorizationProvider, "cerbos"));
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -95,7 +89,7 @@ public class AuthorizationProviderConfigurationServiceTests
             })
             .Build();
         var packageService = Substitute.For<IPolicyPackageService>();
-        var service = CreateService(repository, configuration: configuration, packageService: packageService);
+        var service = CreateService(reader, configuration: configuration, packageService: packageService);
 
         var result = await service.ReadConfigurationAsync();
         var reconciliation = await service.ReconcileDeploymentProviderAsync();
@@ -111,9 +105,8 @@ public class AuthorizationProviderConfigurationServiceTests
     [Test]
     public async Task ReadConfigurationAsync_WithExplicitCerbosProvider_RemainsPendingUntilServerReconciliationSucceeds()
     {
-        var repository = Substitute.For<ISystemSettingRepository>();
-        repository.GetByKey(GovernanceSettingKeys.Security.AuthorizationProvider)
-            .Returns(CreateSetting(GovernanceSettingKeys.Security.AuthorizationProvider, "local"));
+        var reader = new DetachedSettingsReader(
+            CreateSetting(GovernanceSettingKeys.Security.AuthorizationProvider, "local"));
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -122,9 +115,12 @@ public class AuthorizationProviderConfigurationServiceTests
             })
             .Build();
         var state = new AuthorizationProviderBootstrapState();
-        var service = CreateService(repository, configuration: configuration, bootstrapState: state);
+        var packageService = Substitute.For<IPolicyPackageService>();
+        var service = CreateService(reader, configuration: configuration, packageService: packageService,
+            bootstrapState: state);
 
         var pending = await service.ReadConfigurationAsync();
+        packageService.IsPublicationReadyAsync(Arg.Any<CancellationToken>()).Returns(true);
         state.MarkReady("cerbos", endpointVerified: true, policiesSynchronized: true, "ready");
         var ready = await service.ReadConfigurationAsync();
 
@@ -140,7 +136,6 @@ public class AuthorizationProviderConfigurationServiceTests
     [Test]
     public async Task ReconcileDeploymentProviderAsync_WhenCanceled_RecordsSafeFailedState()
     {
-        var repository = Substitute.For<ISystemSettingRepository>();
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -149,7 +144,7 @@ public class AuthorizationProviderConfigurationServiceTests
             })
             .Build();
         var packageService = Substitute.For<IPolicyPackageService>();
-        var service = CreateService(repository, configuration: configuration, packageService: packageService);
+        var service = CreateService(configuration: configuration, packageService: packageService);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
@@ -227,20 +222,23 @@ public class AuthorizationProviderConfigurationServiceTests
     [Test]
     public async Task ApplyConfigurationAsync_WithDeploymentManagedProvider_RejectsApplicationOverride()
     {
-        await using var fixture = await AdministratorAsync();
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Authorization:Provider"] = "local"
             })
             .Build();
-        var service = CreateMutationService(fixture, configuration);
+        await using var fixture = await AdministratorAsync(configuration);
+        var service = CreateMutationService(fixture);
 
-        await Assert.That(() => service.ApplyConfigurationAsync(Command(fixture, new()
+        var failure = await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+            service.ApplyConfigurationAsync(Command(fixture, new()
         {
             Provider = "cerbos",
             CerbosGrpcEndpoint = "https://cerbos.example.test:443"
-        }))).Throws<InvalidOperationException>();
+        })));
+        await Assert.That(failure!.Errors.Select(error => error.PropertyName).ToArray())
+            .IsEquivalentTo(new[] { "Provider" });
 
         await using var observer = fixture.CreateIndependentContext();
         await Assert.That(await observer.SystemSettings.AnyAsync(row =>
@@ -252,18 +250,16 @@ public class AuthorizationProviderConfigurationServiceTests
     [Test]
     public async Task ReadConfigurationAsync_WhenDatabaseEndpointExists_DatabaseWinsOverEnvironmentBootstrap()
     {
-        var repository = Substitute.For<ISystemSettingRepository>();
-        repository.GetByKey(GovernanceSettingKeys.Security.AuthorizationProvider)
-            .Returns(CreateSetting(GovernanceSettingKeys.Security.AuthorizationProvider, "cerbos"));
-        repository.GetByKey(GovernanceSettingKeys.Cerbos.GrpcEndpoint)
-            .Returns(CreateSetting(GovernanceSettingKeys.Cerbos.GrpcEndpoint, "https://saved-cerbos.example.com:443"));
+        var reader = new DetachedSettingsReader(
+            CreateSetting(GovernanceSettingKeys.Security.AuthorizationProvider, "cerbos"),
+            CreateSetting(GovernanceSettingKeys.Cerbos.GrpcEndpoint, "https://saved-cerbos.example.com:443"));
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Cerbos:GrpcEndpoint"] = "cerbosgrpc.openislamu.org:443"
             })
             .Build();
-        var service = CreateService(repository, configuration: configuration);
+        var service = CreateService(reader, configuration: configuration);
 
         var result = await service.ReadConfigurationAsync();
 
@@ -276,9 +272,8 @@ public class AuthorizationProviderConfigurationServiceTests
     [Test]
     public async Task ReadConfigurationAsync_WhenEndpointDeploymentManaged_UsesEnvironmentAndReturnsReadOnlyMetadata()
     {
-        var repository = Substitute.For<ISystemSettingRepository>();
-        repository.GetByKey(GovernanceSettingKeys.Cerbos.GrpcEndpoint)
-            .Returns(CreateSetting(GovernanceSettingKeys.Cerbos.GrpcEndpoint, "https://saved-cerbos.example.com:443"));
+        var reader = new DetachedSettingsReader(
+            CreateSetting(GovernanceSettingKeys.Cerbos.GrpcEndpoint, "https://saved-cerbos.example.com:443"));
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -286,7 +281,7 @@ public class AuthorizationProviderConfigurationServiceTests
                 ["Secrets:Ownership:DeploymentManagedKeys:0"] = GovernanceSettingKeys.Cerbos.GrpcEndpoint
             })
             .Build();
-        var service = CreateService(repository, configuration: configuration);
+        var service = CreateService(reader, configuration: configuration);
 
         var result = await service.ReadConfigurationAsync();
 
@@ -301,7 +296,6 @@ public class AuthorizationProviderConfigurationServiceTests
     [Test]
     public async Task ApplyConfigurationAsync_WhenEndpointAndCredentialsDeploymentManaged_DoesNotPersistOwnedValues()
     {
-        await using var fixture = await AdministratorAsync();
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -310,7 +304,8 @@ public class AuthorizationProviderConfigurationServiceTests
                 ["Secrets:Ownership:DeploymentManagedKeys:2"] = InfrastructureSecretSettingKeys.Cerbos.CustomAdminPassword
             })
             .Build();
-        var service = CreateMutationService(fixture, configuration);
+        await using var fixture = await AdministratorAsync(configuration);
+        var service = CreateMutationService(fixture);
 
         await service.ApplyConfigurationAsync(Command(fixture, new()
         {
@@ -433,13 +428,15 @@ public class AuthorizationProviderConfigurationServiceTests
         var activation = new SettledCacheActivation(fixture);
         var service = CreateMutationService(fixture, activation: activation);
 
-        await Assert.That(async () => await service.ApplyConfigurationAsync(Command(fixture, new()
+        var failure = await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+            service.ApplyConfigurationAsync(Command(fixture, new()
         {
             Provider = "cerbos",
             CerbosGrpcEndpoint = "https://cerbosgrpc.example.com:443",
             CerbosAdminEndpoint = "https://127.0.0.1:3592"
-        })))
-            .Throws<InvalidOperationException>();
+        })));
+        await Assert.That(failure!.Errors.Select(error => error.PropertyName).ToArray())
+            .IsEquivalentTo(new[] { "CerbosAdminEndpoint" });
 
         await using var observer = fixture.CreateIndependentContext();
         await Assert.That(await observer.SystemSettings.AnyAsync(row =>
@@ -453,22 +450,23 @@ public class AuthorizationProviderConfigurationServiceTests
     [Test]
     public async Task VerifyCerbosAdminEndpointAsync_WithUnsafeEndpoint_ReturnsFalseWithoutPersistingSecrets()
     {
-        var repository = Substitute.For<ISystemSettingRepository>();
-        var service = CreateService(repository);
+        await using var fixture = await AdministratorAsync();
+        var service = CreateMutationService(fixture);
+        await using var observer = fixture.CreateIndependentContext();
+        var before = JsonSerializer.Serialize(await observer.SystemSettings.AsNoTracking()
+            .OrderBy(row => row.Id).ToListAsync());
 
         var result = await service.VerifyCerbosAdminEndpointAsync("https://127.0.0.1:3592");
 
         await Assert.That(result).IsFalse();
-        await repository.DidNotReceive().UpsertAsync(
-            Arg.Any<SystemSetting>(),
-            Arg.Any<CancellationToken>());
+        await Assert.That(JsonSerializer.Serialize(await observer.SystemSettings.AsNoTracking()
+            .OrderBy(row => row.Id).ToListAsync())).IsEqualTo(before);
     }
 
     [Test]
     public async Task VerifyCerbosAdminEndpointAsync_WithBareRemoteHost_NormalizesAndAccepts()
     {
-        var repository = Substitute.For<ISystemSettingRepository>();
-        var service = CreateService(repository);
+        var service = CreateService();
 
         var result = await service.VerifyCerbosAdminEndpointAsync("cerbosapi.openislamu.org:3592");
 
@@ -476,7 +474,7 @@ public class AuthorizationProviderConfigurationServiceTests
     }
 
     private static AuthorizationProviderConfigurationService CreateService(
-        ISystemSettingRepository repository,
+        IInstanceSystemSettingsReader? reader = null,
         IAuthorizationProviderModeCacheInvalidator? invalidator = null,
         ICerbosConfigResolver? cerbosConfigResolver = null,
         IConfiguration? configuration = null,
@@ -489,7 +487,7 @@ public class AuthorizationProviderConfigurationServiceTests
             .Returns<IPolicyMutationExecutionScope>(_ =>
                 throw new InvalidOperationException("An observation fixture cannot acquire a mutation owner."));
         return new AuthorizationProviderConfigurationService(
-            repository,
+            reader ?? new DetachedSettingsReader(),
             configuration,
             new CerbosAdminEndpointValidator(),
             invalidator ?? Substitute.For<IAuthorizationProviderModeCacheInvalidator>(),
@@ -501,12 +499,31 @@ public class AuthorizationProviderConfigurationServiceTests
             }),
             bootstrapState ?? new AuthorizationProviderBootstrapState(),
             Substitute.For<ILogger<AuthorizationProviderConfigurationService>>(),
-            readOnlyFactory);
+            readOnlyFactory,
+            new HealthyCerbosEndpointProbe());
     }
 
-    private static async Task<ResourceVisitorAuthenticatedFixture> AdministratorAsync()
+    private static async Task<ResourceVisitorAuthenticatedFixture> AdministratorAsync(IConfiguration? configuration = null)
     {
-        var fixture = await ResourceVisitorAuthenticatedFixture.CreateAsync();
+        var fixture = await ResourceVisitorAuthenticatedFixture.CreateAsync(configureServices: services =>
+        {
+            services.RemoveAll<ICerbosEndpointHealthProbe>();
+            services.AddSingleton<ICerbosEndpointHealthProbe>(new HealthyCerbosEndpointProbe());
+            if (configuration is not null)
+            {
+                var baseline = services.Last(descriptor => descriptor.ServiceType == typeof(IConfiguration))
+                    .ImplementationFactory
+                    ?? throw new InvalidOperationException("The fixture must expose its baseline configuration factory.");
+                services.RemoveAll<IConfiguration>();
+                services.AddSingleton<IConfiguration>(provider => new ConfigurationBuilder()
+                    .AddConfiguration((IConfiguration)baseline(provider))
+                    .AddConfiguration(configuration)
+                    .Build());
+                services.AddOptions<AuthorizationProviderDeploymentOptions>()
+                    .PostConfigure<IConfiguration>((options, deployment) =>
+                        options.Provider = deployment["Authorization:Provider"]);
+            }
+        });
         try
         {
             var role = await fixture.Context.Roles.SingleAsync(row => row.MasterCode == "platform.admin");
@@ -533,19 +550,45 @@ public class AuthorizationProviderConfigurationServiceTests
         };
 
     private static AuthorizationProviderConfigurationService CreateMutationService(
-        ResourceVisitorAuthenticatedFixture fixture, IConfiguration? configuration = null,
-        SettledCacheActivation? activation = null)
+        ResourceVisitorAuthenticatedFixture fixture, SettledCacheActivation? activation = null)
     {
-        configuration ??= new ConfigurationBuilder().Build();
         activation ??= new SettledCacheActivation(fixture);
         return new AuthorizationProviderConfigurationService(
-            fixture.Services.GetRequiredService<ISystemSettingRepository>(), configuration,
+            new MutationSnapshotOnlyReader(), fixture.Services.GetRequiredService<IConfiguration>(),
             new CerbosAdminEndpointValidator(), activation, activation,
             fixture.Services.GetRequiredService<IPolicyPackageService>(),
-            Options.Create(new AuthorizationProviderDeploymentOptions { Provider = configuration["Authorization:Provider"] }),
+            fixture.Services.GetRequiredService<IOptions<AuthorizationProviderDeploymentOptions>>(),
             new AuthorizationProviderBootstrapState(),
             fixture.Services.GetRequiredService<ILogger<AuthorizationProviderConfigurationService>>(),
-            fixture.Services.GetRequiredService<IPolicyMutationExecutionScopeFactory>());
+            fixture.Services.GetRequiredService<IPolicyMutationExecutionScopeFactory>(),
+            fixture.Services.GetRequiredService<ICerbosEndpointHealthProbe>());
+    }
+
+    private sealed class HealthyCerbosEndpointProbe : ICerbosEndpointHealthProbe
+    {
+        public Task<bool> VerifyAsync(string grpcEndpoint, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(true);
+        }
+    }
+
+    private sealed class DetachedSettingsReader(params SystemSetting[] settings) : IInstanceSystemSettingsReader
+    {
+        public Task<IReadOnlyList<SystemSetting>> ReadAsync(
+            IReadOnlyCollection<string> keys, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<IReadOnlyList<SystemSetting>>(
+                settings.Where(setting => keys.Contains(setting.SettingKey)).ToArray());
+        }
+    }
+
+    private sealed class MutationSnapshotOnlyReader : IInstanceSystemSettingsReader
+    {
+        public Task<IReadOnlyList<SystemSetting>> ReadAsync(
+            IReadOnlyCollection<string> keys, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("A prepared mutation must read its original snapshot.");
     }
 
     private sealed class SettledCacheActivation(ResourceVisitorAuthenticatedFixture fixture)

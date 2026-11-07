@@ -25,7 +25,7 @@ public sealed class RegistrationConsentRecordPersistenceTests
         await using var database = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("phase84")
             .WithUsername("postgres")
-            .WithPassword("postgres")
+            .WithPassword(global::Event.Testing.PostgreSql.PostgresTestRoleBootstrap.ReadBootstrapPassword())
             .Build();
         await database.StartAsync();
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()

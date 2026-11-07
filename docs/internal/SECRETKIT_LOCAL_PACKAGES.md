@@ -82,7 +82,7 @@ checksums, license and notices. Narrow `.dockerignore` exceptions retain the
 bundle even when root README/license exclusions would otherwise apply.
 No provider input or credential is part of this build flow.
 
-All four build stages use the same digest-pinned SDK **10.0.302** required
+All four build stages use the same digest-pinned SDK **10.0.403** required
 by `global.json`. Do not replace that pin with the moving `10.0` SDK tag:
 its current feature band may not satisfy the repository's SDK selection.
 This alignment does not weaken global SDK resolution or qualify an image

@@ -10,6 +10,8 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using ISLAMU.Moderation.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -250,6 +252,10 @@ public sealed partial class ModerationPolicyPublicationTests
         public async Task EnrollAsync(Guid subject, ProviderAccountKey account, bool provisioning = true)
         {
             await using var context = Database.Context();
+            await using var securityGate = new HumanSecuritySourceGate(context);
+            await using var securityLease = await securityGate.AcquireAsync();
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(context);
+            await using var discoveryLease = await discoveryGate.AcquireAsync();
             var fence = new PrivacyIdentityFenceOperation(Continuity.Fixture.Retained.Repository,
                 Continuity.Service(context), Clock, new UserExternalLoginRepository(context),
                 NativeIdentityRecognitionBoundary.RejectHumanSettlement);
@@ -282,7 +288,7 @@ public sealed partial class ModerationPolicyPublicationTests
 
         public async Task ComputeAsync(PrivacyErasureRequest request)
         {
-            await using var context = Database.Context();
+            await using var context = Database.MaintenanceContext();
             var repository = Continuity.Repository(context);
             await Continuity.Service(context).ExecuteWithRecognitionLockAsync(async ct =>
             {
@@ -294,7 +300,11 @@ public sealed partial class ModerationPolicyPublicationTests
 
         public async Task<PrivacyErasureIntent> EraseAsync(PrivacyErasureRequest request)
         {
-            await using var context = Database.Context();
+            await using var context = Database.MaintenanceContext();
+            await using var securityGate = new HumanSecuritySourceGate(context);
+            await using var securityLease = await securityGate.AcquireAsync();
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(context);
+            await using var discoveryLease = await discoveryGate.AcquireAsync();
             var capture = Capture(context);
             var fact = await capture.AppendAsync(request, RandomNumberGenerator.GetBytes(32),
                 Clock.UtcNow.AddHours(2), CancellationToken.None)
@@ -308,6 +318,10 @@ public sealed partial class ModerationPolicyPublicationTests
                 var erased = await context.Users.SingleAsync(row => row.Id == request.SubjectId, ct);
                 erased.IsDeleted = true;
                 erased.DeletedAt = Clock.UtcNow.UtcDateTime;
+                var previous = await context.PrivacyErasureReplayCheckpoints.AsNoTracking()
+                    .OrderByDescending(row => row.AuthoritySequence).FirstAsync(ct);
+                context.PrivacyErasureReplayCheckpoints.Add(
+                    PrivacyErasureReplayCheckpoint.Advance(previous, fact, Clock.UtcNow.UtcDateTime));
                 await context.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
                 return true;

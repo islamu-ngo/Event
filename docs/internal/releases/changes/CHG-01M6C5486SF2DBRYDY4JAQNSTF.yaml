@@ -1,0 +1,36 @@
+Change-Id: CHG-01M6C5486SF2DBRYDY4JAQNSTF
+Title: "Withhold receipt tokens when publication authority changes"
+Type: fix
+Scope: access
+Summary: "Recheck caller selection, cancellation and token lifetime after native commit completion before releasing a receipt bearer."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Commit completion is not itself publication authority. Recheck the
+      selected caller, tenant and machine, original context and connection,
+      cancellation and receipt clock window before returning token bytes.
+      Withheld tokens are zeroed without replaying issuance or claiming that
+      already committed receipt history was rolled back.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented
+    Detail: >-
+      A receipt row can remain committed when cancellation, expiry or changed
+      caller selection prevents token delivery. Stored history alone is not
+      a returned bearer or present read permission.

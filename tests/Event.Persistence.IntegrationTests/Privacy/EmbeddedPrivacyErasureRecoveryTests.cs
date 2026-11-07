@@ -18,6 +18,40 @@ namespace Event.Persistence.IntegrationTests.Privacy;
 public sealed class EmbeddedPrivacyErasureRecoveryTests
 {
     [Test]
+    public async Task EnrollmentStateReadsObserveOriginalTransactionWithoutCommittingIt()
+    {
+        DirectoryInfo root = Directory.CreateTempSubdirectory("authority-state-owner-");
+        try
+        {
+            await using var provider = await CreateAuthorityProviderAsync(Path.Combine(root.FullName, "authority.db"));
+            await using var scope = provider.CreateAsyncScope();
+            var authority = scope.ServiceProvider.GetRequiredService<IPrivacyErasureAuthority>();
+            var identity = scope.ServiceProvider.GetRequiredService<IPrivacyIdentityFenceAuthority>();
+            var abort = new InvalidOperationException("abort-original-enrollment");
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                identity.ExecuteEnrollmentSerializedAsync<int>(async token =>
+                {
+                    var fact = await authority.AppendAsync(PrivacyErasureRequest.Create(
+                        Guid.CreateVersion7(), PrivacyErasureSubjectKind.User, Guid.CreateVersion7(),
+                        PrivacyErasureReasonCode.AccountDeletion, 1), token);
+                    await Assert.That((await authority.GetStateAsync(token)).HighWaterSequence)
+                        .IsEqualTo(fact.AuthoritySequence);
+                    await Assert.That((await authority.ReadAfterAsync(0, 1, token)).Single().IntentId)
+                        .IsEqualTo(fact.IntentId);
+                    throw abort;
+                }, _ => Task.CompletedTask, CancellationToken.None));
+            await Assert.That(ReferenceEquals(failure, abort)).IsTrue();
+            await Assert.That(await authority.GetStateAsync()).IsEqualTo(new PrivacyErasureAuthorityState(0, 0));
+            await Assert.That((await authority.ReadAfterAsync(0, 1)).Count).IsEqualTo(0);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            root.Delete(recursive: true);
+        }
+    }
+
+    [Test]
     [Arguments(2L)]
     [Arguments(3L)]
     public async Task RetentionMaintenance_SequenceGapFailsAtomicallyWithoutAdvancingFloor(

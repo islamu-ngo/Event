@@ -3,6 +3,7 @@ using Explore.Application.Authentication;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -83,12 +84,7 @@ public sealed partial class ModerationResourceQuarantineDutyRepository
             || context.Database.ProviderName is not (RelationalNamedLock.PostgreSqlProvider
                 or RelationalNamedLock.SqlServerProvider or RelationalNamedLock.SqliteProvider or RelationalNamedLock.MySqlProvider))
             return false;
-        if (context.Database.ProviderName != RelationalNamedLock.PostgreSqlProvider) return true;
-        await using var command = context.Database.GetDbConnection().CreateCommand();
-        command.Transaction = transaction.GetDbTransaction();
-        command.CommandText = "SELECT current_setting('app.current_tenant_id', true)";
-        return await command.ExecuteScalarAsync(token) is string value
-            && Guid.TryParse(value, out var current) && current == tenantId;
+        return await PostgresTenantSessionProbe.MatchesAsync(context, transaction, tenantId, token);
     }
 
     private IQueryable<Guid> ManagerIds(Guid tenantId) =>

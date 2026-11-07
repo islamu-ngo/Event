@@ -30,6 +30,12 @@ different commits or label missing runtime lanes as complete. If publication fai
 follow [coverage publication operations](OPERATIONS.md#codecov-coverage-publication);
 do not substitute coverage percentages for the checklist's required tests.
 
+Prepare the owned browser through the existing native installer and its
+dedicated committed lock, preserving other tools' locks. Follow
+[security fixture prerequisites](CI_CD_GOVERNANCE.md#security-integration-fixture-execution)
+when restore or download fails. Only actual case execution, not installation,
+can satisfy the browser portion of the candidate's assurance.
+
 Generate the existing durable evidence bundle only as the checklist directs:
 
 ```sh
@@ -252,6 +258,18 @@ execution sidecar and referenced reports have also been supplied:
 3. Keep these exact bytes for replay and tag-only clones. Missing, stale,
    duplicated, skipped, zero-test or digest-inconsistent evidence rejects
    candidate verification before a manifest is written.
+
+When acquisition fails before child launch, distinguish the selected daemon's
+read-only transport result from workload and cleanup evidence. Do not use
+diagnostic socket-completion or global tracing overrides to qualify the final
+candidate; the dedicated handler's context isolation must work normally.
+
+Establish actual engine readiness with a separate bounded read-only uncached
+inventory request on the selected socket. Desktop proxy cache responses can
+precede VM startup; retain startup/readiness evidence separately. Preserve the
+asynchronous client's five-second request and three-second connection allowances.
+A lost mutation response is an unknown outcome: inspect the qualified resource
+and preserve the error instead of adding retries or declaring cleanup complete.
 
 ```sh
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \

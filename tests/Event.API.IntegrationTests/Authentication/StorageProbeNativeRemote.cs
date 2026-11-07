@@ -7,6 +7,7 @@ using Explore.Application.Models;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Storage;
+using Explore.Infrastructure.Secrets;
 using Explore.Persistence;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
@@ -17,11 +18,13 @@ using NSubstitute;
 namespace Event.Api.IntegrationTests.Authentication;
 
 /// <summary>Substitutes only external secret material and the remote storage provider.</summary>
-internal sealed class StorageProbeNativeRemote(PostgreSqlContainerFixture postgres) : ISecretSource
+internal sealed class StorageProbeNativeRemote(PostgreSqlContainerFixture postgres) : ISecretSource, ISecretRevisionOwner
 {
     internal ExploreDbContext? Owner { get; set; }
     internal string Credential { get; set; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     internal string Revision { get; set; } = Guid.CreateVersion7().ToString("N");
+    internal string? InstanceCredential { get; set; }
+    internal string? InstanceRevision { get; set; }
     internal Func<Task>? AfterVersioning { get; set; }
     internal Func<Task>? AfterPut { get; set; }
     internal Func<Task>? AfterDelete { get; set; }
@@ -31,6 +34,10 @@ internal sealed class StorageProbeNativeRemote(PostgreSqlContainerFixture postgr
     internal int SecretReads { get; private set; }
     internal HashSet<(string Key, string Version)> Objects { get; } = [];
     public SecretSourceType SourceType => SecretSourceType.EnvironmentVariable;
+    public bool IsRevisionCurrent(SecretBinding binding, string? revision) =>
+        binding.SourceType == SourceType && string.Equals(revision,
+            binding.Scope == SecretScope.Instance ? InstanceRevision ?? Revision : Revision,
+            StringComparison.Ordinal);
 
     internal void Register(IServiceCollection services)
     {
@@ -53,8 +60,10 @@ internal sealed class StorageProbeNativeRemote(PostgreSqlContainerFixture postgr
         await RequireReleasedAsync();
         SecretReads++;
         if (DuringSecretResolution is { } callback) await callback();
-        return SecretResolutionResult.Resolved(new ResolvedSecret(binding.SettingKey, Credential,
-            SourceType, binding.Scope, binding.ScopeId, DateTimeOffset.UtcNow, Revision));
+        return SecretResolutionResult.Resolved(new ResolvedSecret(binding.SettingKey,
+            binding.Scope == SecretScope.Instance ? InstanceCredential ?? Credential : Credential,
+            SourceType, binding.Scope, binding.ScopeId, DateTimeOffset.UtcNow,
+            binding.Scope == SecretScope.Instance ? InstanceRevision ?? Revision : Revision));
     }
 
     public async Task<bool> ValidateAsync(SecretBinding binding, CancellationToken cancellationToken = default) =>

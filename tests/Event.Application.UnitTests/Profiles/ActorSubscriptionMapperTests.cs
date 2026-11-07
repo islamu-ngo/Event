@@ -312,6 +312,10 @@ public sealed class ActorSubscriptionMapperTests
 
     private sealed class MembershipStore(List<TenantUser> memberships) : ReadStore<TenantUser>, ITenantUserRepository
     {
+        public Task<TenantUser> CreateForExistingAccountAsync(TenantUser membership, CancellationToken cancellationToken = default) =>
+            Create(membership);
+        public Task<TenantUser?> GetForEnrollmentAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken) =>
+            GetByTenantAndUserAsync(tenantId, userId, cancellationToken);
         public Task<bool> FenceActiveTenantUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
         public Task<TenantUser?> GetByTenantAndUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default) =>

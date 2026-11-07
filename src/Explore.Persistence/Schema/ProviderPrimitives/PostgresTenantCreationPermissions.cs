@@ -231,11 +231,18 @@ public static class PostgresTenantCreationPermissions
             PostgresActorOwnershipReadPermissions.TryGetRuntimeReadColumns(context, source.Type, out var columns);
             return columns.Select(column => $"({runtime},{Text(source.Table)},{Text(column)},'SELECT',false)");
         });
+        var bootstrapGrants = sources.SelectMany(source =>
+            PostgresSetupLiveStoragePermissions.GlobalBootstrapColumns(context, source.Type)
+                .SelectMany(column => new[] { "SELECT", "INSERT", "UPDATE" }
+                    .Select(privilege => $"({global},{Text(source.Table)},{Text(column)},{Text(privilege)},false)")));
+        bootstrapGrants = bootstrapGrants.Concat(sources.SelectMany(source =>
+            PostgresSetupLiveStoragePermissions.GlobalCompletionColumns(context, source.Type)
+                .Select(grant => $"({global},{Text(source.Table)},{Text(grant.Column)},{Text(grant.Privilege)},false)")));
         // Role already belongs to Runtime's fixed public catalogue. Recognize that direct
         // source intersection without installing it or admitting an inherited role union.
         var role = sources.Single(source => source.Type == typeof(Role));
         PostgresLookupCatalogueReadPermissions.TryGetRuntimeReadColumns(context, typeof(Role), out var runtimeRoleColumns);
-        string expected = "VALUES " + string.Join(',', globalGrants.Concat(workerGrants).Concat(membershipReads).Concat(membershipMutations).Concat(tenantKeyParents).Concat(actorOwnershipReads).Concat(runtimeRoleColumns.Select(column =>
+        string expected = "VALUES " + string.Join(',', globalGrants.Concat(workerGrants).Concat(membershipReads).Concat(membershipMutations).Concat(tenantKeyParents).Concat(actorOwnershipReads).Concat(bootstrapGrants).Concat(runtimeRoleColumns.Select(column =>
             $"({runtime},{Text(role.Table)},{Text(column)},'SELECT',false)")));
         string tables = "ARRAY[" + string.Join(',', sources.Select(source => Text(source.Table))) + "]::text[]";
         string required = complete ? $"""
@@ -276,7 +283,8 @@ public static class PostgresTenantCreationPermissions
                                             AND acl.grantor=t.relowner AND acl.privilege_type=permission.privilege AND NOT acl.is_grantable)
                                         AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=0 AND acl.privilege_type=permission.privilege))))))
                 AND ({sourceProofs}) AND ({PostgresManagedTenantWorkerCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment)})
-                AND ({PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment)}) {required})
+                AND ({PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment)})
+                AND ({PostgresSetupLiveStoragePermissions.OptionalGlobalCompletionCataloguePredicate(context, enrollment)}) {required})
             """;
     }
 
@@ -501,7 +509,12 @@ public static class PostgresTenantCreationPermissions
             string baseline = string.Join(" OR ", preexistingReads.Select(column =>
                     $"a.attname={Text(column)} AND acl.privilege_type='SELECT'")
                 .Concat(PostgresTenantMembershipMutationPermissions.GlobalUpdateColumns(context, source.Type)
-                    .Select(column => $"a.attname={Text(column)} AND acl.privilege_type='UPDATE'")));
+                    .Select(column => $"a.attname={Text(column)} AND acl.privilege_type='UPDATE'"))
+                .Concat(PostgresSetupLiveStoragePermissions.GlobalBootstrapColumns(context, source.Type)
+                    .SelectMany(column => new[] { "SELECT", "INSERT", "UPDATE" }
+                        .Select(privilege => $"a.attname={Text(column)} AND acl.privilege_type={Text(privilege)}")))
+                .Concat(PostgresSetupLiveStoragePermissions.GlobalCompletionColumns(context, source.Type)
+                    .Select(grant => $"a.attname={Text(grant.Column)} AND acl.privilege_type={Text(grant.Privilege)}")));
             return $"""
                 NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl
                     WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)})

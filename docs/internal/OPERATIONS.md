@@ -13,6 +13,23 @@ A workflow correction on a PR branch does not replace the trusted-base version
 used by `pull_request_target`; arrange an independently reviewed base update
 before relying on its rerun.
 
+The source build pins SDK `10.0.403` and runtime/WASM `10.0.14`; all four
+application image recipes retain verified immutable Microsoft image digests.
+This replaces the SDK-selected vulnerable `Microsoft.DotNet.ILCompiler 10.0.10`
+reported by GHSA-p3jp-9v83-76w9. Regenerate affected locks through native restore
+and keep audit enabled. A trusted-base Release Impact run still uses the base
+branch SDK even when the PR head is patched; qualify an independently reviewed
+base update before treating that gate as repaired.
+
+## Native browser prerequisites
+
+For native browser prerequisite failures, first distinguish installer restore
+from browser download and launch. The installer has a dedicated, committed
+locked dependency graph; preserve the other tools' shared lock. See
+[security fixture prerequisites](CI_CD_GOVERNANCE.md#security-integration-fixture-execution).
+Keep provisioning diagnostics private and do not substitute successful
+installation for actual owned browser-case results.
+
 ## Human administrator commit fences
 
 Tenant API-key revoke/details now acquire original S/P/H and repeat their existing
@@ -2238,6 +2255,21 @@ weighted votes, and no unresolved critical finding. Architecture evidence
 contracts validate structured fields, executable behavior, and sentinel values
 rather than source text, prose, or prompt wording.
 
+The assurance daemon handler sets `ActivityHeadersPropagator` to `null` so
+controller activity headers and baggage do not cross the privileged Unix API.
+Caller activity and application tracing remain enabled. Diagnose transport
+failure before child launch separately from workload or cleanup failure; retain
+the bounded failure step and original exception, not raw headers or payloads.
+
+Before bounded native acquisition, establish actual engine readiness with a
+separate bounded read-only uncached inventory request on the selected socket.
+Docker Desktop may answer version/info/container requests from cache while the
+VM is stopped. Record startup/readiness separately; do not increase the
+asynchronous client's five-second request or three-second connection budgets.
+See [engine readiness](testing/DISTRIBUTED_ASSURANCE.md#engine-readiness-before-bounded-daemon-exchanges).
+Do not replay a DELETE whose response was lost: retain uncertainty and inspect
+the original resource.
+
 For multiple classes, place parenthesized alternatives inside the class segment:
 `/*/*/(EmailDeliveryGraphRevisionTests*)|(EventResourceStorageCleanupTests*)/*`.
 Do not join complete tree paths with `|`: that invalid expression executed
@@ -3181,6 +3213,43 @@ Missing keys require a new search after restoring authority, never an unprotecte
 continuation. See [the public guide](../public/documentation/readme/events-and-ticketing/publication-and-sessions.md#operating-bounded-browsing).
 
 #### Upgrade note — maintenance sweeps moved to the scheduler
+
+Local signup discovery uses the same complete visitor policy snapshot as
+admission. An enabled, usable Local provider with open registration contributes
+`signup:local` pointing to `/auth/local/register` and the `local-register` POST
+relation pointing to the named registration API route. The BFF forwards these
+HAL capabilities through `/auth/providers`; the form checks the action relation.
+Email delivery readiness does not govern either signup link. Discovery remains
+no-store, and both reservation and final admission independently recheck authority.
+
+`visitor-enrollment-recovery` starts after 60 seconds and runs once per minute.
+One pass reads at most 100 receipt versions through the independent Global
+metadata reader, then acquires a fresh tenant-bound Local writer pair for each
+candidate. The writer compares stage, generation and original deadline inside
+its Serializable mutation transaction. Expired unadmitted reservations are
+canceled before native pending credentials are removed. A separate primary
+cleanup acknowledgement is written only after the native deletion commit is
+confirmed and native absence is checked again. Completed cancellations remain as
+evidence but no longer consume recovery scan capacity. Committed admissions may
+finish activation and acknowledgement after expiry or enrollment closure.
+
+Apply generated enrollment migrations and normal migration bootstrap before
+starting the new executable. PostgreSQL bootstrap installs the fixed Global
+metadata SELECT footprint and upgrades only the exact known predecessor Local
+writer profile. Runtime credentials cannot install or repair either profile;
+unknown grant or policy drift fails closed. Recovery uses no SMTP, retains no
+password, and logs only observed and settled counts. A failed or uncertain
+mutation stops the pass; the next scheduled pass rereads durable state rather
+than automatically replaying the mutation.
+
+Quiesce application traffic before any schema downgrade. Local enrollment
+downgrade preflights refuse retained enrollment receipts, visitor-origin native
+operations and missing administrator provenance before the generated DDL runs.
+SQL generation removes EF's synthesized zero-Guid/minimum-date administrator
+defaults and restores the original migration operation objects afterward.
+Existing data is never converted into fabricated administrator authority.
+Use a forward fix while visitor evidence remains; do not delete receipts or
+invent an administrator to make a downgrade succeed.
 
 `Event.Standalone/appsettings.json` enables Quartz, outbox, notification fanout,
 hosted email dispatch and MCP. Scheduled maintenance and durable work should run

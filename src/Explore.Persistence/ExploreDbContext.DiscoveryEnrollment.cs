@@ -78,6 +78,7 @@ public partial class ExploreDbContext
 
     internal void InvalidateDiscoveryEnrollmentSavepoint(DbTransaction transaction)
     {
+        DisclosureMutations.InvalidateUserCreations();
         bool invalidated = false;
         foreach (var creation in _discoveryEnrollmentCreations.Values)
         {

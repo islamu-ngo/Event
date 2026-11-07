@@ -19,16 +19,22 @@ public static class PublicAddressResolver
         && string.IsNullOrEmpty(uri.UserInfo) && string.IsNullOrEmpty(uri.Query)
         && string.IsNullOrEmpty(uri.Fragment);
 
+    public static Task<Uri?> ResolveAsync(IConfiguration configuration,
+        ISystemSettingRepository settings, CancellationToken cancellationToken) =>
+        ResolveAsync(configuration, async token =>
+        {
+            var stored = await settings.GetByKey(GovernanceSettingKeys.Domains.PublicBaseUrl, token);
+            return !string.IsNullOrWhiteSpace(stored?.Value)
+                ? JsonSerializer.Deserialize<string>(stored.Value) : null;
+        }, cancellationToken);
+
+    /// <summary>Reads a decoded stored address lazily, only when no deployment override is present.</summary>
     public static async Task<Uri?> ResolveAsync(IConfiguration configuration,
-        ISystemSettingRepository settings, CancellationToken cancellationToken)
+        Func<CancellationToken, Task<string?>> readStoredValue, CancellationToken cancellationToken)
     {
         var value = ReadOverride(configuration);
         if (value is null)
-        {
-            var stored = await settings.GetByKey(GovernanceSettingKeys.Domains.PublicBaseUrl, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(stored?.Value))
-                value = JsonSerializer.Deserialize<string>(stored.Value);
-        }
+            value = await readStoredValue(cancellationToken);
 
         // An invalid explicit override must not silently fall back to a different host.
         return IsValid(value) ? new Uri(value!.TrimEnd('/') + "/", UriKind.Absolute) : null;

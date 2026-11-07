@@ -6,6 +6,7 @@ using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
+using Explore.Persistence.QueryFilters;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -20,9 +21,16 @@ public sealed partial class ModerationPolicyPublicationTests
     {
         await using var fixture = await RecognitionErasureFixture.CreateAsync();
         var retained = fixture.Retained;
-        await using var context = fixture.Database.Context();
+        await using var context = fixture.Database.MaintenanceContext();
+        var repository = fixture.Repository(context);
+        await repository.ReceiveAsync(fixture.Request, fixture.ReceiptHash, Now.AddHours(2), CancellationToken.None);
+        await repository.ComputeAsync(fixture.Request, CancellationToken.None);
+        var original = (await repository.FindAsync(fixture.Request.IntentId, CancellationToken.None))!;
+        var originalObligation = await context.Set<KeyObligation>()
+            .IgnoreAllFilters(TenantFilterBypassReasons.UserPrivacyErasure).SingleAsync();
+        context.ChangeTracker.Clear();
         var boundary = new RecognitionCommitBoundary(retained.Repository) { LoseAppendAcknowledgement = true };
-        var service = new ModerationRecognitionErasure(fixture.Repository(context), boundary, retained.Repository,
+        var service = new ModerationRecognitionErasure(repository, boundary, retained.Repository,
             new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
         var fact = await service.AppendAsync(fixture.Request, fixture.ReceiptHash, Now.AddHours(2), CancellationToken.None);
         await Assert.That(fact).IsNotNull();
@@ -31,6 +39,81 @@ public sealed partial class ModerationPolicyPublicationTests
         var pending = await fixture.Repository(verification).FindAsync(fixture.Request.IntentId, CancellationToken.None);
         await Assert.That(pending!.AuthoritySequence).IsEqualTo(fact!.AuthoritySequence);
         await Assert.That(pending.HasCompleteMaterial).IsTrue();
+        await Assert.That(pending.MaterialReceipt).IsEqualTo(original.MaterialReceipt);
+        await Assert.That(pending.Material.Single().Id).IsEqualTo(original.Material.Single().Id);
+        await Assert.That(pending.Material.Single().RetainUntil).IsEqualTo(original.Material.Single().RetainUntil);
+        var obligation = await verification.Set<KeyObligation>()
+            .IgnoreAllFilters(TenantFilterBypassReasons.UserPrivacyErasure).SingleAsync();
+        await Assert.That(obligation.Id).IsEqualTo(originalObligation.Id);
+        await Assert.That(obligation.AuthoritySequence).IsEqualTo(fact.AuthoritySequence);
+    }
+
+    [Test]
+    public async Task Recognition_recovery_binds_original_request_after_its_contribution_expires()
+    {
+        await using var fixture = await RecognitionErasureFixture.CreateAsync(sanctionDuration: TimeSpan.FromMinutes(1));
+        await using var context = fixture.Database.MaintenanceContext();
+        var repository = fixture.Repository(context);
+        await repository.ReceiveAsync(fixture.Request, fixture.ReceiptHash, Now.AddHours(2), CancellationToken.None);
+        fixture.Clock.UtcNow = Now.AddMinutes(1);
+        await repository.ComputeAsync(fixture.Request, CancellationToken.None);
+        var fact = await fixture.Retained.Repository.AppendAsync(fixture.Request);
+        await Assert.That(await repository.ReconcileRetainedAsync(fact, CancellationToken.None)).IsTrue();
+        await using var verification = fixture.Database.MaintenanceContext();
+        var pending = (await fixture.Repository(verification).FindAsync(fixture.Request.IntentId, CancellationToken.None))!;
+        await Assert.That(pending.AuthoritySequence).IsEqualTo(fact.AuthoritySequence);
+        await Assert.That(pending.Material.Count).IsEqualTo(0);
+        await Assert.That(pending.MaterialReceipt).IsNull();
+        await Assert.That((await fixture.Retained.Repository.ReadAfterAsync(0, 100)).Count).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments("absent")]
+    [Arguments("uncommitted")]
+    [Arguments("conflict")]
+    [Arguments("missing-obligation")]
+    public async Task Recognition_recovery_hint_cannot_replace_committed_fact_or_original_obligation(string defect)
+    {
+        await using var fixture = await RecognitionErasureFixture.CreateAsync();
+        await using var context = fixture.Database.MaintenanceContext();
+        var repository = fixture.Repository(context);
+        await repository.ReceiveAsync(fixture.Request, fixture.ReceiptHash, Now.AddHours(2), CancellationToken.None);
+        await repository.ComputeAsync(fixture.Request, CancellationToken.None);
+        var original = (await repository.FindAsync(fixture.Request.IntentId, CancellationToken.None))!;
+        if (defect == "absent")
+            await Assert.That(await repository.ReconcileRetainedAsync(fixture.Fact(), CancellationToken.None)).IsFalse();
+        else if (defect == "uncommitted")
+        {
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await fixture.Retained.Repository.ExecuteSerializedAsync(async token =>
+                {
+                    var fact = await fixture.Retained.Repository.AppendAsync(fixture.Request, token);
+                    return await repository.ReconcileRetainedAsync(fact, token);
+                }, CancellationToken.None));
+            await Assert.That(failure?.Message).IsEqualTo("Nested enrollment must reuse its outer identity operation.");
+        }
+        else
+        {
+            var fact = await fixture.Retained.Repository.AppendAsync(fixture.Request);
+            if (defect == "conflict")
+                fact = PrivacyErasureIntent.Record(fact.IntentId, fact.AuthoritySequence, fact.SubjectKind,
+                    fact.SubjectId, fact.ReasonCode, fact.PolicyVersion, fact.RequestedAtUtc,
+                    fact.RecordedAtUtc, fact.RetentionExpiresAtUtc.AddTicks(1));
+            else
+                await context.Set<KeyObligation>().IgnoreAllFilters(TenantFilterBypassReasons.UserPrivacyErasure)
+                    .Where(row => row.IntentId == fixture.Request.IntentId).ExecuteDeleteAsync();
+            await Assert.ThrowsAsync<InvalidOperationException>(() => repository.ReconcileRetainedAsync(fact, CancellationToken.None));
+        }
+        await using var verification = fixture.Database.MaintenanceContext();
+        var pending = (await fixture.Repository(verification).FindAsync(fixture.Request.IntentId, CancellationToken.None))!;
+        await Assert.That(pending.AuthoritySequence).IsNull();
+        await Assert.That(pending.MaterialReceipt).IsEqualTo(original.MaterialReceipt);
+        await Assert.That(pending.Material.Single().Id).IsEqualTo(original.Material.Single().Id);
+        await Assert.That((await fixture.Retained.Repository.GetStateAsync()).HighWaterSequence)
+            .IsEqualTo(defect is "absent" or "uncommitted" ? 0L : 1L);
+        if (defect == "missing-obligation")
+            await Assert.That(await verification.Set<KeyObligation>()
+                .IgnoreAllFilters(TenantFilterBypassReasons.UserPrivacyErasure).AnyAsync()).IsFalse();
     }
 
     [Test]
@@ -154,15 +237,17 @@ public sealed partial class ModerationPolicyPublicationTests
     public async Task ModerationErasureWorstBreak_ScheduledExpiryDropsEligibilityWithoutKeysOrRewritingSettledReceipt()
     {
         await using var fixture = await RecognitionErasureFixture.CreateAsync();
-        await using (var capture = fixture.Database.Context())
+        await using (var capture = fixture.Database.MaintenanceContext())
         {
+            await Assert.That(capture.TenantFilterTenantId).IsNull();
+            await Assert.That(capture.IsTenantFilterBypassed).IsFalse();
             var service = new ModerationRecognitionErasure(fixture.Repository(capture),
                 fixture.Retained.Repository, fixture.Retained.Repository,
                 new RelationalSettingMutationLock(capture, new EfCoreUnitOfWork(capture)));
             await Assert.That(await service.AppendAsync(fixture.Request, fixture.ReceiptHash,
                 Now.AddHours(2), CancellationToken.None)).IsNotNull();
         }
-        await using var resumed = fixture.Database.Context();
+        await using var resumed = fixture.Database.MaintenanceContext();
         var repository = fixture.Repository(resumed);
         var original = (await repository.FindAsync(fixture.Request.IntentId, CancellationToken.None))!;
         fixture.Keys.Available = false;
@@ -190,7 +275,7 @@ public sealed partial class ModerationPolicyPublicationTests
     public async Task ModerationErasureWorstBreak_MatchingRetentionCeilingDoesNotRevokeOrExtendCanonicalSanction()
     {
         await using var fixture = await RecognitionErasureFixture.CreateAsync(sanctionDuration: TimeSpan.FromDays(366));
-        await using var context = fixture.Database.Context();
+        await using var context = fixture.Database.MaintenanceContext();
         var repository = fixture.Repository(context);
         await repository.ReceiveAsync(fixture.Request, fixture.ReceiptHash, Now.AddHours(2), CancellationToken.None);
         await repository.ComputeAsync(fixture.Request, CancellationToken.None);
@@ -205,8 +290,9 @@ public sealed partial class ModerationPolicyPublicationTests
         await Assert.That(expired.Material.Single().EndsAt).IsEqualTo(Now.AddDays(366));
         await Assert.That(expired.MaterialReceipt).IsEqualTo(original.MaterialReceipt);
         await Assert.That(expired.HasCompleteMaterial).IsTrue();
-        context.ModerationTrustDomainId = fixture.Database.Scope.TrustDomainId;
-        var sanction = await context.ModerationSanctions.SingleAsync(row => row.Id == fixture.SanctionId);
+        await using var verification = fixture.Database.Context();
+        verification.ModerationTrustDomainId = fixture.Database.Scope.TrustDomainId;
+        var sanction = await verification.ModerationSanctions.SingleAsync(row => row.Id == fixture.SanctionId);
         await Assert.That(sanction.IsEffectiveAt(fixture.Clock.UtcNow)).IsTrue();
         await Assert.That(sanction.EndsAt).IsEqualTo(Now.AddDays(366));
     }
@@ -215,7 +301,7 @@ public sealed partial class ModerationPolicyPublicationTests
     public async Task ModerationErasureWorstBreak_FailedEligibilityCommitLeavesReceiptIntactAndCanResume()
     {
         await using var fixture = await RecognitionErasureFixture.CreateAsync();
-        await using (var capture = fixture.Database.Context())
+        await using (var capture = fixture.Database.MaintenanceContext())
         {
             var repository = fixture.Repository(capture);
             await repository.ReceiveAsync(fixture.Request, fixture.ReceiptHash, Now.AddHours(2), CancellationToken.None);
@@ -223,7 +309,7 @@ public sealed partial class ModerationPolicyPublicationTests
         }
         fixture.Clock.UtcNow = Now.AddDays(2);
         fixture.Keys.Available = false;
-        await using var failing = fixture.Database.Context(new RecognitionEligibilityFailure());
+        await using var failing = fixture.Database.MaintenanceContext(new RecognitionEligibilityFailure());
         var resumed = fixture.Repository(failing);
         await Assert.ThrowsAsync<IOException>(() => resumed.ExpireMatchingEligibilityAsync(1, CancellationToken.None));
         await using (var verification = fixture.Database.Context())
@@ -244,7 +330,7 @@ public sealed partial class ModerationPolicyPublicationTests
     public async Task ModerationErasureWorstBreak_NativeSourceWithdrawalBetweenStagesPreventsAuthorityAppend()
     {
         await using var fixture = await RecognitionErasureFixture.CreateAsync();
-        await using var context = fixture.Database.Context();
+        await using var context = fixture.Database.MaintenanceContext();
         var boundary = new RecognitionCommitBoundary(fixture.Retained.Repository) { PauseAfterCapture = true };
         var service = new ModerationRecognitionErasure(fixture.Repository(context), boundary, fixture.Retained.Repository,
             new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
@@ -268,7 +354,7 @@ public sealed partial class ModerationPolicyPublicationTests
     public async Task ModerationErasureWorstBreak_CaptureStoreFailureKeepsReceivedRequestButNoPartialReceipt()
     {
         await using var fixture = await RecognitionErasureFixture.CreateAsync();
-        await using var context = fixture.Database.Context(new RecognitionCaptureFailure());
+        await using var context = fixture.Database.MaintenanceContext(new RecognitionCaptureFailure());
         var service = new ModerationRecognitionErasure(fixture.Repository(context),
             fixture.Retained.Repository, fixture.Retained.Repository,
             new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
@@ -279,6 +365,9 @@ public sealed partial class ModerationPolicyPublicationTests
         await Assert.That(pending!.HasCompleteMaterial).IsFalse();
         await Assert.That(pending.Material.Count).IsEqualTo(0);
         await Assert.That(pending.Failure).IsEqualTo(ModerationRecognitionPendingFailure.StoreUnavailable);
+        await Assert.That(await verification.Set<KeyObligation>()
+            .IgnoreAllFilters(TenantFilterBypassReasons.UserPrivacyErasure)
+            .AnyAsync(row => row.IntentId == fixture.Request.IntentId)).IsFalse();
         await Assert.That((await fixture.Retained.Repository.GetStateAsync()).HighWaterSequence).IsEqualTo(0L);
     }
 

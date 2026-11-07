@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6RPB067VGTF1CPTZ300VJ1T
+Title: "read Listmonk instance governance for process health"
+Type: fix
+Scope: self-hosting
+Summary: "Restore Listmonk process readiness without a selected tenant by reading ordinary instance settings through the existing Global capability while retaining tenant integration controls and secret resolution."
+Group: listmonk-instance-health
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: "Process health uses the existing independent Global instance reader for five ordinary Listmonk keys. Credential resolution stays in the instance secret authority, native Runtime tenant guards and tenant request behavior remain intact, and health metadata contains no provider URL or credential value."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: "Listmonk process readiness observes instance governance without selecting a tenant. Disabled integration is Healthy; enabled but incomplete integration is Degraded. No new credential, configuration or migration is required."

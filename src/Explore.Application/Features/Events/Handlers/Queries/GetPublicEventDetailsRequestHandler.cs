@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
@@ -8,7 +9,9 @@ namespace Explore.Application.Features.Events.Handlers.Queries;
 
 public sealed class GetPublicEventDetailsRequestHandler(
     IEventDetailsProjectionService detailsProjectionService,
-    ITenantLifecycleAccessService lifecycle)
+    ITenantLifecycleAccessService lifecycle,
+    ITenantContext tenantContext,
+    IVisitorTenantReadAccessPolicy visitorReadAccess)
     : IQueryHandler<GetPublicEventDetailsRequest, EventDto?>
 {
     public async Task<EventDto?> QueryAsync(GetPublicEventDetailsRequest request, CancellationToken cancellationToken)
@@ -17,6 +20,7 @@ public sealed class GetPublicEventDetailsRequestHandler(
         if (publicCode is null)
             return null;
 
+        await visitorReadAccess.RequireAsync(tenantContext.TenantId, cancellationToken);
         var eventDto = await detailsProjectionService.BuildByPublicCodeAsync(publicCode, cancellationToken);
 
         if (eventDto is null || !await lifecycle.IsPublicAsync(eventDto.TenantId, cancellationToken))

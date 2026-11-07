@@ -22,6 +22,35 @@ public sealed class InstanceAuthProviderSectionTests : IDisposable
     public void Dispose() => _context.Dispose();
 
     [Test]
+    public async Task RetainedUnsupportedConfigurationDisplaysActionableStatusWithoutProviderControls()
+    {
+        var model = LocalModel();
+        const string guidance = "Direct Google authentication is unsupported. Configure Google through Keycloak.";
+        model.UnsupportedProviderMessage = guidance;
+
+        var cut = Render(model);
+
+        await Assert.That(cut.Find("[data-testid=unsupported-auth-provider][role=status]").TextContent).IsEqualTo(guidance);
+        await Assert.That(cut.FindAll("[data-testid=google-public-onboarding-policy]")).Count().IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments(4)]
+    [Arguments(1)]
+    public async Task CallableProviderControlsNeverOfferDirectGoogle(int primary)
+    {
+        var model = LocalModel();
+        model.PrimaryProviderId = primary;
+
+        var cut = Render(model);
+
+        await Assert.That(cut.FindAll("[data-testid=google-public-onboarding-policy]")).Count().IsEqualTo(0);
+        await Assert.That(cut.FindAll("[data-testid=primary-provider-local]")).Count().IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-testid=primary-provider-keycloak]")).Count().IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-testid=primary-provider-atproto]")).Count().IsEqualTo(1);
+    }
+
+    [Test]
     public async Task LocalPrimaryRendersExclusiveSelectorAndIndependentAtprotoControl()
     {
         AuthProviderConfigurationDto model = LocalModel();
@@ -87,16 +116,15 @@ public sealed class InstanceAuthProviderSectionTests : IDisposable
         AuthProviderConfigurationDto model = LocalModel();
         model.KeycloakPublicOnboardingPolicy = PublicOnboardingPolicy.Allowed;
         model.KeycloakPublicSignupUrl = "https://identity.example.test/realms/events/registrations";
-        model.GooglePublicOnboardingPolicy = PublicOnboardingPolicy.Denied;
 
         var cut = Render(model);
         var policies = cut.FindComponents<MudSelect<PublicOnboardingPolicy?>>();
         MudSelect<PublicOnboardingPolicy?> keycloakPolicy = policies.Single(select => select.Instance.Value == PublicOnboardingPolicy.Allowed).Instance;
-        MudSelect<PublicOnboardingPolicy?> googlePolicy = policies.Single(select => select.Instance.Value == PublicOnboardingPolicy.Denied).Instance;
 
-        await Assert.That(cut.FindAll(".instance-auth-provider__visitor-onboarding")).Count().IsEqualTo(2);
-        await cut.InvokeAsync(() => googlePolicy.ValueChanged.InvokeAsync(PublicOnboardingPolicy.Allowed));
-        await Assert.That(model.GooglePublicOnboardingPolicy).IsEqualTo(PublicOnboardingPolicy.Allowed);
+        await Assert.That(cut.FindAll(".instance-auth-provider__visitor-onboarding")).Count().IsEqualTo(1);
+        await cut.InvokeAsync(() => keycloakPolicy.ValueChanged.InvokeAsync(PublicOnboardingPolicy.Denied));
+        await Assert.That(model.KeycloakPublicOnboardingPolicy).IsEqualTo(PublicOnboardingPolicy.Denied);
+        await Assert.That(cut.FindAll("[data-testid=google-public-onboarding-policy]")).Count().IsEqualTo(0);
     }
 
     [Test]
@@ -150,8 +178,7 @@ public sealed class InstanceAuthProviderSectionTests : IDisposable
             PrimaryProviderCode = "ATPROTO",
             PrimaryProviderName = "AT Protocol",
             AtprotoLoginEnabled = true,
-            AtprotoPublicUrl = "https://events.example.test",
-            GoogleSsoEnabled = true
+            AtprotoPublicUrl = "https://events.example.test"
         };
 
         var cut = Render(model);
@@ -173,7 +200,6 @@ public sealed class InstanceAuthProviderSectionTests : IDisposable
     public async Task ConfirmedAtprotoSwitchSetsSoleProviderState()
     {
         AuthProviderConfigurationDto model = LocalModel();
-        model.GoogleSsoEnabled = true;
         _dialogs.ShowMessageBoxAsync(
                 Arg.Any<MessageBoxOptions>(),
                 Arg.Any<DialogOptions>())
@@ -188,7 +214,7 @@ public sealed class InstanceAuthProviderSectionTests : IDisposable
         await Assert.That(model.PrimaryProviderName)
             .IsEqualTo("AT Protocol");
         await Assert.That(model.AtprotoLoginEnabled).IsTrue();
-        await Assert.That(model.GoogleSsoEnabled).IsFalse();
+        await Assert.That(cut.FindAll("[data-testid=google-public-onboarding-policy]")).Count().IsEqualTo(0);
     }
 
     [Test]
@@ -231,7 +257,6 @@ public sealed class InstanceAuthProviderSectionTests : IDisposable
         PrimaryProviderCode = "LOCAL",
         PrimaryProviderName = "Local Identity",
         AtprotoLoginEnabled = true,
-        AtprotoPublicUrl = "https://events.example.test",
-        GoogleSsoEnabled = false
+        AtprotoPublicUrl = "https://events.example.test"
     };
 }

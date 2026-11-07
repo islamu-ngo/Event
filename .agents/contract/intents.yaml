@@ -213,6 +213,11 @@ intents:
       - .agents/rules/efcore-migrations.md
     paths_in_scope:
       - "src/Explore.Persistence/Migrations/**/*.cs"
+      - "src/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite/Migrations/**/*.cs"
+      - "src/Explore.Persistence/Privacy/ErasureAuthority/Configurations/EmbeddedPrivacyErasureCounterConfiguration.cs"
+      - "src/Explore.Persistence/Privacy/ErasureAuthority/EmbeddedPrivacyErasureAuthorityDbContextFactory.cs"
+      - "src/Explore.Persistence/Privacy/ErasureAuthority/ProviderPrimitives/EmbeddedPrivacyErasureMigrationsSqlGenerator.cs"
+      - "tests/Event.Persistence.IntegrationTests/Privacy/EmbeddedAuthorityMigrationRecoveryTests.cs"
       - "src/Explore.Domain/**/*.cs"
     minimum_tests:
       - Event.Persistence.IntegrationTests
@@ -264,6 +269,7 @@ intents:
       - .agents/rules/efcore-persistence.md
     paths_in_scope:
       - "src/Explore.Persistence/Repositories/**/*.cs"
+      - "src/Explore.Persistence/Database/ProviderPrimitives/ModerationNarrativeTemporalQuery.cs"
     minimum_tests:
       - Event.Persistence.IntegrationTests
       - Event.Architecture.Tests
@@ -615,6 +621,8 @@ intents:
       - "global.json"
       - "Explore.slnx"
       - "eng/release/**"
+      - "eng/tools/InstallAssuranceBrowser.cs"
+      - "eng/tools/InstallAssuranceBrowser/packages.lock.json"
       - "docs/internal/CI_CD_GOVERNANCE.md"
       - "docs/internal/OPERATIONS.md"
       - "docs/internal/TESTING.md"
@@ -2266,6 +2274,212 @@ intents:
       - "dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet"
       - "dotnet ef migrations has-pending-model-changes --project src/Explore.Persistence/Explore.Persistence.csproj --startup-project src/Explore.API/Explore.API.csproj --configuration Release --context ExploreDbContext"
 
+  - id: moderation-receipt-recovery-custody
+    title: "Preserve native receipt and recovery advancement ownership through issuance"
+    category: cross-cutting
+    triggers:
+      - "receipt recovery custody"
+      - "native receipt issuance recovery advancement"
+    must_read_docs:
+      - AGENTS.md
+      - docs/internal/QUICK_REFERENCE.md
+      - docs/internal/GOVERNANCE.md
+      - docs/internal/MODERATION.md
+      - docs/internal/TESTING.md
+    load_skills:
+      - criticality-guardrail
+      - dotnet-efcore-guidelines
+    load_rules:
+      - .agents/rules/efcore-persistence.md
+      - .agents/rules/tests.md
+    paths_in_scope:
+      - "src/Explore.Persistence/Moderation/ModerationCaseIntakeCommitter.cs"
+      - "src/Explore.Persistence/ExploreDbContext.ModerationRecovery.cs"
+      - "tests/Event.Persistence.IntegrationTests/Moderation/ModerationCaseNativeProofTests*.cs"
+      - "docs/internal/MODERATION.md"
+      - "docs/public/documentation/readme/security-and-identity/moderation-and-banning.md"
+      - "docs/internal/releases/changes/*.yaml"
+    minimum_tests:
+      - Event.Persistence.IntegrationTests
+      - Event.Architecture.Tests
+    docs_to_update:
+      - docs/internal/MODERATION.md
+      - docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    unique_acceptance:
+      - "Issuance admits only the native recovery object with unchanged coordinates, installation slot and original live transaction"
+      - "Missing, detached, replaced, deleted or altered recovery ownership cannot release a receipt"
+      - "Receipt and any tracked source retain exact object custody; legitimate untracked persisted-source reuse remains supported"
+      - "Caller-owned work, outer transactions, uncertain commit refusal and failed bearer zeroing remain intact"
+    pr_checklist:
+      - "Native positive issuance, tampering and settlement cases execute without replacing real authority or dropping existing assertions"
+      - "Paired moderation guidance distinguishes committed history from present read permission"
+    forbidden_without_approval:
+      - "Admitting recovery state by CLR type or identifier alone"
+      - "Weakening tenant, caller, source, transaction or recovery ownership guards"
+      - "Reminting a bearer after unknown completion or fabricating native receipts"
+      - "Editing product owners outside the two admitted source files"
+    criticality:
+      tier: security
+      required_model_tier: advanced
+      verification_depth: exhaustive
+      tenancy_scope: cross_tenant_admin
+      rollback_strategy: forward_fix_only
+      intake_clarification_mode: mandatory_grill_me
+      exploration_protocol: exhaustive_graph_blast_radius
+      testing_strategy: adversarial_concurrency_invariant_breakers
+      review_protocol: anonymized_epistemic_mad
+      safety_gates:
+        - "original_receipt_source_and_transaction_ownership"
+        - "native_recovery_advancement_custody"
+        - "unknown_commit_never_publishes_bearer"
+        - "zero_pii_in_diagnostics"
+      mandatory_reviewers:
+        - security-privacy-agent
+
+  - id: user-pii-default-attestation-parity
+    title: "Align UserPii revision defaults with generated storage and native attestation"
+    category: cross-cutting
+    triggers:
+      - "UserPii default attestation parity"
+      - "UserPii birth date revision native creation refusal"
+    must_read_docs:
+      - AGENTS.md
+      - docs/internal/QUICK_REFERENCE.md
+      - docs/internal/GOVERNANCE.md
+      - docs/internal/PRIVACY_ERASURE.md
+      - docs/internal/BACKUP_RESTORE_UPGRADE.md
+      - docs/internal/TESTING.md
+    load_skills:
+      - criticality-guardrail
+      - dotnet-efcore-guidelines
+    load_rules:
+      - .agents/rules/efcore-persistence.md
+      - .agents/rules/efcore-migrations.md
+      - .agents/rules/tests.md
+    paths_in_scope:
+      - "src/Explore.Persistence/Configurations/Entities/UserPiiConfiguration.cs"
+      - "src/Explore.Persistence/Schema/ProviderPrimitives/PostgresManagedTenantWorkerCreationPermissions.cs"
+      - "src/Explore.Persistence/Migrations/**"
+      - "src/Explore.Persistence.Migrations.Sqlite/**"
+      - "src/Explore.Persistence.Migrations.SqlServer/**"
+      - "src/Explore.Persistence.Migrations.MySql/**"
+      - "tests/Event.Persistence.IntegrationTests/Database/ExploreDbContextModelProviderTests.cs"
+      - "tests/Event.Persistence.IntegrationTests/Migrations/PostgresMigrationAuthorityIsolationTests.cs"
+      - "schemas/islamu-event.md"
+      - "docs/internal/PRIVACY_ERASURE.md"
+      - "docs/internal/BACKUP_RESTORE_UPGRADE.md"
+      - "docs/public/documentation/readme/security-and-identity/privacy-erasure.md"
+    paths_forbidden:
+      - "src/Explore.Persistence/Migrations/CoLocatedPrivacyErasureAuthority/**"
+      - "src/Explore.Persistence.DataProtection.Migrations.*/**"
+      - "src/Explore.Persistence.PrivacyErasureAuthority.Migrations.*/**"
+    minimum_tests:
+      - Event.Persistence.IntegrationTests
+      - Event.Architecture.Tests
+    docs_to_update:
+      - docs/internal/PRIVACY_ERASURE.md
+      - docs/internal/BACKUP_RESTORE_UPGRADE.md
+      - docs/public/documentation/readme/security-and-identity/privacy-erasure.md
+      - schemas/islamu-event.md
+    unique_acceptance:
+      - "The birth-date revision has an explicit long zero model default and matching generated primary-provider schema"
+      - "Native attestation requires the exact model-derived long default rather than ignoring storage drift"
+      - "Canonical migration and managed worker bootstrap retain their original account, tenant lease and permissions"
+      - "Provider migrations are generated, preserve existing data and do not alter authority or Data Protection migration owners"
+    pr_checklist:
+      - "Model/default invariant fails before repair and canonical native creation is exercised afterward"
+      - "Model and snapshot deltas contain only the admitted UserPii default correction; any provider-emitted historical FK operation retains its existing native behavior"
+      - "Final provider matrix and paired operator upgrade guidance remain explicit"
+    forbidden_without_approval:
+      - "Hand-editing generated migrations, designers or model snapshots"
+      - "Changing private birth-date values, wire contracts or erasure semantics"
+      - "Bypassing native creation admission, ignoring defaults or broadening purpose permissions"
+      - "Changing provider topology or applying DDL to an unrelated database"
+    criticality:
+      tier: security
+      required_model_tier: advanced
+      verification_depth: exhaustive
+      tenancy_scope: cross_tenant_admin
+      rollback_strategy: forward_fix_only
+      intake_clarification_mode: mandatory_grill_me
+      exploration_protocol: exhaustive_graph_blast_radius
+      testing_strategy: adversarial_concurrency_invariant_breakers
+      review_protocol: anonymized_epistemic_mad
+      safety_gates:
+        - "exact_model_default_attestation"
+        - "generated_primary_provider_migrations"
+        - "original_migration_authority"
+        - "zero_pii_in_diagnostics"
+      mandatory_reviewers:
+        - security-privacy-agent
+    related_intents:
+      - add-ef-migration
+
+  - id: recognition-expiry-transaction-ownership
+    title: "Run recognition expiry once under its original authority and primary transactions"
+    category: cross-cutting
+    triggers:
+      - "recognition expiry transaction ownership"
+      - "recognition expiry retrying execution strategy refusal"
+    must_read_docs:
+      - AGENTS.md
+      - docs/internal/QUICK_REFERENCE.md
+      - docs/internal/GOVERNANCE.md
+      - docs/internal/PRIVACY_ERASURE.md
+      - docs/internal/TESTING.md
+    load_skills:
+      - criticality-guardrail
+      - dotnet-efcore-guidelines
+    load_rules:
+      - .agents/rules/efcore-persistence.md
+      - .agents/rules/tests.md
+    paths_in_scope:
+      - "src/Explore.Persistence/Repositories/ModerationRecognitionErasureRepository.cs"
+      - "tests/Event.Persistence.IntegrationTests/Privacy/PostgresSubjectPrivacyErasureAuthorityTests.cs"
+      - "tests/Event.Persistence.IntegrationTests/Moderation/ModerationRecognition*Tests.cs"
+      - "docs/internal/PRIVACY_ERASURE.md"
+      - "docs/public/documentation/readme/security-and-identity/privacy-erasure.md"
+    minimum_tests:
+      - Event.Persistence.IntegrationTests
+      - Event.Architecture.Tests
+    docs_to_update:
+      - docs/internal/PRIVACY_ERASURE.md
+      - docs/public/documentation/readme/security-and-identity/privacy-erasure.md
+    unique_acceptance:
+      - "Only ExpireMatchingEligibilityAsync gains the non-replaying execution scope; sibling recognition operations are unchanged"
+      - "Separate authority and primary transactions retain original context, connection and transaction owners"
+      - "Borrowed SQLite transactions are never committed or disposed by the expiry operation"
+      - "Unknown completion never replays expiry or reports a fabricated successful settlement"
+      - "Real expiry and outbox rollback cases reach their original protected assertions"
+    pr_checklist:
+      - "Existing Npgsql retry/manual-transaction Red and native settlement/outbox invariants are preserved"
+      - "Original-owner and uncertain-completion tests remain deterministic and provider-real"
+      - "Paired privacy documentation explains single-attempt expiry without promising cross-database atomicity"
+    forbidden_without_approval:
+      - "Disabling configured provider retries globally or in test setup"
+      - "Replaying ambiguous completion or borrowing replacement ownership"
+      - "Collapsing independent database transactions or changing authority facts"
+      - "Editing recognition methods outside the admitted expiry operation"
+    criticality:
+      tier: privacy
+      required_model_tier: advanced
+      verification_depth: exhaustive
+      tenancy_scope: cross_tenant_admin
+      rollback_strategy: forward_fix_only
+      intake_clarification_mode: mandatory_grill_me
+      exploration_protocol: exhaustive_graph_blast_radius
+      testing_strategy: adversarial_concurrency_invariant_breakers
+      review_protocol: anonymized_epistemic_mad
+      safety_gates:
+        - "single_attempt_expiry"
+        - "independent_original_transaction_owners"
+        - "borrowed_sqlite_owner_preserved"
+        - "unknown_completion_not_replayed"
+        - "transactional_outbox_pairing"
+        - "zero_pii_in_diagnostics"
+      mandatory_reviewers:
+        - security-privacy-agent
+
   - id: platform-privacy-erasure
     title: "Harden privacy-erasure authority topology and multi-database persistence contracts"
     category: cross-cutting
@@ -2295,10 +2509,25 @@ intents:
       - .agents/rules/efcore-migrations.md
       - .agents/rules/tests.md
     paths_in_scope:
+      - "src/Explore.Persistence/Privacy/ErasureAuthority/Repositories/EmbeddedPrivacyErasureAuthorityRepository.cs"
+      - "tests/Event.Persistence.IntegrationTests/Privacy/EmbeddedPrivacyErasureRecoveryTests.cs"
+      - "src/Explore.Persistence/Repositories/ModerationRecognitionErasureRepository.cs"
+      - "src/Explore.Persistence/Repositories/ModerationRecognitionErasureRepository.Disposition.cs"
+      - "src/Explore.Persistence/Repositories/ModerationRecognitionErasureRepository.Recovery.cs"
+      - "src/Explore.Persistence/Repositories/ModerationRecognitionErasureRepository.Continuity.cs"
+      - "src/Explore.Persistence/ExploreDbContext.RecognitionContinuityAuthority.cs"
+      - "src/Explore.Persistence/ExploreDbContext.TrackedAuthority.cs"
+      - "src/Explore.Application/Contracts/Persistence/IModerationRecognitionErasureRepository.cs"
+      - "src/Explore.Application/Services/Moderation/ModerationRecognitionErasure.cs"
+      - "src/Explore.Persistence/Repositories/ModerationRecognitionKeyLifecycleRepository.cs"
+      - "src/Explore.Persistence/Repositories/ModerationRecognitionKeyLifecycleRepository.Cleanup.cs"
+      - "src/Explore.Persistence/Security/ProviderPrimitives/PostgresMixedSettingsContract.Attestation.cs"
+      - "tests/Event.Persistence.IntegrationTests/MixedSettingsNativeContractTests.cs"
+      - "src/Explore.Persistence/Repositories/ModerationRecognitionKeyLifecycleReplicaOwner.cs"
       - "src/Explore.Persistence/Database/PrimaryDatabaseProviderComposition.cs"
       - "src/Explore.Persistence/PersistenceServicesRegistration.cs"
       - "src/Explore.Persistence/Privacy/ErasureAuthority/EmbeddedPrivacyErasureAuthorityDbContextFactory.cs"
-      - "src/Explore.Persistence/Schema/ExploreDatabaseMigrator.cs"
+      - "src/Explore.Persistence/Schema/ProviderPrimitives/ExploreDatabaseMigrator.cs"
       - "src/Event.MigrationService/Worker.cs"
       - "tests/Event.Persistence.IntegrationTests/Database/PrimaryDatabaseProviderCompositionTests.cs"
       - "tests/Event.Persistence.IntegrationTests/Privacy/PrivacyErasureAuthorityCompositionValidationTests.cs"
@@ -2328,6 +2557,7 @@ intents:
       - docs/internal/TROUBLESHOOTING.md
       - docs/internal/TESTING.md
     unique_acceptance:
+      - "Replica qualification recognizes native Linux contention only after a competing exclusive handle is rejected; other I/O errors remain fail-closed"
       - "Primary application and Data Protection persistence retain PostgreSQL, SQLite, SQL Server, MariaDB, and MySQL provider composition without collapsing provider migration owners or history tables"
       - "PrivacyErasure:Authority:Topology keeps EmbeddedSqlite with any primary provider, CoLocated only for PostgreSQL or SQLite, and ExternalDatabase only for separate PostgreSQL"
       - "Unsupported SQL Server, MariaDB, and MySQL CoLocated authority combinations fail during composition before adapter use and without exposing credentials, connection strings, or structured database values"

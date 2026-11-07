@@ -325,7 +325,8 @@ public class ApiEndpointPostgreSqlBenchmarks : IAsyncDisposable
 
     /// <summary>Retains every original cause privately without exposing credentials to BenchmarkDotNet artifacts.</summary>
     private sealed class NativeBenchmarkFailure(FailurePhase phase, IReadOnlyList<Exception> causes)
-        : Exception($"benchmark_native_failed:phase={phase}:cause_count={causes.Count}")
+        : Exception($"benchmark_native_failed:phase={phase}:cause_count={causes.Count}"
+            + $":first_cause_type={causes[0].GetType().FullName}\n{new System.Diagnostics.StackTrace(causes[0], false)}")
     {
         private readonly IReadOnlyList<Exception> _causes = causes;
 

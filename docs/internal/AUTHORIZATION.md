@@ -83,6 +83,27 @@ Per [ADR-027](adr/ADR-027-first-class-authentication-provider-matrix.md) and [AD
 -   **Authentication** (Local Identity / Keycloak / AT Protocol): The process of verifying who a user is. Exactly one provider is primary for new sign-ins. The Blazor BFF owns browser challenges and HttpOnly cookies; raw provider and platform tokens remain server-side.
 -   **Authorization** (Cerbos / Fallback): The process of determining whether an authenticated user has the permission to perform a specific action on a specific resource. Cerbos acts as the policy decision point (PDP), evaluating fine-grained business resource policies against principal, resource, action, and tenant context.
 
+Local login retains its selected `LocalIdentityWriter` application context during
+account synchronization. `IdentityAccountResolver` reads the bound account through
+`IUserRepository.GetLocalIdentityProfileAsync`: the tracked `User`, email/name
+mirror and revision needed for optimistic concurrency. The projection does not
+load the private birth declaration or collection receipt. The native inventory
+permits revision metadata reads without granting either private value. The
+existing `SaveIdentityProfileAsync` fence still permits only the email mirror and
+verification updates in the original account transaction. Ordinary Global and
+Runtime permissions do not expand. Authentication closes its credential attempt
+before synchronization opens recognition enrollment; lifecycle callbacks alone
+join a transaction through their original lifecycle receipt.
+
+The Local writer also has read-only access to recognition-erasure pending
+receipts and their immutable capture metadata. The existing recognition guard
+loads the exact subject's receipt and validates its complete material before
+allowing synchronization; missing storage permission remains a closed failure.
+This capability permits no recognition insert, update or deletion and supplies
+no recognition key material. C# owns the subject selection, transaction boundary
+and settlement decision. A compromised writer credential can read that stored
+metadata; it cannot use these grants to rewrite settlement or acquire private
+birth declarations.
 
 ATProto does not introduce a second authorization model. The API independently restores the submitted CarpaNet OAuth session and verifies `com.atproto.server.getSession` against the expected DID and PDS. When AT Protocol is primary, the verified DID may JIT-create one passwordless platform `User`, personal `Actor`, and global `UserExternalLogin`; the subsequent purpose-separated ES256 session JWT uses that internal user `Guid` as `sub`. Existing operation authorization, tenant isolation, Cerbos/local fallback policies, and HAL affordance filtering operate unchanged. A DID, handle, or PDS response never authorizes a resource or grants a role by itself.
 
@@ -487,13 +508,62 @@ source contract and migrator installation.
 
 `LocalIdentityCredentialStateStore.ValidateReadySessionAsync` requires the
 ordinal stamp match, email state, password presence, Ready metadata, replaced
-Create/Reset operation and exact live user/login/personal-actor binding. Instance
+Create/Reset/VisitorCreate operation and exact live user/login/personal-actor binding. Instance
 email policy still distinguishes invalid sessions from unavailable validation.
 Login keeps its complete entity and response path; this projection does not
 fabricate a `LocalIdentityUser`. All fourteen native Runtime controls pass with
 both null and selected tenants, including invalid-session outcomes and denied
 direct access to private identity tokens. The selected-tenant fixture uses the
 production `PostgresTenantSessionInterceptor`; caller guards remain unchanged.
+
+### Original Local visitor enrollment
+
+Local visitor enrollment uses separate native CQS reservation and registration
+handlers behind `POST /api/auth/local/enrollment/reserve` and `/register`.
+The current tenant comes from the selected execution scope, never the body.
+The BFF supplies its server-held 256-bit proof as canonical lowercase hex in
+`X-Local-Enrollment-Proof`; Application handlers hash the decoded bytes before
+storage. The protected intent contains only operation, tenant, proof digest and
+the original UTC expiry. Possession of that data type alone is not authority:
+registration compares every field against the authoritative receipt.
+
+`LocalVisitorEnrollmentService` obtains an original Local identity/application
+scope and resolves its storage port and current policy readers from that child.
+`TenantEnrollmentAdmissionOperation` runs provider authorization and effective
+tenant registration policy inside the producer's final admission callback.
+The native producer retains the complete ordered authority-setting group,
+Human/Discovery/lifecycle/privacy custody and Serializable primary transaction
+through commit. Existing exact active membership skips new-allocation policy.
+
+The primary receipt progresses through Reserved, IdentityPrepared,
+PrimaryAdmitted and Active, with terminal Canceled before admission. Identity
+preparation uses VisitorCreate provenance without an administrator initiator or
+verifier, RegistrationPending metadata and the existing eligibility ledger's
+native operation pointer. Primary admission atomically projects the ordinary
+User, personal Actor, Local login, TenantUser and receipt. Only durable admission
+permits native Replaced/Ready settlement; primary acknowledgement records that
+settlement separately. A later legitimate Ready lockout publication must not
+strand acknowledgement. No visitor password, raw proof or bearer is persisted
+in the receipt, and no enrollment response issues a browser session.
+
+The recovery reader releases only operation, tenant, stage, generation and
+deadline metadata. Its fixed Global SELECT footprint also includes the nullable
+cleanup completion timestamp solely to exclude drained cancellations.
+`ILocalVisitorEnrollmentRecoveryScopeFactory` selects a fresh original Local
+writer pair for each persisted target; discovery metadata cannot authorize a
+write. Cancellation and activation compare the candidate version inside their
+Serializable owner transaction. Native purge follows durable primary
+cancellation. A separate transaction acknowledges `CleanupCompletedAt` only
+after the purge commit returned successfully and native absence was checked
+again. This order preserves recoverability across separate identity stores:
+uncertain native deletion never publishes a completed primary cleanup marker.
+The canceled receipt retains its original identifiers, digest and deadline.
+
+Both API actions are rate-limited, private/no-store and excluded from generic
+idempotency response storage. Their BFF caller must retain the original
+host-only flow cookie, server-held proof and antiforgery checks. Expiry and
+uncertain outcomes are reconciled against the same receipt; they never justify
+username adoption, a replacement password, a new target or renewed expiry.
 
 ### Original resource and visitor Settings ownership
 
@@ -504,6 +574,44 @@ an arbitrary caller-owned transaction is not sufficient. Values and lock changes
 remain separate storage effects: resource value upsert does not implicitly
 unlock a row. Fixture migrations exercise actual producers and rollback rather
 than authorizing a write by naming an import operation.
+
+`HumanSettingsMutationPreparation` observes a distinct `VisitorSettingsOriginal`
+for the actual scalar command or standalone visitor envelope while idle.
+`VisitorSettingsOriginalStore` retains that command, its immutable effects,
+subject, tenant, audit actor, canonical IDs and occurrence time. Acquisition
+keeps the original context lease, connector, credential lifetime and
+Serializable transaction. The detached snapshot includes authority settings,
+applicable tenant overrides, live account-required participation and nonsecret
+provider deployment inputs. Mixed, plan, provider and import producers retain
+their own originals.
+
+After C# policy validation, the store independently compiles and compares the
+canonical row changes before persistence. Terminal validation requires either
+those exact changes or an unchanged refusal. Source replacement, replay,
+transaction substitution and closed lifetimes cannot supply another original.
+The row port avoids `SaveChanges` flushing unrelated tracked state. It uses EF
+provider parameter mappings for ordinary relational commands; PostgreSQL's
+fixed read/write functions supply the storage privileges unavailable to its
+selected Runtime/Global connection.
+
+The privileged installer creates the PostgreSQL catalog and grants its two
+function entry points directly to the enrolled application logins, retaining
+the purpose marker roles and their non-inheriting boundaries. It does not grant
+those logins direct settings-table DML. Catalog shape is checked before use. These
+database credentials can invoke the fixed storage ports; credential-only
+compromise is therefore a separate trust boundary from C# authorization, as
+accepted in the application-owned persistence decision.
+
+Native instance-setting transitions also maintain the fixed nonsecret
+`ManagedTenantProvisioningPolicySetting` projection. Before writing the source,
+C# checks the captured original against the projection and retains its revision;
+after writing, C# projects the accepted image using that revision on the same
+retained transaction. A failed projection update rolls back the source mutation.
+This preserves the original-source checks used by later ordinary EF writes.
+The installer grants only the enrolled Global login SELECT over the projection's
+fixed columns and UPDATE over `IsPresent`, `IsLocked`, `Value` and `Revision`.
+It adds no Runtime projection privileges. Policy, authorization and completion
+remain application-owned.
 
 ### Current human Cerbos principal inputs
 
@@ -941,14 +1049,35 @@ fleet convergence from an Admin response. See the public
 
 ### 3.4. HATEOAS Link Authorization
 
+Tenant read privacy is evaluated separately from HAL and participation.
+`VisitorTenantReadAccessPolicy` resolves the inherited current visitor mode;
+`AuthenticatedOnly` admits validated authentication without claiming approved
+membership. Existing resource authorization still applies. HTTP checks precede
+cached/conditional replay, while native readers invoke the same policy directly.
+Machine-public federation uses its anonymous decision even for an authenticated
+worker. Invalid or unavailable policy cannot become a public default. See
+[visitor read admission](MULTI_TENANCY.md#visitor-read-admission) for transport,
+bootstrap, cache and admission-timing contracts.
+
 The API uses a Hypermedia as the Engine of Application State (HATEOAS) model. HAL `_links` are the browser/client source of truth for action availability; Blazor and other clients must not recreate action gates from roles, claims, or cached local state.
 
 Visitor participation adds a capability condition, not a new permission or an
 administrator bypass. `VisitorAccessCapabilityResolver` combines effective visitor
-mode with all enabled, tenant-usable account providers. Local credentials do not
-provide public signup. Configurable external providers contribute onboarding only
+mode and inherited tenant enrollment with all enabled, tenant-usable account
+providers. Existing Local, Keycloak and AT Protocol accounts remain eligible for
+account-required participation when enrollment is closed. That eligibility
+depends on usable login, not a signup destination. Local credentials do not
+provide public signup until a callable registration flow is available.
+Configurable external providers contribute onboarding only
 with an explicit `Allowed` policy and a trusted configured HTTPS destination;
 unknown policy or a successful discovery probe cannot substitute.
+The `tenants.user_registration_enabled` scalar defaults open only on a successful
+missing-value read; malformed or unavailable facts fail closed. The complete
+ordered authority fence includes that scalar for native writes, imports,
+provider changes and new participation. Proposed instance locks are applied
+before interpreting tenant overrides. Tenant administration requires the
+server-produced edit link and per-setting editability; it does not infer authority
+from browser claims.
 
 Public settings, shell, provider configuration and event-detail responses project
 the same immutable `visitorAccess` facts. Provider HAL exposes `signup:<provider>`

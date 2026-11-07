@@ -1,0 +1,33 @@
+Change-Id: CHG-01M6E4FYYVDMCT0E5CJG17HSMT
+Title: "Read enrollment erasure state from its original transaction"
+Type: fix
+Scope: privacy
+Summary: "Embedded authority state checks observe the active enrollment writer rather than a blocked or stale second connection."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Retain enrollment visibility and ownership for counter reads. The reader
+      never commits or disposes its borrowed writer; failed enrollment rolls
+      back both the counter and retained facts.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/privacy-erasure.md
+    Disposition: documented
+    Detail: >-
+      Enrollment checks no longer wait on their own SQLite writer or observe an
+      older counter. No timeout, retry setting or replica permission changes.

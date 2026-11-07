@@ -208,7 +208,52 @@ rather than complete authentication links or query strings.
 
 ### Local Identity
 
-Local Identity provides username/password or email/password sign-in without an external identity container. Passwords are hashed by ASP.NET Core Identity and failed attempts use bounded lockout. Public self-registration is closed: the former API and BFF registration routes have been removed, with no replacement public signup endpoint.
+Local Identity provides username/password or email/password sign-in without an external identity container. Passwords are hashed by ASP.NET Core Identity and failed attempts use bounded lockout. New visitor enrollment follows the selected tenant's registration policy; closing enrollment does not revoke an existing account or membership.
+
+When Local enrollment is available, authentication discovery advertises
+`/auth/local/register`. The form uses the server's `local-register` HAL action
+and does not infer permission from the presence of a Local sign-in provider.
+Closed enrollment hides signup while keeping ordinary sign-in available.
+After account creation, continue through Local sign-in using the original
+password. An uncertain result requires an explicit retry with the original
+credentials; the form clears password fields after each submission.
+
+The Local enrollment API separates reservation from credential submission:
+`POST /api/auth/local/enrollment/reserve` accepts a client-generated UUIDv7
+operation ID, and `POST /api/auth/local/enrollment/register` accepts that ID,
+username, chosen password, optional contact email and the protected enrollment
+intent. Both require the original `X-Local-Enrollment-Proof` over the server
+backchannel. The BFF must retain this random proof server-side; do not put it in
+URLs, browser JavaScript, support logs or stored request bodies. Browser form
+submission also requires its original host-only flow cookie and antiforgery.
+
+A reservation expires after fifteen minutes without renewal. Retrying the same
+operation must preserve its tenant, browser proof and original identifiers.
+The API returns no access or refresh token from enrollment. Contact email remains
+unconfirmed, and enrollment does not require SMTP. A rejected or unfinished
+credential cannot sign in. Once membership admission commits, later enrollment
+closure does not undo it; recovery finishes that same account rather than
+creating a replacement.
+
+Apply the shipped primary and selected Identity-store migrations and the
+attested Local writer profile upgrade before enabling enrollment. Unknown
+permission drift must be repaired through supported operator tooling rather
+than broader Runtime database permissions.
+
+Quartz runs `visitor-enrollment-recovery` once per minute after an initial
+60-second delay. Each pass handles at most 100 receipts. Expired unfinished
+signups are canceled before their pending native credential is removed; completed
+cleanup is acknowledged separately so retained evidence does not keep filling the
+scan. An account whose membership already committed can finish activation even
+after its reservation expires or enrollment closes. Recovery does not need SMTP
+or retain a password. Keep scheduling and the documented database authorities
+available, and investigate failed recovery passes instead of deleting receipts
+or granting broader database access.
+
+Stop application traffic before attempting a schema downgrade. Downgrade is
+refused while visitor receipts, visitor-origin credentials or incomplete
+administrator verification remain. Keep that evidence and apply a forward fix;
+do not delete records or substitute an administrator identity to force rollback.
 
 New credentials require 15–128 NFC-normalized Unicode scalars and a complete-value
 operator blocklist check. Login shape remains separate from creation minimum.
@@ -256,7 +301,7 @@ added to the session token. Supervised bootstrap can establish a verification
 flag as administrative provenance; that does not invent an address or prove
 mailbox delivery. Changing delivery settings never proves mailbox ownership.
 
-Event's delivery setting does not control Keycloak or AT Protocol verification, password recovery, or sign-in. Lifecycle actions follow the account's actual linked provider, not the instance's default provider. Local enrollment remains an administrator or setup operation; recovery never creates an account.
+Event's delivery setting does not control Keycloak or AT Protocol verification, password recovery, or sign-in. Lifecycle actions follow the account's actual linked provider, not the instance's default provider. Local visitor signup follows the tenant's registration policy separately from administrator provisioning and setup; password recovery never creates an account.
 
 The first-run Local wizard applies the standard English locale and UTC timezone
 defaults when no profile override is supplied, just as external-provider setup does.
@@ -620,25 +665,36 @@ and the other 25 remediation phases remain launch blockers.
 
 ## AT Protocol Sign-In
 
+When upgrading the BFF session storage format, existing browser sessions require
+sign-in again. Hosts participating in a browser-session transfer must share the
+configured Redis authority and compatible data-protection context.
+
+Apply the authentication-state migrations before starting the new executable.
+The upgrade preserves existing tenant-bound login records and leaves health
+probes unauthenticated. A downgrade is refused while unscoped verification state
+cannot be represented by the earlier schema. Retain those records or allow their
+bounded expiry and supported cleanup; do not assign an arbitrary tenant to make
+rollback succeed.
+
 Optional or primary [AT Protocol Authentication](../federation-and-open-protocols/at-protocol-and-bluesky-jetstream.md) enables users to sign in using their Bluesky handle (`@handle.bsky.social`) or Decentralized Identifier (DID):
 * Links strictly by the DID verified with the personal data server.
-* JIT-creates a passwordless account when AT Protocol is primary.
+* Offers passwordless enrollment when the provider is ready and the selected tenant permits registration and account-required participation.
 * Never creates accounts through opportunistic email matching.
 * Does not implicitly grant event publication or federation consent.
-* Requires an existing exact DID-linked account when optional under Local Identity or Keycloak.
+* Uses the exact verified DID binding for existing-account sign-in; active members can still sign in after registration closes.
 * Operates under the same provider-neutral [Authorization](authorization.md) rules as Local Identity and Keycloak users.
 
 ---
 
 ## Acceptance Testing Checklist
 
-1. Verify Local sign-in issues only an HttpOnly BFF cookie to the browser and the former public registration routes cannot create accounts.
+1. Verify Local sign-in issues only an HttpOnly BFF cookie to the browser, and visitor signup is offered only through the server-advertised protected flow.
 2. Confirm invalid Local credentials return generic guidance and repeated failures lock the account.
 3. For Keycloak, verify login redirects back to the Blazor application and refresh works.
 4. Switch providers and confirm new-login discovery changes while an existing session remains usable.
 5. Verify logout invalidates the local BFF cookie and invokes provider logout when applicable.
 6. Verify an invalid API key returns `401 Unauthorized` with ProblemDetails.
-7. Enable instance email delivery and confirm unverified Local sign-in is refused, even without SMTP. Disable delivery and confirm successful sign-in does not mark the address verified.
+7. Enable and disable instance email delivery and confirm otherwise eligible Local sign-in works with absent or unverified optional email. Confirm login does not mark an address verified and email recovery still requires verified contact authority.
 
 ---
 

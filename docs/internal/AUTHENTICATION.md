@@ -64,6 +64,74 @@ remain separately owned. Dynamic issuer/JWKS refresh does not change this
 deployment-owned resource/client/purpose policy. Configuration changes take
 effect on process restart. Browser tokens remain server-owned by the BFF.
 
+### Explicit ATProto transient targets
+
+Authentication transient create/read contracts require `flowKind`: `Targeted`
+(`1`) retains an exact nonempty tenant; `UnscopedVerification` (`2`) permits a
+null tenant only for OAuth state. Health probes retain their separate purpose
+with null tenant and null flow kind. Ordinary tenant-session consumption requires
+`Targeted` and compares the kind in its final conditional delete.
+
+The source-owned migration generator classifies existing tenant-bound OAuth and
+handoff rows as `Targeted` before installing the new constraint. It never turns
+health probes into authentication state. SQLite materializes the new column and
+classifies rows before its deferred table rebuild copies them. Downgrade
+preflights reject retained unscoped verification state before removing the
+discriminator; operators must retain that evidence or allow expiry and supported
+cleanup rather than inventing a tenant. Generated migrations remain unedited.
+
+## Final Tenant Enrollment Admission
+
+`POST /api/auth/account-continuation` resolves the exact verified Local or
+Keycloak account independently of signup. It returns a closed result describing
+a destination, missing membership, unlinked identity or unavailable authority.
+An explicit target takes precedence over stored affinity. API keys, machine
+identities and identity assertions in request bodies cannot substitute for the
+validated provider principal. This endpoint does not create accounts,
+memberships or provider credentials.
+
+ATProto authentication transients now carry an explicit flow kind. Targeted
+authentication requires its tenant; unscoped verification excludes a tenant;
+health flows carry neither authentication kind nor tenant. This changes the
+retained authentication contract. Generated migrations backfill existing
+tenant-bound authentication rows as targeted and retain health rows unchanged.
+Downgrade refuses unscoped rows before changing schema. The restricted
+verification and subsequent browser continuation workflow remains under
+implementation.
+
+Ordinary new-account and new-membership allocation share
+`TenantEnrollmentAdmissionOperation.IsOpenAsync`: the current tenant must permit
+registration and account-required participation. Local enrollment evaluates this
+decision within its selected writer callback. Targeted ATProto bootstrap
+evaluates it before allocating a missing membership for an exact linked account.
+Keycloak synchronization evaluates it before binding and allocating an ordinary
+new account, requiring a nonempty target tenant.
+
+Provider operations retain the ordered enrollment-setting groups before the
+identity fence and through the recognition transaction's commit. Existing active
+membership login and exact-account synchronization remain available when
+registration closes. Configured administrator setup retains its independently
+verified bootstrap path. Membership persistence binds existing principal
+references in the committing context through
+`TenantUserRepository.CreateForExistingAccountAsync`, so detached read results
+cannot cause EF to insert the existing tenant again.
+
+### Source-conditioned destination sessions
+
+The BFF cookie store accepts a server-owned `BffSessionTransferSource` feature
+only after the transfer producer has validated its original protected evidence.
+It compares source binding and revision in C#, then atomically compares the
+original protected Redis bytes, checks source/handoff/destination deadlines with
+Redis time, and creates fresh destination custody. Ordinary cookie storage keeps
+its separate fresh-login path. The transfer endpoints and persistence workflow
+remain separate consumers of this storage primitive.
+
+Source and destination require the same Redis authority, namespace and
+data-protection partition. Session keys now use a shared authority hash tag to
+keep the conditional source/destination write in one Redis Cluster slot. The
+changed key/protection prefix invalidates prior server-side session handles on
+upgrade; users sign in again. Independent authorities fail closed.
+
 ## Embedded Account Correlation
 
 `IIdentityAccountResolver` is implemented by the embedded Application

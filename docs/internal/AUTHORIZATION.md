@@ -508,13 +508,62 @@ source contract and migrator installation.
 
 `LocalIdentityCredentialStateStore.ValidateReadySessionAsync` requires the
 ordinal stamp match, email state, password presence, Ready metadata, replaced
-Create/Reset operation and exact live user/login/personal-actor binding. Instance
+Create/Reset/VisitorCreate operation and exact live user/login/personal-actor binding. Instance
 email policy still distinguishes invalid sessions from unavailable validation.
 Login keeps its complete entity and response path; this projection does not
 fabricate a `LocalIdentityUser`. All fourteen native Runtime controls pass with
 both null and selected tenants, including invalid-session outcomes and denied
 direct access to private identity tokens. The selected-tenant fixture uses the
 production `PostgresTenantSessionInterceptor`; caller guards remain unchanged.
+
+### Original Local visitor enrollment
+
+Local visitor enrollment uses separate native CQS reservation and registration
+handlers behind `POST /api/auth/local/enrollment/reserve` and `/register`.
+The current tenant comes from the selected execution scope, never the body.
+The BFF supplies its server-held 256-bit proof as canonical lowercase hex in
+`X-Local-Enrollment-Proof`; Application handlers hash the decoded bytes before
+storage. The protected intent contains only operation, tenant, proof digest and
+the original UTC expiry. Possession of that data type alone is not authority:
+registration compares every field against the authoritative receipt.
+
+`LocalVisitorEnrollmentService` obtains an original Local identity/application
+scope and resolves its storage port and current policy readers from that child.
+`TenantEnrollmentAdmissionOperation` runs provider authorization and effective
+tenant registration policy inside the producer's final admission callback.
+The native producer retains the complete ordered authority-setting group,
+Human/Discovery/lifecycle/privacy custody and Serializable primary transaction
+through commit. Existing exact active membership skips new-allocation policy.
+
+The primary receipt progresses through Reserved, IdentityPrepared,
+PrimaryAdmitted and Active, with terminal Canceled before admission. Identity
+preparation uses VisitorCreate provenance without an administrator initiator or
+verifier, RegistrationPending metadata and the existing eligibility ledger's
+native operation pointer. Primary admission atomically projects the ordinary
+User, personal Actor, Local login, TenantUser and receipt. Only durable admission
+permits native Replaced/Ready settlement; primary acknowledgement records that
+settlement separately. A later legitimate Ready lockout publication must not
+strand acknowledgement. No visitor password, raw proof or bearer is persisted
+in the receipt, and no enrollment response issues a browser session.
+
+The recovery reader releases only operation, tenant, stage, generation and
+deadline metadata. Its fixed Global SELECT footprint also includes the nullable
+cleanup completion timestamp solely to exclude drained cancellations.
+`ILocalVisitorEnrollmentRecoveryScopeFactory` selects a fresh original Local
+writer pair for each persisted target; discovery metadata cannot authorize a
+write. Cancellation and activation compare the candidate version inside their
+Serializable owner transaction. Native purge follows durable primary
+cancellation. A separate transaction acknowledges `CleanupCompletedAt` only
+after the purge commit returned successfully and native absence was checked
+again. This order preserves recoverability across separate identity stores:
+uncertain native deletion never publishes a completed primary cleanup marker.
+The canceled receipt retains its original identifiers, digest and deadline.
+
+Both API actions are rate-limited, private/no-store and excluded from generic
+idempotency response storage. Their BFF caller must retain the original
+host-only flow cookie, server-held proof and antiforgery checks. Expiry and
+uncertain outcomes are reconciled against the same receipt; they never justify
+username adoption, a replacement password, a new target or renewed expiry.
 
 ### Original resource and visitor Settings ownership
 

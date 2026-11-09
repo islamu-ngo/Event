@@ -19,6 +19,7 @@ priority: high
 - [../i-vsd/resources/integration-contract.md](../i-vsd/resources/integration-contract.md)
 - [../grill-me/SKILL.md](../grill-me/SKILL.md)
 - [../conventional-commit/SKILL.md](../conventional-commit/SKILL.md)
+- [../plane-compose/SKILL.md](../plane-compose/SKILL.md)
 
 ## Top Invariants
 1. **Planning vs. Execution Decoupling (Strict Separation of Concerns)**:
@@ -43,6 +44,10 @@ priority: high
    - **Human-facing planning**: Use [reader-first writing](../conventional-commit/resources/reader-first-writing.md) for executive summaries, planned messages, reports, and decision briefs. Explain the user/operator or engineering consequence before the mechanism; keep detailed architecture in its designated section.
 10. **Local Working Memory & Native Harness Tooling**: `dev/active/<task>/` is gitignored local working memory, initially in the root during planning and moved into the worktree during execution. Use native file tools at its authoritative location; never duplicate the active ledger or commit `dev/active/*`.
 11. **Knowledge Graduation Gate**: Active implementation plans in `dev/active/` are ephemeral working memory and disappear upon workstream completion. Every plan MUST include a final phase task for **Knowledge Graduation**: promoting deferred scope into actionable standalone items in `dev/backlog/<slug>.md`, durable architectural decisions into `docs/internal/adr/`, and non-obvious lessons into `dev/_journal/domains/`. These persistent artifacts are staged and committed alongside code.
+12. **Plane Compose Intake & Active Task Grounding (Macro-Project Plane)**:
+   - **Pre-Flight Deduplication & Intake:** Before planning a new feature or substantial architectural change, search `event/work/` (or run `cd event && plane status`) to determine if a matching work item already exists. If an existing work item covers the scope (e.g. `EVENT-XXX`), bind to its sequence ID rather than duplicating it.
+   - **Active Task Authoring:** If no ticket exists, author `event/work/active-<task-slug>.yaml` using `event/work/active-template.yaml` with a stable local ID (`active-<task-slug>`), `state: Backlog`, appropriate priority, and high-level acceptance criteria.
+   - **Dual-Plane Traceability:** Record the Plane Ticket Reference (`EVENT-XXX` or `active-<task-slug>`) in `plan.md` §0 (Planning Metadata) and `tasks.md` summary. Keep `workitems.yaml` intact as the stable baseline; active tasks live in their dedicated `<task-slug>` file.
 
 ## Top Anti-Patterns
 1. Memory-based planning, which turns assumptions about the repository into false implementation facts.

@@ -9,6 +9,7 @@ priority: high
 - [../../../AGENTS.md](../../../AGENTS.md)
 - [../../../.agents/CONTEXT_ENGINEERING.md](../../../.agents/CONTEXT_ENGINEERING.md)
 - [../conventional-commit/SKILL.md](../conventional-commit/SKILL.md)
+- [../plane-compose/SKILL.md](../plane-compose/SKILL.md)
 
 ## Top Invariants
 
@@ -20,7 +21,7 @@ priority: high
      - Active branch: `feat/<task-name>`
      - Task folder: `.worktrees/<task-name>/dev/active/<task-name>/`
      - Execution context: all shell commands set `Cwd: .worktrees/<task-name>`; all file edits target `.worktrees/<task-name>/...`
-     - **Action**: Do NOT recreate worktree or run `mv`. Skip setup steps and resume directly inside the existing worktree. If `AGENTS.local.md` exists in the repository root and is missing in `.worktrees/<task-name>`, copy it: `[ -f AGENTS.local.md ] && [ ! -f .worktrees/<task-name>/AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/`. If the root `.env` exists and the worktree has none, copy it without printing its contents: `[ -f .env ] && [ ! -e .worktrees/<task-name>/.env ] && install -m 600 .env .worktrees/<task-name>/.env`.
+     - **Action**: Do NOT recreate worktree or run `mv`. Skip setup steps and resume directly inside the existing worktree. If `AGENTS.local.md` exists in the repository root and is missing in `.worktrees/<task-name>`, copy it: `[ -f AGENTS.local.md ] && [ ! -f .worktrees/<task-name>/AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/`. If the root `.env` exists and the worktree has none, copy it without printing its contents: `[ -f .env ] && [ ! -e .worktrees/<task-name>/.env ] && install -m 600 .env .worktrees/<task-name>/.env`. If the root has `event/` and the worktree has none, symlink it: `[ -d ../../event ] && [ ! -e event ] && ln -s ../../event event`.
    - **Case B: In-Tree / Develop In-Flight (`dev/active/<task-name>`)**:
      If `dev/active/<task-name>` exists in the repository root and work is already in-progress (e.g. checked items `[x]` in `tasks.md`, existing commits, or user explicitly requested running directly on `develop` or current branch):
      - Active branch: current branch (e.g. `develop` or current feature branch)
@@ -36,8 +37,10 @@ priority: high
        mkdir -p .worktrees/<task-name>/dev/active && mv dev/active/<task-name> .worktrees/<task-name>/dev/active/
        [ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/
        [ -f .env ] && install -m 600 .env .worktrees/<task-name>/.env
+       [ -d event ] && ln -s ../../event .worktrees/<task-name>/event
        ```
      - Moving preserves strict single-source-of-truth, eliminates split-brain checklists, and ensures clean garbage collection on worktree removal.
+     - **Symlink `event/` (Never Copy or Move)**: The `event/` Project-as-Code directory is gitignored and resides in the repository root. Isolated worktrees MUST symlink `event` (`ln -s ../../event .worktrees/<task-name>/event`) so that Plane Compose shares `.plane/state.json` and credentials without duplicating state files or triggering API rate limits.
      - **Copy `AGENTS.local.md` (Never Move)**: If `AGENTS.local.md` exists in the repository root, copy it into `.worktrees/<task-name>/AGENTS.local.md`. It must be **copied (never moved)** so that local developer overrides and environment constraints remain in effect inside the isolated worktree while preserving the root configuration for subsequent sessions or tasks. (Because `AGENTS.local.md` is gitignored, it will not be staged or committed).
      - **Copy `.env` (Never Move or Overwrite)**: If the repository root has an `.env`, copy it into the new worktree with owner-only permissions. On resume, copy only when the worktree has no `.env`; preserve any task-specific values already there. `.env` is gitignored and must never be staged, logged, or committed. A copied file does not supply missing keys: resolve those through the selected approved secret authority.
    - **Case D: Grand Multi-Cohort Execution (Hub-and-Spoke Topology & Bounded Worker Pooling)**:
@@ -74,7 +77,8 @@ priority: high
      - *Class A (Direct Feature Regressions)*: Failing assertions in code touched by this feature. Must resolve in-phase.
      - *Class B (Feature-Induced Integration Ripple)*: Unmodified callers/fixtures broken by changed contracts. If mechanical and minor (< 15m), align immediately. If structural/cross-domain, pause with a Decision Brief before absorbing.
      - *Class C (Pre-Existing Baseline Rot)*: Environment quirks, unmigrated table assumptions, or failures reproducing on clean `origin/develop`. Strictly quarantine into `*-context.md`; never add to `tasks.md` or debug in the feature worktree.
-   - **Semantic Phase Commit**: In the execution context, stage changes and commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. Planning defines semantic meaning; execution handles file discovery.
+   - **Semantic Phase Commit**: In the execution context, stage changes and commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. Planning defines semantic meaning; execution handles file discovery. Commit messages link to Plane via `Refs: EVENT-XXX` (or `Fixes: EVENT-XXX`).
+   - **Plane Macro State Progression**: When beginning implementation, ensure `state: In Progress` is set in `event/work/active-<task-name>.yaml` (or the referenced Plane item). Maintain the active task file locally; never touch or shatter `workitems.yaml`.
    - **Reconcile Ledger**: Batch task checkbox updates at phase gates in `tasks.md`.
 6. **Self-Contained Phase Reporting, Decision Briefs & Mid-Flight Slicing**:
    Apply [reader-first writing](../conventional-commit/resources/reader-first-writing.md) to reports and questions: delivered behavior first, relevant mechanism and verification next. Never use bare phase IDs. Decision Briefs name the exact choice, practical consequences, technical rationale, recommended option, and next action; ordinary progress reports need no invented decision.
@@ -87,6 +91,7 @@ priority: high
    - Stage and commit these persistent files on the task branch so they merge into `develop`.
 8. **Ring 3 Plan Exit Gate & Mass-Failure Circuit Breaker**:
    - **Ring 3 Plan Exit Gate**: Run full 5-database matrix, EF Core migrations, and `Event.Architecture.Tests` once at workstream completion before PR creation.
+   - **Plane Compose Preflight Validation**: Validate Project-as-Code state before publishing: `cd event && plane schema validate && plane validate --offline && plane validate && plane push --dry-run`. For additive work-item synchronization, run `plane push --work-only` to publish task progress safely.
    - **Mass-Failure Circuit Breaker (> 10 Failures)**: If Ring 3 execution yields > 10 failures, the agent MUST NOT generate dozens of individual subtasks or start fixing them one-by-one. Cluster failures by root cause (shared fixture, missing test migration, secret binding, or base divergence). If failures stem from pre-existing baseline rot (Class C), quarantine them. If caused by widespread architectural mismatch, pause and deliver a Decision Brief.
    - **Pre-PR Rebase (Concurrency Conflict Protection)**:
      ```bash
@@ -109,6 +114,7 @@ priority: high
      ```bash
      gh pr create --base develop --title "<type>(<scope>): <title>" --body "<body-with-release-impact>"
      ```
+   - **Plane Lifecycle Advancement**: Upon PR creation, advance `event/work/active-<task-name>.yaml` (or referenced Plane item) to `state: Review Needed` (or `In Review`). Transition to `Done` occurs only after PR merge and verified acceptance evidence.
    - **Park the Worktree (When using Worktree isolation)**:
      Never delete `.worktrees/<task-name>` upon PR creation. The worktree must remain parked and intact so that any subsequent bot reviews (Copilot, CodeQL) or CI check failures can be resolved immediately in-place with zero setup overhead.
    - **Halt and Deliver Partitioned Status Brief**:
@@ -138,6 +144,7 @@ priority: high
         [ -f AGENTS.local.md ] && [ ! -f .worktrees/<task>/AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/
         If .env exists in root and is missing in worktree, copy it without displaying values:
         [ -f .env ] && [ ! -e .worktrees/<task>/.env ] && install -m 600 .env .worktrees/<task>/.env
+        If root has event/ and worktree has no event, symlink it: [ -d ../../event ] && [ ! -e event ] && ln -s ../../event event
      -> NOT FOUND:
         - If dev/active/<task> exists and (resuming OR user mandated in-tree):
           Topology = In-Tree. Set Cwd = repo root, PlanPath = dev/active/<task>/.
@@ -148,6 +155,7 @@ priority: high
           mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/
           [ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/
           [ -f .env ] && install -m 600 .env .worktrees/<task>/.env
+          [ -d event ] && ln -s ../../event .worktrees/<task>/event
           Set Cwd = .worktrees/<task>, PlanPath = .worktrees/<task>/dev/active/<task>/.
 
 2. Context Load & Holistic Orientation:

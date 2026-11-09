@@ -71,6 +71,22 @@ Changelog-Reason: concise explanation of why commit is excluded from public rele
 | `revert` / `docs` | Rollback with stated outcome, or documentation-only change |
 | `test/build/ci/refactor/chore` | Internal outcome (skipped from public release notes) |
 
+### Plane Work Item Trailers
+
+Commits linking to Plane Compose Project-as-Code work items use standard Git trailers placed above terminal changelog skip trailers:
+- **Progress / Feature Deliverable**: `Refs: EVENT-XXX` (or `Refs: active-<task-slug>`)
+- **Resolved Defect / Bug**: `Fixes: EVENT-XXX`
+- **Multiple References**: `Refs: EVENT-123, EVENT-456`
+
+Example:
+```text
+feat(notifications): add user preference dispatch routing
+
+Implement per-category user notification preference channels for email and in-app alerts.
+
+Refs: EVENT-4968
+```
+
 ### CLI Recipe
 
 Confirm `git config --get core.hooksPath` resolves to the repository `.githooks`

@@ -34,6 +34,7 @@ Every change must answer these eight questions **before editing any file**:
 | Intent registry | `.agents/contract/intents.yaml` | Machine-readable task mapping |
 | Operations | `docs/internal/OPERATIONS.md` | Build/Test details, AI operational rules |
 | Durable findings | `dev/_journal/journal.md` | Decisions, non-obvious patterns |
+| Project tracking as code | `event/plane.yaml` | Plane Compose project configuration, schemas, and work items |
 
 ---
 
@@ -90,6 +91,7 @@ Every change must answer these eight questions **before editing any file**:
 17. **Execution Continuity Directive for Approved Tasks**: For tasks within an approved plan, agents must continue implementation and proportional verification end-to-end without routine stage pauses. Pause only at material boundaries: requirement ambiguity, unexpected scope creep, irreversible actions, or explicit user direction.
 18. **Targeted Verification Default & Verification Evidence**: Always target verification against the specific affected project(s) by default using the verified commands in [`PROJECTS.md`](PROJECTS.md). Every task completion, milestone report, or PR description must record exact commands executed and their outcomes, plus any checks not run and why. Never state or imply a build or test suite passed when it was not physically executed.
 19. **Application-Owned Authority, EF-First Persistence**: C# owns authorization, business rules, workflows, concurrency coordination and completion. Keep that logic in Domain/Application services and handlers, not controllers or a second database application. Use EF Core/LINQ and supported provider libraries for ordinary persistence. The database supplies transactions, foreign keys, uniqueness, constraints and useful tenant isolation; narrow permissions support legitimate application operations. Do not introduce or retain stored procedures, privileged business routines or database-enforced workflow authority to prevent an application from performing operations it is authorized to manage. Remaining handwritten SQL needs a demonstrated EF/provider capability gap and a small documented storage primitive. Granting an approved application purpose the fixed permissions its workflow needs is normal implementation, not automatically a defect or a new approval request. Document credential-only compromise risk once; do not repeatedly reopen an accepted trade-off. Escalate genuinely new trust boundaries, secret exposure or destructive actions. Existing SQL contracts are transitional, not a reason to preserve business logic in SQL or silently remove controls before a verified C# replacement. See [the accepted persistence decision](docs/internal/adr/ADR-application-owned-persistence.md).
+20. **Project Tracking with Plane Compose**: For substantive engineering work, maintain a tracked Plane work item as code. Author task-scoped YAML under `event/work/active-<task-slug>.yaml` using [`active-template.yaml`](event/work/active-template.yaml) without sharding the historical baseline `event/work/workitems.yaml` (preventing ID collisions on `plane pull`). Isolated worktrees must link `event/` via `ln -s ../../event event`. Validate locally (`plane schema validate`, `plane validate --offline`) and dry-run (`plane push --dry-run`) before additive pushes (`plane push --work-only`). Destructive operations (`--force`, `schema sync`, `--prune`) and tracking trivial edits are strictly forbidden.
 
 **Full list:** [`docs/internal/QUICK_REFERENCE.md`](docs/internal/QUICK_REFERENCE.md)
 
@@ -108,6 +110,7 @@ Every change must answer these eight questions **before editing any file**:
 | Agent Ops | [`.agents/CONTEXT_ENGINEERING.md`](.agents/CONTEXT_ENGINEERING.md) |
 | PR Review | [`.agents/skills/review-pr/SKILL.md`](.agents/skills/review-pr/SKILL.md) |
 | Log Finding | [`.agents/skills/finding/SKILL.md`](.agents/skills/finding/SKILL.md) |
+| Project Tracking / Plane | [`.agents/skills/plane-compose/SKILL.md`](.agents/skills/plane-compose/SKILL.md) |
 
 ---
 

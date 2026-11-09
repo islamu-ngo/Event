@@ -997,6 +997,8 @@ intents:
       - "update skill resources"
       - "agentic engineering"
       - "context engineering"
+      - "plane compose skill"
+      - "plane-compose skill"
     must_read_docs:
       - AGENTS.md
       - docs/internal/QUICK_REFERENCE.md
@@ -1010,6 +1012,7 @@ intents:
       - agentic-research
       - senior-cto-feedback
       - ip-clean-room
+      - plane-compose
     load_rules:
       - .agents/rules/ip-clean-room.md
     paths_in_scope:
@@ -1067,13 +1070,18 @@ intents:
       - "agent os"
       - "validate intents yaml"
       - "validate literal git commit paths"
+      - "plane compose workflow"
+      - "plane-compose workflow"
+      - "plane project as code"
+      - "active task file"
     must_read_docs:
       - AGENTS.md
       - docs/internal/QUICK_REFERENCE.md
       - docs/internal/AGENTIC_CONTEXT_ENGINEERING.md
       - docs/internal/OPERATIONS.md
       - docs/internal/TESTING.md
-    load_skills: []
+    load_skills:
+      - plane-compose
     load_rules:
       - .agents/rules/tests.md
     paths_in_scope:
@@ -1086,6 +1094,8 @@ intents:
       - ".agents/skills/implementation-plan/SKILL.md"
       - ".agents/skills/implementation-plan/resources/operational-artifacts.md"
       - ".agents/skills/senior-cto-feedback/resources/plan-rewrite-guidance.md"
+      - ".agents/skills/plane-compose/**"
+      - "event/work/active-template.yaml"
       - "eng/agent-workflow/src/ISLAMU.AgentWorkflow/**"
       - "eng/agent-workflow/tests/ISLAMU.AgentWorkflow.Tests/**"
       - "eng/agent-context/**"

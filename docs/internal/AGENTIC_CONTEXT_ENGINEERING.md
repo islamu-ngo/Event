@@ -90,27 +90,27 @@ flowchart TD
 
     subgraph Stage2["Stage 2: Implementation Planning & Interrogation (User-Invoked)"]
         IVSDDoc --> PlanTrigger["User Prompt:\n'Create implementation plan for <feature>'"]
-        PlanTrigger --> PlanSkill["implementation-plan Skill\n• Ingests i-vsd Deliverable\n• Runs /grill-me Technical Socratic Interrogation\n• Dependencies: conventional-commit for commit contracts\n• (If Major Fork: robin-neutral Steelmanning)"]
-        PlanSkill --> DevDocTriadInit["Initializes dev/active/<task>/\n• <task>-plan.md (Scenarios & Architecture)\n• <task>-tasks.md (Tests + Declarative Commit Contracts)\n• <task>-context.md (Ephemeral Working Memory)"]
+        PlanTrigger --> PlanSkill["implementation-plan Skill\n• Ingests i-vsd Deliverable\n• Runs /grill-me Technical Socratic Interrogation\n• Plane deduplication: searches event/work/\n• Authors event/work/active-<task>.yaml (State: Backlog)\n• Dependencies: conventional-commit for commit contracts\n• (If Major Fork: robin-neutral Steelmanning)"]
+        PlanSkill --> DevDocTriadInit["Initializes dev/active/<task>/\n• <task>-plan.md (Scenarios & Architecture)\n• <task>-tasks.md (Tests + Declarative Commit Contracts)\n• <task>-context.md (Ephemeral Working Memory)\n• Plane Ticket Reference in plan.md §0"]
     end
 
     subgraph Stage3["Stage 3: Adversarial CTO Audit & Socratic Stress-Test (User-Invoked)"]
         DevDocTriadInit --> CTOTrigger["User Prompt:\n'Run senior-cto-feedback'"]
-        CTOTrigger --> CTOSkill["senior-cto-feedback Skill\n• Audits & Directly Refines Triad In-Place (Zero Review Files)\n• 3D Scorecard (Completeness, Correctness, Coherence)\n• 4-Point Right-Sizing Check (Split PR Heuristic)\n• 'Worst Break' Catastrophic Invariant Check\n• Validates Declarative Per-Phase Commit Contracts\n• High-Signal Chat Summary"]
+        CTOTrigger --> CTOSkill["senior-cto-feedback Skill\n• Audits & Directly Refines Triad In-Place (Zero Review Files)\n• Audits Plane work-item scope, dependencies & priority\n• Advances active-<task>.yaml state to Ready on approval\n• 3D Scorecard (Completeness, Correctness, Coherence)\n• 4-Point Right-Sizing Check (Split PR Heuristic)\n• 'Worst Break' Catastrophic Invariant Check\n• Validates Declarative Per-Phase Commit Contracts\n• High-Signal Chat Summary"]
     end
 
     subgraph Stage4["Stage 4: Implementation Execution & Autonomous Domain Guardrails"]
-        CTOSkill --> ExecTrigger["User Combines /goal + implement-tasks:\n• Research: Tavily MCP & Context7 MCP\n• Structure: Code-Review-Graph MCP\n• Conventions: Clean Architecture & Enterprise Patterns\n• Pre-Release Freedom: Zero backward compatibility baggage"]
+        CTOSkill --> ExecTrigger["User Combines /goal + implement-tasks:\n• Research: Tavily MCP & Context7 MCP\n• Structure: Code-Review-Graph MCP\n• Topology Discovery (Worktree symlink: ln -s ../../event event)\n• Advances Plane state (Ready -> In Progress -> In Review)\n• Conventions: Clean Architecture & Enterprise Patterns\n• Pre-Release Freedom: Zero backward compatibility baggage"]
         ExecTrigger --> AutoExecution["Autonomous Domain Execution Loop\n• Topology Discovery (Worktree vs In-Tree)\n• clean-architecture-rules\n• cqrs-guidelines\n• dotnet-efcore-guidelines\n• auth-patterns & outbox-pattern\n• debug-issue & refactor-safely\n• Fast TUnit Slicing (--treenode-filter)"]
         AutoExecution --> PhaseVerification["Phase Verification\n• One Release build\n• At most one selected project test\n• Three-Tier Failure Triage (Class A/B/C)"]
-        PhaseVerification --> PhaseCommit["Immediate Phase Commit\n• Execute pre-authored declarative tasks.md contract\n• No conventional-commit skill reload\n• Commit owned paths directly (no hash logging)"]
+        PhaseVerification --> PhaseCommit["Immediate Phase Commit\n• Execute pre-authored declarative tasks.md contract\n• Include Plane trailers (Refs: EVENT-XXX / Fixes: EVENT-XXX)\n• No conventional-commit skill reload\n• Commit owned paths directly (no hash logging)"]
         PhaseCommit --> MorePhases{"More approved phases?"}
         MorePhases -->|"Yes"| AutoExecution
     end
 
     subgraph Stage5["Stage 5: Workstream Completion & Knowledge Graduation"]
         MorePhases -->|"No"| FinalReview["Final Workstream Review & Teaching Summary\n• Comprehensive technical explanation\n• No unrelated shared-tree files committed\n• Dual-documentation parity (public vs internal)"]
-        FinalReview --> KnowledgeGraduation["Knowledge Graduation & Ring 3 Gate\n• dev/backlog/, ADRs, dev/_journal/\n• Full 5-DB Matrix & Architecture Tests\n• Pre-PR Rebase (origin/develop)"]
+        FinalReview --> KnowledgeGraduation["Knowledge Graduation & Ring 3 Gate\n• dev/backlog/, ADRs, dev/_journal/\n• Plane sync preflight (plane validate, plane push --dry-run, --work-only)\n• Advances Plane state to Done upon verified delivery\n• Full 5-DB Matrix & Architecture Tests\n• Pre-PR Rebase (origin/develop)"]
         KnowledgeGraduation --> PRSubmission["PR Creation & Worktree Parking\n• Pre-flight ## Release Impact checklist\n• Park .worktrees/<task> for bot/CI review\n• Halt & Partitioned Status Brief\n• Deferred teardown upon merge"]
     end
 ```
@@ -331,6 +331,91 @@ Instead, **100% of the CTO review's analytical depth and research findings are a
 | **Breaking Deletions & Legacy Elimination** | `plan.md` §12 Migration & Compatibility Plan & `context.md` Key Decisions | Explicitly records obsolete code, endpoints, tables, and adapter shims marked for outright deletion under greenfield development principles. |
 | **Test-First Sequences & Atomic Commits** | `tasks.md` Phase Checklist & Planned Commit Contracts | Turns architectural advice into an executable, verifiable sequence of Red -> Green -> Refactor tasks with path-limited Conventional Commits. |
 
+### The Dual-Plane Cognitive Model (Dev-Doc Triad vs Project-as-Code)
+
+To achieve enterprise-grade maintainability, cross-agent coordination, and developer transparency without polluting git history or swamping context windows, ISLAMU Event implements the **Dual-Plane Cognitive Model**:
+
+```mermaid
+flowchart LR
+    subgraph MacroPlane["Macro Tracking Plane (Human & Fleet Visibility)"]
+        PlaneYAML["event/plane.yaml\n(Workspace: islamu, Project: EVENT)"]
+        ActiveTaskYAML["event/work/active-<task-slug>.yaml\n(State: Backlog -> Ready -> In Progress -> Done)"]
+        PlaneCloud["Plane Workspace (api.plane.so)\n(Boards, Cycles, Cross-Agent Fleet)"]
+        
+        PlaneYAML --> ActiveTaskYAML
+        ActiveTaskYAML <-->|"plane push / pull\n(--work-only)"| PlaneCloud
+    end
+
+    subgraph MicroPlane["Micro Execution Plane (Machine Working Memory)"]
+        DevDocTriad["dev/active/<task>/\n(Gitignored Ephemeral Working Memory)"]
+        PlanMD["<task>-plan.md (Scenarios & ADRs)"]
+        TasksMD["<task>-tasks.md (Red/Green/Refactor Ledger)"]
+        ContextMD["<task>-context.md (Session Handoffs)"]
+        
+        DevDocTriad --> PlanMD
+        DevDocTriad --> TasksMD
+        DevDocTriad --> ContextMD
+    end
+
+    ActiveTaskYAML -.->|"References Macro Deliverable"| PlanMD
+    TasksMD -.->|"Drives State Evidence"| ActiveTaskYAML
+```
+
+| Dimension | Dev-Doc Triad (`dev/active/<task>/`) | Project-as-Code (`event/work/active-<task>.yaml`) |
+|---|---|---|
+| **Audience** | Autonomous executing AI agents (inner loop machine memory). | Platform stewards, developers, cross-agent fleets, PM boards. |
+| **Granularity** | Micro-execution: subtasks, test assertions, compiler diagnostics, class refactors. | Macro deliverable: user-facing capability, milestones, acceptance criteria, blocker dependencies. |
+| **Lifecycle States** | `[ ]` unchecked $\rightarrow$ `[x]` checked. | `Backlog` $\rightarrow$ `Ready` $\rightarrow$ `In Progress` $\rightarrow$ `In Review` $\rightarrow$ `Done`. |
+| **Git Boundary** | Gitignored (`dev/active/*`) to eliminate commit churn and branch merge conflicts. | Gitignored (`event/`, `event-backup-*/`) for operational privacy; synchronized to remote Plane workspace. |
+| **Tooling** | Native agent file tools (`read_file`, `write_file`, `edit_file`). | Plane Compose CLI (`plane schema validate`, `plane validate`, `plane push --work-only`). |
+
+### The Active Task Partitioning Pattern (Anti-Collision Architecture)
+
+A critical architectural finding in repository Project-as-Code operations governs how work items are stored:
+
+1. **The Historical Baseline Monolith (`event/work/workitems.yaml`)**:
+   - Contains 2,616+ baseline work items representing the comprehensive platform backlog.
+   - **Anti-Shattering Invariant**: The repository strictly rejects moving or sharding historical items out of `workitems.yaml` into domain-specific YAML files. When `plane pull` executes, Plane Compose writes pulled items back into `workitems.yaml`. If historical items were previously migrated to separate files, `plane pull` re-creates them in `workitems.yaml`, producing catastrophic duplicate ID validation errors (`ID 'EVENT-XXX' already exists`).
+   - Consequently, `workitems.yaml` remains intact as the authoritative baseline monolith.
+2. **Active Workstream Task Files (`event/work/active-<task-slug>.yaml`)**:
+   - For new feature, bug, refactor, or architecture tasks, agents author a dedicated active task file: `event/work/active-<task-slug>.yaml` using the template at [`event/work/active-template.yaml`](file:///home/amir/ISLAMU/Github/Event/event/work/active-template.yaml).
+   - Keeps active task context small (< 15 KB), isolated from the 2,616-item monolith, and cleanly diffable.
+   - Provides stable local IDs (e.g. `active-plane-compose-workflow-integration`), high-signal acceptance criteria, priority, and blocker relationships.
+
+### The Worktree Symlink Protocol
+
+Because `event/` and `event-backup-*/` are gitignored to preserve developer credentials and internal operational privacy, isolated git worktrees (`.worktrees/<task>`) do not automatically inherit the `event/` folder.
+
+To prevent duplicated state, token drift, or conflicting cache directories:
+- **Topology Discovery**: When initializing or resuming an isolated worktree in `.worktrees/<task>`, the agent discovers if `event/` exists.
+- **Symlink Creation**: If absent, the agent creates a relative symbolic link pointing back to the repository root:
+  ```bash
+  ln -s ../../event event
+  ```
+- **Single Source of Truth**: This links `plane.yaml`, `.plane/state.json`, credentials, and work-item definitions directly to the root checkout, ensuring seamless offline validation and synchronized remote status across all active worktrees.
+
+### Preflight Validation Pipeline & Sync Boundaries
+
+Before any Plane Compose synchronization or state transition:
+1. **Local Schema & Integrity Validation**:
+   ```bash
+   cd event && plane schema validate && plane validate --offline
+   ```
+2. **Dry-Run Remote Diff**:
+   ```bash
+   plane validate && plane push --dry-run
+   ```
+   Inspect the dry-run output to verify that exactly the expected active work items are modified, with zero unexpected deletions or structural schema changes.
+3. **Safe Additive Synchronization**:
+   ```bash
+   plane push --work-only
+   ```
+   Additive work updates must use `--work-only`. Destructive operations (`--force`, `schema sync`, `--prune`) are strictly forbidden without explicit maintainer approval.
+4. **Git Commit Trailer Traceability**:
+   Commits that progress or resolve Plane work items include reader-first Conventional Commit trailers:
+   - Progressing / Referencing: `Refs: EVENT-XXX`
+   - Closing / Resolving: `Fixes: EVENT-XXX`
+
 ### The Human Interaction Boundary & Zero Plan-Opening UX (The Developer Console Principle)
 
 While the Dev-Doc Triad (`plan.md`, `tasks.md`, `context.md` in `dev/active/<task>/`) guarantees deterministic **inter-session machine working memory**, it must **never** become an obstacle to human-agent collaboration.
@@ -375,10 +460,10 @@ Before executing or resuming, the agent discovers the active execution topology 
 
 | Topology Scenario | Conditions & Detection | Working Context (`Cwd`) | Task Triad Path | Action Protocol |
 |---|---|---|---|---|
-| **Case A: Isolated Worktree In-Flight** | `.worktrees/<task>` exists (`git worktree list`) | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Resume in-place**: Skip setup steps and resume directly inside existing worktree on `feat/<task>`. If `AGENTS.local.md` exists in root and is missing in worktree, copy it: `cp AGENTS.local.md .worktrees/<task>/`. |
-| **Case B: In-Tree / Develop In-Flight** | `dev/active/<task>` exists in repo root with work already in progress (`[x]` tasks, commits, or explicit develop mandate) | Repository root (`.`) | `dev/active/<task>/` | **Respect in-tree execution**: Resume directly in the root workspace on the active branch. Do NOT create a worktree or move files. |
-| **Case C: Fresh Worktree Setup (Default New)** | Brand-new plan; `dev/active/<task>` at root; `.worktrees/<task>` does not exist | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Authoritative worktree isolation**: Add branch and worktree, move the plan directory, and copy developer overrides:<br>`git fetch origin develop && git worktree add -b feat/<task> .worktrees/<task> origin/develop`<br>`mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/`<br>`[ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/` |
-| **Case D: Grand Multi-Cohort Execution (Hub-and-Spoke)** | Whole-codebase migrations spanning dozens of cohorts (e.g. 100+ entities) | `.worktrees/<task>` (Lead Hub)<br>`.worktrees/<task>--<cohort>` (Spokes) | `.worktrees/<task>/dev/active/<task>/` | **Hub-and-Spoke with Hyphenated Namespacing & Bounded Pooling**: Lead hub worktree acts as orchestrator and commit aggregator on `feat/<task>`. Spoke cohorts execute in temporary worktrees namespaced as `.worktrees/<task>--<cohort>` on `feat/<task>--<cohort>` with strict `*-ownership.md` disjoint paths.<br>**Prune-As-You-Go Rule**: Active worktrees are bounded to $\le 3–5$. Once a spoke cohort is verified and integrated into the hub branch, the agent **immediately prunes** the spoke worktree (`git worktree remove` and `git branch -d`). |
+| **Case A: Isolated Worktree In-Flight** | `.worktrees/<task>` exists (`git worktree list`) | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Resume in-place**: Skip setup steps and resume directly inside existing worktree on `feat/<task>`. If `AGENTS.local.md` exists in root and is missing in worktree, copy it: `cp AGENTS.local.md .worktrees/<task>/`. Discover Plane link: if `event/` is absent, symlink `ln -s ../../event event`. |
+| **Case B: In-Tree / Develop In-Flight** | `dev/active/<task>` exists in repo root with work already in progress (`[x]` tasks, commits, or explicit develop mandate) | Repository root (`.`) | `dev/active/<task>/` | **Respect in-tree execution**: Resume directly in the root workspace on the active branch. Do NOT create a worktree or move files. `event/` exists locally in root. |
+| **Case C: Fresh Worktree Setup (Default New)** | Brand-new plan; `dev/active/<task>` at root; `.worktrees/<task>` does not exist | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Authoritative worktree isolation**: Add branch and worktree, move the plan directory, copy developer overrides, and symlink Plane project:<br>`git fetch origin develop && git worktree add -b feat/<task> .worktrees/<task> origin/develop`<br>`mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/`<br>`[ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/`<br>`ln -s ../../event .worktrees/<task>/event` |
+| **Case D: Grand Multi-Cohort Execution (Hub-and-Spoke)** | Whole-codebase migrations spanning dozens of cohorts (e.g. 100+ entities) | `.worktrees/<task>` (Lead Hub)<br>`.worktrees/<task>--<cohort>` (Spokes) | `.worktrees/<task>/dev/active/<task>/` | **Hub-and-Spoke with Hyphenated Namespacing & Bounded Pooling**: Lead hub worktree acts as orchestrator and commit aggregator on `feat/<task>`. Spoke cohorts execute in temporary worktrees namespaced as `.worktrees/<task>--<cohort>` on `feat/<task>--<cohort>` with strict `*-ownership.md` disjoint paths.<br>**Prune-As-You-Go Rule**: Active worktrees are bounded to $\le 3–5$. Once a spoke cohort is verified and integrated into the hub branch, the agent **immediately prunes** the spoke worktree (`git worktree remove` and `git branch -d`). Link `event/` into spoke worktrees if Plane item tracking is maintained per cohort. |
 
 > [!IMPORTANT]
 > **Single Source of Truth via `plan mv`**: Moving the triad from `dev/active/<task>` into `.worktrees/<task>/dev/active/<task>` guarantees a single source of truth, eliminates split-brain task lists, and ensures automatic garbage collection upon worktree removal.

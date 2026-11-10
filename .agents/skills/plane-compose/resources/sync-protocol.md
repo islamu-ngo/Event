@@ -15,8 +15,8 @@
 | `plane push --dry-run` | Preview only; no intended writes. |
 | `plane push` | Push schema, then cycles/modules/milestones/pages, then work items. Creates/updates, not work-item deletes. |
 | `plane push --work-only` | Skip schema step; still updates relevant work files. |
-| `plane pull` | **Writes local schema/work YAML and sync state** from Plane. |
-| `plane pull --merge` | Merge remote into existing items instead of wholesale replacement; still a local write. |
+| `plane pull` | **Overwrites `work/workitems.yaml`** (`sync/writer.py#L259`) and schema/operational YAML from Plane, resetting work-item `source` in `.plane/state.json`. |
+| `plane pull --merge` | Flag accepted by CLI in v0.5.2, **but currently unused inside `_pull()`** — still overwrites `work/workitems.yaml`. |
 | `plane schema import` | Connect local schema names to remote IDs in state; default doesn't change YAML. |
 
 ## Before every remote write
@@ -45,9 +45,11 @@ plane push              # when authorized schema + work changes are intended
 
 ## Pulling safely
 
-`plane pull` refreshes local schema and work. Without `--merge`, it can replace existing work-item files. With `--merge`, it preserves more local items, but it still **modifies local files**, and remote changes may alter item fields. Inspect Git changes, take a backup, review the affected files after pulling and revalidate.
+`plane pull` refreshes local schema and operational YAML. Because v0.5.2 `write_work_items_canonical()` unconditionally overwrites `work/workitems.yaml` and resets `.plane/state.json` `source` pointers (`--merge` is currently ignored in project `_pull()`), **inspect local uncommitted diffs and take an isolated backup outside `work/*.yaml` before running `plane pull`**.
 
-**Special hazard:** a project with task shards such as `work/backend.yaml` and `work/frontend.yaml` may receive remote items in `work/workitems.yaml` on pull. That can leave the same item duplicated across files. Detect and reconcile repeated IDs before a push. Do not create backups ending in `.yaml` inside `work/`.
+**One-way multi-file hazard & ephemeral task retirement:** `push` / `validate` read all `work/*.yaml` files, whereas `pull` dumps all remote work items back into `work/workitems.yaml`. Any item pushed from a shard or ephemeral file (`work/active-<task>.yaml`, `work/backend.yaml`) will now also appear in `work/workitems.yaml`, triggering `Duplicate ID` errors on `plane validate` (note the error cites `item.title[:50]`, not the colliding filename). **Delete/retire ephemeral `work/active-<task>.yaml` files once `plane pull` brings their canonical IDs into `work/workitems.yaml`.** Do not place templates or backups ending in `.yaml` inside `work/`.
+
+**Large-project performance (2,000+ items):** `plane diff` fetches every tracked `remote_id` in `.plane/state.json` one by one (`Semaphore(3)` -> retrieve + relations + properties per item), and `plane pull` hydrates relations per item plus fetches `list_work_items_raw()` twice unless `--no-properties` is passed. Prefer `plane status` + `plane push --dry-run` for fast hash-based inner-loop previews, `--skip workitems` on schema diffs, and `--no-properties` on bulk pulls when custom properties aren't needed.
 
 For read-only remote inventory, prefer a fresh isolated `plane clone` to a different directory if the context allows, then inspect without touching the active project.
 

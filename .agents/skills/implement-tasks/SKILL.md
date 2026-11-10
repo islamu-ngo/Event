@@ -30,10 +30,11 @@ priority: high
      - **Action**: Do NOT create a worktree or move files. Respect in-tree execution and resume directly in the root workspace.
    - **Case C: Fresh Worktree Setup (Default New Implementation)**:
      If starting a brand-new plan where `dev/active/<task-name>` exists at the root, `.worktrees/<task-name>` does not exist, and user did not mandate in-tree execution:
+     - **Mint Canonical Plane ID First (when authorized & online):** If `event/work/active-<task-name>.yaml` has no canonical `EVENT-XXX` ID yet and Plane sync is authorized, run `cd event && plane validate && plane push --work-only` before creating the branch so `id_writer.py` writes `id: EVENT-XXX` back into YAML. Use uppercase **`feat/EVENT-XXX-<task-name>`** as the branch name when `EVENT-XXX` is known (enabling Plane's native **Development** panel to auto-link the branch from push #1); otherwise fall back to `feat/<task-name>`.
      - Repository-root scoped worktree isolation applies:
        ```bash
        git fetch origin develop
-       git worktree add -b feat/<task-name> .worktrees/<task-name> origin/develop
+       git worktree add -b feat/<EVENT-XXX-or-empty><task-name> .worktrees/<task-name> origin/develop
        mkdir -p .worktrees/<task-name>/dev/active && mv dev/active/<task-name> .worktrees/<task-name>/dev/active/
        [ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/
        [ -f .env ] && install -m 600 .env .worktrees/<task-name>/.env
@@ -77,7 +78,7 @@ priority: high
      - *Class A (Direct Feature Regressions)*: Failing assertions in code touched by this feature. Must resolve in-phase.
      - *Class B (Feature-Induced Integration Ripple)*: Unmodified callers/fixtures broken by changed contracts. If mechanical and minor (< 15m), align immediately. If structural/cross-domain, pause with a Decision Brief before absorbing.
      - *Class C (Pre-Existing Baseline Rot)*: Environment quirks, unmigrated table assumptions, or failures reproducing on clean `origin/develop`. Strictly quarantine into `*-context.md`; never add to `tasks.md` or debug in the feature worktree.
-   - **Semantic Phase Commit**: In the execution context, stage changes and commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. Planning defines semantic meaning; execution handles file discovery. Commit messages link to Plane via `Refs: EVENT-XXX` (or `Fixes: EVENT-XXX`).
+   - **Semantic Phase Commit**: In the execution context, stage changes and commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. Planning defines semantic meaning; execution handles file discovery. Link commits natively to Plane's **Development** panel via uppercase `Refs: EVENT-XXX` (or `Fixes: EVENT-XXX`) trailers — omit if no canonical `EVENT-XXX` exists yet, and never paste commit logs or PR URLs into YAML `description:`.
    - **Plane Macro State Progression**: When beginning implementation, ensure `state: In Progress` is set in `event/work/active-<task-name>.yaml` (or the referenced Plane item). Maintain the active task file locally; never touch or shatter `workitems.yaml`.
    - **Reconcile Ledger**: Batch task checkbox updates at phase gates in `tasks.md`.
 6. **Self-Contained Phase Reporting, Decision Briefs & Mid-Flight Slicing**:
@@ -100,7 +101,7 @@ priority: high
      Resolve any conflicts inside the execution context, verify tests, and complete rebase (`git rebase --continue`).
 9. **Pull Request Creation & Lifecycle Protocol**:
    - **Push Branch**: `git push -u origin <branch> --force-with-lease`
-   - **Reader-First PR Body**: Use the shared writing guide's PR structure and readability check. Lead with changed behavior; retain technical review details, operator actions, evidence, and limitations. Do not paste phase logs.
+   - **Reader-First PR Body & Native Plane PR Linking**: Use the shared writing guide's PR structure and readability check. Lead with changed behavior; retain technical review details, operator actions, evidence, and limitations. Do not paste phase logs. Keep the PR title strictly Conventional Commit (`type(scope): subject`, never `[EVENT-XXX]` before `type(scope):`), and include `- Plane: [EVENT-XXX]` (uppercase + brackets -> links PR/branch to Plane's **Development** panel and activates PR state automation when GitHub integration + Pro is enabled; use unbracketed `EVENT-XXX` for reference-only without auto state transition) under `## Issues`.
    - **Pre-Flight PR Release Impact Generation (Zero CI Failures)**:
      Never use a bare `gh pr create --fill` that omits metadata. PR descriptions MUST contain the `## Release Impact` checklist mandated by `.ci/scripts/validate-release-impact-pr.cs`. Inspect changed files against category rules:
      - `security` (auth, cerbos, keycloak, cla, secrets): `- [x] Security/auth impact documented`
@@ -114,7 +115,7 @@ priority: high
      ```bash
      gh pr create --base develop --title "<type>(<scope>): <title>" --body "<body-with-release-impact>"
      ```
-   - **Plane Lifecycle Advancement**: Upon PR creation, advance `event/work/active-<task-name>.yaml` (or referenced Plane item) to `state: Review Needed` (or `In Review`). Transition to `Done` occurs only after PR merge and verified acceptance evidence.
+   - **Plane Lifecycle Advancement & Ephemeral File Retirement**: Upon PR creation, advance `event/work/active-<task-name>.yaml` (or referenced Plane item) to `state: Review Needed`. Transition to `Done` occurs only after PR merge and verified acceptance evidence. After merge, when running `plane pull` syncs `EVENT-XXX` into `event/work/workitems.yaml`, delete/retire the ephemeral `event/work/active-<task-name>.yaml` file so `plane validate` never fails on duplicate IDs.
    - **Park the Worktree (When using Worktree isolation)**:
      Never delete `.worktrees/<task-name>` upon PR creation. The worktree must remain parked and intact so that any subsequent bot reviews (Copilot, CodeQL) or CI check failures can be resolved immediately in-place with zero setup overhead.
    - **Halt and Deliver Partitioned Status Brief**:
@@ -150,8 +151,9 @@ priority: high
           Topology = In-Tree. Set Cwd = repo root, PlanPath = dev/active/<task>/.
         - If fresh execution on default topology:
           Topology = New Worktree.
+          (If unpushed new Plane task and push authorized): cd event && plane validate && plane push --work-only -> read minted EVENT-XXX
           git fetch origin develop
-          git worktree add -b feat/<task> .worktrees/<task> origin/develop
+          git worktree add -b feat/<EVENT-XXX-if-known-><task> .worktrees/<task> origin/develop
           mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/
           [ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/
           [ -f .env ] && install -m 600 .env .worktrees/<task>/.env

@@ -25,7 +25,7 @@ Record:
 - matched intents, relevant skills, and relevant rules;
 - primary layers touched;
 - S/M/L/XL complexity with evidence-based rationale;
-- **Plane Ticket Reference:** `EVENT-XXX` or `active-<task-slug>` (bound in `event/work/active-<task-slug>.yaml`);
+- **Plane Ticket Reference:** `EVENT-XXX` (canonical uppercase ID, or `pending: event/work/active-<task-slug>.yaml` minted before branching);
 - **I-VSD Document:** `[islamic-value-sensitive-design/workstreams/i-vsd-<task-name>.md](../../../islamic-value-sensitive-design/workstreams/i-vsd-<task-name>.md)`;
 - **I-VSD Status / Disposition:** `current` plus `plan-aligned`, or the blocking state;
 - **CTO Review:** `Not reviewed`, `Changes required`, `Approved`, or the linked review artifact;

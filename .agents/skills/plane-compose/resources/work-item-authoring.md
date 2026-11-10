@@ -6,12 +6,13 @@
 
 Look for an existing item by canonical Plane ID, title/intent, owning module, code references, and dependency graph. Search *all* `work/*.yaml` task files and (if relevant) remotely fetched items; `plane diff` alone misses remote-only items. Preserve the item's `id`, original metadata, and user-written description when updating. A title change is not justification for creating another task.
 
-### Stable IDs (mandatory for the agent)
+### Stable IDs & canonical `PROJ-N` writeback (v0.5.2)
 
-- Every new authored item needs a unique, stable `id`. Use an unambiguous **local tracking ID** such as `oauth-refresh-token` when no Plane sequence ID exists. First push may replace it in the YAML with `APP-37`; preserve the written-back ID on subsequent edits.
-- For existing Plane items, keep the actual canonical `APP-37`, not a guessed next number. Do not invent `APP-99` based on sequence assumptions.
-- Never use hash-only tracking (no `id`): editing a title can generate duplicates. IDs must be unique **across all** work-item YAML files in that project.
-- Read `git diff` after push; Plane may write canonical IDs back into the task files.
+- **Existing Plane items:** Keep the canonical uppercase ID (`APP-37`). Never invent `APP-99` based on sequence guesses.
+- **Brand-new items pushed before branching (recommended for Git linking):** Omit `id:` in the YAML item (`- title: ...`), finalize the title locally, and push once (`plane validate && plane push --work-only`). In `v0.5.2`, `id_writer.py` **only writes `APP-37` back into YAML when `id:` was omitted** (it skips writeback if any user `id:` is present), and remaps `.plane/state.json` automatically to `id:APP-37`. That gives you canonical uppercase `APP-37` immediately for your branch, commits, and PR.
+- **Brand-new items kept offline before push authorization:** Either keep `id:` omitted while still unpushed (accepting the non-blocking `validate` warning, and pushing once before renaming a pushed title), or set a temporary local slug (`id: active-<slug>`) knowing that `v0.5.2` keeps that slug in YAML on push while storing `sequence_id` only in `.plane/state.json` (`plane state show --json`). Never hand-edit a YAML `id:` from a local slug to `APP-37` without updating `.plane/state.json` or running `plane pull`, or the next push will create a duplicate.
+- **No duplicate IDs:** IDs must remain unique across **all** `work/*.yaml` files. Retire ephemeral active files when `plane pull` brings their `APP-37` item into `work/workitems.yaml`.
+- **Do not ship placeholder templates inside `work/*.yaml`:** Any `*.yaml` directly under `work/` (except `cycles.yaml`, `modules.yaml`, `milestones.yaml`, `pages.yaml`) is ingested as live work items. Store templates outside `work/` (e.g., `templates/active-workitem.yaml`).
 
 ## Recommended task format
 
@@ -19,8 +20,7 @@ The following illustrates the schema; use **only actual** states, labels, types,
 
 ```yaml
 workitems:
-  - id: oauth-refresh-token
-    title: Reject expired refresh tokens at API boundary
+  - title: Reject expired refresh tokens at API boundary  # omit `id:` on first push so id_writer.py writes canonical APP-N; set `id: APP-37` for existing items
     type: Task
     state: Ready
     priority: high
@@ -55,19 +55,28 @@ For a task already published, use its canonical ID. An initial task should not c
 | `labels` | Existing names from schema; do not invent ad hoc labels. |
 | `assignees` | Known member email(s) or UUID(s). Never assign a human without evidence/instruction. |
 | `start_date`, `due_date` | ISO `YYYY-MM-DD`; due date cannot precede start date. |
-| `parent` | Work item ID (flatten child records; no nested `children:`). |
-| `dependencies` | `blocked_by`, `blocking`, `starts_before`, `starts_after`, `finishes_before`, `finishes_after` → lists of item IDs. |
-| `relations` | `relates_to`, `duplicate`, `implements`, `implemented_by`, or configured workspace relation names → ID lists. |
+| `parent` | Parent work item **UUID** in `v0.5.2` (as pulled from API; `v0.5.2` passes `parent:` raw without resolving `APP-12`). Flatten child records; no nested `children:`. |
+| `dependencies` | `blocked_by`, `blocking`, `starts_before`, `starts_after`, `finishes_before`, `finishes_after` → lists of item IDs (`APP-12` or UUID). |
+| `relations` | `relates_to`, `duplicate`, `implements`, `implemented_by`, or configured workspace relation names → ID lists (`APP-12` or UUID). |
 | `properties` | Existing type custom property keys and values, respecting types/requiredness. |
 
-**Not supported on push:** `watchers` and `children`. Older flat forms (`blocked_by`, `blocking`, `relates_to`, `duplicate_of`) may be read, but write normalized `dependencies:` and `relations:` maps.
+**Not supported on push in v0.5.2:** `watchers`, `children`, `links` (external Links widget), comments, worklogs, linked pages, `estimate_point` values, `release_picker` custom properties, `formula` push, and Oct 2026 Enterprise fields (`cascading` properties, work-item `audiences`). Older flat relation keys (`blocked_by`, `blocking`, `relates_to`, `duplicate_of`) may be read, but write normalized `dependencies:` and `relations:` maps.
+
+## Native Git Development linking vs `description:`
+
+Do **not** dump commit logs, branch names, or PR URLs into YAML `description:` to simulate Git tracking:
+- Plane's native **Development** section (Pro+ with GitHub, GitLab, or Bitbucket integration connected) automatically attaches branches, commits, pull/merge requests, and CI statuses whenever uppercase canonical work item IDs (`PROJ-123`) appear in:
+  1. **Branch names:** `feat/PROJ-123-short-slug` or `<user>/PROJ-123` (*lowercase `proj-123` does NOT link*).
+  2. **Commit messages:** e.g. Git trailer `Refs: PROJ-123` or `Fixes: PROJ-123`.
+  3. **Pull/Merge request titles or descriptions:** `[PROJ-123]` with brackets links the PR/branch in **Development**, adds a backlink comment, **and triggers PR state automation**; `PROJ-123` without brackets links as reference-only without automatic state transition.
+- **External links & pages outside Git:** External URLs (docs, specs, runbooks) belong in Plane's **Links** widget (`POST /work-items/{id}/links/` REST API / MCP) or **Linked pages**, not cluttering the work item description, and `plane-compose` currently leaves `links` unmanaged rather than overwriting them.
 
 ## Work item quality bar
 
 - **One testable outcome:** clear “done when”, not generic “Improve backend”.
-- **Actionable scope:** enough context to implement without narrating every code line.
+- **Actionable scope:** enough context to implement without narrating every code line; use native `dependencies:`, `relations:`, `labels:`, and `milestones.yaml` rather than hiding structure inside prose.
 - **Grounded priority:** user deadline, risk, dependency critical path, or real impact; avoid urgent by default.
-- **Traceability:** document relevant code area, commit/PR/test evidence as appropriate (only if real). Never claim a URL exists before confirming it.
+- **Traceability:** bind commits/branches/PRs with canonical uppercase IDs rather than manual URL copy-paste. Never claim a PR, CI run, or remote sync occurred before observing it.
 - **No ticket explosion:** don’t create separate work items for every tiny edit, test name or intermediate thought. Break down only when separate deliverables matter.
 - **No automatic closure:** transitioning to `Done` requires the acceptance criteria to be verified; otherwise state the remaining checks.
 

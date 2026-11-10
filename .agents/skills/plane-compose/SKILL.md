@@ -73,10 +73,11 @@ For execution details read [implementation-loop](resources/implementation-loop.m
 ## Invariants — never skip
 
 - **Right target first:** `plane.yaml` selects credentials for project commands. `-c` on `push` / `pull` only changes a rate-counter label, **not credentials** (v0.5.2).
-- **Existing work wins:** prefer updating a known item over creating a near-duplicate. Give every new item a stable, unique `id`; don't fabricate an existing Plane sequence ID.
-- **No unsupported fields:** use top-level work items plus `parent`; `children` and `watchers` do not push. Match existing state/type/label names and project feature flags.
+- **Existing work wins & ID truth:** prefer updating a known item over creating a near-duplicate. Omit `id:` on a new item if you want first `plane push` to write canonical `PROJ-N` back into YAML (`id_writer.py` skips writeback whenever `id:` is already set in v0.5.2); never fabricate an existing Plane sequence ID. Retire ephemeral task files upon `plane pull` so they never collide in `work/workitems.yaml`.
+- **Native Git & Plane surface parity:** link Git branches (`feat/PROJ-N-...`), commits (`Refs: PROJ-N`), and PRs (`[PROJ-N]` for auto-state + Development panel, `PROJ-N` for link-only) using uppercase canonical IDs instead of stuffing commit/PR logs into `description:`. Use structured fields (`dependencies`, `relations`, `milestones`), and never invent YAML fields absent in v0.5.2 (`links`, `comments`, `audiences`, `cascading`, `formula` push, `cycles`/`modules` `work_items` push).
+- **No unsupported fields:** use top-level work items plus `parent` (UUID in v0.5.2); `children` and `watchers` fail validation. Match existing state/type/label names and project feature flags.
 - **Preflight local validity:** `plane schema validate` and `plane validate` before push. `plane push` may already have changed the remote schema by the time work-item validation fails.
-- **Preview before publishing:** `plane diff`, `plane schema diff` if relevant, and `plane push --dry-run`. Do not treat `plane diff` as a full remote inventory.
+- **Preview before publishing:** `plane diff` (on smaller/filtered sets), `plane schema diff` if relevant, and `plane push --dry-run`. Do not treat `plane diff` as a full remote inventory.
 - **No silent destructive or conflict bypass:** no `schema sync`, `--prune`, `state reset`, `ws state reset`, `--no-conflict-check`, `push --all`, `push --json`, or write with `--force` without explicit high-risk authorization. `push --json` *implies* `--force` in v0.5.2. Never use such modes merely to avoid interaction.
 - **'Dry run' can lie:** `plane upgrade --dry-run` and `plane ws upgrade --dry-run` modify local schema unless also given `--skip-pull`.
 - **State is local and ephemeral:** commit `plane.yaml`, `schema/`, `work/` as appropriate; never commit `.plane/`, API tokens, secrets or debug logs. After a fresh checkout with no state, use `plane schema import` and reconcile before pushing.

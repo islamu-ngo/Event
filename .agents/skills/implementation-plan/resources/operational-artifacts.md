@@ -10,23 +10,23 @@
 | `dev/active/<task>/<task>-plan.md` | Strategic architectural design, current-state evidence, design decisions (ADRs), phase-level boundaries and exit criteria | Granular task checklists (`- [ ]`), dynamic execution statuses (`IN PROGRESS`), session handoffs, dirty worktree logs |
 | `dev/active/<task>/<task>-tasks.md` | Hot execution ledger, granular Red/Green/Refactor task breakdown (`- [ ] **N.M**`), task checkboxes, phase verification gates | Lengthy architectural narrative, design trade-off debates, deep security/I-VSD analysis |
 | `dev/active/<task>/<task>-context.md` | Active session working memory (`COMPLETED`, `IN PROGRESS`, `NEXT`, `BLOCKERS`), quick resume, validation baseline, dated session handoffs | Granular task execution checklists, full architectural specifications |
-| `event/work/active-<task>.yaml` | Macro-Project Plane tracking item (Plane Compose): high-level acceptance criteria, dependencies (`blocked_by`), priority, and remote sync | Granular inner-loop Red/Green/Refactor subtasks, transient compiler errors, temporary test scratch |
+| `event/work/active-<task>.yaml` | Ephemeral Macro-Project Plane staging item (Plane Compose): canonical `EVENT-XXX` (minted on pre-branch push), high-level acceptance criteria, native `dependencies`/`relations`, priority, and remote sync; retired on post-merge `plane pull`. | Granular inner-loop Red/Green/Refactor subtasks, commit logs, PR URLs (handled natively by Plane Git Development panel via `EVENT-XXX`), temporary test scratch. |
 
 ## The Dual-Plane Cognitive Model
 
 The repository maintains an explicit operational boundary between **Macro Project Tracking** and **Micro Engineering Execution**:
 
 ```text
-Macro-Project Plane (Plane Compose: event/work/active-<task>.yaml)
-  │   - Epics, modules, releases, milestone checkpoints
-  │   - High-level deliverables & acceptance criteria
+Macro-Project Plane (Plane Compose: event/work/active-<task>.yaml + Native Git Development Panel)
+  │   - Epics (parent UUID), milestones, native dependencies/relations, acceptance criteria
   │   - Cross-agent & human-visible progress (Plane Cloud)
+  │   - Git branches (feat/EVENT-XXX-<slug>), commits (Refs: EVENT-XXX), PRs ([EVENT-XXX]) -> native Development panel
   ▼
 Micro-Execution Plane (Dev-Doc Triad: dev/active/<task>/)
       - Plan: strategic architecture & RFC 2119 scenario contracts
       - Tasks: atomic Red/Green/Refactor test loops (< 2s TUnit slices)
       - Context: ephemeral working memory and session handoffs
-      - Phase Commits: declarative Conventional Commits (Refs: EVENT-XXX)
+      - Phase Commits: declarative Conventional Commits (Refs: EVENT-XXX / Fixes: EVENT-XXX)
 ```
 
 ## Review State Contract

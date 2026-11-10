@@ -5,8 +5,10 @@
 - 
 
 ## Issues
-<!-- Link related issues or discussions. If reopening a closed PR, explain why it should be reconsidered. -->
+<!-- Link related GitHub issues or Plane work items.
+     Plane GitHub integration (Development panel): use [EVENT-XXX] (uppercase + brackets) to link PR/branch and trigger PR state automation, or EVENT-XXX (without brackets) for a reference-only link. -->
 - Fixes #
+- Plane:
 
 ## Category
 - [ ] Bug fix

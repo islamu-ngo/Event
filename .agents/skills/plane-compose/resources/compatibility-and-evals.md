@@ -4,7 +4,15 @@
 
 ## Known version contract
 
-This skill was authored against **Plane Compose v0.5.2** documentation (latest PyPI release verified in November 2026). Run `plane --version`, then the specific `plane <command> --help`; current installed behavior wins over a stale assumption. Beware v0.5.2 flags intentionally documented but not always shown in `--help` (`push --json`, `--resume`, `--all`; `ws --skip` sections) and old misleading `schema sync --help` text about deletion. Check official docs for changes instead of inferring behavior from package age.
+This skill reflects **Plane Compose v0.5.2** (latest PyPI release as of November 2026, released July 2026 on `plane-sdk 0.2.19`) verified directly against installed source and [Plane documentation](https://developers.plane.so/dev-tools/plane-compose). Run `plane --version`, then the specific `plane <command> --help`; current installed behavior wins over any stale assumption.
+
+### Verified v0.5.2 quirks & Plane platform delta (`plane-sdk 0.3.2` / Late 2026 Changelog)
+- **CLI flags vs `--help`:** beware flags implemented in code but omitted or understated in `--help` (`push --json`, `--resume`, `--all`; `ws --skip` sections) and old `schema sync --help` text.
+- **One-way multi-file support:** `parse_work_items` and `push` / `validate` read all top-level `work/*.yaml` files (excluding `cycles.yaml`, `modules.yaml`, `milestones.yaml`, `pages.yaml`), and `id_writer.py` writes auto-assigned IDs back to `source_file` (when `id:` was omitted). However, `plane pull` always writes all items into `work/workitems.yaml`, resets `.plane/state.json` `source` to `work/workitems.yaml:<idx>`, and leaves `--merge` unused inside project `_pull()`.
+- **`id_writer.py` skip rule:** setting any user `id:` prevents `plane push` from replacing it with `PROJ-N` in YAML; only `.plane/state.json` stores `sequence_id`.
+- **`parent:` format:** `plane push` sends `parent:` raw as a **UUID** without `PROJ-N` lookup (unlike `dependencies:` / `relations:`).
+- **Operational memberships:** `work/milestones.yaml` pushes `work_items:`; `cycles.yaml` and `modules.yaml` only sync metadata on push (`CycleDefinition` / `ModuleDefinition` `extra="forbid"`).
+- **Features outside v0.5.2 YAML:** Git Development panel & PR state automation (native GitHub/GitLab/Bitbucket integration on Pro+ triggered by uppercase `PROJ-N` / `[PROJ-N]`), work-item external `links:`, `comments`, `attachments`, `worklogs`, linked pages, `estimate_point` assignments, `release_picker` / `formula` push, and Oct 2026 Enterprise features (`cascading` properties, work-item `audiences`, page `databases` / `subscriptions`). Use native Git integration or REST API/MCP where appropriate instead of faking them in YAML `description:`.
 
 **Canonical URLs:**
 
@@ -31,7 +39,7 @@ If `skills-ref` is installed, run `skills-ref validate <path-to-plane-compose>` 
 | "Implement OAuth refresh tokens" in an existing Plane Compose repo | Find matching task, implement code, verify, update scoped YAML and authorized sync. |
 | "What tasks remain in Plane?" with stale local state | Explain freshness, obtain remote inventory safely; no fabricated complete backlog. |
 | "Prioritize the next sprint" | Infer grounded priorities/dependencies; no invented dates/assignees; don't change remote without delegation. |
-| Work item has no `id` | Agent adds stable ID before push, not hash-only identity. |
+| Work item created locally before push/branching | Omit `id:` so first `plane push --work-only` auto-writes canonical `PROJ-N` into YAML (rather than trapping a custom slug via `id_writer.py#L94`), or inspect `state.json` `sequence_id` if a local slug was set. |
 | `plane diff` shows nothing but remote-only items exist | Agent does not claim full synchronization or zero remote backlog. |
 | User has two connections on Cloud/self-host | Inspect `plane.yaml` and correct effective server; don't misuse `push -c`. |
 | User asks to see upgrade preview | Use `--dry-run --skip-pull`, without touching existing schema. |

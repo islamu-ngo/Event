@@ -5,10 +5,10 @@
 ## Different organizational constructs
 
 - **Work items:** individual outcomes and their states/priority/assignee/acceptance.
-- **Modules:** related work by feature area. Module status is one of `backlog`, `planned`, `in-progress`, `paused`, `completed`, `cancelled`.
-- **Cycles:** time windows; Plane infers status from start/end dates. Do not set a `status` expecting it to persist.
-- **Milestones:** project checkpoints with a `target_date` and referenced item IDs; requires the Milestones feature enabled in Plane.
-- **Releases:** primarily workspace-level `plane ws` data (`work/releases.yaml` and schema release definitions); don't invent project-level `releases.yaml` as if it were a standard project work file.
+- **Modules:** related work by feature area. Module status is one of `backlog`, `planned`, `in-progress`, `paused`, `completed`, `cancelled`. *v0.5.2 limit:* `plane pull` exports `work_items:` in `work/modules.yaml`, but `plane push` only creates/updates module metadata (`ModuleDefinition` forbids extra fields and does not sync module work-item membership on push).
+- **Cycles:** time windows; Plane infers status from start/end dates. Do not set a `status` expecting it to persist. *v0.5.2 limit:* like modules, `plane push` creates/updates cycle metadata only and does not push `work_items:` membership in v0.5.2; assign items to cycles/modules in Plane UI, MCP, or REST API.
+- **Milestones:** project checkpoints with a `target_date` and referenced item IDs (`work_items: [APP-12, APP-15]`); requires the Milestones feature enabled in Plane. Unlike cycles/modules, `plane push` **does** synchronize milestone work-item membership in `v0.5.2`.
+- **Releases:** primarily workspace-level `plane ws` data (`work/releases.yaml` and schema release definitions); don't invent project-level `releases.yaml` as if it were a standard project work file (`release_picker` custom property push is also blocked in v0.5.2).
 
 ## YAML examples
 

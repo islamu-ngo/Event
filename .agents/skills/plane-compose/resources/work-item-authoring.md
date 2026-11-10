@@ -73,9 +73,9 @@ Do **not** dump commit logs, branch names, or PR URLs into YAML `description:` t
 
 ## Work item quality bar
 
-- **One testable outcome:** clear “done when”, not generic “Improve backend”.
-- **Actionable scope:** enough context to implement without narrating every code line; use native `dependencies:`, `relations:`, `labels:`, and `milestones.yaml` rather than hiding structure inside prose.
-- **Grounded priority:** user deadline, risk, dependency critical path, or real impact; avoid urgent by default.
+- **One completable outcome:** clear “done when”, not unfinishable areas like `"Make webapp secure"` or `"Improve testing"`; track ongoing areas via `type:` + `labels:` + bounded deliverables. Use 1 provider or vertical capability per item (never lump `"Stripe/PayPal"` into one ticket or split one entity into 8 horizontal `Model/API/UI/Test/Docs` tickets).
+- **Actionable scope & client surfaces:** enough context to implement without narrating every code line; use Surface `labels:`, `Epics`, `dependencies:`, `relations:`, and `milestones.yaml` instead of duplicating tickets across codebase sub-projects or hiding structure in prose. Cap `parent:` sub-items strictly at depth 1 (only for genuinely separate PRs or heavy standalone test campaigns; standard unit tests/migrations/docs live in Acceptance Criteria DoD).
+- **Must-have `priority` vs. time urgency:** set `priority` by functional criticality / legal-regulatory must-have level (`urgent` = mandatory law/security/core blocker, `high` = core/killer feature, `low` = optional nice-to-have), and express time urgency via target Version `Module` + `due_date`. Never assign humans (`assignees:`) to unstarted `Candidate`/`Backlog` items.
 - **Traceability:** bind commits/branches/PRs with canonical uppercase IDs rather than manual URL copy-paste. Never claim a PR, CI run, or remote sync occurred before observing it.
 - **No ticket explosion:** don’t create separate work items for every tiny edit, test name or intermediate thought. Break down only when separate deliverables matter.
 - **No automatic closure:** transitioning to `Done` requires the acceptance criteria to be verified; otherwise state the remaining checks.

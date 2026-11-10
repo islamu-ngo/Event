@@ -12,25 +12,33 @@
 6. Map prerequisites using `dependencies.blocked_by`, adding links only when the referenced IDs exist and the dependency is real.
 7. Prioritize and report **why**. Edit project YAML only when requested/authorized, then validate and dry-run.
 
-## Outcome-oriented decomposition
+## Outcome-oriented decomposition & granularity bar
 
-For a large feature, use a parent Feature/Epic **only if supported**, then a small set of independently demonstrable tasks (e.g., contract, server implementation, UI, observability, tests/docs). Prefer vertical slices when that reduces integration risk. Do not create an Epic without the `epics` feature or type support. `parent` holds the real work item ID; do not nest `children` or invent canonical Plane sequence IDs.
+Every Plane work item must pass four structural gates:
 
-Each proposed work item should answer: *Why now? What observable behavior changes? What proves it works? What blocks it? Where is the relevant code?* If those cannot be answered, label it as discovery rather than confidently marking it ready.
+1. **Completable Outcome (No Perpetual Areas):** Every item requires a verifiable finish line (merged PR/CI evidence, release, or published ADR). Never create ongoing quality-area titles (e.g., `"Make webapp secure"`, `"Improve test coverage"`); use `type:` (`Security`, `Test`, `Refactor`) + labels + concrete completable deliverables.
+2. **Vertical & Atomic Slicing (INVEST / SPIDR):** One cohesive vertical capability or **1 external/DB/payment provider** per work item (`"Stripe Connect"` and `"PayPal Checkout"` are separate items; never group multiple providers together, and never split one entity across horizontal layer tickets like `Model`, `API`, `Validator`, `UI`, `Test`, `Docs`).
+3. **3-Tier Placement for Tests, Docs & Sub-Items:**
+   - *Tier 0 (Not in Plane):* Standard feature unit/integration/UI tests, migrations, validators, and feature doc updates belong in the parent item's Acceptance Criteria (Definition of Done) and local task execution checklists — **zero** separate Plane items or sub-items.
+   - *Tier 1 (Sub-Work Items, max depth = 1, 2–5 max):* Use `parent: <parent-uuid>` only when one deliverable genuinely spans separately scheduled/reviewed PR pillars or a distinct heavy test campaign (e.g., E2E Playwright or adversarial security suite separate from the code PR). Never nest sub-sub-items.
+   - *Tier 2 (Standalone top-level item or Epic):* Use standalone `Test`/`Refactor`/`Docs`/`Security` items only for cross-cutting platform work; promote multi-week multi-deliverable programs into a finite **`Epic`** (`is_epic: true` if enabled).
+4. **No Pre-Assigned Backlog Graveyards:** Never set `assignees:` on unstarted `Candidate` / `Backlog` / `Waiting Dependency` items; assign only when advancing to `Ready` or `In Progress`.
 
-## Priority policy (project conventions win)
+Each proposed work item should answer: *Why now? What observable behavior changes? What proves it works? What blocks it? Where is the relevant code?* If those cannot be answered, label/keep it in Intake or `Candidate` rather than marking it ready.
 
-Use Plane's accepted values `urgent`, `high`, `medium`, `low`, `none`:
+## Priority policy (Importance vs. Time Urgency)
 
-| Value | Typical evidence (examples, not a fixed formula) |
+Separate **functional importance (`priority`)** from **schedule urgency (`module` / `milestone` / `due_date`)** using Plane's accepted values `urgent`, `high`, `medium`, `low`, `none`:
+
+| Value | Functional Must-Have / Criticality Evidence |
 | --- | --- |
-| `urgent` | Active production outage, exploitable vulnerability, or immediate release-stopper with a confirmed time constraint. |
-| `high` | Customer/user-impacting defect, critical dependency, or near-term milestone blocker. |
-| `medium` | Planned core functionality or improvement with meaningful benefit but no immediate blocker. |
-| `low` | Nice-to-have polish, speculative optimization, low impact cleanup. |
-| `none` | Untriaged, informational or uncertain; avoid false precision. |
+| `urgent` | Legally or regulatorily mandatory (compliance/law), non-negotiable security requirement, active production outage, or foundational platform blocker — **even if planned for a later version** (e.g., `v1.0.0`). |
+| `high` | High-value core or "killer" requirement essential to the product's core promise or critical dependency chain. |
+| `medium` | Planned standard functionality with meaningful benefit once core paths are covered. |
+| `low` | Optional nice-to-have polish or speculative enhancement easily cut without core loss. |
+| `none` | Untriaged, informational, or unassessed; avoid false precision. |
 
-Compare *impact, urgency, dependency leverage, confidence and effort*. Effort affects **sequencing and size**, not necessarily priority. Record assumptions; ask a targeted question if a business-critical missing fact changes the ordering. Do not invent severity, dates, ROI or estimates.
+Track **time urgency** orthogonally via **Target Version Module** (items in the active next release module — e.g. `v0.1.0` when building the first release — are inherently release-urgent), **Milestones**, and explicit **`due_date`** fields. Compare *requirement criticality, release horizon, dependency leverage, confidence, and effort*. Record assumptions; never invent dates or assignees.
 
 ## Select the next task
 

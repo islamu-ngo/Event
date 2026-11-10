@@ -8,6 +8,7 @@ This skill reflects **Plane Compose v0.5.2** (latest PyPI release as of November
 
 ### Verified v0.5.2 quirks & Plane platform delta (`plane-sdk 0.3.2` / Late 2026 Changelog)
 - **CLI flags vs `--help`:** beware flags implemented in code but omitted or understated in `--help` (`push --json`, `--resume`, `--all`; `ws --skip` sections) and old `schema sync --help` text.
+- **Schema rename quirk (`_item_changed`):** `cli/schema.py` only compares `color`, `group`, and `description` when diffing existing schema UUIDs—changing *only* a label/state/type `name:` is silently skipped by `plane schema push` (`0 to update`) unless `color`/`description` also changes or the rename is done directly in Plane UI/API.
 - **One-way multi-file support:** `parse_work_items` and `push` / `validate` read all top-level `work/*.yaml` files (excluding `cycles.yaml`, `modules.yaml`, `milestones.yaml`, `pages.yaml`), and `id_writer.py` writes auto-assigned IDs back to `source_file` (when `id:` was omitted). However, `plane pull` always writes all items into `work/workitems.yaml`, resets `.plane/state.json` `source` to `work/workitems.yaml:<idx>`, and leaves `--merge` unused inside project `_pull()`.
 - **`id_writer.py` skip rule:** setting any user `id:` prevents `plane push` from replacing it with `PROJ-N` in YAML; only `.plane/state.json` stores `sequence_id`.
 - **`parent:` format:** `plane push` sends `parent:` raw as a **UUID** without `PROJ-N` lookup (unlike `dependencies:` / `relations:`).

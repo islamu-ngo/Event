@@ -100,7 +100,7 @@ flowchart TD
     end
 
     subgraph Stage4["Stage 4: Implementation Execution & Autonomous Domain Guardrails"]
-        CTOSkill --> ExecTrigger["User Combines /goal + implement-tasks:\n• Research: Tavily MCP & Context7 MCP\n• Structure: Code-Review-Graph MCP\n• Topology Discovery (Worktree symlink: ln -s ../../event event)\n• Advances Plane state (Ready -> In Progress -> In Review)\n• Conventions: Clean Architecture & Enterprise Patterns\n• Pre-Release Freedom: Zero backward compatibility baggage"]
+        CTOSkill --> ExecTrigger["User Combines /goal + implement-tasks:\n• Research: Tavily MCP & Context7 MCP\n• Structure: Code-Review-Graph MCP\n• Pre-branch push (omitted id: -> id_writer mints EVENT-XXX)\n• Branch feat/EVENT-XXX-<task> + Worktree symlink: ln -s ../../event event\n• Advances Plane state (Ready -> In Progress -> Review Needed)\n• Conventions: Clean Architecture & Enterprise Patterns\n• Pre-Release Freedom: Zero backward compatibility baggage"]
         ExecTrigger --> AutoExecution["Autonomous Domain Execution Loop\n• Topology Discovery (Worktree vs In-Tree)\n• clean-architecture-rules\n• cqrs-guidelines\n• dotnet-efcore-guidelines\n• auth-patterns & outbox-pattern\n• debug-issue & refactor-safely\n• Fast TUnit Slicing (--treenode-filter)"]
         AutoExecution --> PhaseVerification["Phase Verification\n• One Release build\n• At most one selected project test\n• Three-Tier Failure Triage (Class A/B/C)"]
         PhaseVerification --> PhaseCommit["Immediate Phase Commit\n• Execute pre-authored declarative tasks.md contract\n• Include Plane trailers (Refs: EVENT-XXX / Fixes: EVENT-XXX)\n• No conventional-commit skill reload\n• Commit owned paths directly (no hash logging)"]
@@ -110,8 +110,8 @@ flowchart TD
 
     subgraph Stage5["Stage 5: Workstream Completion & Knowledge Graduation"]
         MorePhases -->|"No"| FinalReview["Final Workstream Review & Teaching Summary\n• Comprehensive technical explanation\n• No unrelated shared-tree files committed\n• Dual-documentation parity (public vs internal)"]
-        FinalReview --> KnowledgeGraduation["Knowledge Graduation & Ring 3 Gate\n• dev/backlog/, ADRs, dev/_journal/\n• Plane sync preflight (plane validate, plane push --dry-run, --work-only)\n• Advances Plane state to Done upon verified delivery\n• Full 5-DB Matrix & Architecture Tests\n• Pre-PR Rebase (origin/develop)"]
-        KnowledgeGraduation --> PRSubmission["PR Creation & Worktree Parking\n• Pre-flight ## Release Impact checklist\n• Park .worktrees/<task> for bot/CI review\n• Halt & Partitioned Status Brief\n• Deferred teardown upon merge"]
+        FinalReview --> KnowledgeGraduation["Knowledge Graduation & Ring 3 Gate\n• dev/backlog/, ADRs, dev/_journal/\n• Plane sync preflight (plane validate, plane push --dry-run, --work-only)\n• Advances Plane state to Review Needed (PR [EVENT-XXX] links Development panel)\n• Full 5-DB Matrix & Architecture Tests\n• Pre-PR Rebase (origin/develop)"]
+        KnowledgeGraduation --> PRSubmission["PR Creation & Worktree Parking\n• Pre-flight ## Release Impact checklist + ## Issues [EVENT-XXX]\n• Park .worktrees/<task> for bot/CI review\n• Halt & Partitioned Status Brief\n• Post-merge: pull & retire active-<task>.yaml, teardown worktree"]
     end
 ```
 
@@ -339,11 +339,13 @@ To achieve enterprise-grade maintainability, cross-agent coordination, and devel
 flowchart LR
     subgraph MacroPlane["Macro Tracking Plane (Human & Fleet Visibility)"]
         PlaneYAML["event/plane.yaml\n(Workspace: islamu, Project: EVENT)"]
-        ActiveTaskYAML["event/work/active-<task-slug>.yaml\n(State: Backlog -> Ready -> In Progress -> Done)"]
-        PlaneCloud["Plane Workspace (api.plane.so)\n(Boards, Cycles, Cross-Agent Fleet)"]
+        ActiveTaskYAML["event/work/active-<task-slug>.yaml\n(Ephemeral: Backlog -> Ready -> In Progress -> Review Needed)"]
+        GitDev["Native Git Development Integration\n(Branch feat/EVENT-XXX-*, Refs: EVENT-XXX, PR [EVENT-XXX])"]
+        PlaneCloud["Plane Workspace (api.plane.so)\n(Development Panel, Boards, PR Automation)"]
         
         PlaneYAML --> ActiveTaskYAML
-        ActiveTaskYAML <-->|"plane push / pull\n(--work-only)"| PlaneCloud
+        ActiveTaskYAML <-->|"plane push --work-only\n(retire on post-merge pull)"| PlaneCloud
+        GitDev -->|"GitHub App Sync"| PlaneCloud
     end
 
     subgraph MicroPlane["Micro Execution Plane (Machine Working Memory)"]
@@ -365,22 +367,30 @@ flowchart LR
 |---|---|---|
 | **Audience** | Autonomous executing AI agents (inner loop machine memory). | Platform stewards, developers, cross-agent fleets, PM boards. |
 | **Granularity** | Micro-execution: subtasks, test assertions, compiler diagnostics, class refactors. | Macro deliverable: user-facing capability, milestones, acceptance criteria, blocker dependencies. |
-| **Lifecycle States** | `[ ]` unchecked $\rightarrow$ `[x]` checked. | `Backlog` $\rightarrow$ `Ready` $\rightarrow$ `In Progress` $\rightarrow$ `In Review` $\rightarrow$ `Done`. |
+| **Lifecycle States** | `[ ]` unchecked $\rightarrow$ `[x]` checked. | `Backlog` $\rightarrow$ `Ready` $\rightarrow$ `In Progress` $\rightarrow$ `Review Needed` $\rightarrow$ `Done`. |
 | **Git Boundary** | Gitignored (`dev/active/*`) to eliminate commit churn and branch merge conflicts. | Gitignored (`event/`, `event-backup-*/`) for operational privacy; synchronized to remote Plane workspace. |
 | **Tooling** | Native agent file tools (`read_file`, `write_file`, `edit_file`). | Plane Compose CLI (`plane schema validate`, `plane validate`, `plane push --work-only`). |
 
-### The Active Task Partitioning Pattern (Anti-Collision Architecture)
+### The Active Task Partitioning Pattern & Ephemeral Retirement (v0.5.2 One-Way Multi-File Reality)
 
-A critical architectural finding in repository Project-as-Code operations governs how work items are stored:
+Because `plane-compose v0.5.2` parses all `event/work/*.yaml` files on `push`/`validate`, while `plane pull` unconditionally writes **all** remote items back into `event/work/workitems.yaml` (and ignores `--merge` inside project `_pull()`):
 
 1. **The Historical Baseline Monolith (`event/work/workitems.yaml`)**:
    - Contains 2,616+ baseline work items representing the comprehensive platform backlog.
-   - **Anti-Shattering Invariant**: The repository strictly rejects moving or sharding historical items out of `workitems.yaml` into domain-specific YAML files. When `plane pull` executes, Plane Compose writes pulled items back into `workitems.yaml`. If historical items were previously migrated to separate files, `plane pull` re-creates them in `workitems.yaml`, producing catastrophic duplicate ID validation errors (`ID 'EVENT-XXX' already exists`).
-   - Consequently, `workitems.yaml` remains intact as the authoritative baseline monolith.
-2. **Active Workstream Task Files (`event/work/active-<task-slug>.yaml`)**:
-   - For new feature, bug, refactor, or architecture tasks, agents author a dedicated active task file: `event/work/active-<task-slug>.yaml` using the template at [`event/work/active-template.yaml`](file:///home/amir/ISLAMU/Github/Event/event/work/active-template.yaml).
-   - Keeps active task context small (< 15 KB), isolated from the 2,616-item monolith, and cleanly diffable.
-   - Provides stable local IDs (e.g. `active-plane-compose-workflow-integration`), high-signal acceptance criteria, priority, and blocker relationships.
+   - **Anti-Shattering Invariant**: Moving historical items out of `workitems.yaml` into permanent domain shards causes fatal `Duplicate ID` validation errors on the very next `plane pull`. `workitems.yaml` remains intact as the historical baseline until upstream Plane Compose adds source-aware round-trip pulls.
+2. **Ephemeral Active Task Files (`event/work/active-<task-slug>.yaml`)**:
+   - For new in-flight workstreams, agents author a temporary, focused (< 15 KB) task file from `event/templates/active-workitem.yaml` (templates live outside `work/*.yaml` so Plane never ingests placeholder templates as live tickets).
+   - **Canonical ID Minting (`id_writer.py`)**: Omit `id:` initially on brand-new active items and push once via `plane push --work-only` before cutting the Git branch (`v0.5.2` only writes canonical `EVENT-XXX` back into YAML when `id:` was omitted; custom user slugs skip writeback).
+   - **Post-Merge Retirement Rule**: Once a PR merges and `plane pull` syncs `EVENT-XXX` into `work/workitems.yaml`, **delete `event/work/active-<task-slug>.yaml`** immediately so `plane validate` never hits `Duplicate ID`.
+
+### Native Git Development Panel, PR State Automation & `v0.5.2` Boundaries
+
+To benefit from Plane's native **Development** panel and **PR State Automation** without compromising YAML hygiene:
+- **Never stuff commit logs or PR URLs into YAML `description:`**: Plane's GitHub integration automatically populates branches, commits, PR review status, diff stats, and CI checks when **uppercase** canonical work item IDs (`EVENT-XXX`) are present (lowercase `event-xxx` does not link):
+  - **Branches:** `feat/EVENT-XXX-<task-slug>` (or `fix/EVENT-XXX-<task-slug>`) while keeping the local worktree folder predictable at `.worktrees/<task-slug>`.
+  - **Commits:** `Refs: EVENT-XXX` / `Fixes: EVENT-XXX` trailers cleanly above terminal `Changelog: skip` footers (never put `[EVENT-XXX]` before `type(scope):`, which breaks `ISLAMU.ReleaseEngineering`).
+  - **Pull Requests:** Place `- Plane: [EVENT-XXX]` under `## Issues` in `.github/PULL_REQUEST_TEMPLATE.md` (with brackets for Development link + PR state automation on Pro+, or unbracketed `EVENT-XXX` for reference-only linking).
+- **Use Native Structural Fields in `v0.5.2`:** Always use `dependencies:` (`blocked_by`, `blocking`, schedule edges), `relations:`, `labels:`, and `work/milestones.yaml` (`work_items:`). Keep verified `v0.5.2` limitations in mind: `parent:` expects a raw parent UUID, `cycles.yaml`/`modules.yaml` do not push `work_items:` membership in `v0.5.2`, and external `links:`, `comments`, `worklogs`, `linked pages`, and late-2026 Enterprise features (`cascading` properties, work-item `audiences`, page `databases`) live outside `plane-compose` YAML (managed via Plane UI, REST API v1/v2, or MCP when enabled).
 
 ### The Worktree Symlink Protocol
 
@@ -411,10 +421,14 @@ Before any Plane Compose synchronization or state transition:
    plane push --work-only
    ```
    Additive work updates must use `--work-only`. Destructive operations (`--force`, `schema sync`, `--prune`) are strictly forbidden without explicit maintainer approval.
-4. **Git Commit Trailer Traceability**:
-   Commits that progress or resolve Plane work items include reader-first Conventional Commit trailers:
-   - Progressing / Referencing: `Refs: EVENT-XXX`
-   - Closing / Resolving: `Fixes: EVENT-XXX`
+4. **Native Git Development Linking & Commit Trailer Traceability**:
+   Plane's GitHub/GitLab **Development** panel discovers branches, commits, and pull requests automatically from canonical uppercase work item identifiers (`EVENT-XXX` — never lowercase `event-xxx`, custom slugs, or fabricated IDs, and never duplicated into YAML `description:` fields):
+   - **Pre-branch ID minting**: Before creating the feature branch (when authorized to sync with Plane), run `plane push --work-only` with `id:` omitted so `id_writer.py` writes the canonical `EVENT-XXX` back into `work/active-<task>.yaml`, then name the branch `feat/EVENT-XXX-<task>`.
+   - **Commit trailers**: Commits that progress or resolve pushed Plane work items use Conventional Commit trailers at the bottom of the message:
+     - Progressing / Referencing: `Refs: EVENT-XXX`
+     - Closing / Resolving: `Fixes: EVENT-XXX`
+     Never prepend `[EVENT-XXX]` before `type(scope):` in commit subject headers (`ISLAMU.ReleaseEngineering` `CommitPolicy.HeaderPattern` enforces standard `<type>(<scope>): <description>`).
+   - **Pull Request linking**: Populate `## Issues` with `- Plane: [EVENT-XXX]` so Plane links the PR to the **Development** panel and triggers native PR state automation (or `EVENT-XXX` without brackets for link-only without automated state transitions).
 
 ### The Human Interaction Boundary & Zero Plan-Opening UX (The Developer Console Principle)
 
@@ -460,9 +474,9 @@ Before executing or resuming, the agent discovers the active execution topology 
 
 | Topology Scenario | Conditions & Detection | Working Context (`Cwd`) | Task Triad Path | Action Protocol |
 |---|---|---|---|---|
-| **Case A: Isolated Worktree In-Flight** | `.worktrees/<task>` exists (`git worktree list`) | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Resume in-place**: Skip setup steps and resume directly inside existing worktree on `feat/<task>`. If `AGENTS.local.md` exists in root and is missing in worktree, copy it: `cp AGENTS.local.md .worktrees/<task>/`. Discover Plane link: if `event/` is absent, symlink `ln -s ../../event event`. |
+| **Case A: Isolated Worktree In-Flight** | `.worktrees/<task>` exists (`git worktree list`) | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Resume in-place**: Skip setup steps and resume directly inside existing worktree on `feat/<EVENT-XXX-<task>|<task>>`. If `AGENTS.local.md` exists in root and is missing in worktree, copy it: `cp AGENTS.local.md .worktrees/<task>/`. Discover Plane link: if `event/` is absent, symlink `ln -s ../../event event`. |
 | **Case B: In-Tree / Develop In-Flight** | `dev/active/<task>` exists in repo root with work already in progress (`[x]` tasks, commits, or explicit develop mandate) | Repository root (`.`) | `dev/active/<task>/` | **Respect in-tree execution**: Resume directly in the root workspace on the active branch. Do NOT create a worktree or move files. `event/` exists locally in root. |
-| **Case C: Fresh Worktree Setup (Default New)** | Brand-new plan; `dev/active/<task>` at root; `.worktrees/<task>` does not exist | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Authoritative worktree isolation**: Add branch and worktree, move the plan directory, copy developer overrides, and symlink Plane project:<br>`git fetch origin develop && git worktree add -b feat/<task> .worktrees/<task> origin/develop`<br>`mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/`<br>`[ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/`<br>`ln -s ../../event .worktrees/<task>/event` |
+| **Case C: Fresh Worktree Setup (Default New)** | Brand-new plan; `dev/active/<task>` at root; `.worktrees/<task>` does not exist | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Authoritative worktree isolation**: If authorized to mint the Plane ID pre-branch, push `event/work/active-<task>.yaml` (with `id:` omitted) via `plane push --work-only` first so canonical `EVENT-XXX` is known. Add branch and worktree (`feat/EVENT-XXX-<task>` if minted, else `feat/<task>`), move the plan directory, copy developer overrides, and symlink Plane project:<br>`git fetch origin develop && git worktree add -b feat/<EVENT-XXX-task> .worktrees/<task> origin/develop`<br>`mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/`<br>`[ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/`<br>`ln -s ../../event .worktrees/<task>/event` |
 | **Case D: Grand Multi-Cohort Execution (Hub-and-Spoke)** | Whole-codebase migrations spanning dozens of cohorts (e.g. 100+ entities) | `.worktrees/<task>` (Lead Hub)<br>`.worktrees/<task>--<cohort>` (Spokes) | `.worktrees/<task>/dev/active/<task>/` | **Hub-and-Spoke with Hyphenated Namespacing & Bounded Pooling**: Lead hub worktree acts as orchestrator and commit aggregator on `feat/<task>`. Spoke cohorts execute in temporary worktrees namespaced as `.worktrees/<task>--<cohort>` on `feat/<task>--<cohort>` with strict `*-ownership.md` disjoint paths.<br>**Prune-As-You-Go Rule**: Active worktrees are bounded to $\le 3–5$. Once a spoke cohort is verified and integrated into the hub branch, the agent **immediately prunes** the spoke worktree (`git worktree remove` and `git branch -d`). Link `event/` into spoke worktrees if Plane item tracking is maintained per cohort. |
 
 > [!IMPORTANT]

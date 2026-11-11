@@ -5,8 +5,15 @@ using Microsoft.AspNetCore.Components.Routing;
 
 namespace Explore.Blazor.Client.Services;
 
+public interface IFooterPresentationService
+{
+    event Action? Changed;
+    Task<FooterConfigDto?> GetAsync(Guid? selectedTenant);
+    void ResetCache();
+}
+
 /// <summary>Owns footer loading for the current browser context and rejects superseded responses.</summary>
-public sealed class FooterPresentationService : IDisposable
+public sealed class FooterPresentationService : IFooterPresentationService, IDisposable
 {
     private readonly IFooterClient client;
     private readonly NavigationManager navigation;
@@ -100,7 +107,10 @@ public sealed class FooterPresentationService : IDisposable
         loading = null;
     }
 
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => ResetCache();
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (!disposed) Changed?.Invoke();
+    }
     private void OnAuthenticationChanged(Task<AuthenticationState> state) => ResetCache();
 
     public void Dispose()

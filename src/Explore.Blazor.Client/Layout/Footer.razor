@@ -1,6 +1,6 @@
 @using Explore.Blazor.Client.Layout.FooterTemplates
 @implements IDisposable
-@inject FooterPresentationService Presentation
+@inject IFooterPresentationService Presentation
 @inject CookieConsentStateService CookieConsentState
 @inject ITranslationService Translation
 
@@ -164,6 +164,7 @@
     private TenantDirectoryOperatorPublicDto? _directoryOperator;
     private InstanceOperatorPublicDto? _instanceOperator;
     private bool _initialized;
+    private Guid? _selectedTenant;
     private long _loadGeneration;
     private bool _disposed;
 
@@ -177,9 +178,14 @@
     private async Task LoadAsync()
     {
         long generation = ++_loadGeneration;
-        Apply(null);
-        _initialized = false;
-        var footer = await Presentation.GetAsync(TenantContext?.TenantId);
+        Guid? selectedTenant = TenantContext?.TenantId;
+        if (_selectedTenant != selectedTenant)
+        {
+            Apply(null);
+            _initialized = false;
+            _selectedTenant = selectedTenant;
+        }
+        var footer = await Presentation.GetAsync(selectedTenant);
         if (_disposed || generation != _loadGeneration) return;
         Apply(footer);
         _initialized = true;

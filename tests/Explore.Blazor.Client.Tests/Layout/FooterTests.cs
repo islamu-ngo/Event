@@ -1,13 +1,72 @@
 using System.Reflection;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Layout;
+using Explore.Blazor.Client.Models;
 using Explore.Blazor.Client.Services;
+using Microsoft.AspNetCore.Components;
 
 namespace Explore.Blazor.Client.Tests.Layout;
 
 public sealed class FooterTests : IDisposable
 {
     private readonly BlazorTestContext _ctx = new();
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task RefreshRetainsOnlyTheSameTenantFooter(bool changeTenant)
+    {
+        var current = new FooterConfigDto
+        {
+            BrandDisplayName = "Current community",
+            Settings = new FooterSettingsDto { Enabled = true, Template = "minimal", ShowCookieSettingsLink = true }
+        };
+        AddFooter(_ctx, Task.FromResult(current));
+        var consent = new CookieConsentStateService();
+        bool reopened = false;
+        consent.OnReopenRequested += () =>
+        {
+            reopened = true;
+            return Task.CompletedTask;
+        };
+        _ctx.Services.AddSingleton(consent);
+        var cut = _ctx.RenderMudComponent<CascadingValue<TenantContext>>(parameters => parameters
+            .Add(component => component.Name, "TenantContext")
+            .Add(component => component.Value, new TenantContext { TenantId = Guid.CreateVersion7() })
+            .AddChildContent<Footer>());
+        await Assert.That(cut.Find("footer").TextContent).Contains("Current community");
+        var pending = new TaskCompletionSource<FooterConfigDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _ctx.Services.GetRequiredService<IFooterClient>()
+            .GetFooterConfigAsync(cancellationToken: Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                started.TrySetResult();
+                return pending.Task;
+            });
+        var updated = current with { BrandDisplayName = "Updated community" };
+        try
+        {
+            if (changeTenant)
+                cut.Render(parameters => parameters
+                    .Add(component => component.Name, "TenantContext")
+                    .Add(component => component.Value, new TenantContext { TenantId = Guid.CreateVersion7() })
+                    .AddChildContent<Footer>());
+            else
+                await cut.InvokeAsync(() => _ctx.Services.GetRequiredService<IFooterPresentationService>().ResetCache());
+            await started.Task.WaitAsync(TUnit.Core.TestContext.Current!.Execution.CancellationToken);
+
+            if (changeTenant)
+                await Assert.That(cut.Find("footer").TextContent).DoesNotContain("Current community");
+            else
+                await Assert.That(cut.Find("footer").TextContent).Contains("Current community");
+            await cut.Find("footer button").ClickAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+            await Assert.That(reopened).IsTrue();
+            pending.SetResult(updated);
+            cut.WaitForState(() => cut.Find("footer").TextContent.Contains("Updated community", StringComparison.Ordinal));
+        }
+        finally { pending.TrySetResult(updated); }
+    }
 
     [Test]
     public async Task StructuredPublicShellIdentity_RendersRoleSeparatedOperatorsAndLegalLinks_WithoutProseDisclaimer()
@@ -185,7 +244,7 @@ public sealed class FooterTests : IDisposable
         client.GetFooterConfigAsync(cancellationToken: Arg.Any<CancellationToken>()).Returns(response);
         context.Services.AddSingleton(client);
         context.Services.AddSingleton(TimeProvider.System);
-        context.Services.AddScoped<FooterPresentationService>();
+        context.Services.AddScoped<IFooterPresentationService, FooterPresentationService>();
     }
 
     private static void SetOperator(object owner, PropertyInfo ownerProperty, IReadOnlyDictionary<string, object?> values)

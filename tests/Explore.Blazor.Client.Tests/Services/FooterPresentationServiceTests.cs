@@ -9,6 +9,30 @@ namespace Explore.Blazor.Client.Tests.Services;
 public sealed class FooterPresentationServiceTests
 {
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task SameTenantNavigationPreservesCachedOrPendingFooter(bool pending)
+    {
+        using var context = new BlazorTestContext();
+        var client = Substitute.For<IFooterClient>();
+        var current = new FooterConfigDto { BrandDisplayName = "Current community" };
+        var completion = new TaskCompletionSource<FooterConfigDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.GetFooterConfigAsync(cancellationToken: Arg.Any<CancellationToken>())
+            .Returns(pending ? completion.Task : Task.FromResult(current),
+                Task.FromResult(new FooterConfigDto { BrandDisplayName = "Unexpected replacement" }));
+        using var service = Create(context, client);
+        Guid tenant = Guid.CreateVersion7();
+        var initial = service.GetAsync(tenant);
+
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/events/next");
+        var following = service.GetAsync(tenant);
+        completion.SetResult(current);
+
+        await Assert.That(await initial).IsSameReferenceAs(current);
+        await Assert.That(await following).IsSameReferenceAs(current);
+    }
+
+    [Test]
     public async Task FailedTransportDoesNotBecomeCachedFooter()
     {
         using var context = new BlazorTestContext();

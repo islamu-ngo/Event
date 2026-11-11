@@ -31,11 +31,14 @@ disclosure. Denied or unavailable tenant admission returns a minimal response
 with only independently ready instance disclosure. The response revision is a
 SHA-256 digest of its public projection, including settings and legal roles.
 
-`FooterPresentationService` uses the generated Footer client. It clears its
-cache on navigation, authentication and settings resets, keys requests by
-selected tenant and generation, shares current in-flight loading and discards
-late responses from earlier generations or a disposed scope. `Footer.razor`
-clears displayed content before awaiting a replacement. A localized footer
+`FooterPresentationService` uses the generated Footer client. It caches a
+successful response for five minutes within the selected tenant. Navigation
+requests a refresh without invalidating that cache or its pending load;
+tenant changes, authentication changes and settings resets invalidate it.
+Requests share current in-flight loading and reject late responses from
+earlier generations or a disposed scope. `Footer.razor` retains the applied
+footer during a same-tenant refresh and clears it immediately when the tenant
+changes, before awaiting the replacement. A localized footer
 landmark and working cookie-settings action are available during loading,
 transport failure and missing configuration. `Enabled=false` suppresses
 optional template columns; neither it nor the template cookie-link setting

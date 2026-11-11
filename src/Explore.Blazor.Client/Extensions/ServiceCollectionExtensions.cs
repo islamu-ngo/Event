@@ -205,7 +205,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInstanceOnboardingService, InstanceOnboardingService>();
         services.AddScoped<ITenantOnboardingService, TenantOnboardingService>();
         services.AddScoped<IPublicExperienceService, PublicExperienceService>();
-        services.AddScoped<FooterPresentationService>();
+        services.AddScoped<IFooterPresentationService, FooterPresentationService>();
         services.AddScoped<IHomeDiscoveryService, HomeDiscoveryService>();
         services.AddScoped<ITenantPublicExperienceAdminService, TenantPublicExperienceAdminService>();
         services.AddScoped<ITenantBrandingSettingsAdminService, TenantBrandingSettingsAdminService>();

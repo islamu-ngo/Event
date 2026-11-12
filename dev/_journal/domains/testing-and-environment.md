@@ -264,3 +264,33 @@ dotnet tests/Event.API.IntegrationTests/bin/Release/net10.0/Event.API.Integratio
 - [x] Retain this measured framework/container distinction and independent request-tenant custody lesson in the testing journal; the API/storage guides own the production contract.
 
 ---
+
+[2026-11-12 Europe/Brussels] — Empirically calibrated TUnit concurrency, Postgres 1024 MiB floor, `/tmp` `tmpfs` trap, and multi-clone `BuildCheck` cache scoping
+
+**Context**: Full in-tree implementation of `bounded-test-execution-and-resource-governance` across all 16 TUnit assemblies, 4 Testcontainers integration projects, `Directory.Build.props`, and `.agents/hooks/BuildCheck.cs` on a Linux workstation running `ISLAMU_EXECUTION_PROFILE=constrained`.
+
+**Symptoms & Empirical Observations**:
+
+1. **TUnit `4 * Environment.ProcessorCount` default**: Without `BoundedTestDiscoveryHook`, TUnit spawned unconstrained worker pools across test assemblies, while static `[assembly: ParallelLimiter<T>]` attributes ignored `--maximum-parallel-tests` overrides.
+2. **PostgreSQL `512 MiB` OOM vs `1024 MiB` empirical floor**: Running `Event.Persistence.IntegrationTests` with `ContainerServiceRole.PostgreSql` capped at `512 MiB` (`task-465`) OOM-killed Postgres mid-`MigrateAsync()` (`PostgresEventCreationPublisherReadContract.ApplyAsync` threw `EndOfStreamException` after 34s). Raising the Postgres/PostGIS floor to `1024 MiB` allowed `PostgresModelConstraintApplierTests` (`2/2`) and `PostgreSqlDatabaseResetTests` container boot + `CreateIsolatedDatabaseAsync()` to complete reliably without OOM (`task-471`, `task-496`). Note that existing `RegistrationFinalizationEffectPersistenceTests`, `RegistrationConsentRecordPersistenceTests`, and `PostgreSqlDatabaseResetTests` fail identically to baseline with `InvalidOperationException: tenant_lease_not_bound` in `ExploreDbContext.RequireBoundTenantLease()` while proving shared-container reuse (`DROP DATABASE ... WITH (FORCE)` cleanup left zero orphan containers).
+3. **Docker Desktop & Linux `/tmp` `tmpfs` trap**: On Linux hosts where `/tmp` is RAM-backed `tmpfs`, heavy builds and test dumps consume host RAM directly unless `TMPDIR` points to a canonical `0700` disk path (e.g., `$HOME/.cache/agent-tmp`); similarly Docker Desktop VMs enforce total VM RAM separately from host cgroups, requiring both `HostConfig.Memory` bounds and `MaximumParallelTests=1` for container lanes.
+4. **`.claude/build-cache` cross-clone leak**: `.claude/build-cache/<session>/edited-files.log` contained historical absolute paths from another local clone (`/home/amir/ISLAMU/Github/islamu.ngo/...`). Without filtering `edited-files.log` paths against the active solution root (`FindSolutionRoot`), `BuildCheck.cs --dry-run` resolved `.csproj` files outside the active repository.
+
+**Resolution**:
+
+- Implemented `tests/Shared/Execution/TestExecutionProfile.cs` + `BoundedTestDiscoveryHook.cs` across all 16 TUnit projects (`TestExecutionProfileTests` `21/21` passed; `TestExecutionGovernanceArchitectureTests` `2/2` passed), deleted static limiters, and enforced `HostConfig.Memory` + `AssuranceOwnershipContext` reuse suppression via `ContainerResourceBounds.cs` (`ContainerResourceBoundsTests` `25/25` passed).
+- Scoped `.agents/hooks/BuildCheck.cs` strictly to `rootDir` descendants in `FindOwningProject(...)`, gated `UseSharedCompilation=false` + `BuildInParallel=false` behind `ISLAMU_EXECUTION_PROFILE=constrained` in `Directory.Build.props`, and dropped bespoke wrapper shell scripts in favor of native SDK flags and env vars (`DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1`, `MSBUILDDISABLENODEREUSE=1`, `DOTNET_GCConserveMemory=5`).
+
+**References**:
+
+- [ADR-bounded-test-execution-profiles](../../docs/internal/adr/ADR-bounded-test-execution-profiles.md)
+- `tests/Shared/Execution/TestExecutionProfile.cs`, `tests/Shared/Execution/BoundedTestDiscoveryHook.cs`
+- `tests/Shared/Containers/ContainerResourceBounds.cs`, `tests/Shared/Containers/TestcontainersBuilderExtensions.cs`
+- `Directory.Build.props`, `.agents/hooks/BuildCheck.cs`
+- Commits `6706f01fd2` (Phase 1), `a2d25a2d30` (Phase 2), `1bc067dac6` (Phase 3), `2337d3e9f7` (Phase 4).
+
+**Promotion Consideration**:
+
+- [x] Architectural invariants promoted to [ADR-bounded-test-execution-profiles](../../docs/internal/adr/ADR-bounded-test-execution-profiles.md), `AGENTS.md`, `docs/internal/TESTING.md`, `docs/internal/OPERATIONS.md`, and `docs/public/documentation/readme/contributing/local-development.md`.
+
+---

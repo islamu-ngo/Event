@@ -121,10 +121,10 @@ dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTes
 
 ### Phase Exit — Target Project Build & Test (Ring 2, < 15s)
 ```bash
-# 1. Clean build of affected project only:
-dotnet build <TargetProject.csproj> --configuration Release --verbosity quiet --nologo
+# 1. Clean sequential build of affected project only (add -m:1 -nr:false under constrained RAM):
+dotnet build <TargetProject.csproj> --configuration Release -m:1 -nr:false --verbosity quiet --nologo
 
-# 2. Run affected test project with Release configuration:
+# 2. Run affected test project one project at a time with Release configuration:
 dotnet test --project <TestProject.csproj> --configuration Release --verbosity quiet --no-build -- --minimum-expected-tests 1
 
 # 3. Targeted test execution by method/class filter:
@@ -133,6 +133,8 @@ dotnet test --project <TestProject.csproj> --configuration Release --verbosity q
 # 4. Architecture guardrail check:
 dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet --no-build -- --minimum-expected-tests 1
 ```
+
+All 16 TUnit assemblies apply adaptive memory-aware concurrency via `BoundedTestDiscoveryHook` (`ISLAMU_EXECUTION_PROFILE=constrained|balanced|performance`), and Testcontainers fixtures bound RAM/JVM ceilings via `ContainerResourceBounds`. On low-RAM laptops or concurrent sessions, set `ISLAMU_EXECUTION_PROFILE=constrained`, `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1`, `MSBUILDDISABLENODEREUSE=1`, `DOTNET_GCConserveMemory=5`, and disk-backed `TMPDIR`.
 
 `EventAddOnLifecycleTests` and `TicketingRecoveryInvariantTests` belong to
 `Event.Domain.UnitTests/Entities/` and execute in its existing normal CI lane.
@@ -164,14 +166,14 @@ in the same executable. Isolated script/process controls do not establish a
 successful real-host journey, workload, recovery or calibrated capacity result.
 
 ```bash
-# 1. Full solution build:
-dotnet build Explore.slnx --configuration Release --verbosity quiet
+# 1. Bounded solution build (or build individual touched projects sequentially):
+dotnet build Explore.slnx --configuration Release -m:1 -nr:false --verbosity quiet
 
 # 2. Code formatting verification on changed files:
 dotnet format Explore.slnx --verify-no-changes --verbosity quiet
 
-# 3. Full multi-provider persistence tests (Testcontainers required):
-dotnet test tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release
+# 3. Full multi-provider persistence tests (Testcontainers required; runs sequentially with --no-build):
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet
 ```
 
 ---

@@ -362,13 +362,14 @@ intents:
       - "Every test cohort is retained, semantically replaced, or deleted with an explicit invariant disposition"
       - "Critical money, state-machine, concurrency, tenant, security, privacy, HAL, BFF, provider, migration, and protocol coverage fails closed until stronger replacement evidence passes"
       - "Every surviving executable project has a documented role, explicit lane ownership, and nonzero execution evidence"
+      - "All TUnit assemblies inherit memory-aware concurrency via BoundedTestDiscoveryHook (zero static ParallelLimiter attributes), Testcontainers fixtures enforce ContainerResourceBounds memory caps, and verification runs sequentially with --no-build honoring ISLAMU_EXECUTION_PROFILE"
       - "Fast lanes require no hidden Docker, browser, Aspire, broker, or live-provider infrastructure"
       - "Product, API, persistence, authorization, privacy, accessibility, and provider behavior remain unchanged"
     pr_checklist:
       - "Deleted cohorts map to stronger retained public-seam tests, passing semantic replacements, or intentionally removed behavior"
-      - "No internal repository or cache call-count mirrors, EF cancellation boilerplate, fixed sleeps, or raw source and prose assurance remain"
+      - "No internal repository or cache call-count mirrors, EF cancellation boilerplate, fixed sleeps, static ParallelLimiter attributes, or raw source and prose assurance remain"
       - "Machine-consumed schema and generated-contract tests parse behavior instead of pinning prose or implementation tokens"
-      - "All affected project gates execute nonzero tests in Release configuration and the repository Release build passes"
+      - "All affected project gates compile via -m:1 -nr:false and execute sequentially with --no-build in Release configuration, and TestExecutionGovernanceArchitectureTests passes"
       - "Use `Changelog: skip` with `Changelog-Reason: Internal test architecture and CI rationalization with no product behavior change`"
     forbidden_without_approval:
       - "Deleting or weakening critical coverage without a passing stronger replacement or intentionally removed behavior"
@@ -399,8 +400,10 @@ intents:
       mandatory_reviewers:
         - quality-verifier-agent
     verification_commands:
-      - "dotnet build --configuration Release --verbosity quiet"
-      - "dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet"
+      - "dotnet build tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release -m:1 -nr:false --verbosity quiet"
+      - "dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --no-build --verbosity quiet"
+      - "dotnet build tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj --configuration Release -m:1 -nr:false --verbosity quiet"
+      - "dotnet test --project tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj --configuration Release --no-build --verbosity quiet"
 
   - id: blazor-component-affordance
     title: "Toggle a Blazor component's mutation affordance"
@@ -1157,8 +1160,9 @@ intents:
       mandatory_reviewers:
         - quality-verifier-agent
     verification_commands:
-      - "dotnet run --project eng/agent-workflow/src/ISLAMU.AgentWorkflow/ISLAMU.AgentWorkflow.csproj -- validate-intents .agents/contract/intents.yaml"
-      - "dotnet test --project eng/agent-workflow/tests/ISLAMU.AgentWorkflow.Tests/ISLAMU.AgentWorkflow.Tests.csproj --configuration Release --verbosity quiet"
+      - "dotnet run --project eng/agent-workflow/src/ISLAMU.AgentWorkflow/ISLAMU.AgentWorkflow.csproj --configuration Release -- validate-intents .agents/contract/intents.yaml"
+      - "dotnet build eng/agent-workflow/tests/ISLAMU.AgentWorkflow.Tests/ISLAMU.AgentWorkflow.Tests.csproj --configuration Release -m:1 -nr:false --verbosity quiet"
+      - "dotnet test --project eng/agent-workflow/tests/ISLAMU.AgentWorkflow.Tests/ISLAMU.AgentWorkflow.Tests.csproj --configuration Release --no-build --verbosity quiet"
 
   - id: update-ai-context-disclosure
     title: "Update or extend the AI Context Disclosure Policy"
@@ -2389,9 +2393,9 @@ intents:
       - add-ef-migration
       - update-repository-query
     verification_commands:
-      - "dotnet build --configuration Release --verbosity quiet"
-      - 'dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release -- --treenode-filter "/*/*/PrimaryDatabaseProviderCompositionTests/*" --minimum-expected-tests 1 --no-progress --maximum-parallel-tests 1'
-      - 'dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release -- --treenode-filter "/*/*/ProviderMigrationOwnershipTests/*" --minimum-expected-tests 1 --no-progress --maximum-parallel-tests 1'
+      - "dotnet build Explore.slnx --configuration Release -m:1 -nr:false --verbosity quiet"
+      - 'dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/PrimaryDatabaseProviderCompositionTests/*" --minimum-expected-tests 1 --no-progress --maximum-parallel-tests 1'
+      - 'dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/ProviderMigrationOwnershipTests/*" --minimum-expected-tests 1 --no-progress --maximum-parallel-tests 1'
 
   - id: strong-typing-refactor
     title: "Remediate strong-typing boundaries and replace reflection and source assurance"

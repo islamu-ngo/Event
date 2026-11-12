@@ -307,38 +307,45 @@ Before submitting a pull request, verify your changes locally.
 > - **Ring 2 (Component Validation):** Run the individual project test command below for the project you touched.
 > - **Ring 3 (Pre-PR Gate):** CI will run the full multi-database and architecture test matrix.
 
-### 1. Solution Build
+### 1. Targeted Build & Execution Profile
+Compile the target project (or solution) once with bounded MSBuild nodes before running tests:
+
 ```bash
-dotnet build --configuration Release --verbosity quiet
+dotnet build <TargetProject.csproj> --configuration Release -m:1 -nr:false --verbosity quiet
 ```
 
-### 2. Run Test Projects Individually
-Do not run solution-wide `dotnet test`. Run the individual test projects relevant to your changes:
+On low-RAM laptops or concurrent desktop workflows, set `ISLAMU_EXECUTION_PROFILE=constrained` alongside `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1`, `MSBUILDDISABLENODEREUSE=1`, `DOTNET_GCConserveMemory=5`, and a disk-backed `TMPDIR` (for example `$HOME/.cache/agent-tmp` on Linux hosts with `tmpfs` `/tmp`). Dedicated high-memory workstations can leave `balanced` (default) or set `ISLAMU_EXECUTION_PROFILE=performance` (and optional `ISLAMU_CONTAINER_MEMORY_MB` / `ISLAMU_TEST_CONTAINER_REUSE=true`).
+
+### 2. Run Test Projects Sequentially (Never Solution-Wide)
+Do not run solution-wide `dotnet test`. Execute affected test projects **one project at a time** passing `--no-build` after building:
 
 ```bash
 # Architecture tests (mandatory CI gate)
-dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --no-build --verbosity quiet
 
 # Domain unit tests
-dotnet test --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --no-build --verbosity quiet
 
 # Application unit tests
-dotnet test --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release --no-build --verbosity quiet
+
+# Diagnostic & execution profile governance tests
+dotnet test --project tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj --configuration Release --no-build --verbosity quiet
 
 # Infrastructure unit / category tests (includes native Secrets tests)
-dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*/*[Category!=Runtime]" --minimum-expected-tests 1
+dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --no-build --verbosity quiet -- --treenode-filter "/*/*/*/*[Category!=Runtime]" --minimum-expected-tests 1
 
 # Persistence integration tests
-dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet
 
 # API integration tests
-dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet
 
 # Blazor client unit & component tests
-dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --no-build --verbosity quiet
 
 # Blazor BFF integration tests
-dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet
 ```
 
 ---

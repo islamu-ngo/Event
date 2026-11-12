@@ -637,7 +637,7 @@ flowchart TD
     end
 
     subgraph Ring2["Ring 2: Phase Exit Gate (Phase Level)"]
-        R2Scope["Scope: Single Modified Project + Release Build\nLatency Budget: < 15 seconds\nInfrastructure: 1 Designated provider (e.g. SQLite / single Postgres)\nSuites: Target project only (dotnet build -c Release -v q)"]
+        R2Scope["Scope: Single Modified Project + Release Build\nLatency Budget: < 15 seconds\nInfrastructure: 1 Designated provider (e.g. SQLite / single Postgres)\nSuites: Sequential single project (dotnet build -c Release -m:1 -nr:false)"]
     end
 
     subgraph Ring3["Ring 3: Plan Exit Gate (Workstream Level)"]
@@ -758,15 +758,21 @@ flowchart TD
 ### Fast-Loop Development Commands
 
 ```bash
-# 1. Fast TUnit Slicing during active subtask coding (~1.5s):
-dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --no-build -- --treenode-filter "/*/*/*<TargetTestClassName>/*"
+# 0. Optional constrained workstation environment (low-RAM / multi-tasking):
+export ISLAMU_EXECUTION_PROFILE=constrained
+export DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1 MSBUILDDISABLENODEREUSE=1 DOTNET_GCConserveMemory=5
 
-# 2. Phase-End Verification (Run ONCE after all phase tasks are complete):
-dotnet build --configuration Release --verbosity quiet
-dotnet test --project tests/<TargetProject>.Tests/<TargetProject>.Tests.csproj --configuration Release --verbosity quiet
+# 1. Fast TUnit Slicing during active subtask coding (~1.5s):
+dotnet build tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release -m:1 -nr:false --verbosity quiet
+dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/*<TargetTestClassName>/*"
+
+# 2. Phase-End Verification (Run sequentially one project at a time after phase tasks are complete):
+dotnet build tests/<TargetProject>/<TargetProject>.csproj --configuration Release -m:1 -nr:false --verbosity quiet
+dotnet test --project tests/<TargetProject>/<TargetProject>.csproj --configuration Release --no-build --verbosity quiet
 
 # 3. Architecture & Convention Integrity Check:
-dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet
+dotnet build tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release -m:1 -nr:false --verbosity quiet
+dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --no-build --verbosity quiet
 
 # 4. Immediate phase close on dedicated task branch (feat/<task-name>):
 git status --short

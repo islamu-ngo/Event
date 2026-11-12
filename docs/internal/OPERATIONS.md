@@ -3937,6 +3937,36 @@ dotnet run --project eng/agent-workflow/src/ISLAMU.AgentWorkflow/ISLAMU.AgentWor
 dotnet run --project eng/agent-workflow/src/ISLAMU.AgentWorkflow/ISLAMU.AgentWorkflow.csproj -- validate-commit -- git commit --only -m "message" -- src/ExactFile.cs docs/ExactFile.md
 ```
 
+### Verification Policy
+
+All agent and contributor verification compiles once sequentially per project (`dotnet build <Project.csproj> --configuration Release -m:1 -nr:false --verbosity quiet`) and executes test projects one at a time with `--no-build`:
+
+- **Execution Profiles (`ISLAMU_EXECUTION_PROFILE`)**: `constrained` (1 container, `2` or `1` unit workers, `Directory.Build.props` sets `UseSharedCompilation=false` + `BuildInParallel=false`), `balanced` (default adaptive host RAM profile), or `performance` (unthrottled CPU scaling on dedicated high-RAM machines).
+- **Constrained SDK Environment Variables**: Pair `ISLAMU_EXECUTION_PROFILE=constrained` with `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1`, `MSBUILDDISABLENODEREUSE=1`, `DOTNET_GCConserveMemory=5`, and a disk-backed `0700` `TMPDIR` (e.g. `$HOME/.cache/agent-tmp`) so Roslyn VBCSCompiler/MSBuild workers terminate promptly and Linux `/tmp` `tmpfs` never exhausts host RAM.
+- **Targeted `BuildCheck` Hook**: `.agents/hooks/BuildCheck.cs` inspects `.claude/build-cache` session logs to compile only touched `.csproj` files inside the current repository root in Release mode (applying `-m:1 -nr:false -p:UseSharedCompilation=false` when `constrained`); verify resolved commands safely with `dotnet run .agents/hooks/BuildCheck.cs -- --dry-run`.
+- **Optional Linux Session Wrapping (External to Repo)**: On shared Linux workstations where multiple agents or tools might compete for RAM, operators may optionally wrap sessions externally via `systemd-run --user --scope -p MemoryMax=16G ...` (requires user `XDG_RUNTIME_DIR` / `DBUS_SESSION_BUS_ADDRESS`) or `flock`; Docker Desktop VM memory stays capped natively in C# via `ContainerResourceBounds` (`HostConfig.Memory`).
+
+### Full Project Test List
+
+Never run solution-wide `dotnet test`. Execute individual projects sequentially after building:
+
+1. `tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj`
+2. `tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj`
+3. `tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj`
+4. `tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj`
+5. `tests/Event.Wire.Contracts.UnitTests/Event.Wire.Contracts.UnitTests.csproj`
+6. `tests/Explore.GeneratedContracts.Tests/Explore.GeneratedContracts.Tests.csproj`
+7. `tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj`
+8. `tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj`
+9. `tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj` (`-- --treenode-filter "/*/*/*/*[Category!=Runtime]"` for fast lane)
+10. `tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj` (Docker / Testcontainers)
+11. `tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj` (Docker / Testcontainers)
+12. `tests/Event.Standalone.IntegrationTests/Event.Standalone.IntegrationTests.csproj`
+13. `tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj`
+14. `eng/agent-workflow/tests/ISLAMU.AgentWorkflow.Tests/ISLAMU.AgentWorkflow.Tests.csproj`
+15. `eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj`
+16. `eng/dependency-submission/tests/ISLAMU.DependencySubmission.Tests/ISLAMU.DependencySubmission.Tests.csproj`
+
 
 ## Planned Capacity Work
 

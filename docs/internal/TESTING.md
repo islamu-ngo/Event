@@ -102,6 +102,46 @@ comparisons after rejected/replayed operations prevent later valid transitions
 from hiding a partial mutation. These pure in-memory tests prove no real-provider
 race, distributed exactly-once effect or production authentication boundary.
 
+## Execution Profiles & Resource Governance
+
+All 16 TUnit assemblies in `tests/` and `eng/` share `tests/Shared/Execution/TestExecutionProfile.cs` and `tests/Shared/Execution/BoundedTestDiscoveryHook.cs` to replace TUnit's unconstrained `4 * CPU cores` concurrency default with memory-aware parallelism:
+
+| Profile (`ISLAMU_EXECUTION_PROFILE`) | `UnitPure` | `IntegrationContainer` | `Distributed` | MSBuild / Roslyn (`Directory.Build.props`) |
+|---|---|---|---|---|
+| `constrained` | `2` (or `1` < 12 GiB) | `1` | `1` | `UseSharedCompilation=false`, `BuildInParallel=false`, `-m:1 -nr:false` |
+| `balanced` *(default)* | `2`–`6` by free RAM | `1` (< 24 GiB) to `3` (>= 48 GiB) | `1` | Standard SDK defaults |
+| `performance` | Up to `Environment.ProcessorCount` | Up to `4` | `2` | Standard SDK defaults |
+
+Precedence order for `MaximumParallelTests` is strictly: `--maximum-parallel-tests` CLI flag > `TUNIT_MAX_PARALLEL_TESTS` > `ISLAMU_TEST_PARALLEL_LIMIT` > `ISLAMU_EXECUTION_PROFILE` / adaptive memory ceiling (reading Linux `/proc/meminfo` `MemAvailable`, cgroup v2 `memory.max`, or cross-platform `GC.GetGCMemoryInfo()`). Static `[assembly: ParallelLimiter<T>]` attributes are forbidden (`Event.Architecture.Tests` `TestExecutionGovernanceArchitectureTests` enforces this across all TUnit assemblies).
+
+### Container Memory Ceilings, Lazy Boot & Reuse Safety
+
+- Every Testcontainers builder chains `.ApplyBoundedResourcePolicy(...)` from `tests/Shared/Containers/TestcontainersBuilderExtensions.cs` + `tests/Shared/Containers/ContainerResourceBounds.cs`, capping `HostConfig.Memory`: `Redis`/`Mailpit` (`128 MiB`), `Cerbos`/`Svix` (`256 MiB`), `RabbitMq`/`Generic` (`512 MiB`), `MySql`/`MariaDb` (`768 MiB`), `PostgreSql`/`PostGis`/`Keycloak` (`1024 MiB`, with Keycloak JVM heap capped via `JAVA_OPTS_APPEND`), and `SqlServer` (`2048 MiB`). Override defaults with `ISLAMU_CONTAINER_MEMORY_MB` and `ISLAMU_KEYCLOAK_HEAP_MB`.
+- Opt-in container reuse (`ISLAMU_TEST_CONTAINER_REUSE=true`) is automatically suppressed (`disableReuse` / `hasAssuranceOwner` / explicit container name) whenever `AssuranceOwnershipContext` or custom container naming is active.
+- Multi-provider fixtures (`AdmissionAuthorityProviderFixture`, `SemanticValueNonTransactionalProviderFixture`, `MySqlMigrationGuardFixture`) start containers lazily on first `CreateOptionsAsync(...)` call under `SemaphoreSlim(1, 1)` instead of spawning 3 engines eagerly in `InitializeAsync()`.
+- `PostgreSqlContainerFixture.CreateIsolatedDatabaseAsync()` creates and disposes per-test logical databases (`test_<guid>`) on one shared `PerAssembly` container instead of booting redundant Postgres instances.
+
+### Portable Workstation Setup & `AGENTS.local.md` Templates
+
+Always build one project cleanly before passing `--no-build` sequentially one test project at a time, and keep `TMPDIR` off RAM-backed Linux `/tmp` `tmpfs` (`mkdir -m 700 -p "$HOME/.cache/agent-tmp" && export TMPDIR="$HOME/.cache/agent-tmp"`). Copy one of these portable templates into gitignored `AGENTS.local.md`:
+
+```markdown
+<!-- Constrained laptop / remote SSH / multi-tasking workstation -->
+export TMPDIR="$HOME/.cache/agent-tmp"
+export ISLAMU_EXECUTION_PROFILE=constrained
+export DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1
+export MSBUILDDISABLENODEREUSE=1
+export DOTNET_GCConserveMemory=5
+# Always pass -m:1 -nr:false to dotnet build and --no-build sequentially per test project.
+```
+
+```markdown
+<!-- Dedicated high-RAM workstation (48 GiB+) -->
+export ISLAMU_EXECUTION_PROFILE=performance
+export ISLAMU_CONTAINER_MEMORY_MB=2048
+export ISLAMU_TEST_CONTAINER_REUSE=true
+```
+
 ## The 3-Ring Progressive Verification Model
 
 To eliminate the 50% test diagnosis and 15% container troubleshooting bottleneck during agentic and contributor workflows, the repository strictly enforces a **3-Ring Progressive Verification** hierarchy:
@@ -353,7 +393,7 @@ dotnet build src/Explore.Blazor.Client/Explore.Blazor.Client.csproj --configurat
 
 The determinism pass repeats the API build, inventory command, and Blazor client build, then requires zero diff in `schemas/openapi_islamu-event.json`, `docs/API_CONTRACT_INVENTORY.md`, and `src/Explore.Blazor.Client/Clients/EventApiClient.g.cs`.
 
-The solution-level build can be blocked by unrelated Blazor WebAssembly task-host issues on local SDK/tooling states where the WebAssembly workload is not installed. For the pinned .NET SDK `10.0.302`, verify the workload with `dotnet workload list` and install the official ASP.NET Core Blazor WebAssembly prerequisite with `dotnet workload install wasm-tools` when Release builds fail in `ComputeWasmBuildAssets`, `Microsoft.NETCore.App.Runtime.Mono.browser-wasm`, or `Microsoft.NET.Sdk.WebAssembly.Pack` resolution. When the change is API/Application/HAL-only, prefer the API project build plus focused tests above and report any broader build blocker separately instead of weakening lifecycle tests.
+The solution-level build can be blocked by unrelated Blazor WebAssembly task-host issues on local SDK/tooling states where the WebAssembly workload is not installed. For the pinned .NET SDK `10.0.403`, verify the workload with `dotnet workload list` and install the official ASP.NET Core Blazor WebAssembly prerequisite with `dotnet workload install wasm-tools` when Release builds fail in `ComputeWasmBuildAssets`, `Microsoft.NETCore.App.Runtime.Mono.browser-wasm`, or `Microsoft.NET.Sdk.WebAssembly.Pack` resolution. When the change is API/Application/HAL-only, prefer the API project build plus focused tests above and report any broader build blocker separately instead of weakening lifecycle tests.
 
 ### Support Access Focused Verification
 

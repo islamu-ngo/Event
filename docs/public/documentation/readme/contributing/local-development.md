@@ -12,7 +12,7 @@ This guide helps developers set up a local development workstation to contribute
 
 To build and run the complete solution from source, install:
 
-- **.NET 10 SDK** (v10.0.302 or compatible)
+- **.NET 10 SDK** (v10.0.403 or compatible)
 - **Docker Engine / Docker Desktop** (v24+ with Compose v2)
 - **.NET Aspire CLI**:
   ```bash
@@ -44,20 +44,34 @@ Open the **Aspire Dashboard** URL displayed in your terminal (typically `http://
 
 ## 3. Building and Testing
 
-Build the solution in Release configuration:
+Compile a target project (or the solution) once in Release configuration before executing tests sequentially one project at a time:
 
 ```bash
-dotnet build --configuration Release --verbosity quiet
-```
-
-Run tests using [TUnit](tunit.md):
-
-```bash
-# Run unit tests for Application layer
-dotnet test tests/Explore.Application.Tests/Explore.Application.Tests.csproj \
+dotnet build tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj \
   --configuration Release \
-  --treenode-filter "/*/*/*<TestClass>/*"
+  -m:1 -nr:false \
+  --verbosity quiet
 ```
+
+Run tests using [TUnit](tunit.md) with `--no-build` so TUnit reuses the compiled binaries without triggering redundant MSBuild graphs:
+
+```bash
+# Run unit tests for the Application layer
+dotnet test --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj \
+  --configuration Release \
+  --no-build \
+  --verbosity quiet \
+  -- --treenode-filter "/*/*/*<TestClass>/*"
+```
+
+### Execution Profiles & Low-Memory Workstations
+
+All test suites automatically adapt TUnit parallelism and Testcontainers Docker memory limits based on host memory and optional environment settings:
+
+* **`ISLAMU_EXECUTION_PROFILE`**: `constrained` (strictly serial builds/containers for laptops, SSH hosts, or concurrent workloads), `balanced` (default adaptive scaling), or `performance` (higher unit-test concurrency on dedicated multi-core hosts; explicit `--maximum-parallel-tests`, `TUNIT_MAX_PARALLEL_TESTS`, or `ISLAMU_TEST_PARALLEL_LIMIT` always win).
+* **Low-RAM MSBuild & Roslyn caps** (when `ISLAMU_EXECUTION_PROFILE=constrained`): `Directory.Build.props` sets `UseSharedCompilation=false` and `BuildInParallel=false`; pair with `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1`, `MSBUILDDISABLENODEREUSE=1`, and `DOTNET_GCConserveMemory=5`.
+* **Container memory & reuse controls**: Testcontainers default ceilings (`PostgreSql`/`PostGis`/`Keycloak` 1024 MiB, `SqlServer` 2048 MiB, `MySql`/`MariaDb` 768 MiB, `RabbitMq` 512 MiB, `Cerbos`/`Svix` 256 MiB, `Redis`/`Mailpit` 128 MiB) can be overridden via `ISLAMU_CONTAINER_MEMORY_MB` and `ISLAMU_KEYCLOAK_HEAP_MB`. Opt-in reuse (`ISLAMU_TEST_CONTAINER_REUSE=true`) is automatically suppressed on security-isolated fixtures.
+* **Linux `tmpfs` `/tmp` protection**: On Linux systems where `/tmp` is RAM-backed (`tmpfs`), point `TMPDIR` at a disk-backed `0700` directory (for example `mkdir -m 700 -p "$HOME/.cache/agent-tmp" && export TMPDIR="$HOME/.cache/agent-tmp"`).
 
 ---
 

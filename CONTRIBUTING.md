@@ -261,6 +261,15 @@ Incomplete bug reports or reports generated purely with generic AI output may be
 ### Issue / Discussion Requirement
 Every non-trivial pull request must reference and close an existing Issue or Discussion. If none exists, start a discussion first.
 
+### How GitHub Issues Relate to Plane (`EVENT-XXX`)
+Maintainers plan and track accepted work in a single [Plane](https://plane.so) project, `EVENT`, using IDs such as `EVENT-1234`. The two systems have different jobs:
+
+- **GitHub Discussions and Issues are where you start.** Describe the problem, provide reproduction steps or source anchors, and discuss the approach. You never need a Plane account and you never create an `EVENT-XXX` ID yourself.
+- **Plane is the maintainers' delivery tracker.** After triage, a maintainer promotes accepted work into Plane through its Intake queue, as one complete, independently shippable deliverable. Plane never holds separate "write tests" or "update docs" tickets; those are part of finishing the work.
+- **Traceability links them.** When your issue has a Plane item, the maintainer shares its `EVENT-XXX` ID. Use it in your branch name (`feat/EVENT-1234-short-slug`) and as a `Refs: EVENT-1234` commit trailer, and list it as `- Plane: [EVENT-1234]` in the PR's `## Issues` section next to `Closes #<issue>`. If no Plane item exists, referencing the GitHub issue is enough.
+
+The full sizing and structure rules are in the [work-item taxonomy standard](docs/internal/project-management/work-item-taxonomy-and-granularity-report.md), and the step-by-step branch/commit/PR flow is in the [internal contribution guide](docs/internal/CONTRIBUTING.md#how-to-contribute).
+
 ### Commit Message Format
 All commits must follow the **Conventional Commits** specification:
 

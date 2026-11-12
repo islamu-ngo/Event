@@ -96,6 +96,9 @@ If you are building pages, dialogs, forms, or navigation in Blazor:
 3. Use [CONTRIBUTOR_RECIPES.md](CONTRIBUTOR_RECIPES.md) to implement your feature across all layers from Domain to Razor components.
 4. Verify your change using the [Pull Request Checklist](CONTRIBUTING.md#pull-request-checklist).
 
+### Tracking Your Work (All Roles)
+Maintainers track work in a single Plane project, `EVENT`. If your change has a work item, name the branch `feat/EVENT-XXX-<slug>` and add `Refs: EVENT-XXX` to your commits so Plane links them automatically. Before proposing new tracked work, read the [work-item taxonomy standard](project-management/work-item-taxonomy-and-granularity-report.md): one completable vertical deliverable per item, with tests and docs inside its Definition of Done. External contributors start from a GitHub Issue or Discussion instead; maintainers promote accepted work into Plane.
+
 ---
 
 ## 3. The 8 Unbreakable Invariants ("Gotchas")

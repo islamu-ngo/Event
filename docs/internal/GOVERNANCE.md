@@ -525,6 +525,7 @@ Key rules:
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture overview
 - **[NAMING_CONVENTIONS.md](NAMING_CONVENTIONS.md)** - OperationId naming policy and exceptions
 - **[TEMPLATE_GLOSSARY.md](TEMPLATE_GLOSSARY.md)** - Placeholder definitions
+- **[Work-item taxonomy standard](project-management/work-item-taxonomy-and-granularity-report.md)** - How Plane `EVENT` work items are sized, typed, labeled, and nested, bound by the [Plane project management ADR](adr/ADR-plane-project-management-standardization.md)
 
 ## Code Review Checklist
 
@@ -567,6 +568,10 @@ Commit messages, PR descriptions, planning summaries, progress/completion report
 Explain technical terms in context; do not make the developer translate internal vocabulary or open a plan to understand the outcome or choice. Improve readability by adding explanations, not by deleting terminology, mechanisms, rationale, constraints, or evidence. Prefer a longer complete account over a shorter account that loses information. Preserve exact API fields, commands, deployment/rollback requirements, security/privacy consequences, and unverified work. Organize final verification rather than copying an execution diary; length follows the substance, not an arbitrary brevity target.
 
 Use the shared [reader-first writing guide](../../.agents/skills/conventional-commit/resources/reader-first-writing.md) for commit examples, PR structure, reporting, decision briefs, and the meaning/technical-detail review. This applies to human-facing communication even when no writing skill is loaded.
+
+### Work Tracking in Plane
+
+Substantive changes are tracked as one Plane work item in the single `EVENT` project. A work item is a completable vertical deliverable, never a code layer or a perpetual area. Tests, migrations, and docs caused by a feature belong to its Definition of Done, not to separate tickets. Traceability uses the uppercase work-item ID in the branch (`feat/EVENT-XXX-<slug>`), commit trailers (`Refs: EVENT-XXX`), and PR (`- Plane: [EVENT-XXX]`). The sizing rules are in the [work-item taxonomy standard](project-management/work-item-taxonomy-and-granularity-report.md); the binding decisions are in the [Plane project management ADR](adr/ADR-plane-project-management-standardization.md); and agents follow `AGENTS.md` Critical Rule 20 with the [`plane-compose`](../../.agents/skills/plane-compose/SKILL.md) and [`plane-mcp`](../../.agents/skills/plane-mcp/SKILL.md) skills.
 
 ### Intent Classification (Decision Table)
 

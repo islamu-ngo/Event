@@ -385,8 +385,10 @@ Because `plane-compose v0.5.2` parses all `event/work/*.yaml` files on `push`/`v
 
 ### Single-Project (`EVENT`) Taxonomy, Granularity & Importance Policy
 
+Authoritative sources: the [work-item taxonomy and granularity standard](project-management/work-item-taxonomy-and-granularity-report.md) and the [Plane project management ADR](adr/ADR-plane-project-management-standardization.md). The bullets below summarize them for agents.
+
 - **Multi-Product Workspace vs. Single-Project `EVENT`**: `islamu` is the workspace boundary separating distinct ISLAMU products (`ISLAMU Event`, `ISLAMU Configurator`, `ISLAMU I-VSD`, `ISLAMU Identity`). **ISLAMU Event stays strictly 1 Plane project (`EVENT`)**—never create Event workspace-level rules or separate Plane projects per client surface. Internal codebase sub-projects and surfaces (`API`, `Web App`, `KMP (mobile, watch & TV)`, `Desktop (Avalonia)`, `TUI`, `CLI`, `Database`, `Payments`, `Finance`) are modeled with orthogonal **Surface/Domain Labels** and finite **`Epics`** (`type: Epic`), while **Version Modules** (`v0.1.0`, `v1.0.0`) track release scope.
-- **Completable Vertical Outcomes & 3-Tier Test/DoD Rule**: Each work item must represent one finishable capability or **1 provider** (never perpetual goals like `"Make app secure"` or 8 horizontal layer tickets per entity). Standard feature tests (Domain/App/API/bUnit), EF migrations, and docs live in Acceptance Criteria + `tasks.md` (`0` Plane tickets); `parent: <uuid>` sub-work items (depth capped at `1`, `2–5` max) apply only to genuinely separate PRs or heavy standalone test campaigns.
+- **Completable Vertical Outcomes & 3-Tier Test/DoD Rule**: Each work item must represent one finishable capability or **1 provider** (never perpetual goals like `"Make app secure"` or 8 horizontal layer tickets per entity). Standard feature tests (Domain/App/API/bUnit), EF migrations, and docs live in Acceptance Criteria + `tasks.md` (`0` Plane tickets); `parent: <uuid>` sub-work items (one level below their Work Item, so the longest chain is `Sub-item → Work Item → Epic`; `2–5` max) apply only to genuinely separate PRs or heavy standalone test campaigns.
 - **Importance (`priority`) vs. Time Urgency (`Module` + `due_date`)**: `priority` (`urgent`/`high`/`medium`/`low`) encodes **functional criticality / must-have requirement level** (regulatory/legal mandates and foundational blockers = `urgent`, core killer features = `high`, optional polish = `low`, regardless of target year). Time urgency is expressed via target **Version `Module`** (`v0.1.0` = active next release) and **`due_date`**. Never set `assignees:` on unstarted `Candidate`/`Backlog` items.
 
 ### Native Git Development Panel, PR State Automation & `v0.5.2` Boundaries
@@ -545,7 +547,7 @@ Representative `tasks.md` declarative commit contract:
 
 Before declaring work complete or pushing, the agent promotes durable knowledge within the execution context:
 - **Deferred Work**: Create `dev/backlog/<topic-slug>.md` with problem statement and acceptance criteria.
-- **Architectural Decisions**: Create an ADR in `docs/internal/adr/ADR-XXX-<name>.md`.
+- **Architectural Decisions**: Create an ADR in `docs/internal/adr/ADR-<topic-slug>.md`. New ADRs use descriptive slugs (for example, `ADR-plane-project-management-standardization.md`); the numbered `ADR-0NN-*` files are historical and keep their names.
 - **Lessons & Quirks**: Append to `dev/_journal/domains/<domain>.md` or `dev/_journal/journal.md`.
 - Stage and commit graduation files on the task branch so they merge into `develop`.
 

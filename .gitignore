@@ -454,8 +454,8 @@ dev/report/visuals/
 inbox
 
 # Project events, local storage & ephemeral data stores
-event/
-event-backup-*/
+/event
+/event-backup-*
 storage-data/
 schemas/archive/
 privacy-erasure-authority-data/aspire-local/

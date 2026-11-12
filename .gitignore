@@ -506,3 +506,11 @@ temp/
 *.json.bak
 ClientBin/
 opencode.json
+skills/system/run-workflow/
+.opencode/
+.omo/
+.gemini/skills/
+.copilot/
+.codex/
+.claude/
+.senpi/

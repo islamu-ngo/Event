@@ -4,7 +4,7 @@
 > **Status:** Implemented
 > **Owner:** Agent Context
 > **Last Verified:** 2026-11-12
-> **Source Anchors:** `event/schema/states.yaml`, `event/schema/labels.yaml`, `event/schema/types.yaml`, `event/work/modules.yaml` (gitignored local Plane Compose project), [ADR](../../../../docs/internal/adr/ADR-plane-project-management-standardization.md)
+> **Source Anchors:** `event/schema/states.yaml`, `event/schema/labels.yaml`, `event/schema/types.yaml`, `event/work/modules.yaml`, `event/work/workitems.yaml` (Epics) (gitignored local Plane Compose project), [ADR](../../../../docs/internal/adr/ADR-plane-project-management-standardization.md)
 
 Stable identifiers for Plane MCP calls against ISLAMU Event. The gitignored `event/schema/*.yaml` files are authoritative. If an ID here disagrees with them, trust the YAML and correct this file.
 
@@ -74,10 +74,10 @@ Surface labels say which codebase surface a deliverable touches (multi-select). 
 | Web App | Surface | `113b3ec2-f1ee-442b-a8c2-8fd54222904e` |
 | Database | Surface | `246a0805-4d13-4240-a1db-9c30700303cb` |
 | KMP (mobile, watch & TV) | Surface | `1dbbfddd-801d-499f-b82d-076962df5fdd` |
-| Desktop (Avalonia) | Surface | pending schema push |
-| TUI | Surface | pending schema push |
-| CLI | Surface | pending schema push |
-| Payments | Domain | pending schema push |
+| Desktop (Avalonia) | Surface | `a377b45f-7c6d-49d4-838d-354fb6d7e1c8` |
+| TUI | Surface | `d73ffc16-fbcf-45ef-838b-a73a01bb6584` |
+| CLI | Surface | `61fe05bf-cb48-488e-b27f-3103055d5856` |
+| Payments | Domain | `c13278ff-ef9f-49b6-bf66-c63644dcac2d` |
 | Finance | Domain | `6d72f6e7-a520-485c-add6-f91bdaff45ce` |
 | Federation | Domain | `980e1183-60e4-43f5-a3ff-2e4b8385ecca` |
 | Decentralization | Domain | `e8010bda-52ff-49c0-a6c7-4dd2f2a87785` |
@@ -92,4 +92,25 @@ Surface labels say which codebase surface a deliverable touches (multi-select). 
 | Marketing | Domain | `cafa9b50-3a80-4b6c-bd3e-54c1c8960708` |
 | Docs | Retiring | `de71e194-4605-4de4-a1c5-305eaac19e19` (redundant with type `Docs`; do not apply to new items) |
 
-Label UUIDs marked "pending schema push" are filled in after `plane schema push` mints them; until then, add those labels by name through YAML, not by MCP UUID.
+
+## Capability Epics
+
+Bounded capability programs created by the 2026-11 backlog standardization. Parent new Work Items under the matching Epic; an Epic never has a parent. Each Epic holds one `Delivered foundation: <Epic> (v0.1.0 rollup)` Feature that records the commit-level history it replaced.
+
+| Epic | ID | UUID |
+|---|---|---|
+| Authentication Provider Matrix v1 | `EVENT-6850` | `80e440cc-e5c9-47e2-9bad-8099ce4c7880` |
+| Event Lifecycle, Sessions & Publishing | `EVENT-6851` | `cf1cca25-5f90-48e4-93b8-b85a845206d3` |
+| Registration, Ticketing & Admission | `EVENT-6852` | `4945c8aa-4bae-45d6-a447-67ac0935f5cd` |
+| Payments & Commerce (Stripe Connect first) | `EVENT-6853` | `c42a470d-4b27-4169-820a-8458adb5c072` |
+| Notifications & Email Delivery | `EVENT-6854` | `ea903ff8-088f-4181-9296-1664b53ad99b` |
+| Webhooks, Public API & Integrations | `EVENT-6855` | `ad8d0e71-3760-4664-ab62-12dc7fef7e78` |
+| Storage & Managed Files | `EVENT-6856` | `57815b2e-1714-47f7-a7ba-632cf232dc99` |
+| Multi-Tenancy, Onboarding & Control Plane | `EVENT-6857` | `7c44fd5b-c56d-4189-816a-4263933cccac` |
+| Moderation, Reporting & Support Access | `EVENT-6858` | `7cb13651-5e24-48b5-b77d-7483cb278be5` |
+| AI Assistant & RAG | `EVENT-6859` | `a114d2d9-a299-4bb6-bdc0-350306f80020` |
+| Federation & ATProto v1 | `EVENT-6860` | `a42dded4-5c82-4752-8cae-fb589dd1d9bb` |
+| Self-Hosting, Configuration & Release Governance | `EVENT-6861` | `47ebe021-7f53-4788-bc7b-fd8a7ccd8b32` |
+| Accessibility & Localization v1 | `EVENT-6862` | `873478e1-83f9-40cc-a38d-ab505562242e` |
+| Organizer Analytics & Dashboards | `EVENT-6863` | `b532111a-8b28-4e6c-9918-7cdf35b5712f` |
+| Additional Client Surfaces (KMP, Avalonia, TUI, CLI) | `EVENT-6864` | `b3a51db9-71b5-4408-aac4-94317ff00247` |

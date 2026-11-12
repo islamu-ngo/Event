@@ -7,7 +7,7 @@
 >
 > **Not for**: Short-term TODOs, tentative ideas, or anything you would not want to read again in six months.
 
-Last Updated: 2026-09-08
+Last Updated: 2026-11-12
 
 ---
 
@@ -24,6 +24,7 @@ Findings are organized by domain under `dev/_journal/domains/` to minimize agent
 | **Testing** | [`domains/testing-and-environment.md`](domains/testing-and-environment.md) | TUnit runner, WebApplicationFactory, Podman/Docker, SDK workloads. |
 | **Email-Optional Self-Hosting** | [`domains/email-optional-self-hosting.md`](domains/email-optional-self-hosting.md) | Global Local credentials, delivery fences, anonymous recovery/cancellation, and purpose retention. |
 | **SecretKit Adoption** | [`domains/secretkit-adoption.md`](domains/secretkit-adoption.md) | Selected authority lifetime, tenant cache/revision fences, retained mutation evidence and process projection. |
+| **Plane Project Management** | [`domains/plane-project-management.md`](domains/plane-project-management.md) | Single `EVENT` project taxonomy, plane-compose + MCP batch order, pull/conflict-check hangs, consolidation rules. |
 | **Index & Recent** | [`journal.md`](journal.md) | Central index and recent cross-cutting stream (last 30 days). |
 
 ---

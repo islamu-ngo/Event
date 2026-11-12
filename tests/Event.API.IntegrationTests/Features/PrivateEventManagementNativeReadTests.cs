@@ -31,7 +31,7 @@ using Microsoft.AspNetCore.Http;
 namespace Event.Api.IntegrationTests.Features;
 
 [NotInParallel]
-[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerClass)]
+[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
 public sealed class PrivateEventManagementNativeReadTests(PostgreSqlContainerFixture postgres)
 {
     [Test]

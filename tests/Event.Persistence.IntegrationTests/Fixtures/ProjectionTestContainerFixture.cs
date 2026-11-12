@@ -28,6 +28,7 @@ public class ProjectionTestContainerFixture : IAsyncInitializer, IAsyncDisposabl
             .WithDatabase("explore_db_projection")
             .WithUsername("postgres")
             .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
+            .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
             .Build();
     }
 

@@ -37,6 +37,7 @@ public sealed partial class NativeEventProgramHttpTests
             {
                 _database = new PostgreSqlBuilder("postgres:18-alpine")
                     .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
+                    .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
                     .Build();
             }
         }

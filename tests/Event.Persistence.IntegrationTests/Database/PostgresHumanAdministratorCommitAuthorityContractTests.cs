@@ -408,6 +408,7 @@ public sealed class PostgresHumanAdministratorCommitAuthorityContractTests(Postg
                 .WithDatabase("administrator_authority_" + Guid.CreateVersion7().ToString("N"))
                 .WithUsername(original.Username!)
                 .WithPassword(original.Password!)
+                .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
                 .Build();
             try
             {

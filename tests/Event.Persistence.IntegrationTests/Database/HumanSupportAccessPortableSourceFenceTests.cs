@@ -30,7 +30,7 @@ public sealed class HumanSupportAccessPortableSourceFenceTests(AdmissionAuthorit
         var session = await HumanSupportAccessSourceFenceTests.SeedAsync(ingress);
         var (subject, forwarding, _) = await HumanSupportAccessSourceFenceTests.CaptureAsync(ingress, session.Id.ToString());
         bool sqlServer = provider == PrimaryDatabaseProvider.SqlServer;
-        await using var setup = Open(provider, ingress.TenantId);
+        await using var setup = await OpenAsync(provider, ingress.TenantId);
         if (sqlServer)
             await setup.Database.ExecuteSqlRawAsync(
                 "IF SCHEMA_ID(N'islamu_event') IS NULL EXEC(N'CREATE SCHEMA [islamu_event]')");
@@ -54,7 +54,7 @@ public sealed class HumanSupportAccessPortableSourceFenceTests(AdmissionAuthorit
         }
         await setup.Database.ExecuteSqlRawAsync(
             $"INSERT INTO {Table(setup, typeof(User))} (id,is_deleted) VALUES ({{0}},{{1}})", subject.PrincipalId, false);
-        await using var context = Open(provider, ingress.TenantId);
+        await using var context = await OpenAsync(provider, ingress.TenantId);
         var source = new HumanSupportAccessSourceFence(context, subject, forwarding, PolicySourceSetPurpose.RuntimeTenant);
         var principal = new HumanPrincipalSourceFence(context, subject, PolicySourceSetPurpose.RuntimeTenant);
         var sets = new PolicySourceSetFence(context, PolicySourceSetPurpose.RuntimeTenant);
@@ -62,7 +62,7 @@ public sealed class HumanSupportAccessPortableSourceFenceTests(AdmissionAuthorit
         var setLease = await sets.AcquireAsync();
         var held = await source.AcquireAsync(setLease, await principal.AcquireAsync(setLease));
         await Assert.That(held.Facts.Sessions.Length).IsEqualTo(0);
-        await using var writer = Open(provider, ingress.TenantId);
+        await using var writer = await OpenAsync(provider, ingress.TenantId);
         await writer.Database.OpenConnectionAsync();
         await writer.Database.ExecuteSqlRawAsync(sqlServer ? "SET LOCK_TIMEOUT 0" : "SET SESSION innodb_lock_wait_timeout = 1");
         string insert = $"INSERT INTO {Table(writer, typeof(SupportAccessSession))} "
@@ -86,10 +86,10 @@ public sealed class HumanSupportAccessPortableSourceFenceTests(AdmissionAuthorit
         await owner.RollbackAsync();
     }
 
-    private ExploreDbContext Open(PrimaryDatabaseProvider provider, Guid tenant)
+    private async Task<ExploreDbContext> OpenAsync(PrimaryDatabaseProvider provider, Guid tenant)
     {
         var options = TestDbContextOptions.Create<ExploreDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.CreateOptions(provider));
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, await fixture.CreateOptionsAsync(provider));
         return new ExploreDbContext(options.Options) { TenantContext = new TenantIdentity(tenant) };
     }
     private static string Table(ExploreDbContext context, Type type)

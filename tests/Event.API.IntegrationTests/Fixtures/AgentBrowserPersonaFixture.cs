@@ -40,7 +40,9 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
     private static readonly Lazy<PostgreSqlContainer> DatabaseContainer = new(() => new PostgreSqlBuilder(
         "postgis/postgis:18-3.6-alpine@sha256:ffcf0c4b904e41b9779f8098007fb5a9484025319c18c70cf8e1bcebb742b9b7")
         .WithDatabase("islamu_event_agent").WithUsername("postgres")
-        .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32))).Build());
+        .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
+        .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostGis)
+        .Build());
     private static PostgreSqlContainer Container => DatabaseContainer.Value;
     private static readonly string MigrationAuthorityDirectory = Path.Join(
         Path.GetTempPath(), $"agent-browser-migration-{Guid.NewGuid():N}");

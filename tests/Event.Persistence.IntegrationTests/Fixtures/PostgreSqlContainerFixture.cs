@@ -48,6 +48,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
     private Task? _initialization;
     private Task? _localIdentityWriterPreparation;
     private readonly ConcurrentBag<string> _isolatedSchemas = new();
+    private readonly ConcurrentBag<string> _isolatedDatabases = new();
     private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
     private string? _runtimeConnectionString;
     private PostgreSqlDatabaseReset? _reset;
@@ -144,6 +145,10 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
                 .WithName(_intendedContainerName!)
                 .WithLabel(OwnerLabel, owner.Owner).WithLabel(ResourceLabel, "postgres")
                 .WithLabel(FixtureLabel, _fixtureNonce).WithImagePullPolicy(PullPolicy.Never);
+        builder = builder.ApplyBoundedResourcePolicy(
+            ContainerServiceRole.PostgreSql,
+            hasAssuranceOwner: _assurance is not null,
+            hasExplicitContainerName: !string.IsNullOrWhiteSpace(_intendedContainerName));
         _container = builder.Build();
         await _container.StartAsync();
         RecordStage(AssuranceStage.ContainerStartReturned);
@@ -457,6 +462,26 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
                     }
                 }
             }
+
+            if (!_isolatedDatabases.IsEmpty && _container is not null)
+            {
+                NpgsqlConnection.ClearAllPools();
+                await using var adminConnection = new NpgsqlConnection(_container.GetConnectionString());
+                await adminConnection.OpenAsync();
+                foreach (var database in _isolatedDatabases)
+                {
+                    try
+                    {
+                        await using var cmd = adminConnection.CreateCommand();
+                        cmd.CommandText = $"DROP DATABASE IF EXISTS \"{database}\" WITH (FORCE);";
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                    catch (DbException)
+                    {
+                        // Best-effort logical database cleanup before container disposal
+                    }
+                }
+            }
         }
         catch (DbException)
         {
@@ -533,6 +558,36 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = $"DROP SCHEMA IF EXISTS \"{schemaName}\" CASCADE;";
         await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// Creates an empty, isolated logical database inside the shared PostgreSQL container and returns its admin connection string.
+    /// Useful for tests that execute EnsureCreatedAsync or schema-specific MigrateAsync without spawning a dedicated container.
+    /// </summary>
+    public async Task<string> CreateIsolatedDatabaseAsync(string databasePrefix = "test_")
+    {
+        string sanitizedPrefix = string.Concat(
+            (databasePrefix ?? "test_").Select(ch => char.IsAsciiLetterOrDigit(ch) || ch == '_' ? char.ToLowerInvariant(ch) : '_'));
+        string databaseName = $"{sanitizedPrefix}{Guid.NewGuid():N}";
+        if (databaseName.Length > 63)
+        {
+            databaseName = databaseName[..63];
+        }
+
+        await using var adminConnection = new NpgsqlConnection(Container.GetConnectionString());
+        await adminConnection.OpenAsync();
+        await using (var command = adminConnection.CreateCommand())
+        {
+            command.CommandText = $"CREATE DATABASE \"{databaseName}\";";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        _isolatedDatabases.Add(databaseName);
+        var builder = new NpgsqlConnectionStringBuilder(Container.GetConnectionString())
+        {
+            Database = databaseName,
+        };
+        return builder.ConnectionString;
     }
 
     /// <summary>

@@ -435,6 +435,7 @@ public sealed class RegistrationCoveragePostgreSqlFixture : IAsyncInitializer, I
         .WithDatabase("registration_coverage")
         .WithUsername("postgres")
         .WithPassword("postgres")
+        .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
         .Build();
 
     public string ConnectionString => _container.GetConnectionString();

@@ -359,7 +359,9 @@ public sealed class RedisBffTicketStoreTests(RedisBffTicketStoreTests.Authority 
         {
             container = new RedisBuilder("redis:7.2.16-alpine@sha256:f8548b29a1f1cb358b5fcfec1e0126beab57ad15776c1e87623f865579f16c5a")
                 .WithCommand("redis-server", "--requirepass", password)
-                .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(6379)).Build();
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(6379))
+                .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.Redis)
+                .Build();
             await container.StartAsync();
             var connectionOptions = new ConfigurationOptions { Password = password };
             connectionOptions.EndPoints.Add(container.Hostname, container.GetMappedPublicPort(6379));

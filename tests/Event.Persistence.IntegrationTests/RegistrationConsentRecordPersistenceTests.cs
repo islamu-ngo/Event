@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
@@ -8,13 +9,13 @@ using Explore.Persistence.Repositories;
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using TUnit.Assertions;
 using TUnit.Core;
 
 namespace Event.Persistence.IntegrationTests;
 
-public sealed class RegistrationConsentRecordPersistenceTests
+[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+public sealed class RegistrationConsentRecordPersistenceTests(PostgreSqlContainerFixture fixture)
 {
     private static readonly DateTime UtcNow = new(2026, 8, 2, 12, 0, 0, DateTimeKind.Utc);
 
@@ -22,14 +23,9 @@ public sealed class RegistrationConsentRecordPersistenceTests
     [Category("Runtime")]
     public async Task PostgreSqlEnforcesTypedSubjectLineageAndRollsBackCombinedNativeEvidence()
     {
-        await using var database = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithDatabase("phase84")
-            .WithUsername("postgres")
-            .WithPassword("postgres")
-            .Build();
-        await database.StartAsync();
+        string connectionString = await fixture.CreateIsolatedDatabaseAsync("phase84_");
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
-            .UseNpgsql(database.GetConnectionString())
+            .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
             .Options;
         await using ExploreDbContext context = CreateContext(options);

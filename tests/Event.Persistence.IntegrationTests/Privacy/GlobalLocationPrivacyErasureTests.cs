@@ -1767,11 +1767,13 @@ public sealed class ExternalDatabasePrivacyErasurePostgreSqlFixture : IAsyncInit
         .WithDatabase(ApplicationDatabaseName)
         .WithUsername("postgres")
         .WithPassword("postgres")
+        .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
         .Build();
     private readonly PostgreSqlContainer _authorityContainer = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("privacy_erasure_authority_test")
         .WithUsername("postgres")
         .WithPassword("postgres")
+        .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
         .Build();
     private string _authorityRuntimeConnectionString = string.Empty;
 

@@ -43,10 +43,12 @@ public sealed class SvixConformanceContainerFixture : IAsyncInitializer, IAsyncD
             .WithEnvironment("POSTGRES_USER", "postgres")
             .WithEnvironment("POSTGRES_PASSWORD", "postgres")
             .WithEnvironment("POSTGRES_DB", "postgres")
+            .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql, disableReuse: true)
             .Build();
         _redis = new ContainerBuilder("redis:7.4-alpine")
             .WithNetwork(_network)
             .WithNetworkAliases("svix-redis")
+            .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.Redis, disableReuse: true)
             .Build();
         await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync());
 
@@ -60,6 +62,7 @@ public sealed class SvixConformanceContainerFixture : IAsyncInitializer, IAsyncD
             .WithEnvironment("SVIX_CACHE_TYPE", "redis")
             .WithEnvironment("SVIX_REDIS_DSN", "redis://svix-redis:6379")
             .WithEnvironment("SVIX_JWT_SECRET", JwtSecret)
+            .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.Svix, disableReuse: true)
             .Build();
         await _svix.StartAsync();
 

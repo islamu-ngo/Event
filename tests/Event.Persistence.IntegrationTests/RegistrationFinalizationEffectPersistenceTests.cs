@@ -1,3 +1,4 @@
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -10,13 +11,13 @@ using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Security.Cryptography;
-using Testcontainers.PostgreSql;
 using TUnit.Assertions;
 using TUnit.Core;
 
 namespace Event.Persistence.IntegrationTests;
 
-public sealed class RegistrationFinalizationEffectPersistenceTests
+[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+public sealed class RegistrationFinalizationEffectPersistenceTests(PostgreSqlContainerFixture fixture)
 {
     private static readonly DateTime UtcNow = new(2026, 8, 2, 12, 0, 0, DateTimeKind.Utc);
 
@@ -24,14 +25,9 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
     [Category("Runtime")]
     public async Task EveryParticipantRequiresFulfillmentForEachCurrentParticipant()
     {
-        await using var database = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithDatabase("phase85subjects")
-            .WithUsername("postgres")
-            .WithPassword("postgres")
-            .Build();
-        await database.StartAsync();
+        string connectionString = await fixture.CreateIsolatedDatabaseAsync("phase85subjects_");
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
-            .UseNpgsql(database.GetConnectionString())
+            .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
             .Options;
         (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder();
@@ -90,14 +86,9 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
     [Category("Runtime")]
     public async Task RequiredApplicabilityMatrixUsesOrderPurchaserChildTicketAndSessionSubjects()
     {
-        await using var database = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithDatabase("phase85matrix")
-            .WithUsername("postgres")
-            .WithPassword("postgres")
-            .Build();
-        await database.StartAsync();
+        string connectionString = await fixture.CreateIsolatedDatabaseAsync("phase85matrix_");
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
-            .UseNpgsql(database.GetConnectionString())
+            .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
             .Options;
         (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder();
@@ -170,14 +161,9 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
     [Category("Runtime")]
     public async Task ConcurrentOptionalSkipAtomicallyConsumesAttemptAndRecordsOneFulfillment()
     {
-        await using var database = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithDatabase("phase86skipatomic")
-            .WithUsername("postgres")
-            .WithPassword("postgres")
-            .Build();
-        await database.StartAsync();
+        string connectionString = await fixture.CreateIsolatedDatabaseAsync("phase86skipatomic_");
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
-            .UseNpgsql(database.GetConnectionString())
+            .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
             .Options;
         (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder();
@@ -248,17 +234,12 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
     [Category("Runtime")]
     public async Task OptionalSkipQueuesOneEffectAndConcurrentWorkersCompleteItOnce()
     {
-        await using var database = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithDatabase("phase85")
-            .WithUsername("postgres")
-            .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
-            .Build();
-        await database.StartAsync();
+        string connectionString = await fixture.CreateIsolatedDatabaseAsync("phase85_");
         string suffix = Guid.CreateVersion7().ToString("N");
         var enrollment = new PostgresNativeQueueEnrollment("postgres", $"final_global_{suffix}",
             $"final_runtime_{suffix}", $"final_instance_{suffix}", $"final_tenant_{suffix}");
         string globalPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-        await using (var connection = new NpgsqlConnection(database.GetConnectionString()))
+        await using (var connection = new NpgsqlConnection(connectionString))
         {
             await connection.OpenAsync();
             foreach (string login in new[]
@@ -276,7 +257,7 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
             }
         }
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
-            .UseNpgsql(database.GetConnectionString())
+            .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
             .Options;
         (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder();
@@ -306,7 +287,7 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
             await PostgresRegistrationFinalizationQueueContract.ApplyAsync(setup, enrollment);
         }
 
-        var databaseConnection = new NpgsqlConnectionStringBuilder(database.GetConnectionString());
+        var databaseConnection = new NpgsqlConnectionStringBuilder(connectionString);
         var global = new GlobalExploreDbContextFactory(new PrimaryDatabaseConnectionOptions
         {
             Role = PrimaryDatabaseRole.Global,
@@ -358,16 +339,11 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         await AssertConvergesAsync("phase95userfirst", callbackFirst: false);
     }
 
-    private static async Task AssertConvergesAsync(string databaseName, bool callbackFirst)
+    private async Task AssertConvergesAsync(string databaseName, bool callbackFirst)
     {
-        await using var database = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithDatabase(databaseName)
-            .WithUsername("postgres")
-            .WithPassword("postgres")
-            .Build();
-        await database.StartAsync();
+        string connectionString = await fixture.CreateIsolatedDatabaseAsync($"{databaseName}_");
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
-            .UseNpgsql(database.GetConnectionString())
+            .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
             .Options;
         (RegistrationOrder order, RegistrationWorkflow workflow) = CreateOrder();

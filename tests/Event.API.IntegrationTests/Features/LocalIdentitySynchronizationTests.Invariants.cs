@@ -210,7 +210,9 @@ public sealed partial class LocalIdentitySynchronizationTests
         timeout.CancelAfter(TimeSpan.FromSeconds(90));
         CancellationToken token = timeout.Token;
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32))).Build();
+            .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
+            .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
+            .Build();
         await postgres.StartAsync(token);
         string address = $"concurrent-{Guid.CreateVersion7():N}@example.test";
         var barrier = new ExternalAdmissionBarrier(address);

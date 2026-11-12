@@ -1,28 +1,24 @@
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql;
-using Testcontainers.PostgreSql;
 
 namespace Event.Persistence.IntegrationTests.Database;
 
-public sealed class PostgresModelConstraintApplierTests
+[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+public sealed class PostgresModelConstraintApplierTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
     [Arguments("islamu_event")]
     [Arguments("custom_event")]
     public async Task ApplyAsync_AfterNamespaceCutover_CreatesConstraintInApplicationSchema(string schema)
     {
-        await using var database = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithDatabase("constraint_applier_test")
-            .WithUsername("postgres")
-            .WithPassword("postgres")
-            .Build();
-        await database.StartAsync();
+        string connectionString = await fixture.CreateIsolatedDatabaseAsync("constraint_applier_");
 
-        var container = new NpgsqlConnectionStringBuilder(database.GetConnectionString());
+        var container = new NpgsqlConnectionStringBuilder(connectionString);
         var options = new PrimaryDatabaseConnectionOptions
         {
             Role = PrimaryDatabaseRole.Migrator,

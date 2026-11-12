@@ -31,7 +31,9 @@ public sealed class CompletionGenerationRaceHttpTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(90));
         var token = timeout.Token;
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32))).Build();
+            .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
+            .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
+            .Build();
         await postgres.StartAsync(token);
         var barrier = new BeforeCompletionBarrier();
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(

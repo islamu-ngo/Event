@@ -396,25 +396,58 @@ internal static class TestExecutionProfile
 
     private static long? DetectLinuxCgroupV2AvailableBytes()
     {
-        string? cgroupDir = ResolveLinuxCgroupV2Directory();
-        if (cgroupDir is not null)
+        return ResolveMinimumCgroupV2AvailableBytes(
+            ResolveLinuxCgroupV2Directory(),
+            "/sys/fs/cgroup",
+            TryReadText);
+    }
+
+    internal static long? ResolveMinimumCgroupV2AvailableBytes(
+        string? startDirectory,
+        string rootDirectory,
+        Func<string, string?> readText)
+    {
+        string normalizedRoot = rootDirectory.Replace('\\', '/').TrimEnd('/');
+        string current = string.IsNullOrWhiteSpace(startDirectory)
+            ? normalizedRoot
+            : startDirectory.Replace('\\', '/').TrimEnd('/');
+
+        if (!current.StartsWith(normalizedRoot, StringComparison.Ordinal))
         {
-            string? maxContent = TryReadText(Path.Combine(cgroupDir, "memory.max"));
-            if (maxContent is not null)
+            current = normalizedRoot;
+        }
+
+        long? minimum = null;
+
+        while (true)
+        {
+            long? scoped = ParseLinuxCgroupV2AvailableBytes(
+                readText($"{current}/memory.max"),
+                readText($"{current}/memory.current"));
+            if (scoped is { } value)
             {
-                long? scoped = ParseLinuxCgroupV2AvailableBytes(
-                    maxContent,
-                    TryReadText(Path.Combine(cgroupDir, "memory.current")));
-                if (scoped is not null)
-                {
-                    return scoped;
-                }
+                minimum = minimum is { } existing ? Math.Min(existing, value) : value;
+            }
+
+            if (string.Equals(current, normalizedRoot, StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            int lastSlash = current.LastIndexOf('/');
+            if (lastSlash <= 0)
+            {
+                break;
+            }
+
+            current = current[..lastSlash];
+            if (!current.StartsWith(normalizedRoot, StringComparison.Ordinal))
+            {
+                current = normalizedRoot;
             }
         }
 
-        return ParseLinuxCgroupV2AvailableBytes(
-            TryReadText("/sys/fs/cgroup/memory.max"),
-            TryReadText("/sys/fs/cgroup/memory.current"));
+        return minimum;
     }
 
     private static string? ResolveLinuxCgroupV2Directory()

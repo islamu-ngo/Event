@@ -123,20 +123,32 @@ Precedence order for `MaximumParallelTests` is strictly: `--maximum-parallel-tes
 
 ### Portable Workstation Setup & `AGENTS.local.md` Templates
 
-Always build one project cleanly before passing `--no-build` sequentially one test project at a time, and keep `TMPDIR` off RAM-backed Linux `/tmp` `tmpfs` (`mkdir -m 700 -p "$HOME/.cache/agent-tmp" && export TMPDIR="$HOME/.cache/agent-tmp"`). Copy one of these portable templates into gitignored `AGENTS.local.md`:
+Always build one project cleanly before passing `--no-build` sequentially one test project at a time.
 
-```markdown
-<!-- Constrained laptop / remote SSH / multi-tasking workstation -->
-export TMPDIR="$HOME/.cache/agent-tmp"
+- **Linux (Arch, Fedora, Ubuntu, etc.)**: Relocate `TMPDIR` off RAM-backed `/tmp` `tmpfs` (`mkdir -m 700 -p "$HOME/.cache/agent-tmp" && export TMPDIR="$HOME/.cache/agent-tmp"`). Rootless Podman uses `DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock`, `TESTCONTAINERS_RYUK_DISABLED=true`, and `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`. Nested systemd/container cgroup v2 parent slices are walked automatically by `TestExecutionProfile`.
+- **macOS & Windows**: `/var/folders` (APFS) and `%TEMP%` (NTFS) are already disk-backed (no `TMPDIR` relocation needed). On 24+ GiB machines running Docker Desktop / WSL2 / Colima / OrbStack, set `ISLAMU_CONTAINER_BUDGET_GIB` to your Linux VM memory limit (since `GC.GetGCMemoryInfo().TotalAvailableMemoryBytes` reports host physical RAM on non-Linux OSes).
+
+Copy the matching template into gitignored `AGENTS.local.md`:
+
+```bash
+# Constrained workstation / remote SSH — Linux & macOS (bash/zsh)
 export ISLAMU_EXECUTION_PROFILE=constrained
-export DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1
-export MSBUILDDISABLENODEREUSE=1
-export DOTNET_GCConserveMemory=5
-# Always pass -m:1 -nr:false to dotnet build and --no-build sequentially per test project.
+export DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1 MSBUILDDISABLENODEREUSE=1 DOTNET_GCConserveMemory=5
+# Linux distros with tmpfs /tmp (Arch, Fedora, etc.): mkdir -m 700 -p "$HOME/.cache/agent-tmp" && export TMPDIR="$HOME/.cache/agent-tmp"
+# macOS Docker Desktop/VM hosts: export ISLAMU_CONTAINER_BUDGET_GIB=8
 ```
 
-```markdown
-<!-- Dedicated high-RAM workstation (48 GiB+) -->
+```powershell
+# Constrained workstation — Windows (PowerShell)
+$env:ISLAMU_EXECUTION_PROFILE = "constrained"
+$env:DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER = "1"
+$env:MSBUILDDISABLENODEREUSE = "1"
+$env:DOTNET_GCConserveMemory = "5"
+$env:ISLAMU_CONTAINER_BUDGET_GIB = "8"
+```
+
+```bash
+# Dedicated high-RAM workstation (48 GiB+)
 export ISLAMU_EXECUTION_PROFILE=performance
 export ISLAMU_CONTAINER_MEMORY_MB=2048
 export ISLAMU_TEST_CONTAINER_REUSE=true

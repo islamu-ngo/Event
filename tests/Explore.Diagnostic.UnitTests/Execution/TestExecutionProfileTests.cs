@@ -237,6 +237,28 @@ public sealed class TestExecutionProfileTests
     }
 
     [Test]
+    public async Task ResolveMinimumCgroupV2AvailableBytes_WalksParentSlicesWhenLeafIsMax()
+    {
+        var files = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["/sys/fs/cgroup/user.slice/user-1000.slice/session.scope/memory.max"] = "max",
+            ["/sys/fs/cgroup/user.slice/user-1000.slice/session.scope/memory.current"] = (1L * GiB).ToString(CultureInfo.InvariantCulture),
+            ["/sys/fs/cgroup/user.slice/user-1000.slice/memory.max"] = (16L * GiB).ToString(CultureInfo.InvariantCulture),
+            ["/sys/fs/cgroup/user.slice/user-1000.slice/memory.current"] = (6L * GiB).ToString(CultureInfo.InvariantCulture),
+            ["/sys/fs/cgroup/user.slice/memory.max"] = (32L * GiB).ToString(CultureInfo.InvariantCulture),
+            ["/sys/fs/cgroup/user.slice/memory.current"] = (8L * GiB).ToString(CultureInfo.InvariantCulture),
+            ["/sys/fs/cgroup/memory.max"] = "max"
+        };
+
+        long? resolved = TestExecutionProfile.ResolveMinimumCgroupV2AvailableBytes(
+            "/sys/fs/cgroup/user.slice/user-1000.slice/session.scope",
+            "/sys/fs/cgroup",
+            path => files.GetValueOrDefault(path));
+
+        await Assert.That(resolved).IsEqualTo(10L * GiB);
+    }
+
+    [Test]
     public async Task Resolve_UnknownAvailableMemory_ConservativeFallbackPreventsOom()
     {
         var env = CreateEnvironment(processorCount: 16, availableMemoryBytes: null);

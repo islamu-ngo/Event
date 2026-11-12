@@ -119,7 +119,7 @@ feed before their first restore. Their final stages also retain the complete
 bundle, including license and notices, at `/app/vendor/secretkit`. The four
 archives occupy approximately 204 KiB in the source tree.
 
-The four build stages share the digest-pinned SDK 10.0.302 selected by
+The four build stages share the digest-pinned SDK 10.0.403 selected by
 `global.json`. Keep those versions aligned; a moving `10.0` SDK image may
 contain a different feature band and fail before restore starts.
 

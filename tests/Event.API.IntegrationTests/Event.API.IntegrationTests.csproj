@@ -29,6 +29,14 @@
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\InstanceSettingsCommandFixture.cs" Link="Fixtures\InstanceSettingsCommandFixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\PostgreSqlContainerFixture.cs" Link="Fixtures\NativePostgreSqlContainerFixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\ConfigurationManifest\ConfigurationManifestBootstrapTestHost.cs" Link="Fixtures\ConfigurationManifestBootstrapTestHost.cs" />
+    <Compile Include="../Shared/Execution/TestExecutionProfile.cs" Link="Execution/TestExecutionProfile.cs" />
+    <Compile Include="../Shared/Execution/BoundedTestDiscoveryHook.cs" Link="Execution/BoundedTestDiscoveryHook.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="Event.Testing.TestSuiteKindAttribute">
+      <_Parameter1>ContainerBacked</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <ItemGroup>

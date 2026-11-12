@@ -74,6 +74,8 @@ Own verification selection, execution, evidence integrity, and failure classific
 
 The handoff includes exact command, environment, expected/actual result, minimal reproduction, logs or artifacts, suspected owner, and checks that already passed. Verification may run parallel with read-only review but not duplicate the same expensive suite.
 
+**Plane:** before an item moves to `Done`, confirm its acceptance criteria and Definition-of-Done evidence (tests, docs parity) actually ran; report unverified criteria instead of approving the transition.
+
 ## Forbidden Moves
 
 - Never edit or disable a failing test, lower an assertion, or add a skip.

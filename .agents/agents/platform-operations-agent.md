@@ -75,6 +75,8 @@ Own AppHost/runtime composition, configuration delivery, observability, CI/CD, p
 
 Handoffs include topology, resource names, config keys/defaults/validation, secret ownership, health and telemetry, data migration, deployment evidence, failure injection, rollback, and operator docs. Never concurrently edit shared workflow or AppHost files with another mutating agent.
 
+**Plane:** operate `event/` only through `plane-compose` and Plane MCP: validate and dry-run before additive pushes, back up `event/` before `plane pull`, and never use `--force`, `schema sync`, or `--prune` without approval.
+
 ## Forbidden Moves
 
 - Never weaken or rename required CI gates without migrating the governing branch/environment contract.

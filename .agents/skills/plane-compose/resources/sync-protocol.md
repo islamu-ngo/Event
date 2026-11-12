@@ -53,6 +53,23 @@ plane push              # when authorized schema + work changes are intended
 
 For read-only remote inventory, prefer a fresh isolated `plane clone` to a different directory if the context allows, then inspect without touching the active project.
 
+## Hybrid `plane-compose` + Plane MCP batches
+
+When one change set mixes YAML pushes with Plane MCP mutations (module membership, comments, deletions), keep this order:
+
+1. Reconcile pre-existing pending items first. `plane push` has **no per-file filter**: every pending `work/*.yaml` change goes out together, including other tasks' `active-*.yaml` files. Inspect `plane status` and `plane push --dry-run`; to hold back another task's file for one push, move it out of `work/` and restore it right after (never edit its content).
+2. `plane schema push` (only for approved schema changes).
+3. `plane push --work-only` for new parents (Epics), then read their minted IDs and UUIDs back.
+4. `plane push --work-only` for children and edited items (`parent:` takes the parent's **UUID**).
+5. Plane MCP mutations (Version Module membership, comments, links, approved deletions).
+6. `plane pull` (after backing up `event/`) so YAML reflects what MCP changed, then retire consumed `active-*.yaml` files.
+
+**Disjoint `work/*.yaml` rule:** an `EVENT-XXX` ID lives in exactly one `work/*.yaml` file at a time. Edit existing items in place in `work/workitems.yaml`. Put only **new** items (with `id:` omitted) in staging files such as `work/active-<task>.yaml`. Copying an existing ID into a staging file fails validation with `Duplicate ID`.
+
+**Never mint through MCP:** an item created with MCP `workitem create` is unknown to `.plane/state.json`. Hand-writing its `id:` into YAML makes the next `plane push` create a duplicate. Mint IDs through `plane push`, or create remotely and then `plane pull`.
+
+**Conflict tables on push:** the push conflict check compares remote and state hashes. Before overriding a reported conflict, confirm with MCP `workitem retrieve_by_identifier` (`fields=id,state,updated_at`) that the remote item has not changed since the last sync. Never override blind.
+
 ## Version traps
 
 - `plane push --json` **implies `--force`**. Do not use for routine machine-readable writes.

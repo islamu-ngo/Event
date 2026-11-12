@@ -58,7 +58,7 @@ For execution details read [implementation-loop](resources/implementation-loop.m
 | Intake requirements, dedupe, break down, assess urgency / priority | [backlog-triage](resources/backlog-triage.md) |
 | Implement code and maintain accurate ticket lifecycle | [implementation-loop](resources/implementation-loop.md) |
 | "What remains?", blockers, status, progress, project health | [progress-reporting](resources/progress-reporting.md) |
-| Push, pull, merge, validate, drift detection | [sync-protocol](resources/sync-protocol.md) |
+| Push/pull, validate, drift, MCP batch order | [sync-protocol](resources/sync-protocol.md) |
 | Conflicting local and remote edits | [conflict-resolution](resources/conflict-resolution.md) |
 | Lost `.plane/`, duplicates, partial pushes and CLI errors | [state-recovery](resources/state-recovery.md) |
 | Types, states, labels, workflows, feature flags | [schema-management](resources/schema-management.md) |

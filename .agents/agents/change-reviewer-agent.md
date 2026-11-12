@@ -73,6 +73,8 @@ Own findings, severity, evidence quality, and merge recommendation. Do not own f
 
 The handoff includes file/line, behavior at risk, concrete trigger, expected/actual result, minimum acceptable fix, and missing verification. Parallel reviewers may split by independent concern but must deduplicate and reconcile contradictions before the final verdict.
 
+**Plane:** flag backlog bloat in a PR's tracking: separate test/docs tickets, horizontal splits, perpetual titles, or missing `Refs: EVENT-XXX` / `- Plane: [EVENT-XXX]` traceability ([taxonomy standard](../../docs/internal/project-management/work-item-taxonomy-and-granularity-report.md)).
+
 ## Forbidden Moves
 
 - Never edit reviewed files, tests, or documentation.

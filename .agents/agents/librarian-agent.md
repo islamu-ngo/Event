@@ -74,6 +74,8 @@ Own documentation truth, research provenance, sanitized handoffs, inventories, a
 
 Handoffs name source anchors, verified facts, assumptions, affected authoritative docs, implementation acceptance criteria, excluded material, and provenance path. Never concurrently edit the same authoritative page with another agent.
 
+**Plane:** keep the [taxonomy standard](../../docs/internal/project-management/work-item-taxonomy-and-granularity-report.md), its ADR, and the `plane-mcp` project reference consistent with live schema IDs; flag committed docs that link gitignored `event/` paths or contain workstation `file://` URIs.
+
 ## Forbidden Moves
 
 - Never copy or transform third-party code, tests, SQL, assets, screenshots, or prose into repository artifacts.

@@ -74,11 +74,29 @@ Do **not** dump commit logs, branch names, or PR URLs into YAML `description:` t
 ## Work item quality bar
 
 - **One completable outcome:** clear “done when”, not unfinishable areas like `"Make webapp secure"` or `"Improve testing"`; track ongoing areas via `type:` + `labels:` + bounded deliverables. Use 1 provider or vertical capability per item (never lump `"Stripe/PayPal"` into one ticket or split one entity into 8 horizontal `Model/API/UI/Test/Docs` tickets).
-- **Actionable scope & client surfaces:** enough context to implement without narrating every code line; use Surface `labels:`, `Epics`, `dependencies:`, `relations:`, and `milestones.yaml` instead of duplicating tickets across codebase sub-projects or hiding structure in prose. Cap `parent:` sub-items strictly at depth 1 (only for genuinely separate PRs or heavy standalone test campaigns; standard unit tests/migrations/docs live in Acceptance Criteria DoD).
+- **Actionable scope & client surfaces:** enough context to implement without narrating every code line; use Surface `labels:`, `Epics`, `dependencies:`, `relations:`, and `milestones.yaml` instead of duplicating tickets across codebase sub-projects or hiding structure in prose. Keep the hierarchy `Epic` (never has a `parent:`) → Work Item → optional Sub-item (never has children): the longest `parent:` chain is 2 and non-Epic nesting is at most 1. Use sub-items only for genuinely separate PRs or heavy standalone test campaigns; standard unit tests, migrations, and docs live in the Acceptance Criteria DoD.
 - **Must-have `priority` vs. time urgency:** set `priority` by functional criticality / legal-regulatory must-have level (`urgent` = mandatory law/security/core blocker, `high` = core/killer feature, `low` = optional nice-to-have), and express time urgency via target Version `Module` + `due_date`. Never assign humans (`assignees:`) to unstarted `Candidate`/`Backlog` items.
 - **Traceability:** bind commits/branches/PRs with canonical uppercase IDs rather than manual URL copy-paste. Never claim a PR, CI run, or remote sync occurred before observing it.
 - **No ticket explosion:** don’t create separate work items for every tiny edit, test name or intermediate thought. Break down only when separate deliverables matter.
 - **No automatic closure:** transitioning to `Done` requires the acceptance criteria to be verified; otherwise state the remaining checks.
+
+## ISLAMU Event (`EVENT`) specifics
+
+- Types are `Epic`, `Feature` (default; `event/plane.yaml` `defaults.type: Feature`), `Bug`, `Security`, `Refactor`, `Test`, `Docs`, `CI/CD`, `Config`, `Chore`. `Task`, `Story`, and `Improvement` do not exist in `EVENT`.
+- Epics are pushed first (`type: Epic`, `id:` omitted). Children reference the Epic's **UUID** in `parent:` after it is minted.
+- Edit existing `EVENT-XXX` items in `work/workitems.yaml`; put only new items in `work/active-*.yaml`. One ID, one file.
+- Version Module membership (`v0.1.0`, `v1.0.0`) is not pushed from YAML in `v0.5.2`; assign it through Plane MCP `module` `manage_workitems`.
+- Sizing rules: [work-item taxonomy standard](../../../../docs/internal/project-management/work-item-taxonomy-and-granularity-report.md).
+
+### Reusable provider / vertical onboarding checklist
+
+Plane work-item templates are tier-gated on this workspace, so `schema/workitem_templates.yaml` stays empty and this checklist is pasted into the Acceptance Criteria of every new payment, identity, or database provider item instead of creating extra tickets:
+
+- Credentials resolve only from an approved secret authority (SecretKit/Infisical); none in source, fixtures, or appsettings.
+- Inbound webhooks verify signatures and are idempotent; outbound calls have bounded retries.
+- Sandbox-backed Ring 2 test and Ring 3 provider-matrix coverage exist for the provider.
+- Financial, privacy, or audit trails cover the provider's state changes.
+- Public operator guide (`docs/public/`) and internal architecture anchor (`docs/internal/`) are updated in the same PR.
 
 ## Validate
 

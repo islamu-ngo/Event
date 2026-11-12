@@ -1002,6 +1002,7 @@ intents:
       - "context engineering"
       - "plane compose skill"
       - "plane-compose skill"
+      - "plane-mcp skill"
     must_read_docs:
       - AGENTS.md
       - docs/internal/QUICK_REFERENCE.md
@@ -1010,14 +1011,17 @@ intents:
       - docs/internal/TESTING.md
       - docs/internal/legal/IP_GOVERNANCE.md
       - .agents/skills/_SKILL_SCHEMA.md
+      - docs/internal/adr/ADR-plane-project-management-standardization.md
     load_skills:
       - skill-authoring
       - agentic-research
       - senior-cto-feedback
       - ip-clean-room
       - plane-compose
+      - plane-mcp
     load_rules:
       - .agents/rules/ip-clean-room.md
+      - .agents/rules/plane-tracking.md
     paths_in_scope:
       - ".agents/skills/**"
       - ".agents/contract/**"
@@ -1077,16 +1081,23 @@ intents:
       - "plane-compose workflow"
       - "plane project as code"
       - "active task file"
+      - "plane mcp"
+      - "work item taxonomy"
+      - "backlog consolidation"
     must_read_docs:
       - AGENTS.md
       - docs/internal/QUICK_REFERENCE.md
       - docs/internal/AGENTIC_CONTEXT_ENGINEERING.md
       - docs/internal/OPERATIONS.md
       - docs/internal/TESTING.md
+      - docs/internal/project-management/work-item-taxonomy-and-granularity-report.md
+      - docs/internal/adr/ADR-plane-project-management-standardization.md
     load_skills:
       - plane-compose
+      - plane-mcp
     load_rules:
       - .agents/rules/tests.md
+      - .agents/rules/plane-tracking.md
     paths_in_scope:
       - "AGENTS.md"
       - "Explore.slnx"
@@ -1098,8 +1109,13 @@ intents:
       - ".agents/skills/implementation-plan/resources/operational-artifacts.md"
       - ".agents/skills/senior-cto-feedback/resources/plan-rewrite-guidance.md"
       - ".agents/skills/plane-compose/**"
-      - "event/templates/active-workitem.yaml"
+      - ".agents/skills/plane-mcp/**"
+      - ".agents/rules/plane-tracking.md"
+      - ".omo/rules/plane-tracking.md"
+      - "docs/internal/project-management/**"
+      - "docs/internal/adr/ADR-plane-project-management-standardization.md"
       - ".github/PULL_REQUEST_TEMPLATE.md"
+      - ".github/ISSUE_TEMPLATE/**"
       - "eng/agent-workflow/src/ISLAMU.AgentWorkflow/**"
       - "eng/agent-workflow/tests/ISLAMU.AgentWorkflow.Tests/**"
       - "eng/agent-context/**"

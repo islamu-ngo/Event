@@ -462,6 +462,20 @@ therefore has fixed column-level INSERT permissions for membership and role-gran
 rows, with only the necessary tenant, role and capacity metadata reads. Runtime
 receives no new rights, and this does not grant private account or credential reads.
 
+The Global creation permission set also includes a column-level write on the
+user primary key. Creation uses it only for the existing no-op row fence when
+assigning the creator as an administrator; the fence preserves coordination with
+user deletion and erasure. It grants no write to other user fields. A compromised
+Global credential still holds this fixed database permission independently of
+the API's human authorization checks, so protect it as a privileged application
+credential.
+
+Installation and runtime readiness verify the same key-column permission and
+reject missing or expanded rights. Existing partial enrollments require fresh
+pre-release enrollment through the installer; do not repair them with manual
+grants or disable their readiness checks. No schema migration or configuration
+setting is added by this correction.
+
 The administrator's active tenant does not become the database owner of a newly
 created tenant. The API selects its dedicated creation owner before checking
 current native administrator authority and the instance's authorization provider.

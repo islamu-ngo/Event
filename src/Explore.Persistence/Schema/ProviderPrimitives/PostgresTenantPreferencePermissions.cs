@@ -187,7 +187,9 @@ public static class PostgresTenantPreferencePermissions
     {
         var (schema, table) = Mapping(context);
         var read = preference ? GlobalReadColumns(context) : PostgresUserTenantNavigationReadPermissions.GlobalReadColumns(context);
-        var update = preference ? GlobalUpdateColumns(context) : [];
+        // The tenant creator's direct key-fence UPDATE is attested by its own installer.
+        var update = (preference ? GlobalUpdateColumns(context) : [])
+            .Concat(PostgresTenantCreationPermissions.GlobalUpdateColumns(context, typeof(User))).Distinct(StringComparer.Ordinal);
         string expected = string.Join(',', read.Select(column => (column, privilege: "SELECT"))
             .Concat(update.Select(column => (column, privilege: "UPDATE")))
             .Select(grant => $"({Text(grant.column)},{Text(grant.privilege)})"));

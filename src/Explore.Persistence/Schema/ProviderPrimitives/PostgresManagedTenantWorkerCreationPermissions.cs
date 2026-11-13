@@ -438,6 +438,8 @@ public static class PostgresManagedTenantWorkerCreationPermissions
             bool core = PostgresTenantCreationPermissions.TryGetGlobalColumns(context, item.Entity, out var coreRead, out var coreInsert);
             baseline.AddRange(coreRead.Select(column => new Grant(column, "SELECT")));
             baseline.AddRange(coreInsert.Select(column => new Grant(column, "INSERT")));
+            baseline.AddRange(PostgresTenantCreationPermissions.GlobalUpdateColumns(context, item.Entity)
+                .Select(column => new Grant(column, "UPDATE")));
             baseline.AddRange(PostgresTenantMembershipMutationPermissions.GlobalUpdateColumns(context, item.Entity)
                 .Select(column => new Grant(column, "UPDATE")));
             if (PostgresProvisioningPolicyPermissions.TryGetGlobalColumns(context, item.Entity,

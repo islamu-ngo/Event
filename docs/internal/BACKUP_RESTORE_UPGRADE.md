@@ -620,9 +620,20 @@ Ordinary human tenant creation has a separate, fixed Global permission manifest:
 `TenantSettingsDocument` INSERT11, `TenantStatus` SELECT2, bounded bootstrap and
 provisioning capacity metadata, `TenantUser` INSERT19,
 `TenantUserRoleGrant` INSERT14, and `Role` SELECT3 (`Id`, `MasterCode`,
-`RoleScopeId`). `PostgresTenantCreationPermissions` owns the exact model-mapped
+`RoleScopeId`), plus a separately attested direct `UPDATE(User.Id)` for the existing
+discovery row fence (Global already reads `User.Id` through navigation enrollment).
+`User` stays outside the creator's whole-relation catalogue; navigation and preference
+catalogues admit only that one direct, non-grantable key-column update.
+That fence performs a no-op key write while adding the creator's administrator
+membership; it retains the conflict with concurrent user deletion or erasure.
+`PostgresTenantCreationPermissions` owns the exact model-mapped
 inventory; it adds no private User, Actor, local credential or RolePermission
-read, table-wide grant, UPDATE, DELETE, grant option or Runtime permission.
+read, other User-column UPDATE, table-wide grant, DELETE, grant option or Runtime permission.
+Installer and runtime catalogue checks require the same direct key-column grant.
+Shared creator, worker, provisioning and mixed-settings guards recognize only
+that declared overlap; they retain rejection of inherited, PUBLIC and expanded
+authority. Old partial enrollments fail closed and require fresh pre-release
+enrollment through the installer, rather than manual grants.
 The original authenticated human creation port authorizes the command, pins its
 new UUIDv7 identities and original transaction, constructs the complete canonical
 graph in C#, and admits only the optional self-administrator effect for that new

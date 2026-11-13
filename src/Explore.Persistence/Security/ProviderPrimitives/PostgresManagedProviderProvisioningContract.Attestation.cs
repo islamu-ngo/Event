@@ -121,23 +121,25 @@ public static partial class PostgresManagedProviderProvisioningContract
         var sql = new HumanPrincipalSourceSql(context);
         var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
         bool creatorIntersection = Sources.Any(relation =>
-            PostgresTenantCreationPermissions.TryGetGlobalColumns(context, relation.Type, out _, out _));
+            PostgresTenantCreationPermissions.TryGetGlobalColumns(context, relation.Type, out _, out _)
+            || PostgresTenantCreationPermissions.GlobalUpdateColumns(context, relation.Type).Count != 0);
         string creatorProof = creatorIntersection
             ? PostgresTenantCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment) : "true";
         string policies = string.Join("\n", Sources.Select(relation =>
         {
             var table = tenantTables.SingleOrDefault(item => item.TableName == context.Model.FindEntityType(relation.Type)!.GetTableName());
             string name = Text(sql.Table(relation.Type));
-            bool creatorInserts = PostgresTenantCreationPermissions.TryGetGlobalColumns(context, relation.Type, out _, out var insert)
-                && insert.Count != 0;
-            string columnWrites = creatorInserts ? $"""
+            PostgresTenantCreationPermissions.TryGetGlobalColumns(context, relation.Type, out _, out var insert);
+            var update = PostgresTenantCreationPermissions.GlobalUpdateColumns(context, relation.Type);
+            string columnWrites = insert.Count != 0 || update.Count != 0 ? $"""
                 EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                     CROSS JOIN (VALUES ('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                     WHERE a.attrelid={name}::regclass AND a.attnum<>0 AND NOT a.attisdropped
                         AND (pg_catalog.has_column_privilege({Text(enrollment.GlobalLogin)},a.attrelid,a.attnum,permission.privilege || ' WITH GRANT OPTION')
                             OR (pg_catalog.has_column_privilege({Text(enrollment.GlobalLogin)},a.attrelid,a.attnum,permission.privilege)
-                                AND NOT (a.attnum>0 AND permission.privilege='INSERT'
-                                    AND a.attname=ANY(ARRAY[{string.Join(',', insert.Select(Text))}]::text[])))))
+                                AND NOT (a.attnum>0 AND (
+                                    (permission.privilege='INSERT' AND a.attname=ANY(ARRAY[{string.Join(',', insert.Select(Text))}]::text[]))
+                                    OR (permission.privilege='UPDATE' AND a.attname=ANY(ARRAY[{string.Join(',', update.Select(Text))}]::text[])))))))
                 """ : $"pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{name}::regclass,'INSERT,UPDATE,REFERENCES')";
             if (PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, relation.Type, out _, out var workerInsert, out var workerUpdate)
                 && (workerInsert.Count != 0 || workerUpdate.Count != 0))

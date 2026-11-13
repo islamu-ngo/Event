@@ -77,7 +77,8 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
         Func<ExploreDbContext, Dictionary<string, string?>, Task>? configurePostgres,
         Action<SanitizedRequestFailure>? requestFailureObserver = null,
         Action<Dictionary<string, string?>>? configure = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        DeploymentMode deploymentMode = DeploymentMode.SingleTenant)
     {
         await EnvironmentOwner.WaitAsync(TestContext.Current!.Execution.CancellationToken);
         var fixture = new AuthenticatedSettingsFixture(createDatabase);
@@ -104,7 +105,7 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
                 ["SecretProvider:Provider"] = "Environment",
                 ["PrivacyErasure:Authority:Topology"] = "CoLocated",
                 ["IdentityDatabase:Topology"] = "Colocated",
-                ["Deployment:Mode"] = "SingleTenant",
+                ["Deployment:Mode"] = deploymentMode.ToString(),
                 ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),
                 ["PublicBaseUrl"] = "https://settings.example.test",
                 ["EffectiveHostAuthority:CanonicalOrigin"] = "https://settings.example.test",
@@ -173,7 +174,7 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
             if (!await seed.InstanceBootstrapStates.AnyAsync())
             {
                 var bootstrap = InstanceBootstrapState.CreateInteractivePending(
-                    Guid.CreateVersion7(), DeploymentMode.SingleTenant, DateTime.UtcNow);
+                    Guid.CreateVersion7(), deploymentMode, DateTime.UtcNow);
                 bootstrap.CompleteInteractive(bootstrapActor, DateTime.UtcNow);
                 seed.InstanceBootstrapStates.Add(bootstrap);
             }

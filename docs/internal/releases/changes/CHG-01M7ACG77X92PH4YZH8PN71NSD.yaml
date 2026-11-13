@@ -1,0 +1,28 @@
+Change-Id: CHG-01M7ACG77X92PH4YZH8PN71NSD
+Title: "Let administrators create tenants from the instance root"
+Type: fix
+Scope: access
+Summary: "POST /api/tenant reaches authentication and the original creation command without a selected tenant in multi-tenant deployments."
+Group: root-tenant-creation-routing
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MULTI_TENANCY.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MULTI_TENANCY.md
+    Disposition: documented
+    Detail: "Only the exact create action carries instance-management metadata. Authentication, linked-user resolution, the secure Tenant/create command, the TenantCreation policy scope and the human creator stay authoritative. Collection reads, navigation and ordinary tenant routes keep their unresolved-tenant 404."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Administrators can create a tenant without first selecting one. Anonymous requests still receive 401 and users without platform authority 403."

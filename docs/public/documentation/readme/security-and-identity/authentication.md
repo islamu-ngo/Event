@@ -278,6 +278,12 @@ reuse of a Local-owned account requires that link to remain present when the
 claim transaction checks it. A link removed before that transaction starts is
 not accepted from an earlier lookup.
 
+`POST /api/tenant` is an instance management action: an authorized human can
+request a new tenant without selecting an existing tenant first. Authentication
+and the existing server-side creation policy still apply. This exception belongs
+to that exact write action; tenant collection reads, navigation, and ordinary
+tenant resources retain their tenant-resolution requirements.
+
 Tenant creation through both `/api/tenant` and the multi-tenant instance-admin
 route `/api/admin/instance/tenants` uses the platform user linked to the authenticated
 provider account, not the provider's token subject GUID. Creator attribution and optional

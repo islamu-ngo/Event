@@ -39,6 +39,20 @@ evaluation. Provider metadata reads only the instance portion of the fixed
 authority-key snapshot, so tenant settings cannot replace instance authentication
 provider configuration. Neither path grants private event management authority.
 
+## Root Tenant Creation
+
+`TenantController.Create` carries method-level `[InstanceManagement]` metadata.
+`ApiTenantResolutionMiddleware` therefore allows the exact `POST /api/tenant`
+action to reach authentication without binding an existing tenant. Public tenant
+lifecycle gating uses the same instance-owned classification. This does not
+exempt the controller's collection reads or navigation actions.
+
+The action retains `[Authorize]`, authenticated endpoint classification, linked
+application-user resolution, and the secure `Tenant/create` command. The
+`TenantCreation` policy-mutation scope and human creator retain the original
+Global owner, credential evidence, policy authorization, admission checks, and
+transaction custody. Routing metadata supplies no creation authority.
+
 ## Tenant Directory-Operator Identity
 
  Every tenant has an authoritative typed directory-operator identity document,

@@ -5,15 +5,20 @@
     <Platform Name="x86" />
   </Configurations>
   <Folder Name="/API/">
-    <Project Path="src/Event.MigrationService/Event.MigrationService.csproj" />
-    <Project Path="src/Event.Standalone/Event.Standalone.csproj" />
     <Project Path="src/Explore.API/Explore.API.csproj" />
   </Folder>
-  <Folder Name="/Core/">
-    <Project Path="src/ISLAMU.Moderation.Application/ISLAMU.Moderation.Application.csproj" />
-    <Project Path="src/ISLAMU.Moderation.Domain/ISLAMU.Moderation.Domain.csproj" />
+  <Folder Name="/Application/">
+    <Project Path="src/Event.Wire.Contracts/Event.Wire.Contracts.csproj" />
     <Project Path="src/Explore.Application/Explore.Application.csproj" />
     <Project Path="src/Explore.Domain/Explore.Domain.csproj" />
+    <Project Path="src/ISLAMU.Moderation.Application/ISLAMU.Moderation.Application.csproj" />
+    <Project Path="src/ISLAMU.Moderation.Domain/ISLAMU.Moderation.Domain.csproj" />
+  </Folder>
+  <Folder Name="/Hosting/">
+    <Project Path="src/Event.MigrationService/Event.MigrationService.csproj" />
+    <Project Path="src/Event.Standalone/Event.Standalone.csproj" />
+    <Project Path="src/Explore.AppHost/Explore.AppHost.csproj" />
+    <Project Path="src/Explore.ServiceDefaults/Explore.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/Infrastructure/">
     <Project Path="src/Explore.Atproto.Transport/Explore.Atproto.Transport.csproj" />
@@ -21,60 +26,55 @@
     <Project Path="src/Explore.Persistence/Explore.Persistence.csproj" />
   </Folder>
   <Folder Name="/Infrastructure/Migrations/">
-    <Project Path="src/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite.csproj" />
     <Project Path="src/Explore.Persistence.DataProtection.Migrations.MySql/Explore.Persistence.DataProtection.Migrations.MySql.csproj" />
     <Project Path="src/Explore.Persistence.DataProtection.Migrations.Sqlite/Explore.Persistence.DataProtection.Migrations.Sqlite.csproj" />
     <Project Path="src/Explore.Persistence.DataProtection.Migrations.SqlServer/Explore.Persistence.DataProtection.Migrations.SqlServer.csproj" />
     <Project Path="src/Explore.Persistence.Migrations.MySql/Explore.Persistence.Migrations.MySql.csproj" />
     <Project Path="src/Explore.Persistence.Migrations.Sqlite/Explore.Persistence.Migrations.Sqlite.csproj" />
     <Project Path="src/Explore.Persistence.Migrations.SqlServer/Explore.Persistence.Migrations.SqlServer.csproj" />
+    <Project Path="src/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite.csproj" />
   </Folder>
-  <Folder Name="/Release Engineering/">
-    <Project Path="eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj" />
-    <Project Path="eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj" />
+  <Folder Name="/Tests/Architecture &amp; Benchmarks/">
+    <Project Path="tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj" />
+    <Project Path="tests/Event.Benchmarks/Event.Benchmarks.csproj" />
+    <Project Path="tests/Explore.GeneratedContracts.Tests/Explore.GeneratedContracts.Tests.csproj" />
   </Folder>
-  <Folder Name="/src/">
-    <Project Path="src/Event.Wire.Contracts/Event.Wire.Contracts.csproj" />
+  <Folder Name="/Tests/Integration/">
+    <Project Path="tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj" />
+    <Project Path="tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj" />
+    <Project Path="tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj" />
+    <Project Path="tests/Event.Standalone.IntegrationTests/Event.Standalone.IntegrationTests.csproj" />
+    <Project Path="tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj" />
+    <Project Path="tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Tests/Unit/">
+    <Project Path="tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj" />
+    <Project Path="tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj" />
+    <Project Path="tests/Event.Wire.Contracts.UnitTests/Event.Wire.Contracts.UnitTests.csproj" />
+    <Project Path="tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj" />
+    <Project Path="tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Tooling/">
+    <Project Path="eng/configuration-manifest-schema/src/ISLAMU.ConfigurationManifest.SchemaGenerator/ISLAMU.ConfigurationManifest.SchemaGenerator.csproj" />
+    <Project Path="eng/tools/Explore.ApiContractInventory/Explore.ApiContractInventory.csproj" />
+    <Project Path="eng/tools/Explore.AssuranceAudit/Explore.AssuranceAudit.csproj" />
+    <Project Path="src/Explore.Diagnostic/Explore.Diagnostic.csproj" />
   </Folder>
   <Folder Name="/Tooling/Agent Workflow/">
     <Project Path="eng/agent-workflow/src/ISLAMU.AgentWorkflow/ISLAMU.AgentWorkflow.csproj" />
     <Project Path="eng/agent-workflow/tests/ISLAMU.AgentWorkflow.Tests/ISLAMU.AgentWorkflow.Tests.csproj" />
   </Folder>
-  <Folder Name="/Tooling/Configuration Manifest/">
-    <Project Path="eng/configuration-manifest-schema/src/ISLAMU.ConfigurationManifest.SchemaGenerator/ISLAMU.ConfigurationManifest.SchemaGenerator.csproj" />
-  </Folder>
   <Folder Name="/Tooling/Dependency Submission/">
     <Project Path="eng/dependency-submission/src/ISLAMU.DependencySubmission/ISLAMU.DependencySubmission.csproj" />
     <Project Path="eng/dependency-submission/tests/ISLAMU.DependencySubmission.Tests/ISLAMU.DependencySubmission.Tests.csproj" />
   </Folder>
-  <Folder Name="/Tooling/OpenAPI/">
-    <Project Path="eng/tools/Explore.ApiContractInventory/Explore.ApiContractInventory.csproj" />
-  </Folder>
-  <Folder Name="/Tooling/Assurance/">
-    <Project Path="eng/tools/Explore.AssuranceAudit/Explore.AssuranceAudit.csproj" />
-  </Folder>
-  <Folder Name="/Test/">
-    <Project Path="tests/Event.Standalone.IntegrationTests/Event.Standalone.IntegrationTests.csproj" />
-    <Project Path="tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj" />
-    <Project Path="tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj" />
-    <Project Path="tests/Event.Wire.Contracts.UnitTests/Event.Wire.Contracts.UnitTests.csproj" />
-    <Project Path="tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj" />
-    <Project Path="tests/Event.Benchmarks/Event.Benchmarks.csproj" />
-    <Project Path="tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj" />
-    <Project Path="tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj" />
-    <Project Path="tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj" />
-    <Project Path="tests/Explore.GeneratedContracts.Tests/Explore.GeneratedContracts.Tests.csproj" />
-    <Project Path="tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj" />
-    <Project Path="tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj" />
+  <Folder Name="/Tooling/Release Engineering/">
+    <Project Path="eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj" />
+    <Project Path="eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj" />
   </Folder>
   <Folder Name="/UI/">
+    <Project Path="src/Event.Web.BffHosting/Event.Web.BffHosting.csproj" />
     <Project Path="src/Explore.Blazor.Client/Explore.Blazor.Client.csproj" />
     <Project Path="src/Explore.Blazor/Explore.Blazor.csproj" />
   </Folder>
-  <Project Path="src/Event.Web.BffHosting/Event.Web.BffHosting.csproj" />
-  <Project Path="src/Explore.AppHost/Explore.AppHost.csproj" />
-  <Project Path="src/Explore.Diagnostic/Explore.Diagnostic.csproj" />
-  <Project Path="src/Explore.ServiceDefaults/Explore.ServiceDefaults.csproj" />
-  <Project Path="tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj" />
-  <Project Path="tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj" />
 </Solution>

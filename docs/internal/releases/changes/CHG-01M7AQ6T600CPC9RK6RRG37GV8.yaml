@@ -1,0 +1,28 @@
+Change-Id: CHG-01M7AQ6T600CPC9RK6RRG37GV8
+Title: "Release SQLite process locks when owning transactions are disposed"
+Type: fix
+Scope: database
+Summary: "Wake existing named-lock contenders after an owning SQLite transaction is implicitly rolled back, including when its external connection remains open."
+Group: sqlite-transaction-lock-disposal
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: "Cleanup requires the exact tracked physical transaction to have ended. Disposing a lease or borrowed EF wrapper cannot release an active owner's exclusion."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: "Abandoned application-owned SQLite transactions release waiting operations without requiring their connection to close. No schema, permission or deployment-setting change is needed."

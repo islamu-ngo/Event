@@ -196,6 +196,19 @@ Unwind the original workflow and its leases before recycling the owning session.
 This repair adds no permissions, business routines or replacement-session cleanup;
 it does not recover an aborted caller-owned transaction.
 
+## SQLite transaction lock disposal
+
+SQLite process locks belong to the physical transaction, rather than the returned
+lease or connection. The named-lock interceptor observes EF transaction disposal
+and releases tracked resources when that physical transaction has ended, even if
+an externally owned connection stays open. This wakes contenders that were already
+waiting; a later acquisition on the original connection is not required.
+
+Disposing a borrowed EF transaction wrapper does not end the external transaction
+or release its locks. Explicit completion and connection cleanup retain their
+existing behavior. Cleanup removes each tracked owner once and releases resources
+in reverse order; this changes no database grants or persistent schema.
+
 ## Instance Onboarding State Across Restore
 
 The database is the authority for completed onboarding. Restore a completed

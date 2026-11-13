@@ -59,6 +59,16 @@ the actual installed privileges. Unexpected column access and grant options
 remain errors; do not widen permissions, remove the check or reorder installers
 to force startup through.
 
+## SQLite operation cleanup
+
+After an abandoned application-owned SQLite transaction is disposed, other
+operations waiting for its process locks can proceed while its database connection
+remains open. Disposing a wrapper around an externally owned transaction still
+preserves that transaction's exclusion until it ends.
+
+This cleanup requires no schema migration, permissions change or deployment
+setting. It does not cancel or recover an operation that is still running.
+
 ## Interrupted PostgreSQL lock reacquisition
 
 If logs report `named_lock_acquisition_cleanup_unconfirmed`, the API could not

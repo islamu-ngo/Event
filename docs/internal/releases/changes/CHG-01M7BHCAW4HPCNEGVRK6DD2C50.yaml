@@ -1,0 +1,28 @@
+Change-Id: CHG-01M7BHCAW4HPCNEGVRK6DD2C50
+Title: "Service audited native hosting dependencies"
+Type: fix
+Scope: testing
+Summary: "Restore audited build graphs with fixed Aspire Hosting and Dashboard packages and explicit shared-framework ownership for native hosts."
+Group: native-hosting-security-servicing
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/GETTING_STARTED.md
+    Disposition: documented
+    Detail: "Select fixed Aspire Hosting/AppHost and Dashboard 13.6.5 for GHSA-4g86-54fm-h9h8 and GHSA-f7vh-h5g3-7jrh. Explicit shared-framework ownership prunes the standalone CBOR package from seven additional executable/test roots while preserving dependency auditing and the serviced .NET runtime."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/contributing/local-development.md
+    Disposition: documented
+    Detail: "Restore committed locks, rebuild and restart AppHost. Service any separately installed Aspire CLI independently. The NuGet-owned orchestration path retains ASPIRE010; this change neither enables CLI-bundle delegation nor suppresses its diagnostic."

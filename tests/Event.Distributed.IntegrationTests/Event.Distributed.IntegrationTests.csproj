@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="../Shared/ExternalDataProtectionTestAuthority.cs" Link="ExternalDataProtectionTestAuthority.cs" />
     <Compile Include="../Shared/AssuranceOwnershipContext.cs" Link="AssuranceOwnershipContext.cs" />
     <Compile Include="../Shared/Execution/TestExecutionProfile.cs" Link="Execution/TestExecutionProfile.cs" />

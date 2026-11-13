@@ -27,6 +27,19 @@ the vulnerable SDK-selected compiler/runtime reported by
 native restore when changing this toolchain; do not bypass an audit failure.
 This pin does not update an SDK or runtime already installed on your host.
 
+Aspire has its own servicing lifecycle. This source tree selects AppHost SDK
+and Hosting/Testing packages `13.6.5`, including fixes for
+`GHSA-4g86-54fm-h9h8` and `GHSA-f7vh-h5g3-7jrh`. Updating .NET alone does not
+replace those dependencies. Restore the committed locks, rebuild AppHost and
+restart it after updating the source tree. If you installed the Aspire CLI
+globally, update it separately to a supported fixed release; repository
+package pins do not modify that installation.
+
+The build may report `ASPIRE010`: this source tree resolves its orchestration
+dependencies from NuGet rather than delegating them to the CLI bundle.
+Direct AppHost launch remains supported. The warning is retained; do not
+silence it or change orchestration ownership merely to hide the message.
+
 ---
 
 ## 2. Clone & Run with .NET Aspire

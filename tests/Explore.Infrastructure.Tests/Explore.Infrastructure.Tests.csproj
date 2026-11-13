@@ -28,6 +28,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Explore.ServiceDefaults\Explore.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\src\Explore.Atproto.Transport\Explore.Atproto.Transport.csproj" />
     <ProjectReference Include="..\..\src\Event.MigrationService\Event.MigrationService.csproj"
@@ -42,7 +46,6 @@
     <PackageReference Include="Cerbos.Sdk" />
     <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="NSubstitute" />

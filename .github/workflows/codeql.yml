@@ -151,7 +151,7 @@ jobs:
 
       - name: Setup .NET
         if: ${{ needs.detect-codeql-changes.outputs.run-analysis == 'true' && matrix.language == 'csharp' }}
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
           cache: true
@@ -159,7 +159,7 @@ jobs:
 
       - name: Initialize CodeQL
         if: ${{ needs.detect-codeql-changes.outputs.run-analysis == 'true' }}
-        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
@@ -175,6 +175,6 @@ jobs:
 
       - name: Perform CodeQL Analysis
         if: ${{ needs.detect-codeql-changes.outputs.run-analysis == 'true' }}
-        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
         with:
           category: "/language:${{matrix.language}}"

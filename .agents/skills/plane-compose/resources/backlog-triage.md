@@ -6,7 +6,7 @@
 
 1. Collect the stated outcome, deliverable, deadlines, exclusions and acceptance criteria from the user.
 2. Inspect the *actual* codebase, docs, test failures, open tasks and confirmed known constraints. Record what is fact, what is an inference and what is unknown.
-3. If project tracking exists: locate matching issues in **local and remote context**. A `plane diff` does not enumerate all remote-only tasks; use a guarded full pull/clone when completeness matters (see [progress reporting](progress-reporting.md)).
+3. If project tracking exists: locate matching issues in **local and remote context**. A `plane diff` does not enumerate all remote-only tasks; use Plane MCP PQL search (`title ~ "<keyword>"`) for completeness; a full pull takes about `items ÷ 50` minutes on `EVENT` (see [progress reporting](progress-reporting.md)).
 4. Deduplicate by desired outcome, not by literal title. Prefer expanding an existing task. If two tickets overlap, explain the duplication; don't delete or close them automatically.
 5. Convert concrete gaps into a **bounded, useful backlog**. Maintain the project's exact state/type/label vocabulary.
 6. Map prerequisites using `dependencies.blocked_by`, adding links only when the referenced IDs exist and the dependency is real.

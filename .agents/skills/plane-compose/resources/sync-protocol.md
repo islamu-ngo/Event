@@ -23,7 +23,7 @@
 
 1. Confirm target folder, `type: project`, `workspace:`, `connection:`, effective server, `project.key`, CLI version, and authorization.
 2. Check `git status --short`; preserve other contributors' edits. For planned local-overwrite commands, establish a rollback checkpoint using Git or a backup **outside `work/*.yaml`**.
-3. Reconcile remote changes if relevant: `plane diff` plus, for schema edits, `plane schema diff`. Guard against remote-only items and sharded task files.
+3. Reconcile remote changes if relevant: for the items you are about to push, compare MCP `retrieve_by_identifier` (`fields=updated_at,state`) with their `last_synced` in `.plane/state.json` (`plane diff` scans every tracked item and takes over an hour on `EVENT`); for schema edits, `plane schema diff`. Guard against remote-only items and sharded task files.
 4. Validate **both** local schema and work before a full push:
 
 ```bash
@@ -45,11 +45,11 @@ plane push              # when authorized schema + work changes are intended
 
 ## Pulling safely
 
-`plane pull` refreshes local schema and operational YAML. Because v0.5.2 `write_work_items_canonical()` unconditionally overwrites `work/workitems.yaml` and resets `.plane/state.json` `source` pointers (`--merge` is currently ignored in project `_pull()`), **inspect local uncommitted diffs and take an isolated backup outside `work/*.yaml` before running `plane pull`**.
+`plane pull` refreshes local schema and operational YAML. Because v0.5.2 `write_work_items_canonical()` unconditionally overwrites `work/workitems.yaml` and resets `.plane/state.json` `source` pointers (`--merge` is currently ignored in project `_pull()`), **inspect local uncommitted diffs and take an isolated backup outside `work/*.yaml` before running `plane pull`**. On `EVENT` a full pull is a maintainer-scheduled resync, not a per-task step: it takes about `items ÷ 50` minutes and needs three repairs before the next push (label UUIDs written instead of names under `--work-only`, no state entries for Plane-only items, stale content hashes); see the [plane-project-management journal](../../../../dev/_journal/domains/plane-project-management.md).
 
-**One-way multi-file hazard & ephemeral task retirement:** `push` / `validate` read all `work/*.yaml` files, whereas `pull` dumps all remote work items back into `work/workitems.yaml`. Any item pushed from a shard or ephemeral file (`work/active-<task>.yaml`, `work/backend.yaml`) will now also appear in `work/workitems.yaml`, triggering `Duplicate ID` errors on `plane validate` (note the error cites `item.title[:50]`, not the colliding filename). **Delete/retire ephemeral `work/active-<task>.yaml` files once `plane pull` brings their canonical IDs into `work/workitems.yaml`.** Do not place templates or backups ending in `.yaml` inside `work/`.
+**One-way multi-file hazard & ephemeral task retirement:** `push` / `validate` read all `work/*.yaml` files, whereas `pull` dumps all remote work items back into `work/workitems.yaml`. Any item pushed from a shard or ephemeral file (`work/active-<task>.yaml`, `work/backend.yaml`) will now also appear in `work/workitems.yaml`, triggering `Duplicate ID` errors on `plane validate` (note the error cites `item.title[:50]`, not the colliding filename). **Retire a finished task file by folding:** move its blocks (with `id:`) into `work/workitems.yaml` and delete the file; the dry run then shows no change. After a full pull, drop the duplicate blocks of task files that are still in use from `work/workitems.yaml` instead. Do not place templates or backups ending in `.yaml` inside `work/`.
 
-**Large-project performance (2,000+ items):** `plane diff` fetches every tracked `remote_id` in `.plane/state.json` one by one (`Semaphore(3)` -> retrieve + relations + properties per item), and `plane pull` hydrates relations per item plus fetches `list_work_items_raw()` twice unless `--no-properties` is passed. Prefer `plane status` + `plane push --dry-run` for fast hash-based inner-loop previews, `--skip workitems` on schema diffs, and `--no-properties` on bulk pulls when custom properties aren't needed.
+**Large-project performance (1,000+ items; measured on `EVENT` 2026-11-13):** the client throttles itself to 50 requests per minute, so per-item fan-out dominates. `plane diff` fetches every tracked `remote_id` in `.plane/state.json` one by one (`Semaphore(3)` -> retrieve + relations + properties per item), and `plane pull` hydrates relations per item plus fetches `list_work_items_raw()` twice unless `--no-properties` is passed. Prefer `plane status` + `plane push --dry-run` for fast hash-based inner-loop previews, `--skip workitems` on schema diffs, and `--no-properties` on bulk pulls when custom properties aren't needed.
 
 For read-only remote inventory, prefer a fresh isolated `plane clone` to a different directory if the context allows, then inspect without touching the active project.
 
@@ -62,13 +62,13 @@ When one change set mixes YAML pushes with Plane MCP mutations (module membershi
 3. `plane push --work-only` for new parents (Epics), then read their minted IDs and UUIDs back.
 4. `plane push --work-only` for children and edited items (`parent:` takes the parent's **UUID**).
 5. Plane MCP mutations (Version Module membership, comments, links, approved deletions).
-6. `plane pull` (after backing up `event/`) so YAML reflects what MCP changed, then retire consumed `active-*.yaml` files.
+6. No pull for routine work: MCP should only touch what YAML cannot hold (modules, comments, links, approved deletions). Fold consumed `active-*.yaml` files into `work/workitems.yaml`. Run a full pull only when Plane-side edits to YAML fields must come back, and repair its output before pushing.
 
 **Disjoint `work/*.yaml` rule:** an `EVENT-XXX` ID lives in exactly one `work/*.yaml` file at a time. Edit existing items in place in `work/workitems.yaml`. Put only **new** items (with `id:` omitted) in staging files such as `work/active-<task>.yaml`. Copying an existing ID into a staging file fails validation with `Duplicate ID`.
 
-**Never mint through MCP:** an item created with MCP `workitem create` is unknown to `.plane/state.json`. Hand-writing its `id:` into YAML makes the next `plane push` create a duplicate. Mint IDs through `plane push`, or create remotely and then `plane pull`.
+**Never mint through MCP:** an item created with MCP `workitem create` (or in the Plane UI) is unknown to `.plane/state.json`. Hand-writing its `id:` into YAML without a state entry makes the next `plane push` create a duplicate. Mint IDs through `plane push`. To bring an existing Plane-only item under YAML, add its `work_items["id:EVENT-N"]` state entry with the real `remote_id` and an empty `content_hash` first ([plan-tracking](plan-tracking.md) stage 1, step 5).
 
-**Conflict tables on push:** the push conflict check compares remote and state hashes. Before overriding a reported conflict, confirm with MCP `workitem retrieve_by_identifier` (`fields=id,state,updated_at`) that the remote item has not changed since the last sync. Never override blind.
+**Conflict tables on push:** the push conflict check fetches only the items being updated and compares remote and state hashes, so it is cheap for task-sized pushes; keep it on. Before overriding a reported conflict, confirm with MCP `workitem retrieve_by_identifier` (`fields=id,state,updated_at`) that the remote item has not changed since the last sync. Never override blind.
 
 ## Version traps
 

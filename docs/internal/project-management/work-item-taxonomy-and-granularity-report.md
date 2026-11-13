@@ -3,7 +3,7 @@
 > **Audience:** Contributors | Maintainers | AI agents
 > **Status:** Implemented
 > **Owner:** Contributor Experience | Agent Context
-> **Last Verified:** 2026-11-12
+> **Last Verified:** 2026-11-13
 > **Source Anchors:** `docs/internal/adr/ADR-plane-project-management-standardization.md`, `.agents/skills/plane-compose/SKILL.md`, `.agents/skills/plane-mcp/SKILL.md`, `.agents/rules/plane-tracking.md`, `AGENTS.md` (Critical Rule 20)
 >
 > **Binding decision record:** [ADR — Plane Project Management Standardization](../adr/ADR-plane-project-management-standardization.md). Paths under `event/` are the gitignored local Plane Compose project; they are named in backticks rather than linked because they never exist in a clean clone.
@@ -121,7 +121,7 @@ Why **Labels** fit code sub-projects inside a `.NET` monorepo (`Explore.slnx`) b
 | **`plane-compose` CLI (`v0.5.2`)** | Declarative YAML truth in `event/` — schema (types, states, labels), work-item fields, `id:` minting via write-back, offline validation | `plane schema validate`, `plane validate --offline`, `plane push --dry-run`, `plane push --work-only`, `plane pull` |
 | **Plane MCP server** | Remote-only operations YAML cannot express — Version Module membership, comments, links, attachments, activity reads, Intake triage, PQL queries, and deletions | `workitem` (`list` with `pql`, `retrieve_by_identifier`, `delete`), `module` (`manage_workitems`, `list_workitems`), `workitem_comment`, `workitem_link`, `workitem_attachment`, `intake` |
 
-Ordering rule: finish YAML pushes first, then MCP mutations, then refresh YAML from remote with `plane pull` so local files reflect what MCP changed. The full sync sequence lives in [`.agents/skills/plane-compose/resources/sync-protocol.md`](../../../.agents/skills/plane-compose/resources/sync-protocol.md).
+Ordering rule: finish YAML pushes first, then MCP mutations. Use MCP only for what YAML cannot hold (module membership, comments, links); never change a YAML field (state, labels, parent, priority) of an item through MCP, so the YAML file stays the single writer and no `plane pull` is needed after routine task work. A full `plane pull` is a maintainer-scheduled resync: it runs about `items ÷ 50` minutes because of per-item relation fetches and needs the repairs listed in the plane-project-management journal before the next push. The full sync sequence lives in [`.agents/skills/plane-compose/resources/sync-protocol.md`](../../../.agents/skills/plane-compose/resources/sync-protocol.md).
 
 ### GitHub Issues & Discussions → Plane Intake Gate
 
@@ -172,6 +172,57 @@ Look directly at how **testing** and **cross-cutting engineering** map onto the 
      - `"Consolidate generated OpenAPI client test fixtures"` (`type: Refactor`)
      - `"Author Operator Self-Hosting & Infisical Secret Rotation Runbook"` (`type: Docs`)
      - `"Add TOTP 2FA enrollment & recovery codes to Local Authentication"` (`type: Security`)
+
+### 4.1 Tracking Budget per Implementation Plan (Plan → Plane Mapping)
+
+An implementation plan (`dev/active/<task>/`) is the unit that agents and developers execute, so it is also the unit that decides how many Plane items exist. Two failure modes are equally harmful. **Flooding** (an item per phase, test, review, or commit) buries the board in cards nobody can triage and duplicates `tasks.md`. **Under-tracking** (one card for weeks of separately merged work) hides real progress behind a single `In Progress` card and leaves pull requests without a Development-panel link. One rule sits between them:
+
+> **One tracked item per separately merged pull request.** Phases that land in the same pull request are `tasks.md` checkboxes, never Plane items. A plan that lands several pull requests gets one parent Work Item plus one Sub-item per pull request.
+
+The rule follows Plane's own linking model: a branch, its commits, and its pull request link to exactly one `EVENT-XXX` in the Development panel, and PR state automation moves exactly that item. One item per pull request therefore makes the board mirror reviewable progress without any hand-maintained status.
+
+| Plan shape | New Plane items | Branch / PR mapping | Typical example |
+|---|---|---|---|
+| **Trivial** (typo, one-line fix, version bump with no behavior change) | `0` (reference an existing item if one already covers the area) | `fix/<slug>` or the existing item's ID | AGENTS.md Rule 20 forbids tracking trivial edits |
+| **S — one pull request** (any number of phases) | `1` Work Item, created or bound | `feat/EVENT-A-<slug>` → one PR | Most features, bug fixes, and refactors |
+| **M — 2–5 separately merged pull requests, one capability** | `1` parent Work Item + `1` Sub-item per PR (`2–5`). Phases that share a PR share a Sub-item. The parent has no branch of its own. | Each PR on `feat/EVENT-<sub-item>-<slug>`; the PR lists the parent as unbracketed `EVENT-<parent>` (reference only) | A provider whose domain model, BFF integration, and heavy test campaign merge separately |
+| **L — program** (more than 5 PRs, or several independently shippable capabilities/providers) | `1` Work Item per shippable capability under the existing capability Epic, each shaped S or M | As S or M per Work Item | Prefer splitting into several plans. A new Epic is allowed only when no existing Epic fits and the program has `3–12` peer Work Items |
+
+**Budget limits.** An S or M plan creates at most **6** new items (1 parent + 5 Sub-items). More than 6 new items, any new Epic, or any item outside the plan's capability requires explicit user approval in the plan's Decision Brief, with the reason per item.
+
+**Floor (never too few).** Every pull request a plan merges links to exactly one item: the S item or its own Sub-item. One Work Item never covers two providers or two independently shippable capabilities. Substantial work with zero items violates AGENTS.md Rule 20.
+
+**Reuse before create.** Search first: `rg` over `event/work/*.yaml` and Plane MCP PQL (`title ~ "<keyword>"`). If an existing item already describes the outcome, even a rough maintainer-written note, bind the plan to it instead of creating a twin. For example, the `.NET 11` upgrade plan was bound to the pre-existing `EVENT-6834` "Update to .NET 11". Binding makes the plan the owner of that item: its description may be rewritten into the plan's acceptance criteria, keeping the original request as a quoted note.
+
+**Never a Plane item:** phases inside one pull request; tests, migrations, validators, and docs caused by the feature (Definition of Done); reviews (CTO review, I-VSD, code review); verification gates and Ring 3 matrix runs; commits and fix-ups; knowledge graduation; ideas discovered during execution (these go to `dev/backlog/<slug>.md` and become a `Candidate` under their Epic only when a maintainer asks).
+
+**Fields on every item a plan creates:**
+
+- `type`: the outcome kind; `Epic` only under the L rule above.
+- `labels`: Surface + Domain labels. Never the retiring `Docs` label.
+- `priority`: functional criticality, not urgency.
+- `parent`: the matching capability Epic UUID (listed in `.agents/skills/plane-mcp/resources/islamu-event-project.md`); Sub-items use the parent Work Item's UUID. New items are never standalone.
+- Version Module: `v0.1.0` or `v1.0.0`, set through Plane MCP.
+- `state`: `Backlog` at planning time.
+- No `assignees:` until the item moves to `Ready` or `In Progress`.
+
+**Ownership boundary.** A plan only touches the items it creates or binds. Agents never run opportunistic backlog clean-ups (re-labelling, re-parenting, clearing maintainers' existing assignments, retitling) on items a plan does not own; bulk backlog work is a separate, explicitly requested task.
+
+**State lifecycle per plan:**
+
+| Moment | S item / parent Work Item | Sub-item | Tool |
+|---|---|---|---|
+| Plan written | `Backlog` in `event/work/active-<task>.yaml` with `id:` omitted, or the bound existing ID | Listed in the plan's Plane Tracking Plan only | none (local YAML) |
+| Senior CTO approval | `Ready` | — | local YAML |
+| Execution starts | push mints `EVENT-XXX`; `In Progress`; assignee = the developer driving the plan; Version Module | Created under the parent's UUID, `Todo`, no assignee | `plane-compose` push; Plane MCP for the module |
+| A Sub-item's pull request starts | stays `In Progress` | `In Progress` + assignee | `plane-compose` |
+| Pull request opened | S item: `Review Needed` | `Review Needed` | `plane-compose`, or PR automation |
+| Review asks for changes | `Changes Requested` | `Changes Requested` | `plane-compose`, or PR automation |
+| Merged with acceptance evidence | S item: `Done`; parent: `Done` when its last Sub-item is `Done` | `Done` | `plane-compose`, or PR automation |
+| Blocked by something outside the plan | `Waiting Dependency` + `dependencies.blocked_by` + one Plane MCP comment naming the blocker | same | `plane-compose` + Plane MCP |
+| Dropped or superseded | `Won't Do` / `Replaced` | same | `plane-compose` |
+
+Comments are for decisions, blockers, and scope changes only; the Development panel already records branches, commits, and pull requests. The step-by-step command protocol lives in [`plan-tracking.md`](../../../.agents/skills/plane-compose/resources/plan-tracking.md).
 
 ---
 
@@ -242,7 +293,7 @@ Look at `EVENT-453` (`Payment Integration (Stripe/PayPal)`) — combining multip
 
 ## 7. Governance Rules & Backlog Hygiene Plan (Concrete Next Actions)
 
-### The 8 Golden Rules for Every AI Agent & Contributor
+### The 9 Golden Rules for Every AI Agent & Contributor
 
 1. **The "Completable PR Outcome" Rule:** Every Plane work item must have a concrete binary finish line (verifiable PR/CI evidence or published ADR). Perpetual goals (`"Make app secure"`, `"Improve performance"`, `"Increase test coverage"`) are **forbidden** as work item titles; express them via **Type + Labels + bounded completable deliverables** assigned to a **Version Module** (`v0.1.0`, `v1.0.0`, …).
 2. **One Project (`EVENT`) & Surface Labels over Sub-Project Proliferation:** Keep all `Explore.*` projects and future clients (`KMP` Mobile/Watch/TV, `Avalonia Desktop`, `TUI`, `CLI`) inside the single `EVENT` Plane project tagged with orthogonal **Surface Labels** + finite client **Epics** (`islamu` Workspace stays reserved for genuinely separate ISLAMU solutions like Configurator / I-VSD / Identity).
@@ -252,9 +303,10 @@ Look at `EVENT-453` (`Payment Integration (Stripe/PayPal)`) — combining multip
    - Standard feature unit/integration/bUnit tests, migrations, and doc updates → **Definition of Done + `dev/active/<task>/tasks.md`** (`0` Plane items).
    - Independent heavy test harness or separate parallel build stream within one feature → **Sub-work item (`parent: <uuid>`)**, capped at **one level below its Work Item** (total chain `Sub-item → Work Item → Epic` ≤ 2) and **2–5 max**.
    - Cross-cutting test architecture/infra upgrades (`TUnit`, multi-DB RLS harness) → **Standalone `Test` / `Refactor` item**.
-6. **No Pre-Assigned Backlog Graveyards:** Never set `assignees:` on `Candidate`, `Backlog`, or `Waiting Dependency` items (`assign` only when moving to `Ready` or `In Progress`).
+6. **No Pre-Assigned Backlog Graveyards:** Never set `assignees:` on `Candidate`, `Backlog`, `Todo`, or `Waiting Dependency` items you create (`assign` only when moving to `Ready` or `In Progress`). Assignments a maintainer made on existing items are their decision: agents never strip them.
 7. **Intake First, Stale Backlog Pruning SLA:** Rough multi-client ideas enter **Intake** or un-assigned `Candidate`. Any `Candidate`/`Backlog` item untouched for **> 6 months** without an active **Version Module** or **Epic** is reviewed quarterly and moved to `Won't Do` or `Replaced`.
 8. **Dual-Plane Discipline:** `event/` tracks **macro truth** (`EVENT-XXX`, `Epic` → `Work Item` → optional `Sub-item`, canonical Git Development panel branches/commits/PRs, Version `Module`); `dev/active/<task>/tasks.md` tracks **micro Red/Green/Refactor execution**.
+9. **Right-Sized Plan Tracking:** One tracked item per separately merged pull request (Section 4.1): `1` Work Item for a single-PR plan, `1` parent + `2–5` Sub-items for a multi-PR plan, never an item per phase, test, review, or commit.
 
 ### Recommended Concrete Improvements & Status
 
@@ -263,5 +315,5 @@ Look at `EVENT-453` (`Payment Integration (Stripe/PayPal)`) — combining multip
 | **P1 (Immediate)** | Keep `modules.yaml` strictly for **Version / Release Tracking** (`v0.1.0`, `v1.0.0`, future `v0.2.0`), adopt **`Epic`** (`type: Epic`) for finite capability programs, and keep `milestones.yaml` (`MVP`, etc.) for concrete dated freeze gates. | `modules.yaml`, `milestones.yaml`, Plane UI | Preserves your tier-safe Release tracking convention while giving `EVENT` its missing capability-grouping layer. |
 | **P1 (Immediate)** | Update `labels.yaml`: refine `KMP (mobile & desktop...)` → `KMP (mobile, watch & TV)`, add Surface/Domain labels (`Desktop (Avalonia)`, `TUI`, `CLI`, `Payments`), and retire redundant `Docs` label during backlog cleanup. | `event/schema/labels.yaml` | Cleanly partitions all internal `.sln` projects and multi-year client/provider growth (`KMP` vs `Avalonia Desktop` vs `TUI`/`CLI`) inside the single `EVENT` project. |
 | **P2 (Workflow Sync)** | Codify the **Granularity Gate, Importance-vs-Urgency `priority`, Single-Project Label/Version-Module Convention & 3-Tier Test/Sub-Item Rule** into `.agents/skills/` and `active-workitem.yaml`. | `.agents/skills/` & `event/templates/` | Prevents future AI agents or contributors from recreating 8-ticket horizontal explosions or misusing `priority`. |
-| **P2 (Optional Triage Pass)** | When ready to declutter `EVENT`, review the `1,449` unstarted items in `workitems.yaml`: clear stale auto-assignments on unstarted items, merge the 8-ticket horizontal entity groups (`EVENT-5020..5090`) into 1–2 vertical features each (marking fragments `Replaced`), and convert perpetual titles (`EVENT-430`, `EVENT-1161`, `EVENT-453`) into bounded items or `Won't Do`/`Replaced`. | Plane Triage / `workitems.yaml` via guarded pull/push | Cuts backlog clutter dramatically and restores instant signal per release version (`v0.1.0` vs `v1.0.0`). |
+| **P2 (Triage Pass) — Done 2026-11-13** | Backlog standardization (`EVENT-6849`) merged horizontal entity groups and per-commit stubs into vertical Features under 17 capability Epics, deleted 1,326 superseded items (2,679 → 1,355), and assigned Version Modules. No further bulk pass runs unless a maintainer explicitly requests one. | Plane via `plane-compose` + Plane MCP | Every non-Epic item now has an Epic parent; the board shows one card per deliverable. |
 | **P3 (Governance)** | Enforce Plane **Saved Views** (`views: true` is already enabled): *"v0.1.0 Ready & Active"*, *"v1.0.0 Scope"*, *"By Client Surface"*, *"Must-Have / Urgent Requirements (`priority: urgent`)"*, and *"Stale Candidate Review"*. | Plane UI / Views | Keeps day-to-day triage under 5 minutes despite multi-year growth inside one `EVENT` project. |

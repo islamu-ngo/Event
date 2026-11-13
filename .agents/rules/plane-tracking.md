@@ -34,6 +34,9 @@ related_intents: [agent-workflow-guard, create-agent-context-skill]
 | 7 | Tooling split | `plane-compose` for YAML and ID minting; Plane MCP for modules, comments, deletes | MCP-created item with hand-written YAML `id:`, or a custom REST client in `eng/` |
 | 8 | Committed paths | Committed docs cite gitignored `event/` paths in backticks only | Linking `event/` files, or `file://` workstation URIs |
 | 9 | Community intake | Issue templates gather evidence; maintainers promote via Plane Intake | Asking reporters to mint `EVENT-XXX` or split work by layer |
+| 10 | Plan tracking size | One item per separately merged PR: single-PR plan = 1 Work Item; 2–5 PRs = 1 parent + 1 Sub-item per PR ([plan-tracking](../skills/plane-compose/resources/plan-tracking.md)) | An item per phase, test, review, or commit; several merged PRs under one card; more than 6 new items without approval |
+| 11 | Ownership | Touch only the items a plan creates or binds | Opportunistic backlog clean-up, re-labelling, or stripping maintainers' assignments |
+| 12 | Sync cost | Task loop: `plane validate --offline`, `plane push --work-only --dry-run`, conflict-checked push; retire task files by folding | `plane pull` or project-wide `plane diff` inside a task (each scans every item, about `items ÷ 50` minutes or more) |
 
 ## Must-Reads for This Path
 

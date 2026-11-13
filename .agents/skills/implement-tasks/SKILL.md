@@ -9,7 +9,7 @@ priority: high
 - [../../../AGENTS.md](../../../AGENTS.md)
 - [../../../.agents/CONTEXT_ENGINEERING.md](../../../.agents/CONTEXT_ENGINEERING.md)
 - [../conventional-commit/SKILL.md](../conventional-commit/SKILL.md)
-- [../plane-compose/SKILL.md](../plane-compose/SKILL.md)
+- [../plane-compose/SKILL.md](../plane-compose/SKILL.md) and [plan-tracking](../plane-compose/resources/plan-tracking.md)
 
 ## Top Invariants
 
@@ -27,10 +27,10 @@ priority: high
      - Active branch: current branch (e.g. `develop` or current feature branch)
      - Task folder: `dev/active/<task-name>/`
      - Execution context: repository root (`Cwd: .`)
-     - **Action**: Do NOT create a worktree or move files. Respect in-tree execution and resume directly in the root workspace.
+     - **Action**: Do NOT create a worktree or move files. Respect in-tree execution and resume directly in the root workspace. If the plan's Plane items are not minted yet, run **Start Plane Tracking First** (described under Case C) before Phase 1.
    - **Case C: Fresh Worktree Setup (Default New Implementation)**:
      If starting a brand-new plan where `dev/active/<task-name>` exists at the root, `.worktrees/<task-name>` does not exist, and user did not mandate in-tree execution:
-     - **Mint Canonical Plane ID First (when authorized & online):** If `event/work/active-<task-name>.yaml` has no canonical `EVENT-XXX` ID yet and Plane sync is authorized, run `cd event && plane validate && plane push --work-only` before creating the branch so `id_writer.py` writes `id: EVENT-XXX` back into YAML. Use uppercase **`feat/EVENT-XXX-<task-name>`** as the branch name when `EVENT-XXX` is known (enabling Plane's native **Development** panel to auto-link the branch from push #1); otherwise fall back to `feat/<task-name>`.
+     - **Start Plane Tracking First (every topology, when authorized & online):** before creating the branch, or before the first phase when executing in-tree, run the `tasks.md` Plane Tracking execution-start checklist ([plan-tracking](../plane-compose/resources/plan-tracking.md) stage 3): validate, dry-run and push the active file so `EVENT-XXX` is minted, push M-plan Sub-items under the parent UUID, set the S item or parent to `In Progress` with the driving developer as assignee, and add new items to their Version Module through Plane MCP. Create only the items in the plan's Plane Tracking Plan. Use uppercase **`feat/EVENT-XXX-<task-name>`** (the S item, or the M Sub-item of the first PR) so Plane's **Development** panel links the branch from push #1; otherwise fall back to `feat/<task-name>`.
      - Repository-root scoped worktree isolation applies:
        ```bash
        git fetch origin develop
@@ -78,8 +78,8 @@ priority: high
      - *Class A (Direct Feature Regressions)*: Failing assertions in code touched by this feature. Must resolve in-phase.
      - *Class B (Feature-Induced Integration Ripple)*: Unmodified callers/fixtures broken by changed contracts. If mechanical and minor (< 15m), align immediately. If structural/cross-domain, pause with a Decision Brief before absorbing.
      - *Class C (Pre-Existing Baseline Rot)*: Environment quirks, unmigrated table assumptions, or failures reproducing on clean `origin/develop`. Strictly quarantine into `*-context.md`; never add to `tasks.md` or debug in the feature worktree.
-   - **Semantic Phase Commit**: In the execution context, stage changes and commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. Planning defines semantic meaning; execution handles file discovery. Link commits natively to Plane's **Development** panel via uppercase `Refs: EVENT-XXX` (or `Fixes: EVENT-XXX`) trailers — omit if no canonical `EVENT-XXX` exists yet, and never paste commit logs or PR URLs into YAML `description:`.
-   - **Plane Macro State Progression**: When beginning implementation, ensure `state: In Progress` is set in `event/work/active-<task-name>.yaml` (or the referenced Plane item). Maintain the active task file locally; never touch or shatter `workitems.yaml`.
+   - **Semantic Phase Commit**: In the execution context, stage changes and commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. Planning defines semantic meaning; execution handles file discovery. Link commits natively to Plane's **Development** panel via uppercase `Refs: EVENT-XXX` (or `Fixes: EVENT-XXX`) trailers naming the item of the pull request the phase lands in (the S item or that PR's Sub-item) — omit if no canonical `EVENT-XXX` exists yet, and never paste commit logs or PR URLs into YAML `description:`.
+   - **Plane State Follows Pull Requests, Not Phases**: Plane changes only at the moments in the `tasks.md` Plane Tracking checklist: execution start, each M-plan PR start (its Sub-item to `In Progress`), PR opened, PR merged, or a real blocker (`Waiting Dependency` + `blocked_by` + one MCP comment). Phases and tasks never change Plane state and never create items; ideas found mid-flight go to `dev/backlog/`. Touch only the items the plan owns; never edit or reshape unrelated `workitems.yaml` entries.
    - **Reconcile Ledger**: Batch task checkbox updates at phase gates in `tasks.md`.
 6. **Self-Contained Phase Reporting, Decision Briefs & Mid-Flight Slicing**:
    Apply [reader-first writing](../conventional-commit/resources/reader-first-writing.md) to reports and questions: delivered behavior first, relevant mechanism and verification next. Never use bare phase IDs. Decision Briefs name the exact choice, practical consequences, technical rationale, recommended option, and next action; ordinary progress reports need no invented decision.
@@ -92,7 +92,7 @@ priority: high
    - Stage and commit these persistent files on the task branch so they merge into `develop`.
 8. **Ring 3 Plan Exit Gate & Mass-Failure Circuit Breaker**:
    - **Ring 3 Plan Exit Gate**: Run full 5-database matrix, EF Core migrations, and `Event.Architecture.Tests` once at workstream completion before PR creation.
-   - **Plane Compose Preflight Validation**: Validate Project-as-Code state before publishing: `cd event && plane schema validate && plane validate --offline && plane validate && plane push --dry-run`. For additive work-item synchronization, run `plane push --work-only` to publish task progress safely.
+   - **Plane Compose Preflight Validation**: Before publishing Plane state, run `cd event && plane schema validate && plane validate --offline && plane push --work-only --dry-run`; the dry run must list only this plan's items. Then `printf 'y\n' | plane push --work-only` with the conflict check left on. Never run `plane pull` or a project-wide `plane diff` as part of a task: both scan every item (about `items ÷ 50` minutes or more on `EVENT`).
    - **Mass-Failure Circuit Breaker (> 10 Failures)**: If Ring 3 execution yields > 10 failures, the agent MUST NOT generate dozens of individual subtasks or start fixing them one-by-one. Cluster failures by root cause (shared fixture, missing test migration, secret binding, or base divergence). If failures stem from pre-existing baseline rot (Class C), quarantine them. If caused by widespread architectural mismatch, pause and deliver a Decision Brief.
    - **Pre-PR Rebase (Concurrency Conflict Protection)**:
      ```bash
@@ -115,7 +115,7 @@ priority: high
      ```bash
      gh pr create --base develop --title "<type>(<scope>): <title>" --body "<body-with-release-impact>"
      ```
-   - **Plane Lifecycle Advancement & Ephemeral File Retirement**: Upon PR creation, advance `event/work/active-<task-name>.yaml` (or referenced Plane item) to `state: Review Needed`. Transition to `Done` occurs only after PR merge and verified acceptance evidence. After merge, when running `plane pull` syncs `EVENT-XXX` into `event/work/workitems.yaml`, delete/retire the ephemeral `event/work/active-<task-name>.yaml` file so `plane validate` never fails on duplicate IDs.
+   - **Plane Lifecycle Advancement & Active File Retirement**: Upon PR creation, set the PR's item (S item or Sub-item) to `Review Needed` and push; list it bracketed under `## Issues` and an M parent unbracketed. `Done` follows only after merge and verified acceptance evidence (an M parent after its last Sub-item). If PR automation already moved the item, mirror that state in YAML before the next push. After the last merge, fold the active file's blocks into `event/work/workitems.yaml`, delete the active file, and confirm `plane push --work-only --dry-run` reports no changes; no `plane pull` is needed.
    - **Park the Worktree (When using Worktree isolation)**:
      Never delete `.worktrees/<task-name>` upon PR creation. The worktree must remain parked and intact so that any subsequent bot reviews (Copilot, CodeQL) or CI check failures can be resolved immediately in-place with zero setup overhead.
    - **Halt and Deliver Partitioned Status Brief**:
@@ -151,7 +151,7 @@ priority: high
           Topology = In-Tree. Set Cwd = repo root, PlanPath = dev/active/<task>/.
         - If fresh execution on default topology:
           Topology = New Worktree.
-          (If unpushed new Plane task and push authorized): cd event && plane validate && plane push --work-only -> read minted EVENT-XXX
+          (If Plane sync authorized): run the tasks.md Plane Tracking execution-start checklist (plan-tracking stage 3) -> read minted EVENT-XXX
           git fetch origin develop
           git worktree add -b feat/<EVENT-XXX-if-known-><task> .worktrees/<task> origin/develop
           mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/

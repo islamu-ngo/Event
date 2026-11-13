@@ -54,6 +54,7 @@ For execution details read [implementation-loop](resources/implementation-loop.m
 | Install/login, self-hosting, wrong workspace, correct connection | [environment-and-targets](resources/environment-and-targets.md) |
 | New project, clone existing, fresh checkout, template initialisation | [project-bootstrap](resources/project-bootstrap.md) |
 | Understand folder layout, `plane.yaml`, schema/work boundaries | [project-files](resources/project-files.md) |
+| Implementation plan: how many items, which Plane action at each stage | [plan-tracking](resources/plan-tracking.md) |
 | Create/update tasks, types, dependencies, IDs, YAML fields | [work-item-authoring](resources/work-item-authoring.md) |
 | Intake requirements, dedupe, break down, assess urgency / priority | [backlog-triage](resources/backlog-triage.md) |
 | Implement code and maintain accurate ticket lifecycle | [implementation-loop](resources/implementation-loop.md) |
@@ -73,8 +74,8 @@ For execution details read [implementation-loop](resources/implementation-loop.m
 ## Invariants — never skip
 
 - **Right target first:** `plane.yaml` selects credentials for project commands. `-c` on `push` / `pull` only changes a rate-counter label, **not credentials** (v0.5.2).
-- **Existing work wins & ID truth:** prefer updating a known item over creating a near-duplicate. Omit `id:` on a new item if you want first `plane push` to write canonical `PROJ-N` back into YAML (`id_writer.py` skips writeback whenever `id:` is already set in v0.5.2); never fabricate an existing Plane sequence ID. Retire ephemeral task files upon `plane pull` so they never collide in `work/workitems.yaml`.
-- **Native Git & Plane surface parity:** link Git branches (`feat/PROJ-N-...`), commits (`Refs: PROJ-N`), and PRs (`[PROJ-N]` for auto-state + Development panel, `PROJ-N` for link-only) using uppercase canonical IDs instead of stuffing commit/PR logs into `description:`. Use structured fields (`dependencies`, `relations`, `milestones`), and never invent YAML fields absent in v0.5.2 (`links`, `comments`, `audiences`, `cascading`, `formula` push, `cycles`/`modules` `work_items` push).
+- **Existing work wins & ID truth:** prefer updating a known item over creating a near-duplicate. Omit `id:` on a new item if you want first `plane push` to write canonical `PROJ-N` back into YAML (`id_writer.py` skips writeback whenever `id:` is already set in v0.5.2); never fabricate an existing Plane sequence ID. Retire a task file by folding its blocks into `work/workitems.yaml` ([plan-tracking](resources/plan-tracking.md)), never by waiting for a pull.
+- **Native Git linking:** uppercase IDs in branch (`feat/PROJ-N-...`), `Refs: PROJ-N` trailers, and PR `[PROJ-N]`; never paste commit/PR logs into `description:` or invent fields absent in v0.5.2 (`links`, `comments`, `audiences`, `cascading`, module `work_items`).
 - **No unsupported fields:** use top-level work items plus `parent` (UUID in v0.5.2); `children` and `watchers` fail validation. Match existing state/type/label names and project feature flags.
 - **Preflight local validity:** `plane schema validate` and `plane validate` before push. `plane push` may already have changed the remote schema by the time work-item validation fails.
 - **Preview before publishing:** `plane diff` (on smaller/filtered sets), `plane schema diff` if relevant, and `plane push --dry-run`. Do not treat `plane diff` as a full remote inventory.

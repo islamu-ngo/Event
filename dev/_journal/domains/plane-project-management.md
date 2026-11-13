@@ -49,7 +49,7 @@ leaves children without parents.
 - `.agents/skills/plane-compose/resources/sync-protocol.md`
 - `.agents/skills/plane-mcp/SKILL.md`
 
-## [2026-11-12 Europe/Brussels] — Large-project pull and conflict check look hung but are rate-limited
+## [2026-11-12 Europe/Brussels] — Large-project pull looks hung but is rate-limited
 
 **Context:** `plane-compose` v0.5.2 against `EVENT` with about 2,650 items
 (1,355 after the backlog cleanup).
@@ -70,14 +70,22 @@ is about `items / 50` minutes (about 28 minutes for 1,355 items, about 55
 minutes for 2,650). The 22-minute "hang" was killed before it could finish.
 Killing a pull mid-run leaves `work/` and `.plane/state.json` untouched.
 
+**Correction (2026-11-13), conflict check:** The push conflict check
+(`_check_conflicts`) fetches only the items being updated, one `get_work_item`
+call each. It looked hung only during the 1,255-update bulk push, where it
+needed about 25 minutes at 50 requests per minute. For task-sized pushes it
+takes seconds, so keep it on.
+
+
 **Resolution:** Run pull in the background with no timeout (or one well above
 `items / 50` minutes), make no other Plane API calls with the same key while it
 runs, and confirm progress with `ss -tnpi`. For quick checks, verify remote
 drift with MCP instead: `workitem list` with PQL
 `updatedAt >= "<last sync date>"` (fields `sequence_id,updated_at`), compare
 each hit's `updated_at` with that item's `last_synced` in `state.json`, and
-check any remaining hits field by field. Then push with
-`--no-conflict-check` (not `--force`). Find remote-only items with PQL
+check any remaining hits field by field. For an approved bulk push of hundreds of updates only, push with
+`--no-conflict-check` (not `--force`) after that MCP drift check; task-sized
+pushes keep the conflict check. Find remote-only items with PQL
 `createdAt` windows and edit them through MCP, never by hand-writing their IDs
 into YAML. Always use `--no-properties` on pull when no custom properties exist.
 

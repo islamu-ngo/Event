@@ -10,7 +10,7 @@ The skill is not a substitute for engineering. **Implement the code requested** 
 
 1. Find the project and inspect repository state. Never assume `plane.yaml` at repo root or that the default connection is appropriate.
 2. Locate an existing matching work item by ID or intent. If remote-only work may exist, reconcile before issuing a duplicate (see `progress-reporting.md`).
-3. If missing and the task is substantial, create one scoped work item (`work/active-<slug>.yaml`) with outcome, acceptance criteria, grounded priority, and appropriate initial state; omit `id:` on creation so the first push writes canonical `PROJ-N` back into YAML for Git branch/commit/PR linking (see `work-item-authoring.md`). For an independent trivial edit, skip ticket creation unless user wants it.
+3. If missing and the task is substantial, create the items its plan shape allows (one per separately merged pull request; see [plan-tracking](plan-tracking.md)) in `work/active-<slug>.yaml` with outcome, acceptance criteria, grounded priority, and appropriate initial state; omit `id:` on creation so the first push writes canonical `PROJ-N` back into YAML for Git branch/commit/PR linking (see `work-item-authoring.md`). For an independent trivial edit, skip ticket creation unless user wants it.
 4. Make a realistic implementation plan with checks. Handle blockers rather than marking progress just because you intend to work on it.
 5. When active development begins and push is authorized, push the initial work item once (if unpushed) so canonical `PROJ-N` is minted before cutting your Git branch (`feat/PROJ-N-<slug>`), and move the ticket to the project's actual **started** state if the workflow allows. Do not invent `In Progress` in a schema that lacks it.
 
@@ -41,11 +41,10 @@ Inside the selected project directory:
 
 ```bash
 plane schema validate
-plane validate
-plane diff
-plane push --dry-run
-# Then, only with ongoing delegation or explicit approval, and no unresolved conflicts:
-plane push --work-only
+plane validate --offline
+plane push --work-only --dry-run
+# Then, only with ongoing delegation or explicit approval (the push conflict check stays on):
+printf 'y\n' | plane push --work-only
 ```
 
 `--work-only` is useful when the task edits only `work/`, avoiding unnecessary schema writes. It still processes supported work sections, so review the plan. `plane validate` should run **before** any full `plane push`, since normal push applies schema before validating work.

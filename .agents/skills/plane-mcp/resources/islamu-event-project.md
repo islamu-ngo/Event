@@ -3,7 +3,7 @@
 > **Audience:** AI agents | Maintainers
 > **Status:** Implemented
 > **Owner:** Agent Context
-> **Last Verified:** 2026-11-12
+> **Last Verified:** 2026-11-13
 > **Source Anchors:** `event/schema/states.yaml`, `event/schema/labels.yaml`, `event/schema/types.yaml`, `event/work/modules.yaml`, `event/work/workitems.yaml` (Epics) (gitignored local Plane Compose project), [ADR](../../../../docs/internal/adr/ADR-plane-project-management-standardization.md)
 
 Stable identifiers for Plane MCP calls against ISLAMU Event. The gitignored `event/schema/*.yaml` files are authoritative. If an ID here disagrees with them, trust the YAML and correct this file.
@@ -42,7 +42,7 @@ Hierarchy: `Epic → Work Item → optional Sub-item`; longest `parent` chain is
 
 ## States
 
-Items in `Candidate`, `Backlog`, `Waiting Dependency`, or `Todo` carry no assignees; assign someone when the item moves to `Ready` or `In Progress`.
+Items an agent creates in `Candidate`, `Backlog`, `Waiting Dependency`, or `Todo` carry no assignees; assign the driving developer when the item moves to `Ready` or `In Progress`. The project has no default assignee (cleared 2026-11-13), so created items start unassigned. Existing assignments made by maintainers stay as they are.
 
 | State | UUID | Group |
 |---|---|---|

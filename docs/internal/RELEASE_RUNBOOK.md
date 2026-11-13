@@ -36,6 +36,14 @@ dedicated committed lock, preserving other tools' locks. Follow
 when restore or download fails. Only actual case execution, not installation,
 can satisfy the browser portion of the candidate's assurance.
 
+For SDK/runtime servicing, verify the official release's CVE mapping and image
+digests, regenerate owned dependency locks with the selected SDK, and retain
+the affected build and deployment evidence. Follow
+[the servicing baseline](OPERATIONS.md#complete-release-impact-metadata) and
+[operator rebuild instructions](../public/documentation/readme/self-hosting/docker-standalone.md).
+Do not treat framework pruning or a Dockerfile static check as a completed
+application image rebuild or a deployed-runtime verification.
+
 Generate the existing durable evidence bundle only as the checklist directs:
 
 ```sh

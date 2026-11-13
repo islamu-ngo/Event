@@ -52,16 +52,19 @@ runtime regression. Installation alone is not browser execution evidence.
 The installer lock also captures the selected SDK's implicit ILCompiler and
 ILLink dependencies. An SDK security update must regenerate this dedicated
 lock through native restore and pass a subsequent locked restore without
-changing the neighboring tool lock. The SDK 10.0.403 graph resolves these
-packages to 10.0.14, the patched floor for
+changing the neighboring tool lock. The selected SDK servicing baseline is
+recorded in [Operations](OPERATIONS.md#complete-release-impact-metadata).
+Inspect the regenerated compiler/linker versions; retain at least the 10.0.14
+patched floor for
 [GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9).
 Playwright remains at its separately approved version; auditing stays enabled.
 
 Release-impact validation executes the trusted base checkout. A patched SDK
 on the pull-request head does not upgrade that checkout: its SDK pin must
-receive an independently reviewed base update before the protected job can
-use the patched compiler. Do not switch this job to untrusted head code or
-suppress the advisory to make the check pass.
+receive the reviewed servicing change before the protected job can use the
+patched compiler. The accepted execution decision waits for the existing PR
+to merge; do not open a separate SDK PR, switch this job to untrusted head
+code or suppress the advisory to make the check pass.
 
 The existing `security-execution.v1.json` packet is governed by the embedded
 `executionRequirements` in `eng/security/security-control-register.json`.

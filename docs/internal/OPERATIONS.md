@@ -13,13 +13,28 @@ A workflow correction on a PR branch does not replace the trusted-base version
 used by `pull_request_target`; arrange an independently reviewed base update
 before relying on its rerun.
 
-The source build pins SDK `10.0.403` and runtime/WASM `10.0.14`; all four
-application image recipes retain verified immutable Microsoft image digests.
+The source build pins SDK `10.0.404` and server runtime `10.0.15`; the separate
+browser/WASM runtime pin remains `10.0.14`. All four application image recipes
+retain verified immutable Microsoft image digests.
 This replaces the SDK-selected vulnerable `Microsoft.DotNet.ILCompiler 10.0.10`
 reported by GHSA-p3jp-9v83-76w9. Regenerate affected locks through native restore
-and keep audit enabled. A trusted-base Release Impact run still uses the base
-branch SDK even when the PR head is patched; qualify an independently reviewed
-base update before treating that gate as repaired.
+and keep audit enabled. Server runtime `10.0.15` also services
+`CVE-2026-118747` / `GHSA-vmv3-wvjp-wqpj`. Rebuild and redeploy both split images
+and the self-contained Standalone image; changing an installed host runtime does
+not replace assemblies embedded in an existing image.
+
+The API integration project declares its direct `Microsoft.AspNetCore.App`
+framework ownership. NuGet then prunes framework-provided assemblies consistently
+with the hosted application instead of retaining an obsolete standalone CBOR
+dependency through an inherited framework reference. Do not add a redundant
+CBOR package reference or suppress NU1510/NU1902 to bypass that distinction.
+Package pruning is not proof that a deployed shared framework is serviced.
+
+A trusted-base Release Impact run still uses the base branch SDK even when the
+PR head is patched. The servicing change must reach that trusted base before
+its rerun can establish recovery. Keep the maintainer's decision to wait for the
+existing PR; do not execute head code in `pull_request_target`, suppress NU1903,
+or create a separate SDK PR to bypass that boundary.
 
 ## Native browser prerequisites
 

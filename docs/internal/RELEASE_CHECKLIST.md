@@ -22,6 +22,11 @@ before relying on its rerun.
 
 ## Release Model
 
+- [ ] Verify the selected SDK, shared runtime and digest-pinned container bases
+  against [the servicing baseline](OPERATIONS.md#complete-release-impact-metadata).
+  Retain regenerated dependency locks and actual restored/build evidence.
+  A clean pruned package graph does not certify the runtime inside an old image.
+
 The current release model is manual semantic-version tags plus manually authored GitHub Releases. Version scope and release history are tracked in [semantic_versioning/CHANGELOG.md](semantic_versioning/CHANGELOG.md); release readiness evidence is assembled from this checklist and the retained CI/CD artifacts referenced below.
 
 Do not add or require `.github/workflows/release.yml`, Release Drafter, or automatic semantic-release behavior until the release evidence bundle format is stable and the automation can attach or link durable evidence without relying only on expiring GitHub Actions artifacts. Conventional Commits remain the preferred commit-message style, but they do not automatically publish or version releases today.

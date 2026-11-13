@@ -17,6 +17,13 @@ before relying on its rerun.
 
 ## Scope and precedence
 
+SDK/runtime servicing evidence must cover the component actually delivered:
+package resolution, framework-provided assemblies and self-contained/container
+runtime bytes have distinct ownership. Pruning an obsolete package reference
+does not establish that a deployed runtime is patched. The selected source and
+image baseline is maintained in
+[Operations](OPERATIONS.md#complete-release-impact-metadata).
+
 This policy governs the future release engine. It does not replace the current manual
 [Release Checklist](RELEASE_CHECKLIST.md) before activation. In a conflict, this
 policy governs release invariants; [ADR-025](adr/ADR-025-provider-neutral-release-governance.md)

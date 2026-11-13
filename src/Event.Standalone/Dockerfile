@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.403@sha256:212fe4cb74627d5adf9817a4088906ae3edff1bd853bb27565d4b46731efe61e AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.404@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb AS build
 ARG TARGETARCH
 WORKDIR /src
 
@@ -44,7 +44,7 @@ RUN dotnet build "src/Event.MigrationService/Event.MigrationService.csproj" -c R
     && cp src/Event.Standalone/appsettings.json /app/publish/appsettings.json \
     && mkdir /app/data
 
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0.14-noble-chiseled-extra@sha256:56b6c354a140e50e09d45a397b43f9f9d31012c325020239e602e06d1594f8ff AS final
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0.15-noble-chiseled-extra@sha256:bf8715422b59a65719605d4fe2b8f3f0eb96209b84cb2ed6bf3b5af7d879f148 AS final
 WORKDIR /app
 ENV ASPNETCORE_HTTP_PORTS=8080
 ENV HttpsRedirection__Enabled=false

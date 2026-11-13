@@ -51,3 +51,28 @@ database. A compromised Runtime credential can therefore attempt primary-key
 changes; credential isolation and the application's original-owner, tenant,
 transaction and concurrency checks remain necessary. No tenant-status write,
 provider configuration write, or additional `User` grant is introduced.
+
+## Native external-enrollment graph
+
+`ExternalTenantEnrollmentInventory` declares the fixed Runtime storage needed
+to insert a new user, personal actor, provider binding, active tenant membership
+and verified identity-email evidence. The production database migrator and
+native test fixture invoke the same
+`PostgresExternalTenantEnrollmentPermissions` installer. Application handlers
+still own authentication, explicit tenant consent and admission; the storage
+grant does not select an enrollment execution purpose.
+
+Installation accepts an absent or complete declared addition and refuses a
+partial, inherited, table-wide, grantable, PUBLIC or foreign-grantor authority
+image. Catalogue owners recognize overlapping declared columns only alongside
+the complete package proof. Existing-identity mutation, private PII reads,
+identity-claim deletion and role-grant insertion remain outside this addition.
+The installer retains its original context, connector, backend and transaction
+through savepoint rollback and settlement.
+
+Composed external and worker catalogue proofs are evaluated through
+statement-local materialized scalars. Repeated consumers share that statement's
+proof, while later statements, transactions and execution owners evaluate it
+again. This bounds planner duplication without retaining observed permission
+results. Native witnesses cover complete graph commit and rollback, unverified
+email, tenant isolation, denied authority drift and same-connector recovery.

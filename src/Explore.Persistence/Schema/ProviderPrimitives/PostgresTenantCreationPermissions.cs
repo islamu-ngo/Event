@@ -179,11 +179,16 @@ public static class PostgresTenantCreationPermissions
     }
 
     /// <summary>Recognizes only an absent or complete fixed addition; no caller identity or executable protocol is inferred.</summary>
-    internal static string OptionalGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    internal static string OptionalGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        string? externalCataloguePredicate = null, string? workerCataloguePredicate = null)
     {
         enrollment.Validate();
         var sources = Sources(context);
-        return $"(({ManifestPredicate(context, sources, enrollment, false)}) AND (({FreshPredicate(context, sources, enrollment)}) OR ({ManifestPredicate(context, sources, enrollment, true)})))";
+        return PostgresExternalTenantEnrollmentPermissions.ComposeCataloguePredicate(context, enrollment,
+            externalCataloguePredicate, reference =>
+                PostgresManagedTenantWorkerCreationPermissions.ComposeCataloguePredicate(context, enrollment,
+                    workerCataloguePredicate, workerReference =>
+                        $"(({ManifestPredicate(context, sources, enrollment, false, reference, workerReference)}) AND (({FreshPredicate(context, sources, enrollment)}) OR ({ManifestPredicate(context, sources, enrollment, true, reference, workerReference)})))"));
     }
 
     /// <summary>Exact policy recognition for the readiness query's p/c/n aliases; never a new grant.</summary>
@@ -242,11 +247,15 @@ public static class PostgresTenantCreationPermissions
     }
 
     private static string ManifestPredicate(ExploreDbContext context, Source[] sources,
-        PostgresNativeQueueEnrollment enrollment, bool complete) =>
-        $"(({SourceManifestPredicate(context, sources, enrollment, complete)}) AND ({KeyFencePredicate(context, enrollment, complete ? true : null)}))";
+        PostgresNativeQueueEnrollment enrollment, bool complete, string? externalCataloguePredicate = null,
+        string? workerCataloguePredicate = null) =>
+        PostgresExternalTenantEnrollmentPermissions.ComposeCataloguePredicate(context, enrollment,
+            externalCataloguePredicate, reference =>
+                $"(({SourceManifestPredicate(context, sources, enrollment, complete, reference, workerCataloguePredicate)}) AND ({KeyFencePredicate(context, enrollment, complete ? true : null)}))");
 
     private static string SourceManifestPredicate(ExploreDbContext context, Source[] sources,
-        PostgresNativeQueueEnrollment enrollment, bool complete)
+        PostgresNativeQueueEnrollment enrollment, bool complete, string? externalCataloguePredicate,
+        string? workerCataloguePredicate)
     {
         string global = Text(enrollment.GlobalLogin), runtime = Text(enrollment.RuntimeLogin);
         var globalGrants = sources.SelectMany(source =>
@@ -284,6 +293,9 @@ public static class PostgresTenantCreationPermissions
             PostgresActorOwnershipReadPermissions.TryGetRuntimeReadColumns(context, source.Type, out var columns);
             return columns.Select(column => $"({runtime},{Text(source.Table)},{Text(column)},'SELECT',false)");
         });
+        var externalEnrollment = sources.SelectMany(source =>
+            PostgresExternalTenantEnrollmentPermissions.RuntimeColumns(context, source.Type)
+                .Select(grant => $"({runtime},{Text(source.Table)},{Text(grant.Column)},{Text(grant.Privilege)},false)"));
         var bootstrapGrants = sources.SelectMany(source =>
             PostgresSetupLiveStoragePermissions.GlobalBootstrapColumns(context, source.Type)
                 .SelectMany(column => new[] { "SELECT", "INSERT", "UPDATE" }
@@ -295,7 +307,7 @@ public static class PostgresTenantCreationPermissions
         // source intersection without installing it or admitting an inherited role union.
         var role = sources.Single(source => source.Type == typeof(Role));
         PostgresLookupCatalogueReadPermissions.TryGetRuntimeReadColumns(context, typeof(Role), out var runtimeRoleColumns);
-        string expected = "VALUES " + string.Join(',', globalGrants.Concat(workerGrants).Concat(membershipReads).Concat(membershipMutations).Concat(tenantKeyParents).Concat(actorOwnershipReads).Concat(bootstrapGrants).Concat(runtimeRoleColumns.Select(column =>
+        string expected = "VALUES " + string.Join(',', globalGrants.Concat(workerGrants).Concat(membershipReads).Concat(membershipMutations).Concat(tenantKeyParents).Concat(actorOwnershipReads).Concat(externalEnrollment).Concat(bootstrapGrants).Concat(runtimeRoleColumns.Select(column =>
             $"({runtime},{Text(role.Table)},{Text(column)},'SELECT',false)")));
         string tables = "ARRAY[" + string.Join(',', sources.Select(source => Text(source.Table))) + "]::text[]";
         string required = complete ? $"""
@@ -335,8 +347,9 @@ public static class PostgresTenantCreationPermissions
                                         AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=r.oid
                                             AND acl.grantor=t.relowner AND acl.privilege_type=permission.privilege AND NOT acl.is_grantable)
                                         AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=0 AND acl.privilege_type=permission.privilege))))))
-                AND ({sourceProofs}) AND ({PostgresManagedTenantWorkerCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment)})
-                AND ({PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment)})
+                AND ({sourceProofs}) AND ({PostgresManagedTenantWorkerCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment, workerCataloguePredicate)})
+                AND ({PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment, externalCataloguePredicate)})
+                AND ({externalCataloguePredicate ?? PostgresExternalTenantEnrollmentPermissions.OptionalCataloguePredicate(context, enrollment)})
                 AND ({PostgresSetupLiveStoragePermissions.OptionalGlobalCompletionCataloguePredicate(context, enrollment)}) {required})
             """;
     }

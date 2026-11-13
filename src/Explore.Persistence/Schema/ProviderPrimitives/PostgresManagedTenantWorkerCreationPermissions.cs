@@ -152,15 +152,29 @@ public static class PostgresManagedTenantWorkerCreationPermissions
     }
 
     /// <summary>The leaf never invokes another permission owner's composed admission predicate.</summary>
-    internal static string OptionalGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    internal static string OptionalGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        string? workerCataloguePredicate = null)
     {
         enrollment.Validate();
         var sources = Sources(context);
-        return $"(({PostgresSetupLiveStoragePermissions.OptionalGlobalCompletionCataloguePredicate(context, enrollment)}) AND (({AbsentPredicate(context, sources, enrollment)}) OR ({CataloguePredicate(context, sources, enrollment, true)})))";
+        return ComposeCataloguePredicate(context, enrollment, workerCataloguePredicate, reference =>
+            $"(({PostgresSetupLiveStoragePermissions.OptionalGlobalCompletionCataloguePredicate(context, enrollment)}) AND (({AbsentPredicate(context, sources, enrollment)}) OR ({reference})))");
     }
 
-    internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
-        CataloguePredicate(context, Sources(context), enrollment, true);
+    internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        string? workerCataloguePredicate = null) =>
+        workerCataloguePredicate ?? CataloguePredicate(context, Sources(context), enrollment, true);
+
+    internal static string ComposeCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        string? workerCataloguePredicate, Func<string, string> predicate)
+    {
+        if (workerCataloguePredicate is not null) return predicate(workerCataloguePredicate);
+        return $"""
+            COALESCE((WITH managed_worker_catalogue AS MATERIALIZED (
+                SELECT ({CompleteGlobalCataloguePredicate(context, enrollment)}) AS ready)
+            SELECT ({predicate("(SELECT ready FROM managed_worker_catalogue)")})),false)
+            """;
+    }
 
     /// <summary>
     /// Composes existing complete application catalogues for storage readiness. The worker leaf never calls this facade.
@@ -409,10 +423,25 @@ public static class PostgresManagedTenantWorkerCreationPermissions
         + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{source.Schema}\n{source.Name}\n{login}\n{policy}"))) + ":";
     private static string SealedSession(string login) => $"SESSION_USER=CURRENT_USER AND CURRENT_USER={Text(login)}::name AND NULLIF(pg_catalog.current_setting('app.current_tenant_id',true),'') IS NULL";
 
-    private static Source[] Sources(ExploreDbContext context)
+    internal static Task RequireExternalEnrollmentSourcesAsync(ExploreDbContext context,
+        PostgresNativeQueueEnrollment enrollment, IdentityDatabaseTopology identityTopology,
+        CancellationToken cancellationToken)
+    {
+        var inventory = ExternalTenantEnrollmentInventory.Sources
+            .Select(source => new ManagedTenantWorkerCreationInventory.Source(source.Entity, source.Read, source.Insert, []));
+        return RequireExecutableSourcesAsync(context, MapSources(context, inventory),
+            ProvisioningSharedWriterAssertions.ManagedTenantWorkerCreationInventory(context, enrollment, identityTopology),
+            enrollment, cancellationToken);
+    }
+
+    private static Source[] Sources(ExploreDbContext context) =>
+        MapSources(context, ManagedTenantWorkerCreationInventory.Sources);
+
+    private static Source[] MapSources(ExploreDbContext context,
+        IEnumerable<ManagedTenantWorkerCreationInventory.Source> inventory)
     {
         var tenants = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
-        return ManagedTenantWorkerCreationInventory.Sources.Select(item =>
+        return inventory.Select(item =>
         {
             var entity = context.Model.FindEntityType(item.Entity) ?? throw new InvalidOperationException("worker_creation_model_missing");
             string name = entity.GetTableName() ?? throw new InvalidOperationException("worker_creation_table_missing");

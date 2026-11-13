@@ -213,7 +213,9 @@ public static class PostgresTenantApiKeyStoragePermissions
     private static string Manifest(ExploreDbContext context, Source[] sources, PostgresNativeQueueEnrollment enrollment, bool complete)
     {
         string runtime = Role(enrollment.RuntimeLogin), migrator = Role(enrollment.MigratorLogin);
-        string expected = string.Join(',', sources.SelectMany(source => source.Grants.Select(grant =>
+        string expected = string.Join(',', sources.SelectMany(source => source.Grants
+            .Concat(PostgresExternalTenantEnrollmentPermissions.RuntimeColumns(context, source.Type)
+                .Select(grant => new Grant(grant.Column, grant.Privilege))).Distinct().Select(grant =>
             $"({Text(source.Table)},{Text(grant.Column)},{Text(grant.Privilege)})")));
         string tables = "ARRAY[" + string.Join(',', sources.Select(source => Text(source.Table))) + "]::text[]";
         string required = complete ? string.Join(" AND ", sources.SelectMany(source => source.Grants.Select(grant => $"""
@@ -252,6 +254,7 @@ public static class PostgresTenantApiKeyStoragePermissions
                     CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=0)
                 AND ({string.Join(" AND ", sources.Select(source => SourcePredicate(context, source, enrollment)))})
                 AND ({required}) AND ({policies})
+                AND ({PostgresExternalTenantEnrollmentPermissions.OptionalCataloguePredicate(context, enrollment)})
                 AND NOT EXISTS (SELECT 1 FROM unnest({tables}) target(relation)
                     JOIN pg_catalog.pg_policy p ON p.polrelid=pg_catalog.to_regclass(target.relation)
                     WHERE p.polname NOT IN ('tenant_isolation',{Text(Policy)})

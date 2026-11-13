@@ -348,6 +348,8 @@ public static class ExploreDatabaseMigrator
                 IdentityDatabaseConfiguration.GetTopology(configuration), cancellationToken);
             await PostgresPrivacyReplayStoragePermissions.ApplyAsync(
                 executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresExternalTenantEnrollmentPermissions.ApplyAsync(executionDatabase, queueEnrollment,
+                IdentityDatabaseConfiguration.GetTopology(configuration), cancellationToken);
         }
         await EventDiscoveryRankBackfill.ApplyAsync(executionDatabase, cancellationToken);
     }

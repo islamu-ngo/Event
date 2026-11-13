@@ -361,6 +361,8 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresActorOwnershipReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresSetupLiveStoragePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresPrivacyReplayStoragePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresExternalTenantEnrollmentPermissions.ApplyAsync(
+                migratorContext, NativeQueueEnrollment, _identityTopology);
         }
 
         RecordStage(AssuranceStage.ContractsReturned);

@@ -14,6 +14,7 @@ using Explore.Application.Features.Settings;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.TenantOnboarding.Requests.Commands;
 using Explore.Application.Features.EventResourceProviderActivation.Requests.Commands;
+using Explore.Application.Features.Appearance.Requests.Commands;
 
 namespace Explore.Application.Contracts.Persistence;
 
@@ -41,6 +42,9 @@ public interface IPreparedHumanSettingsMutation;
 /// </summary>
 public interface IHumanSettingsMutationPreparation
 {
+    /// <summary>Observed parent values select candidate effects; retained DATA validates their exact kind.</summary>
+    Task<IPreparedHumanSettingsMutation> PrepareAsync(UpdateCurrentUserAppearancePreferencesCommand command,
+        string parentLanguage, string parentDirection, CancellationToken cancellationToken = default);
     Task<IPreparedHumanSettingsMutation> PrepareAsync(UpdateLocalizationGovernanceCommand command,
         CancellationToken cancellationToken = default);
     /// <summary>The ordinary source of this issuer's active callback, never an import or mixed source.</summary>

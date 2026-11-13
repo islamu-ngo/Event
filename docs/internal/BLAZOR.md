@@ -419,6 +419,30 @@ Cookie-authenticated BFF mutations use a double-submit-style antiforgery contrac
 7. InteractiveServer storage-upload self-calls use a short-lived Data Protection protected `X-ISLAMU-BFF-SELF-CALL` token bound to the method, path, host, and authenticated user so they can pass the same endpoint filter without exposing browser tokens or setup secrets.
 8. Documented exceptions are setup-secret bootstrap endpoints and `/bff/auth/refresh-session/internal`; these use separate credentials/authorization constraints because initial setup and server-side onboarding calls cannot reliably satisfy browser antiforgery semantics.
 
+## Authenticated Localization Preference Owner
+
+`/bff/language` and `/bff/direction` persist through the existing authenticated
+`PATCH /api/user/appearance` operation before updating culture cookies. The
+native command selects the current tenant's owner before constructing its
+handler. `HumanSettingsMutationPreparation` binds only the supplied language and
+direction effects to the original human subject, credential and physical owner.
+The handler uses that prepared attempt instead of opening a second transaction.
+
+Parent-equivalent values remove the user's override. The ordinary writer
+validates that choice against its retained System/Tenant image using
+`HierarchicalSettingMerge` and `AppearanceSettingGroup`, including canonical
+language/direction normalization and parent locks. Acquiring and completing the
+same source excludes later parent changes; cache invalidation follows successful
+settlement. Theme mode and active profile are outside this intent. This uses the
+existing ordinary-settings provider support and grants no additional database
+rights.
+
+`AppearanceResolutionService` resolves the same current tenant/user setting group
+when reading effective appearance. It overlays only language and direction on the
+selected profile, configured preset or fallback theme. Saving a preference and
+reading it back therefore use the same hierarchy without replacing theme mode or
+the active profile.
+
 ## Storage Upload Proxy Boundary
 
 Browser-mediated storage uploads use BFF-owned upload sessions rather than caller-supplied destination URLs:

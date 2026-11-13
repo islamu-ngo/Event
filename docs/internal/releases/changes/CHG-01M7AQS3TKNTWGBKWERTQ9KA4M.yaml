@@ -1,0 +1,29 @@
+Change-Id: CHG-01M7AQS3TKNTWGBKWERTQ9KA4M
+Title: "save authenticated localization through its native settings owner"
+Type: fix
+Scope: localization
+Summary: "Persist and read current-user language and direction in the selected tenant while preserving theme and profile choices, inherited locks and protected settings completion."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: The appearance command prepares only supplied language and direction effects under the authenticated tenant, original human subject and credential owner. Retained parent DATA validates Set versus Remove and rejects inherited locks. Existing privacy, source lifetime and private completion guards remain unchanged; no additional database rights or body-supplied authority is accepted.
+  Migration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: Signed-in preferences apply only to the current tenant and account. Selecting the inherited value removes its override; effective appearance reads preserve theme and active profile while returning the resolved language and direction. No migration or configuration change is required.

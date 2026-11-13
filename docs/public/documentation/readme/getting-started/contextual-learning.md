@@ -61,6 +61,12 @@ guidance is hidden or disabled. It explains browsing, participation, personal
 work and organization/group collaboration. Administration links reflect the
 settings scopes currently offered by the server; Help does not grant them.
 
+In deployments with native preference support, signed-in language and direction
+changes save only your preferences in the current tenant. Selecting an inherited
+value removes your override so future default changes can apply. These changes
+preserve your theme and active profile. If the server cannot confirm a save, the
+current language stays visible and the picker reports the failure.
+
 Your own profile or currently selected authorized organization/group context can
 show your private learning panel after sign-in. Other visitors see no private
 progress. The panel keeps personal preferences and fictional practice separate

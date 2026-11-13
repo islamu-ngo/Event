@@ -18,7 +18,7 @@ public class UpdateCurrentUserAppearancePreferencesCommandHandler : ICommandHand
     private readonly IPrivacyErasureStateRepository _privacyErasureStateRepository;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IHumanSettingsMutationPreparation _settingsPreparation;
 
     public UpdateCurrentUserAppearancePreferencesCommandHandler(
         IUserPreferenceRepository userPreferenceRepository,
@@ -26,14 +26,14 @@ public class UpdateCurrentUserAppearancePreferencesCommandHandler : ICommandHand
         IPrivacyErasureStateRepository privacyErasureStateRepository,
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
-        IUnitOfWork unitOfWork)
+        IHumanSettingsMutationPreparation settingsPreparation)
     {
         _userPreferenceRepository = userPreferenceRepository;
         _hierarchicalSettingsResolver = hierarchicalSettingsResolver;
         _privacyErasureStateRepository = privacyErasureStateRepository;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
-        _unitOfWork = unitOfWork;
+        _settingsPreparation = settingsPreparation;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateCurrentUserAppearancePreferencesCommand request, CancellationToken cancellationToken)
@@ -62,10 +62,17 @@ public class UpdateCurrentUserAppearancePreferencesCommandHandler : ICommandHand
         }
 
         var tenantId = _tenantContext.TenantId;
+        var parentAppearance = await _hierarchicalSettingsResolver.ResolveGroupAsync<AppearanceSettingGroup>(
+            new SettingContext(TenantId: tenantId), cancellationToken);
+        string parentLanguage = parentAppearance.Language;
+        string parentDirection = parentAppearance.Direction;
+        var prepared = await _settingsPreparation.PrepareAsync(
+            request, parentLanguage, parentDirection, cancellationToken);
 
         DateTime utcNow = DateTime.UtcNow;
-        var response = await _unitOfWork.ExecuteSerializableAsync(
-            async ct => await PersistPreferencesAsync(request, tenantId, userId.Value, utcNow, ct),
+        var response = await _settingsPreparation.ExecutePreparedAsync(prepared,
+            (_, ct) => PersistPreferencesAsync(request, tenantId, userId.Value, utcNow,
+                parentLanguage, parentDirection, ct),
             cancellationToken);
 
         if (response.IsSuccess)
@@ -81,16 +88,14 @@ public class UpdateCurrentUserAppearancePreferencesCommandHandler : ICommandHand
         Guid tenantId,
         Guid userId,
         DateTime utcNow,
+        string parentLanguage,
+        string parentDirection,
         CancellationToken cancellationToken)
     {
         if (await IsFencedAsync(userId, cancellationToken))
         {
             return FencedResponse();
         }
-
-        var parentAppearance = await _hierarchicalSettingsResolver.ResolveGroupAsync<AppearanceSettingGroup>(
-            new SettingContext(TenantId: tenantId),
-            cancellationToken);
 
         var localization = request.Preferences.Localization!;
         if (localization.Language is not null)
@@ -100,7 +105,7 @@ public class UpdateCurrentUserAppearancePreferencesCommandHandler : ICommandHand
                 userId,
                 GovernanceSettingKeys.Appearance.Language,
                 localization.Language.Trim().ToLowerInvariant(),
-                parentAppearance.Language,
+                parentLanguage,
                 utcNow);
         }
 
@@ -111,7 +116,7 @@ public class UpdateCurrentUserAppearancePreferencesCommandHandler : ICommandHand
                 userId,
                 GovernanceSettingKeys.Appearance.Direction,
                 localization.Direction.Trim().ToLowerInvariant(),
-                parentAppearance.Direction,
+                parentDirection,
                 utcNow);
         }
 

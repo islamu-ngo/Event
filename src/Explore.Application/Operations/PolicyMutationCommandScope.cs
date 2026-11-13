@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Appearance.Requests.Commands;
 using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Features.Localization.Requests.Commands;
 using Explore.Application.Contracts.Identity;
@@ -24,6 +25,7 @@ internal static class PolicyMutationCommandScope
     internal static bool Handles(Type request) =>
         FooterOperationScope.Handles(request)
         || HandlesLearning(request)
+        || request == typeof(UpdateCurrentUserAppearancePreferencesCommand)
         || request == typeof(UpdateLocalizationGovernanceCommand)
         || request == typeof(UpdateUserLastActiveTenantCommand)
         || request == typeof(UpdateSettingCommand) || request == typeof(UpdateSettingBatchCommand)
@@ -98,6 +100,10 @@ internal static class PolicyMutationCommandScope
 
     private static PolicyMutationScope? Select(object request, ITenantContextAccessor? tenantContext) => request switch
     {
+        UpdateCurrentUserAppearancePreferencesCommand when tenantContext is { IsResolved: true, TenantId: var tenant }
+            && tenant != Guid.Empty => new(tenant),
+        UpdateCurrentUserAppearancePreferencesCommand =>
+            throw new UnauthorizedAccessException("Appearance preferences require the authenticated tenant."),
         UpdateLocalizationGovernanceCommand => PolicyMutationScope.Instance,
         UpdateUserLastActiveTenantCommand => PolicyMutationScope.Instance,
         SaveInstanceOnboardingProfileCommand => PolicyMutationScope.Instance,

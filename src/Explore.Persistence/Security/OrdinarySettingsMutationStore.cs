@@ -2,8 +2,12 @@ using System.Data;
 using System.Data.Common;
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
+using Explore.Application.Features.Appearance.Requests.Commands;
+using Explore.Application.Settings;
+using Explore.Application.Settings.Groups;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
@@ -46,6 +50,7 @@ public sealed class OrdinarySettingsMutationStore(
         {
             source.RequireSelection();
             source.Expected = native?.Image ?? await ReadAsync(source, cancellationToken);
+            RequireAppearanceEffectKinds(source);
             source.Discovery = await Services.SettingsDiscoveryDisclosureObservation.ObserveAsync(
                 context, selection, mutation, subject, cancellationToken);
             source.RequireSelection();
@@ -76,6 +81,39 @@ public sealed class OrdinarySettingsMutationStore(
             }
         }
         catch { issued.State = 2; throw; }
+    }
+
+    private static void RequireAppearanceEffectKinds(Source source)
+    {
+        if (source.Mutation.Original is not UpdateCurrentUserAppearancePreferencesCommand appearance)
+            return;
+        var image = source.Expected!;
+        var system = image.System.Where(pair => pair.Value is not null)
+            .ToDictionary(pair => pair.Key, pair => pair.Value!.Entity(), StringComparer.Ordinal);
+        var tenant = image.Tenant.Where(pair => pair.Value is not null)
+            .ToDictionary(pair => pair.Key, pair => pair.Value!.Entity(), StringComparer.Ordinal);
+        var parents = new Dictionary<string, ResolvedSetting>(StringComparer.Ordinal);
+        foreach (var effect in source.Mutation.Effects)
+        {
+            var parent = HierarchicalSettingMerge.Resolve(effect.Key, system,
+                source.TenantId.HasValue ? tenant : null);
+            if (parent is null || parent.IsLocked)
+                throw new UnauthorizedAccessException("Appearance effects require their original unlocked parent.");
+            parents.Add(effect.Key, parent);
+        }
+        var inherited = new AppearanceSettingGroup();
+        inherited.Populate(parents);
+        foreach (var effect in source.Mutation.Effects)
+        {
+            var localization = appearance.Preferences.Localization!;
+            string input = (effect.Key == GovernanceSettingKeys.Appearance.Language
+                ? localization.Language : localization.Direction)!.Trim().ToLowerInvariant();
+            string parent = effect.Key == GovernanceSettingKeys.Appearance.Language
+                ? inherited.Language : inherited.Direction;
+            bool remove = string.Equals(input, parent, StringComparison.Ordinal);
+            if (remove != (effect.Kind == HumanSettingsMutationKind.Remove))
+                throw new UnauthorizedAccessException("The appearance parent changed before its original observation.");
+        }
     }
 
     public async Task RequireCompleteAsync(IOrdinarySettingsSource source, CancellationToken cancellationToken)

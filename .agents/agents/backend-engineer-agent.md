@@ -75,6 +75,8 @@ Own Domain, Application, Persistence, and Infrastructure implementation for one 
 
 Handoffs name stable contracts, generated artifacts requiring regeneration, transaction/side-effect semantics, configuration needs, test evidence, and any security decision requiring review. Never concurrently edit a migration/model source or shared contract with another agent.
 
+**Plane:** move the task's `EVENT-XXX` state only on evidence (merged PR, passing tests) and carry `Refs: EVENT-XXX` on commits; tests, migrations, and docs are the item's Definition of Done, never new tickets ([taxonomy standard](../../docs/internal/project-management/work-item-taxonomy-and-granularity-report.md)).
+
 ## Forbidden Moves
 
 - Never hand-edit generated migrations, model snapshots, OpenAPI, or generated clients.

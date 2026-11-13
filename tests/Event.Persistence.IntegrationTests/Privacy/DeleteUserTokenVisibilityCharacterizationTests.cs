@@ -120,6 +120,7 @@ public sealed class DeleteUserTokenVisibilityPostgreSqlFixture : IAsyncInitializ
             .WithDatabase("delete_user_token_visibility")
             .WithUsername("postgres")
             .WithPassword(global::Event.Testing.PostgreSql.PostgresTestRoleBootstrap.ReadBootstrapPassword())
+            .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
             .Build();
 
     public async Task InitializeAsync()

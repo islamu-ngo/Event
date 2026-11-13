@@ -432,7 +432,9 @@ public sealed class PostgresHumanEventAssignmentSourceContractTests(PostgreSqlCo
             var original = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator);
             var container = new PostgreSqlBuilder("postgres:18-alpine")
                 .WithDatabase("assignment_source_" + Guid.CreateVersion7().ToString("N"))
-                .WithUsername(original.Username!).WithPassword(original.Password!).Build();
+                .WithUsername(original.Username!).WithPassword(original.Password!)
+                .ApplyBoundedResourcePolicy(global::Event.Testing.ContainerServiceRole.PostgreSql)
+                .Build();
             try
             {
                 await container.StartAsync();

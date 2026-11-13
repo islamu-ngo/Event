@@ -183,7 +183,8 @@ public sealed class ConfiguredAdministratorBootstrapMySqlConcurrencyTests(
     public async Task ConcurrentPrepareAgainstEmptyMySqlFamilyDatabaseConverges(
         PrimaryDatabaseProvider provider)
     {
-        await using (ExploreDbContext setup = CreateContext(fixture.CreateOptions(provider)))
+        PrimaryDatabaseConnectionOptions dbOptions = await fixture.CreateOptionsAsync(provider);
+        await using (ExploreDbContext setup = CreateContext(dbOptions))
         {
             await setup.Database.EnsureCreatedAsync();
         }
@@ -193,8 +194,8 @@ public sealed class ConfiguredAdministratorBootstrapMySqlConcurrencyTests(
         var barrier = new ConfiguredAdministratorBootstrapStartupConcurrencyTests.BootstrapConnectionBarrier();
         IConfiguration configuration =
             ConfiguredAdministratorBootstrapStartupConcurrencyTests.CreateConfiguration();
-        await using ExploreDbContext firstContext = CreateContext(fixture.CreateOptions(provider), barrier);
-        await using ExploreDbContext secondContext = CreateContext(fixture.CreateOptions(provider), barrier);
+        await using ExploreDbContext firstContext = CreateContext(dbOptions, barrier);
+        await using ExploreDbContext secondContext = CreateContext(dbOptions, barrier);
         ConfiguredAdministratorBootstrapStartupRunner first =
             ConfiguredAdministratorBootstrapStartupConcurrencyTests.CreateRunner(
                 firstContext,
@@ -209,7 +210,7 @@ public sealed class ConfiguredAdministratorBootstrapMySqlConcurrencyTests(
                 second.PrepareAsync(timeout.Token))
             .WaitAsync(timeout.Token);
 
-        await using ExploreDbContext verification = CreateContext(fixture.CreateOptions(provider));
+        await using ExploreDbContext verification = CreateContext(dbOptions);
         var states = await verification.InstanceBootstrapStates
             .AsNoTracking()
             .ToListAsync(timeout.Token);
@@ -225,7 +226,8 @@ public sealed class ConfiguredAdministratorBootstrapMySqlConcurrencyTests(
         PrimaryDatabaseProvider provider)
     {
         string resource = $"explore:instance-onboarding:{Guid.CreateVersion7():N}";
-        await using ExploreDbContext first = CreateContext(fixture.CreateOptions(provider));
+        PrimaryDatabaseConnectionOptions dbOptions = await fixture.CreateOptionsAsync(provider);
+        await using ExploreDbContext first = CreateContext(dbOptions);
         await using (var transaction = await first.Database.BeginTransactionAsync())
         {
             await using var lease = await RelationalNamedLock.AcquireTransactionAsync(
@@ -233,7 +235,7 @@ public sealed class ConfiguredAdministratorBootstrapMySqlConcurrencyTests(
             await transaction.CommitAsync();
         }
 
-        await using ExploreDbContext second = CreateContext(fixture.CreateOptions(provider));
+        await using ExploreDbContext second = CreateContext(dbOptions);
         await using var nextTransaction = await second.Database.BeginTransactionAsync();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await using var nextLease = await RelationalNamedLock.AcquireTransactionAsync(

@@ -249,6 +249,7 @@ public sealed class PostgresHumanPrincipalSourceContractTests(PostgreSqlContaine
                 .WithDatabase("principal_source_" + Guid.CreateVersion7().ToString("N"))
                 .WithUsername(migrator.Username!)
                 .WithPassword(migrator.Password!)
+                .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
                 .Build();
             try
             {

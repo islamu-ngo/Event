@@ -57,7 +57,9 @@ public sealed class CustomPropertyGovernanceExternalRepositoryTests(AdmissionAut
     public async Task ReportUsesPersistedRowsAndFiltersBeforeCountingAndPaging(PrimaryDatabaseProvider provider)
     {
         var options = TestDbContextOptions.Create<ExploreDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.CreateOptions(provider, PrimaryDatabaseRole.Migrator));
+        PrimaryDatabaseProviderComposition.ConfigureApplication(
+            options,
+            await fixture.CreateOptionsAsync(provider, PrimaryDatabaseRole.Migrator));
         await using var db = new ExploreDbContext(options.Options);
         await db.Database.MigrateAsync();
         await CustomPropertyGovernanceRepositoryContract.AssertAsync(db);

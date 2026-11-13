@@ -180,7 +180,7 @@ public sealed class SqlServerApplicationInitialLifecycleTests(
         PrimaryDatabaseProvider provider)
     {
         PrimaryDatabaseConnectionOptions source =
-            fixture.CreateOptions(provider);
+            await fixture.CreateOptionsAsync(provider);
         var options = new PrimaryDatabaseConnectionOptions
         {
             Role = PrimaryDatabaseRole.Migrator,

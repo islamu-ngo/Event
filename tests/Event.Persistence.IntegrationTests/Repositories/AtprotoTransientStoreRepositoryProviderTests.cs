@@ -20,8 +20,8 @@ public sealed class AtprotoTransientStoreRepositoryProviderTests(AdmissionAuthor
     [Arguments(PrimaryDatabaseProvider.MySql)]
     public async Task GeneratedMigrationAndAtomicRepositoryContractPass(PrimaryDatabaseProvider provider)
     {
-        await using (ExploreDbContext migrator = CreateContext(provider, PrimaryDatabaseRole.Migrator)) await migrator.Database.MigrateAsync();
-        await using (ExploreDbContext cleanup = CreateContext(provider))
+        await using (ExploreDbContext migrator = await CreateContextAsync(provider, PrimaryDatabaseRole.Migrator)) await migrator.Database.MigrateAsync();
+        await using (ExploreDbContext cleanup = await CreateContextAsync(provider))
         {
             await cleanup.AtprotoTransientRecords.ExecuteDeleteAsync();
             await cleanup.AtprotoTransientAssertionReplays.ExecuteDeleteAsync();
@@ -29,7 +29,7 @@ public sealed class AtprotoTransientStoreRepositoryProviderTests(AdmissionAuthor
         DateTimeOffset now = DateTimeOffset.UtcNow;
         Guid tenant = Guid.CreateVersion7();
         AtprotoTransientRecord record = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest, AtprotoAuthenticationFlowTarget.Targeted(tenant), "opaque", now.AddMinutes(1).ToUnixTimeMilliseconds());
-        await using (ExploreDbContext writer = CreateContext(provider))
+        await using (ExploreDbContext writer = await CreateContextAsync(provider))
         {
             var repository = new AtprotoTransientStoreRepository(writer, new FixedTimeProvider(now));
             await Assert.That(await repository.TryCreateAsync(record)).IsTrue();
@@ -39,7 +39,7 @@ public sealed class AtprotoTransientStoreRepositoryProviderTests(AdmissionAuthor
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         Task<AtprotoTransientRecord?>[] attempts = Enumerable.Range(0, 8).Select(async index =>
         {
-            await using ExploreDbContext context = CreateContext(provider);
+            await using ExploreDbContext context = await CreateContextAsync(provider);
             // Model construction is setup, not part of the simultaneous consume deadline.
             _ = context.Model;
             await start.Task;
@@ -50,7 +50,7 @@ public sealed class AtprotoTransientStoreRepositoryProviderTests(AdmissionAuthor
         await Assert.That(results.Count(result => result is not null)).IsEqualTo(1);
         await Assert.That(results.Single(result => result is not null)!.ProtectedPayload).IsEqualTo("opaque");
 
-        await using ExploreDbContext replayContext = CreateContext(provider);
+        await using ExploreDbContext replayContext = await CreateContextAsync(provider);
         var replayRepository = new AtprotoTransientAssertionReplayRepository(replayContext, new FixedTimeProvider(now));
         AtprotoTransientAssertionReplay replay = AtprotoTransientAssertionReplay.CreateFromAssertionId("provider-claim", now.AddSeconds(35).ToUnixTimeMilliseconds());
         await Assert.That(await replayRepository.TryClaimAsync(replay)).IsTrue();
@@ -67,11 +67,11 @@ public sealed class AtprotoTransientStoreRepositoryProviderTests(AdmissionAuthor
     public async Task MaximumProtectedPayloadRoundTripsThroughGeneratedMigration(
         PrimaryDatabaseProvider provider, char payloadCharacter)
     {
-        await using (ExploreDbContext migrator = CreateContext(provider, PrimaryDatabaseRole.Migrator))
+        await using (ExploreDbContext migrator = await CreateContextAsync(provider, PrimaryDatabaseRole.Migrator))
         {
             await migrator.Database.MigrateAsync();
         }
-        await using (ExploreDbContext cleanup = CreateContext(provider))
+        await using (ExploreDbContext cleanup = await CreateContextAsync(provider))
         {
             await cleanup.AtprotoTransientRecords.ExecuteDeleteAsync();
         }
@@ -84,18 +84,18 @@ public sealed class AtprotoTransientStoreRepositoryProviderTests(AdmissionAuthor
         AtprotoTransientRecord record = AtprotoTransientRecord.Create(
             AtprotoTransientPurpose.OAuthState, Digest, AtprotoAuthenticationFlowTarget.Targeted(tenant), payload, now.AddMinutes(1).ToUnixTimeMilliseconds());
 
-        await using (ExploreDbContext writer = CreateContext(provider))
+        await using (ExploreDbContext writer = await CreateContextAsync(provider))
         {
             var repository = new AtprotoTransientStoreRepository(writer, new FixedTimeProvider(now));
             await Assert.That(await repository.TryCreateAsync(record)).IsTrue();
         }
-        await using (ExploreDbContext reader = CreateContext(provider))
+        await using (ExploreDbContext reader = await CreateContextAsync(provider))
         {
             var repository = new AtprotoTransientStoreRepository(reader, new FixedTimeProvider(now));
             AtprotoTransientRecord? restored = await repository.ReadAsync(record.Purpose, record.TokenDigest, tenant);
             await Assert.That(restored?.ProtectedPayload).IsEqualTo(payload);
         }
-        await using (ExploreDbContext consumer = CreateContext(provider))
+        await using (ExploreDbContext consumer = await CreateContextAsync(provider))
         {
             var repository = new AtprotoTransientStoreRepository(consumer, new FixedTimeProvider(now));
             AtprotoTransientRecord? consumed = await repository.ConsumeAsync(record.Id, record.Purpose, record.TokenDigest, tenant);
@@ -103,10 +103,10 @@ public sealed class AtprotoTransientStoreRepositoryProviderTests(AdmissionAuthor
         }
     }
 
-    private ExploreDbContext CreateContext(PrimaryDatabaseProvider provider, PrimaryDatabaseRole role = PrimaryDatabaseRole.Runtime)
+    private async Task<ExploreDbContext> CreateContextAsync(PrimaryDatabaseProvider provider, PrimaryDatabaseRole role = PrimaryDatabaseRole.Runtime)
     {
         var builder = TestDbContextOptions.Create<ExploreDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureApplication(builder, fixture.CreateOptions(provider, role));
+        PrimaryDatabaseProviderComposition.ConfigureApplication(builder, await fixture.CreateOptionsAsync(provider, role));
         return new ExploreDbContext(builder.Options);
     }
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider { public override DateTimeOffset GetUtcNow() => now; }

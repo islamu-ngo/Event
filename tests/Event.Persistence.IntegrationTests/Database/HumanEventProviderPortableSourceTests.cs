@@ -34,7 +34,7 @@ public sealed class HumanEventProviderPortableSourceTests(AdmissionAuthorityProv
         Guid tenant = Guid.CreateVersion7();
         Guid eventId = Guid.CreateVersion7();
         DateTime now = DateTime.UtcNow;
-        await using var setup = Open(provider, tenant);
+        await using var setup = await OpenAsync(provider, tenant);
         await CreateSourceRelationsAsync(setup, provider);
         var connection = RegistrationProviderConnection.Create(tenant, "Portable source",
             RegistrationProviderKindEnum.ExternalForm, RegistrationProviderDeploymentKindEnum.HostedSaas,
@@ -49,13 +49,13 @@ public sealed class HumanEventProviderPortableSourceTests(AdmissionAuthorityProv
         setup.AddRange(connection, form, binding);
         await setup.SaveChangesAsync();
 
-        await using var context = Open(provider, tenant);
+        await using var context = await OpenAsync(provider, tenant);
         await using var owner = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var initial = await ReadAsync(context, tenant, eventId, binding.Id);
         await Assert.That(initial[HumanEventProviderSource.Binding].Single()).IsEqualTo(binding.Id);
         await Assert.That(initial[HumanEventProviderSource.Connection].Single()).IsEqualTo(connection.Id);
         await Assert.That(initial[HumanEventProviderSource.Capability].Count).IsEqualTo(0);
-        await using (var writer = Open(provider, tenant))
+        await using (var writer = await OpenAsync(provider, tenant))
         {
             await writer.Database.OpenConnectionAsync();
             // The owner remains held throughout. This bounds a negative lock assertion; no
@@ -137,10 +137,10 @@ public sealed class HumanEventProviderPortableSourceTests(AdmissionAuthorityProv
         }
     }
 
-    private ExploreDbContext Open(PrimaryDatabaseProvider provider, Guid tenant)
+    private async Task<ExploreDbContext> OpenAsync(PrimaryDatabaseProvider provider, Guid tenant)
     {
         var options = TestDbContextOptions.Create<ExploreDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.CreateOptions(provider));
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, await fixture.CreateOptionsAsync(provider));
         return new ExploreDbContext(options.Options) { TenantContext = new TenantIdentity(tenant) };
     }
     private sealed record TenantIdentity(Guid TenantId) : ITenantContext;

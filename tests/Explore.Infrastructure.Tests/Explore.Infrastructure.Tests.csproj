@@ -14,6 +14,17 @@
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\InstanceSettingsCommandFixture.cs" Link="Fixtures\InstanceSettingsCommandFixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\TestDbContextOptions.cs" Link="Fixtures\NativeTestDbContextOptions.cs" />
     <Compile Include="..\Shared\Telemetry\EventLocationPrivacyMetricsFactory.cs" Link="Telemetry\EventLocationPrivacyMetricsFactory.cs" />
+    <Compile Include="../Shared/Execution/TestExecutionProfile.cs" Link="Execution/TestExecutionProfile.cs" />
+    <Compile Include="../Shared/Execution/BoundedTestDiscoveryHook.cs" Link="Execution/BoundedTestDiscoveryHook.cs" />
+    <Compile Include="../Shared/Containers/ContainerResourceBounds.cs" Link="Containers/ContainerResourceBounds.cs" />
+    <Compile Include="../Shared/Containers/TestcontainersBuilderExtensions.cs" Link="Containers/TestcontainersBuilderExtensions.cs" />
+    <Using Include="Event.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="Event.Testing.TestSuiteKindAttribute">
+      <_Parameter1>ContainerBacked</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <ItemGroup>

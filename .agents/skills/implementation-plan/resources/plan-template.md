@@ -25,6 +25,19 @@ Record:
 - matched intents, relevant skills, and relevant rules;
 - primary layers touched;
 - S/M/L/XL complexity with evidence-based rationale;
+- **Plane Ticket Reference:** the S item or M parent: `EVENT-XXX`, or `pending: event/work/active-<task-slug>.yaml` until execution mints it;
+- **Plane Tracking Plan** (sizing: [plan-tracking](../../plane-compose/resources/plan-tracking.md)): the plan shape and one row per item the plan owns, nothing more:
+
+  ```markdown
+  **Shape:** S (1 PR) | M (N PRs, one capability) | L (program, approved)  ·  **New items:** N (≤ 6 without approval)
+
+  | Item | Role | Type | Labels | Parent Epic | Version Module | Priority | Pull request / phases |
+  |---|---|---|---|---|---|---|---|
+  | pending (active file) or EVENT-N (bound) | S item / parent | Feature | API, Web App | EVENT-6851 Event Lifecycle, Sessions & Publishing | v0.1.0 | high | PR 1: Phases 1–4 |
+  | Sub-item (created at execution) | Sub-item | Feature | API | (parent) | v0.1.0 | high | PR 2: Phases 5–6 |
+  ```
+
+  Explain any reuse (bound existing item) or any approval needed (more than 6 items, new Epic). Phases inside one PR, tests, docs, reviews, and verification gates never get rows.
 - **I-VSD Document:** `[islamic-value-sensitive-design/workstreams/i-vsd-<task-name>.md](../../../islamic-value-sensitive-design/workstreams/i-vsd-<task-name>.md)`;
 - **I-VSD Status / Disposition:** `current` plus `plan-aligned`, or the blocking state;
 - **CTO Review:** `Not reviewed`, `Changes required`, `Approved`, or the linked review artifact;
@@ -132,6 +145,7 @@ Use reviewable architectural slices. Every phase in `plan.md` defines high-level
 ### Phase N: <Name>
 - **Goal:**
 - **Depends on:**
+- **Plane item / pull request:** the Plane Tracking Plan row this phase lands under (for example `PR 1 → EVENT-N`); phases never get their own items
 - **Relevant files:** existing/new status included
 - **Phase-owned paths:** exact files this phase may stage; update this list when legitimate phase work discovers or generates another file
 - **Related skills/rules:**

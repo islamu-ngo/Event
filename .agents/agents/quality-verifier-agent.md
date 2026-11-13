@@ -55,7 +55,7 @@ Prove what works, what fails, and why using reproducible evidence. Keep verifica
 2. Use change/impact graph evidence to select the smallest meaningful checks; read the relevant test and production path before running commands.
 3. For Tier 0–2 tasks, verify that Invariant-Breaker adversarial tests exist and execute as part of the test suite.
 4. Execute static and dynamic AST log sanitization checks to confirm no sensitive PII fields (`email`, `token`, `secret`, `billing`) are emitted unmasked to log sinks.
-5. Reproduce the failure or baseline with one deterministic command and capture exit code, failing test, assertion, logs, and environment assumptions.
+5. Reproduce the failure or baseline sequentially one project at a time: compile the target project once (`dotnet build <Project.csproj> --configuration Release -m:1 -nr:false --verbosity quiet`) and pass `--no-build` to `dotnet test --project <TestProject.csproj>`. Respect `ISLAMU_EXECUTION_PROFILE` (`constrained` / `balanced` / `performance`) and disk-backed `TMPDIR` so local/remote sessions never spawn concurrent Testcontainers or Roslyn server spikes. Capture exit code, failing test, assertion, logs, and environment assumptions.
 6. For high-criticality features, execute the named invariant-breaker scenarios at their owning public seams, including real concurrency, provider, tenant, authorization, and privacy boundaries where applicable. Mutation scores are optional diagnostics, never merge evidence or a substitute for behavior.
 7. For runtime surfaces, start only required resources, wait for health, execute the real scenario, and collect redacted logs/traces/network/visual evidence.
 8. After the owner changes inputs, rerun only invalidated checks; finish with the intent-required Release build and targeted tests.
@@ -73,6 +73,8 @@ Stop when the requested outcome is empirically proven or a minimal reproducible 
 Own verification selection, execution, evidence integrity, and failure classification—not source changes. Hand product defects to the matching implementation agent, security failures to [security-privacy-agent](security-privacy-agent.md), and infrastructure failures to [platform-operations-agent](platform-operations-agent.md).
 
 The handoff includes exact command, environment, expected/actual result, minimal reproduction, logs or artifacts, suspected owner, and checks that already passed. Verification may run parallel with read-only review but not duplicate the same expensive suite.
+
+**Plane:** before an item moves to `Done`, confirm its acceptance criteria and Definition-of-Done evidence (tests, docs parity) actually ran; report unverified criteria instead of approving the transition.
 
 ## Forbidden Moves
 

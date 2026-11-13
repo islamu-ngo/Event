@@ -243,6 +243,7 @@ public sealed class PostgresHumanAuthorizationRouteContractTests(PostgreSqlConta
                 .WithDatabase("route_source_" + Guid.CreateVersion7().ToString("N"))
                 .WithUsername(original.Username!)
                 .WithPassword(original.Password!)
+                .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
                 .Build();
             try
             {

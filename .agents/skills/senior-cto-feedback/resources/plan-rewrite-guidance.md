@@ -55,6 +55,7 @@ Every piece of architectural analysis, risk profiling, adversarial stress-testin
 | **Ranked Top Risks & Minimum Acceptable Fixes**<br>(Blocker, Critical, Major) | `plan.md` §13/§14.2 Risk Register & `context.md` Known Risks | Preserves ranked risks with concrete mitigations, severity tiers, and verification triggers in the risk register rather than an isolated review document. |
 | **Breaking Deletions & Legacy Elimination** | `plan.md` §12 Migration & Compatibility Plan & `context.md` Key Decisions | Explicitly records obsolete code, endpoints, tables, and adapter shims marked for outright deletion under greenfield development principles. |
 | **Test-First Sequences & Atomic Commits** | `tasks.md` Phase Checklist & Planned Commit Contracts | Turns architectural advice into an executable, verifiable sequence of Red -> Green -> Refactor tasks with path-limited Conventional Commits. |
+| **Plane Tracking Plan** | `plan.md` §0 Plane Tracking Plan, `tasks.md` Plane Tracking checkboxes & `event/work/active-<task-slug>.yaml` | Right-sizes the items the plan owns (one per separately merged PR; no phase, test, or review items; at most 6 new items without approval), fixes Epic parent, labels, priority, and module, and sets state `Backlog` -> `Ready` on approval so plan approval and the Plane board agree. |
 
 ## I-VSD Invalidation After Rewrites
 

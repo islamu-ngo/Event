@@ -9,6 +9,7 @@ priority: high
 - [../../../AGENTS.md](../../../AGENTS.md)
 - [../../../.agents/CONTEXT_ENGINEERING.md](../../../.agents/CONTEXT_ENGINEERING.md)
 - [../conventional-commit/SKILL.md](../conventional-commit/SKILL.md)
+- [../plane-compose/SKILL.md](../plane-compose/SKILL.md) and [plan-tracking](../plane-compose/resources/plan-tracking.md)
 
 ## Top Invariants
 
@@ -20,31 +21,34 @@ priority: high
      - Active branch: `feat/<task-name>`
      - Task folder: `.worktrees/<task-name>/dev/active/<task-name>/`
      - Execution context: all shell commands set `Cwd: .worktrees/<task-name>`; all file edits target `.worktrees/<task-name>/...`
-     - **Action**: Do NOT recreate worktree or run `mv`. Skip setup steps and resume directly inside the existing worktree. If `AGENTS.local.md` exists in the repository root and is missing in `.worktrees/<task-name>`, copy it: `[ -f AGENTS.local.md ] && [ ! -f .worktrees/<task-name>/AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/`. If the root `.env` exists and the worktree has none, copy it without printing its contents: `[ -f .env ] && [ ! -e .worktrees/<task-name>/.env ] && install -m 600 .env .worktrees/<task-name>/.env`.
+     - **Action**: Do NOT recreate worktree or run `mv`. Skip setup steps and resume directly inside the existing worktree. If `AGENTS.local.md` exists in the repository root and is missing in `.worktrees/<task-name>`, copy it: `[ -f AGENTS.local.md ] && [ ! -f .worktrees/<task-name>/AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/`. If the root `.env` exists and the worktree has none, copy it without printing its contents: `[ -f .env ] && [ ! -e .worktrees/<task-name>/.env ] && install -m 600 .env .worktrees/<task-name>/.env`. If the root has `event/` and the worktree has none, symlink it: `[ -d ../../event ] && [ ! -e event ] && ln -s ../../event event`.
    - **Case B: In-Tree / Develop In-Flight (`dev/active/<task-name>`)**:
      If `dev/active/<task-name>` exists in the repository root and work is already in-progress (e.g. checked items `[x]` in `tasks.md`, existing commits, or user explicitly requested running directly on `develop` or current branch):
      - Active branch: current branch (e.g. `develop` or current feature branch)
      - Task folder: `dev/active/<task-name>/`
      - Execution context: repository root (`Cwd: .`)
-     - **Action**: Do NOT create a worktree or move files. Respect in-tree execution and resume directly in the root workspace.
+     - **Action**: Do NOT create a worktree or move files. Respect in-tree execution and resume directly in the root workspace. If the plan's Plane items are not minted yet, run **Start Plane Tracking First** (described under Case C) before Phase 1.
    - **Case C: Fresh Worktree Setup (Default New Implementation)**:
      If starting a brand-new plan where `dev/active/<task-name>` exists at the root, `.worktrees/<task-name>` does not exist, and user did not mandate in-tree execution:
+     - **Start Plane Tracking First (every topology, when authorized & online):** before creating the branch, or before the first phase when executing in-tree, run the `tasks.md` Plane Tracking execution-start checklist ([plan-tracking](../plane-compose/resources/plan-tracking.md) stage 3): validate, dry-run and push the active file so `EVENT-XXX` is minted, push M-plan Sub-items under the parent UUID, set the S item or parent to `In Progress` with the driving developer as assignee, and add new items to their Version Module through Plane MCP. Create only the items in the plan's Plane Tracking Plan. Use uppercase **`feat/EVENT-XXX-<task-name>`** (the S item, or the M Sub-item of the first PR) so Plane's **Development** panel links the branch from push #1; otherwise fall back to `feat/<task-name>`.
      - Repository-root scoped worktree isolation applies:
        ```bash
        git fetch origin develop
-       git worktree add -b feat/<task-name> .worktrees/<task-name> origin/develop
+       git worktree add -b feat/<EVENT-XXX-or-empty><task-name> .worktrees/<task-name> origin/develop
        mkdir -p .worktrees/<task-name>/dev/active && mv dev/active/<task-name> .worktrees/<task-name>/dev/active/
        [ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/
        [ -f .env ] && install -m 600 .env .worktrees/<task-name>/.env
+       [ -d event ] && ln -s ../../event .worktrees/<task-name>/event
        ```
      - Moving preserves strict single-source-of-truth, eliminates split-brain checklists, and ensures clean garbage collection on worktree removal.
+     - **Symlink `event/` (Never Copy or Move)**: The `event/` Project-as-Code directory is gitignored and resides in the repository root. Isolated worktrees MUST symlink `event` (`ln -s ../../event .worktrees/<task-name>/event`) so that Plane Compose shares `.plane/state.json` and credentials without duplicating state files or triggering API rate limits.
      - **Copy `AGENTS.local.md` (Never Move)**: If `AGENTS.local.md` exists in the repository root, copy it into `.worktrees/<task-name>/AGENTS.local.md`. It must be **copied (never moved)** so that local developer overrides and environment constraints remain in effect inside the isolated worktree while preserving the root configuration for subsequent sessions or tasks. (Because `AGENTS.local.md` is gitignored, it will not be staged or committed).
      - **Copy `.env` (Never Move or Overwrite)**: If the repository root has an `.env`, copy it into the new worktree with owner-only permissions. On resume, copy only when the worktree has no `.env`; preserve any task-specific values already there. `.env` is gitignored and must never be staged, logged, or committed. A copied file does not supply missing keys: resolve those through the selected approved secret authority.
    - **Case D: Grand Multi-Cohort Execution (Hub-and-Spoke Topology & Bounded Worker Pooling)**:
      When a grand migration or refactoring spans dozens of cohorts (e.g. cross-cutting library cutovers), execution uses a **Lead Hub Worktree** (`.worktrees/<task-name>` on `feat/<task-name>`) and **Ephemeral Spoke Workers** (`.worktrees/<task-name>--<cohort>` on `feat/<task-name>--<cohort>`):
      - **Hyphenated Task-Namespacing**: To eliminate collisions and human confusion across concurrent tasks, all spoke worktrees and branches MUST use the strict hyphenated prefix format: `.worktrees/<task-name>--<cohort>` on `feat/<task-name>--<cohort>`. Bare unprefixed worktree names (e.g. `.worktrees/<cohort>`) are strictly forbidden.
      - **Cross-Task Blindness & Task-Bound Confinement**: An agent invoked for `<task-name>` is strictly confined to its own namespace (`.worktrees/<task-name>*`). When listing or checking worktrees, agents must filter by their task name (`git worktree list | grep "/<task-name>"`). Agents are **strictly forbidden** from reading, modifying, or pruning any worktree or branch outside their `<task-name>` boundary.
-     - **Bounded Worker Pool & Prune-As-You-Go Rule**: Agents must bound active worktrees to $\le 3-5$ across the task at any time. Agents are strictly FORBIDDEN from accumulating dozens of idle worktrees on disk (which causes massive `bin/`/`obj/` disk bloat and human cognitive alarm). As soon as a spoke cohort's commits are verified and integrated into the hub branch, the agent MUST immediately prune the spoke worktree (`git worktree remove .worktrees/<task-name>--<cohort>` and `git branch -d feat/<task-name>--<cohort>`).
+     - **Bounded Worker Pool, Sequential Verification & Prune-As-You-Go Rule**: Agents must bound active worktrees to $\le 3-5$ across the task at any time. Never trigger concurrent `dotnet build`, `dotnet test`, or Testcontainers runs across parallel spokes — compile and test one project sequentially at a time (honoring `ISLAMU_EXECUTION_PROFILE=constrained` with `-m:1 -nr:false` and `--no-build` on local/agent workstations). Agents are strictly FORBIDDEN from accumulating dozens of idle worktrees on disk (which causes massive `bin/`/`obj/` disk bloat and human cognitive alarm). As soon as a spoke cohort's commits are verified and integrated into the hub branch, the agent MUST immediately prune the spoke worktree (`git worktree remove .worktrees/<task-name>--<cohort>` and `git branch -d feat/<task-name>--<cohort>`).
      - **Literal Ownership Packets (`*-ownership.md`)**: Every spoke cohort must author an explicit, disjoint file list. No two spokes may ever touch or edit the same file.
      - **Leaf-First DAG Sequencing**: Handlers with zero internal callers (leaves) are migrated before upstream dependents to prevent cascading merge conflicts.
      - **Single Hub PR**: The lead hub worktree (`.worktrees/<task-name>`) accumulates all verified commits from the spokes, runs Ring 3 whole-solution assurance, and issues the single pull request to `develop`. Only the hub worktree remains parked upon PR creation.
@@ -69,12 +73,13 @@ priority: high
    - **Red**: Author failing invariant/specification tests first for core domain, concurrency, state machines, and security boundaries. Shift pure domain invariants to `Event.Domain.UnitTests`. Scaffold compilable stub types/interfaces so the project builds cleanly while the test fails at runtime.
    - **Green**: Implement production code to satisfy invariants.
    - **Ring 1 Sliced Verification (Inner Loop, < 2s)**: Run targeted test class via `--treenode-filter "/*/*/*<TestClass>/*"` in-memory (`Event.Domain.UnitTests` or `Event.Application.UnitTests`). Zero Docker containers, zero network I/O, zero database setup lag.
-   - **Ring 2 Phase Verification (Phase Exit Gate, < 15s)**: Run Release build (`dotnet build -c Release -v q`) and at most ONE selected project test against ONE selected provider within the execution context. Forbid multi-database provider matrices during intermediate phases.
+   - **Ring 2 Phase Verification (Phase Exit Gate, < 15s)**: Compile the single modified project once (`dotnet build <Project.csproj> --configuration Release -m:1 -nr:false --verbosity quiet`), then run at most ONE selected project test (`dotnet test --project <TestProject.csproj> --configuration Release --no-build --verbosity quiet`) against ONE selected provider within the execution context. Forbid multi-database provider matrices or parallel project builds during intermediate phases.
    - **Three-Tier Failure Triage**:
      - *Class A (Direct Feature Regressions)*: Failing assertions in code touched by this feature. Must resolve in-phase.
      - *Class B (Feature-Induced Integration Ripple)*: Unmodified callers/fixtures broken by changed contracts. If mechanical and minor (< 15m), align immediately. If structural/cross-domain, pause with a Decision Brief before absorbing.
      - *Class C (Pre-Existing Baseline Rot)*: Environment quirks, unmigrated table assumptions, or failures reproducing on clean `origin/develop`. Strictly quarantine into `*-context.md`; never add to `tasks.md` or debug in the feature worktree.
-   - **Semantic Phase Commit**: In the execution context, stage changes and commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. Planning defines semantic meaning; execution handles file discovery.
+   - **Semantic Phase Commit**: In the execution context, stage changes and commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. Planning defines semantic meaning; execution handles file discovery. Link commits natively to Plane's **Development** panel via uppercase `Refs: EVENT-XXX` (or `Fixes: EVENT-XXX`) trailers naming the item of the pull request the phase lands in (the S item or that PR's Sub-item) — omit if no canonical `EVENT-XXX` exists yet, and never paste commit logs or PR URLs into YAML `description:`.
+   - **Plane State Follows Pull Requests, Not Phases**: Plane changes only at the moments in the `tasks.md` Plane Tracking checklist: execution start, each M-plan PR start (its Sub-item to `In Progress`), PR opened, PR merged, or a real blocker (`Waiting Dependency` + `blocked_by` + one MCP comment). Phases and tasks never change Plane state and never create items; ideas found mid-flight go to `dev/backlog/`. Touch only the items the plan owns; never edit or reshape unrelated `workitems.yaml` entries.
    - **Reconcile Ledger**: Batch task checkbox updates at phase gates in `tasks.md`.
 6. **Self-Contained Phase Reporting, Decision Briefs & Mid-Flight Slicing**:
    Apply [reader-first writing](../conventional-commit/resources/reader-first-writing.md) to reports and questions: delivered behavior first, relevant mechanism and verification next. Never use bare phase IDs. Decision Briefs name the exact choice, practical consequences, technical rationale, recommended option, and next action; ordinary progress reports need no invented decision.
@@ -87,6 +92,7 @@ priority: high
    - Stage and commit these persistent files on the task branch so they merge into `develop`.
 8. **Ring 3 Plan Exit Gate & Mass-Failure Circuit Breaker**:
    - **Ring 3 Plan Exit Gate**: Run full 5-database matrix, EF Core migrations, and `Event.Architecture.Tests` once at workstream completion before PR creation.
+   - **Plane Compose Preflight Validation**: Before publishing Plane state, run `cd event && plane schema validate && plane validate --offline && plane push --work-only --dry-run`; the dry run must list only this plan's items. Then `printf 'y\n' | plane push --work-only` with the conflict check left on. Never run `plane pull` or a project-wide `plane diff` as part of a task: both scan every item (about `items ÷ 50` minutes or more on `EVENT`).
    - **Mass-Failure Circuit Breaker (> 10 Failures)**: If Ring 3 execution yields > 10 failures, the agent MUST NOT generate dozens of individual subtasks or start fixing them one-by-one. Cluster failures by root cause (shared fixture, missing test migration, secret binding, or base divergence). If failures stem from pre-existing baseline rot (Class C), quarantine them. If caused by widespread architectural mismatch, pause and deliver a Decision Brief.
    - **Pre-PR Rebase (Concurrency Conflict Protection)**:
      ```bash
@@ -95,7 +101,7 @@ priority: high
      Resolve any conflicts inside the execution context, verify tests, and complete rebase (`git rebase --continue`).
 9. **Pull Request Creation & Lifecycle Protocol**:
    - **Push Branch**: `git push -u origin <branch> --force-with-lease`
-   - **Reader-First PR Body**: Use the shared writing guide's PR structure and readability check. Lead with changed behavior; retain technical review details, operator actions, evidence, and limitations. Do not paste phase logs.
+   - **Reader-First PR Body & Native Plane PR Linking**: Use the shared writing guide's PR structure and readability check. Lead with changed behavior; retain technical review details, operator actions, evidence, and limitations. Do not paste phase logs. Keep the PR title strictly Conventional Commit (`type(scope): subject`, never `[EVENT-XXX]` before `type(scope):`), and include `- Plane: [EVENT-XXX]` (uppercase + brackets -> links PR/branch to Plane's **Development** panel and activates PR state automation when GitHub integration + Pro is enabled; use unbracketed `EVENT-XXX` for reference-only without auto state transition) under `## Issues`.
    - **Pre-Flight PR Release Impact Generation (Zero CI Failures)**:
      Never use a bare `gh pr create --fill` that omits metadata. PR descriptions MUST contain the `## Release Impact` checklist mandated by `.ci/scripts/validate-release-impact-pr.cs`. Inspect changed files against category rules:
      - `security` (auth, cerbos, keycloak, cla, secrets): `- [x] Security/auth impact documented`
@@ -109,6 +115,7 @@ priority: high
      ```bash
      gh pr create --base develop --title "<type>(<scope>): <title>" --body "<body-with-release-impact>"
      ```
+   - **Plane Lifecycle Advancement & Active File Retirement**: Upon PR creation, set the PR's item (S item or Sub-item) to `Review Needed` and push; list it bracketed under `## Issues` and an M parent unbracketed. `Done` follows only after merge and verified acceptance evidence (an M parent after its last Sub-item). If PR automation already moved the item, mirror that state in YAML before the next push. After the last merge, fold the active file's blocks into `event/work/workitems.yaml`, delete the active file, and confirm `plane push --work-only --dry-run` reports no changes; no `plane pull` is needed.
    - **Park the Worktree (When using Worktree isolation)**:
      Never delete `.worktrees/<task-name>` upon PR creation. The worktree must remain parked and intact so that any subsequent bot reviews (Copilot, CodeQL) or CI check failures can be resolved immediately in-place with zero setup overhead.
    - **Halt and Deliver Partitioned Status Brief**:
@@ -138,16 +145,19 @@ priority: high
         [ -f AGENTS.local.md ] && [ ! -f .worktrees/<task>/AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/
         If .env exists in root and is missing in worktree, copy it without displaying values:
         [ -f .env ] && [ ! -e .worktrees/<task>/.env ] && install -m 600 .env .worktrees/<task>/.env
+        If root has event/ and worktree has no event, symlink it: [ -d ../../event ] && [ ! -e event ] && ln -s ../../event event
      -> NOT FOUND:
         - If dev/active/<task> exists and (resuming OR user mandated in-tree):
           Topology = In-Tree. Set Cwd = repo root, PlanPath = dev/active/<task>/.
         - If fresh execution on default topology:
           Topology = New Worktree.
+          (If Plane sync authorized): run the tasks.md Plane Tracking execution-start checklist (plan-tracking stage 3) -> read minted EVENT-XXX
           git fetch origin develop
-          git worktree add -b feat/<task> .worktrees/<task> origin/develop
+          git worktree add -b feat/<EVENT-XXX-if-known-><task> .worktrees/<task> origin/develop
           mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/
           [ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/
           [ -f .env ] && install -m 600 .env .worktrees/<task>/.env
+          [ -d event ] && ln -s ../../event .worktrees/<task>/event
           Set Cwd = .worktrees/<task>, PlanPath = .worktrees/<task>/dev/active/<task>/.
 
 2. Context Load & Holistic Orientation:
@@ -174,10 +184,10 @@ priority: high
    d. Stage and commit graduation files on task branch
 
 5. Ring 3 Plan Exit Gate & Pre-PR Rebase:
-   a. Ring 3: Run full multi-provider matrix & architecture tests in Cwd
+   a. Ring 3: Run affected multi-provider & architecture projects sequentially one project at a time in Cwd (`dotnet build <Project.csproj> -c Release -m:1 -nr:false -v q` once, followed by `dotnet test --project <TestProject.csproj> -c Release --no-build -v q`, honoring `ISLAMU_EXECUTION_PROFILE`)
       - Mass-Failure Circuit Breaker: if > 10 failures, cluster root causes; do NOT add 10+ tasks to tasks.md
    b. git fetch origin develop && git rebase origin/develop (in Cwd)
-   c. dotnet test (verify regression-free rebase)
+   c. Compile once and run targeted project tests sequentially (`dotnet build <Project.csproj> --configuration Release -m:1 -nr:false --verbosity quiet` then `dotnet test --project <TestProject.csproj> --configuration Release --no-build --verbosity quiet`; never solution-wide bare `dotnet test`) to verify a regression-free rebase
    d. Commit Audit: run `git log --format='%s' "$(git merge-base HEAD origin/develop)"..HEAD` and verify every subject line is a valid Conventional Commit. If any malformed commits exist (from earlier sessions before the hook was installed), interactive-rebase to fix them before pushing.
 
 6. PR Creation & Handoff:

@@ -78,6 +78,8 @@ Own security/privacy policy and implementation wherever the primary risk is a tr
 
 Handoffs include threat model, enforcement points, tenant/authority semantics, secret/data classification, failure policy, adversarial tests, operator recovery, and residual risk. Never allow a lower-risk agent to silently override a security decision.
 
+**Plane:** security work is a bounded `type: Security` item with a concrete exit (for example, TOTP enrollment), never a perpetual "make it secure" ticket; threat detail stays in the gitignored `event/` backlog, not committed docs.
+
 ## Forbidden Moves
 
 - Never authorize from client UI state, untrusted headers, or model output.

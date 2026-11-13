@@ -49,8 +49,14 @@
     <RestoreLockedMode>true</RestoreLockedMode>
   </PropertyGroup>
 
+  <!-- Opt-in resource-bounded MSBuild/Roslyn settings for constrained local or remote sessions -->
+  <PropertyGroup Condition="'$(ISLAMU_EXECUTION_PROFILE)' == 'constrained'">
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <BuildInParallel>false</BuildInParallel>
+  </PropertyGroup>
+
   <!-- Test Projects: standard BDD test method naming (Method_When_Should) and assertion ergonomics -->
-  <PropertyGroup Condition="$(MSBuildProjectFullPath.Contains('/tests/')) or '$(IsTestProject)' == 'true'">
+  <PropertyGroup Condition="$([System.String]::Copy('$(MSBuildProjectFullPath)').Replace('\', '/').Contains('/tests/')) or '$(IsTestProject)' == 'true'">
     <EnableMicrosoftTestingPlatformExtensions>true</EnableMicrosoftTestingPlatformExtensions>
     <!--
       Test-Specific Policy Suppressions:

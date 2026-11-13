@@ -7,11 +7,13 @@ body:
     attributes:
       value: |
         Documentation should stay source-grounded. If you know the code, config, workflow, or command that proves the correction, include it as a source anchor.
+
+        Maintainers triage documentation reports; accepted corrections are tracked in the project's Plane tracker (Intake) as one documentation item. You never need a Plane account or `EVENT-XXX` ID to report or fix a docs issue.
   - type: input
     id: doc-path
     attributes:
       label: Stale or incorrect doc path
-      placeholder: docs/CONTRIBUTING.md
+      placeholder: docs/internal/CONTRIBUTING.md
     validations:
       required: true
   - type: textarea
@@ -33,7 +35,7 @@ body:
     attributes:
       label: Source anchor if known
       description: Link or name the code/config/test/workflow/doc that proves the correction.
-      placeholder: Explore.API/Program.cs, docker-compose.yml, docs/TESTING.md
+      placeholder: src/Explore.API/Program.cs, docker-compose.yml, docs/internal/TESTING.md
   - type: dropdown
     id: affected-audience
     attributes:

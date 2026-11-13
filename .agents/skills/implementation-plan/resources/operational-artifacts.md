@@ -10,6 +10,25 @@
 | `dev/active/<task>/<task>-plan.md` | Strategic architectural design, current-state evidence, design decisions (ADRs), phase-level boundaries and exit criteria | Granular task checklists (`- [ ]`), dynamic execution statuses (`IN PROGRESS`), session handoffs, dirty worktree logs |
 | `dev/active/<task>/<task>-tasks.md` | Hot execution ledger, granular Red/Green/Refactor task breakdown (`- [ ] **N.M**`), task checkboxes, phase verification gates | Lengthy architectural narrative, design trade-off debates, deep security/I-VSD analysis |
 | `dev/active/<task>/<task>-context.md` | Active session working memory (`COMPLETED`, `IN PROGRESS`, `NEXT`, `BLOCKERS`), quick resume, validation baseline, dated session handoffs | Granular task execution checklists, full architectural specifications |
+| `event/work/active-<task>.yaml` | The Plane items this plan owns (the S item, or an M parent plus its Sub-items once execution creates them): canonical `EVENT-XXX` (minted by the first execution push), acceptance criteria, `parent:` Epic UUID, labels, priority, state, native `dependencies`/`relations`; folded into `work/workitems.yaml` after merge. | Granular inner-loop Red/Green/Refactor subtasks, commit logs, PR URLs (handled natively by Plane Git Development panel via `EVENT-XXX`), temporary test scratch. |
+
+## The Dual-Plane Cognitive Model
+
+The repository maintains an explicit operational boundary between **Macro Project Tracking** and **Micro Engineering Execution**:
+
+```text
+Macro-Project Plane (Plane Compose: event/work/active-<task>.yaml + Native Git Development Panel)
+  │   - One item per separately merged PR: S plan = 1 Work Item; M plan = 1 parent + 2–5 Sub-items
+  │   - Epics (parent UUID), milestones, native dependencies/relations, acceptance criteria
+  │   - Cross-agent & human-visible progress (Plane Cloud)
+  │   - Git branches (feat/EVENT-XXX-<slug>), commits (Refs: EVENT-XXX), PRs ([EVENT-XXX]) -> native Development panel
+  ▼
+Micro-Execution Plane (Dev-Doc Triad: dev/active/<task>/)
+      - Plan: strategic architecture & RFC 2119 scenario contracts
+      - Tasks: atomic Red/Green/Refactor test loops (< 2s TUnit slices)
+      - Context: ephemeral working memory and session handoffs
+      - Phase Commits: declarative Conventional Commits (Refs: EVENT-XXX / Fixes: EVENT-XXX)
+```
 
 ## Review State Contract
 
@@ -116,6 +135,16 @@ Last Updated: YYYY-MM-DD Europe/Brussels
 - Do not run build/tests after individual tasks; verify once at phase end.
 - planning itself never creates branches or worktrees; plan artifacts live in the root dev/active/ directory.
 - Do not start the app, browser, Docker, Aspire, Playwright, Chrome DevTools MCP, or live services for verification.
+- Plane state changes only at the moments listed under Plane Tracking; phases and tasks never change Plane state.
+
+## Plane Tracking ([plan-tracking](../../plane-compose/resources/plan-tracking.md))
+- **Items:** copy the plan §0 Plane Tracking Plan rows with their IDs once minted (S item, or parent + Sub-items).
+- [ ] **Execution start:** validate, dry-run, and push the active file (mints the S item / parent); M plans: push Sub-items with `parent: <parent UUID>`, `state: Todo`.
+- [ ] **Execution start:** S item / parent → `In Progress` with the driving developer as assignee; add every new item to its Version Module through Plane MCP and read it back.
+- [ ] **Each PR start (M plans):** that Sub-item → `In Progress` with assignee.
+- [ ] **Each PR opened:** its item → `Review Needed`; PR `## Issues` lists `- Plane: [EVENT-<item>]` (an M parent unbracketed).
+- [ ] **Each PR merged with acceptance evidence:** its item → `Done`; the M parent → `Done` after its last Sub-item.
+- [ ] **Close:** fold the active file into `event/work/workitems.yaml`, delete it, and confirm `plane push --work-only --dry-run` reports no changes.
 
 ## Phase 1: <Name> ⏳ NOT STARTED
 **Phase-owned paths:** exact files this phase may stage; update before verification when legitimate phase work discovers or generates another file.

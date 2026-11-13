@@ -11,6 +11,17 @@
     <Compile Include="..\Shared\Settings\VisitorReadPolicyTestAuthority.cs" Link="Settings\VisitorReadPolicyTestAuthority.cs" />
     <Compile Include="..\Shared\Moderation\ModerationMeasurementJournalAttribute.cs" Link="Moderation\ModerationMeasurementJournalAttribute.cs" />
     <Compile Include="..\Explore.Infrastructure.Tests\Fixtures\CurrentHumanPrincipalFixture.cs" Link="Fixtures\CurrentHumanPrincipalFixture.cs" />
+    <Compile Include="../Shared/Execution/TestExecutionProfile.cs" Link="Execution/TestExecutionProfile.cs" />
+    <Compile Include="../Shared/Execution/BoundedTestDiscoveryHook.cs" Link="Execution/BoundedTestDiscoveryHook.cs" />
+    <Compile Include="../Shared/Containers/ContainerResourceBounds.cs" Link="Containers/ContainerResourceBounds.cs" />
+    <Compile Include="../Shared/Containers/TestcontainersBuilderExtensions.cs" Link="Containers/TestcontainersBuilderExtensions.cs" />
+    <Using Include="Event.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="Event.Testing.TestSuiteKindAttribute">
+      <_Parameter1>ContainerBacked</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <ItemGroup>

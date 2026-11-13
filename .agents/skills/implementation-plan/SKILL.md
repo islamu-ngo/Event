@@ -19,6 +19,7 @@ priority: high
 - [../i-vsd/resources/integration-contract.md](../i-vsd/resources/integration-contract.md)
 - [../grill-me/SKILL.md](../grill-me/SKILL.md)
 - [../conventional-commit/SKILL.md](../conventional-commit/SKILL.md)
+- [../plane-compose/SKILL.md](../plane-compose/SKILL.md) and [plan-tracking](../plane-compose/resources/plan-tracking.md)
 
 ## Top Invariants
 1. **Planning vs. Execution Decoupling (Strict Separation of Concerns)**:
@@ -43,6 +44,11 @@ priority: high
    - **Human-facing planning**: Use [reader-first writing](../conventional-commit/resources/reader-first-writing.md) for executive summaries, planned messages, reports, and decision briefs. Explain the user/operator or engineering consequence before the mechanism; keep detailed architecture in its designated section.
 10. **Local Working Memory & Native Harness Tooling**: `dev/active/<task>/` is gitignored local working memory, initially in the root during planning and moved into the worktree during execution. Use native file tools at its authoritative location; never duplicate the active ledger or commit `dev/active/*`.
 11. **Knowledge Graduation Gate**: Active implementation plans in `dev/active/` are ephemeral working memory and disappear upon workstream completion. Every plan MUST include a final phase task for **Knowledge Graduation**: promoting deferred scope into actionable standalone items in `dev/backlog/<slug>.md`, durable architectural decisions into `docs/internal/adr/`, and non-obvious lessons into `dev/_journal/domains/`. These persistent artifacts are staged and committed alongside code.
+12. **Right-Sized Plane Tracking Plan (Macro-Project Plane)**: Every plan states exactly which Plane items it owns and which Plane action happens at each lifecycle stage, following [plan-tracking](../plane-compose/resources/plan-tracking.md) and [taxonomy §4.1](../../../docs/internal/project-management/work-item-taxonomy-and-granularity-report.md#41-tracking-budget-per-implementation-plan-plan--plane-mapping).
+   - **Size by pull requests, not phases:** one tracked item per separately merged pull request. A single-PR plan owns `1` Work Item; a `2–5`-PR plan for one capability owns `1` parent Work Item + `1` Sub-item per PR; a larger program owns one such Work Item per shippable capability under an existing Epic (or is split into several plans). Phases inside one PR, tests, docs, migrations, reviews, verification gates, and knowledge graduation never become items. More than `6` new items, or any new Epic, needs explicit user approval in the plan's Decision Brief.
+   - **Reuse before create:** search `event/work/*.yaml` and Plane MCP PQL (`title ~ "<keyword>"`); bind an existing item that already describes the outcome instead of creating a twin.
+   - **Author locally only:** write the S item or M parent into `event/work/active-<task-slug>.yaml` from `event/templates/active-workitem.yaml` with `id:` omitted, `state: Backlog`, no `assignees:`, `parent:` = the capability Epic UUID, Surface + Domain labels, and `priority` = functional criticality. List Sub-items in the plan only; execution creates them after the parent's UUID exists. Planning never pushes to Plane.
+   - **Record it:** `plan.md` §0 carries the **Plane Tracking Plan** table and `tasks.md` carries the Plane action checkboxes (templates in [plan-template.md](resources/plan-template.md) and [operational-artifacts.md](resources/operational-artifacts.md)). Touch only the items the plan creates or binds; never clean up unrelated backlog items.
 
 ## Top Anti-Patterns
 1. Memory-based planning, which turns assumptions about the repository into false implementation facts.
@@ -56,6 +62,7 @@ priority: high
 9. **Dev-Doc Triad Bleed / Duplication**, which pollutes `plan.md` with granular task checklists (`- [ ]`), dynamic execution statuses (`IN PROGRESS`), or session handoffs, duplicating `tasks.md` and `context.md`.
 10. **Monolithic Umbrella Commits or Bash Script Over-Engineering**, which bundles hundreds of files into one giant commit, pre-generates brittle raw bash scripts with escaping errors instead of declarative contracts, or forces post-commit hash recording into ephemeral docs.
 11. **Planning-Time Worktree/Branch Creation**: Planning must not create branches or worktrees; execution owns topology and transfer of the single authoritative task folder.
+12. **Plane Flooding or Under-Tracking**, which creates an item per phase, test, review, or commit (burying the board), or tracks several separately merged pull requests under one card with no Sub-items (hiding progress and leaving PRs unlinked).
 
 ## Minimal Examples
 ```text

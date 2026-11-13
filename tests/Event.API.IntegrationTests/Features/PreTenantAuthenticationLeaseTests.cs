@@ -249,7 +249,9 @@ public sealed class PreTenantAuthenticationLeaseTests(PreTenantAuthenticationDat
 public sealed class PreTenantAuthenticationDatabase : TUnit.Core.Interfaces.IAsyncInitializer, IAsyncDisposable
 {
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine")
-        .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32))).Build();
+        .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
+        .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
+        .Build();
 
     public string ConnectionString => _container.GetConnectionString();
 

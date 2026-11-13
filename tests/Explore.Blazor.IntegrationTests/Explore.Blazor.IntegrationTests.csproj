@@ -2,7 +2,17 @@
   <ItemGroup>
     <Compile Include="../Shared/ExternalDataProtectionTestAuthority.cs" Link="Fixtures/ExternalDataProtectionTestAuthority.cs" />
     <Compile Include="../Shared/SecretKitHttpAuthority.cs" Link="Fixtures/SecretKitHttpAuthority.cs" />
+    <Compile Include="../Shared/Execution/TestExecutionProfile.cs" Link="Execution/TestExecutionProfile.cs" />
+    <Compile Include="../Shared/Execution/BoundedTestDiscoveryHook.cs" Link="Execution/BoundedTestDiscoveryHook.cs" />
+    <Compile Include="../Shared/Containers/ContainerResourceBounds.cs" Link="Containers/ContainerResourceBounds.cs" />
+    <Compile Include="../Shared/Containers/TestcontainersBuilderExtensions.cs" Link="Containers/TestcontainersBuilderExtensions.cs" />
+    <Using Include="Event.Testing" />
     <Using Include="Event.Testing.Secrets" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="Event.Testing.TestSuiteKindAttribute">
+      <_Parameter1>ContainerBacked</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Explore.Atproto.Transport\Explore.Atproto.Transport.csproj" />

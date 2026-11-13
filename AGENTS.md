@@ -1,7 +1,7 @@
 # AGENTS.md — Agent Contribution Contract
 
 > **This is the required entrypoint for every AI tool contributing to this repository.**
-> Last Updated: 2026-10-04
+> Last Updated: 2026-11-13
 
 ---
 
@@ -34,6 +34,7 @@ Every change must answer these eight questions **before editing any file**:
 | Intent registry | `.agents/contract/intents.yaml` | Machine-readable task mapping |
 | Operations | `docs/internal/OPERATIONS.md` | Build/Test details, AI operational rules |
 | Durable findings | `dev/_journal/journal.md` | Decisions, non-obvious patterns |
+| Project tracking as code | `event/plane.yaml` | Plane Compose project configuration, schemas, and work items |
 
 ---
 
@@ -90,6 +91,8 @@ Every change must answer these eight questions **before editing any file**:
 17. **Execution Continuity Directive for Approved Tasks**: For tasks within an approved plan, agents must continue implementation and proportional verification end-to-end without routine stage pauses. Pause only at material boundaries: requirement ambiguity, unexpected scope creep, irreversible actions, or explicit user direction.
 18. **Targeted Verification Default & Verification Evidence**: Always target verification against the specific affected project(s) by default using the verified commands in [`PROJECTS.md`](PROJECTS.md). Every task completion, milestone report, or PR description must record exact commands executed and their outcomes, plus any checks not run and why. Never state or imply a build or test suite passed when it was not physically executed.
 19. **Application-Owned Authority, EF-First Persistence**: C# owns authorization, business rules, workflows, concurrency coordination and completion. Keep that logic in Domain/Application services and handlers, not controllers or a second database application. Use EF Core/LINQ and supported provider libraries for ordinary persistence. The database supplies transactions, foreign keys, uniqueness, constraints and useful tenant isolation; narrow permissions support legitimate application operations. Do not introduce or retain stored procedures, privileged business routines or database-enforced workflow authority to prevent an application from performing operations it is authorized to manage. Remaining handwritten SQL needs a demonstrated EF/provider capability gap and a small documented storage primitive. Granting an approved application purpose the fixed permissions its workflow needs is normal implementation, not automatically a defect or a new approval request. Document credential-only compromise risk once; do not repeatedly reopen an accepted trade-off. Escalate genuinely new trust boundaries, secret exposure or destructive actions. Existing SQL contracts are transitional, not a reason to preserve business logic in SQL or silently remove controls before a verified C# replacement. See [the accepted persistence decision](docs/internal/adr/ADR-application-owned-persistence.md).
+20. **Project Tracking with Plane Compose**: Every implementation plan carries a right-sized **Plane Tracking Plan**: one tracked item per separately merged pull request. A single-PR plan owns 1 Work Item; a 2–5-PR plan owns 1 parent Work Item plus 1 Sub-item per PR; phases, tests, docs, reviews, and commits never become items, and more than 6 new items or a new Epic needs explicit approval ([taxonomy §4.1](docs/internal/project-management/work-item-taxonomy-and-granularity-report.md#41-tracking-budget-per-implementation-plan-plan--plane-mapping), [plan-tracking protocol](.agents/skills/plane-compose/resources/plan-tracking.md)). Reuse an existing item when one fits. Planning authors `event/work/active-<task-slug>.yaml` from `event/templates/active-workitem.yaml` locally with `id:` omitted and `parent:` set to the capability Epic UUID (never place template `.yaml` files inside `event/work/`). Execution start pushes it (`plane push --work-only`) to mint canonical uppercase `EVENT-XXX` for native Git Development linking (`feat/EVENT-XXX-<task>`, `Refs: EVENT-XXX`, PR `[EVENT-XXX]`); Plane state changes per pull request (`In Progress` → `Review Needed` → `Done`), never per phase. After merge, fold the active file's blocks into `event/work/workitems.yaml` and delete the file; no `plane pull` is needed. Isolated worktrees must link `event/` via `ln -s ../../event event`. Validate locally (`plane schema validate`, `plane validate --offline`) and dry-run (`plane push --work-only --dry-run`) before additive pushes. Destructive operations (`--force`, `schema sync`, `--prune`), tracking trivial edits, and editing items the plan does not own are strictly forbidden. Work items follow the [work-item taxonomy standard](docs/internal/project-management/work-item-taxonomy-and-granularity-report.md) and the [Plane project management ADR](docs/internal/adr/ADR-plane-project-management-standardization.md): one `EVENT` project, completable vertical items, `Epic → Work Item → Sub-item`, Surface Labels, Version Modules, and `priority` as functional criticality. `plane-compose` owns YAML truth and ID minting; the Plane MCP server (`plane-mcp` skill) owns module membership, comments, links, and approved deletions. Never mint IDs through MCP, and never add a custom Plane REST client.
+21. **Serial Execution & Resource Execution Profiles (`constrained` / `balanced` / `performance`)**: Always build and run `.NET` test projects **sequentially one project at a time** (never launch parallel `dotnet build`/`dotnet test` background jobs or bare solution-wide `dotnet test`), separating compilation (`dotnet build <Project.csproj> --configuration Release -m:1 -nr:false --verbosity quiet`) from execution (`dotnet test --project <TestProject.csproj> --configuration Release --no-build --verbosity quiet`). All 16 TUnit assemblies inherit memory-aware concurrency via `BoundedTestDiscoveryHook` + `TestExecutionProfile`, and Testcontainers builders bind RAM/JVM ceilings via `ContainerResourceBounds`. When `ISLAMU_EXECUTION_PROFILE=constrained` (recommended for low-RAM laptops, multi-tasking workstations, and AI agent sessions), pair it with `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1`, `MSBUILDDISABLENODEREUSE=1`, `DOTNET_GCConserveMemory=5`, and a disk-backed `0700` `TMPDIR` (e.g. `$HOME/.cache/agent-tmp`) so `Directory.Build.props` disables `UseSharedCompilation`/`BuildInParallel`, `.agents/hooks/BuildCheck.cs` scopes to changed Release projects, and Linux `/tmp` `tmpfs` is not exhausted. Remote/high-RAM hosts remain unthrottled in `balanced` or `performance` mode or via `--maximum-parallel-tests` / `TUNIT_MAX_PARALLEL_TESTS` / `ISLAMU_CONTAINER_MEMORY_MB`.
 
 **Full list:** [`docs/internal/QUICK_REFERENCE.md`](docs/internal/QUICK_REFERENCE.md)
 
@@ -108,6 +111,8 @@ Every change must answer these eight questions **before editing any file**:
 | Agent Ops | [`.agents/CONTEXT_ENGINEERING.md`](.agents/CONTEXT_ENGINEERING.md) |
 | PR Review | [`.agents/skills/review-pr/SKILL.md`](.agents/skills/review-pr/SKILL.md) |
 | Log Finding | [`.agents/skills/finding/SKILL.md`](.agents/skills/finding/SKILL.md) |
+| Project Tracking / Plane | [`.agents/skills/plane-compose/SKILL.md`](.agents/skills/plane-compose/SKILL.md) (YAML) · [`.agents/skills/plane-mcp/SKILL.md`](.agents/skills/plane-mcp/SKILL.md) (remote) |
+| Work-item sizing & taxonomy | [`docs/internal/project-management/work-item-taxonomy-and-granularity-report.md`](docs/internal/project-management/work-item-taxonomy-and-granularity-report.md) · [ADR](docs/internal/adr/ADR-plane-project-management-standardization.md) |
 
 ---
 
@@ -146,10 +151,12 @@ Before the first product edit, ensure local tracking is fresh against upstream. 
 - **Layer-Bounded Execution:** Never run test suites belonging to unrelated architectural layers (e.g., no database integration tests for UI changes; no Blazor tests for CQRS handlers).
 - **Yak-Shaving Quarantine Rule:** Never derail feature implementation to fix pre-existing test rot or broken fixtures outside the task path. Verify reproduction on clean base, log under `*-context.md`, quarantine the failure, and proceed with the assigned deliverable.
 
-**Build Command (Code Changes Only):**
+**Build & Sequential Test Commands (Code Changes Only):**
 ```bash
-dotnet build --configuration Release --verbosity quiet
+dotnet build <TargetProject.csproj> --configuration Release -m:1 -nr:false --verbosity quiet
+dotnet test --project <TestProject.csproj> --configuration Release --no-build --verbosity quiet
 ```
+Set `ISLAMU_EXECUTION_PROFILE=constrained` (alongside `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1`, `MSBUILDDISABLENODEREUSE=1`, `DOTNET_GCConserveMemory=5`, and disk-backed `TMPDIR="$HOME/.cache/agent-tmp"`) on memory-constrained or multi-tasking machines; use `balanced` (default) or `performance` on dedicated high-memory hosts. Never re-introduce static `[assembly: ParallelLimiter<T>]` attributes (`Event.Architecture.Tests` enforces adaptive `BoundedTestDiscoveryHook` parity).
 
 **Full Test List:** [`docs/internal/OPERATIONS.md#full-project-test-list`](docs/internal/OPERATIONS.md#full-project-test-list)
 

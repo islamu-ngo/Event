@@ -30,6 +30,7 @@ public sealed class KeycloakLifecycleNativeGrantTests
                 request.ForPath("/realms/master/.well-known/openid-configuration")
                     .ForPort(8080).ForStatusCode(HttpStatusCode.OK),
                 wait => wait.WithTimeout(TimeSpan.FromMinutes(2))))
+            .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.Keycloak)
             .Build();
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(3));
         await container.StartAsync(deadline.Token);

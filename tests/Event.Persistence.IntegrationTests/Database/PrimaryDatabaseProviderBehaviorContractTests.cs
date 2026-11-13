@@ -999,11 +999,11 @@ public sealed class ContainerizedPrimaryDatabaseProviderBehaviorContractTests(
         PrimaryDatabaseProvider provider)
     {
         PrimaryDatabaseConnectionOptions migratorOptions =
-            containerFixture.CreateOptions(provider, PrimaryDatabaseRole.Migrator);
+            await containerFixture.CreateOptionsAsync(provider, PrimaryDatabaseRole.Migrator);
         await MigrateAsync(migratorOptions);
 
         var fixture = PrimaryDatabaseProviderBehaviorFixture.Create(
-            containerFixture.CreateOptions(provider));
+            await containerFixture.CreateOptionsAsync(provider));
         await PrimaryDatabaseProviderBehaviorContractTests
             .AssertSharedPersistenceBehaviorAsync(fixture);
         await PrimaryDatabaseProviderBehaviorContractTests

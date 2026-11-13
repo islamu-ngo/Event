@@ -71,6 +71,23 @@ Changelog-Reason: concise explanation of why commit is excluded from public rele
 | `revert` / `docs` | Rollback with stated outcome, or documentation-only change |
 | `test/build/ci/refactor/chore` | Internal outcome (skipped from public release notes) |
 
+### Plane Work Item Trailers
+
+Commits linking to Plane work items use standard Git trailers placed above terminal changelog skip trailers, using **canonical uppercase `EVENT-XXX`** so Plane's native Git integration attaches commits directly to the work item's **Development** panel (lowercase `event-xxx` and custom local slugs are not linked by Plane):
+- **Progress / Feature Deliverable**: `Refs: EVENT-XXX` (omit if the ticket has not yet been pushed and assigned a canonical ID — never fabricate or borrow an unrelated `EVENT-XXX`).
+- **Resolved Defect / Bug**: `Fixes: EVENT-XXX`
+- **Multiple References**: `Refs: EVENT-123, EVENT-456`
+- **Subject Guardrail**: Never prepend `[EVENT-XXX]` *before* `type(scope):` in commit or PR titles (that fails `ISLAMU.ReleaseEngineering` `CommitPolicy.HeaderPattern`). Use `[EVENT-XXX]` inside the PR description (`## Issues`) or trailing after the subject if PR State Automation is desired.
+
+Example:
+```text
+feat(notifications): add user preference dispatch routing
+
+Implement per-category user notification preference channels for email and in-app alerts.
+
+Refs: EVENT-4968
+```
+
 ### CLI Recipe
 
 Confirm `git config --get core.hooksPath` resolves to the repository `.githooks`

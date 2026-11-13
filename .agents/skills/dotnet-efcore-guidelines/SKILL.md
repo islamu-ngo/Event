@@ -34,9 +34,10 @@ priority: high
 4. Run focused model/provider tests, real-engine lifecycle evidence where required, pending-model detection, and the owning build.
 
 ## Verification
-- `dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/CleanArchitectureTests/*" --minimum-expected-tests 1 --no-progress --maximum-parallel-tests 1`
-- `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --verbosity quiet`
-- `dotnet build --configuration Release --verbosity quiet`
+- Compile target project once (`dotnet build <Project.csproj> --configuration Release -m:1 -nr:false --verbosity quiet`), then execute affected projects sequentially with `--no-build` (respecting `ISLAMU_EXECUTION_PROFILE=constrained` when active):
+- `dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --no-build --verbosity quiet -- --treenode-filter "/*/*/CleanArchitectureTests/*" --minimum-expected-tests 1 --no-progress --maximum-parallel-tests 1`
+- `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet`
+- Avoid overlapping Testcontainers runs across projects; rely on `PostgreSqlContainerFixture.CreateIsolatedDatabaseAsync()` and lazy `AdmissionAuthorityProviderFixture.CreateOptionsAsync(...)` for provider tests.
 
 ## Related
 - [../clean-architecture-rules/SKILL.md](../clean-architecture-rules/SKILL.md)

@@ -55,6 +55,7 @@ This directory is the engineering brain for core maintainers and AI coding agent
 - **[Hosting Architecture](internal/HOSTING_ARCHITECTURE.md)**: Composition roots (Explore.API, Explore.Blazor, Event.Standalone), startup lifecycle phases, and provider abstraction.
 - **[Operations & Verification](internal/OPERATIONS.md)**: Build, test, CI/CD runbooks, Aspire local hosting, and diagnostic tooling.
 - **[Architecture Decision Records (ADRs)](internal/adr/)**: Permanent record of architectural choices and tradeoffs.
+- **[Plane Work-Item Taxonomy & Granularity Standard](internal/project-management/work-item-taxonomy-and-granularity-report.md)**: How `EVENT` work is sized and structured (Epics, vertical work items, Surface Labels, Version Modules, priority vs urgency), bound by the [Plane project management ADR](internal/adr/ADR-plane-project-management-standardization.md).
 
 ---
 

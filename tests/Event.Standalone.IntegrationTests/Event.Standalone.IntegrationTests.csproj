@@ -2,6 +2,13 @@
   <ItemGroup>
     <Compile Include="../Shared/OperationalEndpointTestTransport.cs" Link="Fixtures/OperationalEndpointTestTransport.cs" />
     <Compile Include="../Shared/ExternalDataProtectionTestAuthority.cs" Link="Fixtures/ExternalDataProtectionTestAuthority.cs" />
+    <Compile Include="../Shared/Execution/TestExecutionProfile.cs" Link="Execution/TestExecutionProfile.cs" />
+    <Compile Include="../Shared/Execution/BoundedTestDiscoveryHook.cs" Link="Execution/BoundedTestDiscoveryHook.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="Event.Testing.TestSuiteKindAttribute">
+      <_Parameter1>HostInProcess</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
   <PropertyGroup>
     <OutputType>Exe</OutputType>

@@ -454,7 +454,8 @@ dev/report/visuals/
 inbox
 
 # Project events, local storage & ephemeral data stores
-event/
+/event
+/event-backup-*
 storage-data/
 schemas/archive/
 privacy-erasure-authority-data/aspire-local/
@@ -505,3 +506,11 @@ temp/
 *.json.bak
 ClientBin/
 opencode.json
+skills/system/run-workflow/
+.opencode/
+.omo/
+.gemini/skills/
+.copilot/
+.codex/
+.claude/
+.senpi/

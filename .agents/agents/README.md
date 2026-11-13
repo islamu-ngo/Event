@@ -61,6 +61,8 @@ Parallel work is preferred for independent read-heavy exploration, test executio
 
 All agents follow [Context Engineering](../CONTEXT_ENGINEERING.md). A subagent is a context firebreak only when its bounded result keeps a larger discovery body out of the main context; otherwise direct lookup is cheaper.
 
+Delegated work that belongs to a tracked Plane item names its `EVENT-XXX` in the task statement. Each profile's **Plane** line states that role's tracking duty: the architect shapes Epics, engineers record evidence-backed state, verifiers and reviewers guard Definition of Done and backlog hygiene, and the librarian keeps taxonomy links current. The shared rules live in the [work-item taxonomy standard](../../docs/internal/project-management/work-item-taxonomy-and-granularity-report.md) and the [`plane-tracking` rule](../rules/plane-tracking.md).
+
 Agent profiles and chat configuration are documentation/configuration artifacts. Validate their schema, links, and routing directly; do not add automated tests for them.
 
 ## Design Basis And Provenance

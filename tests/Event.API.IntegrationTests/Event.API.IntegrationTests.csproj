@@ -41,6 +41,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Bogus" />
     <PackageReference Include="Cerbos.Sdk" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />

@@ -1304,11 +1304,6 @@
         "resolved": "10.0.10",
         "contentHash": "OvGz3PrzuAI/Sj7LTcXcCe3FClRI1IyRMZjNONcZtFh+Ww7nAtSh4kh08r8KVe/xxkXJPjR0Y1jF7H+N42d4xQ=="
       },
-      "System.Formats.Cbor": {
-        "type": "Transitive",
-        "resolved": "10.0.5",
-        "contentHash": "9Zk1wBawwHQ8uRTJPhlksc8hrY7ho4F/4GKSA/0v3iRJ0zQDpCHbZGlPl06kv0raPtBuy1dO14Yz1yrNXNZv/Q=="
-      },
       "System.IO.Hashing": {
         "type": "Transitive",
         "resolved": "10.0.8",

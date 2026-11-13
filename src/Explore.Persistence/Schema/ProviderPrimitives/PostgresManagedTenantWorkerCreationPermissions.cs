@@ -173,6 +173,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
             .Concat(PostgresAtprotoFederationSettingPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresIntegrationSyncReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresEmailRetentionReadPermissions.GlobalCatalogueRelations(context))
+            .Concat(PostgresVisitorEnrollmentRecoveryReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresEmailPointerPublicationPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresWebhookCataloguePermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresEventResourceAuditReadPermissions.GlobalCatalogueRelations(context))
@@ -189,6 +190,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
             PostgresAtprotoFederationSettingPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresIntegrationSyncReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresEmailRetentionReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresVisitorEnrollmentRecoveryReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresEmailPointerPublicationPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresWebhookCataloguePermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresEventResourceAuditReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),

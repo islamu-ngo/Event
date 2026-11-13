@@ -25,6 +25,7 @@ public sealed class IncomingWebhooksController(
     ILogger<IncomingWebhooksController> logger) : EventControllerBase
 {
     [HttpPost("svix/operational", Name = RouteNames.IntegrationSvixOperationalCallback)]
+    [TenantReadBootstrap]
     [EndpointSummary("Record Svix Operational Webhook")]
     [EndpointDescription("Accepts signed Svix operational callbacks without requiring the outgoing webhook provider to be enabled.")]
     [AllowAnonymous]
@@ -82,6 +83,7 @@ public sealed class IncomingWebhooksController(
     }
 
     [HttpPost("stripe/connect", Name = RouteNames.IntegrationStripeConnectCallback)]
+    [TenantReadBootstrap]
     [EndpointSummary("Record Stripe Connect Webhook")]
     [EndpointDescription("Accepts signed Stripe Connect account and payment callbacks for durable asynchronous reconciliation.")]
     [AllowAnonymous]

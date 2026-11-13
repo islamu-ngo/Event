@@ -373,6 +373,7 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<ISupportAccessSessionService, SupportAccessSessionService>();
         services.AddScoped<IPublicUrlBuilder, PublicUrlBuilder>();
         services.AddScoped<IEventReportEvidenceProtector, EventReportEvidenceProtector>();
+        services.AddScoped<ILocalVisitorEnrollmentIntentProtector, LocalVisitorEnrollmentIntentProtector>();
         services.AddScoped<ModerationRecognitionKeyRingProvider>();
         services.AddScoped<IModerationRecognitionKeyRingProvider>(provider =>
             provider.GetRequiredService<ModerationRecognitionKeyRingProvider>());

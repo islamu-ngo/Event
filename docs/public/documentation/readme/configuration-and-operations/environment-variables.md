@@ -987,8 +987,9 @@ Keycloak variables are required only when `AUTHENTICATION_PROVIDER=keycloak`:
 
 The supported primary/AT Protocol combinations are `local/false`,
 `local/true`, `keycloak/false`, `keycloak/true`, and `atproto/true`.
-`atproto/false` is rejected, and Google SSO is disabled while AT Protocol is
-primary. See [Authentication Providers](authentication-providers.md) for
+`atproto/false` is rejected. Direct Google runtime inputs `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET` and their structured aliases are retired and masked;
+Google sign-in uses Keycloak's broker. See [Authentication Providers](authentication-providers.md) for
 onboarding and switching behavior.
 
 | Variable | Status | Default | Description |
@@ -1399,8 +1400,6 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `DATABASE_TLS_MODE` | database | public | Prefer | defaulted | process |
 | `AUTHENTICATION_PROVIDER` | platform | public | None | optional | process |
 | `AUTHENTICATION_CREDENTIAL_PROFILE_REVISION` | security | public | None | optional | process |
-| `GOOGLE_CLIENT_ID` | identity | public | None | optional | process |
-| `GOOGLE_CLIENT_SECRET` | identity | secret | None (secret) | optional | process |
 | `IDENTITYCORRELATION__TRUSTEDISSUERS__0` | identity | public | None | optional | process |
 | `ATPROTO_LOGIN_ENABLED` | platform | public | None | optional | process |
 | `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | identity | public | None | required | process |

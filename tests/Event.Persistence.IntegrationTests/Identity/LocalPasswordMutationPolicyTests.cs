@@ -153,7 +153,7 @@ public sealed class LocalPasswordMutationPolicyTests
         await Assert.That((await fixture.StateStore(scope).CreatePendingAsync(request, fixture.CancellationToken)).Outcome)
             .IsEqualTo(LocalCredentialCreateOutcome.Invalid);
         LocalCredentialResetResult reset = await fixture.StateStore(scope).ResetAsync(new LocalCredentialResetRequest(
-            Guid.CreateVersion7(), fixture.Receipt.InitiatingApplicationUserId, fixture.Receipt.LocalSubjectId,
+                Guid.CreateVersion7(), fixture.AdministratorId, fixture.Receipt.LocalSubjectId,
             fixture.Receipt.OperationId, before.OperationStamp, "Unavailable policy denial"), fixture.CancellationToken);
         await Assert.That(reset.Outcome).IsEqualTo(LocalCredentialResetOutcome.Invalid);
         await Assert.That(await fixture.Identity(scope).Set<LocalIdentityCredentialOperation>()
@@ -259,7 +259,7 @@ public sealed class LocalPasswordMutationPolicyTests
     }
 
     private static LocalCredentialCreateRequest Creation(Fixture fixture) => new(
-        Guid.CreateVersion7(), fixture.Receipt.InitiatingApplicationUserId, null, "Policy", "Owner", Guid.CreateVersion7().ToString("N"));
+        Guid.CreateVersion7(), fixture.AdministratorId, null, "Policy", "Owner", Guid.CreateVersion7().ToString("N"));
 
     private static string Candidate(Fixture fixture, Denial denial) => denial switch
     {

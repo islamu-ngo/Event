@@ -18,7 +18,7 @@ The finishing chat response must follow this structure:
 ## Senior CTO Feedback & Triad Refinements Applied
 
 ### Executive Verdict & Direction
-**Verdict:** [Approved as Refined | Split Applied | Scope Pruned & Aligned]
+**Verdict:** [Approved as Refined | Multiphase Refinement Applied | Scope Preserved & Aligned | Changes Required]
 [A direct, benefit-led 2-3 sentence executive statement explaining the architectural problem, what changes for the workstream, why the triad was updated, and the overall readiness.]
 
 ---
@@ -26,7 +26,7 @@ The finishing chat response must follow this structure:
 ### Key Decisions Made
 - **[Decision 1 — e.g. Architectural Boundary]**: [Decision summary, e.g., Enforced server-side HAL link affordances and moved validation out of Blazor UI into CQRS command pipeline.]
 - **[Decision 2 — e.g. Breaking Change / Simplification]**: [Eliminated deprecated route aliases and legacy adapter shims in favor of clean V1 contracts.]
-- **[Decision 3 — e.g. Sequencing / PR Right-Sizing]**: [Split UI enablement into follow-up backlog item dev/backlog/...; narrowed this workstream strictly to core migration and API contract.]
+- **[Decision 3 — Sequencing / Right-Sizing]**: [Retained all requested capabilities in the same plan; sequenced integration, UI and qualification into later phases with reviewable commit/PR boundaries.]
 - **[Decision 4 — e.g. Invariant Verification]**: [Mandated failing Red-phase tests for concurrency race on order capture before handler implementation.]
 
 ---
@@ -50,7 +50,7 @@ The finishing chat response must follow this structure:
 - **Test-First Invariant Ordering**: [Restructured tasks into explicit Task N.1 Red Phase (failing tests) -> Task N.2 Green Phase (handler) -> Task N.3 Refactor]
 - **Anti-Tautology**: [Replaced shallow mock assertions with domain invariant and contract assertions]
 - **Atomic Commit Contracts**: [Authored complete Conventional Commit packets for every phase, with path-limited git commands and benefit-led titles]
-- **Scope Right-Sizing**: [Pruned un-actionable tasks; graduated deferred items to backlog]
+- **Scope Right-Sizing**: [Preserved all requested outcomes; divided oversized increments into dependency-ordered phases without moving required work to backlog.]
 
 ---
 
@@ -68,6 +68,8 @@ The finishing chat response must follow this structure:
 ```
 
 ## Answer Style Rules
+
+- **Scope preservation**: Report which later phases own every remaining requested outcome. A completed early increment is not completion of the whole plan; backlog creation is not a right-sizing result.
 
 - **Zero review markdown files**: Never create `*-cto-review.md` in `dev/active/<task>/`.
 - **Direct in-place edits**: Always edit the triad files (`plan.md`, `context.md`, `tasks.md`) directly before delivering the chat response.

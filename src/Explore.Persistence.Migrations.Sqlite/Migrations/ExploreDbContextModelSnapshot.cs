@@ -3447,6 +3447,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("expires_at_unix_milliseconds");
 
+                    b.Property<int?>("FlowKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("flow_kind");
+
                     b.Property<string>("ProtectedPayload")
                         .IsRequired()
                         .HasColumnType("TEXT")
@@ -3479,7 +3483,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                     b.ToTable("ie_atproto_transient_records", null, t =>
                         {
-                            t.HasCheckConstraint("ck_atproto_transients_tenant_purpose", "(purpose = 3 AND tenant_id IS NULL) OR (purpose IN (1, 2) AND tenant_id IS NOT NULL)");
+                            t.HasCheckConstraint("ck_atproto_transients_tenant_purpose", "(purpose = 3 AND tenant_id IS NULL AND flow_kind IS NULL) OR (purpose IN (1, 2) AND tenant_id IS NOT NULL AND flow_kind IS NOT NULL AND flow_kind = 1) OR (purpose = 1 AND tenant_id IS NULL AND flow_kind IS NOT NULL AND flow_kind = 2)");
                         });
                 });
 
@@ -46636,6 +46640,104 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.ToTable("ie_visibility_types", (string)null);
                 });
 
+            modelBuilder.Entity("Explore.Domain.VisitorEnrollmentOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("CleanupCompletedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("cleanup_completed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CredentialGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("credential_generation");
+
+                    b.Property<Guid>("CredentialOperationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("credential_operation_id");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("ExternalLoginId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("external_login_id");
+
+                    b.Property<long>("Generation")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation");
+
+                    b.Property<string>("IntentDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("intent_digest")
+                        .IsFixedLength();
+
+                    b.Property<Guid>("LocalSubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("local_subject_id");
+
+                    b.Property<Guid>("PersonalActorId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("personal_actor_id");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("stage");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid?>("TenantUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_user_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_visitor_enrollment_operations");
+
+                    b.HasIndex("CredentialOperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_visitor_enrollment_operations_credential_operation_id");
+
+                    b.HasIndex("LocalSubjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_visitor_enrollment_operations_local_subject_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_visitor_enrollment_operations_tenant_id");
+
+                    b.HasIndex("Stage", "ExpiresAt", "Id")
+                        .HasDatabaseName("ix_visitor_enrollment_operations_stage_expires_at_id");
+
+                    b.ToTable("ie_visitor_enrollment_operations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_visitor_enrollment_cleanup", "cleanup_completed_at IS NULL OR (stage = 5 AND updated_at IS NOT NULL AND cleanup_completed_at >= created_at AND cleanup_completed_at <= updated_at)");
+
+                            t.HasCheckConstraint("ck_visitor_enrollment_evidence", "(stage = 1 AND credential_generation IS NULL AND tenant_user_id IS NULL) OR (stage = 2 AND credential_generation IS NOT NULL AND credential_generation > 0 AND tenant_user_id IS NULL) OR (stage IN (3, 4) AND credential_generation IS NOT NULL AND credential_generation > 0 AND tenant_user_id IS NOT NULL) OR (stage = 5 AND tenant_user_id IS NULL AND (credential_generation IS NULL OR credential_generation > 0))");
+
+                            t.HasCheckConstraint("ck_visitor_enrollment_generation", "generation > 0");
+
+                            t.HasCheckConstraint("ck_visitor_enrollment_stage", "stage BETWEEN 1 AND 5");
+
+                            t.HasCheckConstraint("ck_visitor_enrollment_timeline", "expires_at > created_at AND (updated_at IS NULL OR updated_at >= created_at)");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.WaitlistPaymentIntent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -49890,7 +49992,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("external_login_id");
 
-                    b.Property<Guid>("InitiatingApplicationUserId")
+                    b.Property<Guid?>("InitiatingApplicationUserId")
                         .HasColumnType("TEXT")
                         .HasColumnName("initiating_application_user_id");
 
@@ -49927,13 +50029,17 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("updated_at");
 
-                    b.Property<DateTime>("VerifiedAt")
+                    b.Property<DateTime?>("VerifiedAt")
                         .HasColumnType("TEXT")
                         .HasColumnName("verified_at");
 
-                    b.Property<Guid>("VerifiedByApplicationUserId")
+                    b.Property<Guid?>("VerifiedByApplicationUserId")
                         .HasColumnType("TEXT")
                         .HasColumnName("verified_by_application_user_id");
+
+                    b.Property<Guid?>("VisitorEnrollmentOperationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("visitor_enrollment_operation_id");
 
                     b.HasKey("Id")
                         .HasName("pk_ie_local_identity_credential_operation");
@@ -49943,13 +50049,15 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                     b.ToTable("ie_local_identity_credential_operation", null, t =>
                         {
-                            t.HasCheckConstraint("ck_local_credential_operation_kind", "kind BETWEEN 1 AND 2");
+                            t.HasCheckConstraint("ck_local_credential_operation_kind", "kind BETWEEN 1 AND 3");
 
-                            t.HasCheckConstraint("ck_local_credential_operation_reset_metadata", "(kind = 1 AND previous_operation_id IS NULL AND previous_operation_concurrency_stamp IS NULL AND reset_reason IS NULL) OR (kind = 2 AND previous_operation_id IS NOT NULL AND previous_operation_id <> id AND previous_operation_concurrency_stamp IS NOT NULL AND reset_reason IS NOT NULL AND TRIM(reset_reason) <> '' AND stage <> 1)");
+                            t.HasCheckConstraint("ck_local_credential_operation_origin", "((kind IN (1, 2) AND initiating_application_user_id IS NOT NULL) OR (kind = 3 AND initiating_application_user_id IS NULL)) AND ((kind IN (1, 2) AND visitor_enrollment_operation_id IS NULL AND verified_by_application_user_id IS NOT NULL AND verified_at IS NOT NULL) OR (kind IN (2, 3) AND visitor_enrollment_operation_id IS NOT NULL AND verified_by_application_user_id IS NULL AND verified_at IS NULL))");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_reset_metadata", "(kind IN (1, 3) AND previous_operation_id IS NULL AND previous_operation_concurrency_stamp IS NULL AND reset_reason IS NULL AND (kind <> 3 OR stage <> 2)) OR (kind = 2 AND previous_operation_id IS NOT NULL AND previous_operation_id <> id AND previous_operation_concurrency_stamp IS NOT NULL AND reset_reason IS NOT NULL AND TRIM(reset_reason) <> '' AND stage <> 1)");
 
                             t.HasCheckConstraint("ck_local_credential_operation_stage", "stage BETWEEN 1 AND 5");
 
-                            t.HasCheckConstraint("ck_local_credential_operation_timestamps", "((kind = 1 AND verified_at >= created_at) OR (kind = 2 AND verified_at <= created_at)) AND (updated_at IS NULL OR updated_at >= created_at)");
+                            t.HasCheckConstraint("ck_local_credential_operation_timestamps", "((kind = 1 AND verified_at IS NOT NULL AND verified_at >= created_at) OR (kind = 2 AND (verified_at IS NULL OR verified_at <= created_at)) OR (kind = 3 AND verified_at IS NULL)) AND (updated_at IS NULL OR updated_at >= created_at)");
                         });
                 });
 
@@ -66497,6 +66605,16 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasConstraintName("fk_user_preferences_tenants_tenant_id");
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Explore.Domain.VisitorEnrollmentOperation", b =>
+                {
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_visitor_enrollment_operations_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Explore.Domain.WaitlistPaymentIntent", b =>

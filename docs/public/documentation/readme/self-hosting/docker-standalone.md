@@ -6,6 +6,11 @@ description: Deploy and operate the single-container standalone distribution wit
 
 The standalone image (`Event.Standalone`) is the simplest and lowest-overhead operational topology for ISLAMU Event. It packages the API, background workers, Blazor WebAssembly BFF/UI, health endpoints, and in-process database migrations into **a single non-root container process**.
 
+> [!TIP]
+> **🌟 The Recommended Starting Point (With Zero Lock-In):**  
+> We strongly recommend starting with **Standalone**. It deploys in seconds, runs effortlessly on budget hardware (1 vCPU, 2 GB RAM at ~$4/mo), and requires zero external database configuration.  
+> **Worried about future scaling?** Standalone uses the exact same domain logic and database schema as our clustered enterprise stack. If your community outgrows a single server, you can promote your deployment to a **Split Topology with PostgreSQL in ~15 minutes with zero data loss**. See our comprehensive [Scaling & Migration Guide (Standalone ↔ Split)](topology-and-database-migration.md).
+
 The SQLite distribution applies its own migrations before serving HTTP. If you
 host Standalone with PostgreSQL and a separate MigrationService, complete that
 service before starting the application; the application does not repeat
@@ -100,6 +105,13 @@ docker volume create event_standalone_data
 
 ### Step 2: Prepare Configuration (`.env`)
 
+> **Current limitation:** Browser-session registration still selects Redis even
+> in Standalone. Removing Redis configuration does not yet provide working
+> authenticated browser sessions. An embedded session implementation is needed
+> to meet the zero-external-infrastructure promise for login. External Data
+> Protection key/admission provisioning also remains required by the current
+> [secrets contract](../configuration-and-operations/secrets.md#external-data-protection-rings).
+
 Create a private `.env` file containing your production settings. The repository
 `.env.example` is a curated baseline, not a ready-to-run secret file or an
 exhaustive reference. Its PostgreSQL host, port and role settings must not be
@@ -123,15 +135,6 @@ SECRET_PROVIDER=Environment
 DATABASE_PROVIDER=sqlite
 DEPLOYMENT_MODE=SingleTenant
 Storage__Local__RootPath=/app/data/storage
-
-# Bounded SQLite profile: optional processing stays off
-Webhooks__Enabled=false
-OutboxProcessor__Enabled=false
-NotificationFanoutProcessor__Enabled=false
-Scheduler__Quartz__Enabled=false
-EmailDispatchProcessor__Enabled=false
-EmailDispatchRabbitMq__Enabled=false
-MCP_ENABLED=false
 
 # Base Application URLs
 PUBLIC_BASE_URL=https://events.example.org
@@ -161,23 +164,27 @@ INSTANCE__OPERATORIDENTITY__PRIVACYURL=https://example.org/privacy
 
 #### Bounded SQLite processing profile
 
-Keep the optional-processing settings above for this Standalone recipe. Local
-webhooks are otherwise enabled by default, and their current SQLite readiness
-queries can fail with an unsupported timestamp comparison. The event-directory
+Standalone enables outbox dispatch, notification fanout, Quartz maintenance,
+the hosted email dispatcher, and MCP. These execute in the application process;
+they do not require an external message broker. RabbitMQ is disabled by default.
+Webhooks are also disabled pending the SQLite compatibility correction below.
+No redundant enable/disable switches are needed in `.env`; explicit settings
+can still override each feature.
+Local webhook SQLite readiness queries can fail with an unsupported timestamp
+comparison when enabled. The event-directory
 query correction does not repair webhook readiness. Disabling SMTP alone does
 not avoid that separate failure.
 
-This bounded profile is verified for directory and administrator HTTP access,
-email health, and persisted credential, bootstrap and key continuity. It does
-not run webhook delivery, queued outbox/email/notification processing or Quartz
-jobs. Scheduled maintenance and cleanup therefore do not run, and workflows
-that need asynchronous completion must not be treated as operational under
-these settings. Read-time privacy expiry is not a substitute for physical cleanup.
+Email delivery remains disabled by default through instance settings. The email
+worker being enabled does not enable sending or require SMTP credentials. Configure
+a transport and enable delivery through administration when email is wanted.
+The hosted dispatcher retains the durable database queue and needs no RabbitMQ.
 
-Before relying on those features, verify their database/worker configuration
-separately and deliberately enable the required processors. Enabling persisted
-email delivery does not start processors disabled here. Do not hide the webhook
-failure by changing readiness results or disabling database/security checks.
+The earlier optional-email test profile disabled workers for isolation; it did
+not establish that Standalone requires them disabled. These defaults restore
+background execution but do not certify every workflow or physical erasure
+completion. The startup and session limitations above still apply. Do not hide
+the webhook failure by changing readiness or disabling database/security checks.
 
 Operator legal identity can either be pre-seeded through the environment variables
 above or configured interactively during first-run onboarding at `/setup`. The
@@ -413,6 +420,7 @@ ISLAMU Event is 100% free and open source. If this standalone deployment powers 
 
 ## Related Guides & Next Steps
 
+* **[Scaling & Migration Guide (Standalone ↔ Split)](topology-and-database-migration.md)** — Easily promote to Split topology or PostgreSQL (or downscale back to Standalone) with zero data loss.
 * **[First-Run Administration Guide](../administration-and-branding/admin-guide.md)** — Complete the web onboarding wizard at `/setup`.
 * **[Deployment Tiers & Sizing](deployment-tiers.md)** — Review capacity guidelines and hardware sizing.
 * **[Docker Compose Runbook](docker-compose.md)** — Scale up to split PostgreSQL and Keycloak containers when ready.

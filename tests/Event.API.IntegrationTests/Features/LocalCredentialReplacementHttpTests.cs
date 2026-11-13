@@ -189,7 +189,8 @@ public sealed class LocalCredentialReplacementHttpTests
         await AssertCurrentUserAsync(bearer);
         Snapshot before = await ReadAsync(factory, credential);
         var resetRequest = new LocalCredentialResetRequest(operationId: Guid.CreateVersion7(),
-            initiatingApplicationUserId: credential.Receipt.InitiatingApplicationUserId,
+            initiatingApplicationUserId: credential.Receipt.InitiatingApplicationUserId
+                ?? throw new InvalidOperationException("The administrator fixture has no initiating user."),
             localSubjectId: credential.Receipt.LocalSubjectId, expectedCurrentOperationId: credential.Receipt.OperationId,
             expectedCurrentOperationConcurrencyStamp: before.OperationStamp, reason: "Supervised bearer revocation");
         await using (AsyncServiceScope reset = factory.Services.CreateAsyncScope())

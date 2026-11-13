@@ -29,9 +29,9 @@ Review depth is defined in [output-template.md](resources/output-template.md).
 7. **3-Dimensional Evaluation Model**: Enforce Completeness (capabilities, I-VSD mitigations), Correctness (boundary conditions, concurrency races, negative failure paths), and Coherence (Clean Architecture, HAL link affordances, tenant isolation, transactional outbox).
 8. **Invariant-First & Anti-Tautology Verification**: Enforce strict Test-First Invariant order in `tasks.md` (failing Red Phase tests before Green Phase implementation for core domain invariants, concurrency, and security). Prohibit tautological mock-mirroring (`Received(1)` on internal services) or framework boilerplate.
 9. **Greenfield Breaking Change Posture**: ISLAMU Event is pre-v1 with 0 external adopters. Reject backward-compatibility shims, deprecated aliases, and adapter baggage. Directly simplify contracts and delete obsolete paths in the plan.
-10. **4-Point "Right-Sizing" Rule**: Mandate a PR split when 2+ symptoms match (multi-intent "and also" scope, > 8-10 major tasks, big-bang layer mixing, or backend slice could ship independently). Scope the active triad to the primary slice and graduate deferred scope to `dev/backlog/<slug>.md`.
+10. **4-Point "Right-Sizing" Rule**: When 2+ sizing signals match (independent concerns, an oversized increment, big-bang layer mixing, or independently shippable value), divide implementation into dependency-ordered phases and atomic commit/PR increments within the same triad. Preserve every requested outcome in later phases; never move required work to backlog. Assess the 8-10-task signal per proposed increment, not across the whole multiphase plan. Only explicit user direction can reduce requested scope.
 11. **Planned Commit Readiness**: Ensure every implementation phase in `tasks.md` has a self-sufficient declarative Conventional Commit contract (or atomic sequence) with exact metadata, paths, inspection commands, `git add`, path-limited `git commit`, and verification. These are instructions for later implementation, not actions to execute during review. Preserve explicit user implementation constraints.
-12. **Knowledge Graduation**: Move deferred scope to `dev/backlog/<slug>.md`, durable architectural decisions to `docs/internal/adr/`, and lessons to `dev/_journal/`.
+12. **Knowledge Graduation**: Keep required scope in later phases of the same triad, not backlog. Graduate durable architectural decisions to `docs/internal/adr/` and lessons to `dev/_journal/`. Only explicit user direction can remove a requested outcome.
 13. **Zero-Loss Information Preservation**: Eliminating separate review files does NOT mean discarding review intelligence. Every critical finding, 3D evaluation scorecard, Socratic stress-test challenge, ranked risk with minimum acceptable fix, "Worst Break" failure mode, and architectural trade-off MUST be permanently written into its dedicated section in `plan.md` (§0, §2, §5, §7.1, §12, §13/§14.2), `context.md` (Key Decisions, Review State), and `tasks.md` (Phase Red Invariant Tests). Chat output is strictly an executive summary of what is already durably preserved in the triad.
 
 ## Workflow
@@ -49,5 +49,6 @@ Review depth is defined in [output-template.md](resources/output-template.md).
 
 - Confirm zero `*-cto-review.md` files exist in `dev/active/<task>/`.
 - Confirm the updated triad remains at the exact requested path and no review branch/worktree was created.
+- Confirm every requested outcome remains assigned to a phase; no required scope was moved to backlog for right-sizing.
 - Validate triad consistency: `plan.md`, `context.md`, and `tasks.md` agree on status, next steps, and phase breakdown.
 - Ensure frontmatter adheres to [../_SKILL_SCHEMA.md](../_SKILL_SCHEMA.md).

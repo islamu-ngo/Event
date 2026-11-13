@@ -109,6 +109,16 @@ When working through Oh-My-OpenAgent (OpenCode plugin or Senpi), OmO's **Prometh
 
 This synergy combines Prometheus's structured interview capability (Metis gap analysis, Momus review) with the ISLAMU Event implementation-plan skill's domain-specific investigation workflow (I-VSD evaluation, `/grill-me` intake, Clean Architecture slicing, Test-First Invariant Sequencing).
 
+## Final Response
+
+Present the completed implementation plan in the answer as a self-contained brief
+and link the plan, tasks and context artifacts. End the answer with this exact block:
+
+### Recommended Next Action
+
+Run /senior-cto-feedback in a fresh session if you want an adversarial Senior CTO architectural audit of the plan triad first, or
+Run /implement-tasks to begin executing Phase 1 (TASK-1.1) directly.
+
 ## Verification Hooks
 - `git diff --check -- .agents/skills/implementation-plan`
 - For prose-only skill changes, check metadata, links, and the shared readability criteria; do not run product tests.

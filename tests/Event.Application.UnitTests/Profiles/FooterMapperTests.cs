@@ -3,6 +3,7 @@ using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Footer.Handlers.Queries;
 using Explore.Application.Mappings;
@@ -105,7 +106,16 @@ public sealed class FooterMapperTests
         settings.ResolveGroupAsync<FooterSettingGroup>(Arg.Any<SettingContext>(), default)
             .Returns(new FooterSettingGroup());
 
-        var result = await new GetFooterConfigQueryHandler(settings, repository, Context())
+        var directory = Substitute.For<ITenantDirectoryOperatorReadinessEvaluator>();
+        directory.EvaluateAsync(TenantId, Arg.Any<Explore.Domain.ValueObjects.TenantDirectoryOperatorIdentityCapability>(), default)
+            .Returns(TenantDirectoryOperatorReadinessAssessment.Missing);
+        var instance = Substitute.For<IInstanceOperatorIdentityReadinessEvaluator>();
+        instance.EvaluateAsync(Arg.Any<Explore.Domain.ValueObjects.InstanceOperatorIdentityCapability>(), default)
+            .Returns(new InstanceOperatorIdentityReadinessAssessment(false, "instance_operator_identity_missing", [], null, null));
+        var result = await new GetFooterConfigQueryHandler(settings, repository, Context(),
+                Substitute.For<IVisitorTenantReadAccessPolicy>(),
+                directory, instance,
+                Substitute.For<ITypedSettingsDocumentResolver>())
             .QueryAsync(new(), default);
         links.Clear();
 

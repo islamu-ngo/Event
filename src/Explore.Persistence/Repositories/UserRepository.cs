@@ -26,6 +26,36 @@ public class UserRepository : GenericRepository<User, Guid>, IUserRepository
             .FirstOrDefaultAsync(u => u.Id == id);
     }
 
+    public async Task<User?> GetLocalIdentityProfileAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var snapshot = await _dbContext.Users.IgnoreAutoIncludes()
+            .Where(user => user.Id == id)
+            .Select(user => new
+            {
+                User = user,
+                Profile = user.Pii == null ? null : new
+                {
+                    user.Pii.UserId, user.Pii.Email, user.Pii.FirstName, user.Pii.LastName,
+                    Revision = EF.Property<long>(user.Pii, "_birthDateRevision")
+                }
+            }).FirstOrDefaultAsync(cancellationToken);
+        if (snapshot is null)
+            return null;
+        if (snapshot.Profile is { } stored && snapshot.User.Pii is null)
+        {
+            var profile = new UserPii
+            {
+                UserId = stored.UserId, Email = stored.Email,
+                FirstName = stored.FirstName, LastName = stored.LastName
+            };
+            var entry = _dbContext.Entry(profile);
+            entry.Property<long>("_birthDateRevision").CurrentValue = stored.Revision;
+            entry.State = EntityState.Unchanged;
+            snapshot.User.Pii = profile;
+        }
+        return snapshot.User;
+    }
+
     public Task<User?> GetUserWithDetails(Guid id) =>
         GetUserWithDetails(id, CancellationToken.None);
 

@@ -35,6 +35,7 @@ public sealed class LocalCredentialReplacementController(
             failureCodes: [FailureCodes.ConcurrencyConflict]);
 
     [HttpPost(Name = RouteNames.CompleteLocalCredentialReplacement)]
+    [TenantReadBootstrap]
     [PrivateNoStore]
     [SuppressIdempotencyResponseStorage]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]

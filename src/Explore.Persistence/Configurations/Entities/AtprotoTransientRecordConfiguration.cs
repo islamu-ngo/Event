@@ -10,12 +10,15 @@ public sealed class AtprotoTransientRecordConfiguration : IEntityTypeConfigurati
     {
         builder.ToTable(table => table.HasCheckConstraint(
             "ck_atproto_transients_tenant_purpose",
-            "(purpose = 3 AND tenant_id IS NULL) OR (purpose IN (1, 2) AND tenant_id IS NOT NULL)"));
+            "(purpose = 3 AND tenant_id IS NULL AND flow_kind IS NULL)"
+            + " OR (purpose IN (1, 2) AND tenant_id IS NOT NULL AND flow_kind IS NOT NULL AND flow_kind = 1)"
+            + " OR (purpose = 1 AND tenant_id IS NULL AND flow_kind IS NOT NULL AND flow_kind = 2)"));
         builder.HasKey(record => record.Id);
         builder.Property(record => record.Id).ValueGeneratedNever();
         builder.Property(record => record.Purpose).HasConversion<int>().IsRequired();
         builder.Property(record => record.TokenDigest).HasMaxLength(64).IsFixedLength().IsRequired();
         builder.Property(record => record.TenantId);
+        builder.Property(record => record.FlowKind).HasConversion<int>();
         builder.Property(record => record.ProtectedPayload).IsRequired();
         builder.Property(record => record.ExpiresAtUnixMilliseconds).IsRequired();
         builder.HasIndex(record => new { record.Purpose, record.TokenDigest }).IsUnique().HasDatabaseName("ux_atproto_transients_purpose_digest");

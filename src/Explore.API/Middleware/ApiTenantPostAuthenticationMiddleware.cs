@@ -78,6 +78,15 @@ public sealed class ApiTenantPostAuthenticationMiddleware
 
         if (!tenantContextAccessor.IsResolved)
         {
+            if (apiKeyPrincipal is not null
+                && TenantLifecycleAccessMiddleware.IsVerifiedAccountOperation(context))
+            {
+                // Let the concrete action reject machine credentials without
+                // manufacturing an account's tenant context from the key owner.
+                await _next(context);
+                return;
+            }
+
             if (authenticatedTenantId is Guid principalTenantId && principalTenantId != Guid.Empty)
             {
                 tenantContextAccessor.SetTenant(principalTenantId);

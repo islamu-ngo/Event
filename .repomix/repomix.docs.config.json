@@ -3,6 +3,7 @@
     "schemas/lexicons",
     "schemas/islamu-event.md",
     "docs/**/*",
+    "islamic-value-sensitive-design/**/*",
     "dev/report/**/*",
     "dev/active/**/*",
     "README.md",

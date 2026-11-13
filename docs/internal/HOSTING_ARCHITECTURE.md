@@ -298,12 +298,37 @@ Images distribute pure Intermediate Language (IL) assemblies rather than Ahead-O
 
 ---
 
-## 5. Operational Deployment Runbooks (Public Source of Truth)
+## 5. Bidirectional Topology & Schema Migration Invariants
+
+The platform explicitly guarantees bidirectional portability between monolithic Standalone (`Event.Standalone`) and Split Topology (`Explore.Blazor` BFF + `Explore.API`), as well as relational storage migration between SQLite and PostgreSQL.
+
+### 1. In-Memory Bridge vs. Reverse-Proxy Dispatch
+* **Standalone (`BlazorHostProfile.Combined`)**: Executes `CombinedApiBridgeMiddleware`. Requests to `/api/*` bypass HTTP loopback sockets entirely; cookies are authenticated in-process, transformed into API claims, and dispatched directly into the endpoint routing pipeline (`ApiAuthenticationSchemeNames.MultiAuth`).
+* **Split (`BlazorHostProfile.Split`)**: Registers `AddBffReverseProxy()`. Requests to `/api/*` are captured by YARP, enriched with bearer authorization headers, and proxied over the internal network to `Explore.API` at `API_ENDPOINT`. Browser URLs and client routing paths remain 100% identical across both topologies.
+
+### 2. Relational Schema & Table Prefix Remapping
+* **SQLite Conventions**: SQLite lacks multi-schema support. `RelationalModelNamespace.Apply()` automatically prefixes all table names with `ie_` in the default schema (e.g., `ie_users`, `ie_events`, `ie_orders`). Migration histories are tracked in `__EFMigrationsHistory` and `__EFDataProtectionMigrationsHistory`.
+* **PostgreSQL Conventions**: Tables are assigned to the configured relational schema (default `islamu_event`) **without** the `ie_` prefix (e.g., `islamu_event.users`, `islamu_event.events`). Migration histories live in `islamu_event.__EFMigrationsHistory`.
+* **Migration Invariant**: External data migration tooling (`pgloader`, native SQL dumps) must explicitly remap table names (`ie_(.*)` ➔ `\1`) and switch schemas. Naive cross-database table dumps that omit this prefix transformation will produce orphaned tables in PostgreSQL and cause the application to report empty state.
+
+### 3. Primary Key Sequence Synchronization (`setval`)
+* In PostgreSQL, tables with `int` or `long` primary keys (such as lookup tables, event days, and session sequence items) rely on PostgreSQL sequence objects (`pg_get_serial_sequence`).
+* Inserting explicit primary keys during SQLite-to-PostgreSQL migration leaves sequence counters behind. Operators must execute `SELECT setval(...)` across all schema sequences after data loading to prevent subsequent inserts from throwing duplicate key constraint violations (`23505`).
+
+### 4. SQLite Concurrency & File Lock Invariant
+* `Event.Standalone` and `Explore.API` with `Database:Provider=Sqlite` enforce that `Hosting:ReplicaCount` must equal `1`.
+* SQLite relies on POSIX file locks. Attempting to horizontally scale `Explore.API` against a single SQLite database over NFS, SMB, or a shared Docker volume violates SQLite concurrency guarantees and risks database corruption (`SQLITE_BUSY`).
+* Conversely, the BFF container (`Explore.Blazor`) carries **zero database dependencies** and may be horizontally scaled independently when backed by distributed Redis session storage and a shared Data Protection ring.
+
+---
+
+## 6. Operational Deployment Runbooks (Public Source of Truth)
 
 For step-by-step container configuration, Docker Compose YAML manifests, environment variables, reverse proxies, and backup/restore procedures, **refer exclusively to the authoritative public documentation**:
 
 * 📖 **[Deployment Tiers & Hardware Sizing](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers)**
 * 📖 **[Docker Standalone Runbook](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/docker-standalone)**
+* 📖 **[Scaling & Migration Guide (Standalone ↔ Split)](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/topology-and-database-migration)**
 * 📖 **[Docker Compose Production Runbook](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/docker-compose)**
 * 📖 **[Coolify with Cerbos & Traefik](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/coolify-cerbos-traefik)**
 * 📖 **[Environment Variables Reference](https://islamu.gitbook.io/islamu-event/documentation/readme/configuration-and-operations/environment-variables)**

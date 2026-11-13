@@ -1,0 +1,26 @@
+Change-Id: CHG-01M6RH2H0A2RQVS07QT6QZXEY5
+Title: "Update existing JSON-backed visitor settings"
+Type: fix
+Scope: access
+Summary: "Administrators can update existing visitor settings without PostgreSQL rejecting JSON values as collatable text."
+Group: visitor-json-before-image
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/SECURITY_OVERVIEW.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

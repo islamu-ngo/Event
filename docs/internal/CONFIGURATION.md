@@ -109,6 +109,30 @@ source of requirement categories and remediation authority. Value-free operator
 form metadata supplies authoritative choices; persisted identity and revision remain
 in the existing document. See [SELF_HOSTING.md](SELF_HOSTING.md#2-operator-identity-governance--readiness-gate).
 
+## Tenant user enrollment
+
+`tenants.user_registration_enabled` is a lockable Boolean policy from instance
+to tenant scope, defaulting to `true` when a successful authoritative snapshot
+contains no value. A locked instance value wins over a tenant override.
+`TenantUserRegistrationPolicy` accepts JSON Boolean values only; malformed or
+unavailable configuration cannot be treated as an open-registration default.
+This controls users joining an existing tenant and is independent of
+`tenants.self_service_registration`, which controls creating tenants.
+
+The complete visitor authority group includes enrollment, visitor mode and
+provider facts. Current capability resolution and final native settings writes
+resolve the same inherited scalar. Closing enrollment removes signup destinations
+while preserving usable Local, Keycloak and AT Protocol sign-in and
+account-required participation. Local signup is not advertised until its callable
+registration endpoint is available. `AuthenticatedOnly` governs read privacy;
+enrollment remains a separate policy.
+
+Tenant administrators edit enrollment through the `Tenant` settings category.
+The browser requires the server's category edit link and the setting's editable
+state. Public-experience and enrollment category saves are separate requests;
+rejection refreshes authoritative settings and does not pretend earlier category
+writes were rolled back.
+
 ## Anonymous Registration Intake Controls
 
 `AnonymousRegistrationRateLimiting` resolves final host configuration from
@@ -2104,7 +2128,7 @@ Storage naming rules:
 
 ## Blazor Server Compatibility Mapping
 
-`Explore.Blazor.Extensions.ConfigurationExtensions` maps Keycloak, Google, and API base URL keys for the BFF host.
+`Explore.Blazor.Extensions.ConfigurationExtensions` maps supported Keycloak, AT Protocol and API base URL keys for the BFF host.
 
 API base URL is public deployment configuration (`API_ENDPOINT`); the BFF does not acquire a broad `/blazor` folder. Aspire service discovery supplies its local API endpoint.
 
@@ -2112,7 +2136,8 @@ Important behavior:
 
 - `KEYCLOAK_CLIENT_ID` maps to `Keycloak:ClientId`; when a Keycloak authority is resolved and no client id is provided, the BFF defaults to `islamu-event-blazor`.
 - `Keycloak:ClientSecret` is explicitly overridden when `KEYCLOAK_BLAZOR_CLIENT_SECRET` (Infisical) is present.
-- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` map to `Google:ClientId` and `Google:ClientSecret`.
+- Direct Google runtime inputs are retired. Google sign-in uses Keycloak's broker;
+  neither flat nor structured Google client aliases establish a runtime scheme.
 
 Compose and local Aspire pass `KEYCLOAK_BLAZOR_CLIENT_SECRET` only to BFF or
 Combined runtime under Environment authority; Infisical consumers acquire it
@@ -2192,7 +2217,7 @@ Platform monetization is application-managed instance data, not an `appsettings`
 | AI assistant | `ai_assistant.*` | No credential value; scope metadata selects a secret reference. |
 | Support access | `support_access.*` | none |
 
-`SecretDefinitionRegistry` declares exact runtime coordinates and `SecretAcquisitionPolicy` admits them for each consumer. Keycloak and Cerbos use purpose-specific runtime roots, while existing service roots such as `/storage`, `/postgresql`, `/smtp`, `/analytics` and `/ai` remain. The BFF acquires Google values only from `/runtime/bff/oidc/google`; broad provider folders are not runtime authority.
+`SecretDefinitionRegistry` declares exact runtime coordinates and `SecretAcquisitionPolicy` admits them for each consumer. Keycloak and Cerbos use purpose-specific runtime roots, while existing service roots such as `/storage`, `/postgresql`, `/smtp`, `/analytics` and `/ai` remain. The retained Google definition protects historical binding custody; `/runtime/bff/oidc/google` is excluded from active acquisition. Runtime environment projection masks the retired Google aliases for every consumer.
 
 ### External Link Transport Policy
 
@@ -2348,7 +2373,9 @@ Post-onboarding management note:
 - Instance admins can update authentication provider governance values through `PATCH /api/instance/settings/auth-provider`.
 - Instance admins can update the active authorization provider through `PATCH /api/instance/settings/authz-provider`.
 - Setup and instance-admin policy sync endpoints accept an optional complete one-time Admin API username/password pair. An empty request selects deployment credentials; partial pairs are rejected.
-- Secret values (`keycloak`/`google` client secrets) continue to use secret-setting storage, not plain governance values.
+- Keycloak client credentials remain deployment-owned. Retained Google credential
+  references are historical custody and never become plain governance values or
+  a callable authentication provider.
 
 ## Settings Cascade Rules
 

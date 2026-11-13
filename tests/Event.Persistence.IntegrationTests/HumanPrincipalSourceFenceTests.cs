@@ -152,7 +152,7 @@ public sealed class HumanPrincipalSourceFenceTests
             Value = JsonSerializer.Serialize(new LocalCredentialStateMetadata(1, LocalCredentialState.Ready, operationId, fixture.UserId))
         }, new LocalIdentityCredentialOperation(new LocalCredentialOperationReceipt(
             operationId, LocalCredentialOperationKind.Create, LocalCredentialOperationStage.ProvisioningPending,
-            fixture.UserId, fixture.UserId, fixture.ActorId, loginId, DateTime.UtcNow), Guid.CreateVersion7()));
+            fixture.UserId, fixture.UserId, fixture.ActorId, loginId, DateTime.UtcNow, null), Guid.CreateVersion7()));
         await context.SaveChangesAsync();
         await context.Set<LocalIdentityCredentialOperation>().Where(row => row.Id == operationId)
             .ExecuteUpdateAsync(update => update.SetProperty(row => row.Stage, LocalCredentialOperationStage.Replaced));

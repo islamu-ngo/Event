@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Constants;
+using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Persistence;
@@ -198,6 +199,52 @@ public sealed class ProviderConfigurationNativeContractTests(PostgreSqlContainer
             await transaction.RollbackAsync();
         }
         await Assert.That(before.Same(await PostgresProviderConfigurationContract.ReadAsync(caller, fixture.NativeQueueEnrollment, Actor, default))).IsTrue();
+    }
+
+    [Test]
+    public async Task SupportedProviderWritePreservesArchivedGoogleRowsAndCanonicalBindingMetadata()
+    {
+        await InstallAsync();
+        Guid settingId = Guid.CreateVersion7();
+        Guid bindingId = Guid.CreateVersion7();
+        const string settingKey = GovernanceSettingKeys.Authentication.GoogleClientId;
+        const string secretKey = SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret;
+        await using var migration = Open(PrimaryDatabaseRole.Migrator);
+        migration.BindTenantLease();
+        migration.SystemSettings.Add(new SystemSetting
+        {
+            Id = settingId, SettingKey = settingKey, Value = JsonSerializer.Serialize($"retired-{settingId:N}"),
+            ValueType = SettingValueType.String, IsLocked = true, Category = "Authentication",
+            Description = "Retained provider metadata", DisplayOrder = 8, CreatedBy = Actor
+        });
+        migration.Set<SecretBinding>().Add(new SecretBinding
+        {
+            Id = bindingId, SettingKey = secretKey, Scope = SecretScope.Instance,
+            SourceType = SecretSourceType.EnvironmentVariable, EnvironmentVariableName = "GOOGLE_CLIENT_SECRET",
+            CreatedBy = Actor
+        });
+        await migration.SaveChangesAsync();
+        try
+        {
+            await using var caller = Open(PrimaryDatabaseRole.Global);
+            await caller.Database.OpenConnectionAsync();
+            var before = await PostgresProviderConfigurationContract.ReadAsync(caller, fixture.NativeQueueEnrollment, Actor, default);
+            await Assert.That(before.System[settingKey]!.Id).IsEqualTo(settingId);
+            await Assert.That(before.Bindings).Contains(secretKey);
+            await using var transaction = await caller.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+            await WriteNativeAuthorizationAsync(caller, before.NativeImage!, NativeAuthorizationEffects(before));
+
+            var after = await PostgresProviderConfigurationContract.ReadAsync(caller, fixture.NativeQueueEnrollment, Actor, default);
+            await Assert.That(after.System[settingKey]).IsEqualTo(before.System[settingKey]);
+            await Assert.That(after.Bindings).IsEqualTo(before.Bindings);
+            await transaction.RollbackAsync();
+        }
+        finally
+        {
+            await migration.Set<SecretBinding>().Where(binding => binding.Id == bindingId).ExecuteDeleteAsync();
+            await migration.SystemSettings.Where(setting => setting.Id == settingId).ExecuteDeleteAsync();
+        }
     }
 
     [Test]

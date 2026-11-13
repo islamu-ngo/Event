@@ -37,6 +37,8 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
     private readonly PrivacyIdentityFenceOperation _identityFence;
     private readonly IEventDiscoveryEnrollmentGate _enrollmentGate;
     private readonly IHumanSecuritySourceGate _humanGate;
+    private readonly IVisitorAccessCapabilityResolver _visitorAccess;
+    private readonly ISettingMutationLock _settingMutationLock;
     private readonly IIdentityEmailMirrorWriter _emailMirrorWriter;
 
     public SyncUserCommandHandler(
@@ -56,6 +58,8 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
         PrivacyIdentityFenceOperation identityFence,
         IEventDiscoveryEnrollmentGate enrollmentGate,
         IHumanSecuritySourceGate humanGate,
+        IVisitorAccessCapabilityResolver visitorAccess,
+        ISettingMutationLock settingMutationLock,
         IIdentityEmailMirrorWriter emailMirrorWriter)
     {
         _userRepository = userRepository;
@@ -74,6 +78,8 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
         _identityFence = identityFence;
         _enrollmentGate = enrollmentGate;
         _humanGate = humanGate;
+        _visitorAccess = visitorAccess;
+        _settingMutationLock = settingMutationLock;
         _emailMirrorWriter = emailMirrorWriter;
     }
 
@@ -98,8 +104,14 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                 enrollment = await _enrollmentGate.AcquireAsync(cancellationToken);
             _humanGate.RequireCurrent();
             _enrollmentGate.RequireCurrent();
-            result = await _identityFence.ExecuteEnrollmentAsync(
-                request.AccountKey, token => ExecuteUnderFenceAsync(request, token), cancellationToken);
+            result = request.AccountKey.ProviderKind == AuthenticationProviderKind.Local
+                ? await _identityFence.ExecuteEnrollmentAsync(
+                    request.AccountKey, token => ExecuteUnderFenceAsync(request, token), cancellationToken)
+                : await _settingMutationLock.ExecuteOrderedGroupsAsync(
+                    [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+                    leaseToken => _identityFence.ExecuteEnrollmentAsync(
+                        request.AccountKey, token => ExecuteUnderFenceAsync(request, token), leaseToken),
+                    cancellationToken);
             _humanGate.RequireCurrent();
             _enrollmentGate.RequireCurrent();
         }
@@ -292,6 +304,17 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                 else if (currentUserId is not null && currentLogin is null && await IsLocalOwnedAsync(currentUserId.Value, ct))
                 {
                     return ExplicitBindingRequired();
+                }
+
+                if (currentUserId is null && providerKind != AuthenticationProviderKind.Local)
+                {
+                    if (_tenantContext.TenantId is not Guid targetTenant || targetTenant == Guid.Empty)
+                        return BaseCommandResponse.Failure<Guid>(
+                            "tenant_required", "A tenant is required for enrollment.");
+                    if (!await TenantEnrollmentAdmissionOperation.IsOpenAsync(
+                        _visitorAccess, targetTenant, ct).ConfigureAwait(false))
+                        return BaseCommandResponse.Failure<Guid>(
+                            "registration_closed", "Registration is closed for this tenant.");
                 }
 
                 await _identityFence.MatchAndBindAsync(accountKey, currentUserId ?? newUserId, currentLogin?.Id ?? loginId,

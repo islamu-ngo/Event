@@ -50,7 +50,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
             var before = await service.ReadConfigurationAsync();
             await using var original = await service.ObserveConfigurationAsync(NativeProviderCommand(fixture), default);
             await Assert.That(original.AuthenticationProposed.PrimaryProviderId).IsEqualTo((int)AuthenticationProviderKind.Local);
-            await Assert.That(original.AuthenticationProposed.GoogleSsoEnabled).IsFalse();
+            await Assert.That(original.AuthenticationProposed.KeycloakPublicSignupUrl).IsEqualTo("https://provider-native-after.example.test/signup");
             await Assert.That(original.OriginalOwner is EfCoreUnitOfWork).IsTrue();
             DbConnection connection = observer.Context!.Database.GetDbConnection();
             DbTransaction? writtenTransaction = null;
@@ -101,8 +101,8 @@ public sealed partial class HumanSettingsMutationPreparationTests
             {
                 using var independent = fixture.Native.CreateDatabase();
                 return observer.Context!.Database.CurrentTransaction is null
-                    && independent.SystemSettings.Any(row => row.SettingKey == GovernanceSettingKeys.Authentication.GoogleClientId
-                        && row.Value == "\"provider-native-after\"");
+                    && independent.SystemSettings.Any(row => row.SettingKey == GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl
+                        && row.Value == "\"https://provider-native-after.example.test/signup\"");
             };
             if (change == "unchanged") await service.ApplyConfigurationAsync(original, default);
             else await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.ApplyConfigurationAsync(original, default));
@@ -123,13 +123,14 @@ public sealed partial class HumanSettingsMutationPreparationTests
                 await Assert.That(await final.SecretBindings.AnyAsync(row => row.SettingKey == bindingKey
                     && row.SettingScopeId == 1 && row.ScopeId == null && row.Qualifier == "")).IsFalse();
             var after = await service.ReadConfigurationAsync();
-            await Assert.That(after.GoogleClientId).IsEqualTo(change == "unchanged" ? "provider-native-after" : before.GoogleClientId);
+            await Assert.That(after.KeycloakPublicSignupUrl).IsEqualTo(change == "unchanged"
+                ? "https://provider-native-after.example.test/signup" : before.KeycloakPublicSignupUrl);
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.ApplyConfigurationAsync(original, default));
         });
 
     [Test]
     [Arguments("keycloak")]
-    [Arguments("google")]
+    [Arguments("retained-google-binding")]
     public Task ProviderMaterials_RequestedRemoteApiDoesNotBorrowBffCredentials(string provider) =>
         WithProviderProfileAsync(Guid.CreateVersion7().ToString("D"), async () =>
         {
@@ -137,6 +138,18 @@ public sealed partial class HumanSettingsMutationPreparationTests
             await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(
                 configureServices: services => RegisterProviderMaterialObservation(services, observer));
             await SeedPlatformAdministratorAsync(fixture);
+            SecretBinding? retainedBinding = null;
+            if (provider == "retained-google-binding")
+            {
+                string key = SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret;
+                retainedBinding = SecretBinding.CreateEnvironmentVariable(key, SecretScope.Instance, null,
+                    SecretDefinitionRegistry.GetRequired(key).DefaultEnvironmentVariableName);
+                await using var seed = fixture.Native.CreateDatabase();
+                await seed.SecretBindings.Where(row => row.SettingKey == key
+                    && row.SettingScopeId == 1 && row.ScopeId == null && row.Qualifier == "").ExecuteDeleteAsync();
+                seed.SecretBindings.Add(retainedBinding);
+                await seed.SaveChangesAsync();
+            }
             await using var host = fixture.Host.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 { ["Authentication:Provider"] = "", ["AUTHENTICATION_PROVIDER"] = "" })));
@@ -150,23 +163,24 @@ public sealed partial class HumanSettingsMutationPreparationTests
                 {
                     Configuration = OptionalUpdate<AuthProviderConfigurationWriteDto>.Set(new()
                     {
-                        PrimaryProviderId = (int)(provider == "keycloak" ? AuthenticationProviderKind.Keycloak : AuthenticationProviderKind.Local),
+                        PrimaryProviderId = (int)AuthenticationProviderKind.Keycloak,
                         KeycloakAuthority = $"https://issuer-{Guid.CreateVersion7():N}.example.test/realms/native",
-                        KeycloakClientId = Guid.CreateVersion7().ToString("N"),
-                        GoogleSsoEnabled = provider == "google",
-                        GoogleClientId = Guid.CreateVersion7().ToString("N")
+                        KeycloakClientId = Guid.CreateVersion7().ToString("N")
                     })
                 }
             }, default);
             var validation = await original.ValidateAsync();
             await Assert.That(validation.IsValid).IsFalse();
-            string property = provider == "keycloak" ? "KeycloakClientSecretOwnership" : "GoogleClientSecretOwnership";
-            await Assert.That(validation.Errors.Any(error => error.PropertyName == property)).IsTrue();
+            await Assert.That(validation.Errors.Any(error => error.PropertyName == "KeycloakClientSecretOwnership")).IsTrue();
             await Assert.ThrowsAsync<FluentValidation.ValidationException>(() => service.ApplyConfigurationAsync(original, default));
+            await Assert.That(observer.GoogleMaterialRequests).IsEqualTo(0);
             await Assert.That(observer.Applied).IsFalse();
             await Assert.That(observer.ActivatedAfterCommit).IsNull();
             await Assert.That(observer.Context!.Database.CurrentTransaction).IsNull();
             await using var final = fixture.Native.CreateDatabase();
+            if (retainedBinding is not null)
+                await Assert.That(await final.SecretBindings.AsNoTracking().AnyAsync(row => row.Id == retainedBinding.Id
+                    && row.SettingKey == SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret)).IsTrue();
             foreach (var effect in original.Effects)
             {
                 var row = await final.SystemSettings.AsNoTracking().SingleOrDefaultAsync(row => row.SettingKey == effect.Key);

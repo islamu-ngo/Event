@@ -12,6 +12,36 @@ public sealed class RuntimeSecretEnvironmentTests
             definition.DefaultInfisicalKey, definition.DefaultEnvironmentVariableName)).ToArray();
 
     [Test]
+    [Arguments(SecretConsumerRole.Api)]
+    [Arguments(SecretConsumerRole.Bff)]
+    [Arguments(SecretConsumerRole.Combined)]
+    [Arguments(SecretConsumerRole.Migration)]
+    [Arguments(SecretConsumerRole.ModerationMeasurement)]
+    public async Task RetiredGoogleAliasesCannotSurviveOrBeRestoredByRuntimeProjection(SecretConsumerRole consumer)
+    {
+        string canary = CreateSecret();
+        string[] aliases = [
+            "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
+            "Google:ClientId", "gOoGlE:cLiEnTsEcReT",
+            "Google__ClientId", "Google__ClientSecret"];
+        var inputs = Inputs();
+        var target = new Dictionary<string, object>(StringComparer.Ordinal);
+        foreach (string alias in aliases)
+        {
+            inputs[alias] = canary;
+            target[alias] = canary;
+        }
+
+        RuntimeSecretEnvironment.Apply(target, Configuration(inputs), inputs.Keys, consumer,
+            SecretAuthorityKind.Environment, Entries);
+
+        await Assert.That(SecretAcquisitionPolicy.AllowsRoot(consumer, "/runtime/bff/oidc/google")).IsFalse();
+        foreach (string alias in aliases)
+            await Assert.That(target[alias]).IsEqualTo(string.Empty);
+        await Assert.That(target.Values.Contains(canary)).IsFalse();
+    }
+
+    [Test]
     [Arguments(SecretConsumerRole.Bff)]
     [Arguments(SecretConsumerRole.Combined)]
     public async Task NativeKeycloakPublicMetadataSurvivesWithoutOptionalClientCredential(

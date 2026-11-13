@@ -19,6 +19,8 @@ public sealed class TenantPublicExperienceAdminService(
     ILogger<TenantPublicExperienceAdminService> logger) : ITenantPublicExperienceAdminService
 {
     private const string Category = "PublicExperience";
+    private const string TenantCategory = "Tenant";
+    private const string UserRegistrationEnabledKey = "tenants.user_registration_enabled";
     private const string ModeKey = "public_experience.mode";
     private const string VisitorAccessModeKey = "public_experience.visitor_access_mode";
     private const string EventCatalogLabelKey = "public_experience.event_catalog_label";
@@ -66,8 +68,27 @@ public sealed class TenantPublicExperienceAdminService(
                 Category,
                 cancellationToken: cancellationToken);
 
-            return MapSettings(response);
+            var model = MapSettings(response);
+            try
+            {
+                var enrollment = await apiClient.GetTenantScopedSettingsAsync(TenantCategory,
+                    cancellationToken: cancellationToken);
+                var setting = enrollment.Settings.SingleOrDefault(setting => setting.Key == UserRegistrationEnabledKey);
+                model.UserRegistrationEnabled = setting is null
+                    ? true : System.Text.Json.JsonSerializer.Deserialize<bool>(setting.Value);
+                model.CanEditUserRegistration = setting?.CanEdit == true
+                    && enrollment._links?.ContainsKey("edit") == true;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Tenant enrollment settings could not be loaded.");
+                model.UserRegistrationEnabled = null;
+                model.CanEditUserRegistration = false;
+            }
+            return model;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load tenant public experience settings.");
@@ -223,46 +244,54 @@ public sealed class TenantPublicExperienceAdminService(
 
         Dictionary<string, string> values = BuildEditableValues(model);
 
-        if (values.Count == 0)
+        bool saveEnrollment = model.CanEditUserRegistration && model.UserRegistrationEnabled.HasValue;
+        if (values.Count == 0 && !saveEnrollment)
         {
             return PublicExperienceAdminSaveResult.Failed("No public experience settings are editable.");
         }
 
+        bool publicSettingsSaved = false;
         try
         {
-            BatchUpdateResponseDto response = await apiClient.UpdateTenantSettingsBatchAsync(
-                Category,
-                new UpdateSettingBatchDto
-                {
-                    Values = values,
-                    Mode = (BatchUpdateMode)1 // Strict admin save: reject the batch if any key is locked or invalid.
-                },
-                cancellationToken: cancellationToken);
-
-            if (response.Success == true)
+            if (values.Count > 0)
             {
-                return PublicExperienceAdminSaveResult.Successful();
+                var publicResult = await SaveBatchAsync(Category, values, cancellationToken);
+                if (!publicResult.Success)
+                    return await ReloadAfterRejectedSaveAsync(model, publicResult.Message, cancellationToken);
+                publicSettingsSaved = true;
             }
 
-            return await ReloadAfterRejectedSaveAsync(
-                model,
-                BuildFailureMessage(response),
-                cancellationToken);
+            if (saveEnrollment)
+            {
+                var enrollmentResult = await SaveBatchAsync(TenantCategory,
+                    new Dictionary<string, string>
+                    {
+                        [UserRegistrationEnabledKey] = model.UserRegistrationEnabled == true ? "true" : "false"
+                    }, cancellationToken);
+                if (!enrollmentResult.Success)
+                    return await ReloadAfterRejectedSaveAsync(model,
+                        "Public experience values may already be saved. Enrollment settings were rejected: " + enrollmentResult.Message,
+                        cancellationToken);
+            }
+            return PublicExperienceAdminSaveResult.Successful();
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (ApiException ex) when (ex.StatusCode == 409)
         {
             logger.LogWarning("Tenant visitor access policy save was rejected with a conflict.");
             return await ReloadAfterRejectedSaveAsync(
                 model,
-                "Visitor access settings changed or conflict with current event participation.",
+                (publicSettingsSaved ? "Public experience values may already be saved. " : string.Empty)
+                    + "Visitor access settings changed or conflict with current event participation.",
                 cancellationToken);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to save tenant public experience settings.");
-            MarkUnavailable(model);
-            return PublicExperienceAdminSaveResult.Failed(
-                "Public experience settings could not be saved. Reload the authoritative settings before retrying.");
+            return await ReloadAfterRejectedSaveAsync(model,
+                (publicSettingsSaved ? "Public experience values may already be saved. " : string.Empty)
+                    + "Public experience settings could not be saved. Reload the authoritative settings before retrying.",
+                cancellationToken);
         }
     }
 
@@ -430,10 +459,7 @@ public sealed class TenantPublicExperienceAdminService(
     {
         try
         {
-            HalResourceOfSettingGroupResponseDto response = await apiClient.GetTenantScopedSettingsAsync(
-                Category,
-                cancellationToken: cancellationToken);
-            TenantPublicExperienceAdminModel authoritative = MapSettings(response);
+            TenantPublicExperienceAdminModel authoritative = await GetSettingsAsync(cancellationToken);
             if (!authoritative.IsAvailable)
             {
                 MarkUnavailable(model);
@@ -485,6 +511,8 @@ public sealed class TenantPublicExperienceAdminService(
         target.IsAvailable = source.IsAvailable;
         target.Mode = source.Mode;
         target.VisitorAccessMode = source.VisitorAccessMode;
+        target.UserRegistrationEnabled = source.UserRegistrationEnabled;
+        target.CanEditUserRegistration = source.CanEditUserRegistration;
         target.EventCatalogLabel = source.EventCatalogLabel;
         target.PrimaryOrganizationId = source.PrimaryOrganizationId;
         target.HomeBlocksJson = source.HomeBlocksJson;
@@ -504,6 +532,7 @@ public sealed class TenantPublicExperienceAdminService(
         model.IsAvailable = false;
         model.CanEditMode = false;
         model.CanEditVisitorAccessMode = false;
+        model.CanEditUserRegistration = false;
         model.CanEditEventCatalogLabel = false;
         model.CanEditPrimaryOrganization = false;
         model.CanEditHomeBlocks = false;
@@ -631,6 +660,8 @@ public sealed class TenantPublicExperienceAdminModel
     public bool IsAvailable { get; set; }
     public string Mode { get; set; } = "DiscoveryCentric";
     public VisitorAccessMode? VisitorAccessMode { get; set; }
+    public bool? UserRegistrationEnabled { get; set; }
+    public bool CanEditUserRegistration { get; set; }
     public string EventCatalogLabel { get; set; } = "Events";
     public Guid? PrimaryOrganizationId { get; set; }
     public string HomeBlocksJson { get; set; } = "{\"schemaVersion\":1,\"blocks\":[]}";
@@ -646,6 +677,7 @@ public sealed class TenantPublicExperienceAdminModel
 
     public bool CanEditAny => IsAvailable && (CanEditMode
         || CanEditVisitorAccessMode
+        || CanEditUserRegistration
         || CanEditEventCatalogLabel
         || CanEditPrimaryOrganization
         || CanEditHomeBlocks

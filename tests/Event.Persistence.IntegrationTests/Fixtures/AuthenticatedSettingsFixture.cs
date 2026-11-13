@@ -218,10 +218,19 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
             var login = await fixture.CreateLocalAdministratorAsync(bootstrapActor);
             using var response = await fixture.client.PostAsJsonAsync("/api/auth/local/login", login);
             if (response.StatusCode != HttpStatusCode.OK)
+            {
+                using var failure = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                string? publicCode = failure.RootElement.TryGetProperty("code", out var code)
+                    && code.ValueKind == JsonValueKind.String ? code.GetString() : null;
+                if (publicCode is { Length: > 96 } || publicCode?.Any(character =>
+                    !char.IsAsciiLetterOrDigit(character) && character is not ('_' or '-')) == true)
+                    publicCode = null;
                 throw new InvalidOperationException($"Real Local settings login failed: {response.StatusCode}; "
+                    + $"public code: {publicCode ?? "absent"}; "
                     + $"types: {string.Join(",", observedFailure?.ExceptionTypes ?? [])}; "
                     + $"SQL states: {string.Join(",", observedFailure?.SqlStates ?? [])}; "
                     + $"methods: {string.Join(",", observedFailure?.Methods ?? [])}.");
+            }
             using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             if (!body.RootElement.GetProperty("success").GetBoolean())
                 throw new InvalidOperationException("Real Local settings login was rejected.");

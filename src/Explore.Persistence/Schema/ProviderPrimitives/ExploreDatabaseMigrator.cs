@@ -266,6 +266,7 @@ public static class ExploreDatabaseMigrator
         if (queueEnrollment is not null)
         {
             await PostgresEmailRetentionReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresVisitorEnrollmentRecoveryReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresEmailPointerPublicationPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresWebhookCataloguePermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresEventResourceAuditReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
@@ -318,6 +319,7 @@ public static class ExploreDatabaseMigrator
             await PostgresProviderConfigurationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresMixedSettingsContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresOrdinarySettingsContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresVisitorSettingsStorage.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresLocalizationSecretStatusReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresTenantPreferencePermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresUserTenantNavigationReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);

@@ -22,6 +22,7 @@ using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Seed;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.TestHost;
@@ -65,6 +66,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     private string? _connectionString;
     private IInterceptor? _persistenceInterceptor;
     private ILoggerProvider? _logCapture;
+    private IExceptionHandler? _exceptionObserver;
     private IdentityDatabaseTopology _identityTopology = IdentityDatabaseTopology.Colocated;
     private string? _identityConnectionString;
     private bool _incompleteSetup;
@@ -136,12 +138,14 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         bool enableAtproto = false,
         string? postgreSqlConnectionString = null,
         TimeProvider? timeProvider = null,
+        IExceptionHandler? exceptionObserver = null,
         DeploymentMode deploymentMode = DeploymentMode.SingleTenant)
     {
         var factory = new LocalAdmissionWebApplicationFactory(primaryProvider, enableAtproto, timeProvider)
         {
             _persistenceInterceptor = persistenceInterceptor,
             _logCapture = logCapture,
+            _exceptionObserver = exceptionObserver,
             _identityTopology = identityTopology,
             _incompleteSetup = incompleteSetup,
             _enableRateLimiting = enableRateLimiting,
@@ -243,6 +247,24 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 settings["PublicBaseUrl"] = "https://example.test";
             }
 
+            if (_measurementDatabaseSettings is null && _postgreSqlConnectionString is null)
+            {
+                foreach (var role in Enum.GetValues<PrimaryDatabaseRole>())
+                {
+                    string prefix = $"Database:{role}:";
+                    settings[prefix + "Provider"] = "Sqlite";
+                    settings[prefix + "Name"] = _databasePath;
+                    settings[prefix + "Database"] = _databasePath;
+                    settings[prefix + "Host"] = null;
+                    settings[prefix + "Port"] = null;
+                    settings[prefix + "TlsMode"] = "Prefer";
+                    settings[prefix + "TrustServerCertificate"] = "false";
+                    settings[$"DATABASE_{role.ToString().ToUpperInvariant()}_HOST"] = null;
+                    settings[$"DATABASE_{role.ToString().ToUpperInvariant()}_PORT"] = null;
+                }
+                settings["DATABASE_HOST"] = null;
+                settings["DATABASE_PORT"] = null;
+            }
             if (_measurementDatabaseSettings is not null)
                 foreach (var setting in _measurementDatabaseSettings)
                     settings[setting.Key] = setting.Value;
@@ -252,6 +274,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         });
         builder.ConfigureTestServices(services =>
         {
+            if (_exceptionObserver is not null)
+                services.Insert(0, ServiceDescriptor.Singleton(_exceptionObserver));
             if (_timeProvider is not null)
             {
                 services.RemoveAll<TimeProvider>();

@@ -49,7 +49,7 @@ public static partial class PostgresLocalAdministrationContract
             ["Id", "ConcurrencyStamp", "CreatedAt", "ExternalLoginId", "InitiatingApplicationUserId",
                 "Kind", "LocalSubjectId", "PersonalActorId", "PreviousOperationConcurrencyStamp",
                 "PreviousOperationId", "ResetReason", "Stage", "UpdatedAt", "VerifiedAt",
-                "VerifiedByApplicationUserId"]),
+                 "VerifiedByApplicationUserId", "VisitorEnrollmentOperationId"]),
         new(typeof(IdentityUserToken<Guid>), "UserId", ["UserId", "LoginProvider", "Name", "Value"]),
         new(typeof(User), "Id",
             ["Id", "ConcurrencyStamp", "CreatedAt", "CreatedBy", "DeletedAt", "DeletedBy",

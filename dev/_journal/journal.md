@@ -3511,6 +3511,30 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 
 ---
 
+[2026-11-06 Europe/Brussels] — Tenant scalar commands need explicit native owner selection
+
+**Context**: While implementing recoverable Local visitor signup, actual HTTP tests closed tenant enrollment through the existing authenticated administrator setting endpoint.
+
+**Symptom / Observation**: The setting PUT returned 401 despite a valid Local bearer and `AdminContext: IsTenantAdmin=true`. A test-only exception observer captured `System.UnauthorizedAccessException` at `VisitorSettingsOriginalStore.RequireOriginal`; sanitized `route-unresolved` logging did not mean routing had failed.
+
+**Root Cause**: `PolicyMutationCommandScope.Handles` included the scalar setting command types, but `Select` covered their Instance cases without their Tenant cases. Update, batch, reset, lock and unlock therefore fell through to an unselected owner. The original visitor store correctly requires the retained Standard policy execution owner, exact tenant, subject, credential lifetime and original command. Successful administrator authorization cannot replace that custody.
+
+**Resolution**: Commit `9d747dde5bfab26cf81db8288632d54c9a966ba1` selects the authenticated nonempty tenant's Standard owner before constructing those five handler graphs. Missing or empty tenant fails immediately; dedicated Email/Mixed selections and user preferences keep their existing paths. The original-store checks remain unchanged. `dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release -- --treenode-filter '/*/*/TenantScalarSettingsOwnerSelectionTests/*' --minimum-expected-tests 8` produced seven intended failures before repair and passed all eight afterward. Following the API Release build, `dotnet run --no-build --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release -- --treenode-filter '/*/*/VisitorAccessDiscoveryHttpTests/ClosingEnrollmentPreservesLocalParticipationAndUsesAdministratorHal' --minimum-expected-tests 2` passed both existing-account/HAL cases. Actual Local enrollment closure also passed both cases after its separate pending-receipt cancellation repair.
+
+**Why This Matters for Future Work**: A type being listed in `Handles` does not prove every scope variant selects a native owner. Trace the actual request through `Select` when an authenticated write fails an original-source guard. Fix missing selection rather than treating a null policy purpose as Standard or relaxing principal/connection checks.
+
+**References**:
+- `src/Explore.Application/Operations/PolicyMutationCommandScope.cs:123`
+- `src/Explore.Persistence/Services/VisitorSettingsOriginalStore.cs:201`
+- `tests/Event.Application.UnitTests/Operations/TenantScalarSettingsOwnerSelectionTests.cs`
+- `docs/internal/AUTHORIZATION.md` — Original resource and visitor Settings ownership.
+- Commit: `9d747dde5bfab26cf81db8288632d54c9a966ba1`.
+
+**Promotion Consideration**:
+- [x] Stays in journal only; a regression-specific lesson about existing native selection requirements.
+
+---
+
 [2026-11-13 Europe/Brussels] — Open SQLite connections can hide transaction-lock leaks
 
 **Context**: PR79 persistence assurance examined named-lock cleanup after implicit rollback. Existing tests either closed the original connection or acquired another lock on it after disposing the transaction.

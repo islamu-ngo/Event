@@ -111,7 +111,7 @@ public static class RuntimeSecretEnvironment
         if (consumer is SecretConsumerRole.Bff or SecretConsumerRole.Combined)
         {
             foreach (string name in new[] { "KEYCLOAK_ENDPOINT", "KEYCLOAK_REALM", "KEYCLOAK_CLIENT_ID",
-                "KEYCLOAK_BLAZOR_CLIENT_ID", "GOOGLE_CLIENT_ID", "API_ENDPOINT", "AUTHENTICATION_PROVIDER",
+                "KEYCLOAK_BLAZOR_CLIENT_ID", "API_ENDPOINT", "AUTHENTICATION_PROVIDER",
                 "AUTHENTICATION_CREDENTIAL_PROFILE_REVISION" })
                 if (provider == SecretAuthorityKind.Environment && operatorInputs[name] is { } value
                     && (!target.TryGetValue(name, out object? existing) || existing is string { Length: 0 }))
@@ -178,6 +178,9 @@ public static class RuntimeSecretEnvironment
     private static bool Forbidden(string name, SecretConsumerRole consumer)
     {
         string normalized = name.Replace("__", "_", StringComparison.Ordinal).Replace(':', '_').ToUpperInvariant();
+        if (normalized is "GOOGLE_CLIENT_ID" or "GOOGLE_CLIENTID"
+            or "GOOGLE_CLIENT_SECRET" or "GOOGLE_CLIENTSECRET")
+            return true;
         if (consumer is not (SecretConsumerRole.Api or SecretConsumerRole.Combined)
             && normalized is "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD" or "DATABASE_LOCALIDENTITYWRITER_PASSWORD"
                 or "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD" or "IDENTITYDATABASE_LOCALIDENTITYWRITER_PASSWORD")
@@ -201,7 +204,7 @@ public static class RuntimeSecretEnvironment
         if (consumer == SecretConsumerRole.Api || consumer == SecretConsumerRole.Migration)
             return normalized is "KEYCLOAK_BLAZOR_CLIENT_SECRET" or "KEYCLOAK_CLIENTSECRET"
                 or "KEYCLOAK_CLIENT_SECRET" or "KEYCLOAK_BLAZORCLIENTSECRET"
-                or "GOOGLE_CLIENT_SECRET" or "GOOGLE_CLIENTSECRET" or "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS";
+                or "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS";
         if (consumer == SecretConsumerRole.Bff)
             return normalized.StartsWith("DATABASE", StringComparison.Ordinal)
                 || normalized.StartsWith("POSTGRES", StringComparison.Ordinal)

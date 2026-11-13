@@ -22,6 +22,7 @@ public sealed class LocalAuthController(
     ICommandHandler<LocalLoginCommand, LocalAuthResponseDto> loginHandler) : ControllerBase
 {
     [HttpPost("login", Name = RouteNames.LoginLocalIdentity)]
+    [TenantReadBootstrap]
     [SuppressIdempotencyResponseStorage]
     [PrivateNoStore]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]

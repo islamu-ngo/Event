@@ -22,8 +22,6 @@ public static class ConfigurationExtensions
              new("/runtime/bff/oidc/keycloak", "KEYCLOAK_REALM", "KEYCLOAK_REALM"),
              new("/runtime/bff/oidc/keycloak", "KEYCLOAK_CLIENT_ID", "KEYCLOAK_CLIENT_ID"),
              new("/runtime/bff/oidc/keycloak", "KEYCLOAK_BLAZOR_CLIENT_SECRET", "KEYCLOAK_BLAZOR_CLIENT_SECRET")],
-            [new("/runtime/bff/oidc/google", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_ID"),
-             new("/runtime/bff/oidc/google", "GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET")],
             [new("/runtime/bff/atproto/oauth", "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS", "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS")],
             [new("/runtime/bff/session", "BFF_SESSION_REDIS_PASSWORD", "BFF_SESSION_REDIS_PASSWORD")]
         ];
@@ -68,7 +66,6 @@ public static class ConfigurationExtensions
     /// <remarks>
     /// Standard Infisical keys:
     ///   /runtime/bff/oidc/keycloak: Keycloak confidential-client configuration.
-    ///   /runtime/bff/oidc/google: Google confidential-client configuration.
     ///   /runtime/bff/atproto/oauth: ATProto frontend signing key only.
     ///   /runtime/bff/session: Dedicated shared browser-session authority credential.
     /// </remarks>
@@ -81,7 +78,6 @@ public static class ConfigurationExtensions
     {
         var rawRealm = config["KEYCLOAK_REALM"];
         var rawClientSecret = config["KEYCLOAK_BLAZOR_CLIENT_SECRET"];
-        var rawGoogleClientSecret = config["GOOGLE_CLIENT_SECRET"];
         var rawApiUrl = ordinary["API_ENDPOINT"];
         var rawAuthProvider = ordinary["AUTHENTICATION_PROVIDER"]
             ?? ordinary["Authentication:Provider"];
@@ -94,7 +90,14 @@ public static class ConfigurationExtensions
         var mappedConfig = new Dictionary<string, string?>
         {
             ["Keycloak:ClientSecret"] = rawClientSecret,
-            ["Google:ClientSecret"] = rawGoogleClientSecret,
+            ["Google:ClientId"] = null,
+            ["Google:ClientSecret"] = null,
+            ["Google__ClientId"] = null,
+            ["Google__ClientSecret"] = null,
+            ["GOOGLE_CLIENT_ID"] = null,
+            ["GOOGLE_CLIENT_SECRET"] = null,
+            ["GOOGLE_CLIENTID"] = null,
+            ["GOOGLE_CLIENTSECRET"] = null,
             ["Bff:SessionAuthority:Password"] = config["BFF_SESSION_REDIS_PASSWORD"],
             ["Bff:SessionAuthority:Endpoint"] = ordinary["BFF_SESSION_REDIS_ENDPOINT"]
                 ?? ordinary["Bff:SessionAuthority:Endpoint"],
@@ -116,9 +119,6 @@ public static class ConfigurationExtensions
             mappedConfig["Keycloak:ClientId"] = config["KEYCLOAK_CLIENT_ID"];
         }
 
-        if (rawGoogleClientSecret is not null)
-            mappedConfig["Google:ClientId"] = config["GOOGLE_CLIENT_ID"];
-
         if (!hasAspireApiReference && !string.IsNullOrWhiteSpace(rawApiUrl)
             && string.IsNullOrEmpty(ordinary["ExploreApi:BaseUrl"]))
         {
@@ -132,8 +132,6 @@ public static class ConfigurationExtensions
         configBuilder.AddInMemoryCollection(mappedConfig);
         if (rawClientSecret is not null)
             receipts.RecordAcquired(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc, authority);
-        if (rawGoogleClientSecret is not null)
-            receipts.RecordAcquired(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc, authority);
     }
 
     private static string? GetAspireApiReference(IConfiguration config, string scheme) =>

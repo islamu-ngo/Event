@@ -195,7 +195,7 @@ public sealed class StorageProbeOriginalAction(
         await owner.CheckAsync(CheckSources, RequireTime, token);
         var retained = binding ?? throw Denied();
         var config = await retained.ResolveCredentialsAsync(services, token);
-        string provider = await retained.SelectProviderAsync(services, tenant, config.InstanceConfigured, token);
+        string provider = await retained.SelectProviderAsync(services, tenant, token);
         async Task Handoff(CancellationToken ct)
         {
             owner.RequireIdle();
@@ -206,7 +206,7 @@ public sealed class StorageProbeOriginalAction(
         }
         await Handoff(token);
         var result = await StorageProbeTransport.TestAsync(
-            provider, config.Tenant, services.GetRequiredService<IStorageProbeClientFactory>(), Handoff,
+            provider, config, services.GetRequiredService<IStorageProbeClientFactory>(), Handoff,
             () => { owner.RequireIdle(); RequireTime(); }, token);
         // Even bounded failures are results of the original action; never return them
         // after replacing its principal, setup generation, binding or credential.

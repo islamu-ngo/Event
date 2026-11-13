@@ -35,15 +35,18 @@ internal sealed class StorageProbeBinding
     private readonly ResolvedSetting[] tenant;
     private readonly RetainedSecretReference? access;
     private readonly RetainedSecretReference? secret;
-    private readonly RetainedSecretReference? instanceAccess;
-    private readonly RetainedSecretReference? instanceSecret;
+    private readonly SecretBinding? instanceAccessBinding;
+    private readonly SecretBinding? instanceSecretBinding;
+    private RetainedSecretReference? instanceAccess;
+    private RetainedSecretReference? instanceSecret;
+    private string? instanceReferenceSnapshot;
     private readonly string snapshot;
     private string? credentialSnapshot;
     private string? instanceCredentialSnapshot;
 
     private StorageProbeBinding(Guid ambientTenant, SystemSetting[] instance, ResolvedSetting[] tenant,
         RetainedSecretReference? access, RetainedSecretReference? secret,
-        RetainedSecretReference? instanceAccess, RetainedSecretReference? instanceSecret,
+        SecretBinding? instanceAccessBinding, SecretBinding? instanceSecretBinding,
         string bindingMetadata, string localRoot)
     {
         this.ambientTenant = ambientTenant;
@@ -51,10 +54,10 @@ internal sealed class StorageProbeBinding
         this.tenant = tenant;
         this.access = access;
         this.secret = secret;
-        this.instanceAccess = instanceAccess;
-        this.instanceSecret = instanceSecret;
+        this.instanceAccessBinding = instanceAccessBinding;
+        this.instanceSecretBinding = instanceSecretBinding;
         snapshot = JsonSerializer.Serialize(new { ambientTenant, instance, tenant, access, secret,
-            instanceAccess, instanceSecret, bindingMetadata, localRoot });
+            bindingMetadata, localRoot });
     }
 
     internal static async Task<StorageProbeBinding> CaptureAsync(IServiceProvider services, Guid ambientTenant, CancellationToken ct)
@@ -76,19 +79,7 @@ internal sealed class StorageProbeBinding
         SecretBinding? TransportBinding(string key) => bindingImage.Bindings.SingleOrDefault(
             row => row.SettingKey == key && row.Scope == SecretScope.Tenant && row.ScopeId == ambientTenant)
             ?? InstanceBinding(key);
-        RetainedSecretReference? access = null, secret = null, instanceAccess = null, instanceSecret = null;
-        string endpoint = SettingValueSerializer.DeserializeString(HierarchicalSettingMerge.Resolve(
-            GovernanceSettingKeys.Storage.Endpoint, instanceSettings)?.Value, string.Empty);
-        string bucket = SettingValueSerializer.DeserializeString(HierarchicalSettingMerge.Resolve(
-            GovernanceSettingKeys.Storage.BucketName, instanceSettings)?.Value, string.Empty);
-        if (!string.IsNullOrWhiteSpace(endpoint) && !string.IsNullOrWhiteSpace(bucket))
-        {
-            var secrets = services.GetRequiredService<IRetainedSecretResolver>();
-            instanceAccess = await secrets.CaptureAsync(SecretDefinitionRegistry.Keys.Storage.AccessKeyId,
-                null, InstanceBinding(SecretDefinitionRegistry.Keys.Storage.AccessKeyId), ct);
-            instanceSecret = await secrets.CaptureAsync(SecretDefinitionRegistry.Keys.Storage.SecretAccessKey,
-                null, InstanceBinding(SecretDefinitionRegistry.Keys.Storage.SecretAccessKey), ct);
-        }
+        RetainedSecretReference? access = null, secret = null;
         if (!string.IsNullOrWhiteSpace(Text(tenant, GovernanceSettingKeys.Storage.Endpoint))
             && !string.IsNullOrWhiteSpace(Text(tenant, GovernanceSettingKeys.Storage.BucketName)))
         {
@@ -100,7 +91,9 @@ internal sealed class StorageProbeBinding
                 ambientTenant, TransportBinding(SecretDefinitionRegistry.Keys.Storage.SecretAccessKey), ct)
                 ?? throw new InvalidOperationException("storage_secret_unavailable");
         }
-        return new(ambientTenant, instance, tenant, access, secret, instanceAccess, instanceSecret, bindingImage.Metadata,
+        return new(ambientTenant, instance, tenant, access, secret,
+            InstanceBinding(SecretDefinitionRegistry.Keys.Storage.AccessKeyId),
+            InstanceBinding(SecretDefinitionRegistry.Keys.Storage.SecretAccessKey), bindingImage.Metadata,
             services.GetRequiredService<IOptions<LocalFileStorageOptions>>().Value.RootPath);
     }
 
@@ -110,14 +103,34 @@ internal sealed class StorageProbeBinding
             throw new UnauthorizedAccessException("The original probe provider selection or credential binding changed.");
     }
 
-    internal async Task<(S3Configuration? Tenant, bool InstanceConfigured)> ResolveCredentialsAsync(
+    internal Task<S3Configuration?> ResolveCredentialsAsync(
         IServiceProvider services, CancellationToken ct)
-        => (await ResolveCredentialsAsync(services, false, ct),
-            await ResolveCredentialsAsync(services, true, ct) is not null);
+        => ResolveCredentialsAsync(services, false, ct);
 
     private async Task<S3Configuration?> ResolveCredentialsAsync(
         IServiceProvider services, bool instanceOwner, CancellationToken ct)
     {
+        if (instanceOwner)
+        {
+            bool configured = !string.IsNullOrWhiteSpace(InstanceText(GovernanceSettingKeys.Storage.Endpoint))
+                && !string.IsNullOrWhiteSpace(InstanceText(GovernanceSettingKeys.Storage.BucketName));
+            var resolver = services.GetRequiredService<IRetainedSecretResolver>();
+            var currentAccess = configured
+                ? await resolver.CaptureAsync(SecretDefinitionRegistry.Keys.Storage.AccessKeyId,
+                    null, instanceAccessBinding, ct) : null;
+            var currentSecret = configured
+                ? await resolver.CaptureAsync(SecretDefinitionRegistry.Keys.Storage.SecretAccessKey,
+                    null, instanceSecretBinding, ct) : null;
+            string references = JsonSerializer.Serialize(new { Access = currentAccess, Secret = currentSecret });
+            if (instanceReferenceSnapshot is not null && instanceReferenceSnapshot != references)
+                throw new UnauthorizedAccessException("The original probe credential binding changed.");
+            if (instanceReferenceSnapshot is null)
+            {
+                instanceAccess = currentAccess;
+                instanceSecret = currentSecret;
+                instanceReferenceSnapshot = references;
+            }
+        }
         var accessReference = instanceOwner ? instanceAccess : access;
         var secretReference = instanceOwner ? instanceSecret : secret;
         if (accessReference is null || secretReference is null) return null;
@@ -153,8 +166,7 @@ internal sealed class StorageProbeBinding
             || !password.IsResolved || string.IsNullOrWhiteSpace(password.Value))
             throw new UnauthorizedAccessException("The original probe credential is unavailable.");
         string Read(string settingKey) => instanceOwner
-            ? SettingValueSerializer.DeserializeString(
-                instance.SingleOrDefault(row => row.SettingKey == settingKey)?.Value, string.Empty)
+            ? InstanceText(settingKey)
             : Text(tenant, settingKey);
         string region = Read(GovernanceSettingKeys.Storage.Region);
         return new()
@@ -170,26 +182,30 @@ internal sealed class StorageProbeBinding
     }
 
     internal async Task RequireCredentialsAsync(IServiceProvider services,
-        (S3Configuration? Tenant, bool InstanceConfigured) original, CancellationToken ct)
+        S3Configuration? original, CancellationToken ct)
     {
         var current = await ResolveCredentialsAsync(services, ct);
-        if (current.InstanceConfigured != original.InstanceConfigured
-            || (current.Tenant is null) != (original.Tenant is null)
-            || current.Tenant is not null && (current.Tenant.AccessKeyId != original.Tenant!.AccessKeyId
-                || current.Tenant.SecretAccessKey != original.Tenant.SecretAccessKey))
+        if ((current is null) != (original is null)
+            || current is not null && (current.AccessKeyId != original!.AccessKeyId
+                || current.SecretAccessKey != original.SecretAccessKey))
             throw new UnauthorizedAccessException("The original storage probe credential changed.");
+        if (instanceReferenceSnapshot is not null)
+            _ = await ResolveCredentialsAsync(services, true, ct);
     }
 
     internal async Task<string> SelectProviderAsync(IServiceProvider services, Guid? policyTenant,
-        bool instanceConfigured, CancellationToken ct)
+        CancellationToken ct)
     {
         var resolver = new StoragePolicyResolver(new SnapshotSettings(this), new SnapshotInstanceSettings(this),
-            services.GetRequiredService<IFileStorageProviderResolver>(), new SnapshotInstanceS3(instanceConfigured));
+            services.GetRequiredService<IFileStorageProviderResolver>(), new SnapshotInstanceS3(this, services));
         return (await resolver.ResolveAsync(policyTenant, ct)).Provider;
     }
 
     private static string Text(IEnumerable<ResolvedSetting> settings, string key) =>
         SettingValueSerializer.DeserializeString(settings.SingleOrDefault(row => row.Key == key)?.Value, string.Empty);
+
+    private string InstanceText(string key) =>
+        SettingValueSerializer.DeserializeString(instance.SingleOrDefault(row => row.SettingKey == key)?.Value, string.Empty);
 
     private sealed class SnapshotSettings(StorageProbeBinding binding) : IHierarchicalSettingsReader
     {
@@ -225,12 +241,9 @@ internal sealed class StorageProbeBinding
         }
     }
 
-    private sealed class SnapshotInstanceS3(bool configured) : IInstanceS3ConfigResolver
+    private sealed class SnapshotInstanceS3(StorageProbeBinding binding, IServiceProvider services) : IInstanceS3ConfigResolver
     {
-        public Task<bool> IsInstanceConfiguredAsync(CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(configured);
-        }
+        public async Task<bool> IsInstanceConfiguredAsync(CancellationToken cancellationToken = default) =>
+            await binding.ResolveCredentialsAsync(services, true, cancellationToken) is not null;
     }
 }

@@ -76,14 +76,18 @@ public sealed partial class TenantCreationPermissionsNativeTests
         string verified = names.Column(typeof(User), nameof(User.EmailVerified));
         string globalRole = names.Quote(fixture.NativeQueueEnrollment.GlobalLogin);
         string inherited = names.Quote("creator_fence_attack_" + Guid.CreateVersion7().ToString("N"));
+        string preferenceUpdates = string.Join(", ", new[] { nameof(User.LastActiveTenantId), nameof(User.UpdatedAt), nameof(User.UpdatedBy) }
+            .Select(property => names.Column(typeof(User), property)));
         var (apply, restore) = attack switch
         {
             "missing" => ($"REVOKE UPDATE ({id}) ON {user} FROM {globalRole}",
                 $"GRANT UPDATE ({id}) ON {user} TO {globalRole}"),
             "another-column" => ($"GRANT UPDATE ({verified}) ON {user} TO {globalRole}",
                 $"REVOKE UPDATE ({verified}) ON {user} FROM {globalRole}"),
+            // A table-level REVOKE also removes every column UPDATE, so restore re-grants
+            // exactly the installed key-fence and tenant-preference columns.
             "table" => ($"GRANT UPDATE ON {user} TO {globalRole}",
-                $"REVOKE UPDATE ON {user} FROM {globalRole}"),
+                $"REVOKE UPDATE ON {user} FROM {globalRole}; GRANT UPDATE ({id}, {preferenceUpdates}) ON {user} TO {globalRole}"),
             "public" => ($"GRANT UPDATE ({id}) ON {user} TO PUBLIC",
                 $"REVOKE UPDATE ({id}) ON {user} FROM PUBLIC"),
             "inherited" => ($"CREATE ROLE {inherited} NOLOGIN; GRANT UPDATE ({id}) ON {user} TO {inherited}; "

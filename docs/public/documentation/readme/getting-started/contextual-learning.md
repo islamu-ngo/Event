@@ -66,6 +66,8 @@ changes save only your preferences in the current tenant. Selecting an inherited
 value removes your override so future default changes can apply. These changes
 preserve your theme and active profile. If the server cannot confirm a save, the
 current language stays visible and the picker reports the failure.
+The language picker also updates this browser's culture cookies, so a reload can
+retain the selected language.
 
 Your own profile or currently selected authorized organization/group context can
 show your private learning panel after sign-in. Other visitors see no private

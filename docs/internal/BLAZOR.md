@@ -443,6 +443,14 @@ selected profile, configured preset or fallback theme. Saving a preference and
 reading it back therefore use the same hierarchy without replacing theme mode or
 the active profile.
 
+Language selection invokes the existing browser BFF mutation bridge, including
+its same-origin antiforgery handling, in every interactive render mode. The BFF's
+language and ASP.NET culture cookies must reach the browser; an InteractiveServer
+HTTP self-call can save the database preference while losing those response
+cookies. `LanguageProvider` seeds its first render from the request UI culture
+before persisting hydration state, so a prerendered English default cannot replace
+the selected request culture during hydration.
+
 ## Storage Upload Proxy Boundary
 
 Browser-mediated storage uploads use BFF-owned upload sessions rather than caller-supplied destination URLs:

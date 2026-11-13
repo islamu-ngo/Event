@@ -66,6 +66,16 @@ export async function deleteSetupSecret() {
     return await _bffMutate('DELETE', '/bff/setup-secret');
 }
 
+/**
+ * Keep the language Set-Cookie response in the browser in every render mode.
+ * @param {string} language - A code validated against the application culture registry.
+ * @returns {Promise<boolean>} Whether the BFF confirmed persistence.
+ */
+export async function persistLanguagePreference(language) {
+    const result = await _bffPost('/bff/language?lang=' + encodeURIComponent(language));
+    return result.ok;
+}
+
 const checkoutIssueControllers = new Map();
 
 export async function issueRegistrationPaymentCheckoutTicket(url, guestCapability, operationId) {

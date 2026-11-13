@@ -23,6 +23,9 @@
 
     protected override void OnInitialized()
     {
+        _languageContext = global::Explore.Blazor.Client.Models.LanguageContext.ForLanguage(
+            System.Globalization.CultureInfo.CurrentUICulture.Name);
+
         // Keep a single delegate reference so Dispose unsubscribes the exact same handler.
         // Async work is marshalled onto the render thread via InvokeAsync inside the shim itself.
         _languageChangedShim = code => _ = InvokeAsync(() => HandleLanguageChangedAsync(code));

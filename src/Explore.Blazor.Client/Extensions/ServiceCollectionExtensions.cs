@@ -229,8 +229,6 @@ public static class ServiceCollectionExtensions
 
         // Localization
         services.AddScoped<ITranslationService, TranslationService>();
-        services.AddBffRefitClient<ILanguagePreferenceApi>(configureBffRefitClient)
-            .ConfigureBffRefitClient(configureBffRefitClientBuilder);
         services.AddScoped<ILanguagePreferenceService, LanguagePreferenceService>();
         services.AddTransient<MudBlazor.MudLocalizer, MudBlazorLocalizer>();
 

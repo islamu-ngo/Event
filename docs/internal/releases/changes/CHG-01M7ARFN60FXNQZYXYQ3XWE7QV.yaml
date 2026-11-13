@@ -1,0 +1,29 @@
+Change-Id: CHG-01M7ARFN60FXNQZYXYQ3XWE7QV
+Title: "retain selected language across server rendering and reload"
+Type: fix
+Scope: localization
+Summary: "Submit language changes through the browser BFF bridge so culture cookies reach the browser, and seed prerendered language state from the request culture."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Language selection uses the existing same-origin browser BFF mutation helper and its antiforgery token handling. Bearer credentials remain server-side; the authenticated API still admits and completes the native current-user preference mutation before culture cookies are set. No direct cookie assignment or new endpoint is introduced.
+  Migration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: Selected language persists across page reload in InteractiveServer hosting because the browser receives the BFF culture cookies. Prerendered hydration state begins with the request UI culture. No new deployment setting or migration is required.

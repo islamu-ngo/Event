@@ -1,27 +1,21 @@
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Localization;
 using Microsoft.Extensions.Logging;
-using Refit;
+using Microsoft.JSInterop;
 
 namespace Explore.Blazor.Client.Services;
-
-public interface ILanguagePreferenceApi
-{
-    [Post("/bff/language")]
-    Task<IApiResponse> SetLanguageAsync([Query] string lang, CancellationToken cancellationToken);
-}
 
 /// <summary>
 /// Default <see cref="ILanguagePreferenceService"/> implementation.
 /// </summary>
 public sealed class LanguagePreferenceService : ILanguagePreferenceService
 {
-    private readonly ILanguagePreferenceApi _api;
+    private readonly IJSRuntime _jsRuntime;
     private readonly ILogger<LanguagePreferenceService> _logger;
 
-    public LanguagePreferenceService(ILanguagePreferenceApi api, ILogger<LanguagePreferenceService> logger)
+    public LanguagePreferenceService(IJSRuntime jsRuntime, ILogger<LanguagePreferenceService> logger)
     {
-        _api = api;
+        _jsRuntime = jsRuntime;
         _logger = logger;
     }
 
@@ -37,17 +31,9 @@ public sealed class LanguagePreferenceService : ILanguagePreferenceService
 
         try
         {
-            var response = await _api.SetLanguageAsync(entry.Code, ct);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning(
-                    "[LOCALIZATION] /bff/language returned {Status} for code {Code}",
-                    (int)response.StatusCode, entry.Code);
-                return false;
-            }
-
-            return true;
+            await using var module = await _jsRuntime.InvokeAsync<IJSObjectReference>(
+                "import", ct, "/js/bff.js");
+            return await module.InvokeAsync<bool>("persistLanguagePreference", ct, entry.Code);
         }
         catch (Exception ex)
         {

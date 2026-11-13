@@ -35,3 +35,19 @@ The approved lifecycle-email plan adds dispatch-time privacy authorization witho
 persisting a provider binding. It does not authorize provider selection, account
 linking or tenant enrollment, and it grants no provider configuration writes.
 Those decisions remain with the original authenticated application operation.
+
+## Tenant parent authority fence
+
+`PostgresTenantMembershipMutationPermissions` owns Runtime `UPDATE(Tenant.Id)`
+for the existing `RelationalEntityRowFence` statement
+`UPDATE tenants SET id = id WHERE id = ...`. The selected application's
+transaction retains the parent fence before membership insertion and disclosure
+settlement. The existing API-key parent inventory retains ownership of the
+`Tenant.Id` read; counting it as a new membership grant would misclassify an
+otherwise valid bootstrap as a partial installation.
+
+The grant permits a column update, rather than enforcing no-op SQL in the
+database. A compromised Runtime credential can therefore attempt primary-key
+changes; credential isolation and the application's original-owner, tenant,
+transaction and concurrency checks remain necessary. No tenant-status write,
+provider configuration write, or additional `User` grant is introduced.

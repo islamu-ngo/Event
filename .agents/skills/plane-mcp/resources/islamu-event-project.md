@@ -114,3 +114,7 @@ Bounded capability programs created by the 2026-11 backlog standardization. Pare
 | Accessibility & Localization v1 | `EVENT-6862` | `873478e1-83f9-40cc-a38d-ab505562242e` |
 | Organizer Analytics & Dashboards | `EVENT-6863` | `b532111a-8b28-4e6c-9918-7cdf35b5712f` |
 | Additional Client Surfaces (KMP, Avalonia, TUI, CLI) | `EVENT-6864` | `b3a51db9-71b5-4408-aac4-94317ff00247` |
+| Community Feeds & Member Engagement v1 | `EVENT-6886` | `d1d16426-daca-457c-9de8-c5bc0e770a1f` |
+| Public Beta Launch Readiness | `EVENT-6887` | `7ea1ac4d-c630-4d6f-a3f2-1f3a2ca834de` |
+
+The last two Epics have no rollup Feature because nothing under them has shipped yet. Every non-Epic item has a parent: there are no standalone Work Items.

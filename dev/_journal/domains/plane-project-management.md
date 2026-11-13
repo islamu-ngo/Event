@@ -49,20 +49,31 @@ leaves children without parents.
 - `.agents/skills/plane-compose/resources/sync-protocol.md`
 - `.agents/skills/plane-mcp/SKILL.md`
 
-## [2026-11-12 Europe/Brussels] — Large-project pull and conflict check hang
+## [2026-11-12 Europe/Brussels] — Large-project pull and conflict check look hung but are rate-limited
 
-**Context:** `plane-compose` v0.5.2 against `EVENT` with about 2,650 items.
+**Context:** `plane-compose` v0.5.2 against `EVENT` with about 2,650 items
+(1,355 after the backlog cleanup).
 
 **Symptom / Observation:** `plane pull --work-only` and the default
-`plane push` conflict check both stopped after "Found project: ISLAMU Event"
-and sat idle on an open HTTPS socket (3 s CPU in 22 min). Running two pulls at
-once also exhausted the rate limit, and a pull that fails its fetch prints
+`plane push` conflict check both stop printing after "Found project: ISLAMU
+Event" and show almost no CPU time. Running two pulls at once also exhausted
+the rate limit, and a pull that fails its fetch prints
 `Work items: 0 → work/workitems.yaml` without rewriting the file.
 
-**Root Cause:** The bulk work-item listing used by pull and the conflict check
-does not return for this project size, and the client sets no request timeout.
+**Root Cause (corrected 2026-11-13):** Not a hang. After paging the item list,
+`list_work_items()` hydrates relations with one API call per item
+(`_hydrate_work_item_relations`), and every call waits on the client rate
+limiter (`rate_limit_per_minute: 50` in `planecompose/config/settings.py`). The
+progress spinner is invisible when output is redirected, so the only signal is
+`ss -tnpi` showing a socket with recent `lastsnd`/`lastrcv`. Expected duration
+is about `items / 50` minutes (about 28 minutes for 1,355 items, about 55
+minutes for 2,650). The 22-minute "hang" was killed before it could finish.
+Killing a pull mid-run leaves `work/` and `.plane/state.json` untouched.
 
-**Resolution:** Verify remote drift with MCP instead: `workitem list` with PQL
+**Resolution:** Run pull in the background with no timeout (or one well above
+`items / 50` minutes), make no other Plane API calls with the same key while it
+runs, and confirm progress with `ss -tnpi`. For quick checks, verify remote
+drift with MCP instead: `workitem list` with PQL
 `updatedAt >= "<last sync date>"` (fields `sequence_id,updated_at`), compare
 each hit's `updated_at` with that item's `last_synced` in `state.json`, and
 check any remaining hits field by field. Then push with
@@ -70,9 +81,10 @@ check any remaining hits field by field. Then push with
 `createdAt` windows and edit them through MCP, never by hand-writing their IDs
 into YAML. Always use `--no-properties` on pull when no custom properties exist.
 
-**Why This Matters for Future Work:** A hung pull looks like a slow pull. Check
-process CPU time before waiting longer, and never run two plane-compose
-commands at once.
+**Why This Matters for Future Work:** A rate-limited pull looks hung: low CPU
+time is normal because the process spends its time sleeping in the rate
+limiter. Check socket activity instead of CPU time, and never run two
+plane-compose commands at once.
 
 **References:**
 - `event/.plane/state.json` (`work_items.<id>.last_synced`)
@@ -105,6 +117,58 @@ resume without re-deleting anything.
 **References:**
 - `event/.plane/state.json` (`work_items`)
 - `.agents/skills/plane-mcp/SKILL.md`
+
+## [2026-11-13 Europe/Brussels] — A successful pull still needs three repairs before push
+
+**Context:** First complete `plane pull --work-only --no-properties` of
+`EVENT` (1,355 items, 33 minutes) after the backlog cleanup, followed by
+`plane push --work-only --dry-run --no-conflict-check`.
+
+**Symptom / Observation:** The dry run that should have shown `0` changes
+showed `2,715` `Unknown label '<uuid>'` errors, then `24` creates and `867`
+updates.
+
+**Root Cause:** Three separate v0.5.2 behaviours:
+
+1. With `--work-only` the label cache is not loaded, so pull writes label UUIDs
+   instead of label names into `labels:` lists.
+2. Pull writes items that exist only in Plane into `workitems.yaml` with their
+   `id:`, but adds no `.plane/state.json` entry for them. Push then plans to
+   create each of them again (duplicates).
+3. Pull keeps the old `content_hash` values. Plane stores pushed HTML
+   descriptions in a normalized form (wrapped in `<div>…</div>`), so every
+   item whose stored description differs from the pushed text reads as
+   "content changed".
+
+Separately, the `EVENT` project setting `default_assignee` is the project
+lead, so Plane assigns that user to every item push creates, even when the YAML
+has no `assignees:`. This breaks the rule that unstarted items carry no
+assignees.
+
+**Resolution:**
+
+1. Map label UUIDs back to names inside `labels:` lists only (not
+   `assignees:`), using the `labels` name→UUID map in `.plane/state.json`.
+2. Add a `work_items["id:EVENT-N"]` entry for each Plane-only item, with its
+   real `remote_id` from MCP and an empty `content_hash`, so push updates the
+   item instead of creating it.
+3. Let one push re-send the pulled content; re-sending a `<div>`-wrapped
+   description is idempotent (verified on `EVENT-6887`), and the push stores
+   fresh hashes.
+
+Until `default_assignee` is cleared in the project settings, remove the
+`assignees:` blocks of newly created unstarted items and push again: an update
+sends an explicit empty list, which clears them. Items owned by
+`work/active-*.yaml` files appear twice after a pull; drop their blocks from
+`workitems.yaml` while the task file is still in use.
+
+**Why This Matters for Future Work:** Pushing straight after a pull duplicates
+every Plane-only item. Always dry-run after a pull and check for creates before
+pushing.
+
+**References:**
+- `event/.plane/state.json` (`labels`, `work_items`)
+- `planecompose/backend/plane.py` (`_build_work_item_kwargs`, `include_empty_collections`)
 
 ## [2026-11-12 Europe/Brussels] — Flow-style label lists split on commas
 

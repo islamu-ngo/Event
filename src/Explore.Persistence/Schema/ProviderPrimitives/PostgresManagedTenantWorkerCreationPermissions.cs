@@ -332,13 +332,20 @@ public static class PostgresManagedTenantWorkerCreationPermissions
         if (source.Type == typeof(ManagedTenantProvisioningPolicySetting))
             return PostgresProvisioningPolicyPermissions.CompleteCataloguePredicate(context, enrollment);
 
-        string columns = string.Join(" AND ", source.Columns.Values.Select(column =>
-        {
-            string shape = column.System
-                ? "a.attnum=-2 AND a.attname='xmin' AND a.atttypid='pg_catalog.xid'::regtype"
-                : $"a.attnum>0 AND pg_catalog.format_type(a.atttypid,a.atttypmod)={Text(column.StoreType)} AND a.attnotnull={(column.Required ? "true" : "false")} AND a.attidentity='' AND a.attgenerated=''";
-            return $"EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)}) AND a.attname={Text(column.Name)} AND NOT a.attisdropped AND ({shape}))";
-        }));
+        string expectedColumns = string.Join(',', source.Columns.Values.Select(column =>
+            $"({Text(column.Name)},{Text(column.StoreType)},{(column.Required ? "true" : "false")},{(column.System ? "true" : "false")})"));
+        string columns = $"""
+            NOT EXISTS (SELECT 1 FROM (VALUES {expectedColumns}) expected_column(column_name,store_type,required,system_column)
+                LEFT JOIN pg_catalog.pg_attribute a
+                    ON a.attrelid=pg_catalog.to_regclass({Text(source.Table)})
+                    AND a.attname=expected_column.column_name AND NOT a.attisdropped
+                    AND ((expected_column.system_column
+                            AND a.attnum=-2 AND a.attname='xmin' AND a.atttypid='pg_catalog.xid'::regtype)
+                        OR (NOT expected_column.system_column
+                            AND a.attnum>0 AND pg_catalog.format_type(a.atttypid,a.atttypmod)=expected_column.store_type
+                            AND a.attnotnull=expected_column.required AND a.attidentity='' AND a.attgenerated=''))
+                WHERE a.attrelid IS NULL)
+            """;
         var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
             .SingleOrDefault(table => table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
         string tenant = metadata is null ? "NOT c.relrowsecurity AND NOT c.relforcerowsecurity" : $"""

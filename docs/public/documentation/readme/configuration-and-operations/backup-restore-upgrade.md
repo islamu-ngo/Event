@@ -59,6 +59,17 @@ the actual installed privileges. Unexpected column access and grant options
 remain errors; do not widen permissions, remove the check or reorder installers
 to force startup through.
 
+## PostgreSQL login names during setup
+
+Setup and trusted-settings readiness preserve the exact declared database login
+name, including uppercase letters, backslashes, apostrophes and dollar signs.
+The application does not require renaming those accounts or changing PostgreSQL's
+standard-string setting to make an otherwise valid storage profile pass.
+
+This correction adds no database grants, deployment settings or schema migration.
+Readiness still rejects unexpected privileges and changed policy expressions;
+do not broaden permissions to work around a remaining failure.
+
 ## SQLite operation cleanup
 
 After an abandoned application-owned SQLite transaction is disposed, other

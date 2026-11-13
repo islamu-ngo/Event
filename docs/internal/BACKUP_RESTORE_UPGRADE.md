@@ -196,6 +196,21 @@ Unwind the original workflow and its leases before recycling the owning session.
 This repair adds no permissions, business routines or replacement-session cleanup;
 it does not recover an aborted caller-owned transaction.
 
+## Exact PostgreSQL setup role names
+
+Global setup completion resolves declared Global and Migrator names as quoted
+identifiers before converting them to role OIDs. Uppercase letters, backslashes,
+apostrophes and dollar signs must identify the installed role without folding or
+dropping characters. The existing closed privilege inventories remain unchanged.
+
+Trusted-settings SQL uses explicit escape literals independently of
+`standard_conforming_strings`. Its expected policy expression follows
+`pg_get_expr` rendering: ordinary quotes, doubled apostrophes, and backslashes
+doubled only when standard strings are disabled. Exact expression equality,
+stored policy fingerprints and original connection/transaction checks remain
+required. This corrects false readiness rejection without adding grants,
+changing stored policy meaning or introducing a new schema migration.
+
 ## SQLite transaction lock disposal
 
 SQLite process locks belong to the physical transaction, rather than the returned

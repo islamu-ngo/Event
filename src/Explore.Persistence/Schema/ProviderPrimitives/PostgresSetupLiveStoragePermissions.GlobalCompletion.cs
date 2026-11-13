@@ -67,10 +67,10 @@ public static partial class PostgresSetupLiveStoragePermissions
                     $"a.attname={SettingText(entity.FindProperty(property)!.GetColumnName(store)!)}"));
             return $"""
                 NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class t CROSS JOIN LATERAL pg_catalog.aclexplode(t.relacl) acl
-                    WHERE t.oid=pg_catalog.to_regclass({table}) AND acl.grantee=pg_catalog.to_regrole({global})::oid)
+                    WHERE t.oid=pg_catalog.to_regclass({table}) AND acl.grantee=pg_catalog.to_regrole(pg_catalog.quote_ident({global}))::oid)
                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                     CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl
-                    WHERE a.attrelid=pg_catalog.to_regclass({table}) AND acl.grantee=pg_catalog.to_regrole({global})::oid
+                    WHERE a.attrelid=pg_catalog.to_regclass({table}) AND acl.grantee=pg_catalog.to_regrole(pg_catalog.quote_ident({global}))::oid
                         AND NOT (acl.privilege_type='SELECT' AND ({baseline})))
                 """;
         }));
@@ -112,9 +112,9 @@ public static partial class PostgresSetupLiveStoragePermissions
             string required = !complete ? "" : $"""
                 AND NOT EXISTS (SELECT 1 FROM expected e WHERE NOT EXISTS (
                     SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl
-                    WHERE a.attrelid=t.oid AND a.attname=e.column_name AND acl.grantee=pg_catalog.to_regrole({global})::oid
+                    WHERE a.attrelid=t.oid AND a.attname=e.column_name AND acl.grantee=pg_catalog.to_regrole(pg_catalog.quote_ident({global}))::oid
                         AND acl.grantor=t.relowner AND acl.privilege_type=e.privilege AND NOT acl.is_grantable))
-                {(item.Delete ? $"AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(t.relacl) acl WHERE acl.grantee=pg_catalog.to_regrole({global})::oid AND acl.grantor=t.relowner AND acl.privilege_type='DELETE' AND NOT acl.is_grantable)" : "")}
+                {(item.Delete ? $"AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(t.relacl) acl WHERE acl.grantee=pg_catalog.to_regrole(pg_catalog.quote_ident({global}))::oid AND acl.grantor=t.relowner AND acl.privilege_type='DELETE' AND NOT acl.is_grantable)" : "")}
                 """;
             // Native readers retain dormant policies. They cannot affect this
             // profile while both RLS flags below remain disabled.
@@ -124,7 +124,7 @@ public static partial class PostgresSetupLiveStoragePermissions
                     OR pg_catalog.pg_has_role({global},r.oid,'MEMBER'))
                 SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_class t WHERE t.oid=pg_catalog.to_regclass({table})
                     AND t.relkind='r' AND t.relpersistence='p' AND NOT t.relispartition
-                    AND t.relowner=pg_catalog.to_regrole({migrator})::oid
+                    AND t.relowner=pg_catalog.to_regrole(pg_catalog.quote_ident({migrator}))::oid
                     AND NOT t.relrowsecurity AND NOT t.relforcerowsecurity
                     AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_inherits WHERE inhrelid=t.oid OR inhparent=t.oid)
                     AND ({shape})
@@ -142,12 +142,12 @@ public static partial class PostgresSetupLiveStoragePermissions
                                     AND acl.privilege_type='DELETE' AND NOT acl.is_grantable))))
                     AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(t.relacl) acl
                         WHERE acl.grantee=0 OR (acl.grantee IN (SELECT oid FROM members)
-                            AND NOT ({(item.Delete ? "true" : "false")} AND acl.grantee=pg_catalog.to_regrole({global})::oid
+                            AND NOT ({(item.Delete ? "true" : "false")} AND acl.grantee=pg_catalog.to_regrole(pg_catalog.quote_ident({global}))::oid
                                 AND acl.grantor=t.relowner AND acl.privilege_type='DELETE' AND NOT acl.is_grantable)))
                     AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                         CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl WHERE a.attrelid=t.oid
                             AND (acl.grantee=0 OR acl.grantee IN (SELECT oid FROM members))
-                            AND NOT (a.attnum>0 AND NOT a.attisdropped AND acl.grantee=pg_catalog.to_regrole({global})::oid
+                            AND NOT (a.attnum>0 AND NOT a.attisdropped AND acl.grantee=pg_catalog.to_regrole(pg_catalog.quote_ident({global}))::oid
                                 AND acl.grantor=t.relowner AND NOT acl.is_grantable
                                 AND EXISTS (SELECT 1 FROM expected e WHERE e.column_name=a.attname AND e.privilege=acl.privilege_type)))
                     AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN members r

@@ -234,8 +234,17 @@ public static partial class PostgresSetupLiveStoragePermissions
         string key = $"pg_catalog.quote_ident({SettingText(columns["SettingKey"])})";
         string comparisons = string.Join(" || ' OR ' || ", TrustedSetupSettingsWriter.Keys.Select(value =>
             $"'(convert_to((' || {key} || ')::text, ''UTF8''::name) = convert_to(' || pg_catalog.quote_literal({SettingText(value)}) || '::text, ''UTF8''::name))'"));
+        // pg_get_expr renders ordinary literals and doubles backslashes only when
+        // standard strings are disabled; quote_literal instead adds an E prefix.
+        string identityLiteral = $"""
+            (pg_catalog.chr(39) || pg_catalog.replace(
+                CASE WHEN pg_catalog.current_setting('standard_conforming_strings')='on'
+                    THEN {SettingText(login)}
+                    ELSE pg_catalog.replace({SettingText(login)}, E'\\', E'\\\\') END,
+                pg_catalog.chr(39), pg_catalog.chr(39) || pg_catalog.chr(39)) || pg_catalog.chr(39))
+            """;
         string expression = $"""
-            '((SESSION_USER = CURRENT_USER) AND (CURRENT_USER = ' || pg_catalog.quote_literal({SettingText(login)})
+            '((SESSION_USER = CURRENT_USER) AND (CURRENT_USER = ' || {identityLiteral}
             || '::name) AND (NULLIF(current_setting(''app.current_tenant_id''::text, true), ''''::text) IS NULL) AND ('
             || {comparisons} || '))'
             """;
@@ -286,7 +295,8 @@ public static partial class PostgresSetupLiveStoragePermissions
     private static string SettingsStamp(string table, string login, string operation, bool restrictive) =>
         "trusted-setup-settings:v1:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
             $"{table}\n{login}\n{operation}\n{restrictive}\n{string.Join('\n', TrustedSetupSettingsWriter.Keys)}"))) + ":";
-    private static string SettingText(string value) => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
+    private static string SettingText(string value) => "E'" + value.Replace("\\", "\\\\", StringComparison.Ordinal)
+        .Replace("'", "''", StringComparison.Ordinal) + "'";
 
     private static (string Table, Dictionary<string, string> Columns) SettingsSource(ExploreDbContext context)
     {

@@ -29,6 +29,7 @@ public static class PostgresLookupCatalogueReadPermissions
         (typeof(Role), RuntimeRoleReadProperties.ToArray()),
         (typeof(OrganizationPosition), ["Id", "MasterCode", "FullName", "Description"]),
         (typeof(ActorType), ["Id", "MasterCode", "FullName", "Description"]),
+        (typeof(AuthenticationProvider), ["Id", "MasterCode", "FullName", "Description"]),
         (typeof(DidCustodyType), ["Id", "MasterCode", "FullName", "Description"]),
         (typeof(FileType), ["Id", "MasterCode", "FullName", "Description"]),
         (typeof(TagType), ["Id", "MasterCode", "FullName", "Description"]),

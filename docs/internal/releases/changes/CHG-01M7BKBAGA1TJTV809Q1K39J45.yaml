@@ -1,0 +1,26 @@
+Change-Id: CHG-01M7BKBAGA1TJTV809Q1K39J45
+Title: "Permit fixed authentication-provider reference validation"
+Type: fix
+Scope: access
+Summary: "Allow Runtime to validate authentication-provider foreign keys through the existing fixed lookup catalogue without provider configuration writes."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "Declare only the four fixed AuthenticationProvider reference columns under the existing Runtime lookup owner. Foreign-key visibility confers no provider configuration write, account-linking or enrollment authority."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

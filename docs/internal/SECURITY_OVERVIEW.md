@@ -26,3 +26,12 @@ promotion into the ordinary preview/apply workflow; a signature or transfer
 proof never grants configuration authority.
 
 The approved lifecycle-email plan adds dispatch-time privacy authorization without changing SMTP into an authority. Email may target only a current verified tenant member or an authorization-bound same-tenant managed tenant-administrator invitation. Incompatible pre-1.0 delivery ledgers are reset instead of receiving a synthetic legacy authority; inbox notifications and unrelated business/audit/settings data remain preserved. Consent, preference, disclosure, deletion, and supersession may narrow a snapshotted policy before provider handoff, never broaden it.
+
+## Authentication-provider reference visibility
+
+`PostgresLookupCatalogueReadPermissions` owns Runtime reads of the fixed
+`AuthenticationProvider` lookup columns: `Id`, `MasterCode`, `FullName` and
+`Description`. EF foreign-key preflight uses that reference visibility when
+persisting a provider binding. It does not authorize provider selection, account
+linking or tenant enrollment, and it grants no provider configuration writes.
+Those decisions remain with the original authenticated application operation.

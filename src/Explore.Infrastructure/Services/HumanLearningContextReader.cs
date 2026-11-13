@@ -8,7 +8,6 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Learning;
-using Explore.Domain.Constants;
 using Microsoft.AspNetCore.Http;
 
 namespace Explore.Infrastructure.Services;
@@ -204,16 +203,7 @@ public sealed class HumanLearningContextReader(
             if (current is null || current.PrincipalId != userId || current.TenantId != tenantId
                 || !Same(originalAssignments, current))
                 throw new UnauthorizedAccessException("Original learning event-assignment sources changed.");
-            var target = current.Events.SingleOrDefault(value => value.Id == selectedEvent
-                && value.TenantId == tenantId && !value.IsDeleted);
-            if (target is null || !current.Actors.Any(value => value.Id == target.ActorId
-                    && !value.IsDeleted && !value.IsSuspended)
-                || !HumanEventAssignmentProjection.Authority(current, now.UtcDateTime).Events
-                    .TryGetValue(selectedEvent, out var authority)
-                || !(authority.IsOwner || authority.IsManager
-                    || authority.PermissionCodes.Contains(PermissionCodes.EventUpdate)
-                    || authority.PermissionCodes.Contains(PermissionCodes.EventRegistrationManage)
-                    || authority.PermissionCodes.Contains(PermissionCodes.EventCheckInManage)))
+            if (!HumanLearningEventAuthority.CanManage(current, selectedEvent, now))
                 throw new NotFoundException("Learning event context", selectedEvent);
         }
     }

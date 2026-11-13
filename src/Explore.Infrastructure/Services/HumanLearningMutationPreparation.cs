@@ -9,7 +9,6 @@ using Explore.Application.Exceptions;
 using Explore.Application.Features.Learning;
 using Explore.Application.Features.Learning.Requests.Commands;
 using Explore.Domain;
-using Explore.Domain.Constants;
 using Explore.Domain.Learning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -345,16 +344,7 @@ public sealed class HumanLearningMutationPreparation(
         bool HasEventAuthority(HumanEventAssignmentSourceFacts? current, DateTimeOffset now)
         {
             if (current is null || eventContextId is not { } selectedEvent) return false;
-            var target = current.Events.SingleOrDefault(row => row.Id == selectedEvent
-                && row.TenantId == tenantId && !row.IsDeleted);
-            return target is not null
-                && current.Actors.Any(row => row.Id == target.ActorId && !row.IsDeleted && !row.IsSuspended)
-                && HumanEventAssignmentProjection.Authority(current, now.UtcDateTime).Events
-                    .TryGetValue(selectedEvent, out var authority)
-                && (authority.IsOwner || authority.IsManager
-                    || authority.PermissionCodes.Contains(PermissionCodes.EventUpdate)
-                    || authority.PermissionCodes.Contains(PermissionCodes.EventRegistrationManage)
-                    || authority.PermissionCodes.Contains(PermissionCodes.EventCheckInManage));
+            return HumanLearningEventAuthority.CanManage(current, selectedEvent, now);
         }
     }
 

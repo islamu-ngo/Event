@@ -1,0 +1,29 @@
+Change-Id: CHG-01M7A99GD0EEWRJ7Q6SE4RMWCW
+Title: "admit creators to their event guidance"
+Type: fix
+Scope: onboarding
+Summary: "Recognize retained personal creator ownership alongside existing event assignments when reading and recording event guidance, without granting production permissions."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Private event guidance recognizes the retained personal creating actor's user as an alternative to existing event assignments. Both reads and mutations preserve selected-tenant identity, deleted/suspended actor rejection, original source acquisition and final validation. No administrator override or production action permission is added.
+  Migration:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: Existing creators can open guidance for their own private drafts without receiving a separate event collaboration role. No configuration, migration or stored event change is required; tenant guidance policy and current membership still apply.

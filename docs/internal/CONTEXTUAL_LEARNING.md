@@ -210,6 +210,15 @@ exact transport fields. A plan is a captured context, not permission to execute
 later, and its `TargetKey` is presentation metadata, not an executable selector,
 route or expression. No current renderer or UI readiness follows from this catalog.
 
+Event guidance recognizes the creating personal actor's current user as well as
+the existing event assignment permissions. A creator need not receive a second
+event-role assignment merely to open guidance for their own private draft.
+`HumanLearningEventAuthority` supplies the same predicate to
+`HumanLearningContextReader` and `HumanLearningMutationPreparation`. Both retain
+the original selected-tenant event and actor facts, reject deleted events and
+deleted or suspended creating actors, and validate the acquired image again at
+final admission. This adds no administrator override or production permission.
+
 Semantic identity is `(StepKey, StepVersion)`, not ordinal position, instruction
 copy or target layout. `LearningTourDefinition.AuthoredSteps` retains the full
 authored identity inventory while `Steps` contains only applicable identities.

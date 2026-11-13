@@ -229,6 +229,11 @@ scope and learner revision, with current HAL links indicating claim eligibility.
 An earlier response is not permission to act after switching account, tenant or
 context.
 
+Creators can use guidance for their own private drafts without receiving a
+separate event collaboration role. Current tenant membership, the event and
+creating actor's availability, and tenant guidance policy still apply.
+Guidance does not grant event editing or publication permission.
+
 Steps are identified by a stable key and version, not their screen position.
 Compatible completed evidence survives a temporarily unavailable step or a
 reordered tour. Historical completion or skip remains distinct from coverage of

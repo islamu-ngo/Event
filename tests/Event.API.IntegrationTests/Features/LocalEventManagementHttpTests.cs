@@ -11,6 +11,7 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using ISLAMU.Wire.Contracts.Learning;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -122,7 +123,7 @@ public sealed class LocalEventManagementHttpTests
     }
 
     [Test]
-    public async Task SignedInLocalUserCanSavePrivateInformationOnlyDraft()
+    public async Task SignedInLocalUserCanSavePrivateDraftAndReadItsManagementGuidance()
     {
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
         await JoinTenantAsync(fixture);
@@ -161,6 +162,51 @@ public sealed class LocalEventManagementHttpTests
             .Because(fixture.FailureMetadata);
         await Assert.That(await persisted.Content.ReadAsStringAsync(
             LocalIdentityLifecycleHttpFixture.CancellationToken)).Contains(draft.Title);
+
+        using var guidanceRequest = new HttpRequestMessage(HttpMethod.Get,
+            $"/api/learning/tours/EventManagement/plan?contextKey=self&eventContextId={result.Id:D}");
+        guidanceRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var guidance = await fixture.Client.SendAsync(
+            guidanceRequest, LocalIdentityLifecycleHttpFixture.CancellationToken);
+        await Assert.That(guidance.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(fixture.FailureMetadata);
+        var plan = await guidance.Content.ReadFromJsonAsync<LearningTourPlanDto>(
+            LocalIdentityLifecycleHttpFixture.CancellationToken);
+        await Assert.That(plan).IsNotNull();
+        await Assert.That(plan!.IsAvailable).IsTrue();
+        await Assert.That(plan.EventContextId).IsEqualTo(result.Id);
+        using var claimResponse = await fixture.PostAuthorizedAsync("/api/learning/tours/claim",
+            new LearningClaimTourRequest
+            {
+                ExpectedScopeStamp = plan.ScopeStamp, ExpectedRevision = plan.LearnerRevision,
+                IntentId = Guid.CreateVersion7(), Family = plan.Family,
+                MaterialVersion = plan.MaterialVersion, ContextKey = plan.ContextKey,
+                EventContextId = result.Id, ExpectedPlanFingerprint = plan.PlanFingerprint,
+                ExpectedPolicySourceStamp = plan.PolicySourceStamp, Replay = true
+            }, token);
+        await Assert.That(claimResponse.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(fixture.FailureMetadata);
+        var claimed = await claimResponse.Content.ReadFromJsonAsync<LearningMutationReceiptDto>(
+            LocalIdentityLifecycleHttpFixture.CancellationToken);
+        var step = plan.Steps.First();
+        using var progressResponse = await fixture.PostAuthorizedAsync("/api/learning/tours/outcome",
+            new LearningRecordTourOutcomeRequest
+            {
+                ExpectedScopeStamp = plan.ScopeStamp, ExpectedRevision = claimed!.LearnerRevision,
+                IntentId = Guid.CreateVersion7(), ClaimToken = claimed.Claim!.Token,
+                ContextKey = plan.ContextKey, EventContextId = result.Id, Family = plan.Family,
+                MaterialVersion = plan.MaterialVersion, Action = LearningTourAction.Progress,
+                StepKey = step.StepKey, StepVersion = step.StepVersion,
+                ExpectedPlanFingerprint = plan.PlanFingerprint,
+                ExpectedPolicySourceStamp = plan.PolicySourceStamp
+            }, token);
+        await Assert.That(progressResponse.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(fixture.FailureMetadata);
+        var progressed = await progressResponse.Content.ReadFromJsonAsync<LearningMutationReceiptDto>(
+            LocalIdentityLifecycleHttpFixture.CancellationToken);
+        await Assert.That(progressed!.State!.Tours.Single(tour => tour.Family == plan.Family)
+            .CompletedSteps.Any(completed => completed.StepKey == step.StepKey
+                && completed.StepVersion == step.StepVersion)).IsTrue();
     }
 
     [Test]

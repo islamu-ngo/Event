@@ -3939,7 +3939,26 @@ dotnet run --project eng/agent-workflow/src/ISLAMU.AgentWorkflow/ISLAMU.AgentWor
 
 ### Verification Policy
 
-All agent and contributor verification compiles once sequentially per project (`dotnet build <Project.csproj> --configuration Release -m:1 -nr:false --verbosity quiet`) and executes test projects one at a time with `--no-build`:
+The execution unit is one independently mergeable PR within a persistent canonical
+programme (programme → PR scope → phase → task). Keep the canonical triad in the
+main checkout, delegate only the selected scope and required shared contracts, and
+stop at its reconciled review handoff. After merge, reconcile final reviewed
+delivery before separately authorized cleanup; intermediate merges retain the
+programme and shared active tracking file. See the
+[scope contract](../../.agents/skills/implementation-plan/resources/pr-scope-contract.md)
+and [native lifecycle](../../.agents/skills/implement-tasks/resources/pr-execution-lifecycle.md).
+
+Each PR must satisfy its applicable acceptance checks before merge, including
+affected-provider matrices, migrations, architecture and relevant runtime/contract
+checks. Later PRs cannot own the first validation of behavior already merged.
+Final programme acceptance verifies cross-capability promises when prerequisites
+exist. Preserve explicit user verification overrides, their scope, omitted checks
+and limitations; never silently generalize them. Documentation/agent-context-only
+Tier 4 changes use metadata, links, scenario consistency and diff checks, with no
+.NET build/test, app/browser startup or containers. Record exact commands/outcomes,
+and rerun passed checks only after relevant changes invalidate their evidence.
+
+For executable changes, agent and contributor verification compiles once sequentially per project (`dotnet build <Project.csproj> --configuration Release -m:1 -nr:false --verbosity quiet`) and executes test projects one at a time with `--no-build`:
 
 - **Execution Profiles (`ISLAMU_EXECUTION_PROFILE`)**: `constrained` (1 container, `2` or `1` unit workers, `Directory.Build.props` sets `UseSharedCompilation=false` + `BuildInParallel=false`), `balanced` (default adaptive host RAM profile), or `performance` (unthrottled CPU scaling on dedicated high-RAM machines).
 - **Constrained SDK Environment Variables**: Pair `ISLAMU_EXECUTION_PROFILE=constrained` with `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1`, `MSBUILDDISABLENODEREUSE=1`, `DOTNET_GCConserveMemory=5`, and a disk-backed `0700` `TMPDIR` (e.g. `$HOME/.cache/agent-tmp`) so Roslyn VBCSCompiler/MSBuild workers terminate promptly and Linux `/tmp` `tmpfs` never exhausts host RAM.

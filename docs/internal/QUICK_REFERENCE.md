@@ -45,7 +45,7 @@ ABOUTME: Focuses on non-inferable constraints and project-specific behavior.
 33. **The 3-Ring Progressive Verification Model & Yak-Shaving Quarantine**:
     - **Ring 1 (Inner Loop / Sliced)**: In-progress subtasks run in-memory TUnit sliced tests (`--treenode-filter "/*/*/*<TestClass>/*"`) targeting `Event.Domain.UnitTests` or `Event.Application.UnitTests` (< 2s, 0 Docker containers, 0 network I/O). 90%+ of domain/normalization/validation invariants belong in Domain unit tests.
     - **Ring 2 (Phase Exit Gate)**: Verify the modified project against a single designated provider in < 15s.
-    - **Ring 3 (Plan Exit Gate)**: The full 5-database matrix, migrations, and architecture tests run strictly at plan exit before PR creation.
+    - **Ring 3 (PR Acceptance / Programme Exit)**: Each PR runs its applicable affected-provider, migration, architecture and other acceptance checks before merge. Final programme acceptance covers cross-capability promises when ready; later PRs cannot own the first validation of already merged behavior. Retain explicit user verification overrides with their boundaries and unrun-check limits.
     - **Yak-Shaving Quarantine**: Agents are strictly forbidden from fixing unrelated pre-existing test suite rot or fixture failures encountered during feature tasks. Prove if it reproduces on untouched base, log it in `*-context.md` / `dev/backlog/`, quarantine it, and proceed with the assigned scope.
 34. **Self-Documenting Code & Retirement of ABOUTME on Code**: Source code (`.cs`, `.razor`, `.css`) relies on Clean Architecture naming, directory structure, and standard C# XML doc comments (`/// <summary>`) for discovery. The legacy `ABOUTME:` comment prefix is officially retired for source code; agents must not generate it in new code. Internal documentation in `docs/internal/` and `.agents/` uses natural Markdown metadata blocks (`> **Audience:** ...`) or frontmatter. See [`docs/internal/GOVERNANCE.md`](GOVERNANCE.md#header--file-metadata-policy-natural-metadata--code-retirement).
 35. **No Warning Suppressions to Force Build/Tests**: Never suppress compiler warnings or analyzer diagnostics via `#pragma warning disable` or `[SuppressMessage]` to force a build through. Fix the underlying root cause. If an intentional compiler ratchet is needed, obtain maintainer approval for `Directory.Build.props`.
@@ -99,11 +99,21 @@ Database defense-in-depth (PostgreSQL):
 
 ## Build And Test Baseline
 
+Programmes retain one canonical triad in the main checkout: programme → PR scope →
+phase → task. Execute one ready scope with merged/reconciled prerequisites and one
+live detailed owner; explicit user-selected in-tree execution uses the canonical
+selected section. Reconcile before review and after verified merge, preserve future
+sections and unmet required scope, and stop at that PR's review handoff. Worktree
+cleanup is separately authorized after preserving ignored/local work; the canonical
+programme survives intermediate merges. See the
+[scope contract](../../.agents/skills/implementation-plan/resources/pr-scope-contract.md)
+and [execution lifecycle](../../.agents/skills/implement-tasks/resources/pr-execution-lifecycle.md).
+
 1. Build: `dotnet build --configuration Release --verbosity quiet`
 2. Follow the **3-Ring Progressive Verification Model** (`AGENTS.md` §8):
    - **Ring 1 (< 2s)**: In-memory TUnit slicing (`--treenode-filter`) for subtasks.
    - **Ring 2 (< 15s)**: Single-project, single designated provider run for phase exits.
-   - **Ring 3 (Plan Exit)**: Multi-provider matrix and full suites run once at workstream exit.
+   - **Ring 3 (PR / Programme Exit)**: Run checks applicable to each PR before merge, then final cross-capability programme acceptance when its prerequisites exist. Documentation-only Tier 4 work uses metadata, links, scenario review and diff checks, with no .NET build/test.
 3. Use [`PROJECTS.md`](../../PROJECTS.md) for solution project roles and targeted verification commands.
 4. Enforce the **Yak-Shaving Quarantine Rule**: quarantine pre-existing test rot outside task scope.
 5. Provide a **Verification Evidence Report** on task completion (commands executed, outcomes, omitted checks with technical rationale).

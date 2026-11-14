@@ -45,6 +45,11 @@ recognizes the existing tenant parent fence without granting additional access.
 A changed or broadened permission profile still stops the operation; restore
 the reviewed profile rather than adding broad manual grants.
 
+Fresh PostgreSQL initialization installs the complete provisioning-policy
+projection permission contract before visitor settings storage. Both features
+use that single permission owner. Existing partial or altered permission
+catalogues continue to fail admission rather than being silently repaired.
+
 The BFF can read the instance's non-sensitive resolver configuration before
 selecting a tenant. Private or malformed tenant visitor settings cannot block
 that routing bootstrap. Tenant content still enforces its own visitor policy,

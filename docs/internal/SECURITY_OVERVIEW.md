@@ -104,6 +104,15 @@ The unchanged query returns non-sensitive instance routing configuration.
 This grants no tenant-content authority and does not apply to the authenticated
 resolver PATCH or other actions on `InstanceMessagingSettingsController`.
 
+Provisioning Policy projection permissions have one installation owner:
+`PostgresProvisioningPolicyPermissions`. Migration and native fixture
+composition install that complete contract before Visitor Settings storage.
+Visitor storage grants no projection permissions itself. This prevents its
+former partial Global grant from violating the projection owner's strictly
+absent-or-complete admission rule. The canonical nineteen Global/Email column
+privileges, forced RLS, policy predicates and drift rejection remain unchanged;
+the later migration check verifies the complete installation again.
+
 Local administrator lifecycle guards recognize this same absent-or-complete
 package through one fresh catalogue proof per guard execution. The three local
 credential relations retain their blanket denial of Runtime scalar access.

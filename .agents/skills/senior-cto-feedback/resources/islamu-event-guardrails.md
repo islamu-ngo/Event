@@ -238,9 +238,9 @@ Implementation plans must enforce **Quality-Over-Quantity Invariant Verification
 - **Stryker Mutation Testing**: Stryker threshold gating is disabled during active greenfield development. Do not block implementation approval on Stryker mutation scores.
 - Prioritize high-leverage adversarial tests (concurrency races, state machines, row locking, zero-PII log sinks, tenant isolation) over shallow mock-heavy tests.
 
-At each phase end, run one Release build and at most one project-level `dotnet test` command. Do not add per-task checks, test-only phases, E2E/browser projects, Playwright, Chrome DevTools MCP, app startup, Aspire/Docker startup, live-service smoke, or manual runtime walkthroughs.
+Apply the planner's [verification gates](../../implementation-plan/resources/quality-gates.md#verification-gates): required Ring 1 slices and Red invariant checks, one targeted phase build and at most one project test on one provider, mandatory acceptance for each PR, then final cross-capability programme acceptance. Runtime, browser, provider-matrix and integration checks belong at the PR gate only when a matched intent, rule or changed surface requires them. Do not add unrelated infrastructure or a test-only phase.
 
-Repository-mandated projects remain contract requirements, but distribute them across existing phases without repeating commands or creating extra phases solely for verification. Architecture tests remain mandatory when agent context or architecture contracts change.
+Repository-mandated projects remain contract requirements, assigned to the PR that changes their surface. Preserve sequential resource profiles and explicit user verification overrides with their unrun-check limits. Tier 4 Markdown/agent-context changes use metadata, links, scenario and diff checks, with no .NET build/test. Executable architecture changes retain their applicable architecture tests.
 
 Testing posture for pre-v1:
 

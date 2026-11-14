@@ -5,7 +5,7 @@
 
 ## Stop Condition
 
-Stop after the three planning artifacts are complete, internally consistent, and ready for user review. Do not implement the planned change. Planning agents must NEVER create git branches or git worktrees; planning artifacts live exclusively in `dev/active/<task>/` on the main repository workspace (`develop`).
+Stop after the three planning artifacts are complete, internally consistent, and ready for user review. Do not implement the planned change. Planning agents must NEVER create or switch git branches or create git worktrees. The canonical triad lives in `dev/active/<task>/` of the main checkout and stays there for every PR of the programme; execution receives only a scoped copy under the [PR scope contract](pr-scope-contract.md).
 
 ## 1. Initialize The Integrated Intake
 
@@ -17,8 +17,10 @@ Stop after the three planning artifacts are complete, internally consistent, and
 ## 2. Establish The Workstream
 
 1. Search `dev/active/` and `dev/pause/` for the same or overlapping work.
-2. Re-baseline the existing workstream when it represents the same task; do not create a duplicate.
+2. Re-baseline the existing programme when it represents the same request; do not create a duplicate triad or one triad per PR.
 3. Record overlap, conflicts, inherited blockers, and still-relevant remaining work.
+4. When the programme already has a PR registry, read it before planning changes. A scope that is Implementing or In review is a delegated snapshot: refine only undelegated future scopes and record proposed amendments for the live owner instead of rewriting that section.
+5. A legacy plan without PR scopes is normalized into stable scopes from its actual completed, uncommitted, required and deferred work on its owner's explicit resume; old checked tasks do not prove delivery.
 
 Use persistent dev docs for complex, cross-layer, multi-session, or multi-contributor work. Skip them for an atomic change that can be implemented and verified safely in one short slice.
 
@@ -101,11 +103,19 @@ Do not convert a search miss into proof of absence without recording what was se
 4. For each remaining branch that could alter scope, provider responsibility, architecture, API contracts, scenarios, or tasks, follow `grill-me`: recommend an answer with rationale, ask exactly one question, and wait.
 5. Do not design the future state until those branches are resolved or the user explicitly defers them with the resulting risk and ownership recorded. Plan open questions remain limited to genuinely deferrable details.
 
-## 9. Design Executable Vertical Slices
+## 9. Design PR Scopes, Then Executable Slices
 
 Design the future state only after the evidence report is complete. Follow repository layer ownership and prefer reviewable vertical slices over layer-wide mega-phases.
 
-For each phase and task, specify:
+First divide the complete request into PR scopes under the [PR scope contract](pr-scope-contract.md#required-scope-definition):
+
+- Give each scope a stable ID (`PR-<OUTCOME>`) and an independently usable, independently mergeable outcome. A single coherent change is a one-scope programme.
+- Split when smaller independently mergeable outcomes exist; keep together changes whose separate merge would leave contradictory or unusable intermediate states, and say why.
+- Order scopes by consumed contracts. Each names its predecessors, the merged contracts it consumes or changes, and the readiness conditions that must hold before it can become Ready.
+- Detail the next candidate fully. Later scopes keep rolling detail: required outcomes, scenarios, dependencies, acceptance and I-VSD IDs stay in the same triad even when tasks are still coarse.
+- Never move requested work to backlog to meet a sizing threshold.
+
+Then, inside each scope, for each phase and task, specify:
 
 - goal, owning layer, and dependencies;
 - verified existing files and explicitly marked new files;
@@ -122,11 +132,10 @@ Keep the implementation checklist lean:
 
 - Create tasks only for implementation work that changes code, tests, schemas, configuration, or required documentation.
 - Fold required tests and documentation into the implementation task that owns the behavior; do not create standalone testing, QA, documentation-review, reporting, or dev-doc maintenance tasks.
-- Do not add a verification phase or run checks after individual tasks.
-- At the end of each phase, run `dotnet build --configuration Release --verbosity quiet` once.
-- At the end of each phase, run at most one `dotnet test --project <most-relevant-project>.csproj --configuration Release --verbosity quiet` command once.
-- Select the fastest deterministic test project that covers the phase and does not start the application, browser, Docker, Aspire, or external services.
-- Never plan Playwright, browser automation, Chrome DevTools MCP, visual QA, live-app smoke tests, manual runtime walkthroughs, or E2E test projects.
+- Do not add a verification-only phase or repeat full-project checks after individual tasks; retain required Ring 1 slices and Red invariant checks.
+- Assign verification with the three proportional gates in [Quality Gates](quality-gates.md#verification-gates): a targeted phase gate, a mandatory acceptance gate per PR, and final programme acceptance. Tier 4 documentation/agent-context work runs no .NET build or test.
+- A phase gate is one targeted Release build and at most one fastest relevant project test on one provider, run sequentially per the execution profile.
+- Place provider-matrix, migration, UI, security or integration checks that a matched intent, path rule or the PR's changed surface requires in that PR's acceptance gate. Do not add browser, container or live-service checks that no rule or changed surface requires.
 - Distribute repository-mandated test projects across existing phases without repeating them; never create extra phases solely to run more tests.
 
 ## 10. Write And Synchronize The Artifacts
@@ -140,7 +149,7 @@ dev/active/<task-name>/
 └── <task-name>-tasks.md
 ```
 
-All three files must contain `Last Updated: YYYY-MM-DD Europe/Brussels`. Cross-check status, next action, blockers, decisions, risks, phase names, task ids, and validation commands across the files before stopping.
+All three files must contain `Last Updated: YYYY-MM-DD Europe/Brussels`. Cross-check status, next action, blockers, decisions, risks, PR scope IDs and registry state, phase names, task ids, and validation commands across the files before stopping.
 
 Link `islamic-value-sensitive-design/workstreams/i-vsd-<task-name>.md` from the plan, context, and tasks artifacts, include its reviewed-input revision/status and the resolved Grill-Me decisions, then revalidate the completed triad through I-VSD planning mode. Every material `IVSD-*` ID must map to a named scenario/task, explicit non-applicability, or escalation gate. A `changes-required` or `escalation-required` disposition blocks plan-aligned status.
 
@@ -149,8 +158,12 @@ Write the maintenance contract into the artifacts themselves so implementation a
 - Maintain strict single responsibility: `plan.md` defines architectural phase boundaries and exit criteria without embedding granular task checklists (`- [ ]`) or session handoffs; `tasks.md` is the sole hot execution ledger; `context.md` is the sole active memory and handoff log.
 - `tasks.md` is the hot execution ledger and must be updated during implementation, not by a later cleanup command.
 - A substantial task is checked immediately after its implementation acceptance criteria are met; small related tasks may be reconciled together, but never later than phase end.
-- Phase verification checkboxes remain separate from implementation checkboxes, and the phase becomes complete only after its build and selected test pass.
+- Phase verification checkboxes remain separate from implementation checkboxes, and the phase becomes complete only after its gate is resolved and its commit succeeds. A PR is complete only after merge and acceptance reconciliation; the programme only under the contract's completion rule.
 - `context.md` is refreshed after a phase, a meaningful decision, a blocker, validation failure, scope discovery, or handoff.
 - `plan.md` changes only when scope, architecture, phase order, acceptance criteria, risk, or validation strategy changes.
-- On initial implementation and cold resume, agents read task-owned context and the current task first, then retrieve only the plan heading named by that state.
+- On initial implementation and cold resume, agents read task-owned context first, select the active PR scope from the registry (an Implementing or In review scope, its pending finalization, or else the earliest Planned candidate that passes readiness), then read that scope's current task and only the plan heading it names. Never select work from the first phase or first unchecked historical task.
 - On an uninterrupted session, agents must not reread unchanged artifacts after every task; they use the current task entry and only reopen the exact section needed.
+
+## 11. Optional OmO Prometheus Intake
+
+Under Oh-My-OpenAgent, Prometheus may run the interview (scope, edge cases, architectural decisions, Metis gap analysis, Momus review) while following this skill. It writes the standard triad into `dev/active/<task>/`; `.omo/plans/` may hold runtime state but is never the authoritative plan.

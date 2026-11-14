@@ -17,6 +17,12 @@ before relying on its rerun.
 
 ## Current procedure
 
+If CodeQL is cancelled, inspect the actual workflow conclusion and phase
+timestamps before interpreting the result. Follow
+[the operational procedure](OPERATIONS.md#codeql-analysis-cancellation)
+and retain a completed analysis for the candidate before satisfying its
+scanner gate. A successful traced build alone does not satisfy that gate.
+
 Until a trusted release bundle, release-engine verification, signer policy, provider
 protection evidence, and advisory dry run are implemented, operators MUST use
 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). The current process is manual SemVer

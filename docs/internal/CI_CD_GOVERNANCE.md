@@ -479,6 +479,14 @@ Recommended checks after the PR1-PR8 governance baseline stabilizes:
 | Cerbos policy | `Cerbos Policy Validation` | `Cerbos Policy Validation` | Ready after repository-side check-name verification | Always-present wrapper detects authorization-policy/code paths, runs on schedule/manual dispatch, supports merge queue, and intentionally no-ops for unrelated changes. |
 | Agent context | `agent-context` | `Validate AI-Context Contract` | Ready after repository-side check-name verification | Always-present wrapper detects AI context/docs/rule paths, supports merge queue/manual dispatch, and intentionally no-ops for unrelated changes. |
 
+CodeQL allows 90 minutes for C# and 45 minutes for the other languages.
+Run 43522421495 on November 13, 2026 used about 30 minutes for the traced C#
+build and another four for database finalization. At the former 45-minute
+job limit, query evaluation was progressing at 28/59 and GitHub cancelled
+the job. The C# budget includes all three phases; it does not reduce the
+query suite, coverage, or error enforcement. Retain exact-head terminal
+analysis evidence; a successful build or cancelled scan is not admission.
+
 The security integration job allows 45 minutes for restore, build, the Security category, and the PolicyContract category. On 2026-09-27, the Security category alone passed 238 tests locally in 12 minutes 15 seconds; the previous 15-minute GitHub job expired during that category after a 2-minute 42-second build. The larger budget preserves both test selections rather than reducing coverage.
 
 Do **not** require workflows that are skipped by `paths` filters unless the workflow contains an always-running no-op job. GitHub can leave skipped required checks pending, which blocks merges without useful feedback. `Build & Test`, `CodeQL Advanced`, `Security Integration Tests`, `Cerbos Policy Validation`, and `agent-context` now use workflow-internal change detection instead of trigger-level path skips, so their checks remain present while avoiding unnecessary work for unrelated paths.

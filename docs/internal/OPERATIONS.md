@@ -3,6 +3,14 @@
 
 # Operations
 
+## CodeQL analysis cancellation
+
+For CodeQL cancellation, distinguish the local watch deadline from the actual
+job conclusion. The C# scan budget covers traced build, database finalization
+and query evaluation. Inspect phase timestamps before changing resources or
+rerunning; see [the measured budget](CI_CD_GOVERNANCE.md#required-repository-settings).
+Only the complete analysis for the selected head supplies scanner evidence.
+
 ## Complete release-impact metadata
 
 The release-impact validator reads runner-local file metadata, not an inline

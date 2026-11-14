@@ -17,6 +17,11 @@ before relying on its rerun.
 
 ## Scope and precedence
 
+Scanner admission requires completed analysis for the selected candidate.
+A job budget correction does not waive cancelled or missing query results;
+the [CI execution budget](CI_CD_GOVERNANCE.md#required-repository-settings)
+preserves the full configured suite.
+
 SDK/runtime servicing evidence must cover the component actually delivered:
 package resolution, framework-provided assemblies and self-contained/container
 runtime bytes have distinct ownership. Pruning an obsolete package reference

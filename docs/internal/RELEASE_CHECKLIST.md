@@ -95,6 +95,10 @@ success do not establish activation. Use the
 
 ## Release Evidence Bundle
 
+Retain the selected candidate's completed CodeQL analysis result. A passing
+manual build followed by cancellation is incomplete scanner evidence; follow
+[the cancellation procedure](OPERATIONS.md#codeql-analysis-cancellation).
+
 Before candidate verification, retain the selected security workflow's
 `security-execution.v1.json` and every referenced report/log under
 `docs/internal/releases/<version>/`, preserving relative paths. The packet must

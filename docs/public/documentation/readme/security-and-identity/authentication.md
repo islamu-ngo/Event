@@ -33,6 +33,12 @@ Incomplete or broadened grants stop the operation. Keep Runtime and Migrator
 credentials separate, and restore the reviewed permission profile when a
 mismatch is reported.
 
+Support administration on native PostgreSQL also checks the current membership
+and enrollment permission profiles. Its API-key storage checks recognize the
+tenant parent fence installed for membership operations. Partial or broadened
+profiles remain errors; private support sessions and audit records remain
+accessible only through the application-owned support workflow.
+
 Each deployment has exactly one **primary authentication provider**:
 
 * **Local Identity** uses ASP.NET Core Identity inside ISLAMU Event. It is the

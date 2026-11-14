@@ -46,6 +46,16 @@ settlement. The existing API-key parent inventory retains ownership of the
 `Tenant.Id` read; counting it as a new membership grant would misclassify an
 otherwise valid bootstrap as a partial installation.
 
+The API-key storage manifest recognizes the membership owner's declared read
+and update columns only on intersecting relations. Its existing fresh checks
+attest the exact Runtime grantee, Migrator grantor, non-grantable column rights,
+relation shape and policies alongside the external-enrollment catalogue proof.
+Support administration retains its existing membership-or-actor completeness
+boundary and its zero Runtime scalar authority on private session and audit
+relations. This preserves the supported actor-only profile without coupling
+API-key storage to unrelated membership grants.
+No installer grant list, required API-key permission or policy is expanded.
+
 The grant permits a column update, rather than enforcing no-op SQL in the
 database. A compromised Runtime credential can therefore attempt primary-key
 changes; credential isolation and the application's original-owner, tenant,

@@ -24,6 +24,14 @@ including the Standalone container lock and moderation measurement launcher.
 CI restores those owners before auditing. After the conditional container
 restore, it restores Standalone's ordinary profile again so subsequent solution
 builds use ordinary assets while retaining the deployment packages in the cache.
+The fast lane also restores `eng/tools/InstallAssuranceBrowser.cs` and
+`eng/tools/keycloak-lifecycle-grants.cs` in locked mode before the audit. The
+browser tool's separate lock and the Keycloak tool's `eng/tools/packages.lock.json`
+contribute packages independently of runtime lane selection. Regenerate that
+Keycloak lock through its owning file app when its referenced Domain project
+changes; never retain an obsolete dependency closure or hand-edit package hashes.
+Restore populates package license metadata; it does not run either tool, download
+browsers or attest browser execution.
 
 `Build & Test` consumes `select-build-test-changes` from the existing release
 engineering executable. The workflow accepts exactly seven unique boolean

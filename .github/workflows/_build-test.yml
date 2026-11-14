@@ -105,6 +105,12 @@ jobs:
         if: ${{ inputs.run-fast-tests }}
         run: dotnet tool restore
 
+      - name: Restore Audited File-Based Tools
+        if: ${{ inputs.run-fast-tests }}
+        run: |
+          dotnet restore eng/tools/InstallAssuranceBrowser.cs --locked-mode
+          dotnet restore eng/tools/keycloak-lifecycle-grants.cs --locked-mode
+
       - name: NuGet Security Audit
         if: ${{ inputs.run-fast-tests }}
         env:

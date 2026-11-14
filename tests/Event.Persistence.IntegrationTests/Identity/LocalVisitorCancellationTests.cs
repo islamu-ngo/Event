@@ -251,7 +251,8 @@ public sealed partial class LocalVisitorCancellationTests
                 case ChangedEvidence.PrimaryUser:
                     primary.Users.Add(new User
                     {
-                        Id = reservation.LocalSubjectId, CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime,
+                        Id = reservation.LocalSubjectId,
+                        CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime,
                         Pii = new UserPii { Email = string.Empty, FirstName = "Pending", LastName = string.Empty }
                     });
                     await primary.SaveChangesAsync(fixture.CancellationToken);
@@ -259,7 +260,9 @@ public sealed partial class LocalVisitorCancellationTests
                 case ChangedEvidence.Privileged:
                     identity.Set<IdentityUserClaim<Guid>>().Add(new IdentityUserClaim<Guid>
                     {
-                        UserId = reservation.LocalSubjectId, ClaimType = "role", ClaimValue = "administrator"
+                        UserId = reservation.LocalSubjectId,
+                        ClaimType = "role",
+                        ClaimValue = "administrator"
                     });
                     await identity.SaveChangesAsync(fixture.CancellationToken);
                     break;
@@ -439,8 +442,11 @@ public sealed partial class LocalVisitorCancellationTests
         seed.BindTenantLease();
         seed.Tenants.Add(new Tenant
         {
-            Id = tenant, FullName = "Visitor cancellation tenant", Slug = $"visitor-{tenant:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!,
+            Id = tenant,
+            FullName = "Visitor cancellation tenant",
+            Slug = $"visitor-{tenant:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
             CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime
         });
         await seed.SaveChangesAsync(fixture.CancellationToken);

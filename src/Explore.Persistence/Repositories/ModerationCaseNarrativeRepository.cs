@@ -103,11 +103,11 @@ public sealed partial class ModerationCaseNarrativeRepository(
             // Original acceptance is the anti-resurrection floor, surviving physical payload
             // deletion. A new token/operation for copied material cannot recreate purged text.
             var originalQuery = from acknowledgement in context.ModerationCaseIntakeAcknowledgements.AsNoTracking()
-                                  join receipt in context.ModerationCaseTargetReceipts.AsNoTracking() on acknowledgement.ReceiptId equals receipt.Id
-                                  where acknowledgement.TenantId == held.Authority.Tenant.Id && acknowledgement.CaseId == stage.Case.Id
-                                      && receipt.SourceId == source.Id && receipt.SourceVersion == source.Version
-                                      && receipt.MaterialFactId == source.MaterialFactId
-                                  select acknowledgement;
+                                join receipt in context.ModerationCaseTargetReceipts.AsNoTracking() on acknowledgement.ReceiptId equals receipt.Id
+                                where acknowledgement.TenantId == held.Authority.Tenant.Id && acknowledgement.CaseId == stage.Case.Id
+                                    && receipt.SourceId == source.Id && receipt.SourceVersion == source.Version
+                                    && receipt.MaterialFactId == source.MaterialFactId
+                                select acknowledgement;
             var original = await ModerationNarrativeTemporalQuery.OrderOriginalAcceptance(context, originalQuery)
                 .FirstOrDefaultAsync(cancellationToken);
             if (original is not null)

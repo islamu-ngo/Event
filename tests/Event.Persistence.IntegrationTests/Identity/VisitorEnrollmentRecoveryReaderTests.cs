@@ -425,9 +425,11 @@ internal static class VisitorRecoveryRows
 
     internal static Tenant Tenant() => new()
     {
-        Id = Guid.CreateVersion7(), FullName = "Visitor recovery fixture",
+        Id = Guid.CreateVersion7(),
+        FullName = "Visitor recovery fixture",
         Slug = $"visitor-recovery-{Guid.CreateVersion7():N}",
-        TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+        TenantStatusId = (int)TenantStatusEnum.Active,
+        TenantStatus = null!
     };
 
     internal static VisitorEnrollmentOperation Reserved(Guid id, Guid tenantId, DateTime createdAt) =>

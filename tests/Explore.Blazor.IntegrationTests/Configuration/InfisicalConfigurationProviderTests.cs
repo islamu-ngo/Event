@@ -355,16 +355,22 @@ public sealed class InfisicalConfigurationProviderTests
                 ? Results.Json(new { message = authority.AccessToken }, statusCode: StatusCodes.Status401Unauthorized)
                 : Results.Json(new
                 {
-                    accessToken = authority.AccessToken, accessTokenMaxTTL = 3600, expiresIn = 600, tokenType = "Bearer"
+                    accessToken = authority.AccessToken,
+                    accessTokenMaxTTL = 3600,
+                    expiresIn = 600,
+                    tokenType = "Bearer"
                 }));
             object Observation(RawSecret secret, HttpContext context, bool hidden) => new
             {
                 id = identities.GetOrAdd((secret.secretPath, secret.secretKey), _ => Guid.CreateVersion7().ToString("N")),
                 workspace = context.Request.Query["projectId"].ToString(),
                 environment = context.Request.Query["environment"].ToString(),
-                secret.secretPath, secret.secretKey,
+                secret.secretPath,
+                secret.secretKey,
                 secretValue = hidden ? null : secret.secretValue,
-                secretValueHidden = hidden, type = "shared", version = 1
+                secretValueHidden = hidden,
+                type = "shared",
+                version = 1
             };
             app.MapGet("/api/v4/secrets", (HttpContext context) =>
             {

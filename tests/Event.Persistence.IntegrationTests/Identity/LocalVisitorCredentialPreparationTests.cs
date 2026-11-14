@@ -123,8 +123,12 @@ public sealed class LocalVisitorCredentialPreparationTests
         DateTime at = fixture.Clock.GetUtcNow().UtcDateTime;
         seed.Tenants.Add(new Tenant
         {
-            Id = tenant, FullName = "Visitor preparation tenant", Slug = $"visitor-{tenant:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = at
+            Id = tenant,
+            FullName = "Visitor preparation tenant",
+            Slug = $"visitor-{tenant:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
+            CreatedAt = at
         });
         var row = VisitorEnrollmentOperation.Reserve(Guid.CreateVersion7(), tenant, Guid.CreateVersion7(),
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),

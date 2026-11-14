@@ -41,8 +41,11 @@ public sealed class PostgresManagedTenantDomainAuthorityTests(PostgreSqlContaine
             });
             seed.TenantSettingOverrides.Add(new TenantSetting
             {
-                Id = Guid.CreateVersion7(), TenantId = rows.B, Tenant = null!,
-                SettingKey = "email.smtp_host", Value = SettingValueSerializer.Serialize(privateHost),
+                Id = Guid.CreateVersion7(),
+                TenantId = rows.B,
+                Tenant = null!,
+                SettingKey = "email.smtp_host",
+                Value = SettingValueSerializer.Serialize(privateHost),
                 CreatedAt = DateTime.UtcNow
             });
             await seed.SaveChangesAsync();

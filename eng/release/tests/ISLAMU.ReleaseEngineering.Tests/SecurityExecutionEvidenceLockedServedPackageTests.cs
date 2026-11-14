@@ -61,11 +61,14 @@ public sealed class SecurityExecutionEvidenceLockedServedPackageTests
                     };
                 await File.WriteAllTextAsync(assetsPath, JsonSerializer.Serialize(new
                 {
-                    project = new { restore = new
+                    project = new
                     {
-                        projectPath = scenario == "wrong-project" && owns
-                            ? Path.Combine(repository, unrelated) : Path.Combine(repository, project)
-                    } },
+                        restore = new
+                        {
+                            projectPath = scenario == "wrong-project" && owns
+                                ? Path.Combine(repository, unrelated) : Path.Combine(repository, project)
+                        }
+                    },
                     libraries,
                     packageFolders = new Dictionary<string, object> { [packages + "/"] = new { } }
                 }));

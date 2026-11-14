@@ -47,11 +47,17 @@ public sealed class VisitorEnrollmentOperation : ITenantEntity
             throw new ArgumentException("A SHA-256 intent digest is required.", nameof(intentDigest));
         return new VisitorEnrollmentOperation
         {
-            Id = operationId, TenantId = tenantId, LocalSubjectId = localSubjectId,
-            PersonalActorId = personalActorId, ExternalLoginId = externalLoginId,
-            CredentialOperationId = credentialOperationId, IntentDigest = intentDigest.ToLowerInvariant(),
-            Stage = VisitorEnrollmentStage.Reserved, Generation = 1,
-            CreatedAt = occurredAt, ExpiresAt = occurredAt.AddMinutes(15)
+            Id = operationId,
+            TenantId = tenantId,
+            LocalSubjectId = localSubjectId,
+            PersonalActorId = personalActorId,
+            ExternalLoginId = externalLoginId,
+            CredentialOperationId = credentialOperationId,
+            IntentDigest = intentDigest.ToLowerInvariant(),
+            Stage = VisitorEnrollmentStage.Reserved,
+            Generation = 1,
+            CreatedAt = occurredAt,
+            ExpiresAt = occurredAt.AddMinutes(15)
         };
     }
 

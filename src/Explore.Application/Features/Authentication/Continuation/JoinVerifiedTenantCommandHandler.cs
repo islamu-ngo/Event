@@ -84,10 +84,16 @@ public sealed class JoinVerifiedTenantCommandHandler(
             var occurredAt = clock.GetUtcNow().UtcDateTime;
             var membership = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = command.TenantId, Tenant = tenant,
-                UserId = subject.PrincipalId, User = null!, ActorId = actor.Id, Actor = actor,
+                Id = Guid.CreateVersion7(),
+                TenantId = command.TenantId,
+                Tenant = tenant,
+                UserId = subject.PrincipalId,
+                User = null!,
+                ActorId = actor.Id,
+                Actor = actor,
                 StatusId = (int)TenantUserStatusEnum.Active,
-                JoinedAt = occurredAt, CreatedAt = occurredAt,
+                JoinedAt = occurredAt,
+                CreatedAt = occurredAt,
                 CreatedBy = subject.PrincipalId
             };
             commitFinalizer().Register(async finalToken =>

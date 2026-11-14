@@ -89,16 +89,16 @@ public static partial class PostgresSetupLiveStoragePermissions
                         $"GRANT SELECT ({all}), INSERT ({all}), UPDATE ({updates}) ON {table} TO {role}; ALTER TABLE {table} ENABLE ROW LEVEL SECURITY; ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
                         cancellationToken);
                     foreach (var operation in SettingOperations)
-                    foreach (bool restrictive in new[] { false, true })
-                    {
-                        string condition = SettingsCondition(context, enrollment.GlobalLogin);
-                        string policy = names.DelimitIdentifier(SettingsPolicyName(operation.Operation, restrictive));
-                        string clause = (operation.Operation != "INSERT" ? $"USING ({condition}) " : "")
-                            + (operation.Operation != "SELECT" ? $"WITH CHECK ({condition})" : "");
-                        await context.Database.ExecuteSqlRawAsync(
-                            $"CREATE POLICY {policy} ON {table} AS {(restrictive ? "RESTRICTIVE" : "PERMISSIVE")} FOR {operation.Operation} TO {role} {clause}", cancellationToken);
-                        string stamp = SettingsStamp(table, enrollment.GlobalLogin, operation.Operation, restrictive);
-                        await context.Database.ExecuteSqlRawAsync($"""
+                        foreach (bool restrictive in new[] { false, true })
+                        {
+                            string condition = SettingsCondition(context, enrollment.GlobalLogin);
+                            string policy = names.DelimitIdentifier(SettingsPolicyName(operation.Operation, restrictive));
+                            string clause = (operation.Operation != "INSERT" ? $"USING ({condition}) " : "")
+                                + (operation.Operation != "SELECT" ? $"WITH CHECK ({condition})" : "");
+                            await context.Database.ExecuteSqlRawAsync(
+                                $"CREATE POLICY {policy} ON {table} AS {(restrictive ? "RESTRICTIVE" : "PERMISSIVE")} FOR {operation.Operation} TO {role} {clause}", cancellationToken);
+                            string stamp = SettingsStamp(table, enrollment.GlobalLogin, operation.Operation, restrictive);
+                            await context.Database.ExecuteSqlRawAsync($"""
                             DO $setup_policy$
                             DECLARE fingerprint text;
                             BEGIN
@@ -110,8 +110,8 @@ public static partial class PostgresSetupLiveStoragePermissions
                                     {SettingText(SettingsPolicyName(operation.Operation, restrictive))},{SettingText(table)},fingerprint);
                             END $setup_policy$;
                             """, cancellationToken);
-                        RequireOriginal();
-                    }
+                            RequireOriginal();
+                        }
                     if (await SettingsScalar(context, $"SELECT {GlobalSettingsCataloguePredicate(context, enrollment)}", cancellationToken) is not true)
                         throw new InvalidOperationException(SettingsDrift);
                 }

@@ -35,7 +35,10 @@ public class UserRepository : GenericRepository<User, Guid>, IUserRepository
                 User = user,
                 Profile = user.Pii == null ? null : new
                 {
-                    user.Pii.UserId, user.Pii.Email, user.Pii.FirstName, user.Pii.LastName,
+                    user.Pii.UserId,
+                    user.Pii.Email,
+                    user.Pii.FirstName,
+                    user.Pii.LastName,
                     Revision = EF.Property<long>(user.Pii, "_birthDateRevision")
                 }
             }).FirstOrDefaultAsync(cancellationToken);
@@ -45,8 +48,10 @@ public class UserRepository : GenericRepository<User, Guid>, IUserRepository
         {
             var profile = new UserPii
             {
-                UserId = stored.UserId, Email = stored.Email,
-                FirstName = stored.FirstName, LastName = stored.LastName
+                UserId = stored.UserId,
+                Email = stored.Email,
+                FirstName = stored.FirstName,
+                LastName = stored.LastName
             };
             var entry = _dbContext.Entry(profile);
             entry.Property<long>("_birthDateRevision").CurrentValue = stored.Revision;

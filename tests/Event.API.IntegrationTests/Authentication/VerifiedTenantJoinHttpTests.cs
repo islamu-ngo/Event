@@ -92,7 +92,8 @@ public sealed partial class VerifiedTenantJoinHttpTests
 
         using var response = await fixture.JoinAsync(slug, new
         {
-            targetTenantId = fixture.TargetId, tenantSlug = JoinFixture.TargetSlug
+            targetTenantId = fixture.TargetId,
+            tenantSlug = JoinFixture.TargetSlug
         });
 
         await Assert.That(response.StatusCode).IsEqualTo(expected);
@@ -109,9 +110,12 @@ public sealed partial class VerifiedTenantJoinHttpTests
 
         using var response = await fixture.JoinAsync(JoinFixture.TargetSlug, new
         {
-            userId = fixture.OtherUserId, subject = fixture.OtherUserId.ToString("D"),
-            issuer = "https://forged.example.test", accountKey = fixture.OtherUserId.ToString("D"),
-            email = "forged@example.test", targetTenantId = fixture.DefaultTenantId
+            userId = fixture.OtherUserId,
+            subject = fixture.OtherUserId.ToString("D"),
+            issuer = "https://forged.example.test",
+            accountKey = fixture.OtherUserId.ToString("D"),
+            email = "forged@example.test",
+            targetTenantId = fixture.DefaultTenantId
         });
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK).Because(fixture.Failure);
@@ -134,7 +138,8 @@ public sealed partial class VerifiedTenantJoinHttpTests
             {
                 Content = JsonContent.Create(new CreateExternalApiKeyDto
                 {
-                    Name = "Tenant join rejection witness", Scopes = ["events:read"],
+                    Name = "Tenant join rejection witness",
+                    Scopes = ["events:read"],
                     ExternalApiKeyOwnerTypeId = (int)ExternalApiKeyOwnerType.User
                 })
             };

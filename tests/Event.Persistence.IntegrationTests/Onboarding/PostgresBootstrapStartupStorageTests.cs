@@ -67,7 +67,9 @@ public sealed class PostgresBootstrapStartupStorageTests(PostgreSqlContainerFixt
                     Id = userId,
                     Pii = new UserPii
                     {
-                        Email = $"setup-{userId:N}@example.test", FirstName = "Setup", LastName = "Administrator"
+                        Email = $"setup-{userId:N}@example.test",
+                        FirstName = "Setup",
+                        LastName = "Administrator"
                     },
                     ConcurrencyStamp = Guid.CreateVersion7(),
                     CreatedAt = DateTime.UtcNow
@@ -229,7 +231,9 @@ public sealed class PostgresBootstrapStartupStorageTests(PostgreSqlContainerFixt
             Id = userId,
             Pii = new UserPii
             {
-                Email = $"receipt-{userId:N}@example.test", FirstName = "Setup", LastName = "Administrator"
+                Email = $"receipt-{userId:N}@example.test",
+                FirstName = "Setup",
+                LastName = "Administrator"
             },
             ConcurrencyStamp = Guid.CreateVersion7(),
             CreatedAt = DateTime.UtcNow
@@ -325,7 +329,7 @@ public sealed class PostgresBootstrapStartupStorageTests(PostgreSqlContainerFixt
                     2, System.Security.Cryptography.RandomNumberGenerator.GetBytes(32), now.AddHours(1), now));
                 var insertDenied = await Assert.ThrowsAsync<DbUpdateException>(() => original.SaveChangesAsync(token));
                 await Assert.That(insertDenied!.InnerException is PostgresException
-                    { SqlState: PostgresErrorCodes.InsufficientPrivilege }).IsTrue();
+                { SqlState: PostgresErrorCodes.InsufficientPrivilege }).IsTrue();
                 await transaction.RollbackToSavepointAsync("denied_saga_insert", token);
                 original.ChangeTracker.Clear();
                 await Assert.That(await repository.ExistsBySubjectAsync(subjectId, token)).IsTrue();
@@ -393,9 +397,13 @@ public sealed class PostgresBootstrapStartupStorageTests(PostgreSqlContainerFixt
             migrator.Users.Add(user);
             migrator.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = loginId, UserId = userId, User = user,
+                Id = loginId,
+                UserId = userId,
+                User = user,
                 AuthenticationProviderId = (int)"keycloak".ParseAuthenticationProviderKind(),
-                AuthenticationProvider = null!, ProviderKey = $"setup-{loginId:N}", CreatedAt = now
+                AuthenticationProvider = null!,
+                ProviderKey = $"setup-{loginId:N}",
+                CreatedAt = now
             });
             await migrator.SaveChangesAsync(token);
             string runtimeBefore = await ReadRuntimeBootstrapPrivileges(migrator, token);
@@ -435,8 +443,13 @@ public sealed class PostgresBootstrapStartupStorageTests(PostgreSqlContainerFixt
                 Guid assignmentId = Guid.CreateVersion7();
                 original.PlatformUserRoles.Add(new PlatformUserRole
                 {
-                    Id = assignmentId, UserId = userId, User = null!, RoleId = roleId, Role = null!,
-                    GrantedAt = now, GrantedBy = userId
+                    Id = assignmentId,
+                    UserId = userId,
+                    User = null!,
+                    RoleId = roleId,
+                    Role = null!,
+                    GrantedAt = now,
+                    GrantedBy = userId
                 });
                 await original.SaveChangesAsync(token);
                 await Assert.That((await roles.GetByUserAndRole(userId, roleId))!.Id).IsEqualTo(assignmentId);

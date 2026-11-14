@@ -144,41 +144,41 @@ public static class PersistenceCapabilityAudit
 
         var calls = new List<Call>();
         foreach (var compilation in compilations.Values)
-        foreach (var tree in compilation.SyntaxTrees)
-        {
-            var model = compilation.GetSemanticModel(tree);
-            var observed = new HashSet<(int Start, string Api)>();
-            foreach (var node in tree.GetRoot().DescendantNodes().Where(node => node is ExpressionSyntax))
+            foreach (var tree in compilation.SyntaxTrees)
             {
-                var operation = model.GetOperation(node);
-                if (operation is IDynamicInvocationOperation or IDynamicObjectCreationOperation)
-                    diagnostics.Add(Diagnostic("persistence-unresolved", node.GetLocation(), "Dynamic dispatch cannot establish a persistence boundary."));
-                ISymbol? target = operation switch
+                var model = compilation.GetSemanticModel(tree);
+                var observed = new HashSet<(int Start, string Api)>();
+                foreach (var node in tree.GetRoot().DescendantNodes().Where(node => node is ExpressionSyntax))
                 {
-                    IInvocationOperation invocation => Normalize(invocation.TargetMethod),
-                    IMethodReferenceOperation reference => Normalize(reference.Method),
-                    IObjectCreationOperation creation when creation.Constructor is not null => creation.Constructor.OriginalDefinition,
-                    IPropertyReferenceOperation property when property.Parent is IAssignmentOperation assignment
-                        && ReferenceEquals(assignment.Target, property) => property.Property.OriginalDefinition,
-                    IPropertyReferenceOperation property when property.Property.IsIndexer => property.Property.OriginalDefinition,
-                    IPropertyReferenceOperation property when property.Property.ContainingType.ToDisplayString()
-                        == "Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade" && property.Property.Name == "ProviderName"
-                        => property.Property.OriginalDefinition,
-                    _ => null
-                };
-                if (target is null) continue;
-                string? api = target.GetDocumentationCommentId();
-                if (api is null || !observed.Add((operation!.Syntax.SpanStart, api))) continue;
-                ISymbol? owner = model.GetEnclosingSymbol(node.SpanStart);
-                while (owner is not null && (owner.GetDocumentationCommentId() is null
-                       || owner is IMethodSymbol { MethodKind: MethodKind.LocalFunction or MethodKind.AnonymousFunction }))
-                    owner = owner.ContainingSymbol;
-                string ownerKey = Key(compilation.AssemblyName!, owner?.GetDocumentationCommentId() ?? "<initializer>");
-                bool raw = IsRaw(target);
-                if (raw || compilations.ContainsKey(target.ContainingAssembly.Name))
-                    calls.Add(new(ownerKey, Key(target.ContainingAssembly.Name, api), api, operation.Syntax.GetLocation(), raw));
+                    var operation = model.GetOperation(node);
+                    if (operation is IDynamicInvocationOperation or IDynamicObjectCreationOperation)
+                        diagnostics.Add(Diagnostic("persistence-unresolved", node.GetLocation(), "Dynamic dispatch cannot establish a persistence boundary."));
+                    ISymbol? target = operation switch
+                    {
+                        IInvocationOperation invocation => Normalize(invocation.TargetMethod),
+                        IMethodReferenceOperation reference => Normalize(reference.Method),
+                        IObjectCreationOperation creation when creation.Constructor is not null => creation.Constructor.OriginalDefinition,
+                        IPropertyReferenceOperation property when property.Parent is IAssignmentOperation assignment
+                            && ReferenceEquals(assignment.Target, property) => property.Property.OriginalDefinition,
+                        IPropertyReferenceOperation property when property.Property.IsIndexer => property.Property.OriginalDefinition,
+                        IPropertyReferenceOperation property when property.Property.ContainingType.ToDisplayString()
+                            == "Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade" && property.Property.Name == "ProviderName"
+                            => property.Property.OriginalDefinition,
+                        _ => null
+                    };
+                    if (target is null) continue;
+                    string? api = target.GetDocumentationCommentId();
+                    if (api is null || !observed.Add((operation!.Syntax.SpanStart, api))) continue;
+                    ISymbol? owner = model.GetEnclosingSymbol(node.SpanStart);
+                    while (owner is not null && (owner.GetDocumentationCommentId() is null
+                           || owner is IMethodSymbol { MethodKind: MethodKind.LocalFunction or MethodKind.AnonymousFunction }))
+                        owner = owner.ContainingSymbol;
+                    string ownerKey = Key(compilation.AssemblyName!, owner?.GetDocumentationCommentId() ?? "<initializer>");
+                    bool raw = IsRaw(target);
+                    if (raw || compilations.ContainsKey(target.ContainingAssembly.Name))
+                        calls.Add(new(ownerKey, Key(target.ContainingAssembly.Name, api), api, operation.Syntax.GetLocation(), raw));
+                }
             }
-        }
 
         var unsafeOwners = new HashSet<string>(StringComparer.Ordinal);
         var usedApis = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);

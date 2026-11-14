@@ -54,29 +54,48 @@ public sealed partial class ExternalTenantEnrollmentPermissionTests(PostgreSqlCo
             await using var transaction = await runtime.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             var user = new User
             {
-                Id = userId, EmailVerified = verifiedEmail, CreatedAt = occurredAt, CreatedBy = userId,
+                Id = userId,
+                EmailVerified = verifiedEmail,
+                CreatedAt = occurredAt,
+                CreatedBy = userId,
                 Pii = new UserPii { Email = email, FirstName = "Native", LastName = "Enrollment" }
             };
             var actor = new Actor
             {
-                Id = actorId, UserId = userId, User = user,
-                ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+                Id = actorId,
+                UserId = userId,
+                User = user,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
                 Pii = new ActorPii { DisplayName = "Native Enrollment" },
-                CreatedAt = occurredAt, CreatedBy = userId
+                CreatedAt = occurredAt,
+                CreatedBy = userId
             };
             var binding = new UserExternalLogin
             {
-                Id = loginId, UserId = userId, User = user,
-                AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak, AuthenticationProvider = null!,
-                ProviderKey = providerKey, ProviderDisplayName = "Keycloak",
-                CreatedAt = occurredAt, CreatedBy = userId
+                Id = loginId,
+                UserId = userId,
+                User = user,
+                AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
+                AuthenticationProvider = null!,
+                ProviderKey = providerKey,
+                ProviderDisplayName = "Keycloak",
+                CreatedAt = occurredAt,
+                CreatedBy = userId
             };
             runtime.AddRange(user, actor, binding, new TenantUser
             {
-                Id = membershipId, TenantId = tenant, Tenant = null!,
-                UserId = userId, User = user, ActorId = actorId, Actor = actor,
-                StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = occurredAt,
-                CreatedAt = occurredAt, CreatedBy = userId
+                Id = membershipId,
+                TenantId = tenant,
+                Tenant = null!,
+                UserId = userId,
+                User = user,
+                ActorId = actorId,
+                Actor = actor,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = occurredAt,
+                CreatedAt = occurredAt,
+                CreatedBy = userId
             });
             await runtime.SaveChangesAsync();
             var emails = new UserIdentityEmailRepository(runtime);
@@ -179,8 +198,11 @@ public sealed partial class ExternalTenantEnrollmentPermissionTests(PostgreSqlCo
         await using var writer = Open(PrimaryDatabaseRole.Migrator, tenant);
         writer.Tenants.Add(new Tenant
         {
-            Id = tenant, FullName = "External enrollment storage", Slug = $"external-enrollment-{tenant:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = tenant,
+            FullName = "External enrollment storage",
+            Slug = $"external-enrollment-{tenant:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         });
         await writer.SaveChangesAsync();
         return tenant;

@@ -166,7 +166,7 @@ public sealed class EmbeddedAuthorityMigrationRecoveryTests
             await Assert.That((await reopened.AuthorityCounters.SingleAsync()).GetRecoveryState()).IsEqualTo(recovery);
             SqliteConnection.ClearPool((SqliteConnection)reopened.Database.GetDbConnection());
             await using var raw = new SqliteConnection(new SqliteConnectionStringBuilder
-                { DataSource = path, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
+            { DataSource = path, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
             await raw.OpenAsync();
             await using var integrity = raw.CreateCommand();
             integrity.CommandText = "PRAGMA quick_check";

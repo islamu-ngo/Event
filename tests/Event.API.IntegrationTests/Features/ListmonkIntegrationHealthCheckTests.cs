@@ -72,7 +72,9 @@ public sealed class ListmonkIntegrationHealthCheckTests(PostgreSqlContainerFixtu
                 {
                     row = new SystemSetting
                     {
-                        SettingKey = setting.Key, Value = setting.Value, ValueType = setting.Type
+                        SettingKey = setting.Key,
+                        Value = setting.Value,
+                        ValueType = setting.Type
                     };
                     seed.SystemSettings.Add(row);
                 }

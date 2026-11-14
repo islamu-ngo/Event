@@ -8,18 +8,18 @@ internal static class PublicOperatorIdentityMapper
 {
     internal static TenantDirectoryOperatorPublicDto MapDirectoryOperator(
         TenantDirectoryOperatorIdentity identity, Guid documentRevision) => new()
-    {
-        DocumentRevision = documentRevision,
-        PublicName = identity.PublicName,
-        LegalName = identity.LegalName,
-        OperatorKindCode = identity.OperatorKindCode,
-        JurisdictionCountryCode = identity.JurisdictionCountryCode,
-        RegistrationIdentifier = identity.RegistrationIdentifier,
-        PublicContactEmail = identity.PublicContactEmail,
-        LegalNoticeUrl = identity.LegalNoticeUrl,
-        TermsUrl = identity.TermsUrl,
-        PrivacyUrl = identity.PrivacyUrl
-    };
+        {
+            DocumentRevision = documentRevision,
+            PublicName = identity.PublicName,
+            LegalName = identity.LegalName,
+            OperatorKindCode = identity.OperatorKindCode,
+            JurisdictionCountryCode = identity.JurisdictionCountryCode,
+            RegistrationIdentifier = identity.RegistrationIdentifier,
+            PublicContactEmail = identity.PublicContactEmail,
+            LegalNoticeUrl = identity.LegalNoticeUrl,
+            TermsUrl = identity.TermsUrl,
+            PrivacyUrl = identity.PrivacyUrl
+        };
 
     internal static InstanceOperatorPublicDto MapInstanceOperator(IInstanceOperatorIdentity identity) => new()
     {

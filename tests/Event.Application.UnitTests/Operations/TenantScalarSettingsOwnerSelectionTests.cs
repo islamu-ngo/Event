@@ -56,7 +56,8 @@ public sealed class TenantScalarSettingsOwnerSelectionTests
         { Key = GovernanceSettingKeys.Tenants.UserRegistrationEnabled, Value = "false", Scope = scope },
         "batch" => new UpdateSettingBatchCommand
         {
-            Category = "Tenant", Scope = scope,
+            Category = "Tenant",
+            Scope = scope,
             Values = new Dictionary<string, string>
             { [GovernanceSettingKeys.Tenants.UserRegistrationEnabled] = "false" }
         },

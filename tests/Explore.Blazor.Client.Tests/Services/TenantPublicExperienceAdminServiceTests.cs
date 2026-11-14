@@ -41,8 +41,10 @@ public class TenantPublicExperienceAdminServiceTests
             });
         var result = await _service.SaveAsync(new TenantPublicExperienceAdminModel
         {
-            IsAvailable = true, VisitorAccessMode = VisitorAccessMode.FullRegistrationAndAuth,
-            CanEditUserRegistration = true, UserRegistrationEnabled = false
+            IsAvailable = true,
+            VisitorAccessMode = VisitorAccessMode.FullRegistrationAndAuth,
+            CanEditUserRegistration = true,
+            UserRegistrationEnabled = false
         });
 
         await Assert.That(result.Success).IsTrue();
@@ -59,8 +61,11 @@ public class TenantPublicExperienceAdminServiceTests
     {
         var model = new TenantPublicExperienceAdminModel
         {
-            IsAvailable = true, VisitorAccessMode = VisitorAccessMode.DirectoryListingOnly,
-            CanEditVisitorAccessMode = true, CanEditUserRegistration = true, UserRegistrationEnabled = false
+            IsAvailable = true,
+            VisitorAccessMode = VisitorAccessMode.DirectoryListingOnly,
+            CanEditVisitorAccessMode = true,
+            CanEditUserRegistration = true,
+            UserRegistrationEnabled = false
         };
         _apiClient.UpdateTenantSettingsBatchAsync(Category, Arg.Any<UpdateSettingBatchDto>(),
             null, null, Arg.Any<CancellationToken>()).Returns(new BatchUpdateResponseDto { Success = true });

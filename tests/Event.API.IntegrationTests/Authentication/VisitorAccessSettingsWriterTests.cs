@@ -513,9 +513,19 @@ public sealed class VisitorAccessSettingsWriterTests
             .OrderBy(row => row.SettingKey)
             .Select(row => new
             {
-                row.Id, row.SettingKey, row.Value, row.SettingValueTypeId, row.IsLocked,
-                row.AllowedValues, row.Description, row.Category, row.DisplayOrder,
-                row.CreatedAt, row.CreatedBy, row.UpdatedAt, row.UpdatedBy
+                row.Id,
+                row.SettingKey,
+                row.Value,
+                row.SettingValueTypeId,
+                row.IsLocked,
+                row.AllowedValues,
+                row.Description,
+                row.Category,
+                row.DisplayOrder,
+                row.CreatedAt,
+                row.CreatedBy,
+                row.UpdatedAt,
+                row.UpdatedBy
             });
         var beforeRows = await groupRows.ToListAsync();
         var configuration = new AuthProviderConfigurationWriteDto

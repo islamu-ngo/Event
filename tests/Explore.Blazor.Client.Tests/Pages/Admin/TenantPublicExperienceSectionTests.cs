@@ -15,8 +15,10 @@ public sealed class TenantPublicExperienceSectionTests : IDisposable
     {
         var model = new TenantPublicExperienceAdminModel
         {
-            IsAvailable = true, VisitorAccessMode = VisitorAccessMode.AuthenticatedOnly,
-            UserRegistrationEnabled = false, CanEditUserRegistration = canEdit
+            IsAvailable = true,
+            VisitorAccessMode = VisitorAccessMode.AuthenticatedOnly,
+            UserRegistrationEnabled = false,
+            CanEditUserRegistration = canEdit
         };
         var cut = _context.RenderMudComponent<TenantPublicExperienceSection>(parameters => parameters
             .Add(component => component.Model, model));

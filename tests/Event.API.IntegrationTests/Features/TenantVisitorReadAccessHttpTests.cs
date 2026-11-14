@@ -150,21 +150,33 @@ public sealed class TenantVisitorReadAccessHttpTests
             if (authority == "wrong")
                 database.Tenants.Add(new Tenant
                 {
-                    Id = tenantId, FullName = "Other directory", Slug = $"other-{tenantId:N}",
-                    TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                    Id = tenantId,
+                    FullName = "Other directory",
+                    Slug = $"other-{tenantId:N}",
+                    TenantStatusId = (int)TenantStatusEnum.Active,
+                    TenantStatus = null!
                 });
             var membership = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-                UserId = user.Id, User = user, StatusId = (int)TenantUserStatusEnum.Active
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                UserId = user.Id,
+                User = user,
+                StatusId = (int)TenantUserStatusEnum.Active
             };
             database.TenantUsers.Add(membership);
             if (authority != "member")
                 database.Set<TenantUserRoleGrant>().Add(new TenantUserRoleGrant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-                    TenantUserId = membership.Id, TenantUser = membership, Role = null!,
-                    RoleId = (int)RoleEnum.TenantAdmin, RoleScopeId = (int)RoleScopeEnum.Tenant,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenantId,
+                    Tenant = null!,
+                    TenantUserId = membership.Id,
+                    TenantUser = membership,
+                    Role = null!,
+                    RoleId = (int)RoleEnum.TenantAdmin,
+                    RoleScopeId = (int)RoleScopeEnum.Tenant,
                     GrantedAt = DateTime.UtcNow
                 });
             await database.SaveChangesAsync(Token);

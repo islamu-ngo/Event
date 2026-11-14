@@ -213,14 +213,23 @@ public sealed class ProviderConfigurationNativeContractTests(PostgreSqlContainer
         migration.BindTenantLease();
         migration.SystemSettings.Add(new SystemSetting
         {
-            Id = settingId, SettingKey = settingKey, Value = JsonSerializer.Serialize($"retired-{settingId:N}"),
-            ValueType = SettingValueType.String, IsLocked = true, Category = "Authentication",
-            Description = "Retained provider metadata", DisplayOrder = 8, CreatedBy = Actor
+            Id = settingId,
+            SettingKey = settingKey,
+            Value = JsonSerializer.Serialize($"retired-{settingId:N}"),
+            ValueType = SettingValueType.String,
+            IsLocked = true,
+            Category = "Authentication",
+            Description = "Retained provider metadata",
+            DisplayOrder = 8,
+            CreatedBy = Actor
         });
         migration.Set<SecretBinding>().Add(new SecretBinding
         {
-            Id = bindingId, SettingKey = secretKey, Scope = SecretScope.Instance,
-            SourceType = SecretSourceType.EnvironmentVariable, EnvironmentVariableName = "GOOGLE_CLIENT_SECRET",
+            Id = bindingId,
+            SettingKey = secretKey,
+            Scope = SecretScope.Instance,
+            SourceType = SecretSourceType.EnvironmentVariable,
+            EnvironmentVariableName = "GOOGLE_CLIENT_SECRET",
             CreatedBy = Actor
         });
         await migration.SaveChangesAsync();

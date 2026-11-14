@@ -245,8 +245,12 @@ public sealed class LocalVisitorCredentialActivationTests
         DateTime at = fixture.Clock.GetUtcNow().UtcDateTime;
         seed.Tenants.Add(new Tenant
         {
-            Id = tenant, FullName = "Visitor activation tenant", Slug = $"visitor-{tenant:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = at
+            Id = tenant,
+            FullName = "Visitor activation tenant",
+            Slug = $"visitor-{tenant:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
+            CreatedAt = at
         });
         var row = VisitorEnrollmentOperation.Reserve(Guid.CreateVersion7(), tenant, Guid.CreateVersion7(),
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
@@ -267,28 +271,44 @@ public sealed class LocalVisitorCredentialActivationTests
         row.RecordIdentityPrepared(row.Generation, row.CredentialOperationId, generation, at);
         var user = new User
         {
-            Id = row.LocalSubjectId, EmailVerified = false, CreatedAt = at,
+            Id = row.LocalSubjectId,
+            EmailVerified = false,
+            CreatedAt = at,
             Pii = new UserPii { Email = string.Empty, FirstName = "Visitor", LastName = "Owner" }
         };
         var actor = new Actor
         {
-            Id = row.PersonalActorId, UserId = user.Id, User = user,
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!, CreatedAt = at,
+            Id = row.PersonalActorId,
+            UserId = user.Id,
+            User = user,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            CreatedAt = at,
             Pii = new ActorPii { DisplayName = "Visitor Owner" }
         };
         seed.Actors.Add(actor);
         seed.UserExternalLogins.Add(new UserExternalLogin
         {
-            Id = row.ExternalLoginId, UserId = user.Id, User = user,
-            AuthenticationProviderId = (int)AuthenticationProviderKind.Local, AuthenticationProvider = null!,
-            ProviderKey = user.Id.ToString("D"), CreatedAt = at
+            Id = row.ExternalLoginId,
+            UserId = user.Id,
+            User = user,
+            AuthenticationProviderId = (int)AuthenticationProviderKind.Local,
+            AuthenticationProvider = null!,
+            ProviderKey = user.Id.ToString("D"),
+            CreatedAt = at
         });
         Guid membership = Guid.CreateVersion7();
         seed.Set<TenantUser>().Add(new TenantUser
         {
-            Id = membership, TenantId = row.TenantId, Tenant = null!, UserId = user.Id, User = user,
-            ActorId = exactBinding ? actor.Id : null, StatusId = (int)TenantUserStatusEnum.Active,
-            JoinedAt = at, CreatedAt = at
+            Id = membership,
+            TenantId = row.TenantId,
+            Tenant = null!,
+            UserId = user.Id,
+            User = user,
+            ActorId = exactBinding ? actor.Id : null,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            JoinedAt = at,
+            CreatedAt = at
         });
         row.RecordPrimaryAdmission(row.Generation, row.CredentialOperationId, membership, at);
         await seed.SaveChangesAsync(fixture.CancellationToken);

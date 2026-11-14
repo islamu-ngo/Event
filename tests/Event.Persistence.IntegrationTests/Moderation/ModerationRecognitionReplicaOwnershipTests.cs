@@ -15,7 +15,7 @@ public sealed class ModerationRecognitionReplicaOwnershipTests
         try
         {
             await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-                { DataSource = path, Pooling = false }.ToString());
+            { DataSource = path, Pooling = false }.ToString());
             await connection.OpenAsync();
             await using var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(connection).Options);

@@ -56,8 +56,16 @@ internal sealed class StorageProbeBinding
         this.secret = secret;
         this.instanceAccessBinding = instanceAccessBinding;
         this.instanceSecretBinding = instanceSecretBinding;
-        snapshot = JsonSerializer.Serialize(new { ambientTenant, instance, tenant, access, secret,
-            bindingMetadata, localRoot });
+        snapshot = JsonSerializer.Serialize(new
+        {
+            ambientTenant,
+            instance,
+            tenant,
+            access,
+            secret,
+            bindingMetadata,
+            localRoot
+        });
     }
 
     internal static async Task<StorageProbeBinding> CaptureAsync(IServiceProvider services, Guid ambientTenant, CancellationToken ct)

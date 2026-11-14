@@ -281,7 +281,8 @@ public sealed class LocalVisitorEnrollmentHttpTests
     private static HttpClient Client(LocalAdmissionWebApplicationFactory factory) =>
         factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost")
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost")
         });
 
     private static async Task<HttpClient> AdministratorAsync(LocalAdmissionWebApplicationFactory factory)
@@ -297,21 +298,37 @@ public sealed class LocalVisitorEnrollmentHttpTests
             var role = await database.Set<Role>().SingleAsync(row => row.MasterCode == "platform.admin");
             database.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = user.Id, User = user, RoleId = role.Id, Role = role,
+                Id = Guid.CreateVersion7(),
+                UserId = user.Id,
+                User = user,
+                RoleId = role.Id,
+                Role = role,
                 GrantedAt = DateTime.UtcNow
             });
             var member = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                UserId = user.Id, User = user, ActorId = actor.Id, Actor = actor,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                UserId = user.Id,
+                User = user,
+                ActorId = actor.Id,
+                Actor = actor,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = DateTime.UtcNow
             };
             database.TenantUsers.Add(member);
             database.Set<TenantUserRoleGrant>().Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                TenantUserId = member.Id, TenantUser = member, RoleId = (int)RoleEnum.TenantAdmin,
-                Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                TenantUserId = member.Id,
+                TenantUser = member,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = DateTime.UtcNow
             });
             await database.SaveChangesAsync();
             var roles = scope.ServiceProvider.GetRequiredService<RoleManager<LocalIdentityRole>>();

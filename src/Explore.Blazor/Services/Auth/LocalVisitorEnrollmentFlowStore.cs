@@ -147,8 +147,12 @@ public sealed class LocalVisitorEnrollmentFlowStore(
 
     private static CookieOptions CookieOptions(DateTimeOffset? expiresAt = null) => new()
     {
-        Path = "/", Secure = true, HttpOnly = true, SameSite = SameSiteMode.Strict,
-        Expires = expiresAt, IsEssential = true
+        Path = "/",
+        Secure = true,
+        HttpOnly = true,
+        SameSite = SameSiteMode.Strict,
+        Expires = expiresAt,
+        IsEssential = true
     };
 
     private static void DeleteCookie(HttpContext context) =>

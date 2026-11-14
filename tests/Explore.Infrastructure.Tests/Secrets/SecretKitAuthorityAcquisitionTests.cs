@@ -393,7 +393,9 @@ public sealed class SecretKitAuthorityAcquisitionTests
         using var bootstrap = SecretMaterial.FromText(Guid.NewGuid().ToString("N"));
         using var transport = new SocketsHttpHandler
         {
-            AllowAutoRedirect = false, UseCookies = false, ActivityHeadersPropagator = null
+            AllowAutoRedirect = false,
+            UseCookies = false,
+            ActivityHeadersPropagator = null
         };
         var network = new InfisicalNetworkOptions { AllowLoopbackDevelopmentHttp = true };
         using var authentication = new InfisicalUniversalAuthentication(authority.Origin, transport, network);

@@ -64,8 +64,10 @@ public sealed class TypedPersistenceFixtureTests
 
         var tenant = new Tenant
         {
-            FullName = "Fulfillment fixture", Slug = $"fulfillment-{Guid.CreateVersion7():N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            FullName = "Fulfillment fixture",
+            Slug = $"fulfillment-{Guid.CreateVersion7():N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var user = new User
         {
@@ -76,16 +78,27 @@ public sealed class TypedPersistenceFixtureTests
         var actor = new Actor
         {
             Pii = new ActorPii { DisplayName = "Fixture organizer" },
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!, UserId = user.Id
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = user.Id
         };
         context.Add(actor);
         await context.SaveChangesAsync();
         var eventEntity = new Explore.Domain.Event(EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), Title = "Fulfillment fixture", ActorId = actor.Id, Actor = null!,
-            TenantId = tenant.Id, Tenant = null!, EventStatus = null!, EventFormatId = 1,
-            EventFormat = null!, EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = 1, VisibilityType = null!, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            Title = "Fulfillment fixture",
+            ActorId = actor.Id,
+            Actor = null!,
+            TenantId = tenant.Id,
+            Tenant = null!,
+            EventStatus = null!,
+            EventFormatId = 1,
+            EventFormat = null!,
+            EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+            VisibilityTypeId = 1,
+            VisibilityType = null!,
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         var catalog = EventTicketCatalogVersion.Create(tenant.Id, eventEntity.Id, "EUR", 1);
         var workflow = RegistrationWorkflow.Create(tenant.Id, eventEntity.Id, "FULFILLMENT", Now);
@@ -125,8 +138,10 @@ public sealed class TypedPersistenceFixtureTests
         await context.SaveChangesAsync();
         var otherTenant = new Tenant
         {
-            FullName = "Other tenant", Slug = $"other-{Guid.CreateVersion7():N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            FullName = "Other tenant",
+            Slug = $"other-{Guid.CreateVersion7():N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         context.Add(otherTenant);
         await context.SaveChangesAsync();

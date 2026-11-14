@@ -154,25 +154,25 @@ public static class PostgresVisitorSettingsStorage
             GRANT USAGE,CREATE ON SCHEMA {{schema}} TO {{OwnerRole}};
             GRANT USAGE ON SCHEMA {{schema}} TO {{Identifier(enrollment.RuntimeLogin)}},{{Identifier(enrollment.GlobalLogin)}};
             {{settingRights}}
-            GRANT SELECT ({{participationColumns}}) ON {{Table(context,typeof(EventParticipationConfiguration))}} TO {{OwnerRole}};
-            GRANT SELECT ({{eventColumns}}) ON {{Table(context,typeof(Explore.Domain.Event))}} TO {{OwnerRole}};
+            GRANT SELECT ({{participationColumns}}) ON {{Table(context, typeof(EventParticipationConfiguration))}} TO {{OwnerRole}};
+            GRANT SELECT ({{eventColumns}}) ON {{Table(context, typeof(Explore.Domain.Event))}} TO {{OwnerRole}};
             GRANT SELECT ({{projectionColumns}}), UPDATE ({{projectionUpdates}})
-                ON {{Table(context,typeof(ManagedTenantProvisioningPolicySetting))}} TO {{Identifier(enrollment.GlobalLogin)}};
+                ON {{Table(context, typeof(ManagedTenantProvisioningPolicySetting))}} TO {{Identifier(enrollment.GlobalLogin)}};
             {{policies}}
             DO $install$ DECLARE previous text := pg_catalog.current_setting('role'); BEGIN
                 PERFORM pg_catalog.set_config('role',{{Text(OwnerRole)}},true);
                 EXECUTE $ddl$
-                    CREATE OR REPLACE FUNCTION {{Name(context,ReadFunction)}}(p_tenant uuid)
+                    CREATE OR REPLACE FUNCTION {{Name(context, ReadFunction)}}(p_tenant uuid)
                     RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog
                     AS $body${{bodies.Read}}$body$;
-                    CREATE OR REPLACE FUNCTION {{Name(context,WriteFunction)}}(p_tenant uuid,p_family text,p_before jsonb,p_after jsonb)
+                    CREATE OR REPLACE FUNCTION {{Name(context, WriteFunction)}}(p_tenant uuid,p_family text,p_before jsonb,p_after jsonb)
                     RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog
                     AS $body${{bodies.Write}}$body$;
                 $ddl$;
                 PERFORM pg_catalog.set_config('role',previous,true);
             END $install$;
-            REVOKE ALL ON FUNCTION {{Name(context,ReadFunction)}}(uuid),{{Name(context,WriteFunction)}}(uuid,text,jsonb,jsonb) FROM PUBLIC;
-            GRANT EXECUTE ON FUNCTION {{Name(context,ReadFunction)}}(uuid),{{Name(context,WriteFunction)}}(uuid,text,jsonb,jsonb) TO {{Identifier(enrollment.RuntimeLogin)}},{{Identifier(enrollment.GlobalLogin)}};
+            REVOKE ALL ON FUNCTION {{Name(context, ReadFunction)}}(uuid),{{Name(context, WriteFunction)}}(uuid,text,jsonb,jsonb) FROM PUBLIC;
+            GRANT EXECUTE ON FUNCTION {{Name(context, ReadFunction)}}(uuid),{{Name(context, WriteFunction)}}(uuid,text,jsonb,jsonb) TO {{Identifier(enrollment.RuntimeLogin)}},{{Identifier(enrollment.GlobalLogin)}};
             REVOKE CREATE ON SCHEMA {{schema}} FROM {{OwnerRole}};
             """;
     }
@@ -199,17 +199,17 @@ public static class PostgresVisitorSettingsStorage
             BEGIN
                 {{guard}}
                 RETURN pg_catalog.jsonb_build_object(
-                    'SystemSetting',COALESCE((SELECT pg_catalog.jsonb_agg({{Image(context,typeof(SystemSetting),"s")}} ORDER BY {{C(typeof(SystemSetting),"s","Id")}})
-                        FROM {{systems}} s WHERE {{Key(typeof(SystemSetting),"s")}}),'[]'::jsonb),
-                    'TenantSetting',COALESCE((SELECT pg_catalog.jsonb_agg({{Image(context,typeof(TenantSetting),"t")}} ORDER BY {{C(typeof(TenantSetting),"t","Id")}})
-                        FROM {{tenants}} t WHERE {{Key(typeof(TenantSetting),"t")}} AND (p_tenant IS NULL OR {{C(typeof(TenantSetting),"t","TenantId")}}=p_tenant)),'[]'::jsonb),
+                    'SystemSetting',COALESCE((SELECT pg_catalog.jsonb_agg({{Image(context, typeof(SystemSetting), "s")}} ORDER BY {{C(typeof(SystemSetting), "s", "Id")}})
+                        FROM {{systems}} s WHERE {{Key(typeof(SystemSetting), "s")}}),'[]'::jsonb),
+                    'TenantSetting',COALESCE((SELECT pg_catalog.jsonb_agg({{Image(context, typeof(TenantSetting), "t")}} ORDER BY {{C(typeof(TenantSetting), "t", "Id")}})
+                        FROM {{tenants}} t WHERE {{Key(typeof(TenantSetting), "t")}} AND (p_tenant IS NULL OR {{C(typeof(TenantSetting), "t", "TenantId")}}=p_tenant)),'[]'::jsonb),
                     'AccountRequiredTenantIds',COALESCE((SELECT pg_catalog.jsonb_agg(required.id ORDER BY required.id) FROM
-                        (SELECT DISTINCT {{C(typeof(EventParticipationConfiguration),"p","TenantId")}} AS id FROM {{participation}} p
-                        JOIN {{events}} e ON {{C(typeof(Explore.Domain.Event),"e","Id")}}={{C(typeof(EventParticipationConfiguration),"p","Id")}}
-                            AND {{C(typeof(Explore.Domain.Event),"e","TenantId")}}={{C(typeof(EventParticipationConfiguration),"p","TenantId")}}
-                        WHERE NOT {{C(typeof(EventParticipationConfiguration),"p","IsDeleted")}} AND NOT {{C(typeof(Explore.Domain.Event),"e","IsDeleted")}}
-                            AND {{C(typeof(EventParticipationConfiguration),"p","IdentityAccessModeId")}}={{(int)IdentityAccessModeEnum.AccountRequired}}
-                            AND (p_tenant IS NULL OR {{C(typeof(EventParticipationConfiguration),"p","TenantId")}}=p_tenant)) required),'[]'::jsonb));
+                        (SELECT DISTINCT {{C(typeof(EventParticipationConfiguration), "p", "TenantId")}} AS id FROM {{participation}} p
+                        JOIN {{events}} e ON {{C(typeof(Explore.Domain.Event), "e", "Id")}}={{C(typeof(EventParticipationConfiguration), "p", "Id")}}
+                            AND {{C(typeof(Explore.Domain.Event), "e", "TenantId")}}={{C(typeof(EventParticipationConfiguration), "p", "TenantId")}}
+                        WHERE NOT {{C(typeof(EventParticipationConfiguration), "p", "IsDeleted")}} AND NOT {{C(typeof(Explore.Domain.Event), "e", "IsDeleted")}}
+                            AND {{C(typeof(EventParticipationConfiguration), "p", "IdentityAccessModeId")}}={{(int)IdentityAccessModeEnum.AccountRequired}}
+                            AND (p_tenant IS NULL OR {{C(typeof(EventParticipationConfiguration), "p", "TenantId")}}=p_tenant)) required),'[]'::jsonb));
             END
             """;
         string branches = string.Join("\n", new[] { typeof(SystemSetting), typeof(TenantSetting) }.Select(type =>
@@ -219,7 +219,7 @@ public static class PostgresVisitorSettingsStorage
             var properties = model.GetProperties().ToArray();
             string Col(IProperty property) => context.GetService<ISqlGenerationHelper>().DelimitIdentifier(property.GetColumnName(table)!);
             string Map(string parameter) => "pg_catalog.jsonb_build_object(" + string.Join(",",
-                properties.Select(property => $"{Text(property.GetColumnName(table)! )},{parameter}->{Text(property.Name)}")) + ")";
+                properties.Select(property => $"{Text(property.GetColumnName(table)!)},{parameter}->{Text(property.Name)}")) + ")";
             string relation = Table(context, type);
             string row(string parameter) => $"pg_catalog.jsonb_populate_record(NULL::{relation},{Map(parameter)})";
             string predicate = string.Join(" AND ", properties.Select(property =>
@@ -249,7 +249,7 @@ public static class PostgresVisitorSettingsStorage
                 {{guard}}
                 IF pg_catalog.current_setting('transaction_isolation') <> 'serializable'
                     OR (p_before IS NULL AND p_after IS NULL)
-                    OR NOT ((COALESCE(p_after,p_before)->>'SettingKey') COLLATE "C" = ANY(ARRAY[{{string.Join(",",VisitorAccessCapabilityResolver.AuthoritySettingKeys.Select(Text))}}]::text[]))
+                    OR NOT ((COALESCE(p_after,p_before)->>'SettingKey') COLLATE "C" = ANY(ARRAY[{{string.Join(",", VisitorAccessCapabilityResolver.AuthoritySettingKeys.Select(Text))}}]::text[]))
                     OR (p_before IS NOT NULL AND p_after IS NOT NULL AND
                         (p_before->'Id' IS DISTINCT FROM p_after->'Id' OR p_before->'SettingKey' IS DISTINCT FROM p_after->'SettingKey'
                             OR p_before->'TenantId' IS DISTINCT FROM p_after->'TenantId')) THEN
@@ -265,7 +265,7 @@ public static class PostgresVisitorSettingsStorage
 
     private static string Image(ExploreDbContext context, Type type, string alias) =>
         "pg_catalog.jsonb_build_object(" + string.Join(",", context.Model.FindEntityType(type)!.GetProperties()
-            .Select(property => $"{Text(property.Name)},{alias}.{Column(context,type,property.Name)}")) + ")";
+            .Select(property => $"{Text(property.Name)},{alias}.{Column(context, type, property.Name)}")) + ")";
 
     private static string Schema(ExploreDbContext context) => new HumanPrincipalSourceSql(context).Schema;
     private static string Name(ExploreDbContext context, string name) =>
@@ -290,5 +290,5 @@ public static class PostgresVisitorSettingsStorage
         return command;
     }
     private static void Add(System.Data.Common.DbCommand command, string name, NpgsqlDbType type, object? value) =>
-        command.Parameters.Add(new NpgsqlParameter(name,type) { Value = value ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter(name, type) { Value = value ?? DBNull.Value });
 }

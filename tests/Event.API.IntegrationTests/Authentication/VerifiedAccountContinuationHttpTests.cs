@@ -98,9 +98,12 @@ public sealed partial class VerifiedAccountContinuationHttpTests
             var tenant = await database.Tenants.SingleAsync(row => row.Id == preferred);
             database.TenantSettingOverrides.Add(new TenantSetting
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
                 SettingKey = GovernanceSettingKeys.Tenants.UserRegistrationEnabled,
-                Value = "false", CreatedAt = DateTime.UtcNow
+                Value = "false",
+                CreatedAt = DateTime.UtcNow
             });
             await database.SaveChangesAsync();
         }
@@ -165,9 +168,12 @@ public sealed partial class VerifiedAccountContinuationHttpTests
             var tenant = await database.Tenants.SingleAsync(row => row.Id == PlatformDefaults.DefaultTenantId);
             database.TenantSettingOverrides.Add(new TenantSetting
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
                 SettingKey = GovernanceSettingKeys.Domains.TenantCustomDomain,
-                Value = JsonSerializer.Serialize("continuation.example.test"), CreatedAt = DateTime.UtcNow
+                Value = JsonSerializer.Serialize("continuation.example.test"),
+                CreatedAt = DateTime.UtcNow
             });
             var customDomain = await database.SystemSettings.SingleOrDefaultAsync(
                 row => row.SettingKey == GovernanceSettingKeys.Routing.ResolverCustomDomainEnabled);
@@ -176,7 +182,9 @@ public sealed partial class VerifiedAccountContinuationHttpTests
                 {
                     Id = Guid.CreateVersion7(),
                     SettingKey = GovernanceSettingKeys.Routing.ResolverCustomDomainEnabled,
-                    Value = "true", ValueType = SettingValueType.Boolean, Category = "Routing",
+                    Value = "true",
+                    ValueType = SettingValueType.Boolean,
+                    Category = "Routing",
                     CreatedAt = DateTime.UtcNow
                 });
             else
@@ -224,7 +232,9 @@ public sealed partial class VerifiedAccountContinuationHttpTests
             {
                 database.UserExternalLogins.Add(new UserExternalLogin
                 {
-                    Id = Guid.CreateVersion7(), UserId = user.Id, User = user,
+                    Id = Guid.CreateVersion7(),
+                    UserId = user.Id,
+                    User = user,
                     AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
                     AuthenticationProvider = null!,
                     ProviderKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
@@ -233,8 +243,12 @@ public sealed partial class VerifiedAccountContinuationHttpTests
                 });
                 database.TenantUsers.Add(new TenantUser
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = destination,
-                    UserId = user.Id, User = user, StatusId = (int)TenantUserStatusEnum.Active,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant,
+                    Tenant = destination,
+                    UserId = user.Id,
+                    User = user,
+                    StatusId = (int)TenantUserStatusEnum.Active,
                     CreatedAt = DateTime.UtcNow
                 });
                 await database.SaveChangesAsync();

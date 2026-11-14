@@ -450,17 +450,38 @@ public sealed class RegistrationFinalizationEffectPersistenceTests(PostgreSqlCon
 
     private static (RegistrationOrder Order, RegistrationWorkflow Workflow) CreateOrder(out FinalizationPrincipals principals)
     {
-        var tenant = new Tenant { Id = Guid.CreateVersion7(), FullName = "Finalization", Slug = $"finalization-{Guid.CreateVersion7():N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null! };
+        var tenant = new Tenant
+        {
+            Id = Guid.CreateVersion7(),
+            FullName = "Finalization",
+            Slug = $"finalization-{Guid.CreateVersion7():N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
+        };
         var user = new User { Id = Guid.CreateVersion7(), Pii = new UserPii { Email = $"{Guid.CreateVersion7():N}@example.test", FirstName = "Finalization", LastName = "Registrant" } };
-        var actor = new Actor { Id = Guid.CreateVersion7(), Pii = new ActorPii { DisplayName = "Organizer" }, ActorTypeId = (int)ActorTypeEnum.User,
-            ActorType = null!, UserId = user.Id };
+        var actor = new Actor
+        {
+            Id = Guid.CreateVersion7(),
+            Pii = new ActorPii { DisplayName = "Organizer" },
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = user.Id
+        };
         var eventEntity = new Explore.Domain.Event(EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), Title = "Finalization", TenantId = tenant.Id, Tenant = null!,
-            ActorId = actor.Id, Actor = null!, EventStatus = null!, EventFormatId = 1, EventFormat = null!,
+            Id = Guid.CreateVersion7(),
+            Title = "Finalization",
+            TenantId = tenant.Id,
+            Tenant = null!,
+            ActorId = actor.Id,
+            Actor = null!,
+            EventStatus = null!,
+            EventFormatId = 1,
+            EventFormat = null!,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = 1, VisibilityType = null!, ConcurrencyStamp = Guid.CreateVersion7()
+            VisibilityTypeId = 1,
+            VisibilityType = null!,
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         Guid tenantId = tenant.Id;
         Guid eventId = eventEntity.Id;

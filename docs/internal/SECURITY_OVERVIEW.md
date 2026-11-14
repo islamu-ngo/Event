@@ -96,6 +96,14 @@ again. This bounds planner duplication without retaining observed permission
 results. Native witnesses cover complete graph commit and rollback, unverified
 email, tenant isolation, denied authority drift and same-connector recovery.
 
+The anonymous instance resolver GET is an exact `TenantReadBootstrap` action.
+Its existing path exemption already allows routing before tenant binding and
+lifecycle selection; the marker also keeps the visitor-content gate from
+requiring a tenant or applying a selected tenant's private/malformed read mode.
+The unchanged query returns non-sensitive instance routing configuration.
+This grants no tenant-content authority and does not apply to the authenticated
+resolver PATCH or other actions on `InstanceMessagingSettingsController`.
+
 Local administrator lifecycle guards recognize this same absent-or-complete
 package through one fresh catalogue proof per guard execution. The three local
 credential relations retain their blanket denial of Runtime scalar access.

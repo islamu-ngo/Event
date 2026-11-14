@@ -45,6 +45,12 @@ recognizes the existing tenant parent fence without granting additional access.
 A changed or broadened permission profile still stops the operation; restore
 the reviewed profile rather than adding broad manual grants.
 
+The BFF can read the instance's non-sensitive resolver configuration before
+selecting a tenant. Private or malformed tenant visitor settings cannot block
+that routing bootstrap. Tenant content still enforces its own visitor policy,
+and changing resolver configuration still requires authenticated administrative
+authority. This correction needs no new configuration, credentials or migration.
+
 Each deployment has exactly one **primary authentication provider**:
 
 * **Local Identity** uses ASP.NET Core Identity inside ISLAMU Event. It is the

@@ -178,6 +178,7 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
 
     [HttpGet("resolver-config", Name = RouteNames.GetInstanceResolverConfiguration)]
     [AllowAnonymous]
+    [TenantReadBootstrap]
     [EndpointClassification(EndpointClass.Public)]
     [EndpointSummary("Get Tenant Resolver Configuration")]
     [EndpointDescription("Returns the non-sensitive instance-level tenant resolver configuration used by API clients and the BFF routing bootstrap.")]

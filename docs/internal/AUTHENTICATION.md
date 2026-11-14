@@ -15,6 +15,18 @@
 8. `UserExternalLogin` is instance-global identity authority. Tenant participation exists only through `TenantUser`; a provider binding never derives authorization from a tenant ID.
 9. Public Local enrollment is closed. Eligible Local credentials can authenticate and validate their ordinary sessions independently of email-delivery configuration. An absent or unverified email never becomes a verified-contact claim through sign-in.
 
+## AT Protocol OAuth Publication Transport
+
+`AtprotoOAuthEndpointExtensions` owns the `/oauth/client-metadata.json` and
+`/oauth/jwks.json` route paths and their transport checks. HTTP requests receive
+404 without a redirect or publication document. The host excludes those exact
+paths from generic HTTPS redirection and status-page re-execution so their
+fail-closed response reaches the caller unchanged. Other browser routes retain
+their normal HTTPS enforcement; operational listeners retain their own guard.
+
+The existing HTTP rejection and HTTPS publication tests exercise this ordering.
+Do not replace the exact route classification with a general `/oauth` exemption.
+
 ## Keycloak API Access Context
 
 `AuthenticationExtensions.AddApiAuthentication` requires the configured

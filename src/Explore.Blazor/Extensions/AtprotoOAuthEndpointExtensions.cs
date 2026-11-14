@@ -10,6 +10,8 @@ public static class AtprotoOAuthEndpointExtensions
 {
     private const int MaximumDocumentBytes = 32 * 1024;
     private const string PublicationCacheControl = "public, max-age=300, must-revalidate";
+    private const string ClientMetadataPath = "/oauth/client-metadata.json";
+    private const string JwksPath = "/oauth/jwks.json";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -19,10 +21,14 @@ public static class AtprotoOAuthEndpointExtensions
 
     public static WebApplication MapAtprotoOAuthEndpoints(this WebApplication app)
     {
-        app.MapGet("/oauth/client-metadata.json", PublishClientMetadata).AllowAnonymous();
-        app.MapGet("/oauth/jwks.json", PublishJwks).AllowAnonymous();
+        app.MapGet(ClientMetadataPath, PublishClientMetadata).AllowAnonymous();
+        app.MapGet(JwksPath, PublishJwks).AllowAnonymous();
         return app;
     }
+
+    internal static bool IsPublicationPath(PathString path) =>
+        path.Equals(ClientMetadataPath, StringComparison.OrdinalIgnoreCase)
+        || path.Equals(JwksPath, StringComparison.OrdinalIgnoreCase);
 
     private static IResult PublishClientMetadata(
         HttpContext context,
@@ -41,7 +47,7 @@ public static class AtprotoOAuthEndpointExtensions
         }
 
         var metadata = new AtprotoClientMetadata(
-            new Uri(baseUri, "/oauth/client-metadata.json").AbsoluteUri,
+            new Uri(baseUri, ClientMetadataPath).AbsoluteUri,
             OptionalText(options.ClientName),
             OptionalAbsoluteHttpsUri(options.ClientUri),
             OptionalAbsoluteHttpsUri(options.LogoUri),
@@ -55,7 +61,7 @@ public static class AtprotoOAuthEndpointExtensions
             true,
             "private_key_jwt",
             "ES256",
-            new Uri(baseUri, "/oauth/jwks.json").AbsoluteUri);
+            new Uri(baseUri, JwksPath).AbsoluteUri);
 
         return JsonDocumentResult(context.Response, metadata);
     }

@@ -155,7 +155,9 @@ public static class BlazorHostApplicationExtensions
             || context.Request.Path.Equals("/metrics", StringComparison.OrdinalIgnoreCase);
 
         pipeline.UseWhen(
-            context => !IsOperationalPath(context) && !context.Request.Path.StartsWithSegments(
+            context => !IsOperationalPath(context)
+                && !AtprotoOAuthEndpointExtensions.IsPublicationPath(context.Request.Path)
+                && !context.Request.Path.StartsWithSegments(
                 "/bff",
                 StringComparison.OrdinalIgnoreCase),
             branch => branch.UseStatusCodePagesWithReExecute(
@@ -163,8 +165,11 @@ public static class BlazorHostApplicationExtensions
                 createScopeForStatusCodePages: true));
         // Operational requests must reach their physical-listener guard without
         // being redirected onto the public HTTPS listener.
+        // OAuth publication endpoints own their HTTP rejection and must not
+        // redirect or re-execute that response through the public error routes.
         pipeline.UseWhen(
-            context => !IsOperationalPath(context),
+            context => !IsOperationalPath(context)
+                && !AtprotoOAuthEndpointExtensions.IsPublicationPath(context.Request.Path),
             branch => branch.UseHttpsRedirection());
         pipeline.UseStartupRedirectMiddleware(app);
         pipeline.UsePathTenantResolverMiddleware();

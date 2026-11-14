@@ -4,6 +4,15 @@ description: Operate Local Identity, Keycloak, or passwordless AT Protocol authe
 
 # Authentication Architecture
 
+## AT Protocol OAuth publication
+
+Use the deployment's HTTPS public origin for `/oauth/client-metadata.json` and
+`/oauth/jwks.json`. Requests over HTTP return 404 without redirecting or publishing
+OAuth metadata. Check the HTTPS URL when diagnosing provider discovery; an HTTP
+404 is the expected transport protection.
+
+## Provider configuration
+
 In Split deployments, AppHost preserves the public Keycloak endpoint, realm and
 client ID it supplies to the browser host. Public metadata alone leaves the
 optional confidential client unconfigured; a configured client secret still

@@ -83,7 +83,12 @@ public sealed class BffSessionAuthorityMiddlewareTests(RedisBffTicketStoreTests.
         using var statusBody = JsonDocument.Parse(await status.Content.ReadAsStringAsync());
         await Assert.That(statusBody.RootElement.GetProperty("isAuthenticated").GetBoolean()).IsTrue();
 
-        if (backendOutage) await authority.StopAsync();
+        var options = authority.Options();
+        var control = authority.Connection.GetServer(authority.Connection.GetEndPoints()[0]);
+        if (backendOutage)
+        {
+            await control.ExecuteAsync("CLIENT", "PAUSE", 5_000, "ALL");
+        }
         else liveness.Unavailable = true;
         try
         {
@@ -92,7 +97,6 @@ public sealed class BffSessionAuthorityMiddlewareTests(RedisBffTicketStoreTests.
             await Assert.That(outage.Headers.Contains("Set-Cookie")).IsFalse();
             await Assert.That(outage.Content.Headers.ContentType?.MediaType).IsEqualTo("application/problem+json");
             var body = await outage.Content.ReadAsStringAsync();
-            var options = authority.Options();
             await Assert.That(new[] { savedCookie, options.Endpoint!, options.Password! }
                 .Any(value => body.Contains(value, StringComparison.Ordinal))).IsFalse();
             await Assert.That(body.Contains("Redis", StringComparison.OrdinalIgnoreCase)).IsFalse();
@@ -108,11 +112,21 @@ public sealed class BffSessionAuthorityMiddlewareTests(RedisBffTicketStoreTests.
         }
         finally
         {
-            if (backendOutage) await authority.StartAsync();
+            if (backendOutage)
+            {
+                // The pausing connection is paused too; observe the bounded
+                // server-side pause ending instead of sending control behind it.
+                await control.PingAsync();
+            }
             else liveness.Unavailable = false;
         }
 
-        await Assert.That(await SavedCookieRecoversAsync(client)).IsTrue();
+        if (backendOutage)
+        {
+            await Assert.That(authority.Options().Endpoint).IsEqualTo(options.Endpoint);
+        }
+
+        await Assert.That(await RecoveredSessionStatusAsync(client)).IsEqualTo(HttpStatusCode.OK);
         using var logout = await client.GetAsync("/auth/signout");
         await Assert.That(logout.StatusCode).IsEqualTo(HttpStatusCode.Redirect);
         using var replay = await client.GetAsync("/test/session-authority/protected");
@@ -127,20 +141,20 @@ public sealed class BffSessionAuthorityMiddlewareTests(RedisBffTicketStoreTests.
         await Assert.That(withoutCookie.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
     }
 
-    private static async Task<bool> SavedCookieRecoversAsync(HttpClient client)
+    private static async Task<HttpStatusCode> RecoveredSessionStatusAsync(HttpClient client)
     {
+        var status = HttpStatusCode.ServiceUnavailable;
         for (var attempt = 0; attempt < 12; attempt++)
         {
             using var response = await client.GetAsync("/test/session-authority/protected");
-            if (response.StatusCode == HttpStatusCode.OK) return true;
-            if (response.StatusCode != HttpStatusCode.ServiceUnavailable) return false;
+            status = response.StatusCode;
+            if (status != HttpStatusCode.ServiceUnavailable) return status;
             await Task.Delay(100);
         }
-
-        return false;
+        return status;
     }
 
-    // The false variant supplies an outage only after real native ticket retrieval; the true variant stops Redis itself.
+    // The false variant supplies an outage after native retrieval; the true variant pauses Redis without replacing its address.
     private sealed class ControlledLivenessFailure(IBffSessionAuthority inner) : IBffSessionAuthority
     {
         public bool Unavailable { get; set; }

@@ -1,0 +1,26 @@
+Change-Id: CHG-01M6SJAF4K13JQB5NGB3FBPVQQ
+Title: "Expose protected Local visitor signup"
+Type: feat
+Scope: access
+Summary: "Offer tenant-bound browser signup with antiforgery, protected retry intent and server-advertised capability links."
+Group: tenant-auth-browser
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+  Migration:
+    Reference: schemas/islamu-event.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented

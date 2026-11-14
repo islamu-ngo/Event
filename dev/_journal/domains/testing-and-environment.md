@@ -265,6 +265,186 @@ dotnet tests/Event.API.IntegrationTests/bin/Release/net10.0/Event.API.Integratio
 
 ---
 
+[2026-10-31 Europe/Brussels] — Retired foreign volume paths are not owned custody
+
+**Context**: The native assurance parent was qualifying the genuine managed-cleanup child under the `ci-cd-change` contract. The selected Docker Desktop inventory included unrelated historical containers that the workstream did not own.
+
+**Symptom / Observation**: The configured-resource join failed before qualified inventory. A private read-only snapshot contained 37 containers; 15 named-volume mounts had an explicitly empty string `Source`, all on unrelated exited containers without assurance labels. Names, destinations and `RW` fields remained present. The intended host-free regression failed on accepting one such unrelated row beside an otherwise valid owned resource.
+
+**Root Cause**: `TryReadConfiguredOwnedResources` parsed every mount with the strict owned-source contract before classifying the row's owner. Historical foreign volume-consumption evidence therefore had to establish the same canonical source path as an owned mount. Foreign named-volume conflicts actually depend on retained volume names; foreign bind conflicts still require canonical source paths and overlap checks.
+
+**Resolution**: Commit `4759a7a51e7d8830ab0710b29be237d004bd5b02` classifies validated labels first and allows an explicitly empty named-volume source only for foreign rows with explicit string state `exited` or `dead`. It retains every mount for conflict checks. Owned sources and other shared-parser callers remain strict; missing, null, wrong-type, relative and empty bind sources remain refusals. No unrelated container or volume was removed.
+
+The owning Release build passed with zero errors, and this exact selection passed 8/8 with zero skips in 19.578 seconds:
+
+```bash
+dotnet eng/release/tests/ISLAMU.ReleaseEngineering.Tests/bin/Release/net10.0/ISLAMU.ReleaseEngineering.Tests.dll --treenode-filter "/*/*/SecurityExecutionEvidenceParentModelTests/*" --minimum-expected-tests 8 --maximum-parallel-tests 1 --timeout 300s --report-trx --results-directory "$TMPDIR/pr79-assurance-intake/retired-foreign-volume-parent-green"
+```
+
+The subsequent native cleanup attempt failed earlier in daemon image acquisition and did not reach this repaired join. These results do not certify native fallback cleanup or candidate admission.
+
+**Why This Matters for Future Work**: Distinguish foreign-conflict evidence from evidence granting owned-resource custody. Preserve conflict-relevant fields when accepting a legitimate historical shape; do not skip stopped rows, fabricate paths, prune somebody else's runtime, or relax every caller of a shared parser.
+
+**References**:
+
+- `eng/release/src/ISLAMU.ReleaseEngineering/SecurityExecutionEvidence.Execution.cs`, `TryReadConfiguredOwnedResources` and `TryReadRuntimeMounts`.
+- `eng/release/tests/ISLAMU.ReleaseEngineering.Tests/SecurityExecutionEvidenceExecutionTests.cs`, `PrivateDeclarationRequiresExactOwnerResourceImageAndMountInventory`.
+- `docs/internal/testing/DISTRIBUTED_ASSURANCE.md`, Controlled cleanup child.
+- `docs/public/documentation/readme/contributing/distributed-testing.md`.
+- Commit `4759a7a51e7d8830ab0710b29be237d004bd5b02`.
+
+**Promotion Consideration**:
+
+- [x] Keep the observed historical-container failure in this journal; the internal and public distributed guides already own the narrow parser contract.
+
+---
+
+[2026-10-31 Europe/Brussels] — Cached Desktop metadata does not prove engine readiness
+
+**Context**: Native managed-cleanup qualification under `ci-cd-change` repeatedly stopped at image acquisition before child launch. Local Unix-peer tests passed, and instrumentation or a later independent client sometimes made the native sequence pass.
+
+**Symptom / Observation**: The actual acquisition methods reported `selected_daemon_read_failed:3`. Version, info and container-list requests had succeeded. Socket-mode, fresh-connection and worker-scheduling experiments did not isolate a transport defect.
+
+**Root Cause**: In the timestamp-correlated reproduction, the Docker Desktop proxy served the first three requests from cache while its VM was stopped. Image inventory started the VM at 16:40:19 UTC; the runtime reported the daemon ready at 16:40:31 UTC, after both five-second image requests expired. A later passing client therefore did not constitute a contemporaneous control for the cold engine.
+
+**Resolution**: Restore the original asynchronous client and request deadlines; retain the independently proven handler-local trace-context isolation. Establish actual engine readiness with a separately bounded read-only uncached inventory request on the same selected socket. Do not change global settings, restart the backend, substitute endpoints or retry mutations. Archive rejected transport experiments and their failures instead of shipping them as a cure.
+
+The owning Release build and all three real-peer privacy/cancellation cases passed. After the separate readiness operation returned HTTP 200, this original asynchronous acquisition selection passed 2/2 with zero failures or skips in 2.053 seconds, without diagnostic runtime overrides:
+
+```bash
+timeout --signal=INT --kill-after=5s 150s dotnet eng/release/tests/ISLAMU.ReleaseEngineering.Tests/bin/Release/net10.0/ISLAMU.ReleaseEngineering.Tests.dll --treenode-filter "/*/*/SecurityExecutionEvidenceDaemonTransportTests/SelectedSocketCompletes*AcquisitionSequence" --minimum-expected-tests 2 --maximum-parallel-tests 1 --timeout 60s --report-trx --results-directory "$TMPDIR/pr79-assurance-intake/daemon-restored-ready-native"
+```
+
+Genuine killed-child cleanup was still running when this finding was recorded. These transport results do not establish cleanup, resource custody or registered-lane admission, and the correlation does not classify every historical failure.
+
+**Why This Matters for Future Work**: Correlate the selected runtime's actual startup state before rewriting an apparently stalled client. Cached metadata, instrumented passes and later probes can mask a cold-engine prerequisite; keep startup readiness distinct from bounded operational requests.
+
+**References**:
+- `docs/internal/testing/DISTRIBUTED_ASSURANCE.md`, Engine readiness before bounded daemon exchanges.
+- `docs/public/documentation/readme/contributing/distributed-testing.md`.
+- `eng/release/tests/ISLAMU.ReleaseEngineering.Tests/SecurityExecutionEvidenceDaemonTransportTests.cs`.
+- PR79 task context and private `daemon-desktop-readiness-correlation.json`, which locates the actual native TRX and runtime-log timestamps.
+
+**Promotion Consideration**:
+- [x] Keep the reproduction in this journal; the paired distributed-testing guides own the operational prerequisite.
+
+[2026-10-31 Europe/Brussels] — Green cleanup cases do not establish descendant custody
+
+**Context**: The PR79 follow-up reproduced an exited load parent leaving a live descendant with inherited output pipes. The work used the approved test-suite and CI tooling contracts.
+
+**Symptom / Observation**: The original runner skipped tree termination after parent exit and raised a drain `TimeoutException`. A proposed numeric process-group repair passed all 11 then-selected cases, but independent review still found session escape and an inspection-to-signal identity-reuse window. That Green run was rejected, not treated as containment proof.
+
+**Root Cause**: Process identity checks and later numeric signalling are separate operations; adding another check does not make them atomic. Tests that only keep the parent and descendants in one session omit the boundary that the repair claims to protect. A separate readiness test also required processes to remain live after their deadline had correctly removed them.
+
+**Resolution**: Commit `07004574d008312bb27b67fbbd821835c7c3866f` uses a dedicated native subreaper, exclusive waiting and pidfds acquired before reaping. Its protocol lease covers controller exit, and acceptance requires kernel `ECHILD` plus real output EOF. The paired guides own the operational contract and SIGKILL limitation. The corrected 16-case class includes actual parent exit, session escape, controller exit, unrelated-process preservation and event-controlled adapter failures. The owning Release build passed with 10 existing warnings; all 16 cases passed with no failures or skips in 7.722 seconds:
+
+```bash
+dotnet build tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-restore --verbosity quiet
+timeout --signal=INT --kill-after=15s 150s dotnet tests/Event.Distributed.IntegrationTests/bin/Release/net10.0/Event.Distributed.IntegrationTests.dll --treenode-filter "/*/*/K6LoadProcessHarnessTests/*" --minimum-expected-tests 16 --maximum-parallel-tests 1 --timeout 120s --progress off --report-trx --show-stdout All --results-directory "$TMPDIR/pr79-assurance-intake/k6-native-owner-green"
+```
+
+These working-source lifecycle receipts do not qualify offered load, application capacity, container cleanup or final-candidate admission.
+
+**Why This Matters for Future Work**: Name the lifetime and escape boundary before accepting a cleanup test result. Preserve a rejected Green experiment when adversarial review exposes a missing invariant; expand the native regression rather than weakening the ownership claim or repeatedly rerunning the same cases.
+
+**References**:
+- `eng/release/src/ISLAMU.ReleaseEngineering/LoadProcessOwner.cs:394`.
+- `tests/Event.Distributed.IntegrationTests/K6LoadRunner.cs:1533`.
+- `tests/Event.Distributed.IntegrationTests/K6LoadTests.cs:896`.
+- `docs/internal/testing/DISTRIBUTED_ASSURANCE.md`, Load-process custody.
+- Commit: `07004574d008312bb27b67fbbd821835c7c3866f`.
+
+**Promotion Consideration**:
+- [x] Stays in journal as the rejected-approach lesson; the existing paired guides own the implemented contract.
+
+[2026-11-01 Europe/Brussels] — Temporary role grants need lifetime-owned revocations
+
+**Context**: Native PostgreSQL privacy-assurance cases needed fixed table and projected-column permissions for their existing ordinary application purpose. The test-suite fixture retained its private-data denials and generated temporary logins.
+
+**Symptom / Observation**: After adding those permissions, both settlement cases failed during disposal with `2BP01`: the temporary global role could not be dropped because objects depended on it. Both independent static reviews identified missing privilege revocation. An `await using` disposal exception could replace an earlier workflow exception, so this failure did not establish that the workflow body had succeeded.
+
+**Root Cause**: The fixture's old cleanup revoked its previous mirror-table, eligibility-column and role-membership grants, but not the new direct table and column grants. The create and dispose paths no longer described the same privilege lifetime.
+
+**Resolution**: Record exact inverse `REVOKE SELECT` and `REVOKE UPDATE(column)` statements alongside each fixed grant group, then execute those statements before the existing role removal. Resolve physical identifiers through EF metadata. Do not replace this with `DROP OWNED`, cascading object deletion or a database-wide privilege sweep. The owning build passed:
+
+```bash
+dotnet build tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-restore --verbosity quiet
+```
+
+The subsequent two-case native run reported no cleanup exception, but still failed both cases on the previously masked `NpgsqlRetryingExecutionStrategy`/manual-transaction conflict in recognition expiry. Its result was **0 passed, 2 failed**, not a successful settlement or whole-fixture qualification. The task ledger retains the exact native commands and all earlier failures.
+
+The four newly affected forgery cases then passed on the current fixture: **4 passed, 0 failed or skipped**, in 21:02.716. Those cases include the private-read assertions and successful scope teardown. They do not qualify the two still-failing settlement cases.
+
+```bash
+timeout --signal=INT --kill-after=15s 1680s dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/PostgresSubjectPrivacyErasureAuthorityTests/ForgedPreparationAndMismatchedNativeTupleCannotErase" --minimum-expected-tests 4 --maximum-parallel-tests 1 --timeout 1620s --progress off --report-trx --results-directory "$TMPDIR/pr79-assurance-intake/privacy-fixture-forged-current"
+```
+
+**Why This Matters for Future Work**: A temporary database principal owns a privilege lifecycle as well as a login lifecycle. Keep each new permission and its inverse together, including column grants, and preserve the original body failure separately from teardown failure. Removing a cleanup error can reveal another defect; it is not evidence that the protected business operation completed.
+
+**References**:
+- `tests/Event.Persistence.IntegrationTests/Privacy/PostgresSubjectPrivacyErasureAuthorityTests.cs`, `OrdinaryLogins.CreateAsync` and `DisposeAsync`.
+- `dev/active/pr79-testing-assurance-follow-up/pr79-testing-assurance-follow-up-tasks.md`, native privacy fixture qualification.
+- Private native receipts: `privacy-fixture-key-native/` and `privacy-fixture-revoke-native/`.
+- Commit: `9deb4a917815d3f7dbe41e2563744b93268e4662`.
+
+**Promotion Consideration**:
+- [x] Stays in the testing journal; this is an observed fixture-lifetime failure, not a new product authorization or transaction policy.
+
+---
+
+[2026-11-05 Europe/Brussels] — Test private listeners through real dual-stack sockets
+
+**Context**: Split Blazor was running but its private readiness endpoint returned 404. Earlier synthetic listener tests supplied ordinary IPv4 connection metadata.
+
+**Symptom / Observation**: Real dual-stack Kestrel reported the IPv4 loopback local address in IPv4-mapped IPv6 form. Direct `IPAddress.Equals` against configured `127.0.0.1` rejected the equivalent physical address.
+
+**Root Cause**: Synthetic connection metadata omitted a representation produced by the real server socket. The access boundary was correct, but its address comparison assumed matching address families.
+
+**Resolution**: Normalize only an IPv4-mapped physical local address before the existing exact private-address and local-port checks. Two real-socket cases passed for matching and different private addresses. Four existing host, wrong-port and liveness cases also passed:
+
+```bash
+dotnet run --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --no-restore -- --treenode-filter '/*/*/OperationalEndpointListenerTests/*' --minimum-expected-tests 2 --maximum-parallel-tests 1
+dotnet run --project tests/Event.Standalone.IntegrationTests/Event.Standalone.IntegrationTests.csproj --configuration Release --no-restore -- --treenode-filter '/*/*/EffectiveHostSecurityTests/(PrivateIpv4ProbeRequiresDeclaredHostAndExactListener|OperationalReportsRequireTheActualPrivateListenerWhileLivenessHasNoBody)' --minimum-expected-tests 4 --maximum-parallel-tests 1
+```
+
+**Why This Matters for Future Work**: Real listener tests complement TestServer metadata tests. Normalize equivalent socket representations without substituting forwarded headers, relaxing the declared address, or accepting a public listener port.
+
+**References**:
+- `src/Explore.ServiceDefaults/OperationalEndpointAccess.cs:28`
+- `tests/Explore.Infrastructure.Tests/Infrastructure/OperationalEndpointListenerTests.cs`
+- `tests/Event.Standalone.IntegrationTests/EffectiveHostSecurityTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in the journal; the physical listener contract is documented in the security model.
+
+---
+
+[2026-11-05 Europe/Brussels] — Operational probes must retain their original listener
+
+**Context**: Correcting mapped IPv4 comparison passed real-socket tests but did not qualify the full Split BFF pipeline.
+
+**Symptom / Observation**: Temporary rejection-coordinate logging showed a configured private listener at `127.0.0.1:45293`, while health reached public `::1:40287`. Complete BFF host tests reproduced HTTPS redirects for health and metrics. Removing their first redirect exposed another: UI error-page re-execution redirected the guard's public-listener 404.
+
+**Root Cause**: Generic browser middleware moved operational requests away from the physical connection their access policy needed to check. A handler-only wire test did not exercise HTTPS redirection or UI error rendering.
+
+**Resolution**: Keep exact health/metrics requests out of HTTPS redirection and UI error-page re-execution, retaining the existing physical-listener guard. Preserve public UI HTTPS redirection. Remove temporary diagnostics. Five complete-host cases passed, covering private responses, public denial, parsed no-store policy and the ordinary public HTTPS control:
+
+```bash
+dotnet run --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration Release --no-restore -- --treenode-filter '/*/*/BffOperationalListenerTests/*' --minimum-expected-tests 5 --maximum-parallel-tests 1
+```
+
+**Why This Matters for Future Work**: Readiness must not become a browser redirect or rendered UI error. Preserve health's 503 response and the listener guard's 404. Check the semantic no-store directive rather than rejecting additional no-cache/must-revalidate directives. These focused cases do not certify native startup.
+
+**References**:
+- `src/Explore.Blazor/Hosting/BlazorHostApplicationExtensions.cs`, `UseBlazorHostMiddlewareCore`
+- `src/Explore.ServiceDefaults/OperationalEndpointAccess.cs`
+- `tests/Explore.Blazor.IntegrationTests/Endpoints/BffOperationalListenerTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in the journal; security documentation records the operational response boundary.
+
+---
+
 [2026-11-12 Europe/Brussels] — Empirically calibrated TUnit concurrency, Postgres 1024 MiB floor, `/tmp` `tmpfs` trap, and multi-clone `BuildCheck` cache scoping
 
 **Context**: Full in-tree implementation of `bounded-test-execution-and-resource-governance` across all 16 TUnit assemblies, 4 Testcontainers integration projects, `Directory.Build.props`, and `.agents/hooks/BuildCheck.cs` on a Linux workstation running `ISLAMU_EXECUTION_PROFILE=constrained`.

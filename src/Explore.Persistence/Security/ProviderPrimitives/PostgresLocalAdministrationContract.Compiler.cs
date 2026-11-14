@@ -54,7 +54,8 @@ public static partial class PostgresLocalAdministrationContract
             ("PreviousOperationId", reset ? "previous->'Id'" : "NULL"), ("ResetReason", reset ? "p_request->'Reason'" : "NULL"),
             ("Stage", reset ? "2" : "1"), ("UpdatedAt", "NULL"),
             ("VerifiedAt", reset ? "previous->'VerifiedAt'" : "p_accepted->'ChangedAt'"),
-            ("VerifiedByApplicationUserId", reset ? "previous->'VerifiedByApplicationUserId'" : "p_request->'ActorId'"));
+            ("VerifiedByApplicationUserId", reset ? "previous->'VerifiedByApplicationUserId'" : "p_request->'ActorId'"),
+            ("VisitorEnrollmentOperationId", reset ? "previous->'VisitorEnrollmentOperationId'" : "NULL"));
         string createToken = Row(typeof(IdentityUserToken<Guid>),
             ("UserId", "p_accepted->'LocalSubjectId'"),
             ("LoginProvider", Text(LocalCredentialStateMetadata.TokenLoginProvider)),

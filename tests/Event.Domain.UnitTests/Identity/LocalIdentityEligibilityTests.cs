@@ -34,6 +34,72 @@ public sealed class LocalIdentityEligibilityTests
     }
 
     [Test]
+    public async Task VisitorAdmissionCompletesTheOriginalPendingBindingWithoutTemporaryCredentialState()
+    {
+        var row = Begin();
+        var pending = Image(row);
+
+        row.CompleteVisitorAdmission(1, pending.Operation, Start.AddSeconds(1));
+
+        await Assert.That(row.State).IsEqualTo(LocalIdentityEligibilityState.Ready);
+        await Assert.That(row.Generation).IsEqualTo(2L);
+        await Assert.That(Current(row)).IsTrue();
+        await Assert.That(Matches(row, pending)).IsFalse();
+        await Assert.That((row.Id, row.LocalSubjectId, row.CurrentOperationId, row.PersonalActorId, row.ExternalLoginId))
+            .IsEqualTo((pending.Id, pending.Subject, pending.Operation, pending.Actor, pending.Login));
+        await Assert.That(row.UpdatedAt).IsEqualTo(Start.AddSeconds(1));
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task VisitorAdmissionRejectsSupersededGenerationOrOperationWithoutChangingItsBinding(bool staleGeneration)
+    {
+        var row = Begin();
+        var pending = Image(row);
+
+        await Assert.That(() => row.CompleteVisitorAdmission(staleGeneration ? 0 : 1,
+            staleGeneration ? row.CurrentOperationId : Guid.CreateVersion7(), Start.AddSeconds(1)))
+            .Throws<InvalidOperationException>();
+
+        await Assert.That(Image(row)).IsEqualTo(pending);
+        await Assert.That(row.IsEligible).IsFalse();
+    }
+
+    [Test]
+    [Arguments(LocalIdentityEligibilityState.ChangeRequired)]
+    [Arguments(LocalIdentityEligibilityState.Ready)]
+    [Arguments(LocalIdentityEligibilityState.Revoked)]
+    [Arguments(LocalIdentityEligibilityState.Deleted)]
+    public async Task VisitorAdmissionCannotCompleteAnAlreadySettledOrInvalidatedBinding(LocalIdentityEligibilityState state)
+    {
+        var row = Begin();
+        switch (state)
+        {
+            case LocalIdentityEligibilityState.ChangeRequired:
+                row.Activate(1, row.CurrentOperationId, Start.AddSeconds(1));
+                break;
+            case LocalIdentityEligibilityState.Ready:
+                row.CompleteVisitorAdmission(1, row.CurrentOperationId, Start.AddSeconds(1));
+                break;
+            case LocalIdentityEligibilityState.Revoked:
+                row.Revoke(1, row.CurrentOperationId, Start.AddSeconds(1));
+                break;
+            case LocalIdentityEligibilityState.Deleted:
+                row.Delete(1, row.CurrentOperationId, Start.AddSeconds(1));
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(state));
+        }
+        var settled = Image(row);
+
+        await Assert.That(() => row.CompleteVisitorAdmission(row.Generation, row.CurrentOperationId, Start.AddSeconds(2)))
+            .Throws<InvalidOperationException>();
+
+        await Assert.That(Image(row)).IsEqualTo(settled);
+    }
+
+    [Test]
     public async Task ReplacementAdvancesIndependentGenerationWithoutInventingAnotherOperation()
     {
         var row = Begin();

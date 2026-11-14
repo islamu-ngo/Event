@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Models.Storage;
 using Explore.Application.Settings;
 using Explore.Domain;
@@ -29,15 +30,18 @@ public sealed class StoragePolicyResolver : IStoragePolicyResolver
     ];
 
     private readonly IHierarchicalSettingsReader _settingsResolver;
+    private readonly IInstanceSystemSettingsReader _instanceSettings;
     private readonly IFileStorageProviderResolver _providerResolver;
-    private readonly IS3ConfigResolver? _s3ConfigResolver;
+    private readonly IInstanceS3ConfigResolver? _s3ConfigResolver;
 
     public StoragePolicyResolver(
         IHierarchicalSettingsReader settingsResolver,
+        IInstanceSystemSettingsReader instanceSettings,
         IFileStorageProviderResolver providerResolver,
-        IS3ConfigResolver? s3ConfigResolver = null)
+        IInstanceS3ConfigResolver? s3ConfigResolver = null)
     {
         _settingsResolver = settingsResolver;
+        _instanceSettings = instanceSettings;
         _providerResolver = providerResolver;
         _s3ConfigResolver = s3ConfigResolver;
     }
@@ -52,7 +56,12 @@ public sealed class StoragePolicyResolver : IStoragePolicyResolver
         StoragePolicyIntent request,
         CancellationToken cancellationToken = default)
     {
-        var instanceSettings = await ResolveSettingsAsync(new SettingContext(), cancellationToken);
+        var stored = (await _instanceSettings.ReadAsync(PolicySettingKeys, cancellationToken))
+            .ToDictionary(row => row.SettingKey, StringComparer.Ordinal);
+        var instanceSettings = PolicySettingKeys
+            .Select(key => HierarchicalSettingMerge.Resolve(key, stored))
+            .OfType<ResolvedSetting>()
+            .ToDictionary(setting => setting.Key, StringComparer.Ordinal);
         var isMultiTenant = IsMultiTenant(instanceSettings);
         var tenantStorageLocked = ReadBool(instanceSettings, GovernanceSettingKeys.TenantDelegation.LockStorage, defaultValue: true);
         var tenantOverridesAllowed = tenantId.HasValue && (!isMultiTenant || !tenantStorageLocked);
@@ -129,7 +138,7 @@ public sealed class StoragePolicyResolver : IStoragePolicyResolver
             return configuredProvider;
         }
 
-        return await _s3ConfigResolver.IsConfiguredAsync(cancellationToken)
+        return await _s3ConfigResolver.IsInstanceConfiguredAsync(cancellationToken)
             ? StorageProviders.S3Compatible
             : StorageProviders.Local;
     }

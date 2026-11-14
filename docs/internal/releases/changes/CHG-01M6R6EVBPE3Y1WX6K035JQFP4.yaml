@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6R6EVBPE3Y1WX6K035JQFP4
+Title: "return the generated profile revision to Global"
+Type: fix
+Scope: onboarding
+Summary: "Allow Global application-profile creation to return its database-generated concurrency revision without exposing private birth-date values or collection receipts."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: "Add only _birthDateRevision to the fixed Global UserPii read inventory. Private date and receipt reads, revision updates and grant-option delegation remain excluded. Actual-role coverage preserves the original source leases, Serializable transaction and Runtime privilege inventory."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: "Provision a fresh development worker permission profile through the native migration workflow. An older incomplete profile remains rejected. Global credentials can observe concurrency counters but receive no additional private-date, receipt, Runtime or Local authority."

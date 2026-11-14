@@ -112,7 +112,12 @@ public static partial class PostgresProviderConfigurationContract
         var sql = new HumanPrincipalSourceSql(context);
         string C(string name) => sql.Column(typeof(SystemSetting), name);
         var authenticationKeys = VisitorAccessCapabilityResolver.AuthoritySettingKeys
-            .Where(key => key != GovernanceSettingKeys.PublicExperience.VisitorAccessMode).ToArray();
+            .Where(key => key != GovernanceSettingKeys.PublicExperience.VisitorAccessMode
+                && key != GovernanceSettingKeys.Tenants.UserRegistrationEnabled
+                && key != GovernanceSettingKeys.Authentication.GoogleSsoEnabled
+                && key != GovernanceSettingKeys.Authentication.GoogleClientId
+                && key != GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy
+                && key != GovernanceSettingKeys.Authentication.GooglePublicSignupUrl).ToArray();
         var allowed = authentication ? authenticationKeys : new[]
         {
             GovernanceSettingKeys.Security.AuthorizationProvider, GovernanceSettingKeys.Cerbos.GrpcEndpoint,
@@ -130,14 +135,14 @@ public static partial class PostgresProviderConfigurationContract
                 _ => "Cerbos Admin API endpoint for policy package publishing"
             };
             return $"({Text(key)},{(authentication ? (int)definition.ValueType : (int)SettingValueType.String)},"
-                + $"{(authentication && key is GovernanceSettingKeys.Authentication.PrimaryProviderId or GovernanceSettingKeys.Authentication.AtprotoLoginEnabled or GovernanceSettingKeys.Authentication.GoogleSsoEnabled ? "false" : "true")},"
+                + $"{(authentication && key is GovernanceSettingKeys.Authentication.PrimaryProviderId or GovernanceSettingKeys.Authentication.AtprotoLoginEnabled ? "false" : "true")},"
                 + $"{(description is null ? "NULL" : Text(description))},"
                 + $"{(authentication ? definition.Category is null ? "NULL" : Text(definition.Category) : Text("Security"))},{(authentication ? 0 : index + 1)})";
         }));
         const string instant = "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,6})?Z$";
         const string uuid7 = "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
         string authenticationGroup = $"""
-            IF pg_catalog.jsonb_array_length(p_effects) NOT BETWEEN 9 AND 11
+            IF pg_catalog.jsonb_array_length(p_effects) NOT BETWEEN {authenticationKeys.Length - 2} AND {authenticationKeys.Length}
                 OR EXISTS (SELECT 1 FROM unnest(ARRAY[{string.Join(",", authenticationKeys.Where(key =>
                     key is not (GovernanceSettingKeys.Authentication.KeycloakAuthority or GovernanceSettingKeys.Authentication.KeycloakClientId)).Select(Text))}]::text[]) k
                     WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.jsonb_array_elements(p_effects) e WHERE e->>'Key' = k))

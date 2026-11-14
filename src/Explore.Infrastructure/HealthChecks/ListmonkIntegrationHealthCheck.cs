@@ -1,6 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text;
-using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
@@ -12,7 +12,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 namespace Explore.Infrastructure.HealthChecks;
 
 public sealed class ListmonkIntegrationHealthCheck(
-    IHierarchicalSettingsResolver settingsResolver,
+    IInstanceSystemSettingsReader settingsReader,
     ISecretResolver secretResolver,
     IHttpClientFactory httpClientFactory)
     : IHealthCheck
@@ -21,19 +21,19 @@ public sealed class ListmonkIntegrationHealthCheck(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        var settingContext = new SettingContext();
-        var enabled = await settingsResolver.ResolveAsync<bool>(
+        var stored = (await settingsReader.ReadAsync(
+        [
             GovernanceSettingKeys.Integrations.Listmonk.Enabled,
-            settingContext,
-            cancellationToken);
-        var syncOnRegistration = await settingsResolver.ResolveAsync<bool>(
             GovernanceSettingKeys.Integrations.Listmonk.SyncOnRegistration,
-            settingContext,
-            cancellationToken);
-        var preconfirmSubscriptions = await settingsResolver.ResolveAsync<bool>(
             GovernanceSettingKeys.Integrations.Listmonk.PreconfirmSubscriptions,
-            settingContext,
-            cancellationToken);
+            GovernanceSettingKeys.Integrations.Listmonk.InstanceUrl,
+            GovernanceSettingKeys.Integrations.Listmonk.DefaultListId
+        ], cancellationToken)).ToDictionary(row => row.SettingKey, StringComparer.Ordinal);
+        T Resolve<T>(string key, T defaultValue) =>
+            SettingValueSerializer.Deserialize(HierarchicalSettingMerge.Resolve(key, stored)?.Value, defaultValue);
+        var enabled = Resolve(GovernanceSettingKeys.Integrations.Listmonk.Enabled, false);
+        var syncOnRegistration = Resolve(GovernanceSettingKeys.Integrations.Listmonk.SyncOnRegistration, false);
+        var preconfirmSubscriptions = Resolve(GovernanceSettingKeys.Integrations.Listmonk.PreconfirmSubscriptions, false);
 
         if (!enabled)
         {
@@ -42,14 +42,8 @@ public sealed class ListmonkIntegrationHealthCheck(
                 BuildData(enabled, syncOnRegistration, preconfirmSubscriptions));
         }
 
-        var instanceUrl = await settingsResolver.ResolveAsync<string>(
-            GovernanceSettingKeys.Integrations.Listmonk.InstanceUrl,
-            settingContext,
-            cancellationToken);
-        var defaultListId = await settingsResolver.ResolveAsync<int>(
-            GovernanceSettingKeys.Integrations.Listmonk.DefaultListId,
-            settingContext,
-            cancellationToken);
+        var instanceUrl = Resolve<string?>(GovernanceSettingKeys.Integrations.Listmonk.InstanceUrl, null);
+        var defaultListId = Resolve(GovernanceSettingKeys.Integrations.Listmonk.DefaultListId, 0);
         var username = await secretResolver.ResolveAsync(
             SecretDefinitionRegistry.Keys.Integrations.Listmonk.ApiUsername,
             tenantId: null,

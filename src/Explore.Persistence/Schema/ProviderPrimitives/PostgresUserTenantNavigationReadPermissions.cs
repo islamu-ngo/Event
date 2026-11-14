@@ -82,8 +82,10 @@ public static class PostgresUserTenantNavigationReadPermissions
     }
 
     // Overlapping owners recognize this fixed inventory, never live ACLs as authority.
-    internal static string AllowedGlobalReadPredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
-        ReadPredicate(context, enrollment, Text(enrollment.GlobalLogin), requireComplete: false);
+    internal static string AllowedGlobalReadPredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        string? externalCataloguePredicate = null, string? workerCataloguePredicate = null) =>
+        ReadPredicate(context, enrollment, Text(enrollment.GlobalLogin), requireComplete: false,
+            externalCataloguePredicate, workerCataloguePredicate);
 
     private static string NoObsoleteInstallation(string schema) => $"""
         NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc p
@@ -94,30 +96,17 @@ public static class PostgresUserTenantNavigationReadPermissions
         """;
 
     private static string RuntimeBoundary(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
-    {
-        string runtime = Text(enrollment.RuntimeLogin);
-        string global = Text(enrollment.GlobalLogin);
-        string relation = Text(Mapping(context).Table);
-        return $"""
-            NOT pg_catalog.pg_has_role({runtime}, {global}, 'MEMBER')
-            AND NOT pg_catalog.pg_has_role({global}, {runtime}, 'MEMBER')
-            AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
-                WHERE pg_catalog.pg_has_role({runtime}, r.oid, 'MEMBER')
-                    AND (r.rolsuper OR r.rolbypassrls OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication
-                        OR r.oid = (SELECT relowner FROM pg_catalog.pg_class WHERE oid = pg_catalog.to_regclass({relation}))
-                        OR (pg_catalog.has_table_privilege(r.oid, {relation}, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                            OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", relation, false)})
-                        OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
-                            WHERE a.attrelid = pg_catalog.to_regclass({relation}) AND a.attnum <> 0 AND NOT a.attisdropped
-                                AND pg_catalog.has_column_privilege(r.oid, a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES'))))
-            """;
-    }
+        => PostgresExternalTenantEnrollmentPermissions.OptionalCataloguePredicate(context, enrollment);
 
-    private static string ReadPredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment, string login, bool requireComplete)
+    private static string ReadPredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment, string login,
+        bool requireComplete, string? externalCataloguePredicate = null, string? workerCataloguePredicate = null)
     {
         var (schema, table, columns) = Mapping(context);
         string relation = Text(table);
         string allowed = "ARRAY[" + string.Join(",", columns.Select(Text)) + "]::text[]";
+        // The tenant creator's separately attested key-fence UPDATE is the only write admitted here.
+        string creatorKeyFence = "ARRAY[" + string.Join(",", PostgresTenantCreationPermissions
+            .GlobalUpdateColumns(context, typeof(User)).Select(Text)) + "]::text[]";
         string complete = requireComplete ? $"""
             AND NOT EXISTS (SELECT 1 FROM unnest({allowed}) AS expected(name)
                 WHERE NOT pg_catalog.has_column_privilege({login}, {relation}, expected.name, 'SELECT')
@@ -136,7 +125,13 @@ public static class PostgresUserTenantNavigationReadPermissions
                         OR pg_catalog.has_schema_privilege(r.oid, {Text(schema)}, 'CREATE')
                         OR (pg_catalog.has_table_privilege(r.oid, {relation}, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                             OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", relation, false)})
-                        OR pg_catalog.has_any_column_privilege(r.oid, {relation}, 'INSERT,UPDATE,REFERENCES')
+                        OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
+                            CROSS JOIN (VALUES ('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
+                            WHERE a.attrelid = pg_catalog.to_regclass({relation}) AND a.attnum <> 0 AND NOT a.attisdropped
+                                AND (pg_catalog.has_column_privilege(r.oid, a.attrelid, a.attnum, permission.privilege || ' WITH GRANT OPTION')
+                                    OR (pg_catalog.has_column_privilege(r.oid, a.attrelid, a.attnum, permission.privilege)
+                                        AND NOT (permission.privilege = 'UPDATE' AND r.rolname = {login} AND a.attnum > 0
+                                            AND a.attname = ANY({creatorKeyFence})))))
                         OR (r.rolname <> {login} AND pg_catalog.has_any_column_privilege(r.oid, {relation}, 'SELECT'))
                         OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                             WHERE a.attrelid = pg_catalog.to_regclass({relation}) AND a.attnum <> 0 AND NOT a.attisdropped
@@ -145,7 +140,11 @@ public static class PostgresUserTenantNavigationReadPermissions
                                         AND pg_catalog.has_column_privilege(r.oid, a.attrelid, a.attnum, 'SELECT'))))))
             {complete}
             """;
-        return $"(({navigation}) OR ({PostgresTenantPreferencePermissions.CompleteGlobalCataloguePredicate(context, enrollment)}) OR ({PostgresManagedTenantWorkerCreationPermissions.CompleteGlobalCataloguePredicate(context, enrollment)}))";
+        return PostgresExternalTenantEnrollmentPermissions.ComposeCataloguePredicate(context, enrollment,
+            externalCataloguePredicate, reference =>
+                PostgresManagedTenantWorkerCreationPermissions.ComposeCataloguePredicate(context, enrollment,
+                    workerCataloguePredicate, workerReference =>
+                        $"(({navigation}) OR ({PostgresTenantPreferencePermissions.CompleteGlobalCataloguePredicate(context, enrollment, reference, workerReference)}) OR ({workerReference}))"));
     }
 
     private static (string Schema, string Table, string[] Columns) Mapping(ExploreDbContext context)

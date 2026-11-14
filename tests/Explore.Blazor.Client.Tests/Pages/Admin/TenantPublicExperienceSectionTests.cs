@@ -8,6 +8,27 @@ namespace Explore.Blazor.Client.Tests.Pages.Admin;
 
 public sealed class TenantPublicExperienceSectionTests : IDisposable
 {
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task EnrollmentControlUsesOnlyItsSuppliedEditCapability(bool canEdit)
+    {
+        var model = new TenantPublicExperienceAdminModel
+        {
+            IsAvailable = true,
+            VisitorAccessMode = VisitorAccessMode.AuthenticatedOnly,
+            UserRegistrationEnabled = false,
+            CanEditUserRegistration = canEdit
+        };
+        var cut = _context.RenderMudComponent<TenantPublicExperienceSection>(parameters => parameters
+            .Add(component => component.Model, model));
+        var control = cut.FindComponent<MudSwitch<bool>>().Instance;
+
+        await Assert.That(control.Value).IsFalse();
+        await Assert.That(control.Disabled).IsEqualTo(!canEdit);
+        await Assert.That(cut.Markup).Contains("existing-account sign-in");
+    }
+
     private readonly BlazorTestContext _context = new();
 
     public TenantPublicExperienceSectionTests()

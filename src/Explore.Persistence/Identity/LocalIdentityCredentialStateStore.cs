@@ -177,7 +177,8 @@ internal sealed partial class LocalIdentityCredentialStateStore(
             operationId: operation.Id, kind: operation.Kind, stage: operation.Stage,
             initiatingApplicationUserId: operation.InitiatingApplicationUserId,
             localSubjectId: operation.LocalSubjectId, personalActorId: operation.PersonalActorId,
-            externalLoginId: operation.ExternalLoginId, createdAt: operation.CreatedAt);
+            externalLoginId: operation.ExternalLoginId, createdAt: operation.CreatedAt,
+            visitorEnrollmentOperationId: operation.VisitorEnrollmentOperationId);
         LocalCredentialResetReceipt? resetAudit = operation.Kind == LocalCredentialOperationKind.Reset
             ? new LocalCredentialResetReceipt(
                 operation: receipt, previousOperationId: operation.PreviousOperationId!.Value,
@@ -195,8 +196,12 @@ internal sealed partial class LocalIdentityCredentialStateStore(
     private static bool IsCurrentMetadata(LocalIdentityCredentialOperation operation, LocalCredentialStateMetadata? state) =>
         state is not null && state.OperationId == operation.Id && state.ApplicationUserId == operation.LocalSubjectId
         && operation.Kind is LocalCredentialOperationKind.Create or LocalCredentialOperationKind.Reset
+            or LocalCredentialOperationKind.VisitorCreate
         && ((state.State == LocalCredentialState.ProvisioningPending
                 && operation.Kind == LocalCredentialOperationKind.Create
+                && operation.Stage == LocalCredentialOperationStage.ProvisioningPending)
+            || (state.State == LocalCredentialState.RegistrationPending
+                && operation.Kind == LocalCredentialOperationKind.VisitorCreate
                 && operation.Stage == LocalCredentialOperationStage.ProvisioningPending)
             || (state.State == LocalCredentialState.ChangeRequired && operation.Stage == LocalCredentialOperationStage.ChangeRequired)
             || (state.State == LocalCredentialState.Ready && operation.Stage == LocalCredentialOperationStage.Replaced));
@@ -255,7 +260,8 @@ internal sealed partial class LocalIdentityCredentialStateStore(
                         && candidate.Name == LocalCredentialStateMetadata.TokenName, cancellationToken).ConfigureAwait(false);
                 LocalCredentialStateMetadata? state = DeserializeMetadata(token?.Value);
                 if (previous is null || previous.LocalSubjectId != request.LocalSubjectId
-                    || previous.Kind is not (LocalCredentialOperationKind.Create or LocalCredentialOperationKind.Reset)
+                    || previous.Kind is not (LocalCredentialOperationKind.Create or LocalCredentialOperationKind.Reset
+                        or LocalCredentialOperationKind.VisitorCreate)
                     || previous.ConcurrencyStamp != request.ExpectedCurrentOperationConcurrencyStamp
                     || state is null || state.OperationId != previous.Id || state.ApplicationUserId != request.LocalSubjectId
                     || !((state.State == LocalCredentialState.ChangeRequired && previous.Stage == LocalCredentialOperationStage.ChangeRequired)
@@ -289,7 +295,8 @@ internal sealed partial class LocalIdentityCredentialStateStore(
                         stage: LocalCredentialOperationStage.ChangeRequired,
                         initiatingApplicationUserId: request.InitiatingApplicationUserId,
                         localSubjectId: previous.LocalSubjectId, personalActorId: previous.PersonalActorId,
-                        externalLoginId: previous.ExternalLoginId, createdAt: createdAt),
+                        externalLoginId: previous.ExternalLoginId, createdAt: createdAt,
+                        visitorEnrollmentOperationId: previous.VisitorEnrollmentOperationId),
                     previousOperationId: previous.Id,
                     previousOperationConcurrencyStamp: previous.ConcurrencyStamp, reason: request.Reason);
                 ownedOperation = new LocalIdentityCredentialOperation(
@@ -396,7 +403,8 @@ internal sealed partial class LocalIdentityCredentialStateStore(
                 operationId: operation.Id, kind: operation.Kind, stage: operation.Stage,
                 initiatingApplicationUserId: operation.InitiatingApplicationUserId,
                 localSubjectId: operation.LocalSubjectId, personalActorId: operation.PersonalActorId,
-                externalLoginId: operation.ExternalLoginId, createdAt: operation.CreatedAt),
+                externalLoginId: operation.ExternalLoginId, createdAt: operation.CreatedAt,
+                visitorEnrollmentOperationId: operation.VisitorEnrollmentOperationId),
             previousOperationId: operation.PreviousOperationId.Value,
             previousOperationConcurrencyStamp: operation.PreviousOperationConcurrencyStamp.Value,
             reason: operation.ResetReason!));
@@ -636,7 +644,8 @@ internal sealed partial class LocalIdentityCredentialStateStore(
                 localSubjectId: operation.LocalSubjectId,
                 personalActorId: operation.PersonalActorId,
                 externalLoginId: operation.ExternalLoginId,
-                createdAt: operation.CreatedAt),
+                createdAt: operation.CreatedAt,
+                visitorEnrollmentOperationId: operation.VisitorEnrollmentOperationId),
             operationConcurrencyStamp: operation.ConcurrencyStamp,
             email: user.Email,
             firstName: user.FirstName,
@@ -925,7 +934,8 @@ internal sealed partial class LocalIdentityCredentialStateStore(
                         localSubjectId: user.Id,
                         personalActorId: Guid.CreateVersion7(),
                         externalLoginId: Guid.CreateVersion7(),
-                        createdAt: createdAt);
+                        createdAt: createdAt,
+                        visitorEnrollmentOperationId: null);
                     var operation = new LocalIdentityCredentialOperation(
                         receipt: receipt,
                         concurrencyStamp: Guid.CreateVersion7());
@@ -1024,7 +1034,8 @@ internal sealed partial class LocalIdentityCredentialStateStore(
             localSubjectId: operation.LocalSubjectId,
             personalActorId: operation.PersonalActorId,
             externalLoginId: operation.ExternalLoginId,
-            createdAt: operation.CreatedAt));
+            createdAt: operation.CreatedAt,
+            visitorEnrollmentOperationId: operation.VisitorEnrollmentOperationId));
     }
 
     private static async Task RollbackBestEffortAsync(LocalIdentityMutationTransaction transaction)
@@ -1073,7 +1084,8 @@ internal sealed partial class LocalIdentityCredentialStateStore(
             .AsNoTracking().SingleOrDefaultAsync(candidate => candidate.Id == state.OperationId, cancellationToken)
             .ConfigureAwait(false);
         if (operation is null || operation.LocalSubjectId != authority.LocalSubjectId
-            || operation.Kind is not (LocalCredentialOperationKind.Create or LocalCredentialOperationKind.Reset)
+            || operation.Kind is not (LocalCredentialOperationKind.Create or LocalCredentialOperationKind.Reset
+                or LocalCredentialOperationKind.VisitorCreate)
             || operation.Stage != LocalCredentialOperationStage.Replaced
             || !await HasExactApplicationBindingAsync(operation, cancellationToken).ConfigureAwait(false))
         {

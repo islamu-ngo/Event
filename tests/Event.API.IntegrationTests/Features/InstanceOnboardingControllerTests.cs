@@ -683,7 +683,7 @@ public class InstanceOnboardingControllerTests
 
         using var request = new HttpRequestMessage(HttpMethod.Patch, $"{SettingsBaseUrl}/auth-provider")
         {
-            Content = JsonContent.Create(CreateGoogleOnlyAuthProviderPatch())
+            Content = JsonContent.Create(CreateSupportedAuthProviderPatch())
         };
         var response = await client.SendAsync(request);
 
@@ -703,7 +703,7 @@ public class InstanceOnboardingControllerTests
             HttpMethod.Patch,
             $"{SettingsBaseUrl}/auth-provider",
             userId,
-            CreateGoogleOnlyAuthProviderPatch(),
+            CreateSupportedAuthProviderPatch(),
             includeSetupSecret: false);
 
         var response = await client.SendAsync(request);
@@ -725,7 +725,7 @@ public class InstanceOnboardingControllerTests
             HttpMethod.Patch,
             $"{SettingsBaseUrl}/auth-provider",
             userId,
-            CreateGoogleOnlyAuthProviderPatch(),
+            CreateSupportedAuthProviderPatch(),
             includeSetupSecret: false);
 
         var response = await client.SendAsync(request);
@@ -752,7 +752,7 @@ public class InstanceOnboardingControllerTests
             HttpMethod.Patch,
             $"{SettingsBaseUrl}/auth-provider",
             userId,
-            CreateGoogleOnlyAuthProviderPatch(),
+            CreateSupportedAuthProviderPatch(),
             includeSetupSecret: false);
 
         var updateResponse = await client.SendAsync(updateRequest);
@@ -776,7 +776,7 @@ public class InstanceOnboardingControllerTests
         await Assert.That(config).IsNotNull();
         await Assert.That(config!.PrimaryProviderId)
             .IsEqualTo((int)AuthenticationProviderKind.Local);
-        await Assert.That(config.GoogleSsoEnabled).IsTrue();
+        await Assert.That(config.AtprotoLoginEnabled).IsTrue();
     }
 
     [Test]
@@ -1088,8 +1088,9 @@ public class InstanceOnboardingControllerTests
         await Assert.That(adminResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var adminConfig = await adminResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>(TestJsonOptions.Default);
         await Assert.That(adminConfig).IsNotNull();
-        await Assert.That(adminConfig!.GoogleClientSecretOwnership.Editable).IsFalse();
-        await Assert.That(adminConfig.GoogleClientSecretOwnership.Mode).IsEqualTo("deployment-managed");
+        await Assert.That(adminConfig!.UnsupportedProviderMessage).Contains("Keycloak");
+        await Assert.That(JsonSerializer.SerializeToElement(adminConfig, TestJsonOptions.Default)
+            .TryGetProperty("googleClientSecretOwnership", out _)).IsFalse();
 
         using var closedSetupRequest = new HttpRequestMessage(
             HttpMethod.Get, $"{BaseUrl}/auth-provider-configuration/internal");
@@ -1512,24 +1513,21 @@ public class InstanceOnboardingControllerTests
         await Assert.That(configuration.KeycloakClientSecretOwnership.Editable).IsFalse();
     }
 
-    private static AuthProviderConfigurationDto CreateGoogleOnlyAuthProviderConfiguration()
+    private static AuthProviderConfigurationDto CreateSupportedAuthProviderConfiguration()
     {
         return new AuthProviderConfigurationDto
         {
             KeycloakAuthority = string.Empty,
             KeycloakClientId = string.Empty,
-            AtprotoLoginEnabled = false,
-            AtprotoPublicUrl = string.Empty,
-            GoogleSsoEnabled = true,
-            GoogleClientId = "google-client-id",
-            LockAtprotoLoginEnabled = false,
-            LockGoogleSsoEnabled = false
+            AtprotoLoginEnabled = true,
+            AtprotoPublicUrl = "https://events.example.test",
+            LockAtprotoLoginEnabled = false
         };
     }
 
-    private static PatchAuthProviderConfigurationDto CreateGoogleOnlyAuthProviderPatch()
+    private static PatchAuthProviderConfigurationDto CreateSupportedAuthProviderPatch()
     {
-        var configuration = CreateGoogleOnlyAuthProviderConfiguration();
+        var configuration = CreateSupportedAuthProviderConfiguration();
         return new PatchAuthProviderConfigurationDto
         {
             Configuration = OptionalUpdate<AuthProviderConfigurationWriteDto>.Set(new AuthProviderConfigurationWriteDto
@@ -1539,10 +1537,7 @@ public class InstanceOnboardingControllerTests
                 KeycloakClientId = configuration.KeycloakClientId,
                 AtprotoLoginEnabled = configuration.AtprotoLoginEnabled,
                 AtprotoPublicUrl = configuration.AtprotoPublicUrl,
-                GoogleSsoEnabled = configuration.GoogleSsoEnabled,
-                GoogleClientId = configuration.GoogleClientId,
-                LockAtprotoLoginEnabled = configuration.LockAtprotoLoginEnabled,
-                LockGoogleSsoEnabled = configuration.LockGoogleSsoEnabled
+                LockAtprotoLoginEnabled = configuration.LockAtprotoLoginEnabled
             })
         };
     }

@@ -76,7 +76,7 @@ jobs:
             base_sha="HEAD~1"
           fi
 
-          changed_files="$(git diff --name-only "$base_sha" "$GITHUB_SHA" || true)"
+          changed_files="$(git diff --no-renames --name-only "$base_sha" "$GITHUB_SHA" || true)"
           if [[ -z "$changed_files" ]]; then
             echo "run-analysis=true" >> "$GITHUB_OUTPUT"
             {
@@ -119,7 +119,8 @@ jobs:
     name: Analyze (${{ matrix.language }})
     needs: detect-codeql-changes
     runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
-    timeout-minutes: 45
+    # C# extraction and finalization take about 34 minutes before queries begin.
+    timeout-minutes: ${{ matrix.language == 'csharp' && 90 || 45 }}
     permissions:
       security-events: write
       packages: read

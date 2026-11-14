@@ -53,6 +53,36 @@ internal static class PostgresLocalIdentitySystemSettingPolicies
                 OR ({Required(owner, $"pg_catalog.to_regclass({Text(relation)})")}))
             """)) + $" AND ({Required(Migrator(migratorLogin), $"pg_catalog.to_regclass({Text(relation)})")})";
 
+    private static readonly (string Role, string Name, char Command)[] ExistingSourcePolicies =
+    [
+        (PostgresHumanPrincipalSourceContract.OwnerRole, PostgresHumanPrincipalSourceContract.ReadPolicy, 'r'),
+        (PostgresHumanPrincipalSourceContract.OwnerRole, PostgresHumanPrincipalSourceContract.UpdatePolicy, 'w'),
+        (PostgresHumanAuthorizationRouteContract.OwnerRole, PostgresHumanAuthorizationRouteContract.ReadPolicy, 'r'),
+        (PostgresHumanSupportAccessSourceContract.OwnerRole, PostgresHumanSupportAccessSourceContract.ReadPolicy, 'r'),
+        (PostgresHumanSupportAccessSourceContract.OwnerRole, PostgresHumanSupportAccessSourceContract.UpdatePolicy, 'w'),
+        (PostgresHumanEmailSourceContract.OwnerRole, PostgresHumanEmailSourceContract.ReadPolicy, 'r'),
+        (PostgresHumanEmailSourceContract.OwnerRole, PostgresHumanEmailSourceContract.LockPolicy, 'w'),
+        (PostgresPlatformApiKeySourceContract.OwnerRole, PostgresPlatformApiKeySourceContract.ReadPolicy, 'r'),
+        (PostgresPlatformApiKeySourceContract.OwnerRole, PostgresPlatformApiKeySourceContract.LockPolicy, 'w')
+    ];
+
+    /// <summary>Existing source contracts install their policies before enabling relation-wide RLS.</summary>
+    internal static string ExistingSourcePolicyPredicate(string relationOid) =>
+        string.Join(" OR ", ExistingSourcePolicies.Select(policy => "(" + SourcePolicy(policy, relationOid) + ")"));
+
+    internal static string CompleteExistingSources(string relationOid) =>
+        string.Join(" AND ", ExistingSourcePolicies.Select(policy => $"""
+            (NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname={Text(policy.Role)})
+                OR EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE {SourcePolicy(policy, relationOid)}))
+            """));
+
+    private static string SourcePolicy((string Role, string Name, char Command) policy, string relationOid) => $"""
+        p.polrelid={relationOid} AND p.polname={Text(policy.Name)} AND p.polcmd='{policy.Command}' AND p.polpermissive
+        AND p.polroles=ARRAY[(SELECT oid FROM pg_catalog.pg_roles WHERE rolname={Text(policy.Role)})]
+        AND pg_catalog.pg_get_expr(p.polqual,p.polrelid)='true'
+        AND {(policy.Command == 'r' ? "p.polwithcheck IS NULL" : "pg_catalog.pg_get_expr(p.polwithcheck,p.polrelid)='true'")}
+        """;
+
     private static string Required(Owner owner, string relationOid) =>
         string.Join(" AND ", owner.Operations.Select(operation => $"""
             EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid={relationOid}

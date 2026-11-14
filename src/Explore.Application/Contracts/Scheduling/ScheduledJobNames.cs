@@ -7,6 +7,7 @@ public static class ScheduledJobNames
     public const string EmailDispatchDrain = "email-dispatch-drain";
     public const string PdsSyncDrain = "pds-sync-drain";
     public const string EmailDispatchRecoveryScan = "email-dispatch-recovery-scan";
+    public const string VisitorEnrollmentRecovery = "visitor-enrollment-recovery";
     public const string DeadLetterSummary = "dead-letter-summary";
     public const string EventReminderDispatch = "event-reminder-dispatch";
     public const string WaitlistPromotionScan = "waitlist-promotion-scan";
@@ -58,6 +59,7 @@ public static class ScheduledJobNames
         EmailDispatchDrain,
         PdsSyncDrain,
         EmailDispatchRecoveryScan,
+        VisitorEnrollmentRecovery,
         DeadLetterSummary,
         EventReminderDispatch,
         WaitlistPromotionScan,

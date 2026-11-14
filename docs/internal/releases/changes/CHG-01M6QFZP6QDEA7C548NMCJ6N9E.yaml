@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6QFZP6QDEA7C548NMCJ6N9E
+Title: "build and deploy with the patched .NET toolchain"
+Type: fix
+Scope: self-hosting
+Summary: "Align the source SDK, WASM runtime and all four application container recipes with patched Microsoft components while preserving immutable image digests, native dependency locks and auditing."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: "SDK 10.0.403 selects patched runtime/compiler 10.0.14 for GHSA-p3jp-9v83-76w9. The explicit WASM pin and SDK-generated asset/linker locks align with 10.0.14. Audit remains enabled; trusted-base CI still requires an independently reviewed base update."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/GETTING_STARTED.md
+    Disposition: documented
+    Detail: "Source builds require SDK 10.0.403 selected by global.json. All four application Dockerfiles retain verified immutable Microsoft image digests."
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/contributing/local-development.md
+    Disposition: documented
+    Detail: "Install the pinned SDK when building from source and rebuild deployed images using the patched recipes. A repository pin does not update existing host installations. Preserve upstream license notices and native locked restore."

@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6P2J345P2DYXHVFEZHAH3E8
+Title: "Install fixed Global bootstrap storage permissions"
+Type: fix
+Scope: self-hosting
+Summary: "Allow application-owned bootstrap convergence through fixed Global columns while preserving migration credential separation and startup gates."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/HOSTING_ARCHITECTURE.md
+    Disposition: documented
+    Detail: "Global receives fixed bootstrap columns; DELETE, table-wide grants, ownership and RLS bypass remain excluded."
+  Migration:
+    Reference: docs/internal/HOSTING_ARCHITECTURE.md
+    Disposition: documented
+    Detail: "The canonical setup installer supplies bootstrap storage rights; related catalogues recognize only this declared column intersection."
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: "Run the matching Migrator before hosts; bootstrap convergence preserves completed state and blocks invalid configuration before HTTP authority."

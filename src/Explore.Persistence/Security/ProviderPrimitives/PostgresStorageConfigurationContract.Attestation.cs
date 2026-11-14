@@ -234,7 +234,9 @@ public static partial class PostgresStorageConfigurationContract
                     AND (pg_catalog.has_table_privilege(r.oid,pg_catalog.to_regclass({anchor}),'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                         OR pg_catalog.has_any_column_privilege(r.oid,pg_catalog.to_regclass({anchor}),'SELECT,INSERT,UPDATE,REFERENCES')
                         OR pg_catalog.has_table_privilege(r.oid,{Text(sql.Table(typeof(SystemSetting)))}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                        OR pg_catalog.has_any_column_privilege(r.oid,{Text(sql.Table(typeof(SystemSetting)))}::regclass,'INSERT,UPDATE,REFERENCES')
+                        OR (pg_catalog.has_any_column_privilege(r.oid,{Text(sql.Table(typeof(SystemSetting)))}::regclass,'INSERT,UPDATE,REFERENCES')
+                            AND NOT (r.rolname={Text(enrollment.GlobalLogin)}
+                                AND ({PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(context, enrollment)}) IS TRUE))
                         OR pg_catalog.has_table_privilege(r.oid,{tenantTable}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                         OR pg_catalog.has_any_column_privilege(r.oid,{tenantTable}::regclass,'UPDATE,REFERENCES')
                         OR (pg_catalog.has_any_column_privilege(r.oid,{tenantTable}::regclass,'INSERT')

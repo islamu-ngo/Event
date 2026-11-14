@@ -1,0 +1,26 @@
+Change-Id: CHG-01M7BMHDTAJRXC4ZB61FWDP3QH
+Title: "Permit the attested native external-enrollment graph"
+Type: fix
+Scope: access
+Summary: "Install the fixed Runtime graph storage rights needed by explicit external enrollment and recognize only the complete declared package across overlapping catalogue owners, preserving original execution custody and privilege provenance."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "Install only the fixed explicit-enrollment graph rights. Require complete-package recognition, direct non-grantable Migrator provenance, unchanged connector/transaction custody and fresh statement-local catalogue checks; deny existing-identity mutation, private PII reads and role-grant insertion."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

@@ -59,6 +59,27 @@ the actual installed privileges. Unexpected column access and grant options
 remain errors; do not widen permissions, remove the check or reorder installers
 to force startup through.
 
+## PostgreSQL login names during setup
+
+Setup and trusted-settings readiness preserve the exact declared database login
+name, including uppercase letters, backslashes, apostrophes and dollar signs.
+The application does not require renaming those accounts or changing PostgreSQL's
+standard-string setting to make an otherwise valid storage profile pass.
+
+This correction adds no database grants, deployment settings or schema migration.
+Readiness still rejects unexpected privileges and changed policy expressions;
+do not broaden permissions to work around a remaining failure.
+
+## SQLite operation cleanup
+
+After an abandoned application-owned SQLite transaction is disposed, other
+operations waiting for its process locks can proceed while its database connection
+remains open. Disposing a wrapper around an externally owned transaction still
+preserves that transaction's exclusion until it ends.
+
+This cleanup requires no schema migration, permissions change or deployment
+setting. It does not cancel or recover an operation that is still running.
+
 ## Interrupted PostgreSQL lock reacquisition
 
 If logs report `named_lock_acquisition_cleanup_unconfirmed`, the API could not
@@ -461,6 +482,20 @@ may create that same person's administrator membership in the new tenant. Global
 therefore has fixed column-level INSERT permissions for membership and role-grant
 rows, with only the necessary tenant, role and capacity metadata reads. Runtime
 receives no new rights, and this does not grant private account or credential reads.
+
+The Global creation permission set also includes a column-level write on the
+user primary key. Creation uses it only for the existing no-op row fence when
+assigning the creator as an administrator; the fence preserves coordination with
+user deletion and erasure. It grants no write to other user fields. A compromised
+Global credential still holds this fixed database permission independently of
+the API's human authorization checks, so protect it as a privileged application
+credential.
+
+Installation and runtime readiness verify the same key-column permission and
+reject missing or expanded rights. Existing partial enrollments require fresh
+pre-release enrollment through the installer; do not repair them with manual
+grants or disable their readiness checks. No schema migration or configuration
+setting is added by this correction.
 
 The administrator's active tenant does not become the database owner of a newly
 created tenant. The API selects its dedicated creation owner before checking

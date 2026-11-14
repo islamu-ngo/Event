@@ -15,9 +15,23 @@ Use this page for the shortest safe local path. For production-style hosting, st
 
 | Tool | Version | Purpose |
 |---|---|---|
-| .NET SDK | `10.0.403` or compatible SDK from `global.json` | Build and run the solution. |
+| .NET SDK | `10.0.404` selected by `global.json` | Build and run the solution. |
+| Aspire AppHost SDK and Hosting integrations | `13.6.5` selected by the AppHost project and central package versions | Serviced orchestration, testing host and dashboard. |
 | Docker / Docker Compose v2 | Current | Local Aspire infrastructure and self-hosting stack. |
 | .NET Aspire CLI | Current compatible CLI | Preferred local development loop; `dotnet run --project Explore.AppHost` remains the fallback/IDE launch path. |
+
+Aspire 13.6 introduces `ASPIRE010` when using NuGet-restored orchestration
+dependencies without CLI bundle delegation. This repository currently uses
+that package-owned path; the warning remains visible and is not suppressed.
+Changing to CLI bundle ownership requires separate lifecycle qualification.
+
+Aspire servicing is independent of .NET runtime servicing. The AppHost SDK and
+Hosting and Testing packages use one aligned release train to address
+`GHSA-4g86-54fm-h9h8` and `GHSA-f7vh-h5g3-7jrh`. Keep native-generated locks
+with the package inputs and leave dependency auditing enabled. After updating,
+rebuild and restart AppHost so its dashboard and hosting dependencies are
+replaced. Repository package pins do not update a globally installed Aspire
+CLI; service that installation separately.
 
 Install the Aspire CLI before using `aspire run`:
 

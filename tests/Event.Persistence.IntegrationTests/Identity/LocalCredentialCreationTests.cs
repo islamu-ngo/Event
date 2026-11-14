@@ -264,7 +264,8 @@ public sealed class LocalCredentialCreationTests
             localSubjectId: Guid.CreateVersion7(),
             personalActorId: Guid.CreateVersion7(),
             externalLoginId: Guid.CreateVersion7(),
-            createdAt: DateTime.UtcNow);
+            createdAt: DateTime.UtcNow,
+            visitorEnrollmentOperationId: null);
         string temporaryPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
         await Assert.ThrowsAsync<ArgumentException>(() =>

@@ -88,7 +88,10 @@ public sealed partial class DiscoveryMetadataAuthorityTests(PostgreSqlContainerF
     }
 
     [Test]
-    public async Task MetadataAdmissionObservesCommittedPrivilegeDriftOnTheSameOpenGlobalConnector()
+    [Arguments(PrimaryDatabaseRole.Global)]
+    [Arguments(PrimaryDatabaseRole.Runtime)]
+    public async Task MetadataAdmissionObservesCommittedPrivilegeDriftOnTheSameOpenGlobalConnector(
+        PrimaryDatabaseRole changedRole)
     {
         await using var global = await OpenGlobalAsync();
         await global.Database.OpenConnectionAsync();
@@ -97,8 +100,10 @@ public sealed partial class DiscoveryMetadataAuthorityTests(PostgreSqlContainerF
         await PostgresDiscoveryMetadataPermissions.RequireCurrentAsync(global, fixture.NativeQueueEnrollment, true, default);
         await using var migration = fixture.CreateDbContext();
         var names = new HumanPrincipalSourceSql(migration);
-        string source = $"({names.Column(typeof(Tenant), nameof(Tenant.Id))}) ON {names.Table(typeof(Tenant))}";
-        string login = names.Quote(fixture.NativeQueueEnrollment.GlobalLogin);
+        string property = changedRole == PrimaryDatabaseRole.Global ? nameof(Tenant.Id) : nameof(Tenant.FullName);
+        string source = $"({names.Column(typeof(Tenant), property)}) ON {names.Table(typeof(Tenant))}";
+        string login = names.Quote(changedRole == PrimaryDatabaseRole.Global
+            ? fixture.NativeQueueEnrollment.GlobalLogin : fixture.NativeQueueEnrollment.RuntimeLogin);
         await migration.Database.ExecuteSqlRawAsync($"GRANT UPDATE {source} TO {login}");
         try
         {

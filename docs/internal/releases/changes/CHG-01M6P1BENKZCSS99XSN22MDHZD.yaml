@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6P1BENKZCSS99XSN22MDHZD
+Title: "Enroll the declared API key issuance owner during canonical migration"
+Type: fix
+Scope: access
+Summary: "Project the issuance username to migration and enroll its existing executor purpose without exposing the application credential."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Migration receives only the declared issuance username, never its password, and grants inherited executor rights without SET or ADMIN authority."
+  Migration:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Canonical migration enrolls InstanceKeyIssuance alongside the existing API key purpose logins; fresh-cluster verification opens all four factories."
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: "Use the declared purpose identities and canonical migrator; serving hosts retain separate credentials and fail closed on missing grants."

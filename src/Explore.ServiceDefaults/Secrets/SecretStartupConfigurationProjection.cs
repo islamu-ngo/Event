@@ -92,7 +92,6 @@ internal static class SecretStartupConfigurationProjection
                 ("KEYCLOAK_", "/runtime/api/authentication/keycloak"),
                 ("Keycloak:", "/runtime/api/authentication/keycloak"),
                 ("CERBOS_", "/runtime/api/authorization/cerbos"), ("Cerbos:", "/runtime/api/authorization/cerbos"),
-                ("GOOGLE_", "/runtime/bff/oidc/google"), ("Google:", "/runtime/bff/oidc/google"),
                 ("MAIL_", "/smtp"), ("SMTP_", "/smtp"), ("Smtp:", "/smtp"),
                 ("AUTHENTICATION_", "/api"), ("Authentication:", "/api"),
                 ("AUTHORIZATION_", "/api"), ("Authorization:", "/api"),
@@ -158,8 +157,6 @@ internal static class SecretStartupConfigurationProjection
                 ("/runtime/bff/oidc/keycloak", "KEYCLOAK_ENDPOINT") => "Bff:Keycloak:Endpoint",
                 ("/runtime/bff/oidc/keycloak", "KEYCLOAK_REALM") => "Bff:Keycloak:Realm",
                 ("/runtime/bff/oidc/keycloak", "KEYCLOAK_CLIENT_ID") => "Bff:Keycloak:ClientId",
-                ("/runtime/bff/oidc/google", "GOOGLE_CLIENT_ID") => "Google:ClientId",
-                ("/runtime/bff/oidc/google", "GOOGLE_CLIENT_SECRET") => "Google:ClientSecret",
                 ("/runtime/bff/atproto/oauth", "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS") => "Atproto:OauthClientPrivateJwks",
                 ("/runtime/bff/session", "BFF_SESSION_REDIS_PASSWORD") => "Bff:SessionAuthority:Password",
                 _ => throw new InvalidOperationException("secret_authority_invalid")

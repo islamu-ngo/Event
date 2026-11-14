@@ -4,6 +4,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Domain;
 using Explore.Domain.Constants;
+using Explore.Domain.ValueObjects;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.API.IntegrationTests.Authentication;
@@ -83,7 +84,7 @@ public sealed class AtprotoTransientStoreControllerTests(AtprotoTransientApiFixt
         foreach (var spec in new[] { (disabled, 30), (enabled, -1) })
         {
             string digest = AtprotoTransientApiFixture.NewDigest();
-            var row = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, digest, spec.Item1, "opaque",
+            var row = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, digest, AtprotoAuthenticationFlowTarget.Targeted(spec.Item1), "opaque",
                 fixture.Clock.GetUtcNow().AddSeconds(spec.Item2).ToUnixTimeMilliseconds());
             // P1 accepts immutable timestamps; Application/HTTP owns the creation TTL ceiling.
             if (spec.Item2 < 0)
@@ -161,7 +162,8 @@ public sealed class AtprotoTransientStoreControllerTests(AtprotoTransientApiFixt
             tokenDigest = digest,
             tenantId = tenant,
             protectedPayload = payload,
-            expiresAtUnixMilliseconds = fixture.Clock.GetUtcNow().AddSeconds(lifetimeSeconds).ToUnixTimeMilliseconds()
+            expiresAtUnixMilliseconds = fixture.Clock.GetUtcNow().AddSeconds(lifetimeSeconds).ToUnixTimeMilliseconds(),
+            flowKind = AtprotoAuthenticationFlowKind.Targeted
         });
 
     private static byte[] ConsumeBody(Guid id, string purpose, string digest, Guid tenant) =>

@@ -39,7 +39,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
     public async Task ProviderConsumersRetainOriginalHumanAndExactEffects(bool authorization, string change)
     {
         string key = authorization ? GovernanceSettingKeys.Security.AuthorizationProvider
-            : GovernanceSettingKeys.Authentication.GoogleClientId;
+            : GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl;
         var before = new ConsumerBeforeOwnerTransaction();
         var terminal = new SpecializedBeforeSettlement(key);
         ProviderWriterProbe? originalProbe = null;
@@ -112,7 +112,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
                     Patch = new()
                     {
                         Configuration = OptionalUpdate<AuthProviderConfigurationWriteDto>.Set(
-                        new() { GoogleClientId = "provider-original-owner" })
+                        new() { KeycloakPublicSignupUrl = "https://provider-original-owner.example.test/signup" })
                     }
                 }, CancellationToken.None);
         bool committed = change is "unchanged" or "effect-probe";
@@ -123,7 +123,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
         await using var observer = fixture.Native.CreateDatabase();
         var stored = await observer.SystemSettings.AsNoTracking().SingleOrDefaultAsync(row => row.SettingKey == key);
         await Assert.That(stored?.Value).IsEqualTo(committed
-            ? authorization ? "\"local\"" : "\"provider-original-owner\"" : previous);
+            ? authorization ? "\"local\"" : "\"https://provider-original-owner.example.test/signup\"" : previous);
         if (committed)
         {
             await Assert.That(stored!.IsLocked).IsTrue();
@@ -153,7 +153,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
     public async Task ActualSetupConsumersRetainSecretAndPendingGeneration(bool authorization, string change)
     {
         string key = authorization ? GovernanceSettingKeys.Security.AuthorizationProvider
-            : GovernanceSettingKeys.Authentication.GoogleClientId;
+            : GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl;
         var before = new ConsumerBeforeOwnerTransaction();
         var terminal = new SpecializedBeforeSettlement(key);
         await using var native = await LocalAdmissionWebApplicationFactory.CreateAsync(
@@ -214,7 +214,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
                     Patch = new()
                     {
                         Configuration = OptionalUpdate<AuthProviderConfigurationWriteDto>.Set(
-                        new() { GoogleClientId = "setup-original-owner" })
+                        new() { KeycloakPublicSignupUrl = "https://setup-original-owner.example.test/signup" })
                     }
                 }, CancellationToken.None);
         if (change == "unchanged")
@@ -225,7 +225,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
         var stored = await observer.SystemSettings.AsNoTracking().SingleOrDefaultAsync(row => row.SettingKey == key);
         if (change == "unchanged")
         {
-            await Assert.That(stored!.Value).IsEqualTo(authorization ? "\"local\"" : "\"setup-original-owner\"");
+            await Assert.That(stored!.Value).IsEqualTo(authorization ? "\"local\"" : "\"https://setup-original-owner.example.test/signup\"");
             await Assert.That(stored.IsLocked).IsTrue();
         }
         else

@@ -94,6 +94,16 @@ jobs:
         if: ${{ inputs.run-fast-tests }}
         run: dotnet restore eng/security/Event.DataProtection.Operator/Event.DataProtection.Operator.csproj --locked-mode
 
+      - name: Restore Deployment and Engineering Profiles
+        if: ${{ inputs.run-fast-tests }}
+        run: |
+          dotnet restore src/Event.Standalone/Event.Standalone.csproj --locked-mode -p:StandaloneContainerPublish=true
+          dotnet restore eng/moderation/MeasurementLauncher.csproj --locked-mode
+          dotnet restore eng/tools/InstallAssuranceBrowser.cs --locked-mode
+          dotnet restore eng/tools/ScaffoldPrimaryMigration.cs --locked-mode
+          dotnet restore eng/tools/keycloak-lifecycle-grants.cs --locked-mode
+          dotnet restore --locked-mode
+
       - name: Restore .NET Tools
         if: ${{ inputs.run-fast-tests }}
         run: dotnet tool restore

@@ -30,6 +30,42 @@ public sealed class AuthProviderConfigurationTests : IDisposable
     public void Dispose() => _context.Dispose();
 
     [Test]
+    public async Task RetainedUnsupportedConfigurationDisplaysActionableStatusWithoutProviderControls()
+    {
+        const string guidance = "Direct Google authentication is unsupported. Configure Google through Keycloak.";
+        _onboarding.GetAuthProviderConfigurationAsync().Returns(new AuthProviderConfigurationDto
+        {
+            PrimaryProviderId = 4,
+            UnsupportedProviderMessage = guidance
+        });
+
+        var cut = _context.RenderMudComponent<AuthProviderConfiguration>();
+
+        await Assert.That(cut.Find("[data-testid=unsupported-auth-provider][role=status]").TextContent).IsEqualTo(guidance);
+        await Assert.That(cut.FindAll("[data-testid=onboarding-google-public-policy]")).Count().IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments(4)]
+    [Arguments(1)]
+    public async Task CallableProviderControlsNeverOfferDirectGoogle(int primary)
+    {
+        _onboarding.GetAuthProviderConfigurationAsync().Returns(new AuthProviderConfigurationDto
+        {
+            PrimaryProviderId = primary,
+            KeycloakAuthority = "https://identity.example.test/realms/events",
+            KeycloakClientId = "event-bff"
+        });
+
+        var cut = _context.RenderMudComponent<AuthProviderConfiguration>();
+
+        await Assert.That(cut.FindAll("[data-testid=onboarding-google-public-policy]")).Count().IsEqualTo(0);
+        await Assert.That(cut.FindAll("[data-testid=onboarding-primary-local]")).Count().IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-testid=onboarding-primary-keycloak]")).Count().IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-testid=onboarding-primary-atproto]")).Count().IsEqualTo(1);
+    }
+
+    [Test]
     public async Task UnsetProviderDefaultsToLocalWithIndependentAtprotoChoice()
     {
         _onboarding.GetAuthProviderConfigurationAsync()
@@ -128,7 +164,7 @@ public sealed class AuthProviderConfigurationTests : IDisposable
 
         await Assert.That(policy.Value).IsEqualTo(PublicOnboardingPolicy.Allowed);
         await Assert.That(signupUrl.Value).IsEqualTo("https://identity.example.test/realms/events/registrations");
-        await Assert.That(cut.FindAll(".auth-provider-configuration__visitor-onboarding")).Count().IsEqualTo(2);
+        await Assert.That(cut.FindAll(".auth-provider-configuration__visitor-onboarding")).Count().IsEqualTo(1);
         await cut.InvokeAsync(() => policy.ValueChanged.InvokeAsync(PublicOnboardingPolicy.Denied));
         await Assert.That(model.KeycloakPublicOnboardingPolicy).IsEqualTo(PublicOnboardingPolicy.Denied);
     }
@@ -177,9 +213,7 @@ public sealed class AuthProviderConfigurationTests : IDisposable
             PrimaryProviderId = 4,
             PrimaryProviderCode = "local",
             PrimaryProviderName = "Local Identity",
-            AtprotoLoginEnabled = false,
-            GoogleSsoEnabled = true,
-            GoogleClientId = "client.apps.googleusercontent.com"
+            AtprotoLoginEnabled = false
         };
         _onboarding.GetAuthProviderConfigurationAsync().Returns(model);
         var cut = _context.RenderMudComponent<AuthProviderConfiguration>();
@@ -191,7 +225,7 @@ public sealed class AuthProviderConfigurationTests : IDisposable
         await Assert.That(model.PrimaryProviderCode).IsEqualTo("ATPROTO");
         await Assert.That(model.PrimaryProviderName).IsEqualTo("AT Protocol");
         await Assert.That(model.AtprotoLoginEnabled).IsTrue();
-        await Assert.That(model.GoogleSsoEnabled).IsFalse();
+        await Assert.That(cut.FindAll("[data-testid=onboarding-google-public-policy]")).Count().IsEqualTo(0);
         await Assert.That(cut.Markup).DoesNotContain("Authority URL (Required)");
     }
 

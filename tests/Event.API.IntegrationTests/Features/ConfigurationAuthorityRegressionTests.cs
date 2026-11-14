@@ -440,13 +440,26 @@ public sealed class ConfigurationAuthorityRegressionTests
                 if (hidden)
                     return new
                     {
-                        id, workspace, environment, secret.secretPath, secret.secretKey,
-                        secretValueHidden = true, type = "shared", version = 1
+                        id,
+                        workspace,
+                        environment,
+                        secret.secretPath,
+                        secret.secretKey,
+                        secretValueHidden = true,
+                        type = "shared",
+                        version = 1
                     };
                 return new
                 {
-                    id, workspace, environment, secret.secretPath, secret.secretKey, secret.secretValue,
-                    secretValueHidden = false, type = "shared", version = 1
+                    id,
+                    workspace,
+                    environment,
+                    secret.secretPath,
+                    secret.secretKey,
+                    secret.secretValue,
+                    secretValueHidden = false,
+                    type = "shared",
+                    version = 1
                 };
             }
             app.MapGet("/api/v4/secrets", (HttpContext context) =>

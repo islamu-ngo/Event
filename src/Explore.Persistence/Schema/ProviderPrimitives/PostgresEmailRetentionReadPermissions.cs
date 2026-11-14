@@ -15,7 +15,7 @@ public static class PostgresEmailRetentionReadPermissions
 {
     private const string Policy = "email_retention_metadata_global_read";
     private const string Drift = "email_retention_read_permissions_drift";
-    private static readonly string[] ReadProperties =
+    internal static readonly string[] ReadProperties =
     [nameof(EmailDispatchOutbox.TenantId), nameof(EmailDispatchOutbox.CreatedAt), nameof(EmailDispatchOutbox.Status),
         nameof(EmailDispatchOutbox.SentAt), nameof(EmailDispatchOutbox.LastFailureAt),
         nameof(EmailDispatchOutbox.ContentRedactedAt), nameof(EmailDispatchOutbox.IsDeleted)];
@@ -72,8 +72,8 @@ public static class PostgresEmailRetentionReadPermissions
                     throw new InvalidOperationException("email_retention_requires_fresh_development_cluster");
                 RequireOriginal();
                 string fresh = Fresh(sources, enrollment.GlobalLogin);
-                string complete = Manifest(sources, enrollment, complete: true);
-                if (!await IsTrueAsync(context, $"({Manifest(sources, enrollment, complete: false)}) AND (({fresh}) OR ({complete}))", cancellationToken))
+                string complete = Manifest(context, sources, enrollment, complete: true);
+                if (!await IsTrueAsync(context, $"({Manifest(context, sources, enrollment, complete: false)}) AND (({fresh}) OR ({complete}))", cancellationToken))
                     throw new InvalidOperationException(Drift);
                 RequireOriginal();
                 if (await IsTrueAsync(context, fresh, cancellationToken))
@@ -145,7 +145,7 @@ public static class PostgresEmailRetentionReadPermissions
             RequireOriginal();
             var sources = Sources(context);
             bool ready = await IsTrueAsync(context,
-                $"({NoObsoleteInstallation(sources)}) AND ({Manifest(sources, enrollment, complete: true)})", cancellationToken);
+                $"({NoObsoleteInstallation(sources)}) AND ({Manifest(context, sources, enrollment, complete: true)})", cancellationToken);
             RequireOriginal();
             if (!ready) throw new UnauthorizedAccessException("email_retention_read_permissions_not_ready");
         }
@@ -155,13 +155,16 @@ public static class PostgresEmailRetentionReadPermissions
     internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var sources = Sources(context);
-        return $"({NoObsoleteInstallation(sources)}) AND ({Manifest(sources, enrollment, complete: true)})";
+        return $"({NoObsoleteInstallation(sources)}) AND ({Manifest(context, sources, enrollment, complete: true)})";
     }
 
     internal static IReadOnlyList<string> GlobalCatalogueRelations(ExploreDbContext context) =>
         Sources(context).Select(source => source.Table).ToArray();
 
-    private static string Manifest(Source[] sources, PostgresNativeQueueEnrollment enrollment, bool complete)
+    internal static string SharedOutboxPolicyPredicate(ExploreDbContext context, string login) =>
+        PolicyPredicate(Sources(context)[0], login);
+
+    private static string Manifest(ExploreDbContext context, Source[] sources, PostgresNativeQueueEnrollment enrollment, bool complete)
     {
         string global = Text(enrollment.GlobalLogin), runtime = Text(enrollment.RuntimeLogin);
         string tables = "ARRAY[" + string.Join(',', sources.Select(source => Text(source.Table))) + "]::text[]";
@@ -174,7 +177,8 @@ public static class PostgresEmailRetentionReadPermissions
                     AND acl.privilege_type='SELECT' AND NOT acl.is_grantable)
             """)) + $" AND pg_catalog.has_schema_privilege({global},{Text(sources[0].Schema)},'USAGE')" : "true";
         return $"""
-            (WITH expected(relation,column_name) AS ({expected}), members AS
+            (WITH expected(relation,column_name) AS ({expected}), publication AS
+                (SELECT ({PostgresEmailPointerPublicationPermissions.CompleteGlobalCataloguePredicate(context, enrollment)}) AS ready), members AS
                 (SELECT r.* FROM pg_catalog.pg_roles r WHERE pg_catalog.pg_has_role({RoleOid(enrollment.GlobalLogin)},r.oid,'MEMBER'))
             SELECT (SELECT count(*)=2 FROM pg_catalog.pg_roles WHERE rolname IN ({global},{runtime}) AND rolcanlogin)
                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members WHERE roleid={RoleOid(enrollment.GlobalLogin)})
@@ -193,16 +197,19 @@ public static class PostgresEmailRetentionReadPermissions
                             WHERE a.attrelid=t.oid AND a.attnum<>0 AND NOT a.attisdropped
                                 AND (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege || ' WITH GRANT OPTION')
                                     OR (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege) AND NOT (
-                                        a.attnum>0 AND r.rolname={global} AND permission.privilege='SELECT'
-                                        AND EXISTS (SELECT 1 FROM expected e WHERE e.relation=source.relation AND e.column_name=a.attname)
+                                        a.attnum>0 AND r.rolname={global}
+                                        AND ((permission.privilege='SELECT'
+                                            AND EXISTS (SELECT 1 FROM expected e WHERE e.relation=source.relation AND e.column_name=a.attname))
+                                            OR ((SELECT ready FROM publication)
+                                                AND ({PostgresEmailPointerPublicationPermissions.DeclaredColumnPrivilegePredicate(context, "source.relation", "a.attname", "permission.privilege")})))
                                         AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=r.oid
-                                            AND acl.grantor=t.relowner AND acl.privilege_type='SELECT' AND NOT acl.is_grantable)
-                                        AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=0 AND acl.privilege_type='SELECT'))))))
-                AND ({required}) AND ({string.Join(" AND ", sources.Select(source => SourcePredicate(source, enrollment, complete)))}))
+                                            AND acl.grantor=t.relowner AND acl.privilege_type=permission.privilege AND NOT acl.is_grantable)
+                                        AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=0 AND acl.privilege_type=permission.privilege))))))
+                AND ({required}) AND ({string.Join(" AND ", sources.Select(source => SourcePredicate(context, source, enrollment, complete)))}))
             """;
     }
 
-    private static string SourcePredicate(Source source, PostgresNativeQueueEnrollment enrollment, bool complete)
+    private static string SourcePredicate(ExploreDbContext context, Source source, PostgresNativeQueueEnrollment enrollment, bool complete)
     {
         string columns = source.ReadColumns.Length == 0 ? "true" : string.Join(" AND ", source.ReadColumns.Select(column => $"""
             EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid=c.oid AND a.attname={Text(column.Name)}
@@ -225,7 +232,8 @@ public static class PostgresEmailRetentionReadPermissions
                         AND (p.polname={Text(Policy)} OR (p.polname<>'tenant_isolation'
                             AND EXISTS (SELECT 1 FROM unnest(p.polroles) role_id
                                 WHERE role_id=0 OR pg_catalog.pg_has_role({RoleOid(enrollment.GlobalLogin)},role_id,'MEMBER'))))
-                        AND NOT COALESCE(({ownPolicy}),false))
+                        AND NOT COALESCE((({ownPolicy}) OR ((SELECT ready FROM publication)
+                            AND ({PostgresEmailPointerPublicationPermissions.DeclaredPolicyPredicate(context, enrollment.GlobalLogin)}))),false))
                     {(complete && source.ReadColumns.Length != 0 ? $"AND EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE {ownPolicy})" : "")}
                     AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_inherits i WHERE i.inhrelid=c.oid OR i.inhparent=c.oid)
                     AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite r WHERE r.ev_class=c.oid))

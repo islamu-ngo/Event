@@ -6,6 +6,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using TUnit.Core;
 
@@ -468,16 +469,24 @@ public sealed class EventLocationPrivacyRepositoryTests(ProjectionTestContainerF
         EventLocation loser = await losingRepository.GetForUpdateAsync(graph.EventLocationId, CancellationToken.None)
             ?? throw new InvalidOperationException("Losing EventLocation was not found.");
 
-        winner.DetachFinalReference(graph.ActorUserId, DateTime.UtcNow);
-        await new EfCoreUnitOfWork(winningContext).ExecuteInTransactionAsync(
-            ct => winningRepository.SaveChangesAsync(ct),
-            CancellationToken.None);
+        await using (var gate = new EventDiscoveryEnrollmentGate(winningContext))
+        {
+            await using var custody = await gate.AcquireAsync();
+            winner.DetachFinalReference(graph.ActorUserId, DateTime.UtcNow);
+            await new EfCoreUnitOfWork(winningContext).ExecuteInTransactionAsync(
+                ct => winningRepository.SaveChangesAsync(ct),
+                CancellationToken.None);
+        }
 
         loser.DetachFinalReference(graph.ActorUserId, DateTime.UtcNow.AddSeconds(1));
-        ConcurrencyConflictException? exception = await Assert.ThrowsAsync<ConcurrencyConflictException>(() =>
-            new EfCoreUnitOfWork(losingContext).ExecuteInTransactionAsync(
+        ConcurrencyConflictException? exception = await Assert.ThrowsAsync<ConcurrencyConflictException>(async () =>
+        {
+            await using var gate = new EventDiscoveryEnrollmentGate(losingContext);
+            await using var custody = await gate.AcquireAsync();
+            await new EfCoreUnitOfWork(losingContext).ExecuteInTransactionAsync(
                 ct => losingRepository.SaveChangesAsync(ct),
-                CancellationToken.None));
+                CancellationToken.None);
+        });
 
         await Assert.That(exception!.Code).IsEqualTo(ConcurrencyConflictException.ConcurrentUpdate);
         await Assert.That(exception.EntityType).IsEqualTo(nameof(EventLocation));
@@ -641,6 +650,8 @@ public sealed class EventLocationPrivacyRepositoryTests(ProjectionTestContainerF
         await gate;
         try
         {
+            await using var enrollment = new EventDiscoveryEnrollmentGate(context);
+            await using var custody = await enrollment.AcquireAsync();
             await new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(
                 ct => new EventLocationDisclosureAuditRepository(context).AppendAsync(audit, ct),
                 CancellationToken.None);

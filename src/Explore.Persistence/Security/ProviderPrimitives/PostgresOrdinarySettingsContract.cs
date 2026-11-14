@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Data;
 using System.Data.Common;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -11,6 +12,8 @@ using Explore.Domain;
 using Explore.Domain.Settings;
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using NpgsqlTypes;
@@ -33,6 +36,9 @@ public static partial class PostgresOrdinarySettingsContract
     private const string Policy = "ordinary_settings_owner";
     private const string Stamp = "ordinary-settings:v1:";
     private static readonly JsonSerializerOptions Json = new() { Converters = { new NativeInstantConverter() } };
+    private static readonly ConditionalWeakTable<IModel,
+        ConditionalWeakTable<ISqlGenerationHelper,
+            Dictionary<(string Schema, PostgresNativeQueueEnrollment Enrollment), string>>> Attestations = new();
     private static readonly string[] Roles = [OwnerRole, MigratorRole, RuntimeRole, GlobalRole];
     private static readonly Type[] Sources = [typeof(SystemSetting), typeof(TenantSetting), typeof(UserPreference)];
     private static readonly (string Name, string Signature, string Arguments, string Result)[] Routines =
@@ -66,7 +72,24 @@ public static partial class PostgresOrdinarySettingsContract
     }
 
     internal static string AdmissionSql(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
-        $"DO $admission$ BEGIN {Guard(context, enrollment)} {ExactBodies(context, enrollment)} END $admission$;";
+        $"DO $admission$ BEGIN {AttestationSql(context, enrollment)} END $admission$;";
+
+    private static string AttestationSql(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        // Reuse only immutable SQL; every call still executes the live authority checks.
+        var templates = Attestations.GetValue(context.Model, static _ => new())
+            .GetValue(context.GetService<ISqlGenerationHelper>(), static _ => new());
+        var key = (new HumanPrincipalSourceSql(context).Schema, enrollment);
+        lock (templates)
+        {
+            if (!templates.TryGetValue(key, out string? text))
+            {
+                text = $"{Guard(context, enrollment)} {ExactBodies(context, enrollment)}";
+                templates.Add(key, text);
+            }
+            return text;
+        }
+    }
 
     internal static string SourceTriggerPredicate(ExploreDbContext context, Type sourceType)
     {
@@ -87,8 +110,7 @@ public static partial class PostgresOrdinarySettingsContract
         string tenant = context.TenantFilterTenantId is { } selected ? Text(selected.ToString()) + "::uuid" : "NULL::uuid";
         command.CommandText = $"""
             DO $ready$ BEGIN
-                {Guard(context, enrollment)}
-                {ExactBodies(context, enrollment)}
+                {AttestationSql(context, enrollment)}
                 IF session_user IN ({Text(enrollment.RuntimeLogin)},{Text(enrollment.GlobalLogin)}) THEN
                     PERFORM {FunctionSql(context, "read")}({tenant},NULL::uuid,'[]'::jsonb);
                 ELSIF session_user = {Text(enrollment.MigratorLogin)} AND current_user = session_user

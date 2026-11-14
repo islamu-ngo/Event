@@ -2,9 +2,8 @@ using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;
 
-public interface IPrivacyErasureStateRepository
+public interface IPrivacyErasureStateRepository : IPrivacyErasurePresenceReader
 {
-    Task<bool> ExistsBySubjectAsync(Guid subjectId, CancellationToken cancellationToken);
     Task<PrivacyErasureSaga?> GetBySubjectAsync(Guid subjectId, CancellationToken cancellationToken);
     Task<PrivacyErasureSaga?> GetByIntentAsync(Guid intentId, CancellationToken cancellationToken);
     Task<PrivacyErasureSaga?> FindByReceiptHashAsync(byte[] receiptHash, CancellationToken cancellationToken);

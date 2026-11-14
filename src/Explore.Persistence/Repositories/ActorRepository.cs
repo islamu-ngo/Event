@@ -15,6 +15,21 @@ public class ActorRepository : GenericRepository<Actor, Guid>, IActorRepository
         _dbContext = dbContext;
     }
 
+    public Task<Actor?> GetForIdentityEnrollmentAsync(Guid userId, CancellationToken cancellationToken) =>
+        _dbContext.Actors.IgnoreAutoIncludes().AsNoTracking()
+            .Where(actor => actor.UserId == userId)
+            .Select(actor => new Actor
+            {
+                Id = actor.Id,
+                UserId = actor.UserId,
+                ActorTypeId = actor.ActorTypeId,
+                ActorType = null!,
+                IsDeleted = actor.IsDeleted,
+                IsSuspended = actor.IsSuspended,
+                Pii = null!
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
     public Task<Actor?> GetForModerationAsync(Guid id, CancellationToken cancellationToken = default) =>
         _dbContext.Actors
             .IgnoreAutoIncludes()

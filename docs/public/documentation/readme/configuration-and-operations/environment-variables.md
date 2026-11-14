@@ -14,6 +14,18 @@ ISLAMU Event follows **Convention over Configuration**. The platform includes se
 
 ---
 
+## Address geocoding retry budget
+
+`GEOCODING_RETRY_DELAYS_MILLISECONDS` is a comma-separated retry schedule.
+An explicit schedule replaces the built-in `200,500` delays; it is not appended
+to them. Leaving the schedule unconfigured retains those defaults.
+
+The number of delays must match `GEOCODING_MAXIMUM_RETRY_COUNT` (default `2`),
+and their sum must be strictly below `GEOCODING_TOTAL_TIMEOUT_MILLISECONDS`
+(default and maximum `5000`). For example, `150,400` is valid with two retries
+and a total budget of `4500`. Invalid budgets block startup even when the
+provider is `None`; disabling geocoding does not bypass configuration validation.
+
 ## Shared browser session authority
 
 These inputs are required for browser sign-in in BFF and Standalone hosts,
@@ -200,6 +212,73 @@ configured-administrator fingerprints or private erasure receipts, state and
 fences. A stolen writer credential can enumerate that metadata. Reprovision a
 fresh development permission profile when adopting this inventory; readiness
 rejects an older partial profile instead of silently expanding its permissions.
+
+Credential creation must also read pending recognition and its captured material
+before admitting enrollment. The application-store writer has fixed read-only
+access to that continuity inventory, including pending state and receipt hashes;
+it cannot insert, update or delete those records. A stolen writer credential can
+read this material. This does not grant Runtime or Global the writer's authority,
+or give the writer private erasure-saga payloads or secret bindings. Provision a
+fresh development writer profile for the expanded read inventory; a partial old
+profile remains rejected.
+
+Creating the initial actor does not grant this writer event-table access.
+Classification stamping avoids existing-event lookups for a newly inserted
+actor; changes to existing actors retain their normal classification checks.
+The writer can read the generated profile concurrency revision, but cannot read
+the private birth date or its collection receipt.
+
+Configured administrator completion uses its existing Global enrollment owner
+to read only user existence and personal actor binding/state. It does not load
+private user or actor profiles. This fits the existing permission profile and
+does not require granting Global full user/actor table access. Receipt and
+binding conflicts still stop completion.
+
+The same setup transaction can create the administrator's application identity,
+reconcile its verified email evidence and assign its platform role. Migrations
+install the fixed Global permissions for those operations. The erasure check
+reads only a subject identifier; it cannot expose private erasure receipts or
+change erasure state. This does not enable private profile reads or add ordinary
+Runtime permissions. Credentials remain inactive until authoritative setup
+completion commits and activation reconciles, including after a restart.
+Protect Global against direct changes to its admitted email-evidence and
+platform-role records as well as instance settings. No new connection credential
+or environment variable is required.
+
+Initial application-profile creation also returns a database-generated
+concurrency revision. Global can read this counter so the insert can complete;
+the person's birth date, collection receipt and other private profile fields
+remain unreadable through that grant. Protect Global credentials against
+revision-counter observation. Provision a fresh development worker permission
+profile through the native migration workflow; readiness rejects an older
+incomplete profile instead of expanding its rights during a request.
+
+Creating the administrator and its personal actor remains atomic even though
+the repositories save them separately. The later save recognizes the User row
+inserted successfully by the same transaction; Global does not need permission
+to update the User identifier. A save failure, savepoint rollback or replacement
+transaction invalidates that creation evidence. Existing-account fences remain
+required, and no additional credential or environment setting is needed.
+
+The migration service also installs fixed storage access for setup's twelve
+settings: deployment mode, branding, public/admin addresses, default language,
+public-experience content, default public home page and operator identity.
+Global can read and create these rows and update their values and descriptive
+metadata. It cannot rename or delete them, alter creation audit, or read unrelated
+private settings through this access. PostgreSQL row policies preserve that
+boundary; existing native settings editors retain their separate permissions.
+Setup still requires its real credential receipt and source checks. A stolen
+Global database credential could change these twelve settings directly, so
+protect and rotate it as an application credential.
+Global also receives the existing execute-only discovery operations needed to
+refresh tenant disclosure after an instance-setting change. This does not grant
+access to discovery source tables or admit ordinary Runtime to those operations.
+Protecting Global also protects those dependency and epoch operations.
+
+Migrations and setup refuse an incomplete or modified settings permission
+profile. Investigate permission drift rather than granting Global blanket
+settings-table access. No additional credential or environment variable is
+required.
 
 Only the migration service receives migration credentials; API runtime does not
 inherit them. Provision real database roles/grants separately: setup readiness
@@ -908,8 +987,9 @@ Keycloak variables are required only when `AUTHENTICATION_PROVIDER=keycloak`:
 
 The supported primary/AT Protocol combinations are `local/false`,
 `local/true`, `keycloak/false`, `keycloak/true`, and `atproto/true`.
-`atproto/false` is rejected, and Google SSO is disabled while AT Protocol is
-primary. See [Authentication Providers](authentication-providers.md) for
+`atproto/false` is rejected. Direct Google runtime inputs `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET` and their structured aliases are retired and masked;
+Google sign-in uses Keycloak's broker. See [Authentication Providers](authentication-providers.md) for
 onboarding and switching behavior.
 
 | Variable | Status | Default | Description |
@@ -1037,6 +1117,10 @@ The same `ERASURE_DATABASE_*` names are used inside the Infisical `/database/era
 
 For Local bootstrap, use the configured UUIDv7 subject as the username. Bootstrap
 creates the account and administrator linkage without requiring email delivery.
+The initial password is read directly from its registered reference in the
+selected secret authority, independently of database binding metadata. Database
+bindings cannot redirect that reference or replace a missing bootstrap password;
+do not grant Runtime access to `secret_bindings` to make bootstrap succeed.
 After setup completes, changing or leaving the bootstrap password configured
 does not reset the account. Use the credential-administration flow instead.
 
@@ -1316,8 +1400,6 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `DATABASE_TLS_MODE` | database | public | Prefer | defaulted | process |
 | `AUTHENTICATION_PROVIDER` | platform | public | None | optional | process |
 | `AUTHENTICATION_CREDENTIAL_PROFILE_REVISION` | security | public | None | optional | process |
-| `GOOGLE_CLIENT_ID` | identity | public | None | optional | process |
-| `GOOGLE_CLIENT_SECRET` | identity | secret | None (secret) | optional | process |
 | `IDENTITYCORRELATION__TRUSTEDISSUERS__0` | identity | public | None | optional | process |
 | `ATPROTO_LOGIN_ENABLED` | platform | public | None | optional | process |
 | `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | identity | public | None | required | process |

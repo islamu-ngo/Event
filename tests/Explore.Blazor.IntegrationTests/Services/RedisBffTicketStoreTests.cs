@@ -19,6 +19,64 @@ namespace Explore.Blazor.IntegrationTests.Services;
 public sealed class RedisBffTicketStoreTests(RedisBffTicketStoreTests.Authority authority)
 {
     [Test]
+    [Arguments("revoked")]
+    [Arguments("renewed")]
+    [Arguments("expired-handoff")]
+    [Arguments("foreign-destination")]
+    public async Task DestinationCookieStoreCannotMintFromInvalidOriginalSource(string invalidation)
+    {
+        using var source = authority.Create(sessionNamespace: Guid.NewGuid().ToString("N"));
+        var original = Ticket();
+        string handle = await source.StoreAsync(original);
+        BffSessionIdentity.TryGetBinding(original.Principal, out var binding);
+        string revision = original.Properties.Items[BffSessionIdentity.RevisionProperty]!;
+        string storageKey = (await authority.Keys()).Single(key =>
+            key.ToString().EndsWith(handle, StringComparison.Ordinal)).ToString();
+        string prefix = storageKey[..^handle.Length];
+        if (invalidation == "revoked") await source.RemoveAsync(handle);
+        if (invalidation == "renewed") await source.RenewAsync(handle, original);
+        int before = (await authority.Keys()).Count(key => key.ToString().StartsWith(prefix, StringComparison.Ordinal));
+        var context = new DefaultHttpContext();
+        context.Features.Set(new BffSessionTransferSource(binding, revision,
+            invalidation == "expired-handoff" ? DateTimeOffset.UtcNow.AddSeconds(-1) : DateTimeOffset.UtcNow.AddMinutes(1)));
+        var destination = Ticket();
+        if (invalidation == "foreign-destination")
+            destination = new(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "different-owner")],
+                CookieAuthenticationDefaults.AuthenticationScheme)), destination.Properties,
+                CookieAuthenticationDefaults.AuthenticationScheme);
+
+        await Assert.That(async () => { _ = await source.StoreAsync(destination, context, CancellationToken.None); })
+            .Throws<BffSessionAuthorityUnavailableException>();
+
+        await Assert.That(destination.Properties.Items.ContainsKey(BffSessionIdentity.HandleProperty)).IsFalse();
+        await Assert.That((await authority.Keys()).Count(key => key.ToString().StartsWith(prefix, StringComparison.Ordinal)))
+            .IsEqualTo(before);
+    }
+
+    [Test]
+    public async Task DestinationCookieStoreCreatesFreshCustodyFromLiveOriginalSource()
+    {
+        using var store = authority.Create(sessionNamespace: Guid.NewGuid().ToString("N"));
+        var original = Ticket();
+        string sourceHandle = await store.StoreAsync(original);
+        BffSessionIdentity.TryGetBinding(original.Principal, out var source);
+        string revision = original.Properties.Items[BffSessionIdentity.RevisionProperty]!;
+        var context = new DefaultHttpContext();
+        context.Features.Set(new BffSessionTransferSource(source, revision, DateTimeOffset.UtcNow.AddMinutes(1)));
+        var destination = Ticket();
+
+        string handle = await store.StoreAsync(destination, context, CancellationToken.None);
+
+        await Assert.That(handle).IsNotEqualTo(sourceHandle);
+        var restored = (await store.RetrieveAsync(handle))!;
+        await Assert.That(restored.Properties.Items[BffSessionIdentity.RevisionProperty]).IsNotEqualTo(revision);
+        BffSessionIdentity.TryGetBinding(restored.Principal, out var fresh);
+        await Assert.That(fresh.Handle).IsEqualTo(handle);
+        await Assert.That(fresh.OwnerPartitionKey).IsEqualTo(source.OwnerPartitionKey);
+        await Assert.That(await store.RetrieveAsync(sourceHandle)).IsNotNull();
+    }
+
+    [Test]
     public async Task PeerReadsTicketAndLogoutRevokesOnlyThatBrowser()
     {
         using var first = authority.Create();

@@ -194,7 +194,7 @@
         "dependencies": {
           "Event.Wire.Contracts": "[1.0.0, )",
           "ISLAMU.Moderation.Domain": "[1.0.0, )",
-          "Microsoft.Extensions.Compliance.Abstractions": "[10.8.0, )"
+          "Microsoft.Extensions.Compliance.Abstractions": "[10.10.0, )"
         }
       },
       "islamu.moderation.application": {
@@ -241,9 +241,9 @@
       },
       "Microsoft.Extensions.Compliance.Abstractions": {
         "type": "CentralTransitive",
-        "requested": "[10.8.0, )",
-        "resolved": "10.8.0",
-        "contentHash": "7I0DXMTCqpXpXg+SLLDlfedtv6DN5Lgiv+PR3MclzqKPOHNB17YP42KMNI61ckSrffh0xsuIqQyCIjvWc6vUuw=="
+        "requested": "[10.10.0, )",
+        "resolved": "10.10.0",
+        "contentHash": "Sh3ujDRJpCMNY4x+43ljCROt4qBOoWfsL8l816RPYZS1S+Tw277r5002rbB15Sh6hFcCT8mGYBO7NtpfSYrQ0Q=="
       },
       "OpenFeature": {
         "type": "CentralTransitive",

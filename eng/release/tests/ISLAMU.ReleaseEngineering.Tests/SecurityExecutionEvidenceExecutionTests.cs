@@ -269,6 +269,56 @@ public sealed class SecurityExecutionEvidenceManagedHintTests
 public sealed class SecurityExecutionEvidenceParentModelTests
 {
     [Test]
+    [Arguments("unrelated", "/unrelated", true)]
+    [Arguments("owned", "/unrelated", false)]
+    [Arguments("unrelated", "/volumes", false)]
+    [Arguments("unrelated", "/volumes/owned/data/child", false)]
+    [Arguments("unrelated", "relative", false)]
+    [Arguments("", "/unrelated", false)]
+    public async Task VolumeCleanupUsesNamedVolumeIdentityAndRuntimeBindPaths(string name, string bindSource, bool absent)
+    {
+        var mounts = new JsonArray(
+            new JsonObject { ["Type"] = "volume", ["Name"] = name, ["Source"] = "", ["Destination"] = "/data", ["RW"] = true },
+            new JsonObject { ["Type"] = "bind", ["Source"] = bindSource, ["Destination"] = "/config", ["RW"] = false });
+        var inventory = JsonSerializer.SerializeToElement(new[] { new JsonObject { ["State"] = "exited", ["Mounts"] = mounts } });
+        await Assert.That(SecurityExecutionEvidence.VolumeConsumersAbsent(inventory,
+            new Dictionary<string, string> { ["owned"] = "/volumes/owned/data" })).IsEqualTo(absent);
+    }
+
+    [Test]
+    [Arguments("tmpfs", "", true)]
+    [Arguments("npipe", "", true)]
+    [Arguments("bind", "/unrelated", true)]
+    [Arguments("bind", "/volumes", false)]
+    [Arguments("bind", "/volumes/owned/data", false)]
+    [Arguments("bind", "/volumes/owned/data/child", false)]
+    [Arguments("bind", "/volumes/owned/./data", false)]
+    [Arguments("bind", "relative", false)]
+    public async Task VolumeCleanupRequiresValidatedNonoverlappingConsumers(string type, string source, bool absent)
+    {
+        var inventory = JsonSerializer.SerializeToElement(new[]
+        {
+            new { Mounts = new[] { new { Type = type, Source = source, Destination = "/witness", RW = true } } }
+        });
+        await Assert.That(SecurityExecutionEvidence.VolumeConsumersAbsent(inventory,
+            new Dictionary<string, string> { ["owned"] = "/volumes/owned/data" })).IsEqualTo(absent);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task VolumeCleanupRefusesMissingOrNullBindSources(bool missing)
+    {
+        var mount = new JsonObject { ["Type"] = "bind", ["Destination"] = "/witness", ["RW"] = true };
+        if (!missing) mount["Source"] = null;
+        var inventory = JsonSerializer.SerializeToElement(new[] { new JsonObject { ["Mounts"] = new JsonArray(mount) } });
+        Task ReadAsync() => Task.FromResult(SecurityExecutionEvidence.VolumeConsumersAbsent(inventory,
+            new Dictionary<string, string> { ["owned"] = "/volumes/owned/data" }));
+        if (missing) await Assert.ThrowsAsync<KeyNotFoundException>(ReadAsync);
+        else await Assert.ThrowsAsync<InvalidDataException>(ReadAsync);
+    }
+
+    [Test]
     public async Task ReplacedEntryPathCannotQualifyWhileTheOriginalAssemblyRemainsMapped()
     {
         if (!OperatingSystem.IsLinux()) return;
@@ -337,7 +387,9 @@ public sealed class SecurityExecutionEvidenceParentModelTests
     }
 
     [Test]
-    public async Task LiveChildPossessionCannotBeReplacedByCopiedBytesOrDifferentProcessInputs()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task LiveChildPossessionCannotBeReplacedByCopiedBytesOrDifferentProcessInputs(bool useAppHost)
     {
         if (!OperatingSystem.IsLinux()) return;
         using var fixture = new SecurityExecutionEvidenceProcessTests.ProcessFixture();
@@ -678,6 +730,8 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         using var launcherFixture = new SecurityExecutionEvidenceProcessTests.ProcessFixture();
         using var launcherCaller = new CancellationTokenSource(TimeSpan.FromSeconds(40));
         ProcessStartInfo launcherCommand = await launcherFixture.CommandAsync("managed-launcher");
+        if (useAppHost)
+            launcherCommand.Environment["ISLAMU_RELEASE_NATIVE_CHILD_APPHOST"] = "1";
         ProcessStartInfo unrelatedCommand = await launcherFixture.CommandAsync("managed-claim");
         string launcherTemporary = launcherCommand.WorkingDirectory;
         File.SetUnixFileMode(launcherTemporary, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
@@ -1031,6 +1085,49 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             new SecurityExecutionEvidence.ObservedOwnedResource(containerId, imageId, "native-model-control", true));
         await Assert.That(exactObserved.Single().Mounts.Single()).IsEqualTo(
             new SecurityExecutionEvidence.ObservedContainerMount("volume", source, mountpoint, "/native-data", true));
+        JsonObject abbreviated = RuntimeContainer();
+        abbreviated["Mounts"]![0]!["Source"] = string.Empty;
+        JsonObject inspection = new()
+        {
+            ["Id"] = containerId,
+            ["Image"] = imageId,
+            ["Mounts"] = RuntimeContainer()["Mounts"]!.DeepClone()
+        };
+        await Assert.That(SecurityExecutionEvidence.TryJoinContainerMountInspection(
+            JsonSerializer.SerializeToElement(abbreviated), JsonSerializer.SerializeToElement(inspection),
+            out var inspectedSummary)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+            JsonSerializer.SerializeToUtf8Bytes(new[] { inspectedSummary }), expected, out var inspectedResources)).IsTrue();
+        var inspectedControl = inspectedResources ?? throw new InvalidDataException("native_control_inspection_missing");
+        await Assert.That(inspectedControl.Single().Container).IsEqualTo(exactObserved.Single().Container);
+        await Assert.That(inspectedControl.Single().Mounts.Single()).IsEqualTo(exactObserved.Single().Mounts.Single());
+        foreach (string defect in new[] { "id", "image", "type", "name", "target", "writable",
+            "empty-source", "missing-source", "null-source", "extra-mount", "summary-source" })
+        {
+            JsonObject changed = inspection.DeepClone().AsObject();
+            JsonObject summary = abbreviated.DeepClone().AsObject();
+            JsonObject mount = changed["Mounts"]![0]!.AsObject();
+            switch (defect)
+            {
+                case "id": changed["Id"] = new string('4', 64); break;
+                case "image": changed["Image"] = "sha256:" + new string('8', 64); break;
+                case "type": mount["Type"] = "bind"; mount.Remove("Name"); break;
+                case "name": mount["Name"] = "other-volume"; break;
+                case "target": mount["Destination"] = "/other"; break;
+                case "writable": mount["RW"] = false; break;
+                case "empty-source": mount["Source"] = string.Empty; break;
+                case "missing-source": mount.Remove("Source"); break;
+                case "null-source": mount["Source"] = null; break;
+                case "extra-mount":
+                    JsonObject extra = mount.DeepClone().AsObject();
+                    extra["Destination"] = "/extra";
+                    changed["Mounts"]!.AsArray().Add(extra);
+                    break;
+                case "summary-source": summary["Mounts"]![0]!["Source"] = mountpoint + "-changed"; break;
+            }
+            await Assert.That(SecurityExecutionEvidence.TryJoinContainerMountInspection(
+                JsonSerializer.SerializeToElement(summary), JsonSerializer.SerializeToElement(changed), out _)).IsFalse();
+        }
         string pendingForeignId = new('6', 64), pendingCreationId = "01929b87c1d070009a01f3b20d6e0a11";
         JsonObject pendingForeign = RuntimeContainer();
         pendingForeign["Id"] = pendingForeignId;
@@ -1234,6 +1331,78 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(Encoding.UTF8.GetBytes("[]"), expected,
             out var pendingResources)).IsTrue();
         await Assert.That(pendingResources!.Count).IsEqualTo(0);
+        foreach (bool labelled in new[] { false, true })
+        {
+            JsonObject retired = RuntimeContainer();
+            retired["Id"] = new string('4', 64);
+            retired["State"] = "exited";
+            retired["Labels"] = labelled
+                ? new JsonObject { ["islamu.assurance.owner"] = new string('b', 32) }
+                : new JsonObject();
+            JsonObject retiredMount = retired["Mounts"]![0]!.AsObject();
+            retiredMount["Name"] = "retired-unrelated-volume";
+            retiredMount["Source"] = string.Empty;
+            await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+                JsonSerializer.SerializeToUtf8Bytes(new JsonArray(RuntimeContainer(), retired.DeepClone())),
+                expected, out var withRetired)).IsTrue();
+            await Assert.That(withRetired!.Single().Container).IsEqualTo(exactObserved.Single().Container);
+            foreach (string? state in new string?[] { "exited", "dead", "running", "paused", "created",
+                "restarting", "removing", "unknown", null })
+            {
+                JsonObject changedState = retired.DeepClone().AsObject();
+                changedState["State"] = state;
+                await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+                    JsonSerializer.SerializeToUtf8Bytes(new JsonArray(changedState)), expected,
+                    out var stateResources)).IsEqualTo(state is "exited" or "dead" or "running" or "paused"
+                        or "created" or "restarting" or "removing");
+                if (stateResources is not null) await Assert.That(stateResources.Count).IsEqualTo(0);
+            }
+            foreach (string bindSource in new[] { mountpoint, mountpoint + "/child", "/native-volumes",
+                "/", "/unrelated-retired-bind" })
+            {
+                JsonObject mixed = retired.DeepClone().AsObject();
+                mixed["Mounts"]!.AsArray().Add(new JsonObject
+                {
+                    ["Type"] = "bind",
+                    ["Source"] = bindSource,
+                    ["Destination"] = "/foreign-bind",
+                    ["RW"] = false
+                });
+                await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+                    JsonSerializer.SerializeToUtf8Bytes(new JsonArray(mixed)), expected, out _))
+                    .IsEqualTo(bindSource == "/unrelated-retired-bind");
+            }
+            foreach (string invalid in new[] { "declared-name", "implicit-name", "missing-source",
+                "null-source", "numeric-source", "boolean-source", "object-source", "array-source",
+                "whitespace-source", "relative-source", "trailing-slash-source", "empty-bind-source" })
+            {
+                JsonObject conflict = retired.DeepClone().AsObject();
+                JsonObject conflictMount = conflict["Mounts"]![0]!.AsObject();
+                switch (invalid)
+                {
+                    case "declared-name": conflictMount["Name"] = source; break;
+                    case "implicit-name": conflictMount["Name"] = anonymous; break;
+                    case "missing-source": conflictMount.Remove("Source"); break;
+                    case "null-source": conflictMount["Source"] = null; break;
+                    case "numeric-source": conflictMount["Source"] = 1; break;
+                    case "boolean-source": conflictMount["Source"] = false; break;
+                    case "object-source": conflictMount["Source"] = new JsonObject(); break;
+                    case "array-source": conflictMount["Source"] = new JsonArray(); break;
+                    case "whitespace-source": conflictMount["Source"] = " "; break;
+                    case "relative-source": conflictMount["Source"] = "relative"; break;
+                    case "trailing-slash-source": conflictMount["Source"] = "/foreign/"; break;
+                    case "empty-bind-source": conflictMount["Type"] = "bind"; conflictMount.Remove("Name"); break;
+                }
+                await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+                    JsonSerializer.SerializeToUtf8Bytes(new JsonArray(withImplicit.DeepClone(), conflict)),
+                    implicitExpected, out _)).IsFalse();
+            }
+        }
+        JsonObject missingOwnedSource = RuntimeContainer();
+        missingOwnedSource["State"] = "exited";
+        missingOwnedSource["Mounts"]![0]!["Source"] = string.Empty;
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+            RuntimeBytes(missingOwnedSource), expected, out _)).IsFalse();
         await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(Encoding.UTF8.GetBytes("[]"),
             expected with
             {
@@ -1708,7 +1877,7 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         await Assert.That(outsideBenchmarkArtifacts).IsTrue();
         ProcessStartInfo baselineCommand = SecurityExecutionEvidence.ApiBenchmarkStartInfo(benchmarkEntry, benchmarkTemporary, benchmarkArtifacts, "baseline");
         await Assert.That(baselineCommand.ArgumentList.SequenceEqual(new[] { benchmarkEntry, "--filter", "*ApiEndpointPostgreSqlBenchmarks*",
-            "*EfCoreQueryBenchmarks*", "--stopOnFirstError", "--artifacts", benchmarkArtifacts })).IsTrue();
+            "*EfCoreQueryBenchmarks*", "--buildTimeout", "600", "--stopOnFirstError", "--artifacts", benchmarkArtifacts })).IsTrue();
         if (OperatingSystem.IsLinux())
         {
             File.SetUnixFileMode(metadataFixture.Root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
@@ -1781,9 +1950,103 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             .EndsWith(".deps.json", StringComparison.Ordinal))).IsTrue();
     }
 
-    private static void WriteOwnMetadataAssembly(string path, IEnumerable<KeyValuePair<string, string>> fields)
+    [Test]
+    public async Task ExitedNativeToolCannotFaultObservationOrBecomeQualified()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = new SecurityExecutionEvidenceProcessTests.ProcessFixture();
+        ProcessStartInfo command = await fixture.CommandAsync("hold");
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        bool linked = false, rejected = false;
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command,
+            TimeSpan.FromSeconds(20), cancellation.Token, async (context, _) =>
+            {
+                var captured = await SecurityExecutionEvidence.CaptureLiveNativeToolAsync(context,
+                    context.Pid, CancellationToken.None, async () =>
+                    {
+                        using var process = Process.GetProcessById(context.Pid);
+                        var exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                        process.Exited += (_, _) => exited.TrySetResult();
+                        process.EnableRaisingEvents = true;
+                        linked = true;
+                        await cancellation.CancelAsync();
+                        await exited.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                    });
+                rejected = captured is null;
+            });
+        if (result.ObserverFailures.Count != 0)
+            throw new AggregateException("Native executable probe failed.", result.ObserverFailures);
+        await Assert.That(linked && rejected).IsTrue();
+        await Assert.That(result.Cancelled && result.CleanupSucceeded && result.ObserverSettled
+            && !result.ResidualOwnedChildren && result.ObserverFailures.Count == 0).IsTrue();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task NativeToolMetadataRetainsLiveAndIndependentFailures(bool expireWithIndependentFailure)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = new SecurityExecutionEvidenceProcessTests.ProcessFixture();
+        ProcessStartInfo command = await fixture.CommandAsync("hold");
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var metadataFailure = new InvalidDataException("managed_metadata_unavailable");
+        var independentFailure = new InvalidOperationException("independent_metadata_failure");
+        var failure = expireWithIndependentFailure
+            ? new AggregateException(metadataFailure, independentFailure)
+            : new AggregateException(metadataFailure);
+        bool linked = false;
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command,
+            TimeSpan.FromSeconds(20), cancellation.Token, async (context, _) =>
+            {
+                await SecurityExecutionEvidence.CaptureLiveNativeToolAsync(context,
+                    context.Pid, CancellationToken.None, async () =>
+                    {
+                        linked = true;
+                        if (expireWithIndependentFailure)
+                        {
+                            using var process = Process.GetProcessById(context.Pid);
+                            var exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                            process.Exited += (_, _) => exited.TrySetResult();
+                            process.EnableRaisingEvents = true;
+                            await cancellation.CancelAsync();
+                            await exited.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                        }
+                        throw failure;
+                    });
+            });
+        await Assert.That(linked && result.ObserverSettled && result.CleanupSucceeded
+            && !result.ResidualOwnedChildren).IsTrue();
+        await Assert.That(result.ObserverFailures.Count == 1 && ReferenceEquals(result.ObserverFailures[0], failure)).IsTrue();
+    }
+
+    [Test]
+    [Arguments(16, true)]
+    [Arguments(33, false)]
+    public async Task OwnBuildMetadataRemainsBoundedForLargeNativeAssemblies(int metadataMiB, bool accepted)
+    {
+        using var fixture = new SecurityExecutionEvidenceCandidateTests.SourceFixture();
+        string assembly = Path.Combine(fixture.Root, "large-own-metadata.dll");
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["ISLAMU.Assurance.ProjectPath"] = "src/Own/Own.csproj",
+            ["ISLAMU.Assurance.TargetPath"] = "src/Own/bin/Release/net10.0/Own.dll",
+            ["ISLAMU.Assurance.TargetName"] = "Own"
+        };
+        WriteOwnMetadataAssembly(assembly, fields, metadataMiB * 1_048_576);
+        if (accepted)
+            await Assert.That(SecurityExecutionEvidence.ReadOwnManagedBuild(assembly)).IsEqualTo(
+                new SecurityExecutionEvidence.OwnManagedBuild("src/Own/Own.csproj",
+                    "src/Own/bin/Release/net10.0/Own.dll", "Own", null, null));
+        else
+            await Assert.That(() => SecurityExecutionEvidence.ReadOwnManagedBuild(assembly))
+                .Throws<InvalidDataException>();
+    }
+
+    private static void WriteOwnMetadataAssembly(string path, IEnumerable<KeyValuePair<string, string>> fields, int metadataPadding = 0)
     {
         var metadata = new MetadataBuilder();
+        if (metadataPadding != 0) metadata.GetOrAddBlob(new byte[metadataPadding]);
         metadata.AddModule(0, metadata.GetOrAddString("Own.dll"), metadata.GetOrAddGuid(Guid.CreateVersion7()), default, default);
         AssemblyDefinitionHandle assembly = metadata.AddAssembly(metadata.GetOrAddString("Own"), new Version(1, 0, 0, 0),
             default, default, default, default);
@@ -1938,6 +2201,58 @@ public sealed class SecurityExecutionEvidencePublicationTests
             }
         }
         finally { Directory.Delete(root, recursive: true); }
+    }
+}
+
+public sealed class SecurityExecutionEvidenceRuntimeExporterTests
+{
+    [Test]
+    [Arguments("unscoped")]
+    [Arguments("scoped")]
+    [Arguments("different-scope")]
+    [Arguments("different-version")]
+    [Arguments("version-without-name")]
+    [Arguments("duplicate-scope-label")]
+    [Arguments("invalid-escape")]
+    [Arguments("duplicate-memory")]
+    public async Task RuntimeSeriesRequireOneConsistentUnambiguousScope(string variant)
+    {
+        string scope = variant == "unscoped" ? "" : ",otel_scope_name=\"System.Runtime\",otel_scope_version=\"10.0.0\"";
+        if (variant == "version-without-name") scope = ",otel_scope_version=\"10.0.0\"";
+        string systemScope = scope;
+        string memoryScope = scope;
+        switch (variant)
+        {
+            case "different-scope":
+                memoryScope = ",otel_scope_name=\"Foreign.Runtime\",otel_scope_version=\"10.0.0\"";
+                break;
+            case "different-version":
+                systemScope = ",otel_scope_name=\"System.Runtime\",otel_scope_version=\"11.0.0\"";
+                break;
+            case "duplicate-scope-label":
+                memoryScope += ",otel_scope_name=\"System.Runtime\"";
+                break;
+            case "invalid-escape":
+                memoryScope = ",otel_scope_name=\"System\\qRuntime\",otel_scope_version=\"10.0.0\"";
+                break;
+        }
+        string memoryLabels = memoryScope.Length == 0 ? "" : "{" + memoryScope[1..] + "}";
+        string memory = "dotnet_process_memory_working_set_bytes" + memoryLabels + " 9007199254740993\n";
+        string exporter = "# TYPE dotnet_process_cpu_time_seconds counter\n"
+            + "# UNIT dotnet_process_cpu_time_seconds seconds\n"
+            + "dotnet_process_cpu_time_seconds_total{cpu_mode=\"user\"" + scope + "} 1.25\n"
+            + "dotnet_process_cpu_time_seconds_total{cpu_mode=\"system\"" + systemScope + "} 0.5\n"
+            + "# TYPE dotnet_process_memory_working_set_bytes gauge\n"
+            + "# UNIT dotnet_process_memory_working_set_bytes bytes\n"
+            + memory + (variant == "duplicate-memory" ? memory : "") + "# EOF\n";
+
+        bool accepted = SecurityExecutionEvidence.TryReadRuntimeExporter(Encoding.UTF8.GetBytes(exporter), out var values);
+        bool valid = variant is "unscoped" or "scoped";
+        await Assert.That(accepted).IsEqualTo(valid);
+        if (valid)
+            await Assert.That(values).IsEqualTo(new SecurityExecutionEvidence.RuntimeExporterValues(1.25, 0.5, 9007199254740993L));
+        else
+            await Assert.That(values).IsNull();
     }
 }
 
@@ -3137,6 +3452,13 @@ public sealed class SecurityExecutionEvidenceProcessTests
                     typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location,
                     [TestContext.Current!.Metadata.TestDetails.Identity.TestId], Path.Combine(root, "host-results"),
                     root, "managed-host.trx", 60);
+                if (Environment.GetEnvironmentVariable("ISLAMU_RELEASE_NATIVE_CHILD_APPHOST") == "1")
+                {
+                    string assembly = hosted.StartInfo.ArgumentList[0];
+                    hosted.StartInfo.FileName = Path.Combine(Path.GetDirectoryName(assembly)!,
+                        Path.GetFileNameWithoutExtension(assembly));
+                    hosted.StartInfo.ArgumentList.RemoveAt(0);
+                }
                 hosted.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CONTROL"] = "managed-host";
                 hosted.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_ROOT"] = root;
                 hosted.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CANARY"] = canary;

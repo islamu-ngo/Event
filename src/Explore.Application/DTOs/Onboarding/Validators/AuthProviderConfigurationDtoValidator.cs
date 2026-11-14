@@ -18,9 +18,6 @@ public class AuthProviderConfigurationDtoValidator : AbstractValidator<AuthProvi
                 .Equal(true)
                 .WithMessage("AT Protocol login must be enabled when AT Protocol is the primary provider.");
 
-            RuleFor(x => x.GoogleSsoEnabled)
-                .Equal(false)
-                .WithMessage("Google SSO must be disabled when AT Protocol is the sole primary provider.");
         });
 
         When(x => x.PrimaryProviderId == (int)AuthenticationProviderKind.Keycloak, () =>
@@ -51,16 +48,6 @@ public class AuthProviderConfigurationDtoValidator : AbstractValidator<AuthProvi
                 .WithMessage("ATProto public URL must be a valid URL.");
         });
 
-        When(x => x.GoogleSsoEnabled, () =>
-        {
-            RuleFor(x => x.GoogleClientId)
-                .NotEmpty()
-                .WithMessage("Google client ID is required when Google SSO is enabled.");
-
-            RuleFor(x => x.GoogleClientSecretOwnership)
-                .Must(_ => authoritativeCurrentConfiguration?.GoogleClientSecretOwnership.Configured == true)
-                .WithMessage("The selected deployment authority must have a configured Google credential.");
-        });
     }
 
     private static bool BeSupportedPrimaryProvider(int providerId) =>

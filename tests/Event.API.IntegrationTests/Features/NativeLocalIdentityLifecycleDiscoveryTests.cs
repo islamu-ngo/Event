@@ -87,8 +87,12 @@ public sealed class NativeLocalIdentityLifecycleDiscoveryTests
         var operation = (await credentials.ReadOperationAsync(current.CurrentOperationId!.Value, CancellationToken))!;
         // The fixture freezes its clock before seeding with the native host's system clock.
         // Reset must not precede the persisted verification provenance.
-        fixture.Clock.Advance(operation.VerifiedAt - fixture.Clock.GetUtcNow().UtcDateTime);
-        var reset = await credentials.ResetAsync(new(Guid.CreateVersion7(), operation.Receipt.InitiatingApplicationUserId,
+        DateTime verifiedAt = operation.VerifiedAt
+            ?? throw new InvalidOperationException("The administrator fixture has no verification time.");
+        fixture.Clock.Advance(verifiedAt - fixture.Clock.GetUtcNow().UtcDateTime);
+        var reset = await credentials.ResetAsync(new(Guid.CreateVersion7(),
+            operation.Receipt.InitiatingApplicationUserId
+                ?? throw new InvalidOperationException("The administrator fixture has no initiating user."),
             dto.Id, current.CurrentOperationId.Value, current.CurrentOperationConcurrencyStamp!.Value, "Discovery revocation regression"), CancellationToken);
         await Assert.That(reset.Outcome).IsEqualTo(LocalCredentialResetOutcome.Reset);
         await Assert.That((await credentials.ReadLinkedIdentityAsync(dto.Id, CancellationToken))!.CredentialState)
@@ -121,6 +125,13 @@ public sealed class NativeLocalIdentityLifecycleDiscoveryTests
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
             await AssertLinksAsync(json, emailEnabled, emailEnabled, false);
             await Assert.That(json.RootElement.TryGetProperty("primaryProviderId", out _)).IsTrue();
+            var links = json.RootElement.GetProperty("_links");
+            await Assert.That(links.GetProperty("signup:local").GetProperty("href").GetString())
+                .IsEqualTo("/auth/local/register");
+            await Assert.That(links.GetProperty("local-register").GetProperty("method").GetString())
+                .IsEqualTo("POST");
+            await Assert.That(links.GetProperty("local-register").GetProperty("href").GetString())
+                .IsEqualTo("/api/auth/local/enrollment/register");
         }
         string bearer = await fixture.SignInAsync();
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/User");
@@ -132,9 +143,12 @@ public sealed class NativeLocalIdentityLifecycleDiscoveryTests
 
         await using (var database = fixture.Native.CreateDatabase())
         {
+            database.BindTenantLease();
+            await using var transaction = await database.Database.BeginTransactionAsync(CancellationToken);
             var host = await database.SystemSettings.SingleAsync(row => row.SettingKey == GovernanceSettingKeys.Email.SmtpHost, CancellationToken);
             host.Value = "\"\"";
             await database.SaveChangesAsync(CancellationToken);
+            await transaction.CommitAsync(CancellationToken);
         }
         await Assert.That(await QueryAsync(scope.ServiceProvider, new(PublicDiscovery: true))).IsEqualTo(new(false, false, false));
         var principal = await AuthenticateAsync(scope.ServiceProvider, bearer);
@@ -143,6 +157,29 @@ public sealed class NativeLocalIdentityLifecycleDiscoveryTests
         await Assert.That(missing.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var missingJson = JsonDocument.Parse(await missing.Content.ReadAsStringAsync(CancellationToken));
         await AssertLinksAsync(missingJson, false, false, false);
+        await Assert.That(missingJson.RootElement.GetProperty("_links").TryGetProperty("local-register", out _)).IsTrue();
+        await using (var database = fixture.Native.CreateDatabase())
+        {
+            database.BindTenantLease();
+            await using var transaction = await database.Database.BeginTransactionAsync(CancellationToken);
+            await Assert.That(await database.SystemSettings.AnyAsync(
+                row => row.SettingKey == GovernanceSettingKeys.Tenants.UserRegistrationEnabled, CancellationToken)).IsFalse();
+            database.SystemSettings.Add(new()
+            {
+                SettingKey = GovernanceSettingKeys.Tenants.UserRegistrationEnabled,
+                Value = "false"
+            });
+            await database.SaveChangesAsync(CancellationToken);
+            await transaction.CommitAsync(CancellationToken);
+        }
+        using var closed = await fixture.Client.GetAsync(DiscoveryPath, CancellationToken);
+        await Assert.That(closed.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var closedJson = JsonDocument.Parse(await closed.Content.ReadAsStringAsync(CancellationToken));
+        var closedLinks = closedJson.RootElement.GetProperty("_links");
+        await Assert.That(closedLinks.TryGetProperty("local-register", out _)).IsFalse();
+        await Assert.That(closedLinks.TryGetProperty("signup:local", out _)).IsFalse();
+        await Assert.That(closedJson.RootElement.GetProperty("visitorAccess")
+            .GetProperty("allowsExistingAccountLogin").GetBoolean()).IsTrue();
     }
 
     [Test]
@@ -151,11 +188,14 @@ public sealed class NativeLocalIdentityLifecycleDiscoveryTests
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(AuthenticationProviderKind.Keycloak);
         await using (var database = factory.CreateDatabase())
         {
+            database.BindTenantLease();
+            await using var transaction = await database.Database.BeginTransactionAsync(CancellationToken);
             var settings = await database.SystemSettings.ToDictionaryAsync(row => row.SettingKey, CancellationToken);
             settings[GovernanceSettingKeys.Email.DeliveryEnabled].Value = "true";
             settings[GovernanceSettingKeys.Email.SmtpHost].Value = "\"smtp.lifecycle.test\"";
             settings[GovernanceSettingKeys.Email.FromAddress].Value = "\"events@lifecycle.test\"";
             await database.SaveChangesAsync(CancellationToken);
+            await transaction.CommitAsync(CancellationToken);
         }
         var login = await factory.SeedLocalUserAsync(emailConfirmed: true);
         using var client = factory.CreateClient();
@@ -172,6 +212,8 @@ public sealed class NativeLocalIdentityLifecycleDiscoveryTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         await AssertLinksAsync(json, false, false, false);
+        await Assert.That(json.RootElement.GetProperty("_links").TryGetProperty("local-register", out _)).IsFalse();
+        await Assert.That(json.RootElement.GetProperty("_links").TryGetProperty("signup:local", out _)).IsFalse();
     }
 
     [Test]

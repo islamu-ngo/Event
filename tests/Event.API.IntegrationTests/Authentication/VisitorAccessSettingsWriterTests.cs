@@ -1,4 +1,5 @@
-
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using EventVisitorCapabilitySqliteFixture = Event.Api.IntegrationTests.Authentication.ResourceVisitorAuthenticatedFixture;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
@@ -10,6 +11,8 @@ using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Settings;
 using Explore.Application.Features.InstanceAdmin.Requests.Commands;
 using Explore.Application.Features.ConfigurationManifest.Application;
+using Explore.Application.Features.ConfigurationManifest.Importing;
+using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Features.Events;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
@@ -22,14 +25,18 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Security;
 using Explore.Persistence.Services;
+using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Api.IntegrationTests.Authentication;
 
+[NotInParallel]
 public sealed class VisitorAccessSettingsWriterTests
 {
     private const string Conflict = "visitor_access_account_required_conflict";
@@ -83,9 +90,16 @@ public sealed class VisitorAccessSettingsWriterTests
     {
         await using var fixture = await ReadyAsync();
         await GrantAdministratorAsync(fixture);
+        SelectUnusablePrimaryLogin(fixture);
         Guid otherTenantId = Guid.CreateVersion7();
         await using (var context = fixture.CreateIndependentContext())
         {
+            context.TenantContext = new SeedTenant(otherTenantId);
+            context.BindTenantLease();
+            await using var human = new Explore.Persistence.Security.HumanSecuritySourceGate(context);
+            await using var humanLease = await human.AcquireAsync();
+            await using var discovery = new EventDiscoveryEnrollmentGate(context);
+            await using var discoveryLease = await discovery.AcquireAsync();
             var tenant = new Tenant
             {
                 Id = otherTenantId,
@@ -119,7 +133,7 @@ public sealed class VisitorAccessSettingsWriterTests
             ProviderService(fixture).ApplyConfigurationAsync(ProviderCommand(fixture,
                 new() { PrimaryProviderId = (int)AuthenticationProviderKind.Local })));
         await Assert.That((await fixture.Services.GetRequiredService<ISystemSettingRepository>()
-            .GetByKey(GovernanceSettingKeys.Authentication.GoogleSsoEnabled))!.Value).IsEqualTo("true");
+            .GetByKey(GovernanceSettingKeys.Authentication.AtprotoLoginEnabled))!.Value).IsEqualTo("true");
         await Assert.That(await fixture.Services.GetRequiredService<ITenantSettingRepository>().GetAllForTenant(otherTenantId)).IsEmpty();
     }
 
@@ -130,6 +144,7 @@ public sealed class VisitorAccessSettingsWriterTests
     {
         await using var fixture = await ReadyAsync();
         await GrantAdministratorAsync(fixture);
+        SelectUnusablePrimaryLogin(fixture);
         var entity = await fixture.SeedEventAsync(accountRequired: true);
         await using var selected = await fixture.Services.GetRequiredService<IPolicyMutationExecutionScopeFactory>()
             .CreateAsync(PolicyMutationScope.Instance, CancellationToken.None);
@@ -167,14 +182,25 @@ public sealed class VisitorAccessSettingsWriterTests
             writerServices.GetRequiredService<ITenantAdministratorCommitAuthority>(),
             writerServices.GetRequiredService<IHumanActionCommitFinalizer>(), subject,
             writerServices.GetRequiredService<IHumanSettingsMutationPreparation>());
-        Task<BaseCommandResponse<Guid>> Publish() => publisher.ExecuteAsync(entity.Id,
-            new PublishEventRequestDto { ExpectedConcurrencyStamp = entity.ConcurrencyStamp },
-            EventPublicationMode.PrivilegedApproval, timeout.Token);
-        Task<VisitorAccessSettingsWriteResult> Remove() => writerLock.ExecuteOrderedGroupsAsync(
-            [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
-            token => writer.ApplyAsync(
-                [new(null, GovernanceSettingKeys.Authentication.GoogleSsoEnabled, VisitorAccessSettingMutationKind.SetValue, "false")],
-                subject, SettingsMutationOperation.InstanceSettings, fixture.UserId, token), timeout.Token);
+        async Task<BaseCommandResponse<Guid>> Publish()
+        {
+            // A writer-first contender waits at discovery custody before reaching its key hook.
+            if (!publicationFirst)
+                contenderArrived.TrySetResult();
+            await using var discovery = new EventDiscoveryEnrollmentGate(fixture.Context);
+            await using var lease = await discovery.AcquireAsync(timeout.Token);
+            return await publisher.ExecuteAsync(entity.Id,
+                new PublishEventRequestDto { ExpectedConcurrencyStamp = entity.ConcurrencyStamp },
+                EventPublicationMode.PrivilegedApproval, timeout.Token);
+        }
+        Task<VisitorAccessSettingsWriteResult> Remove()
+        {
+            if (publicationFirst)
+                contenderArrived.TrySetResult();
+            return writer.ApplyAsync(
+                [new(null, GovernanceSettingKeys.Authentication.AtprotoLoginEnabled, VisitorAccessSettingMutationKind.SetValue, "false")],
+                subject, SettingsMutationOperation.InstanceSettings, fixture.UserId, timeout.Token);
+        }
         Task<BaseCommandResponse<Guid>>? publishing = null;
         Task<VisitorAccessSettingsWriteResult>? removing = null;
         if (publicationFirst) publishing = Publish(); else removing = Remove();
@@ -198,7 +224,7 @@ public sealed class VisitorAccessSettingsWriterTests
         var persisted = await fixture.Services.GetRequiredService<IEventRepository>().GetById(entity.Id);
         await Assert.That(persisted!.EventStatusId).IsEqualTo((int)EventStatusEnum.Published);
         await Assert.That((await fixture.Services.GetRequiredService<ISystemSettingRepository>()
-            .GetByKey(GovernanceSettingKeys.Authentication.GoogleSsoEnabled))!.Value).IsEqualTo("true");
+            .GetByKey(GovernanceSettingKeys.Authentication.AtprotoLoginEnabled))!.Value).IsEqualTo("true");
     }
 
     [Test]
@@ -251,25 +277,35 @@ public sealed class VisitorAccessSettingsWriterTests
         await using var fixture = await ReadyAsync();
         await GrantAdministratorAsync(fixture);
         bool unlocking = operation == "unlock";
-        fixture.Context.SystemSettings.Add(new SystemSetting
+        await using (var seed = fixture.CreateIndependentContext())
         {
-            Id = Guid.CreateVersion7(),
-            SettingKey = ModeKey,
-            Value = unlocking ? "\"FullRegistrationAndAuth\"" : "\"AnonymousOnly\"",
-            ValueType = SettingValueType.String,
-            IsLocked = unlocking,
-            CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime
-        });
-        fixture.Context.Set<TenantSetting>().Add(new TenantSetting
-        {
-            Id = Guid.CreateVersion7(),
-            TenantId = fixture.TenantId,
-            Tenant = null!,
-            SettingKey = ModeKey,
-            Value = unlocking ? "\"AnonymousOnly\"" : "\"FullRegistrationAndAuth\"",
-            CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime
-        });
-        await fixture.Context.SaveChangesAsync();
+            seed.BindTenantLease();
+            await using var human = new Explore.Persistence.Security.HumanSecuritySourceGate(seed);
+            await using var humanLease = await human.AcquireAsync();
+            await using var discovery = new EventDiscoveryEnrollmentGate(seed);
+            await using var discoveryLease = await discovery.AcquireAsync();
+            await using var transaction = await seed.Database.BeginTransactionAsync();
+            seed.SystemSettings.Add(new SystemSetting
+            {
+                Id = Guid.CreateVersion7(),
+                SettingKey = ModeKey,
+                Value = unlocking ? "\"FullRegistrationAndAuth\"" : "\"AnonymousOnly\"",
+                ValueType = SettingValueType.String,
+                IsLocked = unlocking,
+                CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime
+            });
+            seed.Set<TenantSetting>().Add(new TenantSetting
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = fixture.TenantId,
+                Tenant = null!,
+                SettingKey = ModeKey,
+                Value = unlocking ? "\"AnonymousOnly\"" : "\"FullRegistrationAndAuth\"",
+                CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime
+            });
+            await seed.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
         await fixture.SeedEventAsync(accountRequired: true);
         BaseCommandResponse<Guid> result = operation switch
         {
@@ -320,6 +356,13 @@ public sealed class VisitorAccessSettingsWriterTests
     {
         await using var fixture = await ReadyAsync();
         await GrantAdministratorAsync(fixture);
+        await RetainOperatorLoginAsync(fixture, AuthenticationProviderKind.Atproto);
+        await ProviderService(fixture).ApplyConfigurationAsync(ProviderCommand(fixture, new()
+        {
+            PrimaryProviderId = (int)AuthenticationProviderKind.Atproto,
+            AtprotoLoginEnabled = true,
+            AtprotoPublicUrl = "https://original.example.test"
+        }));
         await fixture.SeedEventAsync(accountRequired: true);
         await ProviderService(fixture).ApplyConfigurationAsync(ProviderCommand(fixture, new()
         {
@@ -332,6 +375,8 @@ public sealed class VisitorAccessSettingsWriterTests
         await Assert.That(capability.SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Atproto);
         var authentication = await fixture.Services.GetRequiredService<IAuthProviderConfigurationService>().ReadConfigurationAsync();
         await Assert.That(authentication.PrimaryProviderId).IsEqualTo((int)AuthenticationProviderKind.Local);
+        await Assert.That(authentication.AtprotoLoginEnabled).IsTrue();
+        await Assert.That(authentication.AtprotoPublicUrl).IsEqualTo("https://events.example.test");
     }
 
     [Test]
@@ -427,6 +472,7 @@ public sealed class VisitorAccessSettingsWriterTests
                 CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime
             });
         await fixture.Context.SaveChangesAsync();
+        fixture.Services.GetRequiredService<IConfiguration>()["Authentication:Provider"] = "atproto";
         AuthProviderConfigurationDto result = await ProviderService(fixture).ReadConfigurationAsync();
         await Assert.That(result.PrimaryProviderId).IsEqualTo((int)AuthenticationProviderKind.Atproto);
         await Assert.That(result.PrimaryProviderCode).IsEqualTo("atproto");
@@ -439,10 +485,11 @@ public sealed class VisitorAccessSettingsWriterTests
     {
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
         await GrantAdministratorAsync(fixture);
+        await RetainOperatorLoginAsync(fixture, AuthenticationProviderKind.Atproto);
         await ProviderService(fixture).ApplyConfigurationAsync(ProviderCommand(fixture, new()
         {
             PrimaryProviderId = (int)AuthenticationProviderKind.Atproto,
-            AtprotoLoginEnabled = false,
+            AtprotoLoginEnabled = true,
             AtprotoPublicUrl = "https://events.example.test"
         }));
         await Assert.That((await fixture.Services.GetRequiredService<ISystemSettingRepository>()
@@ -454,37 +501,64 @@ public sealed class VisitorAccessSettingsWriterTests
     {
         await using var fixture = await ReadyAsync();
         await GrantAdministratorAsync(fixture);
+        SelectUnusablePrimaryLogin(fixture);
         await fixture.SeedEventAsync(accountRequired: true);
         var service = ProviderService(fixture);
         AuthProviderConfigurationDto previous = await service.ReadConfigurationAsync();
+        await Assert.That(previous.PrimaryProviderId).IsEqualTo((int)AuthenticationProviderKind.Keycloak);
+        await Assert.That((await fixture.Services.GetRequiredService<IVisitorAccessCapabilityResolver>()
+            .ResolveAsync(fixture.TenantId)).SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Atproto);
+        var groupRows = fixture.Context.SystemSettings.AsNoTracking()
+            .Where(row => VisitorAccessCapabilityResolver.AuthoritySettingKeys.Contains(row.SettingKey))
+            .OrderBy(row => row.SettingKey)
+            .Select(row => new
+            {
+                row.Id,
+                row.SettingKey,
+                row.Value,
+                row.SettingValueTypeId,
+                row.IsLocked,
+                row.AllowedValues,
+                row.Description,
+                row.Category,
+                row.DisplayOrder,
+                row.CreatedAt,
+                row.CreatedBy,
+                row.UpdatedAt,
+                row.UpdatedBy
+            });
+        var beforeRows = await groupRows.ToListAsync();
         var configuration = new AuthProviderConfigurationWriteDto
         {
-            PrimaryProviderId = previous.PrimaryProviderId,
+            PrimaryProviderId = (int)AuthenticationProviderKind.Local,
             LockPrimaryProvider = previous.LockPrimaryProvider,
             KeycloakAuthority = previous.KeycloakAuthority,
             KeycloakClientId = previous.KeycloakClientId,
             AtprotoLoginEnabled = previous.AtprotoLoginEnabled,
             AtprotoPublicUrl = previous.AtprotoPublicUrl,
-            GoogleSsoEnabled = previous.GoogleSsoEnabled,
-            GoogleClientId = previous.GoogleClientId,
             LockAtprotoLoginEnabled = previous.LockAtprotoLoginEnabled,
-            LockGoogleSsoEnabled = previous.LockGoogleSsoEnabled,
             KeycloakPublicOnboardingPolicy = previous.KeycloakPublicOnboardingPolicy,
-            KeycloakPublicSignupUrl = previous.KeycloakPublicSignupUrl,
-            GooglePublicOnboardingPolicy = previous.GooglePublicOnboardingPolicy,
-            GooglePublicSignupUrl = previous.GooglePublicSignupUrl
+            KeycloakPublicSignupUrl = previous.KeycloakPublicSignupUrl
         };
         await Assert.ThrowsAsync<Explore.Application.Exceptions.ConcurrencyConflictException>(() =>
             service.ApplyConfigurationAsync(ProviderCommand(fixture, configuration with
-            { GoogleSsoEnabled = false, KeycloakAuthority = "https://uncommitted.example.test" })));
+            { AtprotoLoginEnabled = false, KeycloakAuthority = "https://uncommitted.example.test" })));
         await Assert.That(await fixture.Services.GetRequiredService<ISystemSettingRepository>()
             .GetByKey(GovernanceSettingKeys.Authentication.KeycloakAuthority)).IsNull();
+        await Assert.That((await groupRows.ToListAsync()).SequenceEqual(beforeRows)).IsTrue();
+        await Assert.That((await fixture.Services.GetRequiredService<IVisitorAccessCapabilityResolver>()
+            .ResolveAsync(fixture.TenantId)).AllowsAccountRequiredParticipation).IsTrue();
         await service.ApplyConfigurationAsync(ProviderCommand(fixture, configuration with
         { KeycloakAuthority = "https://configured.example.test" }));
         AuthProviderConfigurationDto after = await service.ReadConfigurationAsync();
-        await Assert.That(after.GoogleSsoEnabled).IsTrue();
-        await Assert.That(after.GooglePublicOnboardingPolicy).IsEqualTo(PublicOnboardingPolicy.Allowed);
-        await Assert.That(after.GooglePublicSignupUrl).IsEqualTo(previous.GooglePublicSignupUrl);
+        await Assert.That(after.AtprotoLoginEnabled).IsTrue();
+        await Assert.That(after.AtprotoPublicUrl).IsEqualTo(previous.AtprotoPublicUrl);
+        await Assert.That(after.LockAtprotoLoginEnabled).IsEqualTo(previous.LockAtprotoLoginEnabled);
+        await Assert.That(after.PrimaryProviderId).IsEqualTo(previous.PrimaryProviderId);
+        await Assert.That(after.LockPrimaryProvider).IsEqualTo(previous.LockPrimaryProvider);
+        await Assert.That(after.KeycloakClientId).IsEqualTo(previous.KeycloakClientId);
+        await Assert.That(after.KeycloakPublicOnboardingPolicy).IsEqualTo(previous.KeycloakPublicOnboardingPolicy);
+        await Assert.That(after.KeycloakPublicSignupUrl).IsEqualTo(previous.KeycloakPublicSignupUrl);
         await Assert.That(after.KeycloakAuthority).IsEqualTo("https://configured.example.test");
     }
 
@@ -504,6 +578,7 @@ public sealed class VisitorAccessSettingsWriterTests
             TenantPlanId = plan.Id,
             VersionNumber = 1,
             TenantPlanStatusId = (int)TenantPlanStatusEnum.Published,
+            PriceAmount = 9.95m,
             CurrencyCode = "EUR",
             BillingPeriod = "monthly",
             IsActiveForProvisioning = true,
@@ -546,22 +621,86 @@ public sealed class VisitorAccessSettingsWriterTests
                  new(GovernanceSettingKeys.PublicExperience.EventCatalogLabel, "\"Not committed\"")], fixture.UserId, DateTime.UtcNow), token)));
         var systems = fixture.Services.GetRequiredService<ISystemSettingRepository>();
         await Assert.That(await systems.GetByKey(GovernanceSettingKeys.PublicExperience.EventCatalogLabel)).IsNull();
-        var result = await unitOfWork.ExecuteSerializableAsync(token => boundary.ApplyInCurrentTransactionAsync(new(
-            [new(GovernanceSettingKeys.PublicExperience.EventCatalogLabel, "\"Manifest events\"")], fixture.UserId, DateTime.UtcNow), token));
-        await Assert.That(result.Success).IsTrue();
+        await GrantAdministratorAsync(fixture);
+        if (!await fixture.Context.PaidEventPolicyVersions.AnyAsync())
+        {
+            fixture.Context.PaidEventPolicyVersions.Add(PaidEventPolicyVersion.CreateDefaultInstance());
+            await fixture.Context.SaveChangesAsync();
+        }
+        var human = fixture.Services.GetRequiredService<IHumanCommitScopePreparation>();
+        await human.PrepareAsync(CancellationToken.None);
+        await using var scope = fixture.CreateScope();
+        var context = await fixture.Services.GetRequiredService<IGlobalExploreDbContextFactory>().CreateDbContextAsync();
+        context.BindConfigurationInstanceImportOwner();
+        var lease = scope.ServiceProvider.GetRequiredService<ExploreDbContextExecutionLease>();
+        lease.Bind(context, null);
+        lease.BindHuman(human.Subject!, HumanAdministratorCommitPurpose.ConfigurationImport, null, fixture.Lifetime);
+        lease.BindOriginalCredential(scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>()
+            .HttpContext ?? throw new InvalidOperationException("The original authenticated request is required."));
+        var snapshot = await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().ExecuteSerializableAsync(token =>
+            scope.ServiceProvider.GetRequiredService<ConfigurationManifestCurrentStateReader>()
+                .ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, null, token));
+        var manifest = JsonNode.Parse(snapshot.Utf8Json.Span)!;
+        manifest["spec"]!["instance"]!["settings"]![GovernanceSettingKeys.PublicExperience.EventCatalogLabel] =
+            "Manifest events";
+        var sessions = scope.ServiceProvider.GetRequiredService<ConfigurationImportSessionApplicationService>();
+        var created = await sessions.CreateInstanceAsync(JsonSerializer.SerializeToUtf8Bytes(manifest), CancellationToken.None);
+        var request = new ConfigurationImportPreviewRequest
+        {
+            SelectedSectionKeys = ["instance.settings"],
+            Mappings = new Dictionary<string, string>(),
+            ApplyMode = ConfigurationImportApplyMode.ApplySelected,
+            GrantedApprovalCodes = []
+        };
+        await Assert.That((await sessions.PreviewInstanceAsync(
+            created.SessionId, created.AccessToken, request, CancellationToken.None)).IsApplyReady).IsTrue();
+        ConfigurationImportOperationResult result =
+            await scope.ServiceProvider.GetRequiredService<ConfigurationImportApplyService>()
+                .ApplyInstanceAsync(created.SessionId, created.AccessToken, request, human.Subject!, null, null, CancellationToken.None);
+        await Assert.That(result.Status).IsEqualTo(ConfigurationImportOperationStatus.Applied);
         await Assert.That((await systems.GetByKey(GovernanceSettingKeys.PublicExperience.EventCatalogLabel))!.Value)
             .IsEqualTo("\"Manifest events\"");
     }
 
     private static AuthProviderConfigurationService ProviderService(EventVisitorCapabilitySqliteFixture fixture)
     {
-        IConfiguration configuration = new ConfigurationBuilder().Build();
+        IConfiguration configuration = fixture.Services.GetRequiredService<IConfiguration>();
         var unitOfWork = new EfCoreUnitOfWork(fixture.Context);
         var mutationLock = new RelationalSettingMutationLock(fixture.Context, unitOfWork);
         return new AuthProviderConfigurationService(SystemSettingRepository.CreateReadOnly(fixture.Context, mutationLock), configuration,
             fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.IPolicyMutationExecutionScopeFactory>(),
-            new KeycloakConnectionResolver(fixture.Services.GetRequiredService<ISecretResolver>(), configuration),
-            fixture.Services.GetRequiredService<ISecretResolver>());
+            new KeycloakConnectionResolver(fixture.Services.GetRequiredService<ISecretResolver>(), configuration));
+    }
+
+    private sealed record SeedTenant(Guid TenantId) : Explore.Application.Contracts.Infrastructure.ITenantContext;
+
+    private static async Task RetainOperatorLoginAsync(
+        EventVisitorCapabilitySqliteFixture fixture, AuthenticationProviderKind provider)
+    {
+        await using var seed = fixture.CreateIndependentContext();
+        seed.BindTenantLease();
+        seed.UserExternalLogins.Add(new UserExternalLogin
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = fixture.UserId,
+            User = null!,
+            AuthenticationProviderId = (int)provider,
+            AuthenticationProvider = null!,
+            ProviderKey = provider == AuthenticationProviderKind.Atproto
+                ? "did:plc:abcdefghijklmnopqrstuvwx" : $"operator-{fixture.UserId:N}",
+            CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime
+        });
+        await seed.SaveChangesAsync();
+    }
+
+    private static void SelectUnusablePrimaryLogin(EventVisitorCapabilitySqliteFixture fixture)
+    {
+        // The operator already authenticated through Local. These visitor deployment
+        // facts leave secondary ATProto as the only usable login for new requests.
+        var configuration = fixture.Services.GetRequiredService<IConfiguration>();
+        configuration["Authentication:Provider"] = "keycloak";
+        configuration["Keycloak:Authority"] = string.Empty;
+        configuration["Keycloak:ClientId"] = string.Empty;
     }
 
     private static UpdateAuthProviderConfigurationCommand ProviderCommand(
@@ -581,10 +720,8 @@ public sealed class VisitorAccessSettingsWriterTests
         {
             foreach (var (key, value, type) in new[]
             {
-                (GovernanceSettingKeys.Authentication.GoogleSsoEnabled, "true", SettingValueType.Boolean),
-                (GovernanceSettingKeys.Authentication.GoogleClientId, "\"public-client\"", SettingValueType.String),
-                (GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy, "\"Allowed\"", SettingValueType.String),
-                (GovernanceSettingKeys.Authentication.GooglePublicSignupUrl, "\"https://accounts.example.test/signup\"", SettingValueType.String)
+                (GovernanceSettingKeys.Authentication.AtprotoLoginEnabled, "true", SettingValueType.Boolean),
+                (GovernanceSettingKeys.Authentication.AtprotoPublicUrl, "\"https://events.example.test\"", SettingValueType.String)
             })
             {
                 fixture.Context.SystemSettings.Add(new SystemSetting

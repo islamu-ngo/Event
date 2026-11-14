@@ -1,0 +1,28 @@
+Change-Id: CHG-01M7AXNMCHQPA34T7ESHPAMKAJ
+Title: "Service the runtime used by self-hosted server images"
+Type: fix
+Scope: self-hosting
+Summary: "Build server images with SDK 10.0.404 and the .NET 10.0.15 servicing release for CVE-2026-118747, retaining verified immutable container digests."
+Group: dotnet-cbor-runtime-servicing
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: "The selected SDK and server runtimes move to the release associated with CVE-2026-118747 / GHSA-vmv3-wvjp-wqpj. The trusted-base Release Impact boundary and audit enforcement remain required."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: "Rebuild and redeploy Standalone or both split server images. Updating only the container host does not replace the runtime carried by an existing image; packaged Blazor dependencies retain their separate servicing requirement."

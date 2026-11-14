@@ -29,6 +29,38 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
             .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.UserId == userId, cancellationToken);
     }
 
+    public Task<TenantUser?> GetForEnrollmentAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken)
+    {
+        _dbContext.ValidateTenantLease();
+        if (_dbContext.TenantFilterTenantId != tenantId || _dbContext.IsTenantFilterBypassed)
+            throw new UnauthorizedAccessException("Enrollment requires its original selected tenant.");
+        return _dbContext.TenantUsers.IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.TenantId == tenantId && row.UserId == userId)
+            .Select(row => new TenantUser
+            {
+                Id = row.Id,
+                TenantId = row.TenantId,
+                Tenant = null!,
+                UserId = row.UserId,
+                User = null!,
+                ActorId = row.ActorId,
+                StatusId = row.StatusId,
+                IsDeleted = row.IsDeleted
+            }).SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<TenantUser> CreateForExistingAccountAsync(TenantUser membership, CancellationToken cancellationToken = default)
+    {
+        membership.Tenant = await _dbContext.Tenants.AsTracking()
+            .SingleAsync(tenant => tenant.Id == membership.TenantId, cancellationToken);
+        membership.User = await _dbContext.Users.AsTracking()
+            .SingleAsync(user => user.Id == membership.UserId, cancellationToken);
+        membership.Actor = membership.ActorId is Guid actorId
+            ? await _dbContext.Actors.AsTracking().SingleAsync(actor => actor.Id == actorId, cancellationToken)
+            : null;
+        return await Create(membership);
+    }
+
     public async Task<TenantUser?> GetByTenantAndActorAsync(Guid tenantId, Guid actorId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.TenantUsers

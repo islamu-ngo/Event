@@ -31,6 +31,7 @@ public sealed partial class SupportAdministrationNativeContractTests
             await using var transaction = await context.Database.BeginTransactionAsync(token);
             var connection = context.Database.GetDbConnection();
             int backend = ((NpgsqlConnection)connection).ProcessID;
+            await RevokeExternalEnrollmentAdditionsAsync(context, fixture.NativeQueueEnrollment.RuntimeLogin, token);
             var names = new HumanPrincipalSourceSql(context);
             string table = names.Table(typeof(TenantUser));
             string runtime = names.Quote(fixture.NativeQueueEnrollment.RuntimeLogin);

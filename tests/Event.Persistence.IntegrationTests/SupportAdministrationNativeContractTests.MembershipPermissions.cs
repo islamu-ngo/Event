@@ -10,11 +10,27 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
+using Native = Explore.Persistence.Security.PostgresSupportAdministrationContract;
 
 namespace Event.Persistence.IntegrationTests;
 
 public sealed partial class SupportAdministrationNativeContractTests
 {
+    [Test]
+    public async Task CompleteApiKeyProfileRecognizesMembershipTenantFenceWithoutRepair()
+    {
+        await using var migrator = MembershipMigrator();
+        await migrator.Database.OpenConnectionAsync();
+        var names = new HumanPrincipalSourceSql(migrator);
+        string tenants = names.Table(typeof(Tenant));
+        string before = await MembershipAclImageAsync(migrator, tenants);
+
+        await PostgresTenantApiKeyStoragePermissions.ApplyAsync(migrator, fixture.NativeQueueEnrollment);
+
+        await Assert.That(await MembershipAclImageAsync(migrator, tenants)).IsEqualTo(before);
+        await Native.RequireReadyAsync(migrator, fixture.NativeQueueEnrollment);
+    }
+
     [Test]
     public async Task CompleteMembershipProfileCoexistsWithSupportWriterButExtraColumnAndPartialProfileDoNot()
     {
@@ -109,6 +125,30 @@ public sealed partial class SupportAdministrationNativeContractTests
         var context = new ExploreDbContext(options.Options);
         context.BindTenantLease();
         return context;
+    }
+
+    private static async Task RevokeExternalEnrollmentAdditionsAsync(ExploreDbContext context,
+        string runtimeLogin, CancellationToken token)
+    {
+        var names = new HumanPrincipalSourceSql(context);
+        foreach (var source in ExternalTenantEnrollmentInventory.Sources)
+        {
+            PostgresTenantMembershipMutationPermissions.TryGetRuntimeColumns(context, source.Entity,
+                out var membershipRead, out _, out _);
+            PostgresActorOwnershipReadPermissions.TryGetRuntimeReadColumns(context, source.Entity, out var actorRead);
+            var baseline = membershipRead.Concat(actorRead)
+                .Concat(PostgresTenantApiKeyStoragePermissions.RuntimeParentReadColumns(context, source.Entity))
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (var grants in PostgresExternalTenantEnrollmentPermissions.RuntimeColumns(context, source.Entity)
+                .Where(grant => grant.Privilege != "SELECT" || !baseline.Contains(grant.Column))
+                .GroupBy(grant => grant.Privilege))
+            {
+                string columns = string.Join(',', grants.Select(grant => names.Quote(grant.Column)));
+                await using var command = MembershipCommand(context,
+                    $"REVOKE {grants.Key} ({columns}) ON {names.Table(source.Entity)} FROM {names.Quote(runtimeLogin)}");
+                await command.ExecuteNonQueryAsync(token);
+            }
+        }
     }
 
     private static NpgsqlCommand MembershipCommand(ExploreDbContext context, string sql) =>

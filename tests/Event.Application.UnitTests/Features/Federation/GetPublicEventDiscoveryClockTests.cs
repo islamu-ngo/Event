@@ -52,7 +52,8 @@ public sealed class GetPublicEventDiscoveryClockTests
             Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<EventDiscoveryIdentity>());
         var handler = new GetPublicEventDiscoveryRequestHandler(
-            local, projection, new AtprotoEventGovernanceResolver(settings), tenant, clock, lifecycle, identities);
+            local, projection, new AtprotoEventGovernanceResolver(settings), tenant, clock, lifecycle, identities,
+            new Event.Testing.Settings.VisitorReadPolicyTestAuthority(tenant.TenantId).Policy);
         await handler.QueryAsync(new GetPublicEventDiscoveryRequest(new GetEventListRequest
         {
             PageNumber = 1,

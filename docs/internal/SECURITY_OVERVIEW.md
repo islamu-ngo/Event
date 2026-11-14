@@ -56,6 +56,15 @@ relations. This preserves the supported actor-only profile without coupling
 API-key storage to unrelated membership grants.
 No installer grant list, required API-key permission or policy is expanded.
 
+Discovery metadata attestation checks the enrolled Global and Runtime accounts
+across both revision storage and the tenant parent relation. Its permitted
+inventory also includes existing mapped Runtime membership and external
+enrollment columns on intersecting relations. These are declaration-only
+intersections; no composed admission predicate or additional grant is introduced.
+Global tenant creation retains its original open connector, bound null tenant
+and Serializable transaction. The same connector must reject subsequent
+privilege drift, including an undeclared Runtime tenant-description update.
+
 The grant permits a column update, rather than enforcing no-op SQL in the
 database. A compromised Runtime credential can therefore attempt primary-key
 changes; credential isolation and the application's original-owner, tenant,

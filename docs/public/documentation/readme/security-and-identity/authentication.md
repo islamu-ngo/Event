@@ -39,6 +39,12 @@ tenant parent fence installed for membership operations. Partial or broadened
 profiles remain errors; private support sessions and audit records remain
 accessible only through the application-owned support workflow.
 
+Native PostgreSQL tenant creation also validates discovery metadata permissions
+against the installed membership and enrollment storage rights. This check
+recognizes the existing tenant parent fence without granting additional access.
+A changed or broadened permission profile still stops the operation; restore
+the reviewed profile rather than adding broad manual grants.
+
 Each deployment has exactly one **primary authentication provider**:
 
 * **Local Identity** uses ASP.NET Core Identity inside ISLAMU Event. It is the

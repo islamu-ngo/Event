@@ -13,6 +13,83 @@ namespace Event.Persistence.IntegrationTests.Federation;
 public sealed partial class DiscoveryMetadataAuthorityTests
 {
     [Test]
+    public async Task MetadataInstallerReapplyPreservesItsOriginalOwnerAndPermissionImage()
+    {
+        await using var migrator = OpenMigrator();
+        await migrator.Database.OpenConnectionAsync();
+        var connection = (NpgsqlConnection)migrator.Database.GetDbConnection();
+        int backend = connection.ProcessID;
+        var contextId = migrator.ContextId;
+        string before = await EnrollmentMetadataImageAsync(migrator);
+        await migrator.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var owner = await migrator.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            await PostgresDiscoveryMetadataPermissions.ApplyAsync(migrator, fixture.NativeQueueEnrollment);
+            await PostgresDiscoveryMetadataPermissions.ApplyAsync(migrator, fixture.NativeQueueEnrollment);
+            await Assert.That(await EnrollmentMetadataImageAsync(migrator)).IsEqualTo(before);
+            await Assert.That(migrator.ContextId).IsEqualTo(contextId);
+            await Assert.That(migrator.Database.GetDbConnection()).IsSameReferenceAs(connection);
+            await Assert.That(connection.State).IsEqualTo(ConnectionState.Open);
+            await Assert.That(connection.ProcessID).IsEqualTo(backend);
+            await Assert.That(migrator.Database.CurrentTransaction).IsSameReferenceAs(owner);
+            await owner.RollbackAsync();
+        });
+        await Assert.That(await EnrollmentMetadataImageAsync(migrator)).IsEqualTo(before);
+        await Assert.That(migrator.Database.CurrentTransaction).IsNull();
+    }
+
+    [Test]
+    public async Task GlobalMetadataAdmissionRecognizesInstalledRuntimeTenantDeclarationsWithoutRepair()
+    {
+        await using var global = await OpenGlobalAsync();
+        await global.Database.OpenConnectionAsync();
+        global.RequireBoundTenantLease();
+        var connection = (NpgsqlConnection)global.Database.GetDbConnection();
+        int backend = connection.ProcessID;
+        var contextId = global.ContextId;
+        var tenant = global.TenantContext;
+        await Assert.That(global.TenantFilterTenantId).IsNull();
+        await Assert.That(global.IsTenantFilterBypassed).IsFalse();
+        await Assert.That(global.IsConfigurationInstanceImportOwner).IsFalse();
+        await Assert.That(global.Database.CurrentTransaction).IsNull();
+        await Assert.That(System.Transactions.Transaction.Current).IsNull();
+        await using (var identity = EnrollmentCommand(global, """
+            SELECT current_user=session_user AND session_user=@login
+                AND pg_catalog.current_setting('role') IN ('none',session_user::text)
+                AND pg_catalog.current_setting('session_replication_role')='origin'
+                AND COALESCE(pg_catalog.current_setting('app.current_tenant_id',true),'')=''
+            """))
+        {
+            identity.Parameters.AddWithValue("login", fixture.NativeQueueEnrollment.GlobalLogin);
+            await Assert.That(await identity.ExecuteScalarAsync()).IsEqualTo(true);
+        }
+        string before = await EnrollmentMetadataImageAsync(global);
+
+        await PostgresDiscoveryMetadataPermissions.RequireCurrentAsync(
+            global, fixture.NativeQueueEnrollment, globalOnly: true, default);
+
+        await Assert.That(await EnrollmentMetadataImageAsync(global)).IsEqualTo(before);
+        await Assert.That(global.Database.CurrentTransaction).IsNull();
+        await global.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var owner = await global.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            await PostgresDiscoveryMetadataPermissions.RequireCurrentAsync(
+                global, fixture.NativeQueueEnrollment, globalOnly: true, default);
+            await Assert.That(global.Database.CurrentTransaction).IsSameReferenceAs(owner);
+            await Assert.That(await EnrollmentMetadataImageAsync(global)).IsEqualTo(before);
+            await owner.RollbackAsync();
+        });
+        await Assert.That(global.ContextId).IsEqualTo(contextId);
+        await Assert.That(global.Database.GetDbConnection()).IsSameReferenceAs(connection);
+        await Assert.That(connection.State).IsEqualTo(ConnectionState.Open);
+        await Assert.That(connection.ProcessID).IsEqualTo(backend);
+        await Assert.That(ReferenceEquals(global.TenantContext, tenant)).IsTrue();
+        await Assert.That(global.TenantFilterTenantId).IsNull();
+        await Assert.That(global.Database.CurrentTransaction).IsNull();
+        await Assert.That(global.ChangeTracker.Entries().Any()).IsFalse();
+    }
+
+    [Test]
     [Arguments(PrimaryDatabaseRole.Runtime)]
     [Arguments(PrimaryDatabaseRole.Global)]
     public async Task QuotedEnrollmentRoleRenameRejectsWithoutParsingOrChangingAuthority(PrimaryDatabaseRole renamedRole)

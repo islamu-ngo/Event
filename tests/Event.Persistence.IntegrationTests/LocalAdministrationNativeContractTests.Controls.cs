@@ -5,6 +5,7 @@ using Explore.Domain;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Security;
 using Explore.Persistence.Database;
+using Explore.Persistence.Schema;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -239,6 +240,12 @@ public sealed partial class LocalAdministrationNativeContractTests
     [Arguments("private-pii-default")]
     [Arguments("private-pii-select")]
     [Arguments("private-pii-update")]
+    [Arguments("enrollment-partial")]
+    [Arguments("enrollment-table")]
+    [Arguments("enrollment-grant-option")]
+    [Arguments("enrollment-pii-read")]
+    [Arguments("enrollment-user-update")]
+    [Arguments("enrollment-foreign-grantor")]
     public async Task CatalogAndAuthorityDriftFailReadinessAndNeverRepairOnReinstall(string drift)
     {
         var source = await SeedAsync();
@@ -251,6 +258,14 @@ public sealed partial class LocalAdministrationNativeContractTests
         string global = names.Quote(fixture.NativeQueueEnrollment.GlobalLogin);
         string revision = names.Column(typeof(UserPii), "_birthDateRevision");
         string birthDate = names.Column(typeof(UserPii), "_dateOfBirth");
+        string email = names.Column(typeof(UserPii), nameof(UserPii.Email));
+        string binding = names.Table(typeof(UserExternalLogin));
+        string providerKey = names.Column(typeof(UserExternalLogin), nameof(UserExternalLogin.ProviderKey));
+        string bindingRead = string.Join(",", PostgresExternalTenantEnrollmentPermissions
+            .RuntimeColumns(migration, typeof(UserExternalLogin))
+            .Where(grant => grant.Privilege == "SELECT").Select(grant => names.Quote(grant.Column)));
+        string applicationUser = names.Table(typeof(User));
+        string userStatus = names.Column(typeof(User), nameof(User.IsDeleted));
         (string Change, string Restore) statements = drift switch
         {
             "owner-login" => ($"ALTER ROLE {Native.OwnerRole} LOGIN", $"ALTER ROLE {Native.OwnerRole} NOLOGIN"),
@@ -265,19 +280,60 @@ public sealed partial class LocalAdministrationNativeContractTests
                 $"REVOKE SELECT ({birthDate}) ON {pii} FROM {Native.OwnerRole}"),
             "private-pii-update" => ($"GRANT UPDATE ({birthDate}) ON {pii} TO {Native.OwnerRole}",
                 $"REVOKE UPDATE ({birthDate}) ON {pii} FROM {Native.OwnerRole}"),
+            "enrollment-partial" => ($"REVOKE INSERT ({email}) ON {pii} FROM {runtime}",
+                $"GRANT INSERT ({email}) ON {pii} TO {runtime}"),
+            "enrollment-table" => ($"GRANT SELECT ON {binding} TO {runtime}",
+                $"REVOKE SELECT ON {binding} FROM {runtime}; GRANT SELECT ({bindingRead}) ON {binding} TO {runtime}"),
+            "enrollment-grant-option" => ($"GRANT SELECT ({providerKey}) ON {binding} TO {runtime} WITH GRANT OPTION",
+                $"REVOKE GRANT OPTION FOR SELECT ({providerKey}) ON {binding} FROM {runtime}"),
+            "enrollment-pii-read" => ($"GRANT SELECT ({email}) ON {pii} TO {runtime}",
+                $"REVOKE SELECT ({email}) ON {pii} FROM {runtime}"),
+            "enrollment-user-update" => ($"GRANT UPDATE ({userStatus}) ON {applicationUser} TO {runtime}",
+                $"REVOKE UPDATE ({userStatus}) ON {applicationUser} FROM {runtime}"),
             _ => ($"GRANT {Native.RuntimeRole} TO {global} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE",
                 $"REVOKE {Native.RuntimeRole} FROM {global}")
         };
+        if (drift == "enrollment-foreign-grantor")
+        {
+            string helper = names.Quote($"local_enrollment_grantor_{Guid.CreateVersion7():N}");
+            statements = ($"""
+                CREATE ROLE {helper} NOLOGIN NOINHERIT;
+                GRANT USAGE ON SCHEMA {names.Quote(names.Schema)} TO {helper};
+                GRANT SELECT ({providerKey}) ON {binding} TO {helper} WITH GRANT OPTION;
+                SET ROLE {helper};
+                GRANT SELECT ({providerKey}) ON {binding} TO {runtime};
+                RESET ROLE;
+                """, $"""
+                SET ROLE {helper};
+                REVOKE SELECT ({providerKey}) ON {binding} FROM {runtime};
+                RESET ROLE;
+                REVOKE SELECT ({providerKey}) ON {binding} FROM {helper};
+                REVOKE USAGE ON SCHEMA {names.Quote(names.Schema)} FROM {helper};
+                DROP ROLE {helper};
+                """);
+        }
         await using var caller = Open(PrimaryDatabaseRole.Runtime, source.Tenant);
         await caller.Database.OpenConnectionAsync();
         await Native.RequireReadyAsync(caller, fixture.NativeQueueEnrollment);
         await migration.Database.ExecuteSqlRawAsync(statements.Change);
         try
         {
+            await using (var changed = await caller.Database.BeginTransactionAsync(IsolationLevel.Serializable))
+            {
+                var failure = await Assert.ThrowsAsync<PostgresException>(() =>
+                    RawAsync(caller, "read", Create(source)));
+                await Assert.That(failure!.SqlState).IsEqualTo("55000");
+                await changed.RollbackAsync();
+            }
             await Assert.ThrowsAsync<PostgresException>(() => Native.RequireReadyAsync(caller, fixture.NativeQueueEnrollment));
             await Assert.ThrowsAsync<PostgresException>(() => Native.ApplyAsync(migration, fixture.NativeQueueEnrollment));
         }
         finally { await migration.Database.ExecuteSqlRawAsync(statements.Restore); }
+        await Native.RequireReadyAsync(caller, fixture.NativeQueueEnrollment);
+        await using var restored = await caller.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        string image = await RawAsync(caller, "read", Create(source));
+        await Assert.That(JsonNode.Parse(image)!["Data"]).IsNotNull();
+        await restored.RollbackAsync();
     }
 
     [Test]

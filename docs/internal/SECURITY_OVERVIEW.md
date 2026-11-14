@@ -76,3 +76,10 @@ proof, while later statements, transactions and execution owners evaluate it
 again. This bounds planner duplication without retaining observed permission
 results. Native witnesses cover complete graph commit and rollback, unverified
 email, tenant isolation, denied authority drift and same-connector recovery.
+
+Local administrator lifecycle guards recognize this same absent-or-complete
+package through one fresh catalogue proof per guard execution. The three local
+credential relations retain their blanket denial of Runtime scalar access.
+Recognition grants no new privilege and does not waive original-source,
+transaction, row, User, trigger or routine checks. Executable lifecycle routines
+must reject privilege drift even after an earlier successful readiness check.

@@ -27,6 +27,12 @@ Private health and metrics probes stay on that listener without following a
 redirect to the public HTTPS endpoint. Ordinary public requests retain HTTPS
 redirection, and public listeners cannot serve the operational responses.
 
+Local administrator credential operations on native PostgreSQL validate the
+current application permission profile, including installed enrollment rights.
+Incomplete or broadened grants stop the operation. Keep Runtime and Migrator
+credentials separate, and restore the reviewed permission profile when a
+mismatch is reported.
+
 Each deployment has exactly one **primary authentication provider**:
 
 * **Local Identity** uses ASP.NET Core Identity inside ISLAMU Event. It is the

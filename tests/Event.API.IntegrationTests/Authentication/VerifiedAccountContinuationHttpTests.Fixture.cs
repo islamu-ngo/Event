@@ -16,7 +16,8 @@ public sealed partial class VerifiedAccountContinuationHttpTests
     private static HttpClient CreateClient(LocalAdmissionWebApplicationFactory factory) =>
         factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
 
     private static async Task<Guid> ArrangeMembershipsAsync(
@@ -36,10 +37,16 @@ public sealed partial class VerifiedAccountContinuationHttpTests
         {
             database.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                UserId = user.Id, User = user, ActorId = actor.Id, Actor = actor,
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                UserId = user.Id,
+                User = user,
+                ActorId = actor.Id,
+                Actor = actor,
                 StatusId = (int)TenantUserStatusEnum.Active,
-                JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                JoinedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
             });
         }
         user.LastActiveTenantId = preferred.Id;
@@ -52,8 +59,11 @@ public sealed partial class VerifiedAccountContinuationHttpTests
 
     private static Tenant NewTenant(string slug) => new()
     {
-        Id = Guid.CreateVersion7(), Slug = slug, FullName = slug,
-        TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!,
+        Id = Guid.CreateVersion7(),
+        Slug = slug,
+        FullName = slug,
+        TenantStatusId = (int)TenantStatusEnum.Active,
+        TenantStatus = null!,
         CreatedAt = DateTime.UtcNow
     };
 

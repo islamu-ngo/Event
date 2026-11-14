@@ -33,7 +33,10 @@ internal static class AtprotoFlowKindMigrationOperations
                 }
                 : new AddCheckConstraintOperation
                 {
-                    Name = DowngradeConstraint, Table = removal.Table, Schema = removal.Schema, Sql = condition
+                    Name = DowngradeConstraint,
+                    Table = removal.Table,
+                    Schema = removal.Schema,
+                    Sql = condition
                 });
         }
         foreach (var operation in operations)
@@ -41,7 +44,9 @@ internal static class AtprotoFlowKindMigrationOperations
             if (operation is DropColumnOperation removal && IsFlowKind(removal.Name, removal.Table) && !sqlite)
                 prepared.Add(new DropCheckConstraintOperation
                 {
-                    Name = DowngradeConstraint, Table = removal.Table, Schema = removal.Schema
+                    Name = DowngradeConstraint,
+                    Table = removal.Table,
+                    Schema = removal.Schema
                 });
             if (operation is not AddColumnOperation column || !IsFlowKind(column.Name, column.Table))
             {

@@ -38,9 +38,14 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
             .Where(row => row.TenantId == tenantId && row.UserId == userId)
             .Select(row => new TenantUser
             {
-                Id = row.Id, TenantId = row.TenantId, Tenant = null!,
-                UserId = row.UserId, User = null!, ActorId = row.ActorId,
-                StatusId = row.StatusId, IsDeleted = row.IsDeleted
+                Id = row.Id,
+                TenantId = row.TenantId,
+                Tenant = null!,
+                UserId = row.UserId,
+                User = null!,
+                ActorId = row.ActorId,
+                StatusId = row.StatusId,
+                IsDeleted = row.IsDeleted
             }).SingleOrDefaultAsync(cancellationToken);
     }
 

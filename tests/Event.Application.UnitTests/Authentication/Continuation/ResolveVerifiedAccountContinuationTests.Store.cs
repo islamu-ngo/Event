@@ -25,9 +25,12 @@ public sealed partial class ResolveVerifiedAccountContinuationTests
 
         public Store() => Login = new()
         {
-            Id = Guid.CreateVersion7(), UserId = User!.Id, User = null!,
+            Id = Guid.CreateVersion7(),
+            UserId = User!.Id,
+            User = null!,
             AuthenticationProviderId = (int)Key.ProviderKind,
-            AuthenticationProvider = null!, ProviderKey = Key.Value
+            AuthenticationProvider = null!,
+            ProviderKey = Key.Value
         };
 
         public Task<VerifiedAccountContinuationResult> Resolve(Guid? target = null, CancellationToken token = default) =>
@@ -37,13 +40,20 @@ public sealed partial class ResolveVerifiedAccountContinuationTests
         {
             var tenant = new Tenant
             {
-                Id = Guid.CreateVersion7(), FullName = slug, Slug = slug,
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                Id = Guid.CreateVersion7(),
+                FullName = slug,
+                Slug = slug,
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
             };
             return new()
             {
-                Id = Guid.CreateVersion7(), UserId = Login.UserId, User = null!,
-                TenantId = tenant.Id, Tenant = tenant, StatusId = (int)TenantUserStatusEnum.Active,
+                Id = Guid.CreateVersion7(),
+                UserId = Login.UserId,
+                User = null!,
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                StatusId = (int)TenantUserStatusEnum.Active,
                 JoinedAt = new DateTime(2026, 1, day, 0, 0, 0, DateTimeKind.Utc),
                 CreatedAt = new DateTime(2026, 1, day, 0, 0, 0, DateTimeKind.Utc)
             };

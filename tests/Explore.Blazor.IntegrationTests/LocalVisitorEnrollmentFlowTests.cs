@@ -228,7 +228,9 @@ public sealed class LocalVisitorEnrollmentFlowTests
         using var start = await fixture.StartAsync();
         using var response = await fixture.PostAsync("/register", new Dictionary<string, string>
         {
-            ["username"] = fixture.Username, ["password"] = fixture.Password, [member] = Secret()
+            ["username"] = fixture.Username,
+            ["password"] = fixture.Password,
+            [member] = Secret()
         });
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         await Assert.That(fixture.Transport.Registrations).IsEqualTo(0);
@@ -399,7 +401,8 @@ public sealed class LocalVisitorEnrollmentFlowTests
                 token = json.RootElement.GetProperty("token").GetString();
             }
             using var request = new HttpRequestMessage(HttpMethod.Post,
-                "https://" + Host + BffLocalVisitorEnrollmentEndpoints.Prefix + suffix) { Content = JsonContent.Create(body) };
+                "https://" + Host + BffLocalVisitorEnrollmentEndpoints.Prefix + suffix)
+            { Content = JsonContent.Create(body) };
             request.Headers.Add("Origin", Origin);
             request.Headers.Add("X-Tenant-Slug", "untrusted");
             request.Headers.Add("X-Local-Enrollment-Proof", Secret());
@@ -475,8 +478,14 @@ public sealed class LocalVisitorEnrollmentFlowTests
         {
             var path = request.RequestUri!.AbsolutePath;
             if (!path.StartsWith("/api/auth/local/enrollment/", StringComparison.Ordinal))
-                return Json(new { isCompleted = SetupComplete, state = SetupComplete ? "Completed" : "Closed",
-                    mode = "Interactive", generation = 1, provider = "Local" });
+                return Json(new
+                {
+                    isCompleted = SetupComplete,
+                    state = SetupComplete ? "Completed" : "Closed",
+                    mode = "Interactive",
+                    generation = 1,
+                    provider = "Local"
+                });
             using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
             var operation = body.RootElement.GetProperty("operationId").GetGuid();
             var proof = request.Headers.GetValues("X-Local-Enrollment-Proof").Single();

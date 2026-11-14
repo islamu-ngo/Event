@@ -320,8 +320,12 @@ public sealed class LocalVisitorPrimaryAdmissionTests
         DateTime now = fixture.Clock.GetUtcNow().UtcDateTime;
         seed.Tenants.Add(new Tenant
         {
-            Id = tenant, FullName = "Visitor primary admission tenant", Slug = $"visitor-{tenant:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = now
+            Id = tenant,
+            FullName = "Visitor primary admission tenant",
+            Slug = $"visitor-{tenant:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
+            CreatedAt = now
         });
         var reservation = VisitorEnrollmentOperation.Reserve(Guid.CreateVersion7(), tenant, Guid.CreateVersion7(),
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),

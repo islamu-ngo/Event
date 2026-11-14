@@ -28,16 +28,40 @@ public sealed class EfFirstReadContractTests
         context.BindTenantLease();
         await context.Database.EnsureCreatedAsync();
         await LookupTableSeeder.SeedAsync(context);
-        var tenant = new Tenant { Id = Guid.CreateVersion7(), FullName = "Domain owner",
-            Slug = $"domain-{Guid.CreateVersion7():N}", TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null! };
+        var tenant = new Tenant
+        {
+            Id = Guid.CreateVersion7(),
+            FullName = "Domain owner",
+            Slug = $"domain-{Guid.CreateVersion7():N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
+        };
         context.Add(tenant);
         context.AddRange(
-            new TenantSetting { Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                SettingKey = "domains.tenant_custom_domain", Value = SettingValueSerializer.Serialize("BOUND.EXAMPLE.TEST.") },
-            new TenantSetting { Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                SettingKey = "domains.tenant_subdomain", Value = SettingValueSerializer.Serialize("sub.example.test") },
-            new TenantSetting { Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                SettingKey = "email.smtp_host", Value = SettingValueSerializer.Serialize("private.example.test") });
+            new TenantSetting
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                SettingKey = "domains.tenant_custom_domain",
+                Value = SettingValueSerializer.Serialize("BOUND.EXAMPLE.TEST.")
+            },
+            new TenantSetting
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                SettingKey = "domains.tenant_subdomain",
+                Value = SettingValueSerializer.Serialize("sub.example.test")
+            },
+            new TenantSetting
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                SettingKey = "email.smtp_host",
+                Value = SettingValueSerializer.Serialize("private.example.test")
+            });
         await context.SaveChangesAsync();
         context.ClearTenantFilterBypass();
         context.ChangeTracker.Clear();
@@ -68,14 +92,28 @@ public sealed class EfFirstReadContractTests
         context.BindTenantLease();
         await context.Database.EnsureCreatedAsync();
         await LookupTableSeeder.SeedAsync(context);
-        var tenant = new Tenant { FullName = "Accounting", Slug = $"accounting-{Guid.CreateVersion7():N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null! };
-        var otherTenant = new Tenant { FullName = "Other", Slug = $"other-{Guid.CreateVersion7():N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null! };
+        var tenant = new Tenant
+        {
+            FullName = "Accounting",
+            Slug = $"accounting-{Guid.CreateVersion7():N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
+        };
+        var otherTenant = new Tenant
+        {
+            FullName = "Other",
+            Slug = $"other-{Guid.CreateVersion7():N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
+        };
         context.AddRange(tenant, otherTenant);
         var binding = StorageProviderBinding.Local(Path.Combine(Path.GetTempPath(), "accounting-fixture"));
-        var user = new User { Id = Guid.CreateVersion7(), Pii = new UserPii
-            { Email = "accounting@example.test", FirstName = "Accounting", LastName = "Fixture" } };
+        var user = new User
+        {
+            Id = Guid.CreateVersion7(),
+            Pii = new UserPii
+            { Email = "accounting@example.test", FirstName = "Accounting", LastName = "Fixture" }
+        };
         context.AddRange(binding, user);
         await context.SaveChangesAsync();
         var empty = await StorageScopeTotalsQuery.ReadAsync(context, tenant.Id, StorageProviders.Local, CancellationToken.None);
@@ -84,11 +122,23 @@ public sealed class EfFirstReadContractTests
         int fileTypeId = await context.FileTypes.Select(value => value.Id).FirstAsync();
         StorageObject Object(Tenant owner, long bytes, string lifecycle, bool deleted = false) => new()
         {
-            Id = Guid.CreateVersion7(), TenantId = owner.Id, Tenant = owner, FileTypeId = fileTypeId, FileType = null!,
-            StorageProviderBindingId = binding.Id, ObjectKey = Guid.CreateVersion7().ToString("N"),
-            Provider = StorageProviders.Local, FullName = "fixture", SafeDisplayName = "fixture", Extension = ".bin",
-            Size = bytes, Purpose = StorageObjectPurposes.Attachment, Visibility = StorageObjectVisibilities.PrivateOwner,
-            LifecycleState = lifecycle, IsDeleted = deleted, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            TenantId = owner.Id,
+            Tenant = owner,
+            FileTypeId = fileTypeId,
+            FileType = null!,
+            StorageProviderBindingId = binding.Id,
+            ObjectKey = Guid.CreateVersion7().ToString("N"),
+            Provider = StorageProviders.Local,
+            FullName = "fixture",
+            SafeDisplayName = "fixture",
+            Extension = ".bin",
+            Size = bytes,
+            Purpose = StorageObjectPurposes.Attachment,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            LifecycleState = lifecycle,
+            IsDeleted = deleted,
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         var active = Object(tenant, 17, StorageObjectLifecycleStates.Active);
         var held = Object(tenant, 23, StorageObjectLifecycleStates.Quarantined);
@@ -109,12 +159,20 @@ public sealed class EfFirstReadContractTests
 
         StorageUploadSession Session(Tenant owner, long bytes, string? objectKey = null) => new()
         {
-            Id = Guid.CreateVersion7(), TenantId = owner.Id, StorageProviderBindingId = binding.Id,
-            Provider = StorageProviders.Local, ExpectedSizeBytes = bytes, ReservedBytes = bytes,
-            ContentType = "application/octet-stream", SafeDisplayName = "fixture",
-            Purpose = StorageObjectPurposes.Attachment, Visibility = StorageObjectVisibilities.PrivateOwner,
-            Status = StorageUploadSessionStates.Reserved, ObjectKey = objectKey ?? Guid.CreateVersion7().ToString("N"),
-            ExpiresAt = DateTime.UtcNow.AddHours(1), ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            TenantId = owner.Id,
+            StorageProviderBindingId = binding.Id,
+            Provider = StorageProviders.Local,
+            ExpectedSizeBytes = bytes,
+            ReservedBytes = bytes,
+            ContentType = "application/octet-stream",
+            SafeDisplayName = "fixture",
+            Purpose = StorageObjectPurposes.Attachment,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            Status = StorageUploadSessionStates.Reserved,
+            ObjectKey = objectKey ?? Guid.CreateVersion7().ToString("N"),
+            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         var reserved = Session(tenant, 71);
         var uploading = Session(tenant, 73);

@@ -1089,7 +1089,8 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         abbreviated["Mounts"]![0]!["Source"] = string.Empty;
         JsonObject inspection = new()
         {
-            ["Id"] = containerId, ["Image"] = imageId,
+            ["Id"] = containerId,
+            ["Image"] = imageId,
             ["Mounts"] = RuntimeContainer()["Mounts"]!.DeepClone()
         };
         await Assert.That(SecurityExecutionEvidence.TryJoinContainerMountInspection(
@@ -1362,7 +1363,10 @@ public sealed class SecurityExecutionEvidenceParentModelTests
                 JsonObject mixed = retired.DeepClone().AsObject();
                 mixed["Mounts"]!.AsArray().Add(new JsonObject
                 {
-                    ["Type"] = "bind", ["Source"] = bindSource, ["Destination"] = "/foreign-bind", ["RW"] = false
+                    ["Type"] = "bind",
+                    ["Source"] = bindSource,
+                    ["Destination"] = "/foreign-bind",
+                    ["RW"] = false
                 });
                 await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
                     JsonSerializer.SerializeToUtf8Bytes(new JsonArray(mixed)), expected, out _))

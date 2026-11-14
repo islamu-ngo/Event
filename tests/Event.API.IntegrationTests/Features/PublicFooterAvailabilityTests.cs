@@ -38,8 +38,12 @@ public sealed class PublicFooterAvailabilityTests
                     var definition = SettingRegistry.Get(pair.Key)!;
                     row = new SystemSetting
                     {
-                        Id = Guid.CreateVersion7(), SettingKey = pair.Key, Value = pair.Value,
-                        ValueType = definition.ValueType, Category = definition.Category, CreatedAt = DateTime.UtcNow
+                        Id = Guid.CreateVersion7(),
+                        SettingKey = pair.Key,
+                        Value = pair.Value,
+                        ValueType = definition.ValueType,
+                        Category = definition.Category,
+                        CreatedAt = DateTime.UtcNow
                     };
                     database.SystemSettings.Add(row);
                 }

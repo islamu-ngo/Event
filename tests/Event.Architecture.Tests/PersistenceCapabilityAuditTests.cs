@@ -237,13 +237,20 @@ public sealed class PersistenceCapabilityAuditTests
             if (!directoryPresent) Directory.Delete(generated, recursive: true);
             string metadata = JsonSerializer.Serialize(new
             {
-                Properties = new {
-                    MSBuildProjectFullPath = project, AssemblyName = "AuditSpec", DefineConstants = "RAW_STORAGE",
-                    LangVersion = "preview", AllowUnsafeBlocks = "false", OutputType = "Library",
+                Properties = new
+                {
+                    MSBuildProjectFullPath = project,
+                    AssemblyName = "AuditSpec",
+                    DefineConstants = "RAW_STORAGE",
+                    LangVersion = "preview",
+                    AllowUnsafeBlocks = "false",
+                    OutputType = "Library",
                     PersistenceAuditExportReady = "true",
-                    EmitCompilerGeneratedFiles = emitted ? "true" : "false", CompilerGeneratedFilesOutputPath = generated
+                    EmitCompilerGeneratedFiles = emitted ? "true" : "false",
+                    CompilerGeneratedFilesOutputPath = generated
                 },
-                Items = new {
+                Items = new
+                {
                     Compile = new[] { new { FullPath = ordinary } },
                     PersistenceAuditGeneratedCompile = new[] { new { FullPath = Path.Combine(generated, "Generated.cs") } },
                     ReferencePath = References.Select(path => new { FullPath = path }).ToArray()

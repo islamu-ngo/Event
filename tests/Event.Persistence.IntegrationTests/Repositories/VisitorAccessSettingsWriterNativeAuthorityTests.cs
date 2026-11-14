@@ -570,8 +570,12 @@ public sealed class VisitorAccessSettingsWriterNativeAuthorityTests(PostgreSqlCo
             {
                 registrationOverride = new TenantSetting
                 {
-                    Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                    SettingKey = RegistrationKey, Value = "\"false\"", CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = PlatformDefaults.DefaultTenantId,
+                    Tenant = null!,
+                    SettingKey = RegistrationKey,
+                    Value = "\"false\"",
+                    CreatedAt = DateTime.UtcNow
                 };
                 seed.TenantSettingOverrides.Add(registrationOverride);
             }
@@ -662,9 +666,11 @@ public sealed class VisitorAccessSettingsWriterNativeAuthorityTests(PostgreSqlCo
         {
             seed.Tenants.Add(new Tenant
             {
-                Id = tenantB, FullName = "Isolated runtime tenant",
+                Id = tenantB,
+                FullName = "Isolated runtime tenant",
                 Slug = $"runtime-{tenantB:N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
             });
             await seed.SaveChangesAsync();
             await Assert.That(await seed.EventParticipationConfigurations.IgnoreQueryFilters().AnyAsync()).IsFalse();
@@ -785,9 +791,13 @@ public sealed class VisitorAccessSettingsWriterNativeAuthorityTests(PostgreSqlCo
                 {
                     setting = new SystemSetting
                     {
-                        Id = Guid.CreateVersion7(), SettingKey = key, Value = value,
-                        ValueType = definition.ValueType, Category = definition.Category,
-                        Description = definition.Description, CreatedAt = DateTime.UtcNow
+                        Id = Guid.CreateVersion7(),
+                        SettingKey = key,
+                        Value = value,
+                        ValueType = definition.ValueType,
+                        Category = definition.Category,
+                        Description = definition.Description,
+                        CreatedAt = DateTime.UtcNow
                     };
                     seed.SystemSettings.Add(setting);
                 }
@@ -805,12 +815,20 @@ public sealed class VisitorAccessSettingsWriterNativeAuthorityTests(PostgreSqlCo
             .Select(row => row.Id).SingleAsync();
         var source = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-            ActorId = actorId, Actor = null!, Title = "Native registration participation",
-            EventStatus = null!, EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Digital, EventFormat = null!,
-            CreatedAt = DateTime.UtcNow, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            TenantId = PlatformDefaults.DefaultTenantId,
+            Tenant = null!,
+            ActorId = actorId,
+            Actor = null!,
+            Title = "Native registration participation",
+            EventStatus = null!,
+            EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Digital,
+            EventFormat = null!,
+            CreatedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         tenantSeed.Events.Add(source);
         tenantSeed.EventParticipationConfigurations.Add(EventParticipationConfiguration.Create(
@@ -822,8 +840,12 @@ public sealed class VisitorAccessSettingsWriterNativeAuthorityTests(PostgreSqlCo
         {
             modeOverride = new TenantSetting
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                SettingKey = ModeKey, Value = $"\"{foreignMode}\"", CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                SettingKey = ModeKey,
+                Value = $"\"{foreignMode}\"",
+                CreatedAt = DateTime.UtcNow
             };
             tenantSeed.TenantSettingOverrides.Add(modeOverride);
         }

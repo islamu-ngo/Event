@@ -329,8 +329,11 @@ public sealed class LocalVisitorReservationTests
         await using var seed = SeedContext(scope.ServiceProvider, tenant);
         seed.Tenants.Add(new Tenant
         {
-            Id = tenant, FullName = "Visitor reservation tenant", Slug = $"visitor-{tenant:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!,
+            Id = tenant,
+            FullName = "Visitor reservation tenant",
+            Slug = $"visitor-{tenant:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
             CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime
         });
         await seed.SaveChangesAsync(fixture.CancellationToken);

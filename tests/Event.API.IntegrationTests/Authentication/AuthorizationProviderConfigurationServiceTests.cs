@@ -233,10 +233,10 @@ public class AuthorizationProviderConfigurationServiceTests
 
         var failure = await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
             service.ApplyConfigurationAsync(Command(fixture, new()
-        {
-            Provider = "cerbos",
-            CerbosGrpcEndpoint = "https://cerbos.example.test:443"
-        })));
+            {
+                Provider = "cerbos",
+                CerbosGrpcEndpoint = "https://cerbos.example.test:443"
+            })));
         await Assert.That(failure!.Errors.Select(error => error.PropertyName).ToArray())
             .IsEquivalentTo(new[] { "Provider" });
 
@@ -430,11 +430,11 @@ public class AuthorizationProviderConfigurationServiceTests
 
         var failure = await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
             service.ApplyConfigurationAsync(Command(fixture, new()
-        {
-            Provider = "cerbos",
-            CerbosGrpcEndpoint = "https://cerbosgrpc.example.com:443",
-            CerbosAdminEndpoint = "https://127.0.0.1:3592"
-        })));
+            {
+                Provider = "cerbos",
+                CerbosGrpcEndpoint = "https://cerbosgrpc.example.com:443",
+                CerbosAdminEndpoint = "https://127.0.0.1:3592"
+            })));
         await Assert.That(failure!.Errors.Select(error => error.PropertyName).ToArray())
             .IsEquivalentTo(new[] { "CerbosAdminEndpoint" });
 

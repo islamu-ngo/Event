@@ -95,9 +95,15 @@ public sealed class TenantAuthHandoffTests
 
     private static TenantAuthHandoffBinding Binding() => new()
     {
-        OwnerUserId = Guid.CreateVersion7(), TenantId = Guid.CreateVersion7(), FlowId = Guid.CreateVersion7(),
-        SourceSessionDigest = Digest, SourceRevisionDigest = Digest, BrowserProofDigest = Digest,
-        RoutingDigest = Digest, SourceOrigin = "https://source.example.test/",
-        DestinationOrigin = "https://tenant.example.test:8443/", LocalPath = "/events?view=upcoming"
+        OwnerUserId = Guid.CreateVersion7(),
+        TenantId = Guid.CreateVersion7(),
+        FlowId = Guid.CreateVersion7(),
+        SourceSessionDigest = Digest,
+        SourceRevisionDigest = Digest,
+        BrowserProofDigest = Digest,
+        RoutingDigest = Digest,
+        SourceOrigin = "https://source.example.test/",
+        DestinationOrigin = "https://tenant.example.test:8443/",
+        LocalPath = "/events?view=upcoming"
     };
 }

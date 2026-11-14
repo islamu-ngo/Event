@@ -272,11 +272,11 @@ public sealed class VisitorSettingsOriginalStore(
             var events = context.Events
                 .IgnoreTenantFilter(TenantFilterBypassReasons.VisitorPolicyAuthorityInheritanceSafetyRead).AsNoTracking();
             var required = await (from row in participation
-                join item in events on new { row.Id, row.TenantId } equals new { item.Id, item.TenantId }
-                where !row.IsDeleted && !item.IsDeleted
-                    && row.IdentityAccessModeId == (int)IdentityAccessModeEnum.AccountRequired
-                    && (!original!.TenantId.HasValue || row.TenantId == original.TenantId)
-                select row.TenantId).Distinct().ToListAsync(token);
+                                  join item in events on new { row.Id, row.TenantId } equals new { item.Id, item.TenantId }
+                                  where !row.IsDeleted && !item.IsDeleted
+                                      && row.IdentityAccessModeId == (int)IdentityAccessModeEnum.AccountRequired
+                                      && (!original!.TenantId.HasValue || row.TenantId == original.TenantId)
+                                  select row.TenantId).Distinct().ToListAsync(token);
             image = new JsonObject
             {
                 [nameof(SystemSetting)] = new JsonArray(systems.Select(row => (JsonNode)Snapshot(row)).ToArray()),
@@ -359,15 +359,24 @@ public sealed class VisitorSettingsOriginalStore(
                 : type == typeof(SystemSetting)
                     ? new SystemSetting
                     {
-                        Id = request.NewIds[effect.Key], SettingKey = effect.Key, Value = definition.DefaultValue,
-                        ValueType = definition.ValueType, Category = definition.Category, Description = definition.Description,
-                        CreatedAt = request.OccurredAt, CreatedBy = request.AuditActor
+                        Id = request.NewIds[effect.Key],
+                        SettingKey = effect.Key,
+                        Value = definition.DefaultValue,
+                        ValueType = definition.ValueType,
+                        Category = definition.Category,
+                        Description = definition.Description,
+                        CreatedAt = request.OccurredAt,
+                        CreatedBy = request.AuditActor
                     }
                     : new TenantSetting
                     {
-                        Id = request.NewIds[effect.Key], TenantId = effect.TenantId!.Value, Tenant = null!,
-                        SettingKey = effect.Key, Value = definition.DefaultValue,
-                        CreatedAt = request.OccurredAt, CreatedBy = request.AuditActor
+                        Id = request.NewIds[effect.Key],
+                        TenantId = effect.TenantId!.Value,
+                        Tenant = null!,
+                        SettingKey = effect.Key,
+                        Value = definition.DefaultValue,
+                        CreatedAt = request.OccurredAt,
+                        CreatedBy = request.AuditActor
                     };
             if (entity is SystemSetting system)
             {

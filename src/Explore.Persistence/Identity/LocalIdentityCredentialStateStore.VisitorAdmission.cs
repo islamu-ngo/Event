@@ -158,12 +158,14 @@ internal sealed partial class LocalIdentityCredentialStateStore
                 DateTime now = timeProvider.GetUtcNow().UtcDateTime;
                 var user = new User
                 {
-                    Id = enrollment.LocalSubjectId, CreatedAt = now,
+                    Id = enrollment.LocalSubjectId,
+                    CreatedAt = now,
                     EmailVerified = finalEvidence.User.EmailConfirmed,
                     Pii = new UserPii
                     {
                         Email = finalEvidence.User.Email ?? string.Empty,
-                        FirstName = finalEvidence.User.FirstName, LastName = finalEvidence.User.LastName
+                        FirstName = finalEvidence.User.FirstName,
+                        LastName = finalEvidence.User.LastName
                     }
                 };
                 owned.Add(user);
@@ -172,8 +174,12 @@ internal sealed partial class LocalIdentityCredentialStateStore
                 RequireCurrent();
                 var actor = new Actor
                 {
-                    Id = enrollment.PersonalActorId, UserId = user.Id, User = user,
-                    ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!, CreatedAt = now,
+                    Id = enrollment.PersonalActorId,
+                    UserId = user.Id,
+                    User = user,
+                    ActorTypeId = (int)ActorTypeEnum.User,
+                    ActorType = null!,
+                    CreatedAt = now,
                     Pii = new ActorPii
                     {
                         DisplayName = $"{finalEvidence.User.FirstName} {finalEvidence.User.LastName}".Trim()
@@ -185,9 +191,14 @@ internal sealed partial class LocalIdentityCredentialStateStore
                 RequireCurrent();
                 var login = new UserExternalLogin
                 {
-                    Id = enrollment.ExternalLoginId, UserId = user.Id, User = user,
-                    AuthenticationProviderId = (int)AuthenticationProviderKind.Local, AuthenticationProvider = null!,
-                    ProviderKey = providerKey, ProviderDisplayName = "Local", CreatedAt = now
+                    Id = enrollment.ExternalLoginId,
+                    UserId = user.Id,
+                    User = user,
+                    AuthenticationProviderId = (int)AuthenticationProviderKind.Local,
+                    AuthenticationProvider = null!,
+                    ProviderKey = providerKey,
+                    ProviderDisplayName = "Local",
+                    CreatedAt = now
                 };
                 owned.Add(login);
                 applicationDbContext.UserExternalLogins.Add(login);
@@ -199,9 +210,16 @@ internal sealed partial class LocalIdentityCredentialStateStore
                 RequireCurrent();
                 var member = new TenantUser
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!,
-                    UserId = user.Id, User = user, ActorId = actor.Id, Actor = actor,
-                    StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = now, CreatedAt = now
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant,
+                    Tenant = null!,
+                    UserId = user.Id,
+                    User = user,
+                    ActorId = actor.Id,
+                    Actor = actor,
+                    StatusId = (int)TenantUserStatusEnum.Active,
+                    JoinedAt = now,
+                    CreatedAt = now
                 };
                 owned.Add(member);
                 applicationDbContext.Set<TenantUser>().Add(member);

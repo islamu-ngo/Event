@@ -474,9 +474,13 @@ public sealed class SecretKitNativeWriterTests
             Definition = SecretDefinitionRegistry.GetRequired(key);
             Binding = new SecretBinding
             {
-                Id = Guid.CreateVersion7(), SettingKey = key, Scope = SecretScope.Instance,
-                SourceType = SecretSourceType.Infisical, InfisicalEnvironment = "test",
-                InfisicalPath = Definition.DefaultInfisicalPath, InfisicalKey = Definition.DefaultInfisicalKey
+                Id = Guid.CreateVersion7(),
+                SettingKey = key,
+                Scope = SecretScope.Instance,
+                SourceType = SecretSourceType.Infisical,
+                InfisicalEnvironment = "test",
+                InfisicalPath = Definition.DefaultInfisicalPath,
+                InfisicalKey = Definition.DefaultInfisicalKey
             };
             Bindings.Rows.Add(Binding);
         }
@@ -598,7 +602,10 @@ public sealed class SecretKitNativeWriterTests
                 Interlocked.Increment(ref _logins);
                 await context.Response.WriteAsJsonAsync(new
                 {
-                    accessToken = _token, accessTokenMaxTTL = 3600, expiresIn = 600, tokenType = "Bearer"
+                    accessToken = _token,
+                    accessTokenMaxTTL = 3600,
+                    expiresIn = 600,
+                    tokenType = "Bearer"
                 }, context.RequestAborted);
                 return;
             }
@@ -632,10 +639,15 @@ public sealed class SecretKitNativeWriterTests
             {
                 secret = new
                 {
-                    id = _resourceId, workspace = Owner.InfisicalOptions!.ProjectId,
-                    environment = "test", secretPath = Definition.DefaultInfisicalPath,
-                    secretKey = Definition.DefaultInfisicalKey, type = "shared", version = 2,
-                    secretValue = root.GetProperty("secretValue").GetString(), secretValueHidden = false
+                    id = _resourceId,
+                    workspace = Owner.InfisicalOptions!.ProjectId,
+                    environment = "test",
+                    secretPath = Definition.DefaultInfisicalPath,
+                    secretKey = Definition.DefaultInfisicalKey,
+                    type = "shared",
+                    version = 2,
+                    secretValue = root.GetProperty("secretValue").GetString(),
+                    secretValueHidden = false
                 }
             }, context.RequestAborted);
         }

@@ -166,7 +166,9 @@ public sealed class McpAdapterHealthCheckTests(PostgreSqlContainerFixture postgr
                 {
                     row = new SystemSetting
                     {
-                        SettingKey = key, Value = value, ValueType = SettingValueType.Boolean
+                        SettingKey = key,
+                        Value = value,
+                        ValueType = SettingValueType.Boolean
                     };
                     seed.SystemSettings.Add(row);
                 }

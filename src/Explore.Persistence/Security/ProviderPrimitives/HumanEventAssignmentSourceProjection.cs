@@ -38,11 +38,11 @@ internal static class HumanEventAssignmentSourceProjection
             row.ExpiresAtUtc, row.RevokedAtUtc, row.Version)));
         var roleFacts = await Rows(roles.Select(row => new HumanAssignmentRoleFact(row.Id, row.MasterCode)));
         var permissions = await Rows(from mapping in Source<RolePermission>(context)
-            join permission in Source<Permission>(context) on mapping.PermissionId equals permission.Id
-            where assignments.Any(row => row.RoleId == mapping.RoleId)
-                || organizations.Any(row => row.RoleId == mapping.RoleId) || groups.Any(row => row.RoleId == mapping.RoleId)
-            select new HumanAssignmentPermissionFact(mapping.RoleId, mapping.PermissionId,
-                permission.MasterCode, permission.IsActive));
+                                     join permission in Source<Permission>(context) on mapping.PermissionId equals permission.Id
+                                     where assignments.Any(row => row.RoleId == mapping.RoleId)
+                                         || organizations.Any(row => row.RoleId == mapping.RoleId) || groups.Any(row => row.RoleId == mapping.RoleId)
+                                     select new HumanAssignmentPermissionFact(mapping.RoleId, mapping.PermissionId,
+                                         permission.MasterCode, permission.IsActive));
         var actors = await Rows(Source<Actor>(context)
             .Where(row => events.Any(parent => parent.ActorId == row.Id || parent.OrganizerActorId == row.Id))
             .Select(row => new HumanAssignmentActorFact(row.Id, row.UserId, row.OrganizationId,
@@ -50,17 +50,17 @@ internal static class HumanEventAssignmentSourceProjection
         var members = await Rows(Source<TenantUser>(context).Where(row => row.TenantId == tenant && row.UserId == actor)
             .Select(row => new HumanAssignmentTenantMemberFact(row.Id, row.ActorId, row.StatusId, row.IsDeleted)));
         var organizationFacts = await Rows(from member in organizations
-            join placement in Source<OrganizationTenant>(context)
-                on new { Id = member.OrganizationTenantId, member.TenantId } equals new { placement.Id, placement.TenantId }
-            select new HumanAssignmentOwnerMemberFact(member.Id, placement.Id, placement.OrganizationId,
-                member.RoleId, member.IsDeleted, placement.IsDeleted, placement.IsSuspended,
-                placement.IsOrganizerEligible, placement.ApprovalStatusId));
+                                           join placement in Source<OrganizationTenant>(context)
+                                               on new { Id = member.OrganizationTenantId, member.TenantId } equals new { placement.Id, placement.TenantId }
+                                           select new HumanAssignmentOwnerMemberFact(member.Id, placement.Id, placement.OrganizationId,
+                                               member.RoleId, member.IsDeleted, placement.IsDeleted, placement.IsSuspended,
+                                               placement.IsOrganizerEligible, placement.ApprovalStatusId));
         var groupFacts = await Rows(from member in groups
-            join placement in Source<GroupTenant>(context)
-                on new { Id = member.GroupTenantId, member.TenantId } equals new { placement.Id, placement.TenantId }
-            select new HumanAssignmentOwnerMemberFact(member.Id, placement.Id, placement.GroupId,
-                member.RoleId, member.IsDeleted, placement.IsDeleted, placement.IsSuspended,
-                placement.IsOrganizerEligible, placement.ApprovalStatusId));
+                                    join placement in Source<GroupTenant>(context)
+                                        on new { Id = member.GroupTenantId, member.TenantId } equals new { placement.Id, placement.TenantId }
+                                    select new HumanAssignmentOwnerMemberFact(member.Id, placement.Id, placement.GroupId,
+                                        member.RoleId, member.IsDeleted, placement.IsDeleted, placement.IsSuspended,
+                                        placement.IsOrganizerEligible, placement.ApprovalStatusId));
         var provenance = await Rows(Source<EventProvenanceType>(context)
             .Where(row => events.Any(parent => parent.EventProvenanceTypeId == row.Id))
             .Select(row => new HumanAssignmentProvenanceFact(row.Id, row.MasterCode)));

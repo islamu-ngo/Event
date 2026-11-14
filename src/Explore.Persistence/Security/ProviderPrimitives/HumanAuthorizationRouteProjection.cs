@@ -21,8 +21,13 @@ internal static class HumanAuthorizationRouteProjection
             .Where(row => keys.Contains(row.SettingKey))
             .Select(row => new
             {
-                row.SettingKey, row.Value, row.SettingValueTypeId, row.IsLocked,
-                row.Description, row.Category, row.AllowedValues
+                row.SettingKey,
+                row.Value,
+                row.SettingValueTypeId,
+                row.IsLocked,
+                row.Description,
+                row.Category,
+                row.AllowedValues
             }).ToArrayAsync(cancellationToken);
         requireCurrent();
         var systemByKey = system.ToDictionary(row => row.SettingKey, StringComparer.Ordinal);

@@ -55,12 +55,20 @@ public sealed class TenantAuthHandoff
             throw new ArgumentOutOfRangeException(nameof(expiresAtUnixMilliseconds));
         return new()
         {
-            Id = Guid.CreateVersion7(), OwnerUserId = binding.OwnerUserId, TenantId = binding.TenantId,
-            FlowId = binding.FlowId, SourceSessionDigest = binding.SourceSessionDigest,
-            SourceRevisionDigest = binding.SourceRevisionDigest, CodeDigest = codeDigest,
-            BrowserProofDigest = binding.BrowserProofDigest, RoutingDigest = binding.RoutingDigest,
-            SourceOrigin = source, DestinationOrigin = destination, LocalPath = binding.LocalPath,
-            ProtectedTicket = protectedTicket, CreatedAtUnixMilliseconds = createdAtUnixMilliseconds,
+            Id = Guid.CreateVersion7(),
+            OwnerUserId = binding.OwnerUserId,
+            TenantId = binding.TenantId,
+            FlowId = binding.FlowId,
+            SourceSessionDigest = binding.SourceSessionDigest,
+            SourceRevisionDigest = binding.SourceRevisionDigest,
+            CodeDigest = codeDigest,
+            BrowserProofDigest = binding.BrowserProofDigest,
+            RoutingDigest = binding.RoutingDigest,
+            SourceOrigin = source,
+            DestinationOrigin = destination,
+            LocalPath = binding.LocalPath,
+            ProtectedTicket = protectedTicket,
+            CreatedAtUnixMilliseconds = createdAtUnixMilliseconds,
             ExpiresAtUnixMilliseconds = expiresAtUnixMilliseconds
         };
     }

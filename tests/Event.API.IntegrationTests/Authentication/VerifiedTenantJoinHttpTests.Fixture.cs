@@ -54,7 +54,8 @@ public sealed partial class VerifiedTenantJoinHttpTests
                             })));
                     fixture.Client = fixture._keycloakHost.CreateClient(new WebApplicationFactoryClientOptions
                     {
-                        BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+                        BaseAddress = new Uri("https://localhost"),
+                        AllowAutoRedirect = false
                     });
                 }
                 else
@@ -89,16 +90,22 @@ public sealed partial class VerifiedTenantJoinHttpTests
                 database.Tenants.AddRange(target, inactive);
                 database.TenantSettingOverrides.Add(new TenantSetting
                 {
-                    Id = Guid.CreateVersion7(), TenantId = target.Id, Tenant = target,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = target.Id,
+                    Tenant = target,
                     SettingKey = GovernanceSettingKeys.Tenants.UserRegistrationEnabled,
-                    Value = registrationOpen ? "true" : "false", CreatedAt = DateTime.UtcNow
+                    Value = registrationOpen ? "true" : "false",
+                    CreatedAt = DateTime.UtcNow
                 });
                 if (keycloak)
                 {
                     database.Actors.Add(new Actor
                     {
-                        Id = Guid.CreateVersion7(), UserId = user.Id, User = user,
-                        ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+                        Id = Guid.CreateVersion7(),
+                        UserId = user.Id,
+                        User = user,
+                        ActorTypeId = (int)ActorTypeEnum.User,
+                        ActorType = null!,
                         Pii = new ActorPii { DisplayName = "Verified join account" },
                         CreatedAt = DateTime.UtcNow
                     });
@@ -108,14 +115,18 @@ public sealed partial class VerifiedTenantJoinHttpTests
                         Pii = new UserPii
                         {
                             Email = $"other-{fixture.OtherUserId:N}@example.test",
-                            FirstName = "Other", LastName = "Account"
+                            FirstName = "Other",
+                            LastName = "Account"
                         },
-                        EmailVerified = true, CreatedAt = DateTime.UtcNow
+                        EmailVerified = true,
+                        CreatedAt = DateTime.UtcNow
                     });
                     string subject = "join-account-" + Guid.CreateVersion7().ToString("N");
                     database.UserExternalLogins.Add(new UserExternalLogin
                     {
-                        Id = Guid.CreateVersion7(), UserId = user.Id, User = user,
+                        Id = Guid.CreateVersion7(),
+                        UserId = user.Id,
+                        User = user,
                         AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
                         AuthenticationProvider = null!,
                         ProviderKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
@@ -139,10 +150,16 @@ public sealed partial class VerifiedTenantJoinHttpTests
                         : target;
                     database.TenantUsers.Add(new TenantUser
                     {
-                        Id = Guid.CreateVersion7(), TenantId = membershipTenant.Id, Tenant = membershipTenant,
-                        UserId = user.Id, User = user, ActorId = actor.Id, Actor = actor,
+                        Id = Guid.CreateVersion7(),
+                        TenantId = membershipTenant.Id,
+                        Tenant = membershipTenant,
+                        UserId = user.Id,
+                        User = user,
+                        ActorId = actor.Id,
+                        Actor = actor,
                         StatusId = (int)(membershipStatus ?? TenantUserStatusEnum.Active),
-                        JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                        JoinedAt = DateTime.UtcNow,
+                        CreatedAt = DateTime.UtcNow
                     });
                 }
                 await database.SaveChangesAsync();
@@ -158,8 +175,11 @@ public sealed partial class VerifiedTenantJoinHttpTests
 
         private static Tenant NewTenant(string slug) => new()
         {
-            Id = Guid.CreateVersion7(), Slug = slug, FullName = slug,
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!,
+            Id = Guid.CreateVersion7(),
+            Slug = slug,
+            FullName = slug,
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -226,8 +246,15 @@ public sealed partial class VerifiedTenantJoinHttpTests
                 Memberships = await database.TenantUsers.IgnoreQueryFilters().AsNoTracking().OrderBy(row => row.Id)
                     .Select(row => new
                     {
-                        row.Id, row.UserId, row.TenantId, row.ActorId, row.StatusId,
-                        row.IsDeleted, row.JoinedAt, row.CreatedAt, row.UpdatedAt
+                        row.Id,
+                        row.UserId,
+                        row.TenantId,
+                        row.ActorId,
+                        row.StatusId,
+                        row.IsDeleted,
+                        row.JoinedAt,
+                        row.CreatedAt,
+                        row.UpdatedAt
                     }).ToArrayAsync()
             });
         }

@@ -60,8 +60,11 @@ public sealed partial class LocalIdentityWriterPermissionsNativeTests
         {
             retained = new LocalIdentityUser
             {
-                UserName = "retained-upgrade-user", NormalizedUserName = "RETAINED-UPGRADE-USER",
-                CreatedAt = DateTime.UtcNow, FirstName = "Retained", LastName = "Profile"
+                UserName = "retained-upgrade-user",
+                NormalizedUserName = "RETAINED-UPGRADE-USER",
+                CreatedAt = DateTime.UtcNow,
+                FirstName = "Retained",
+                LastName = "Profile"
             };
             migrator.Add(retained);
             await migrator.SaveChangesAsync();
@@ -100,7 +103,8 @@ public sealed partial class LocalIdentityWriterPermissionsNativeTests
         await RequireOrdinaryPurposeIsolationAsync(fixture, migratorOptions, migrator, topology, store);
         await using var runtime = CreateContext(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime) with
         {
-            Database = migratorOptions.Database, Schema = migratorOptions.Schema
+            Database = migratorOptions.Database,
+            Schema = migratorOptions.Schema
         }, store);
         await runtime.Database.OpenConnectionAsync();
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>

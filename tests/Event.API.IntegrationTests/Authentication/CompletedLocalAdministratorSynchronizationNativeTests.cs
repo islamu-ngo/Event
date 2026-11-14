@@ -180,8 +180,15 @@ public sealed class CompletedLocalAdministratorSynchronizationNativeTests
             .Select(row => new { row.Id, row.UserId, row.RoleId, row.GrantedAt }).ToListAsync();
         var tenant = await context.Set<TenantUserRoleGrant>().AsNoTracking()
             .OrderBy(row => row.Id)
-            .Select(row => new { row.Id, row.TenantId, row.TenantUserId, row.RoleId,
-                row.RoleScopeId, row.GrantedAt }).ToListAsync();
+            .Select(row => new
+            {
+                row.Id,
+                row.TenantId,
+                row.TenantUserId,
+                row.RoleId,
+                row.RoleScopeId,
+                row.GrantedAt
+            }).ToListAsync();
         return JsonSerializer.Serialize(new { bootstrap, platform, tenant });
     }
 

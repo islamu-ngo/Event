@@ -112,7 +112,7 @@ public sealed class EmailDispatchPointerPublicationStore(
                 || context.IsConfigurationInstanceImportOwner || context.Database.CurrentTransaction is not null
                 || System.Transactions.Transaction.Current is not null
                 || context.GetService<IDbContextTransactionManager>() is ITransactionEnlistmentManager
-                    { EnlistedTransaction: not null })
+                { EnlistedTransaction: not null })
                 throw new UnauthorizedAccessException("email_pointer_publication_original_global_required");
         }
         RequireLease();

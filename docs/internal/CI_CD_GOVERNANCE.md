@@ -20,10 +20,10 @@ Workflow YAML defines what runs; repository settings define which checks are req
 ## Native build and test selection
 
 The dependency license audit covers tracked deployment and engineering profiles,
-including the Standalone container lock and moderation measurement launcher.
-CI restores those owners before auditing. After the conditional container
-restore, it restores Standalone's ordinary profile again so subsequent solution
-builds use ordinary assets while retaining the deployment packages in the cache.
+including the Standalone container lock, moderation launcher, browser installer,
+migration scaffolder and Keycloak lifecycle tool. CI restores those owners
+without executing the tools. A final ordinary solution restore resets generated
+assets for subsequent builds while retaining profile-specific packages in the cache.
 
 `Build & Test` consumes `select-build-test-changes` from the existing release
 engineering executable. The workflow accepts exactly seven unique boolean

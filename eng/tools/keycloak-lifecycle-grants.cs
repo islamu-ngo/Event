@@ -19,7 +19,7 @@ try
     }
     using var export = await JsonDocument.ParseAsync(input, new JsonDocumentOptions { MaxDepth = 64 });
     bool accepted = KeycloakLifecycleGrantProfile.AllowsDeployment(export.RootElement, args[0], args[1], args[2]);
-    Console.WriteLine(JsonSerializer.Serialize(new { valid = accepted }));
+    Console.WriteLine(accepted ? """{"valid":true}""" : """{"valid":false}""");
     return accepted ? 0 : 1;
 }
 catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)

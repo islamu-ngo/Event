@@ -3,7 +3,7 @@
 > **Audience:** Contributors | Maintainers | AI agents
 > **Status:** Accepted
 > **Owner:** Contributor Experience | Agent Context
-> **Last Verified:** 2026-11-13
+> **Last Verified:** 2026-11-14
 > **Source Anchors:** `docs/internal/project-management/work-item-taxonomy-and-granularity-report.md`, `AGENTS.md` (Critical Rule 20), `.agents/skills/plane-compose/SKILL.md`, `.agents/skills/plane-mcp/SKILL.md`, `.agents/rules/plane-tracking.md`, `islamic-value-sensitive-design/workstreams/i-vsd-plane-project-management-standardization.md`
 
 ---
@@ -60,7 +60,8 @@ Modules are intentionally used as release containers rather than Plane Releases.
 - **Tier B — Sub-item:** only for a separately reviewed PR stream, or a heavy dedicated test campaign, inside one deliverable.
 - **Tier C — Standalone `Test`/`Refactor`/`Docs`/`CI/CD` item:** only for cross-cutting platform work spanning multiple features (for example, a TUnit migration).
 - **Completion test:** every item must be closeable on a concrete date with PR/CI/ADR evidence. Perpetual areas are expressed as Type + Labels + bounded items, never as titles.
-- **Tracking budget per plan (amended 2026-11-13):** one tracked item per separately merged pull request. A single-PR plan owns 1 Work Item; a 2–5-PR plan owns 1 parent plus 1 Sub-item per PR; a program owns one such item per capability under an existing Epic. More than 6 new items or a new Epic needs explicit approval. Phases, tests, docs, reviews and commits never become items. See [taxonomy §4.1](../project-management/work-item-taxonomy-and-granularity-report.md#41-tracking-budget-per-implementation-plan-plan--plane-mapping).
+- **Tracking budget per plan (amended 2026-11-13):** one tracked item per separately merged pull request. A single-PR plan owns 1 Work Item; a 2–5-PR plan owns 1 parent plus 1 Sub-item per PR; a program owns one such item per capability under an existing Epic. More than 6 new items or a new Epic needs explicit approval; a larger programme asks for that approval and keeps one canonical plan instead of fragmenting into several plans to meet the budget. Phases, tests, docs, reviews and commits never become items. See [taxonomy §4.1](../project-management/work-item-taxonomy-and-granularity-report.md#41-tracking-budget-per-implementation-plan-plan--plane-mapping).
+- **Programme retirement (amended 2026-11-14):** an item reaches `Done` only after its pull request has merged and its delivery has been reconciled against the scope's required acceptance; a merged PR with an unmet criterion keeps it open. A parent is `Done` only when every Sub-item is `Done` and every retained programme obligation is satisfied. The plan's `active-<task>.yaml` file and its canonical triad survive intermediate merges and are folded or retired only after the final programme reconciliation. Delivery, reconciliation, and worktree cleanup are separate facts recorded in the plan's PR registry; Plane mirrors delivery and acceptance only. See the [multi-PR agentic workflow ADR](ADR-multi-pr-agentic-workflow.md).
 - **Assignment:** items an agent creates in an unstarted state (`Candidate`, `Backlog`, `Waiting Dependency`, `Todo`) carry no assignees. Assignment happens on the move to `Ready`/`In Progress`. The project has no default assignee (cleared 2026-11-13). Assignments a maintainer made on existing items are kept, never stripped.
 
 ### E. GitHub → Plane Intake gate
@@ -71,7 +72,7 @@ GitHub Discussions (ideas) and GitHub Issues (reproducible bugs, documentation d
 
 - **`plane-compose v0.5.2`** owns the declarative YAML truth in the gitignored `event/` project: schema, work-item fields, `EVENT-XXX` minting via `id:` write-back, offline validation, and additive push.
 - **Plane MCP server** owns remote-only operations: Version Module membership, comments, links, attachments, activity, Intake triage, PQL queries, and deletions.
-- **Ordering (amended 2026-11-13):** YAML pushes first, MCP mutations second. MCP only touches what YAML cannot hold, so routine work needs no `plane pull`; finished `active-*.yaml` files are folded into `work/workitems.yaml`. A full pull (about `items ÷ 50` minutes on `EVENT`, plus repairs before the next push) is a maintainer-scheduled resync. The same `EVENT-XXX` must never appear in two `event/work/*.yaml` files. An item created through MCP must never have its `id:` hand-written into YAML, because `plane push` tracks items through `.plane/state.json` and would create a duplicate.
+- **Ordering (amended 2026-11-13):** YAML pushes first, MCP mutations second. MCP only touches what YAML cannot hold, so routine work needs no `plane pull`; a programme's `active-*.yaml` file is folded into `work/workitems.yaml` after its final pull request is merged and reconciled. A full pull (about `items ÷ 50` minutes on `EVENT`, plus repairs before the next push) is a maintainer-scheduled resync. The same `EVENT-XXX` must never appear in two `event/work/*.yaml` files. An item created through MCP must never have its `id:` hand-written into YAML, because `plane push` tracks items through `.plane/state.json` and would create a duplicate.
 - **No bespoke tooling:** no custom Plane REST client, sync daemon, or Python/Node helper is added to `eng/`. `ISLAMU.AgentWorkflow` keeps only `validate-intents` and `validate-commit`.
 
 ### G. Git traceability
@@ -109,6 +110,7 @@ Plane's GitHub integration populates the Development panel from these markers, s
 ## 5. Related
 
 - [Work-item taxonomy and granularity standard](../project-management/work-item-taxonomy-and-granularity-report.md)
+- [Multi-PR agentic workflow ADR](ADR-multi-pr-agentic-workflow.md)
 - [I-VSD assessment: Plane project management standardization](../../../islamic-value-sensitive-design/workstreams/i-vsd-plane-project-management-standardization.md)
 - [Agentic Context Engineering — Single-Project `EVENT` taxonomy policy](../AGENTIC_CONTEXT_ENGINEERING.md#single-project-event-taxonomy-granularity--importance-policy)
 - [`plane-compose` skill](../../../.agents/skills/plane-compose/SKILL.md) · [`plane-mcp` skill](../../../.agents/skills/plane-mcp/SKILL.md) · [`plane-tracking` path rule](../../../.agents/rules/plane-tracking.md)

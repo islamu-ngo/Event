@@ -10,6 +10,42 @@ namespace Explore.Blazor.IntegrationTests.Middleware;
 public class PathTenantResolverMiddlewareTests
 {
     [Test]
+    [Arguments("/login", "", null)]
+    [Arguments("/join", "", null)]
+    [Arguments("/auth/local/register", "", null)]
+    [Arguments("/auth/session/start", "/auth", null)]
+    [Arguments("/join/select", "/join", null)]
+    [Arguments("/AUTH/session/handoff", "", null)]
+    [Arguments("/authentic/events", "", "authentic")]
+    [Arguments("/login-community/events", "", "login-community")]
+    [Arguments("/join-club/events", "", "join-club")]
+    public async Task GlobalAuthenticationRoutesCannotBeCapturedByTenantConfiguration(
+        string path, string prefix, string? expectedTenant)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = path;
+        var routeContext = new TenantRouteContextAccessor(new HttpContextAccessor { HttpContext = context });
+        var api = Substitute.For<IInstanceMessagingSettingsClient>();
+        api.GetInstanceResolverConfigurationAsync(cancellationToken: Arg.Any<CancellationToken>())
+            .Returns(new ResolverConfigurationDto
+            {
+                PathEnabled = true,
+                PathPrefix = prefix,
+                ReservedSlugs = ["reserved"]
+            });
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var configuration = new BffResolverConfigurationProvider(api, cache,
+            NullLogger<BffResolverConfigurationProvider>.Instance);
+        var middleware = new PathTenantResolverMiddleware(_ => Task.CompletedTask);
+
+        await middleware.InvokeAsync(context, configuration, routeContext);
+
+        await Assert.That(context.Request.Path.Value).IsEqualTo(expectedTenant is null ? path : "/events");
+        await Assert.That(context.Request.PathBase.Value).IsEqualTo(expectedTenant is null ? string.Empty : "/" + expectedTenant);
+        await Assert.That(routeContext.TenantSlug).IsEqualTo(expectedTenant);
+    }
+
+    [Test]
     public async Task Request_WithRootSlug_ExtractsSlugAndRewritesPath()
     {
         using var baseFactory = new BlazorBffWebApplicationFactory();

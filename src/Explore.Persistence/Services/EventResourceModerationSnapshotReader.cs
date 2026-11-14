@@ -8,6 +8,7 @@ using Explore.Application.Contracts.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Repositories;
 using ISLAMU.Moderation.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -270,12 +271,6 @@ public sealed class EventResourceModerationSnapshotReader(
 
     private async Task<bool> ProviderTenantMatchesAsync(Guid tenantId, CancellationToken cancellationToken)
     {
-        if (context.Database.ProviderName != RelationalNamedLock.PostgreSqlProvider) return true;
-        await using var command = context.Database.GetDbConnection().CreateCommand();
-        command.Transaction = context.Database.CurrentTransaction?.GetDbTransaction();
-        command.CommandText = "SELECT current_setting('app.current_tenant_id', true)";
-        var value = await command.ExecuteScalarAsync(cancellationToken);
-        return value is string setting && Guid.TryParse(setting, out var providerTenant)
-            && providerTenant == tenantId;
+        return await PostgresTenantSessionProbe.MatchesAsync(context, context.Database.CurrentTransaction, tenantId, cancellationToken);
     }
 }

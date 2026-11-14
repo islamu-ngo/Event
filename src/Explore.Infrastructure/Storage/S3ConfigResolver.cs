@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;
 using Explore.Application.Settings;
@@ -13,9 +14,10 @@ namespace Explore.Infrastructure.Storage;
 /// Resolves S3 governance through the hierarchical settings engine and credentials through
 /// the selected external secret authority.
 /// </summary>
-public class S3ConfigResolver : IS3ConfigResolver
+public class S3ConfigResolver : IS3ConfigResolver, IInstanceS3ConfigResolver
 {
     private readonly IHierarchicalSettingsReader _resolver;
+    private readonly IInstanceSystemSettingsReader _instanceSettings;
     private readonly ITenantContext _tenantContext;
     private readonly IMemoryCache _cache;
     private readonly S3ConfigCacheRegistry _cacheRegistry;
@@ -27,6 +29,7 @@ public class S3ConfigResolver : IS3ConfigResolver
 
     public S3ConfigResolver(
         IHierarchicalSettingsReader resolver,
+        IInstanceSystemSettingsReader instanceSettings,
         ITenantContext tenantContext,
         IMemoryCache cache,
         S3ConfigCacheRegistry cacheRegistry,
@@ -34,6 +37,7 @@ public class S3ConfigResolver : IS3ConfigResolver
         ILogger<S3ConfigResolver> logger)
     {
         _resolver = resolver;
+        _instanceSettings = instanceSettings;
         _tenantContext = tenantContext;
         _cache = cache;
         _cacheRegistry = cacheRegistry;
@@ -41,10 +45,16 @@ public class S3ConfigResolver : IS3ConfigResolver
         _logger = logger;
     }
 
-    public async Task<S3Configuration?> ResolveAsync(CancellationToken cancellationToken = default)
+    public Task<S3Configuration?> ResolveAsync(CancellationToken cancellationToken = default)
+        => ResolveForScopeAsync(_tenantContext.TenantId, cancellationToken);
+
+    public async Task<bool> IsInstanceConfiguredAsync(CancellationToken cancellationToken = default)
+        => await ResolveForScopeAsync(null, cancellationToken) is not null;
+
+    private async Task<S3Configuration?> ResolveForScopeAsync(
+        Guid? tenantId, CancellationToken cancellationToken)
     {
-        var tenantId = _tenantContext.TenantId;
-        var cacheKey = $"{CacheKeyPrefix}{tenantId}";
+        var cacheKey = tenantId.HasValue ? $"{CacheKeyPrefix}{tenantId}" : $"{CacheKeyPrefix}Instance";
 
         if (_cacheRegistry.TryGet(_cache, cacheKey, out var cached, out long generation))
         {
@@ -78,23 +88,35 @@ public class S3ConfigResolver : IS3ConfigResolver
     }
 
     private async Task<S3Configuration?> ResolveFromSettingsAsync(
-        Guid tenantId,
+        Guid? tenantId,
         CancellationToken cancellationToken)
     {
-        var endpoint = await ResolveStringAsync(
-            GovernanceSettingKeys.Storage.Endpoint,
-            tenantId,
-            cancellationToken);
+        var instanceSettings = tenantId is null
+            ? (await _instanceSettings.ReadAsync(
+            [
+                GovernanceSettingKeys.Storage.Endpoint,
+                GovernanceSettingKeys.Storage.BucketName,
+                GovernanceSettingKeys.Storage.UploadUrlExpirationMinutes,
+                GovernanceSettingKeys.Storage.ForcePathStyle,
+                GovernanceSettingKeys.Storage.Region,
+                GovernanceSettingKeys.Storage.PublicEndpoint
+            ], cancellationToken)).ToDictionary(row => row.SettingKey, StringComparer.Ordinal)
+            : null;
+
+        async Task<T?> ResolveSettingAsync<T>(string key) =>
+            instanceSettings is not null
+                ? SettingValueSerializer.Deserialize(
+                    HierarchicalSettingMerge.Resolve(key, instanceSettings)?.Value, default(T)!)
+                : await _resolver.ResolveAsync<T>(key, new SettingContext(TenantId: tenantId), cancellationToken);
+
+        var endpoint = await ResolveSettingAsync<string>(GovernanceSettingKeys.Storage.Endpoint);
         if (string.IsNullOrWhiteSpace(endpoint))
         {
             _logger.LogDebug("S3 not configured because the endpoint is empty");
             return null;
         }
 
-        var bucketName = await ResolveStringAsync(
-            GovernanceSettingKeys.Storage.BucketName,
-            tenantId,
-            cancellationToken);
+        var bucketName = await ResolveSettingAsync<string>(GovernanceSettingKeys.Storage.BucketName);
         if (string.IsNullOrWhiteSpace(bucketName))
         {
             _logger.LogDebug("S3 not configured because the bucket is empty");
@@ -121,17 +143,11 @@ public class S3ConfigResolver : IS3ConfigResolver
             return null;
         }
 
-        var uploadExpiration = await _resolver.ResolveAsync<int>(GovernanceSettingKeys.Storage.UploadUrlExpirationMinutes, new SettingContext(TenantId: tenantId), cancellationToken);
-        var forcePathStyle = await _resolver.ResolveAsync<bool>(GovernanceSettingKeys.Storage.ForcePathStyle, new SettingContext(TenantId: tenantId), cancellationToken);
+        var uploadExpiration = await ResolveSettingAsync<int>(GovernanceSettingKeys.Storage.UploadUrlExpirationMinutes);
+        var forcePathStyle = await ResolveSettingAsync<bool>(GovernanceSettingKeys.Storage.ForcePathStyle);
 
-        var region = await ResolveStringAsync(
-            GovernanceSettingKeys.Storage.Region,
-            tenantId,
-            cancellationToken);
-        var publicEndpoint = await ResolveStringAsync(
-            GovernanceSettingKeys.Storage.PublicEndpoint,
-            tenantId,
-            cancellationToken);
+        var region = await ResolveSettingAsync<string>(GovernanceSettingKeys.Storage.Region);
+        var publicEndpoint = await ResolveSettingAsync<string>(GovernanceSettingKeys.Storage.PublicEndpoint);
 
         return new S3Configuration
         {
@@ -147,18 +163,9 @@ public class S3ConfigResolver : IS3ConfigResolver
         };
     }
 
-    private async Task<string?> ResolveStringAsync(
-        string settingKey,
-        Guid tenantId,
-        CancellationToken cancellationToken) =>
-        await _resolver.ResolveAsync<string>(
-            settingKey,
-            new SettingContext(TenantId: tenantId),
-            cancellationToken);
-
     private async Task<string?> ResolveSecretAsync(
         string settingKey,
-        Guid tenantId,
+        Guid? tenantId,
         CancellationToken cancellationToken)
     {
         SecretResolutionResult result = await _secretResolver.ResolveAsync(

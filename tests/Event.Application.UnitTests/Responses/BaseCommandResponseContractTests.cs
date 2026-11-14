@@ -18,6 +18,7 @@ using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.RegistrationOrders.Commands;
 using Explore.Application.Features.Promotions;
 using Explore.Domain;
+using Explore.Domain.ValueObjects;
 using Explore.Application.Features.Promotions.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Serialization;
@@ -1110,7 +1111,7 @@ public sealed partial class BaseCommandResponseContractTests
 
     private static LocalCredentialOperationStatus CreateCredentialOperation() => new(
         receipt: new LocalCredentialOperationReceipt(ResultId, LocalCredentialOperationKind.Create,
-            LocalCredentialOperationStage.ChangeRequired, RelatedId, TenantId, ChoiceId, RefundId, FixtureUtc),
+            LocalCredentialOperationStage.ChangeRequired, RelatedId, TenantId, ChoiceId, RefundId, FixtureUtc, null),
         operationConcurrencyStamp: ChoiceId, verifiedByApplicationUserId: RelatedId,
         verifiedAt: FixtureUtc, updatedAt: FixtureUtc, isCurrent: true,
         credentialState: LocalCredentialState.ChangeRequired, resetAudit: null);
@@ -1119,7 +1120,8 @@ public sealed partial class BaseCommandResponseContractTests
         new(SyntheticReveal, FixtureOffset.AddMinutes(5), difficulty: 18, version: 1);
 
     private static AtprotoTransientValue CreateTransientValue() => new(ResultId, AtprotoTransientPurpose.OAuthState,
-        new string('a', 64), TenantId, SyntheticReveal, FixtureOffset.AddMinutes(1).ToUnixTimeMilliseconds());
+        new string('a', 64), TenantId, SyntheticReveal, FixtureOffset.AddMinutes(1).ToUnixTimeMilliseconds(),
+        AtprotoAuthenticationFlowKind.Targeted);
 
     private static RegistrationOrderDto CreateOrder() => new()
     {

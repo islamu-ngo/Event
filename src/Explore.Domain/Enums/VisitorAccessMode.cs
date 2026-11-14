@@ -5,5 +5,6 @@ public enum VisitorAccessMode
 {
     FullRegistrationAndAuth = 0,
     AnonymousOnly = 1,
-    DirectoryListingOnly = 2
+    DirectoryListingOnly = 2,
+    AuthenticatedOnly = 3
 }

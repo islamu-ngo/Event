@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6NX1539N24P03YVYNNPTG35
+Title: "allow unconfigured optional browser OIDC credentials"
+Type: fix
+Scope: access
+Summary: "Allow Split and Combined browser hosts to start with public Keycloak metadata when the optional confidential client is absent; reject invalid values and incomplete credential-bearing groups before publishing configuration or acquisition evidence."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "An absent optional confidential client remains unconfigured. Present invalid values and incomplete credential-bearing groups still fail closed, with atomic credential and acquisition-evidence publication."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Public Keycloak coordinates do not require configuring the optional browser confidential client. No new configuration keys or credential fallback are introduced."
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Split and Combined hosts can start when the optional browser OIDC credential is absent. Configured credentials still require their complete valid metadata group."

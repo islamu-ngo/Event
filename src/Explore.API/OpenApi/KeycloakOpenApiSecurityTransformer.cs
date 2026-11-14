@@ -1,6 +1,8 @@
+using Explore.API.Controllers;
 using Explore.Application.Constants;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -85,17 +87,25 @@ internal sealed class KeycloakOpenApiSecurityTransformer(IConfiguration configur
         }
 
         AddDefaultSecuritySchemes(document);
+        bool verifiedAccount = actionDescriptor is ControllerActionDescriptor action
+            && (action.ControllerTypeInfo.AsType() == typeof(VerifiedAccountContinuationController)
+                && action.MethodInfo.Name == nameof(VerifiedAccountContinuationController.Resolve)
+                || action.ControllerTypeInfo.AsType() == typeof(VerifiedTenantJoinController)
+                && action.MethodInfo.Name == nameof(VerifiedTenantJoinController.Join));
         operation.Security =
         [
             new OpenApiSecurityRequirement
             {
                 [new OpenApiSecuritySchemeReference(JwtBearerDefaults.AuthenticationScheme, document)] = []
-            },
-            new OpenApiSecurityRequirement
-            {
-                [new OpenApiSecuritySchemeReference(ApiAuthenticationSchemeNames.ApiKey, document)] = []
             }
         ];
+        if (!verifiedAccount)
+        {
+            operation.Security.Add(new OpenApiSecurityRequirement
+            {
+                [new OpenApiSecuritySchemeReference(ApiAuthenticationSchemeNames.ApiKey, document)] = []
+            });
+        }
         if (includeKeycloak)
         {
             operation.Security.Add(new OpenApiSecurityRequirement

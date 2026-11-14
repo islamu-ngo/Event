@@ -19,8 +19,14 @@ Workflow YAML defines what runs; repository settings define which checks are req
 
 ## Native build and test selection
 
+The dependency license audit covers tracked deployment and engineering profiles,
+including the Standalone container lock and moderation measurement launcher.
+CI restores those owners before auditing. After the conditional container
+restore, it restores Standalone's ordinary profile again so subsequent solution
+builds use ordinary assets while retaining the deployment packages in the cache.
+
 `Build & Test` consumes `select-build-test-changes` from the existing release
-engineering executable. The workflow accepts exactly eight unique boolean
+engineering executable. The workflow accepts exactly seven unique boolean
 decisions and rejects malformed, missing or inconsistent output before exporting
 job outputs. The native selector independently chooses Architecture for both
 configuration schema artifacts and their generator; only root README and public
@@ -32,7 +38,39 @@ can change. The fast reusable workflow runs the distributed project's pure
 `Harness` category; real `Distributed` and browser execution require their
 separate runtime evidence and are never inferred from Harness results.
 
+SetupLive routing is verified by passing all 37 governed input families through
+the native command and requiring both Architecture and Setup selection.
+Workflow architecture checks verify the native command wiring, read-only
+authority, fork-safe secret handling and serial Setup execution. They do not
+require the retired inline path-glob list to remain in the workflow shell script.
+
 ## Security integration fixture execution
+
+The browser prerequisite uses `eng/tools/InstallAssuranceBrowser.cs` with its
+own generated lock at `eng/tools/InstallAssuranceBrowser/packages.lock.json`.
+The installer requires locked restore and retains the approved Playwright
+version. It must not reuse or overwrite `eng/tools/packages.lock.json`, which
+belongs to other tools: disabling lock generation does not bypass an existing
+lock and causes `NU1005`. Verify the ordinary installer command against its
+committed lock before interpreting a prerequisite failure as a browser or
+runtime regression. Installation alone is not browser execution evidence.
+
+The installer lock also captures the selected SDK's implicit ILCompiler and
+ILLink dependencies. An SDK security update must regenerate this dedicated
+lock through native restore and pass a subsequent locked restore without
+changing the neighboring tool lock. The selected SDK servicing baseline is
+recorded in [Operations](OPERATIONS.md#complete-release-impact-metadata).
+Inspect the regenerated compiler/linker versions; retain at least the 10.0.14
+patched floor for
+[GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9).
+Playwright remains at its separately approved version; auditing stays enabled.
+
+Release-impact validation executes the trusted base checkout. A patched SDK
+on the pull-request head does not upgrade that checkout: its SDK pin must
+receive the reviewed servicing change before the protected job can use the
+patched compiler. The accepted execution decision waits for the existing PR
+to merge; do not open a separate SDK PR, switch this job to untrusted head
+code or suppress the advisory to make the check pass.
 
 The existing `security-execution.v1.json` packet is governed by the embedded
 `executionRequirements` in `eng/security/security-control-register.json`.
@@ -43,6 +81,16 @@ every registered lane and its exact native result variants, with no
 missing/skipped results or reused report/execution identities. Candidate,
 run/attempt and retained artifact byte hashes must agree.
 Provider, database role and authentication remain `not-attested`.
+
+The daemon control client excludes ambient trace headers and baggage through its
+own handler. Wire-level context-isolation checks and the explicit read-only
+daemon probe remain prerequisite diagnostics, not registered-lane admission.
+
+Establish uncached engine readiness on the selected socket before bounded
+assurance requests; cached Desktop proxy responses do not prove a running VM.
+Retain the asynchronous client's five-second request budget and separate
+readiness evidence. A canceled DELETE with no accepted response has an unknown
+outcome, not successful cleanup.
 
 The API lanes require their registered key witnesses within the complete
 category report. Owned lanes require equality between registered and observed
@@ -436,6 +484,14 @@ Recommended checks after the PR1-PR8 governance baseline stabilizes:
 | Security integration | `Security Integration Tests` | `Security Integration Tests` | Ready after repository-side check-name verification | Always-present wrapper detects security-relevant paths, runs on schedule/manual dispatch, supports merge queue, and intentionally no-ops for unrelated changes. |
 | Cerbos policy | `Cerbos Policy Validation` | `Cerbos Policy Validation` | Ready after repository-side check-name verification | Always-present wrapper detects authorization-policy/code paths, runs on schedule/manual dispatch, supports merge queue, and intentionally no-ops for unrelated changes. |
 | Agent context | `agent-context` | `Validate AI-Context Contract` | Ready after repository-side check-name verification | Always-present wrapper detects AI context/docs/rule paths, supports merge queue/manual dispatch, and intentionally no-ops for unrelated changes. |
+
+CodeQL allows 90 minutes for C# and 45 minutes for the other languages.
+Run 43522421495 on November 13, 2026 used about 30 minutes for the traced C#
+build and another four for database finalization. At the former 45-minute
+job limit, query evaluation was progressing at 28/59 and GitHub cancelled
+the job. The C# budget includes all three phases; it does not reduce the
+query suite, coverage, or error enforcement. Retain exact-head terminal
+analysis evidence; a successful build or cancelled scan is not admission.
 
 The security integration job allows 45 minutes for restore, build, the Security category, and the PolicyContract category. On 2026-09-27, the Security category alone passed 238 tests locally in 12 minutes 15 seconds; the previous 15-minute GitHub job expired during that category after a 2-minute 42-second build. The larger budget preserves both test selections rather than reducing coverage.
 

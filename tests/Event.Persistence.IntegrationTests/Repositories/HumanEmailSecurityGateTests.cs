@@ -8,6 +8,7 @@ using Explore.Domain.Constants;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Security;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +18,43 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 [NotInParallel("SqliteEmailDispatchEligibility")]
 public sealed class HumanEmailSecurityGateTests
 {
+    [Test]
+    public async Task SourceAcquisitionReservesBorrowedDeferredTransactionUntilRollback()
+    {
+        await using var authentication = await AuthenticatedSettingsFixture.CreateSqliteAsync();
+        CancellationToken token = TestContext.Current!.Execution.CancellationToken;
+        await authentication.RunInstanceEmailAsync(async session =>
+        {
+            var context = session.Services.GetRequiredService<ExploreDbContext>();
+            await using var gate = await session.Services.GetRequiredService<IHumanSecuritySourceGate>().AcquireAsync(token);
+            var protocol = await session.Services.GetRequiredService<IHumanEmailSourceFactory>().CreateAsync(token);
+            var preparation = await protocol.PrepareAsync(includeSelectedRoute: false, token);
+            await context.Database.OpenConnectionAsync(token);
+            var connection = (SqliteConnection)context.Database.GetDbConnection();
+            await using var deferred = connection.BeginTransaction(IsolationLevel.Serializable, deferred: true);
+            await using var borrowed = await context.Database.UseTransactionAsync(deferred, token);
+            var contenderOptions = new SqliteConnectionStringBuilder(connection.ConnectionString) { DefaultTimeout = 1 };
+            await using var contender = new SqliteConnection(contenderOptions.ToString());
+            await contender.OpenAsync(token);
+
+            await using (var before = contender.BeginTransaction(IsolationLevel.Serializable, deferred: false))
+                await before.RollbackAsync(token);
+
+            await protocol.AcquireAsync(preparation, token);
+            var blocked = await Assert.ThrowsAsync<SqliteException>(async () =>
+            {
+                await using var unexpected = contender.BeginTransaction(IsolationLevel.Serializable, deferred: false);
+                await unexpected.RollbackAsync(token);
+            });
+            await Assert.That(blocked!.SqliteErrorCode).IsEqualTo(5);
+
+            await borrowed!.RollbackAsync(token);
+            await using var after = contender.BeginTransaction(IsolationLevel.Serializable, deferred: false);
+            await after.RollbackAsync(token);
+            return true;
+        }, token);
+    }
+
     [Test]
     [Arguments(false)]
     [Arguments(true)]

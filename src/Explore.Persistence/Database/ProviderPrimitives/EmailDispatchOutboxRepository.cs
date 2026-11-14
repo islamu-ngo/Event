@@ -514,34 +514,6 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
         return await ReadReminderStateChangeAsync(command, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<EmailDispatchOutbox>> GetRabbitMqPublishBatch(
-        int batchSize,
-        DateTime now,
-        DateTime retryAttemptsBefore,
-        CancellationToken cancellationToken)
-    {
-        var pausedTenantIds = _dbContext.EmailDispatchTenantControls
-            .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDispatchWorkerCrossTenantQueue)
-            .Where(control => control.IsPaused)
-            .Select(control => control.TenantId);
-        var processorPaused = _dbContext.EmailDispatchProcessorStates
-            .AsNoTracking()
-            .Any(state => state.ProcessorCode == SmtpProcessorCode && state.IsPaused);
-
-        return await _dbContext.EmailDispatchOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDispatchWorkerCrossTenantQueue)
-            .AsNoTracking()
-            .Where(e => e.ContentRedactedAt == null
-                && (e.Status == EmailDispatchStatus.Pending || e.Status == EmailDispatchStatus.RetryScheduled)
-                && (e.NextAttemptAt == null || e.NextAttemptAt <= now)
-                && (e.RabbitMqLastPublishAttemptAt == null || e.RabbitMqLastPublishAttemptAt <= retryAttemptsBefore)
-                && !processorPaused
-                && !pausedTenantIds.Contains(e.TenantId))
-            .OrderBy(e => e.CreatedAt)
-            .Take(batchSize)
-            .ToListAsync(cancellationToken);
-    }
-
     public Task<int> CountDueDispatchAsync(
         DateTime now,
         CancellationToken cancellationToken)
@@ -2499,40 +2471,6 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
         return providerFenceExists
             ? EmailDispatchPreHandoffReleaseOutcome.ProviderHandoffFenced
             : EmailDispatchPreHandoffReleaseOutcome.LostClaim;
-    }
-
-    public async Task MarkRabbitMqPublishSucceeded(
-        Guid id,
-        DateTime publishedAt,
-        CancellationToken cancellationToken)
-    {
-        await _dbContext.EmailDispatchOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDispatchWorkerCrossTenantQueue)
-            .Where(e => e.Id == id
-                && (e.Status == EmailDispatchStatus.Pending || e.Status == EmailDispatchStatus.RetryScheduled))
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(e => e.RabbitMqLastPublishedAt, publishedAt)
-                .SetProperty(e => e.RabbitMqLastPublishAttemptAt, publishedAt)
-                .SetProperty(e => e.RabbitMqPublishAttemptCount, e => e.RabbitMqPublishAttemptCount + 1)
-                .SetProperty(e => e.RabbitMqLastPublishFailureCategory, (string?)null)
-                .SetProperty(e => e.UpdatedAt, publishedAt), cancellationToken);
-    }
-
-    public async Task MarkRabbitMqPublishFailed(
-        Guid id,
-        string failureCategory,
-        DateTime attemptedAt,
-        CancellationToken cancellationToken)
-    {
-        await _dbContext.EmailDispatchOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDispatchWorkerCrossTenantQueue)
-            .Where(e => e.Id == id
-                && (e.Status == EmailDispatchStatus.Pending || e.Status == EmailDispatchStatus.RetryScheduled))
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(e => e.RabbitMqLastPublishAttemptAt, attemptedAt)
-                .SetProperty(e => e.RabbitMqPublishAttemptCount, e => e.RabbitMqPublishAttemptCount + 1)
-                .SetProperty(e => e.RabbitMqLastPublishFailureCategory, Truncate(failureCategory, 100))
-                .SetProperty(e => e.UpdatedAt, attemptedAt), cancellationToken);
     }
 
     public async Task SettleProviderAccepted(

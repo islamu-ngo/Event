@@ -15,7 +15,8 @@ public sealed class GetPublicEventOpenGraphImageRequestHandler(
     ITenantPolicySettingService tenantPolicySettingService,
     IStorageObjectContentReader contentReader,
     IEventOpenGraphImageRenderer renderer,
-    ITenantLifecycleAccessService lifecycle)
+    ITenantLifecycleAccessService lifecycle,
+    IVisitorTenantReadAccessPolicy visitorReadAccess)
     : IQueryHandler<GetPublicEventOpenGraphImageRequest, EventOpenGraphImageRenderResult?>
 {
     public async Task<EventOpenGraphImageRenderResult?> QueryAsync(
@@ -34,6 +35,8 @@ public sealed class GetPublicEventOpenGraphImageRequestHandler(
         {
             return null;
         }
+
+        await visitorReadAccess.RequireAsync(eventEntity.TenantId, cancellationToken);
 
         TenantPolicySettingsDto settings = await tenantPolicySettingService
             .ReadEffectiveTenantSettingsAsync(eventEntity.TenantId);

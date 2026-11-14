@@ -1,4 +1,5 @@
 using Explore.Domain;
+using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
@@ -24,7 +25,7 @@ public sealed class AtprotoTransientStoreRepositorySqliteTests
             }
             Guid tenantId = Guid.CreateVersion7();
             var time = new FixedTimeProvider(DateTimeOffset.FromUnixTimeMilliseconds(2_000_000_000_000));
-            AtprotoTransientRecord record = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest, tenantId, "protected", 2_000_000_060_000);
+            AtprotoTransientRecord record = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest, AtprotoAuthenticationFlowTarget.Targeted(tenantId), "protected", 2_000_000_060_000);
             await using (ExploreDbContext writer = CreateContext(path))
                 await Assert.That(await new AtprotoTransientStoreRepository(writer, time).TryCreateAsync(record)).IsTrue();
 

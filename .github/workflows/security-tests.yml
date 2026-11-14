@@ -99,7 +99,7 @@ jobs:
             base_sha="HEAD~1"
           fi
 
-          changed_files="$(git diff --name-only "$base_sha" "$GITHUB_SHA" || true)"
+          changed_files="$(git diff --no-renames --name-only "$base_sha" "$GITHUB_SHA" || true)"
           if [[ -z "$changed_files" ]]; then
             echo "run-tests=true" >> "$GITHUB_OUTPUT"
             {
@@ -164,9 +164,21 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
+          stage=Keycloak
+          trap 'status=$?; if (( status != 0 )); then printf "Prerequisite %s ended: exit=%s\n" "$stage" "$status"; fi; exit "$status"' EXIT
+          printf 'Prerequisite %s started\n' "$stage"
           docker --host "$DOCKER_HOST" pull quay.io/keycloak/keycloak:26.1.2 > "$TMPDIR/keycloak-provisioning.log" 2>&1
+          printf 'Prerequisite %s ended: exit=0\n' "$stage"
+          stage=Cerbos
+          printf 'Prerequisite %s started\n' "$stage"
           docker --host "$DOCKER_HOST" pull ghcr.io/cerbos/cerbos:0.53.0 > "$TMPDIR/cerbos-provisioning.log" 2>&1
+          printf 'Prerequisite %s ended: exit=0\n' "$stage"
+          stage=browser
+          printf 'Prerequisite %s started\n' "$stage"
           dotnet run eng/tools/InstallAssuranceBrowser.cs > "$TMPDIR/browser-provisioning.log" 2>&1
+          printf 'Prerequisite %s ended: exit=0\n' "$stage"
+          stage=k6
+          printf 'Prerequisite %s started\n' "$stage"
           archive="$RUNNER_TEMP/islamu-security-tools/k6-v2.3.0-linux-amd64.tar.gz"
           curl --fail --location --proto '=https' --tlsv1.2 \
             https://github.com/grafana/k6/releases/download/v2.3.0/k6-v2.3.0-linux-amd64.tar.gz \
@@ -181,6 +193,7 @@ jobs:
             --strip-components=1 --no-same-owner --no-same-permissions -- "$member"
           chmod 700 "$ISLAMU_K6_PATH"
           printf '%s  %s\n' e001bbf39ba67424a85c9c8516440ba5c73ecf7a6021be96c76194380c15f260 "$ISLAMU_K6_PATH" | sha256sum --check --status
+          printf 'Prerequisite %s ended: exit=0\n' "$stage"
 
       - name: Execute Registered Security Profiles
         if: ${{ steps.changes.outputs.run-tests == 'true' }}

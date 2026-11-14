@@ -11,6 +11,33 @@ ABOUTME: Grounds release operations in provider-native database tools, authority
 
 This runbook covers self-hosted deployments using the repository Docker Compose topology. Treat every upgrade as a data operation first and an image rollout second.
 
+## Primary UserPii Revision Default
+
+The primary application correction `DeclareUserPiiBirthDateRevisionDefault`
+must also be applied through its selected migration owner. It adds the declared
+zero default for the private birth-date revision without changing stored dates
+or existing revisions. The four generated primary catalogs cover all five
+supported engines; MySQL and MariaDB share their catalog. No privacy-authority
+or Data Protection catalog is changed.
+
+SQL Server's native scaffold repeats the existing moderation-evidence foreign
+key operation. Its owning SQL generator retains the existing `NO ACTION`
+behavior in both directions; do not hand-edit generated metadata to remove the
+historical operation. The downgrade removes the revision default, not user
+rows. Use matched code/schema versions and retain the normal backups rather
+than weakening native readiness checks to start a mismatched deployment.
+
+## Co-Located Authority Recovery Coordinates
+
+For PostgreSQL `CoLocated` authority, apply
+`20261031102545_RestoreCoLocatedAuthorityRecoveryCoordinates` through the selected
+migration owner before traffic. It initializes the missing recovery counters and
+store identity without rewriting erasure facts. Take matched primary/authority
+backups first. Its generated `Down` drops those coordinates; it is not a
+data-preserving rollback after adoption. See the
+[migration contract](PRIVACY_ERASURE.md#5-migration-ownership-and-history-separation)
+for defaults and ownership, and retain the authority during recovery.
+
 ## SecretKit Lifecycle Cutover
 
 Before upgrading from the retired Secrets implementation, remove `SecretRefresh`
@@ -168,6 +195,34 @@ for confirmed physical cleanup: Npgsql can defer reset until the next use.
 Unwind the original workflow and its leases before recycling the owning session.
 This repair adds no permissions, business routines or replacement-session cleanup;
 it does not recover an aborted caller-owned transaction.
+
+## Exact PostgreSQL setup role names
+
+Global setup completion resolves declared Global and Migrator names as quoted
+identifiers before converting them to role OIDs. Uppercase letters, backslashes,
+apostrophes and dollar signs must identify the installed role without folding or
+dropping characters. The existing closed privilege inventories remain unchanged.
+
+Trusted-settings SQL uses explicit escape literals independently of
+`standard_conforming_strings`. Its expected policy expression follows
+`pg_get_expr` rendering: ordinary quotes, doubled apostrophes, and backslashes
+doubled only when standard strings are disabled. Exact expression equality,
+stored policy fingerprints and original connection/transaction checks remain
+required. This corrects false readiness rejection without adding grants,
+changing stored policy meaning or introducing a new schema migration.
+
+## SQLite transaction lock disposal
+
+SQLite process locks belong to the physical transaction, rather than the returned
+lease or connection. The named-lock interceptor observes EF transaction disposal
+and releases tracked resources when that physical transaction has ended, even if
+an externally owned connection stays open. This wakes contenders that were already
+waiting; a later acquisition on the original connection is not required.
+
+Disposing a borrowed EF transaction wrapper does not end the external transaction
+or release its locks. Explicit completion and connection cleanup retain their
+existing behavior. Cleanup removes each tracked owner once and releases resources
+in reverse order; this changes no database grants or persistent schema.
 
 ## Instance Onboarding State Across Restore
 
@@ -593,9 +648,20 @@ Ordinary human tenant creation has a separate, fixed Global permission manifest:
 `TenantSettingsDocument` INSERT11, `TenantStatus` SELECT2, bounded bootstrap and
 provisioning capacity metadata, `TenantUser` INSERT19,
 `TenantUserRoleGrant` INSERT14, and `Role` SELECT3 (`Id`, `MasterCode`,
-`RoleScopeId`). `PostgresTenantCreationPermissions` owns the exact model-mapped
+`RoleScopeId`), plus a separately attested direct `UPDATE(User.Id)` for the existing
+discovery row fence (Global already reads `User.Id` through navigation enrollment).
+`User` stays outside the creator's whole-relation catalogue; navigation and preference
+catalogues admit only that one direct, non-grantable key-column update.
+That fence performs a no-op key write while adding the creator's administrator
+membership; it retains the conflict with concurrent user deletion or erasure.
+`PostgresTenantCreationPermissions` owns the exact model-mapped
 inventory; it adds no private User, Actor, local credential or RolePermission
-read, table-wide grant, UPDATE, DELETE, grant option or Runtime permission.
+read, other User-column UPDATE, table-wide grant, DELETE, grant option or Runtime permission.
+Installer and runtime catalogue checks require the same direct key-column grant.
+Shared creator, worker, provisioning and mixed-settings guards recognize only
+that declared overlap; they retain rejection of inherited, PUBLIC and expanded
+authority. Old partial enrollments fail closed and require fresh pre-release
+enrollment through the installer, rather than manual grants.
 The original authenticated human creation port authorizes the command, pins its
 new UUIDv7 identities and original transaction, constructs the complete canonical
 graph in C#, and admits only the optional self-administrator effect for that new
@@ -788,6 +854,7 @@ If release notes do not explicitly state that a rollback is image-only safe, ass
 - [ ] `EmbeddedSqlite` restore evidence proves the dedicated authority file was not overwritten by the primary restore and writer replica count remained one.
 - [ ] `CoLocated` restore evidence proves app + authority rows were restored and replay catches up correctly from the shared checkpoint.
 - [ ] `Event.MigrationService` completed twice against the restored provider before API/BFF startup.
+- [ ] Policy installation used its migration-owned execution context in the selected namespace; no request context was rebound or Runtime account promoted to repair a lease failure.
 - [ ] `docker compose ps` shows required services running.
 - [ ] API `/alive` and `/health` return expected status.
 - [ ] Blazor loads and can proxy API requests.

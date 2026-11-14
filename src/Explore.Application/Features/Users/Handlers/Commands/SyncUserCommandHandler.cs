@@ -37,6 +37,9 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
     private readonly PrivacyIdentityFenceOperation _identityFence;
     private readonly IEventDiscoveryEnrollmentGate _enrollmentGate;
     private readonly IHumanSecuritySourceGate _humanGate;
+    private readonly IVisitorAccessCapabilityResolver _visitorAccess;
+    private readonly ISettingMutationLock _settingMutationLock;
+    private readonly IIdentityEmailMirrorWriter _emailMirrorWriter;
 
     public SyncUserCommandHandler(
         IUserRepository userRepository,
@@ -54,7 +57,10 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
         ILogger<SyncUserCommandHandler> logger,
         PrivacyIdentityFenceOperation identityFence,
         IEventDiscoveryEnrollmentGate enrollmentGate,
-        IHumanSecuritySourceGate humanGate)
+        IHumanSecuritySourceGate humanGate,
+        IVisitorAccessCapabilityResolver visitorAccess,
+        ISettingMutationLock settingMutationLock,
+        IIdentityEmailMirrorWriter emailMirrorWriter)
     {
         _userRepository = userRepository;
         _userExternalLoginRepository = userExternalLoginRepository;
@@ -72,6 +78,9 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
         _identityFence = identityFence;
         _enrollmentGate = enrollmentGate;
         _humanGate = humanGate;
+        _visitorAccess = visitorAccess;
+        _settingMutationLock = settingMutationLock;
+        _emailMirrorWriter = emailMirrorWriter;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(SyncUserCommand request, CancellationToken cancellationToken = default)
@@ -95,8 +104,14 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                 enrollment = await _enrollmentGate.AcquireAsync(cancellationToken);
             _humanGate.RequireCurrent();
             _enrollmentGate.RequireCurrent();
-            result = await _identityFence.ExecuteEnrollmentAsync(
-                request.AccountKey, token => ExecuteUnderFenceAsync(request, token), cancellationToken);
+            result = request.AccountKey.ProviderKind == AuthenticationProviderKind.Local
+                ? await _identityFence.ExecuteEnrollmentAsync(
+                    request.AccountKey, token => ExecuteUnderFenceAsync(request, token), cancellationToken)
+                : await _settingMutationLock.ExecuteOrderedGroupsAsync(
+                    [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+                    leaseToken => _identityFence.ExecuteEnrollmentAsync(
+                        request.AccountKey, token => ExecuteUnderFenceAsync(request, token), leaseToken),
+                    cancellationToken);
             _humanGate.RequireCurrent();
             _enrollmentGate.RequireCurrent();
         }
@@ -179,17 +194,16 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                     "tenant_lifecycle_unavailable", "Tenant is not available for user synchronization.");
             }
 
-            bool completedOrdinaryLocalBinding = providerKind == AuthenticationProviderKind.Local
+            bool completedLocalBinding = providerKind == AuthenticationProviderKind.Local
                 && bootstrap is
                 {
                     Mode: InstanceBootstrapMode.ConfiguredAdministrator,
                     Status: InstanceBootstrapStatus.Completed,
-                    CompletedByUserId: Guid administratorId
+                    CompletedByUserId: not null
                 }
-                && existingLogin is not null
-                && existingLogin.UserId != administratorId;
+                && existingLogin is not null;
 
-            if (request.LocalLifecycleSynchronization is null && !completedOrdinaryLocalBinding && bootstrap is
+            if (request.LocalLifecycleSynchronization is null && !completedLocalBinding && bootstrap is
                 {
                     Mode: InstanceBootstrapMode.ConfiguredAdministrator
                 })
@@ -246,7 +260,7 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                 accountKey, request.AuthorityEvidence, cancellationToken);
             if (resolution.Decision == IdentityCorrelationDecision.RecoveryRequired)
                 return ExplicitBindingRequired();
-            User? user = resolution.User;
+            Guid? userId = resolution.UserId;
 
             // IDs generated before lambda — captured via closure for retry safety
             var newUserId = Guid.CreateVersion7();
@@ -261,12 +275,12 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                 IdentityAccountResolution current = await _identityAccountResolver.ResolveAsync(
                     accountKey, request.AuthorityEvidence, ct);
                 if (current.Decision == IdentityCorrelationDecision.RecoveryRequired
-                    || current.User?.Id != user?.Id
+                    || current.UserId != userId
                     || (resolution.Decision == IdentityCorrelationDecision.ExactBinding
                         && current.Decision != IdentityCorrelationDecision.ExactBinding))
                     return ExplicitBindingRequired();
 
-                User? currentUser = current.User;
+                Guid? currentUserId = current.UserId;
 
                 UserExternalLogin? currentLogin = await _userExternalLoginRepository.GetByProviderAndKey(accountKey);
                 var observation = new IdentityEmailObservation(
@@ -278,24 +292,35 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                 {
                     if (!await HasValidLocalBindingAsync(accountKey, userDto.Id, currentLogin, ct,
                             request.LocalLifecycleSynchronization)
-                        || currentUser is null || currentLogin!.UserId != currentUser.Id)
+                        || currentUserId is null || currentLogin!.UserId != currentUserId)
                     {
                         return ExplicitBindingRequired();
                     }
                 }
-                else if (currentLogin is not null && (currentUser is null || currentLogin.UserId != currentUser.Id))
+                else if (currentLogin is not null && (currentUserId is null || currentLogin.UserId != currentUserId))
                 {
                     return ExplicitBindingRequired();
                 }
-                else if (currentUser is not null && currentLogin is null && await IsLocalOwnedAsync(currentUser.Id, ct))
+                else if (currentUserId is not null && currentLogin is null && await IsLocalOwnedAsync(currentUserId.Value, ct))
                 {
                     return ExplicitBindingRequired();
                 }
 
-                await _identityFence.MatchAndBindAsync(accountKey, currentUser?.Id ?? newUserId, currentLogin?.Id ?? loginId,
+                if (currentUserId is null && providerKind != AuthenticationProviderKind.Local)
+                {
+                    if (_tenantContext.TenantId is not Guid targetTenant || targetTenant == Guid.Empty)
+                        return BaseCommandResponse.Failure<Guid>(
+                            "tenant_required", "A tenant is required for enrollment.");
+                    if (!await TenantEnrollmentAdmissionOperation.IsOpenAsync(
+                        _visitorAccess, targetTenant, ct).ConfigureAwait(false))
+                        return BaseCommandResponse.Failure<Guid>(
+                            "registration_closed", "Registration is closed for this tenant.");
+                }
+
+                await _identityFence.MatchAndBindAsync(accountKey, currentUserId ?? newUserId, currentLogin?.Id ?? loginId,
                     _tenantContext.TenantId, replacementProvisioning: currentLogin is null, ct);
 
-                if (currentUser == null)
+                if (currentUserId is null)
                 {
                     if (observation.CanClaimIdentityEmail && observation.EmailVerified
                         && !string.IsNullOrWhiteSpace(email)
@@ -331,30 +356,22 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                     await _actorRepository.Create(actor);
 
                     UserExternalLogin createdLogin = await EnsureExternalLoginLinkInTransactionAsync(
-                        createdUser, accountKey, loginId, ct);
-                    await _identityEmailSynchronization.ExecuteAsync(createdUser, createdLogin, observation, ct);
+                        createdUser.Id, accountKey, loginId, ct);
+                    await _identityEmailSynchronization.ExecuteAsync(createdUser.Id, createdLogin, observation, ct);
                     return BaseCommandResponse.Success(id: createdUser.Id, message: "User synchronized successfully.");
                 }
                 else
                 {
+                    await using var mirror = await _emailMirrorWriter.PrepareAsync(currentUserId.Value, ct);
                     UserExternalLogin login = await EnsureExternalLoginLinkInTransactionAsync(
-                        currentUser, accountKey, loginId, ct);
+                        currentUserId.Value, accountKey, loginId, ct);
                     IdentityEmailSynchronizationOutcome emailOutcome =
-                        await _identityEmailSynchronization.ExecuteAsync(currentUser, login, observation, ct);
-                    if (!string.IsNullOrWhiteSpace(email)
-                        && emailOutcome != IdentityEmailSynchronizationOutcome.ConflictingOwner)
-                    {
-                        currentUser.Email = email;
-                    }
+                        await _identityEmailSynchronization.ExecuteAsync(currentUserId.Value, login, observation, ct);
+                    await mirror.ApplyAsync(!string.IsNullOrWhiteSpace(email)
+                        && emailOutcome != IdentityEmailSynchronizationOutcome.ConflictingOwner ? email : null,
+                        emailVerified, ct);
 
-                    if (emailVerified.HasValue)
-                    {
-                        currentUser.EmailVerified = emailVerified;
-                    }
-
-                    await _userRepository.SaveIdentityProfileAsync(currentUser, ct);
-
-                    return BaseCommandResponse.Success(id: currentUser.Id,
+                    return BaseCommandResponse.Success(id: currentUserId.Value,
                         message: emailOutcome == IdentityEmailSynchronizationOutcome.ConflictingOwner
                             ? "Account synchronized; the identity address needs recovery or operator support."
                             : "User synchronized successfully.");
@@ -431,7 +448,7 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
     }
 
     private async Task<UserExternalLogin> EnsureExternalLoginLinkInTransactionAsync(
-        User user,
+        Guid userId,
         ProviderAccountKey accountKey,
         Guid loginId,
         CancellationToken ct)
@@ -439,7 +456,7 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
         var existingByProviderAndKey = await _userExternalLoginRepository.GetByProviderAndKey(accountKey);
         if (existingByProviderAndKey != null)
         {
-            if (existingByProviderAndKey.UserId != user.Id)
+            if (existingByProviderAndKey.UserId != userId)
                 throw new InvalidOperationException("This provider identity is already linked to another account.");
 
             return existingByProviderAndKey;
@@ -448,8 +465,8 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
         var login = new UserExternalLogin
         {
             Id = loginId,
-            UserId = user.Id,
-            User = user,
+            UserId = userId,
+            User = null!,
             AuthenticationProviderId = (int)accountKey.ProviderKind,
             AuthenticationProvider = null!,
             ProviderKey = accountKey.Value,

@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6QDYSJNA6RBDPWKVAESMQ5B
+Title: "complete setup settings on the original Global owner"
+Type: fix
+Scope: onboarding
+Summary: "Admit setup's fixed settings reads, writes and disclosure updates on the original Global enrollment transaction without exposing unrelated private settings or replacing the real setup source."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: "Column-only access and paired forced-RLS policies admit twelve compiled keys. Exact catalogue and disclosure-executor membership checks reject additional grants, ADMIN delegation and role switching. Source receipts, create-only operator identity and completion authority remain in C#."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: "Run the native migrator to install the fixed Global settings and existing execute-only disclosure profile. Investigate incomplete or modified permissions instead of granting blanket settings access; protect Global credentials against direct changes to the admitted settings and disclosure epochs."

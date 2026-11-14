@@ -4,6 +4,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -191,13 +192,7 @@ public sealed class ModerationAuthoritySourceRepository(
 
     private async Task<bool> ProviderTenantMatchesAsync(Guid tenantId, CancellationToken token)
     {
-        if (context.Database.ProviderName != RelationalNamedLock.PostgreSqlProvider)
-            return true;
-        await using var command = context.Database.GetDbConnection().CreateCommand();
-        command.Transaction = context.Database.CurrentTransaction?.GetDbTransaction();
-        command.CommandText = "SELECT current_setting('app.current_tenant_id', true)";
-        var value = await command.ExecuteScalarAsync(token);
-        return value is string setting && Guid.TryParse(setting, out var currentTenant) && currentTenant == tenantId;
+        return await PostgresTenantSessionProbe.MatchesAsync(context, context.Database.CurrentTransaction, tenantId, token);
     }
 
     private sealed class AbortInstallation(ModerationAuthoritySourceResult result) : Exception

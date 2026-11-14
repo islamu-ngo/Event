@@ -97,7 +97,42 @@ together; late grant, binding or credential changes roll both back and retain
 other tenants. Slug-cache refresh occurs after acknowledged deletion.
 These authored controls await executable security-programme assurance.
 
+### Native visitor settings storage
+
+Visitor-policy changes use their original authorized settings transaction.
+The PostgreSQL migration installer also installs the fixed storage catalog
+and application execution grants needed by this path. Run the normal migration
+process with the selected Migrator authority during an upgrade. An incomplete
+catalog or missing grant blocks the operation; repairing the installation
+does not require giving the application direct settings-table write access.
+Authorization and policy decisions remain in Event.
+
+The same transaction keeps the nonsecret provisioning-policy projection aligned
+with visitor-setting changes, including instance locks. This allows later
+administrative edits to verify their original policy state. The installer grants
+the selected Global application purpose the projection read and update columns
+needed for that maintenance; it does not require direct settings-table writes.
+Keep this catalog installation current when deploying the application update.
+
 ### Registration provider connections
+
+Tenant public-experience settings include **Allow new users to enroll**.
+Enrollment defaults to enabled. An instance administrator can lock the setting,
+in which case tenant administrators see a disabled control. Closing enrollment
+removes public signup choices while existing accounts can continue signing in
+and participating in events that require an account. It does not revoke
+memberships or change event authorization.
+
+The setting key is `tenants.user_registration_enabled`; it governs users joining
+an existing tenant. It is separate from allowing new tenants to self-register.
+Authenticated-only visitor access controls who may read tenant content and can
+be selected independently. Only functioning provider signup flows are offered;
+enabling enrollment does not invent a Local signup endpoint.
+
+If enrollment cannot be loaded, reload settings before changing it. Public display
+and enrollment changes use separate settings categories. If a later save is
+rejected, earlier successful category writes can remain; the page reloads the
+authoritative values rather than claiming the whole operation rolled back.
 
 Creating or updating a provider connection, replacing approved origins and
 deleting an unused connection retain the original administrator's authority
@@ -413,7 +448,12 @@ not silently repair stale database authority.
 Deploy regenerated clients with the matching API version. Provider credentials
 belong in the selected deployment secret authority, not administrative JSON:
 AI model creation and instance AI patches no longer accept `apiKey`, and
-authentication-provider patches no longer accept `googleClientSecret`.
+authentication-provider patches reject all retired Google configuration fields,
+including `googleSsoEnabled`, `googleClientId`, `lockGoogleSsoEnabled`,
+`googlePublicOnboardingPolicy`, `googlePublicSignupUrl` and `googleClientSecret`.
+Configure Google through Keycloak's broker. The settings response may show
+`unsupportedProviderMessage` for retained configuration; it is advisory metadata,
+not a new provider or permission to acquire/delete old credentials.
 Tenant onboarding settings and completion no longer carry `aiAssistantApiKey`.
 Settings and onboarding reads no longer disclose the removed plaintext
 authentication secrets or the former AI/Cerbos credential-status properties;
@@ -721,6 +761,17 @@ Tenant administrators manage their community experience via `/settings/admin`:
 ### Custom Footers
 - Choose footer layouts, social links, and copyright notices.
 - Built-in governance locks prevent tenants from removing legally required disclosures (such as Terms of Service and Privacy Policy).
+
+Disabling the optional footer layout leaves a minimum footer and Cookie
+Settings control available. The control also works while footer configuration
+is loading or unavailable. A missing directory or platform operator identity
+omits only that operator's disclosure; branding never replaces legal identity.
+Correct the missing identity through its own administration section.
+
+Anonymous visitors to an authenticated-only tenant receive a minimal footer,
+without private tenant links, branding or directory disclosure. Footer content
+clears when browser context changes, so a delayed response from another tenant
+cannot replace the current footer.
 
 ### Custom Registration Properties
 - Define custom questions and fields for events and attendee registrations (see [Custom Properties Governance](../events-and-ticketing/custom-properties.md)).

@@ -83,8 +83,8 @@ public sealed class ModerationEmbeddedConsumerRuntimeSourceTests
         var inventory = ModerationCapabilityRegistry.Parse(ModerationCapabilityRegistry.ReadInventory());
         var services = new ServiceCollection().AddSingleton(inventory);
         // Observation reads types only; these native owners never execute or touch a repository.
-        services.AddSingleton(new GetEventCalendarExportRequestHandler(null!, null!, null!, null!));
-        services.AddSingleton(new GetAttendeeEventCalendarExportRequestHandler(null!, null!, null!));
+        services.AddSingleton(new GetEventCalendarExportRequestHandler(null!, null!, null!, null!, null!));
+        services.AddSingleton(new GetAttendeeEventCalendarExportRequestHandler(null!, null!, null!, null!, null!));
         return ModerationEmbeddedConsumerRuntimeSource.AddSources(services);
     }
 

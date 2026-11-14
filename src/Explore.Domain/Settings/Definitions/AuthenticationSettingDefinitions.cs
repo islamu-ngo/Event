@@ -52,35 +52,11 @@ public static class AuthenticationSettingDefinitions
         MinScope: SettingScope.Instance,
         MaxScope: SettingScope.Instance);
 
-    public static readonly SettingDefinition GoogleSsoEnabled = new(
-        Key: GovernanceSettingKeys.Authentication.GoogleSsoEnabled,
-        ValueType: SettingValueType.Boolean,
-        DefaultValue: "false",
-        Category: "Authentication",
-        Description: "Whether Google SSO authentication is enabled",
-        MinScope: SettingScope.Instance,
-        MaxScope: SettingScope.Instance);
-
-    public static readonly SettingDefinition GoogleClientId = new(
-        Key: GovernanceSettingKeys.Authentication.GoogleClientId,
-        ValueType: SettingValueType.String,
-        DefaultValue: "\"\"",
-        Category: "Authentication",
-        Description: "Google OAuth client ID",
-        MinScope: SettingScope.Instance,
-        MaxScope: SettingScope.Instance);
-
     public static readonly SettingDefinition KeycloakPublicOnboardingPolicy = OnboardingPolicy(
         GovernanceSettingKeys.Authentication.KeycloakPublicOnboardingPolicy);
 
     public static readonly SettingDefinition KeycloakPublicSignupUrl = SignupUrl(
         GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl);
-
-    public static readonly SettingDefinition GooglePublicOnboardingPolicy = OnboardingPolicy(
-        GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy);
-
-    public static readonly SettingDefinition GooglePublicSignupUrl = SignupUrl(
-        GovernanceSettingKeys.Authentication.GooglePublicSignupUrl);
 
     public static IReadOnlyList<SettingDefinition> All =>
     [
@@ -89,12 +65,8 @@ public static class AuthenticationSettingDefinitions
         KeycloakClientId,
         AtprotoLoginEnabled,
         AtprotoPublicUrl,
-        GoogleSsoEnabled,
-        GoogleClientId,
         KeycloakPublicOnboardingPolicy,
-        KeycloakPublicSignupUrl,
-        GooglePublicOnboardingPolicy,
-        GooglePublicSignupUrl
+        KeycloakPublicSignupUrl
     ];
 
     private static SettingDefinition OnboardingPolicy(string key) => new(

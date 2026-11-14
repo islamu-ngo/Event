@@ -11,11 +11,14 @@ internal sealed partial class LocalIdentityCredentialStateStore
         operation.GetProperty("Id").GetGuid(),
         (LocalCredentialOperationKind)operation.GetProperty("Kind").GetInt32(),
         (LocalCredentialOperationStage)operation.GetProperty("Stage").GetInt32(),
-        operation.GetProperty("InitiatingApplicationUserId").GetGuid(),
+        operation.GetProperty("InitiatingApplicationUserId").ValueKind == JsonValueKind.Null
+            ? null : operation.GetProperty("InitiatingApplicationUserId").GetGuid(),
         operation.GetProperty("LocalSubjectId").GetGuid(),
         operation.GetProperty("PersonalActorId").GetGuid(),
         operation.GetProperty("ExternalLoginId").GetGuid(),
-        operation.GetProperty("CreatedAt").GetDateTime());
+        operation.GetProperty("CreatedAt").GetDateTime(),
+        operation.GetProperty("VisitorEnrollmentOperationId").ValueKind == JsonValueKind.Null
+            ? null : operation.GetProperty("VisitorEnrollmentOperationId").GetGuid());
 
     private static LocalCredentialResetReceipt NativeResetReceipt(JsonElement operation) => new(
         NativeReceipt(operation), operation.GetProperty("PreviousOperationId").GetGuid(),
@@ -34,8 +37,12 @@ internal sealed partial class LocalIdentityCredentialStateStore
         return state is not null && state.OperationId == receipt.OperationId
             && state.ApplicationUserId == receipt.LocalSubjectId
             && receipt.Kind is LocalCredentialOperationKind.Create or LocalCredentialOperationKind.Reset
+                or LocalCredentialOperationKind.VisitorCreate
             && (state.State == LocalCredentialState.ProvisioningPending
                     && receipt.Kind == LocalCredentialOperationKind.Create
+                    && receipt.Stage == LocalCredentialOperationStage.ProvisioningPending
+                || state.State == LocalCredentialState.RegistrationPending
+                    && receipt.Kind == LocalCredentialOperationKind.VisitorCreate
                     && receipt.Stage == LocalCredentialOperationStage.ProvisioningPending
                 || state.State == LocalCredentialState.ChangeRequired
                     && receipt.Stage == LocalCredentialOperationStage.ChangeRequired
@@ -66,7 +73,10 @@ internal sealed partial class LocalIdentityCredentialStateStore
         var state = NativeMetadata(data, receipt.LocalSubjectId);
         bool current = NativeCurrent(row, state);
         return new(receipt, row.GetProperty("ConcurrencyStamp").GetGuid(),
-            row.GetProperty("VerifiedByApplicationUserId").GetGuid(), row.GetProperty("VerifiedAt").GetDateTime(),
+            row.GetProperty("VerifiedByApplicationUserId").ValueKind == JsonValueKind.Null
+                ? null : row.GetProperty("VerifiedByApplicationUserId").GetGuid(),
+            row.GetProperty("VerifiedAt").ValueKind == JsonValueKind.Null
+                ? null : row.GetProperty("VerifiedAt").GetDateTime(),
             row.GetProperty("UpdatedAt").ValueKind == JsonValueKind.Null ? null : row.GetProperty("UpdatedAt").GetDateTime(),
             current, current ? state!.State : null,
             receipt.Kind == LocalCredentialOperationKind.Reset ? NativeResetReceipt(row) : null);

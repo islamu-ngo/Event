@@ -15,22 +15,29 @@ public class GetEventDetailsRequestHandler : IQueryHandler<GetEventDetailsReques
     private readonly IEventRepository _eventRepository;
     private readonly IEventDetailsProjectionService _detailsProjectionService;
     private readonly ITenantLifecycleAccessService _lifecycle;
+    private readonly ITenantContext _tenantContext;
+    private readonly IVisitorTenantReadAccessPolicy _visitorReadAccess;
     private readonly IQueryHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?> _optionalQuestionnaireHandler;
 
     public GetEventDetailsRequestHandler(
         IEventRepository eventRepository,
         IEventDetailsProjectionService detailsProjectionService,
         IQueryHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?> optionalQuestionnaireHandler,
-        ITenantLifecycleAccessService lifecycle)
+        ITenantLifecycleAccessService lifecycle,
+        ITenantContext tenantContext,
+        IVisitorTenantReadAccessPolicy visitorReadAccess)
     {
         _eventRepository = eventRepository;
         _detailsProjectionService = detailsProjectionService;
         _lifecycle = lifecycle;
+        _tenantContext = tenantContext;
+        _visitorReadAccess = visitorReadAccess;
         _optionalQuestionnaireHandler = optionalQuestionnaireHandler;
     }
 
     public async Task<EventDto?> QueryAsync(GetEventDetailsRequest request, CancellationToken cancellationToken)
     {
+        await _visitorReadAccess.RequireAsync(_tenantContext.TenantId, cancellationToken);
         var eventDto = await _detailsProjectionService.BuildPublicAsync(request.Id, cancellationToken);
 
         if (eventDto is null || !await _lifecycle.IsPublicAsync(eventDto.TenantId, cancellationToken))

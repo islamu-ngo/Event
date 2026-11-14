@@ -1,7 +1,6 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
-using Explore.Persistence.Database.ProviderPrimitives;
 
 namespace Explore.Persistence.Repositories;
 
@@ -16,7 +15,6 @@ public sealed class EventReportOperationsRepository(IGlobalExploreDbContextFacto
     private async Task<int> CountAsync(EventReportSyncState state, DateTime? before, CancellationToken cancellationToken)
     {
         await using var context = await factory.CreateDbContextAsync(cancellationToken);
-        return await EventReportOperationsQuery.TryCountNativeAsync(context, state, before, cancellationToken)
-            ?? await new EventReportRepository(context).CountOperationalExternalLinksAsync(state, before, cancellationToken);
+        return await new EventReportRepository(context).CountOperationalExternalLinksAsync(state, before, cancellationToken);
     }
 }

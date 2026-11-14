@@ -6,8 +6,6 @@ using Explore.Application.Models;
 using Explore.Application.Settings;
 using Explore.Infrastructure.Mail;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Configuration;
-using Explore.Application.Configuration;
 
 namespace Explore.Infrastructure.Authentication;
 
@@ -18,13 +16,10 @@ public sealed class LocalIdentityLifecycleDeliveryProcessor(
     IHierarchicalSettingsReader settings,
     EmailDeliveryCapabilityResolver capability,
     ILocalIdentityLifecycleSmtpTransport transport,
-    IConfiguration configuration,
-    ISystemSettingRepository systemSettings,
     IOptions<EmailDispatchProcessorSettings> processorOptions)
 {
-    public async Task DrainAsync(CancellationToken cancellationToken)
+    public async Task DrainAsync(Uri? origin, CancellationToken cancellationToken)
     {
-        var origin = await PublicAddressResolver.ResolveAsync(configuration, systemSettings, cancellationToken);
         if (origin is not { Scheme: "https" }) return;
         var callbackUri = new Uri(origin, "auth/local-account-recovery");
         var pending = await deliveries.ReadPendingAsync(32, cancellationToken);

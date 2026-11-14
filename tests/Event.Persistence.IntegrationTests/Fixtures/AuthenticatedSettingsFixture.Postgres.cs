@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
 using Explore.Domain;
+using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Persistence.Seed;
@@ -19,10 +21,11 @@ internal sealed partial class AuthenticatedSettingsFixture
         Func<ExploreDbContext> createDatabase, PostgreSqlContainerFixture? postgres,
         IInterceptor? interceptor = null, Action<SanitizedRequestFailure>? requestFailureObserver = null,
         Action<Dictionary<string, string?>>? configure = null,
-        Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>? configureServices = null)
+        Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>? configureServices = null,
+        DeploymentMode deploymentMode = DeploymentMode.SingleTenant)
     {
         return CreateCoreAsync(createDatabase, interceptor, postgres is null ? null : ConfigureAsync,
-            requestFailureObserver, configure, configureServices);
+            requestFailureObserver, configure, configureServices, deploymentMode);
 
         async Task ConfigureAsync(ExploreDbContext seed, Dictionary<string, string?> configuration)
         {
@@ -44,6 +47,20 @@ internal sealed partial class AuthenticatedSettingsFixture
                     postgres.NativeQueueEnrollment.GlobalLogin);
                 await PostgresLocalIdentityWriterPermissions.ApplyAsync(seed, enrollment,
                     IdentityDatabaseTopology.Colocated, LocalIdentityWriterInventory.Store.Application);
+            }
+            var authorityOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
+                authorityOptions, postgres.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator, schema));
+            await using (var authority = new CoLocatedPrivacyErasureAuthorityDbContext(authorityOptions.Options))
+            {
+                var table = authority.Model.GetEntityTypes().First();
+                int existing = await authority.Database.SqlQueryRaw<int>(
+                    "SELECT COUNT(*)::integer AS \"Value\" FROM information_schema.tables WHERE table_schema = {0} AND table_name = {1}",
+                    table.GetSchema()!, table.GetTableName()!).SingleAsync();
+                if (existing == 0)
+                    await authority.Database.ExecuteSqlRawAsync(authority.Database.GenerateCreateScript());
+                await PostgresCoLocatedPrivacyAuthorityStoragePermissions.ApplyAsync(
+                    authority, postgres.NativeQueueEnrollment);
             }
             foreach (var role in new[]
             {
@@ -120,6 +137,7 @@ internal sealed partial class AuthenticatedSettingsFixture
             await PostgresHumanAuthorizationRouteContract.ApplyAsync(seed, postgres.NativeQueueEnrollment);
             await PostgresHumanSupportAccessSourceContract.ApplyAsync(seed, postgres.NativeQueueEnrollment);
             await PostgresOrdinarySettingsContract.ApplyAsync(seed, postgres.NativeQueueEnrollment);
+            await PostgresVisitorSettingsStorage.ApplyAsync(seed, postgres.NativeQueueEnrollment);
             await PostgresMixedSettingsContract.ApplyAsync(seed, postgres.NativeQueueEnrollment);
             await LookupTableSeeder.SeedAsync(seed);
         }

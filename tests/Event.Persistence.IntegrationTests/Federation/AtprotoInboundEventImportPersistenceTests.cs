@@ -3016,7 +3016,9 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             .Returns([]);
         var bindings = new StorageProviderBindingService(new StorageProviderBindingRepository(context), settings,
             Substitute.For<IRetainedSecretResolver>(), options, Substitute.For<IS3ClientFactory>(), NullLoggerFactory.Instance);
-        var policy = new StoragePolicyResolver(settings, new FileStorageProviderResolver(
+        var instanceSettings = Substitute.For<Explore.Application.Contracts.Persistence.IInstanceSystemSettingsReader>();
+        instanceSettings.ReadAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>()).Returns([]);
+        var policy = new StoragePolicyResolver(settings, instanceSettings, new FileStorageProviderResolver(
             [new LocalFileStorageProvider(options, NullLogger<LocalFileStorageProvider>.Instance)]));
         return (new ManagedStorageProducer(bindings, new StorageObjectRepository(context), new EfCoreUnitOfWork(context)), policy, bindings);
     }

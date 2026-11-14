@@ -22,6 +22,9 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository(
     public async Task<PrivacyErasureAuthorityState> GetStateAsync(
         CancellationToken cancellationToken = default)
     {
+        if (_identityGate.Value is { } active)
+            return await GetStateInContextAsync(active, cancellationToken);
+
         if (storage is not null)
         {
             await storage.EnsureReadyAsync(cancellationToken);
@@ -29,6 +32,12 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository(
 
         await using EmbeddedPrivacyErasureAuthorityDbContext db =
             await contextFactory.CreateDbContextAsync(cancellationToken);
+        return await GetStateInContextAsync(db, cancellationToken);
+    }
+
+    private static async Task<PrivacyErasureAuthorityState> GetStateInContextAsync(
+        EmbeddedPrivacyErasureAuthorityDbContext db, CancellationToken cancellationToken)
+    {
         PrivacyErasureCounter? counter = await db.AuthorityCounters
             .AsNoTracking()
             .SingleOrDefaultAsync(cancellationToken);

@@ -457,8 +457,7 @@ public class InstanceOnboardingServiceTests
                 AtprotoPublicUrl = "https://events.example.test",
                 KeycloakPublicOnboardingPolicy = PublicOnboardingPolicy.Allowed,
                 KeycloakPublicSignupUrl = "https://identity.example.test/realms/events/registrations",
-                GooglePublicOnboardingPolicy = PublicOnboardingPolicy.Denied,
-                GooglePublicSignupUrl = "https://accounts.example.test/enroll"
+                UnsupportedProviderMessage = "Configure Google through Keycloak."
             });
         using var document = JsonDocument.Parse(requestBody!);
         JsonElement configuration = document.RootElement
@@ -476,10 +475,10 @@ public class InstanceOnboardingServiceTests
             .IsEqualTo("Allowed");
         await Assert.That(configuration.GetProperty("keycloakPublicSignupUrl").GetString())
             .IsEqualTo("https://identity.example.test/realms/events/registrations");
-        await Assert.That(configuration.GetProperty("googlePublicOnboardingPolicy").GetString())
-            .IsEqualTo("Denied");
-        await Assert.That(configuration.GetProperty("googlePublicSignupUrl").GetString())
-            .IsEqualTo("https://accounts.example.test/enroll");
+        await Assert.That(configuration.EnumerateObject().Any(property =>
+            property.Name.StartsWith("google", StringComparison.OrdinalIgnoreCase)
+            || property.Name == "lockGoogleSsoEnabled")).IsFalse();
+        await Assert.That(configuration.TryGetProperty("unsupportedProviderMessage", out _)).IsFalse();
     }
 
     #endregion

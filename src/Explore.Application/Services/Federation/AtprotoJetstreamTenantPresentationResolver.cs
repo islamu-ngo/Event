@@ -6,22 +6,20 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 
 public sealed class AtprotoJetstreamTenantPresentationResolver(
-    ITenantRepository tenantRepository,
-    ISystemSettingRepository systemSettingRepository,
+    IInstanceSystemSettingsReader instanceSettings,
     IAtprotoFederationGlobalReadRepository federationSettings)
 {
     public async Task<IReadOnlyList<Guid>> ResolveEnabledTenantIdsAsync(CancellationToken cancellationToken)
     {
         string[] keys = [GovernanceSettingKeys.Federation.AtprotoEventsEnabled];
-        IReadOnlyList<AtprotoFederationInstanceSetting> instanceSettings =
+        IReadOnlyList<AtprotoFederationInstanceSetting> federationInstanceSettings =
             await federationSettings.GetInstanceAsync(keys, cancellationToken);
-        AtprotoFederationInstanceSetting? capability = instanceSettings.SingleOrDefault();
-        SystemSetting? deploymentMode = await systemSettingRepository.GetByKey(
-            GovernanceSettingKeys.Deployment.Mode,
-            cancellationToken);
+        AtprotoFederationInstanceSetting? capability = federationInstanceSettings.SingleOrDefault();
+        SystemSetting? deploymentMode = (await instanceSettings.ReadAsync(
+            [GovernanceSettingKeys.Deployment.Mode], cancellationToken)).SingleOrDefault();
         IReadOnlyList<AtprotoFederationTenantSetting> tenantSettings =
             await federationSettings.GetOverridesAsync(keys, cancellationToken);
-        IReadOnlyList<Tenant> tenants = await tenantRepository.GetActiveAsNoTrackingAsync(cancellationToken);
+        IReadOnlyList<Guid> tenants = await federationSettings.GetActiveTenantIdsAsync(cancellationToken);
 
         bool instanceEnabled = SettingValueSerializer.DeserializeBool(capability?.Value, false);
         bool isMultiTenant = string.Equals(
@@ -33,8 +31,7 @@ public sealed class AtprotoJetstreamTenantPresentationResolver(
             .ToDictionary(setting => setting.TenantId);
 
         return tenants
-            .Where(tenant => IsEnabled(tenant.Id, instanceEnabled, tenantOverridesApply, overrides))
-            .Select(tenant => tenant.Id)
+            .Where(tenantId => IsEnabled(tenantId, instanceEnabled, tenantOverridesApply, overrides))
             .Order()
             .ToArray();
     }

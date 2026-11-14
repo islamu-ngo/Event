@@ -1,0 +1,25 @@
+Change-Id: CHG-01M6QEWM0VSADB0392R13MN631
+Title: "Restore native Local account synchronization"
+Type: fix
+Scope: access
+Summary: "Restore real Local login with a narrow tracked identity profile, concurrency revision reads and read-only recognition settlement metadata while retaining private birth-data denials."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented

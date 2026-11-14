@@ -4,6 +4,47 @@ description: Operate Local Identity, Keycloak, or passwordless AT Protocol authe
 
 # Authentication Architecture
 
+In Split deployments, AppHost preserves the public Keycloak endpoint, realm and
+client ID it supplies to the browser host. Public metadata alone leaves the
+optional confidential client unconfigured; a configured client secret still
+requires a complete, valid credential group. No database permission changes are
+needed for this startup projection.
+
+API JWT refresh reads saved public provider metadata through a separate
+configuration reader. It does not need permission to read confidential-client
+bindings. Deployment-managed settings retain precedence, and a new signing-key
+configuration replaces the current one only after metadata retrieval succeeds.
+
+The browser host also obtains public tenant-routing configuration through the
+API's independent settings reader. Saved routing values and existing defaults
+remain authoritative; this bootstrap read requires no administrator credential
+or direct settings-table access for the ordinary API database identity.
+
+Private health and metrics checks support dual-stack listeners that represent
+IPv4 addresses in mapped IPv6 form. The physical address and port must still
+match the declared private listener; forwarded headers do not grant access.
+Private health and metrics probes stay on that listener without following a
+redirect to the public HTTPS endpoint. Ordinary public requests retain HTTPS
+redirection, and public listeners cannot serve the operational responses.
+
+Local administrator credential operations on native PostgreSQL validate the
+current application permission profile, including installed enrollment rights.
+Incomplete or broadened grants stop the operation. Keep Runtime and Migrator
+credentials separate, and restore the reviewed permission profile when a
+mismatch is reported.
+
+Support administration on native PostgreSQL also checks the current membership
+and enrollment permission profiles. Its API-key storage checks recognize the
+tenant parent fence installed for membership operations. Partial or broadened
+profiles remain errors; private support sessions and audit records remain
+accessible only through the application-owned support workflow.
+
+Native PostgreSQL tenant creation also validates discovery metadata permissions
+against the installed membership and enrollment storage rights. This check
+recognizes the existing tenant parent fence without granting additional access.
+A changed or broadened permission profile still stops the operation; restore
+the reviewed profile rather than adding broad manual grants.
+
 Each deployment has exactly one **primary authentication provider**:
 
 * **Local Identity** uses ASP.NET Core Identity inside ISLAMU Event. It is the
@@ -25,13 +66,32 @@ for the five supported states.
 
 ## Authentication In Native API Documentation
 
+An active community can require authentication for browsing with visitor mode
+`AuthenticatedOnly`. Public modes continue to allow visitors to browse without
+an account. Authentication is not approval of membership: event, organization
+and other resource permissions still apply after sign-in.
+
+The server enforces this requirement for direct API reads, discovery, exports,
+public images and MCP, including previously cached responses. An anonymous
+request receives an uncached 401 response; a temporary policy failure receives
+503 rather than public content. Sign-in, setup and individually authorized
+recovery/callback operations keep their own narrowly scoped authority.
+Federation cannot newly publish a private community's content merely because its
+worker is signed in.
+
+Changes take effect at the next read-admission check. A request admitted before
+the change may finish, and content downloaded while public cannot be recalled.
+Do not roll back to software that ignores a configured private mode; stop serving
+and restore compatible software or forward-fix the deployment.
+
 Protected operations in the native OpenAPI document advertise JWT bearer
 authentication (`Authorization: Bearer <token>`) or an external API key
 (`X-API-Key`) as alternatives, including when Keycloak is not configured.
 Bearer tokens can come from the deployment's supported identity providers;
 the documentation does not imply that Local Identity requires a Keycloak server.
 Configured Keycloak authorization metadata adds the existing OAuth option.
-Anonymous operations remain public, while purpose-bound credentials such as
+Anonymous operation metadata permits public-community access; the current tenant
+privacy policy still applies. Purpose-bound credentials such as
 erasure receipts and admission-scanner capabilities keep their separate schemes.
 An advertised credential does not bypass tenant, scope, or resource permission
 checks.
@@ -130,7 +190,13 @@ The browser communicates strictly with `Explore.Blazor` over HTTPS regardless of
 * Authentication state is tracked via an encrypted `SameSite=Lax` session cookie managed by the BFF.
 * Local login posts through an antiforgery-protected BFF endpoint. The BFF stores the returned bearer token only in server-side authentication properties. Public Local registration is not available.
 * The API validates Local and Keycloak tokens with isolated bearer schemes. A token signed or issued for one authority cannot authenticate through the other.
-* Direct Google sign-in and Google sign-in brokered by Keycloak use separate provider account namespaces. A brokered login remains bound to the Keycloak issuer and subject; a provider hint does not turn it into a direct Google account. Keep the configured issuer stable when diagnosing account-linking failures.
+* Direct Google sign-in is unsupported. Configure Google through Keycloak's identity broker; its login remains bound to the Keycloak issuer and subject. Existing direct-Google bindings are retained and are not reinterpreted or linked by email during this change.
+
+Remove the former Google runtime inputs from deployment configuration and deploy
+the regenerated API clients with the matching server. Provider settings no longer
+offer direct Google controls, and old Google JSON fields are rejected. Retained
+configuration produces broker guidance rather than a usable provider. The server
+does not acquire the old Google credential or delete its stored binding.
 
 During single-tenant configured-administrator setup, the default tenant remains unpublished
 until activation. Only the authenticated account matching the configured
@@ -160,7 +226,52 @@ rather than complete authentication links or query strings.
 
 ### Local Identity
 
-Local Identity provides username/password or email/password sign-in without an external identity container. Passwords are hashed by ASP.NET Core Identity and failed attempts use bounded lockout. Public self-registration is closed: the former API and BFF registration routes have been removed, with no replacement public signup endpoint.
+Local Identity provides username/password or email/password sign-in without an external identity container. Passwords are hashed by ASP.NET Core Identity and failed attempts use bounded lockout. New visitor enrollment follows the selected tenant's registration policy; closing enrollment does not revoke an existing account or membership.
+
+When Local enrollment is available, authentication discovery advertises
+`/auth/local/register`. The form uses the server's `local-register` HAL action
+and does not infer permission from the presence of a Local sign-in provider.
+Closed enrollment hides signup while keeping ordinary sign-in available.
+After account creation, continue through Local sign-in using the original
+password. An uncertain result requires an explicit retry with the original
+credentials; the form clears password fields after each submission.
+
+The Local enrollment API separates reservation from credential submission:
+`POST /api/auth/local/enrollment/reserve` accepts a client-generated UUIDv7
+operation ID, and `POST /api/auth/local/enrollment/register` accepts that ID,
+username, chosen password, optional contact email and the protected enrollment
+intent. Both require the original `X-Local-Enrollment-Proof` over the server
+backchannel. The BFF must retain this random proof server-side; do not put it in
+URLs, browser JavaScript, support logs or stored request bodies. Browser form
+submission also requires its original host-only flow cookie and antiforgery.
+
+A reservation expires after fifteen minutes without renewal. Retrying the same
+operation must preserve its tenant, browser proof and original identifiers.
+The API returns no access or refresh token from enrollment. Contact email remains
+unconfirmed, and enrollment does not require SMTP. A rejected or unfinished
+credential cannot sign in. Once membership admission commits, later enrollment
+closure does not undo it; recovery finishes that same account rather than
+creating a replacement.
+
+Apply the shipped primary and selected Identity-store migrations and the
+attested Local writer profile upgrade before enabling enrollment. Unknown
+permission drift must be repaired through supported operator tooling rather
+than broader Runtime database permissions.
+
+Quartz runs `visitor-enrollment-recovery` once per minute after an initial
+60-second delay. Each pass handles at most 100 receipts. Expired unfinished
+signups are canceled before their pending native credential is removed; completed
+cleanup is acknowledged separately so retained evidence does not keep filling the
+scan. An account whose membership already committed can finish activation even
+after its reservation expires or enrollment closes. Recovery does not need SMTP
+or retain a password. Keep scheduling and the documented database authorities
+available, and investigate failed recovery passes instead of deleting receipts
+or granting broader database access.
+
+Stop application traffic before attempting a schema downgrade. Downgrade is
+refused while visitor receipts, visitor-origin credentials or incomplete
+administrator verification remain. Keep that evidence and apply a forward fix;
+do not delete records or substitute an administrator identity to force rollback.
 
 New credentials require 15–128 NFC-normalized Unicode scalars and a complete-value
 operator blocklist check. Login shape remains separate from creation minimum.
@@ -185,11 +296,30 @@ Login failures use bounded machine-readable error codes. Do not include login
 request bodies or successful token responses in support logs. Their ordinary
 diagnostic text omits credentials, but explicit JSON body capture does not.
 
-A correct password is not sufficient when credential setup is incomplete. Local sign-in also requires an explicit ready state in the selected Identity database. Missing, invalid, or unfinished credential state blocks sign-in even for a verified email address; disabling email delivery does not bypass this check. Records without state are not automatically treated as ready. This sign-in check alone does not revoke existing sessions.
+Local account synchronization reads the email/name mirror and its concurrency
+revision without reading a private birth declaration or collection receipt.
+Do not broaden ordinary database-role permissions to resolve a synchronization
+failure. Use the supported native-purpose enrollment and its permission checks;
+the Local writer's required revision metadata is separate from private birth data.
+Local sign-in also checks recognition-erasure settlement. Its native writer needs
+read-only access to pending receipts and captured settlement metadata so the
+application can reject unsettled subjects. Those grants do not allow changes to
+recognition records and do not include cryptographic keys.
 
-When instance email delivery is enabled, Local sign-in requires the stored Local verification flag. Supervised bootstrap can establish that flag as administrative provenance; this does not invent an address or prove mailbox delivery. Missing SMTP configuration or a delivery outage does not bypass the gate. Tenant email settings cannot override the instance sign-in policy. When instance delivery is disabled, unverified Local accounts may sign in, but their addresses remain unverified; disabling delivery never proves mailbox ownership. An invalid or unreadable instance policy blocks unverified sign-in until the configuration is repaired.
+A correct password is not sufficient when credential setup is incomplete. Local sign-in also requires an explicit ready state in the selected Identity database. Missing, invalid, or unfinished credential state blocks sign-in even for a verified email address. Records without state are not automatically treated as ready. Ordinary bearer validation also checks the current credential and identity binding.
 
-Event's delivery setting does not control Keycloak or AT Protocol verification, password recovery, or sign-in. Lifecycle actions follow the account's actual linked provider, not the instance's default provider. Local enrollment remains an administrator or setup operation; recovery never creates an account.
+An eligible Local account can sign in and keep using its ordinary session
+without an email address or SMTP service. Enabling, disabling or repairing
+email delivery does not change that eligibility; unavailable or malformed
+delivery settings do not block ordinary sign-in. Credential setup, lockout,
+current identity binding and session security checks still apply.
+
+An unverified address stays unverified after login. An absent address is not
+added to the session token. Supervised bootstrap can establish a verification
+flag as administrative provenance; that does not invent an address or prove
+mailbox delivery. Changing delivery settings never proves mailbox ownership.
+
+Event's delivery setting does not control Keycloak or AT Protocol verification, password recovery, or sign-in. Lifecycle actions follow the account's actual linked provider, not the instance's default provider. Local visitor signup follows the tenant's registration policy separately from administrator provisioning and setup; password recovery never creates an account.
 
 The first-run Local wizard applies the standard English locale and UTC timezone
 defaults when no profile override is supplied, just as external-provider setup does.
@@ -199,8 +329,8 @@ defaults when no profile override is supplied, just as external-provider setup d
 Use the verification, recovery or password-change action offered by the server in
 sign-in or account security settings. Local verification and recovery require
 usable instance email delivery; a tenant mail server does not replace it.
-Disabling delivery or an SMTP outage never verifies an address or bypasses the
-existing sign-in gate. Keycloak and AT Protocol recovery remain with their provider.
+Disabling delivery or an SMTP outage never verifies an address or bypasses
+credential eligibility or verified-contact requirements. Keycloak and AT Protocol recovery remain with their provider.
 
 Verification and email-change links expire after 30 minutes, and password-recovery
 links after 15 minutes. Repeating a request while its operation remains live reuses
@@ -254,6 +384,12 @@ user ID. Without an exact provider link it creates a new application account;
 reuse of a Local-owned account requires that link to remain present when the
 claim transaction checks it. A link removed before that transaction starts is
 not accepted from an earlier lookup.
+
+`POST /api/tenant` is an instance management action: an authorized human can
+request a new tenant without selecting an existing tenant first. Authentication
+and the existing server-side creation policy still apply. This exception belongs
+to that exact write action; tenant collection reads, navigation, and ordinary
+tenant resources retain their tenant-resolution requirements.
 
 Tenant creation through both `/api/tenant` and the multi-tenant instance-admin
 route `/api/admin/instance/tenants` uses the platform user linked to the authenticated
@@ -334,7 +470,10 @@ and let you retry while the challenge is still current.
 
 Direct API clients can submit the short-lived challenge as a Bearer token to
 `POST /api/auth/local/credential-replacement`, with a JSON body containing only
-`newPassword`. An ordinary access token cannot replace the challenge. Successful
+`newPassword`. This request also works at the instance root in multi-tenant
+deployments; no tenant header is needed. The exception applies only to this
+exact POST, and a valid replacement challenge is still required. An ordinary
+access token cannot replace the challenge. Successful
 replacement returns an empty HTTP 204 response, not a signed-in session; sign in
 again using the new password. Password validation returns HTTP 400 and allows a
 corrected request while the challenge remains valid. Invalid, expired or consumed
@@ -342,6 +481,15 @@ authority returns HTTP 401; a concurrent operation conflict returns HTTP 409.
 If the challenge expires during the database updates, replacement rolls back
 without changing the password. Sign in with the temporary password to obtain
 a fresh challenge rather than retrying the expired one.
+PostgreSQL password replacement coordinates with background email processing
+before starting its database transaction, so email claim polling cannot
+invalidate its earlier credential observations. This requires no new setting,
+permission grant or migration; the challenge deadline and fresh-login requirement
+remain unchanged.
+After configured setup is complete, the administrator's fresh Local sign-in uses
+the existing account binding without repeating setup or assigning roles again.
+The current Local account, login link and personal actor must still be valid;
+no extra bootstrap database permission is required.
 Do not log or persist challenges or password request bodies. Reusing an
 `Idempotency-Key` cannot replay successful replacement.
 
@@ -425,11 +573,11 @@ Instance administrators can switch among Local Identity, Keycloak, and AT Protoc
 2. Configure the target provider and confirm that it can authenticate.
 3. Select it as the primary provider and save.
 
-The server rejects a switch that would leave the administrator without usable target credentials. New login discovery and challenges use only the selected primary provider. Existing sessions continue through their original validation/refresh scheme until normal expiry. This is session continuity, not dual-primary authentication.
+The server rejects a switch that would leave the administrator without usable target credentials. New login discovery and challenges use only supported providers. Supported-provider sessions continue through their original validation/refresh scheme until normal expiry. Direct Google is not a supported session authority.
 
 AT Protocol remains independently enabled or disabled when Local Identity or
-Keycloak is primary. It is forced on, and Google SSO is forced off, when AT
-Protocol is primary.
+Keycloak is primary. It is forced on when AT Protocol is primary. Google sign-in
+is available through Keycloak rather than a separate Google provider.
 
 ---
 
@@ -551,27 +699,51 @@ and the other 25 remediation phases remain launch blockers.
 
 ---
 
+## Explicit Tenant Joining
+
+An existing Local or Keycloak account can explicitly join an open tenant through
+`POST /api/auth/tenant-join`, authenticated with its verified bearer token. Select
+the tenant through `X-Tenant-Slug` or the verified tenant host; account and tenant
+values in a request body do not select either identity or destination. Closed
+registration refuses a new membership but preserves an existing active one.
+Suspended or removed memberships require their ordinary administrative recovery
+flow and cannot be revived by joining again. This operation does not register an
+account or sign the browser into another host.
+
+## Browser Session Storage
+
+When upgrading the BFF session storage format, existing browser sessions require
+sign-in again. Hosts participating in a browser-session transfer must share the
+configured Redis authority and compatible data-protection context.
+
 ## AT Protocol Sign-In
+
+Apply the authentication-state migrations before starting the new executable.
+The upgrade preserves existing tenant-bound login records and leaves health
+probes unauthenticated. A downgrade is refused while unscoped verification state
+cannot be represented by the earlier schema. Retain those records or allow their
+bounded expiry and supported cleanup; do not assign an arbitrary tenant to make
+rollback succeed.
 
 Optional or primary [AT Protocol Authentication](../federation-and-open-protocols/at-protocol-and-bluesky-jetstream.md) enables users to sign in using their Bluesky handle (`@handle.bsky.social`) or Decentralized Identifier (DID):
 * Links strictly by the DID verified with the personal data server.
-* JIT-creates a passwordless account when AT Protocol is primary.
+* Offers passwordless enrollment when the provider is ready and the selected tenant permits registration and account-required participation.
 * Never creates accounts through opportunistic email matching.
 * Does not implicitly grant event publication or federation consent.
-* Requires an existing exact DID-linked account when optional under Local Identity or Keycloak.
+* Uses the exact verified DID binding for existing-account sign-in; active members can still sign in after registration closes.
 * Operates under the same provider-neutral [Authorization](authorization.md) rules as Local Identity and Keycloak users.
 
 ---
 
 ## Acceptance Testing Checklist
 
-1. Verify Local sign-in issues only an HttpOnly BFF cookie to the browser and the former public registration routes cannot create accounts.
+1. Verify Local sign-in issues only an HttpOnly BFF cookie to the browser, and visitor signup is offered only through the server-advertised protected flow.
 2. Confirm invalid Local credentials return generic guidance and repeated failures lock the account.
 3. For Keycloak, verify login redirects back to the Blazor application and refresh works.
 4. Switch providers and confirm new-login discovery changes while an existing session remains usable.
 5. Verify logout invalidates the local BFF cookie and invokes provider logout when applicable.
 6. Verify an invalid API key returns `401 Unauthorized` with ProblemDetails.
-7. Enable instance email delivery and confirm unverified Local sign-in is refused, even without SMTP. Disable delivery and confirm successful sign-in does not mark the address verified.
+7. Enable and disable instance email delivery and confirm otherwise eligible Local sign-in works with absent or unverified optional email. Confirm login does not mark an address verified and email recovery still requires verified contact authority.
 
 ---
 

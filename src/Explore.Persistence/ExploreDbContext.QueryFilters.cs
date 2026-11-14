@@ -27,6 +27,9 @@ public partial class ExploreDbContext
         modelBuilder.Entity<SetupSecretBindingOperation>()
             .HasQueryFilter(QueryFilterNames.Tenant, value =>
                 IsTenantFilterBypassed || value.TenantId == TenantFilterTenantId);
+        modelBuilder.Entity<VisitorEnrollmentOperation>()
+            .HasQueryFilter(QueryFilterNames.Tenant, value =>
+                IsTenantFilterBypassed || value.TenantId == TenantFilterTenantId);
 
         modelBuilder.Entity<LegalDocument>()
             .HasQueryFilter(QueryFilterNames.Tenant, value =>

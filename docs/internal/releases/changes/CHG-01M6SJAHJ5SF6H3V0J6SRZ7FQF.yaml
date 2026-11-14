@@ -1,0 +1,26 @@
+Change-Id: CHG-01M6SJAHJ5SF6H3V0J6SRZ7FQF
+Title: "Apply tenant enrollment closure across verified providers"
+Type: fix
+Scope: registration
+Summary: "Preserve existing-member login while denying new federated accounts and missing memberships after registration closes."
+Group: tenant-auth-admission
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+  Migration:
+    Reference: schemas/islamu-event.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented

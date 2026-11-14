@@ -69,6 +69,15 @@ public sealed class LocalIdentityEligibility
         Advance(LocalIdentityEligibilityState.ChangeRequired, occurredAt);
     }
 
+    /// <summary>Completes a visitor binding after its owning workflow confirms committed primary admission.</summary>
+    public void CompleteVisitorAdmission(long expectedGeneration, Guid expectedOperationId, DateTime occurredAt)
+    {
+        RequireMutation(expectedGeneration, expectedOperationId, occurredAt);
+        if (State != LocalIdentityEligibilityState.ProvisioningPending)
+            throw new InvalidOperationException("Only the original pending visitor binding can become ready.");
+        Advance(LocalIdentityEligibilityState.Ready, occurredAt);
+    }
+
     public void ReplaceCredential(long expectedGeneration, Guid expectedOperationId, DateTime occurredAt)
     {
         RequireMutation(expectedGeneration, expectedOperationId, occurredAt);

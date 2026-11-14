@@ -225,6 +225,7 @@ public sealed partial class LocalAdministrationNativeContractTests(PostgreSqlCon
     private async Task<Seeded> SeedAsync()
     {
         await using var migration = fixture.CreateDbContext();
+        migration.BindTenantLease();
         Guid administrator = await AddAdministratorAsync();
         var tenant = new Tenant
         {
@@ -242,6 +243,7 @@ public sealed partial class LocalAdministrationNativeContractTests(PostgreSqlCon
     private async Task<Guid> AddAdministratorAsync()
     {
         await using var migration = fixture.CreateDbContext();
+        migration.BindTenantLease();
         var administrator = new User
         {
             Id = Guid.CreateVersion7(),

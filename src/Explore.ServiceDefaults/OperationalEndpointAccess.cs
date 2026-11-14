@@ -25,11 +25,14 @@ public static class OperationalEndpointAccess
                 var configuration = context.RequestServices.GetRequiredService<IConfiguration>();
                 var port = configuration.GetValue<int>("OperationalEndpoints:Port");
                 var address = configuration["OperationalEndpoints:Address"];
+                var local = context.Connection.LocalIpAddress;
+                if (local?.IsIPv4MappedToIPv6 == true)
+                    local = local.MapToIPv4();
                 if (port is < 1 or > 65535
                     || !IPAddress.TryParse(address, out var expected)
                     || !IsPrivate(expected)
                     || context.Connection.LocalPort != port
-                    || context.Connection.LocalIpAddress is not { } local
+                    || local is null
                     || !local.Equals(expected))
                 {
                     context.Response.StatusCode = StatusCodes.Status404NotFound;

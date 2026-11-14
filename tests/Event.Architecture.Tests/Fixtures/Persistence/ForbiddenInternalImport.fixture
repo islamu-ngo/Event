@@ -1,4 +1,0 @@
-// ABOUTME: Synthetic architecture fixture representing a forbidden direct dependency on an EF internal namespace.
-// ABOUTME: Exists only to prove internal APIs remain isolated behind the approved migration adapter.
-
-using Microsoft.EntityFrameworkCore.Migrations.Internal;

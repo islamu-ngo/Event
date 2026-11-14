@@ -66,8 +66,6 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
             var envClientId = _configuration["Keycloak:ClientId"];
             var envClientSecret = _configuration["Keycloak:ClientSecret"];
             var envMetadataAddress = _configuration["Keycloak:MetadataAddress"];
-            var envGoogleClientId = _configuration["Google:ClientId"];
-            var envGoogleClientSecret = _configuration["Google:ClientSecret"];
 
             if (!string.IsNullOrEmpty(envAuthority)
                 && !string.IsNullOrEmpty(envClientId))
@@ -86,17 +84,6 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
 
                     RegisterKeycloakScheme(envAuthority, envClientId, envClientSecret, envMetadataAddress);
                 }
-            }
-
-            if (!string.IsNullOrEmpty(envGoogleClientId)
-                && !string.IsNullOrWhiteSpace(envGoogleClientSecret)
-                && !string.Equals(
-                    _activePrimaryProvider,
-                    "atproto",
-                    StringComparison.Ordinal))
-            {
-                _logger.LogInformation("Google config detected in environment/configuration — registering Google scheme from env");
-                RegisterGoogleScheme(envGoogleClientId, envGoogleClientSecret);
             }
 
             if (string.Equals(
@@ -238,35 +225,6 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         {
             RemoveScheme(AuthSchemeNames.Keycloak);
         }
-        // Google: register if enabled and has credentials
-        if (config.GoogleSsoEnabled == true && !string.IsNullOrEmpty(config.GoogleClientId)
-            && !string.IsNullOrWhiteSpace(_configuration["Google:ClientSecret"]))
-        {
-            if (!_registeredSchemes.Contains(AuthSchemeNames.Google))
-            {
-                RegisterGoogleScheme(config.GoogleClientId, _configuration["Google:ClientSecret"]);
-            }
-            else
-            {
-                UpdateGoogleSchemeOptions(config.GoogleClientId, _configuration["Google:ClientSecret"]);
-            }
-        }
-        else if (_registeredSchemes.Contains(AuthSchemeNames.Google))
-        {
-            // Only remove if NOT configured via env vars (env vars take priority)
-            var envGoogleClientId = _configuration["Google:ClientId"];
-            if (string.IsNullOrEmpty(envGoogleClientId)
-                || string.IsNullOrWhiteSpace(_configuration["Google:ClientSecret"]))
-            {
-                RemoveScheme(AuthSchemeNames.Google);
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "Google is disabled in DB settings but configured via environment variables — keeping scheme registered");
-            }
-        }
-
         // ATProto: register handler if enabled (no OIDC — custom handler)
         if (config.AtprotoLoginEnabled == true
             || string.Equals(
@@ -356,50 +314,6 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
             _configuration.GetValue<bool?>("Keycloak:RequireHttpsMetadata")));
     }
 
-    private void RegisterGoogleScheme(string clientId, string? clientSecret)
-    {
-        var options = CreateGoogleOptions(clientId, clientSecret);
-        new OpenIdConnectPostConfigureOptions(_dataProtection)
-            .PostConfigure(AuthSchemeNames.Google, options);
-        bool optionsAdded = _oidcOptionsCache.TryAdd(AuthSchemeNames.Google, options);
-
-        var scheme = new AuthenticationScheme(
-            AuthSchemeNames.Google,
-            displayName: "Google",
-            typeof(OpenIdConnectHandler));
-
-        bool schemeAdded = _schemeProvider.TryAddScheme(scheme);
-        _acquisitionReceipts?.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc,
-            optionsAdded && schemeAdded);
-        lock (_registeredSchemesSync)
-        {
-            _registeredSchemes.Add(AuthSchemeNames.Google);
-        }
-
-        _logger.LogInformation("Registered Google OIDC scheme");
-    }
-
-    private void UpdateGoogleSchemeOptions(string clientId, string? clientSecret)
-    {
-        _oidcOptionsCache.TryRemove(AuthSchemeNames.Google);
-        var options = CreateGoogleOptions(clientId, clientSecret);
-        new OpenIdConnectPostConfigureOptions(_dataProtection)
-            .PostConfigure(AuthSchemeNames.Google, options);
-        bool optionsAdded = _oidcOptionsCache.TryAdd(AuthSchemeNames.Google, options);
-        _acquisitionReceipts?.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc,
-            optionsAdded);
-
-        _logger.LogInformation("Updated Google OIDC scheme options");
-    }
-
-    private OpenIdConnectOptions CreateGoogleOptions(string clientId, string? clientSecret)
-    {
-        return _oidcOptionsFactory.CreateGoogleOptions(new EventBffOidcProviderOptions(
-            "https://accounts.google.com",
-            clientId,
-            clientSecret));
-    }
-
     private void RegisterAtprotoScheme(string publicUrl)
     {
         var scheme = new AuthenticationScheme(
@@ -420,12 +334,10 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
     {
         if (schemeName == AuthSchemeNames.Keycloak)
             _acquisitionReceipts?.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc, false);
-        if (schemeName == AuthSchemeNames.Google)
-            _acquisitionReceipts?.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc, false);
         _schemeProvider.RemoveScheme(schemeName);
 
         // Clean up cached options for OIDC-based schemes
-        if (schemeName is AuthSchemeNames.Keycloak or AuthSchemeNames.Google)
+        if (schemeName == AuthSchemeNames.Keycloak)
         {
             _oidcOptionsCache.TryRemove(schemeName);
         }

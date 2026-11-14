@@ -22,8 +22,8 @@ public static partial class PostgresHumanEmailSourceContract
     private const string Signature = "uuid,integer,text,integer,uuid,text,uuid,uuid,boolean";
     private const string Arguments = "p_actor uuid,p_provider integer,p_account text,p_purpose integer,"
         + "p_tenant uuid,p_stamp text,p_session uuid,p_resolved uuid,p_route boolean";
-    private const string ReadPolicy = "human_email_source_read";
-    private const string LockPolicy = "human_email_source_lock";
+    internal const string ReadPolicy = "human_email_source_read";
+    internal const string LockPolicy = "human_email_source_lock";
     private const string Stamp = "human-email-source:v1:";
     private static readonly string[] Roles = [OwnerRole, MigratorRole, InstanceRole, TenantRole];
     private static readonly string[] Anchors =

@@ -19,8 +19,8 @@ public static partial class PostgresPlatformApiKeySourceContract
     private const string Acquire = "platform_key_source_acquire";
     private const string Arguments = "p_actor uuid,p_provider integer,p_account text,p_purpose integer,p_stamp text,p_session uuid,p_resolved uuid";
     private const string Signature = "uuid,integer,text,integer,text,uuid,uuid";
-    private const string ReadPolicy = "platform_key_source_read";
-    private const string LockPolicy = "platform_key_source_lock";
+    internal const string ReadPolicy = "platform_key_source_read";
+    internal const string LockPolicy = "platform_key_source_lock";
     private const string Stamp = "platform-key-source:v1:";
     private static readonly string[] Roles = [OwnerRole, MigratorRole];
     private static readonly string[] Executors = [PostgresInstanceApiKeyManagementContract.ReadExecutor,

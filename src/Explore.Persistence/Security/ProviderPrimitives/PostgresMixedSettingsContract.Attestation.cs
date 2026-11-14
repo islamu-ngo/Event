@@ -172,8 +172,11 @@ public static partial class PostgresMixedSettingsContract
     {
         var sql = new HumanPrincipalSourceSql(context);
         string roles = string.Join(",", Roles.Select(Text));
-        string routineIds = string.Join(",", Routines.Select(routine =>
-            $"pg_catalog.to_regprocedure({Text(FunctionSql(context, routine.Name) + "(" + routine.Signature + ")")})"));
+        // Keep fixed signature resolution uncorrelated with scanned catalog rows.
+        string routineIds = "SELECT pg_catalog.to_regprocedure(signature) FROM (VALUES "
+            + string.Join(",", Routines.Select(routine =>
+                $"({Text(FunctionSql(context, routine.Name) + "(" + routine.Signature + ")")})"))
+            + ") expected(signature)";
         string routines = string.Join("\n", Routines.Select(routine => $"""
             IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc f
                 WHERE f.oid = pg_catalog.to_regprocedure({Text(FunctionSql(context, routine.Name) + "(" + routine.Signature + ")")})
@@ -251,8 +254,12 @@ public static partial class PostgresMixedSettingsContract
             mixed_write_authority AS MATERIALIZED (
                 SELECT target.*,
                     pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},target.relation,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') AS table_write,
-                    pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},target.relation,'UPDATE,REFERENCES') AS column_write,
-                    pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},target.relation,'INSERT') AS insert_write
+                    (pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},target.relation,'UPDATE,REFERENCES')
+                        AND NOT (target.relation={Text(sql.Table(typeof(Explore.Domain.SystemSetting)))}::regclass
+                            AND ({PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(context, enrollment)}) IS TRUE)) AS column_write,
+                    (pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},target.relation,'INSERT')
+                        AND NOT (target.relation={Text(sql.Table(typeof(Explore.Domain.SystemSetting)))}::regclass
+                            AND ({PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(context, enrollment)}) IS TRUE)) AS insert_write
                 FROM mixed_write_targets target),
             mixed_catalogues AS MATERIALIZED (
                 SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM mixed_write_authority WHERE table_write OR column_write)

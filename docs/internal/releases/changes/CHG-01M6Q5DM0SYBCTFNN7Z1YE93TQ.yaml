@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6Q5DM0SYBCTFNN7Z1YE93TQ
+Title: "restrict completion reads to enrollment binding state"
+Type: fix
+Scope: onboarding
+Summary: "Read only user existence and personal actor binding/state during administrator completion, retaining the original enrollment owner and conflict checks without loading private profiles or adding permissions."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: "Detached scalar-only user and actor projections fit the existing Global bootstrap column inventory. Full profile reads remain denied; receipt, binding, deletion and suspension checks remain intact."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: "Administrator completion uses the existing Global permission profile; do not grant full user or actor profile access."

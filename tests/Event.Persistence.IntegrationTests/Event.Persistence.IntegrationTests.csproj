@@ -8,6 +8,7 @@
     <Compile Include="..\Shared\PostgresTestRoleBootstrap.cs" Link="Fixtures\PostgresTestRoleBootstrap.cs" />
     <Compile Include="..\Shared\TransactionCleanupFault.cs" Link="Fixtures\TransactionCleanupFault.cs" />
     <Compile Include="..\Shared\Telemetry\EventLocationPrivacyMetricsFactory.cs" Link="Telemetry\EventLocationPrivacyMetricsFactory.cs" />
+    <Compile Include="..\Shared\Settings\VisitorReadPolicyTestAuthority.cs" Link="Settings\VisitorReadPolicyTestAuthority.cs" />
     <Compile Include="..\Shared\Moderation\ModerationMeasurementJournalAttribute.cs" Link="Moderation\ModerationMeasurementJournalAttribute.cs" />
     <Compile Include="..\Explore.Infrastructure.Tests\Fixtures\CurrentHumanPrincipalFixture.cs" Link="Fixtures\CurrentHumanPrincipalFixture.cs" />
     <Compile Include="../Shared/Execution/TestExecutionProfile.cs" Link="Execution/TestExecutionProfile.cs" />
@@ -21,6 +22,10 @@
     <AssemblyAttribute Include="Event.Testing.TestSuiteKindAttribute">
       <_Parameter1>ContainerBacked</_Parameter1>
     </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>

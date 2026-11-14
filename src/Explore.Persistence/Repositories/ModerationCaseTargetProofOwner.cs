@@ -6,6 +6,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Moderation;
 using Explore.Domain;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using ISLAMU.Moderation.Domain;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -131,15 +132,7 @@ public sealed partial class ModerationCaseTargetProofOwner(
             || caller.UserId is not { } userId || userId == Guid.Empty
             || context.TenantFilterTenantId is not { } tenantId || tenantId == Guid.Empty)
             return null;
-        if (context.Database.ProviderName == RelationalNamedLock.PostgreSqlProvider)
-        {
-            await using var command = context.Database.GetDbConnection().CreateCommand();
-            command.Transaction = transaction.GetDbTransaction();
-            command.CommandText = "SELECT current_setting('app.current_tenant_id', true)";
-            if (await command.ExecuteScalarAsync(token) is not string value
-                || !Guid.TryParse(value, out var tenant) || tenant != tenantId)
-                return null;
-        }
+        if (!await PostgresTenantSessionProbe.MatchesAsync(context, transaction, tenantId, token)) return null;
         if (!await AccountAsync(userId, acquire, token)) return null;
         if (acquire && readGrantId is { } grantId
             && !await AcquireReadIssuancePlanAsync(grantId, userId, tenantId, token))

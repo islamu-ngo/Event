@@ -23,6 +23,7 @@ public sealed class LocalPasswordRecoveryController(
     ICommandHandler<CompleteLocalPasswordRecoveryCommand, BaseCommandResponse<Guid>> completeHandler) : ControllerBase
 {
     [HttpPost(Name = RouteNames.RequestLocalPasswordRecovery)]
+    [TenantReadBootstrap]
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
     [PrivateNoStore]
@@ -42,6 +43,7 @@ public sealed class LocalPasswordRecoveryController(
             await requestHandler.ExecuteAsync(new RequestLocalPasswordRecoveryCommand(body), cancellationToken), onSuccess: Accepted);
 
     [HttpPost("consume", Name = RouteNames.CompleteLocalPasswordRecovery)]
+    [TenantReadBootstrap]
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
     [PrivateNoStore]

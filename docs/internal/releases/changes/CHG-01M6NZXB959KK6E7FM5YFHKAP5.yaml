@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6NZXB959KK6E7FM5YFHKAP5
+Title: "Read public resolver configuration through its Global owner"
+Type: fix
+Scope: access
+Summary: "Read stored routing settings through independent Global authority while preserving defaults, normalization and isolated cache copies."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Independent Global observation preserves Runtime settings-table denial and acquires no mutation custody."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Public browser routing bootstrap retains saved settings, defaults and cache isolation."

@@ -7,6 +7,7 @@ using Explore.Application.Services.Moderation;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Repositories;
 using ISLAMU.Moderation.Domain;
 using ISLAMU.Moderation.Domain.Policies;
@@ -154,14 +155,7 @@ public sealed class ModerationEventRightsSourceOwner(
                 row.Id == native.Authority.Epoch.Id && row.HostBindingId == native.Authority.Binding.Id
                 && row.TenantId == native.Authority.Tenant.Id && row.Revision == native.Authority.Epoch.Revision, token))
             return null;
-        if (context.Database.ProviderName == RelationalNamedLock.PostgreSqlProvider)
-        {
-            await using var command = context.Database.GetDbConnection().CreateCommand();
-            command.Transaction = native.Transaction.GetDbTransaction();
-            command.CommandText = "SELECT current_setting('app.current_tenant_id', true)";
-            var value = await command.ExecuteScalarAsync(token);
-            if (!Guid.TryParse(value?.ToString(), out var tenant) || tenant != native.Authority.Tenant.Id) return null;
-        }
+        if (!await PostgresTenantSessionProbe.MatchesAsync(context, native.Transaction, native.Authority.Tenant.Id, token)) return null;
         // This is the caller's original concrete session, never a substitute or private snapshot.
         return await session.AcquireNativeAsync(transactionId, observedAt, token);
     }

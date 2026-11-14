@@ -96,6 +96,12 @@ public class MainLayoutTests : IDisposable
         _ctx.Services.AddSingleton(Substitute.For<IAnalyticsInterop>());
         _ctx.Services.AddSingleton(Substitute.For<ICookieConsentInterop>());
         _ctx.Services.AddSingleton(new CookieConsentStateService());
+        var footerClient = Substitute.For<IFooterClient>();
+        footerClient.GetFooterConfigAsync(cancellationToken: Arg.Any<CancellationToken>())
+            .Returns(new FooterConfigDto { Settings = new FooterSettingsDto { Enabled = false, ShowCookieSettingsLink = true } });
+        _ctx.Services.AddSingleton(footerClient);
+        _ctx.Services.AddSingleton(TimeProvider.System);
+        _ctx.Services.AddScoped<IFooterPresentationService, FooterPresentationService>();
     }
 
     private IRenderedComponent<MainLayout> RenderLayout()

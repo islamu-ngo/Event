@@ -3,6 +3,7 @@ using Explore.Application.Contracts.Moderation;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using ISLAMU.Moderation.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -236,13 +237,8 @@ public sealed class ModerationCaseIntakeRepository(
 
     private async Task<bool> ProviderTenantMatchesAsync(CancellationToken token)
     {
-        if (context.Database.ProviderName != RelationalNamedLock.PostgreSqlProvider)
-            return true;
-        await using var command = context.Database.GetDbConnection().CreateCommand();
-        command.Transaction = context.Database.CurrentTransaction!.GetDbTransaction();
-        command.CommandText = "SELECT current_setting('app.current_tenant_id', true)";
-        return await command.ExecuteScalarAsync(token) is string value
-            && Guid.TryParse(value, out var tenant) && tenant == context.TenantFilterTenantId;
+        if (context.Database.ProviderName == RelationalNamedLock.PostgreSqlProvider && context.TenantFilterTenantId is null) return false;
+        return await PostgresTenantSessionProbe.MatchesAsync(context, context.Database.CurrentTransaction, context.TenantFilterTenantId, token);
     }
 
     private sealed record StagedCase(

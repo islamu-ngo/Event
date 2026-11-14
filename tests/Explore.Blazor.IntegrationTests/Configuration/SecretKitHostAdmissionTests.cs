@@ -43,8 +43,7 @@ public sealed class SecretKitHostAdmissionTests
     [Arguments("KEYCLOAK_ENDPOINT")]
     [Arguments("KEYCLOAK_REALM")]
     [Arguments("KEYCLOAK_CLIENT_ID")]
-    [Arguments("KEYCLOAK_BLAZOR_CLIENT_SECRET")]
-    public async Task PartialKeycloakGroupCannotPublishMaterialOrAcquisitionEvidence(string missingKey)
+    public async Task CredentialBearingPartialKeycloakGroupCannotPublishMaterialOrAcquisitionEvidence(string missingKey)
     {
         var values = KeycloakValues();
         values.Remove(missingKey);
@@ -60,6 +59,31 @@ public sealed class SecretKitHostAdmissionTests
         values["GOOGLE_CLIENT_ID"] = Guid.NewGuid().ToString("N");
         values["GOOGLE_CLIENT_SECRET"] = Guid.NewGuid().ToString("N");
         values[key] = " ";
+        await AssertGroupRejected(values);
+    }
+
+    [Test]
+    [Arguments("KEYCLOAK_BLAZOR_CLIENT_SECRET", "")]
+    [Arguments("KEYCLOAK_BLAZOR_CLIENT_SECRET", "${UNRESOLVED}")]
+    [Arguments("GOOGLE_CLIENT_SECRET", "")]
+    [Arguments("GOOGLE_CLIENT_SECRET", "${UNRESOLVED}")]
+    public async Task InvalidCredentialCannotProduceAcquisitionEvidence(string key, string value)
+    {
+        var values = KeycloakValues();
+        values["GOOGLE_CLIENT_ID"] = Guid.NewGuid().ToString("N");
+        values["GOOGLE_CLIENT_SECRET"] = Guid.NewGuid().ToString("N");
+        values[key] = value;
+        await AssertGroupRejected(values);
+    }
+
+    [Test]
+    [Arguments("KEYCLOAK_ENDPOINT", " ")]
+    [Arguments("KEYCLOAK_REALM", "${UNRESOLVED}")]
+    public async Task InvalidMetadataCannotBecomeOptionalCredentialAbsence(string key, string value)
+    {
+        var values = KeycloakValues();
+        values.Remove("KEYCLOAK_BLAZOR_CLIENT_SECRET");
+        values[key] = value;
         await AssertGroupRejected(values);
     }
 

@@ -2,6 +2,7 @@ using Explore.Application.Authentication;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -74,12 +75,7 @@ public sealed partial class ModerationNoticeCleanupRepository
             || context.TenantFilterTenantId != tenantId
             || context.Database.CurrentTransaction.GetDbTransaction().Connection != context.Database.GetDbConnection())
             return false;
-        if (context.Database.ProviderName != RelationalNamedLock.PostgreSqlProvider) return true;
-        await using var command = context.Database.GetDbConnection().CreateCommand();
-        command.Transaction = context.Database.CurrentTransaction.GetDbTransaction();
-        command.CommandText = "SELECT current_setting('app.current_tenant_id', true)";
-        var value = await command.ExecuteScalarAsync(token);
-        return value is string setting && Guid.TryParse(setting, out var actual) && actual == tenantId;
+        return await PostgresTenantSessionProbe.MatchesAsync(context, context.Database.CurrentTransaction, tenantId, token);
     }
 
     private sealed record CleanupAuthority(

@@ -1,0 +1,26 @@
+Change-Id: CHG-01M6SJAJJXKA3PBA7F500G5EPK
+Title: "Keep global authentication routes outside tenant capture"
+Type: fix
+Scope: access
+Summary: "Reserve authentication path segments before configured tenant-prefix matching."
+Group: tenant-auth-routing
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+  Migration:
+    Reference: schemas/islamu-event.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented

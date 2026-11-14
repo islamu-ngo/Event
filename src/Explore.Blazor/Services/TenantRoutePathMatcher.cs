@@ -16,6 +16,11 @@ internal static class TenantRoutePathMatcher
         matchedPathBase = PathString.Empty;
         remainingPath = requestPath;
 
+        if (requestPath.StartsWithSegments("/auth", StringComparison.OrdinalIgnoreCase)
+            || requestPath.StartsWithSegments("/login", StringComparison.OrdinalIgnoreCase)
+            || requestPath.StartsWithSegments("/join", StringComparison.OrdinalIgnoreCase))
+            return false;
+
         var pathPrefix = NormalizePathPrefix(configuredPathPrefix);
         var remainingAfterPrefix = requestPath;
         if (pathPrefix is not null &&

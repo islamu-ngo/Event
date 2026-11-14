@@ -36,7 +36,7 @@ public sealed class RedisBffTicketStore : ITicketStore, IBffSessionAuthority, ID
         {
             string authority = string.Join('\n', deploymentNamespace, partition.Name,
                 ExternalDataProtectionRegistration.ApplicationName(partition.Name), CookieAuthenticationDefaults.AuthenticationScheme);
-            keyPrefix = $"event:bff-session:v1:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(authority)))}:";
+            keyPrefix = $"event:bff-session:v1:{{{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(authority)))}}}:";
         }
         connection = new(() => ConnectAsync(endpoint, password));
     }
@@ -45,7 +45,9 @@ public sealed class RedisBffTicketStore : ITicketStore, IBffSessionAuthority, ID
     public async Task<string> StoreAsync(AuthenticationTicket ticket, HttpContext httpContext, CancellationToken cancellationToken)
     {
         using var request = CancellationTokenSource.CreateLinkedTokenSource(httpContext.RequestAborted, cancellationToken);
-        return await StoreAsync(ticket, request.Token).ConfigureAwait(false);
+        return httpContext.Features.Get<BffSessionTransferSource>() is { } source
+            ? await StoreFromLiveSourceAsync(ticket, source, request.Token).ConfigureAwait(false)
+            : await StoreAsync(ticket, request.Token).ConfigureAwait(false);
     }
 
     public async Task<string> StoreAsync(AuthenticationTicket ticket, CancellationToken cancellationToken)
@@ -53,16 +55,8 @@ public sealed class RedisBffTicketStore : ITicketStore, IBffSessionAuthority, ID
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            if (ticket.Properties.Items.ContainsKey(BffSessionIdentity.HandleProperty)
-                || ticket.Properties.Items.ContainsKey(BffSessionIdentity.RevisionProperty)
-                || !IsValidIdentity(ticket)) throw Unavailable();
             string handle = FreshValue();
-            var candidate = Clone(ticket);
-            foreach (var identity in candidate.Principal.Identities)
-                foreach (var claim in identity.FindAll(BffSessionIdentity.HandleClaim).ToArray()) identity.RemoveClaim(claim);
-            ((ClaimsIdentity)candidate.Principal.Identity!).AddClaim(new Claim(BffSessionIdentity.HandleClaim, handle));
-            candidate.Properties.Items[BffSessionIdentity.HandleProperty] = handle;
-            candidate.Properties.Items[BffSessionIdentity.RevisionProperty] = FreshValue();
+            var candidate = PrepareFreshTicket(ticket, handle);
             byte[] payload = Protect(handle, candidate);
             var database = await DatabaseAsync(cancellationToken).ConfigureAwait(false);
             bool stored = await database.StringSetAsync(Key(handle), payload, Lifetime(candidate), When.NotExists)
@@ -73,6 +67,63 @@ public sealed class RedisBffTicketStore : ITicketStore, IBffSessionAuthority, ID
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch { throw Unavailable(); }
+    }
+
+    private async Task<string> StoreFromLiveSourceAsync(
+        AuthenticationTicket ticket, BffSessionTransferSource source, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            if (!BffSessionIdentity.IsValidHandle(source.Revision)
+                || source.HandoffExpiresUtc <= clock.GetUtcNow()) throw Unavailable();
+            var database = await DatabaseAsync(cancellationToken).ConfigureAwait(false);
+            RedisKey sourceKey = Key(source.Binding.Handle);
+            RedisValue sourceValue = await database.StringGetAsync(sourceKey)
+                .WaitAsync(OperationTimeout, cancellationToken).ConfigureAwait(false);
+            var original = Unprotect(source.Binding.Handle, sourceValue);
+            if (original is null
+                || !BffSessionIdentity.TryGetBinding(original.Principal, out var originalBinding)
+                || originalBinding != source.Binding
+                || original.Properties.Items[BffSessionIdentity.RevisionProperty] != source.Revision)
+                throw Unavailable();
+            string handle = FreshValue();
+            var candidate = PrepareFreshTicket(ticket, handle);
+            if (!BffSessionIdentity.TryGetBinding(candidate.Principal, out var destination)
+                || destination.OwnerPartitionKey != source.Binding.OwnerPartitionKey) throw Unavailable();
+            byte[] payload = Protect(handle, candidate);
+            const string create = """
+                if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
+                local time = redis.call('TIME')
+                local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
+                if tonumber(ARGV[3]) <= now or tonumber(ARGV[4]) <= now or tonumber(ARGV[5]) <= now then return 0 end
+                if redis.call('SET', KEYS[2], ARGV[2], 'PXAT', ARGV[5], 'NX') then return 1 end
+                return 0
+                """;
+            var result = await database.ScriptEvaluateAsync(create, [sourceKey, Key(handle)],
+                [sourceValue, payload, original.Properties.ExpiresUtc!.Value.ToUnixTimeMilliseconds(),
+                    source.HandoffExpiresUtc.ToUnixTimeMilliseconds(), candidate.Properties.ExpiresUtc!.Value.ToUnixTimeMilliseconds()])
+                .WaitAsync(OperationTimeout, cancellationToken).ConfigureAwait(false);
+            if ((long)result != 1) throw Unavailable();
+            CopyBinding(candidate, ticket);
+            return handle;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch { throw Unavailable(); }
+    }
+
+    private AuthenticationTicket PrepareFreshTicket(AuthenticationTicket ticket, string handle)
+    {
+        if (ticket.Properties.Items.ContainsKey(BffSessionIdentity.HandleProperty)
+            || ticket.Properties.Items.ContainsKey(BffSessionIdentity.RevisionProperty)
+            || !IsValidIdentity(ticket)) throw Unavailable();
+        var candidate = Clone(ticket);
+        foreach (var identity in candidate.Principal.Identities)
+            foreach (var claim in identity.FindAll(BffSessionIdentity.HandleClaim).ToArray()) identity.RemoveClaim(claim);
+        ((ClaimsIdentity)candidate.Principal.Identity!).AddClaim(new Claim(BffSessionIdentity.HandleClaim, handle));
+        candidate.Properties.Items[BffSessionIdentity.HandleProperty] = handle;
+        candidate.Properties.Items[BffSessionIdentity.RevisionProperty] = FreshValue();
+        return candidate;
     }
 
     public Task RenewAsync(string key, AuthenticationTicket ticket) => RenewAsync(key, ticket, CancellationToken.None);

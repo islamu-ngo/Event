@@ -2,10 +2,12 @@
 using Event.Persistence.IntegrationTests.Identity;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;
 using Explore.Application.Services;
 using Explore.Domain.Constants;
+using Explore.Domain;
 using Explore.Infrastructure;
 using Explore.Infrastructure.Authentication;
 using Explore.Infrastructure.Mail;
@@ -119,7 +121,7 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
             : provider.GetRequiredService<ExploreDbContext>();
     }
 
-    internal sealed class Scope : IAsyncDisposable, ITenantContext
+    internal sealed class Scope : IAsyncDisposable, ITenantContext, IInstanceSystemSettingsReader
     {
         private readonly AsyncServiceScope _scope;
         private readonly AsyncServiceScope executionScope;
@@ -154,20 +156,22 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
                 if (call.ArgAt<Guid?>(1) is not null) throw new InvalidOperationException("Lifecycle requested tenant credentials.");
                 return SecretResolutionResult.Unconfigured;
             });
-            var capabilities = new EmailDeliveryCapabilityResolver(settings, secrets, new SecretBindingRepository(Application));
+            var capabilities = new EmailDeliveryCapabilityResolver(settings, secrets, new SecretBindingRepository(Application), this);
             ILocalIdentityLifecycleSmtpTransport transport = fixture.UseRealSmtp
                 ? new LocalIdentityLifecycleSmtpTransport(new SmtpEmailService(new SmtpConfigResolver(capabilities, this, settings),
                     NullLogger<SmtpEmailService>.Instance)) : fixture.Smtp;
             Processor = new(Lifecycle, Deliveries, MutationLock, settings, capabilities, transport,
-                new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(
-                    new Dictionary<string, string?> { ["PublicBaseUrl"] = "https://instance.test" }).Build(),
-                SystemSettingRepository.CreateReadOnly(Application, MutationLock),
                 Options.Create(new EmailDispatchProcessorSettings()));
             executionScope = fixture.executionProvider.CreateAsyncScope();
             Router = new(new UserExternalLoginRepository(Application),
                 [new LocalIdentityLifecycleEmailService(
                     executionScope.ServiceProvider.GetRequiredService<ILocalIdentityExecutionScopeFactory>())]);
         }
+
+        public async Task<IReadOnlyList<SystemSetting>> ReadAsync(
+            IReadOnlyCollection<string> keys, CancellationToken cancellationToken = default)
+            => await Application.SystemSettings.AsNoTracking()
+                .Where(row => keys.Contains(row.SettingKey)).ToArrayAsync(cancellationToken);
 
         public async ValueTask DisposeAsync()
         {

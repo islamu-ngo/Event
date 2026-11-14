@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6NZFBJF345N3VPA65DNZZ9W
+Title: "refresh JWT authority without acquiring client secrets"
+Type: fix
+Scope: access
+Summary: "Read only saved primary-provider and public Keycloak authority/client metadata through the independent instance reader; retain deployment precedence and prefetch signing metadata before publishing a replacement JWT configuration."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "JWT observation acquires only public provider metadata through independent Global read authority. Runtime remains denied confidential-client bindings; signing-key prefetch precedes publication."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Stored authority refresh no longer requires administrative credential material. Existing deployment precedence and previous-manager retention on prefetch failure remain."

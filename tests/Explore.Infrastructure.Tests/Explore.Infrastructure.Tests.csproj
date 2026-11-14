@@ -6,6 +6,7 @@
     <Compile Include="..\Shared\AssuranceOwnershipContext.cs" Link="Fixtures\AssuranceOwnershipContext.cs" />
     <Compile Include="..\Shared\Authorization\ProviderNeutralCorpus.cs" Link="Authorization\ProviderNeutralCorpus.cs" />
     <Compile Include="..\Shared\Settings\SmtpSettingsDatabase.cs" Link="Settings\SmtpSettingsDatabase.cs" />
+    <Compile Include="..\Shared\Settings\VisitorReadPolicyTestAuthority.cs" Link="Settings\VisitorReadPolicyTestAuthority.cs" />
     <Compile Include="..\Shared\ExternalDataProtectionTestAuthority.cs" Link="Fixtures\ExternalDataProtectionTestAuthority.cs" />
     <Compile Include="..\Shared\SecretKitHttpAuthority.cs" Link="Fixtures\SecretKitHttpAuthority.cs" />
     <Using Include="Event.Testing.Secrets" />
@@ -27,6 +28,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Explore.ServiceDefaults\Explore.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\src\Explore.Atproto.Transport\Explore.Atproto.Transport.csproj" />
     <ProjectReference Include="..\..\src\Event.MigrationService\Event.MigrationService.csproj"
@@ -41,7 +46,6 @@
     <PackageReference Include="Cerbos.Sdk" />
     <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="NSubstitute" />

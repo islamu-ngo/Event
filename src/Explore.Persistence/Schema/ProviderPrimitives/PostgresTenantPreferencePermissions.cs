@@ -24,11 +24,21 @@ public static class PostgresTenantPreferencePermissions
         Array.AsReadOnly(Update.Select(property => Column(context, property)).ToArray());
 
     // These proofs compose fixed declarations, not observed ACLs. The worker consumes only the two descriptors above.
-    internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
-        $"COALESCE((({Boundary(context, enrollment)}) AND ({Required(context, enrollment)}) AND (({FixedCatalogue(context, enrollment, preference: true)}) OR ({PostgresManagedTenantWorkerCreationPermissions.CompleteGlobalCataloguePredicate(context, enrollment)}))),false)";
+    internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        string? externalCataloguePredicate = null, string? workerCataloguePredicate = null) =>
+        PostgresExternalTenantEnrollmentPermissions.ComposeCataloguePredicate(context, enrollment,
+            externalCataloguePredicate, reference =>
+                PostgresManagedTenantWorkerCreationPermissions.ComposeCataloguePredicate(context, enrollment,
+                    workerCataloguePredicate, workerReference =>
+                        $"COALESCE((({Boundary(context, enrollment, reference)}) AND ({Required(context, enrollment)}) AND (({FixedCatalogue(context, enrollment, preference: true)}) OR ({workerReference}))),false)"));
 
-    internal static string OptionalGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
-        $"COALESCE((({Boundary(context, enrollment)}) AND (({Fresh(context, enrollment)}) OR ({CompleteGlobalCataloguePredicate(context, enrollment)}))),false)";
+    internal static string OptionalGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        string? externalCataloguePredicate = null, string? workerCataloguePredicate = null) =>
+        PostgresExternalTenantEnrollmentPermissions.ComposeCataloguePredicate(context, enrollment,
+            externalCataloguePredicate, reference =>
+                PostgresManagedTenantWorkerCreationPermissions.ComposeCataloguePredicate(context, enrollment,
+                    workerCataloguePredicate, workerReference =>
+                        $"COALESCE((({Boundary(context, enrollment, reference)}) AND (({Fresh(context, enrollment)}) OR ({CompleteGlobalCataloguePredicate(context, enrollment, reference, workerReference)}))),false)"));
 
     private static string Fresh(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
         FixedCatalogue(context, enrollment, preference: false);
@@ -146,10 +156,10 @@ public static class PostgresTenantPreferencePermissions
         finally { connection.StateChange -= Changed; }
     }
 
-    private static string Boundary(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    private static string Boundary(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        string? externalCataloguePredicate)
     {
-        var (schema, table) = Mapping(context);
-        string relation = $"pg_catalog.to_regclass({Text(table)})";
+        var (schema, _) = Mapping(context);
         return $"""
             NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
                 WHERE n.nspname={Text(schema)} AND p.proname IN ('human_tenant_preference_write','human_tenant_preference_image'))
@@ -157,16 +167,7 @@ public static class PostgresTenantPreferencePermissions
                 ('event_tenant_preference_owner','event_tenant_preference_global','event_tenant_preference_migrator'))
             AND NOT pg_catalog.pg_has_role({Role(enrollment.RuntimeLogin)},{Role(enrollment.GlobalLogin)},'MEMBER')
             AND NOT pg_catalog.pg_has_role({Role(enrollment.GlobalLogin)},{Role(enrollment.RuntimeLogin)},'MEMBER')
-            AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE pg_catalog.pg_has_role({Role(enrollment.RuntimeLogin)},r.oid,'MEMBER')
-                AND (r.oid=(SELECT relowner FROM pg_catalog.pg_class WHERE oid={relation})
-                    OR r.rolsuper OR r.rolbypassrls OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication
-                    OR (pg_catalog.has_table_privilege(r.oid,{relation},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                        OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", relation, false)})
-                    OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN
-                        (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
-                        WHERE a.attrelid={relation} AND a.attnum<>0 AND NOT a.attisdropped
-                            AND (pg_catalog.has_column_privilege(r.oid,a.attrelid,a.attnum,permission.privilege)
-                                OR pg_catalog.has_column_privilege(r.oid,a.attrelid,a.attnum,permission.privilege || ' WITH GRANT OPTION')))))
+            AND ({externalCataloguePredicate ?? PostgresExternalTenantEnrollmentPermissions.OptionalCataloguePredicate(context, enrollment)})
             """;
     }
 
@@ -187,7 +188,9 @@ public static class PostgresTenantPreferencePermissions
     {
         var (schema, table) = Mapping(context);
         var read = preference ? GlobalReadColumns(context) : PostgresUserTenantNavigationReadPermissions.GlobalReadColumns(context);
-        var update = preference ? GlobalUpdateColumns(context) : [];
+        // The tenant creator's direct key-fence UPDATE is attested by its own installer.
+        var update = (preference ? GlobalUpdateColumns(context) : [])
+            .Concat(PostgresTenantCreationPermissions.GlobalUpdateColumns(context, typeof(User))).Distinct(StringComparer.Ordinal);
         string expected = string.Join(',', read.Select(column => (column, privilege: "SELECT"))
             .Concat(update.Select(column => (column, privilege: "UPDATE")))
             .Select(grant => $"({Text(grant.column)},{Text(grant.privilege)})"));

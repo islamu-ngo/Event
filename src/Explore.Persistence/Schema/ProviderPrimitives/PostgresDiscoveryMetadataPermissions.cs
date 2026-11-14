@@ -271,10 +271,18 @@ public static class PostgresDiscoveryMetadataPermissions
                     .Select(column => (column, Privilege: "UPDATE")))
                 .Select(grant => $"({Text(source.Table)},{Text(grant.column)},{Text(creatorEnrollment.GlobalLogin)},{Text(grant.Privilege)})");
         }).ToArray();
-        string[] declaredRuntimeParents = context is null || creatorEnrollment is null ? [] : sources.SelectMany(source =>
-            PostgresTenantApiKeyStoragePermissions.RuntimeParentReadColumns(context, source.Type)
-                .Select(column => $"({Text(source.Table)},{Text(column)},{Text(creatorEnrollment.RuntimeLogin)},'SELECT')")).ToArray();
-        string[] declaredGrants = [.. declaredGlobalGrants, .. declaredRuntimeParents];
+        string[] declaredRuntimeGrants = context is null || creatorEnrollment is null ? [] : sources.SelectMany(source =>
+        {
+            PostgresTenantMembershipMutationPermissions.TryGetRuntimeColumns(context, source.Type,
+                out var read, out var update, out _);
+            return PostgresTenantApiKeyStoragePermissions.RuntimeParentReadColumns(context, source.Type)
+                .Concat(read).Select(column => (Column: column, Privilege: "SELECT"))
+                .Concat(update.Select(column => (Column: column, Privilege: "UPDATE")))
+                .Concat(PostgresExternalTenantEnrollmentPermissions.RuntimeColumns(context, source.Type))
+                .Distinct().Select(grant =>
+                    $"({Text(source.Table)},{Text(grant.Column)},{Text(creatorEnrollment.RuntimeLogin)},{Text(grant.Privilege)})");
+        }).ToArray();
+        string[] declaredGrants = [.. declaredGlobalGrants, .. declaredRuntimeGrants];
         string permitted = "SELECT * FROM expected" + (declaredGrants.Length == 0 ? "" : " UNION VALUES " + string.Join(',', declaredGrants));
         string tables = "ARRAY[" + string.Join(',', sources.Select(source => Text(source.Table))) + "]::text[]";
         string required = complete ? """

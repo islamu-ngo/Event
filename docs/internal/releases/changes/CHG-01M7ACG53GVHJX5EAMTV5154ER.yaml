@@ -1,0 +1,28 @@
+Change-Id: CHG-01M7ACG53GVHJX5EAMTV5154ER
+Title: "Consult instance storage credentials only when the probe policy needs them"
+Type: fix
+Scope: storage
+Summary: "Tenant storage provider probes no longer fail on instance S3 credentials that the selected storage policy never uses."
+Group: storage-probe-instance-credential-parity
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+    Detail: "Instance credentials are observed only when storage policy requests instance S3 autodetection, after source transactions settle. Once observed, their reference, status, material and revision are revalidated on every later probe handoff; required but unavailable credentials still refuse the probe."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented
+    Detail: "A tenant with an explicit provider or its own S3 settings can test storage while the instance credential is unavailable. No setting, permission or migration changes."

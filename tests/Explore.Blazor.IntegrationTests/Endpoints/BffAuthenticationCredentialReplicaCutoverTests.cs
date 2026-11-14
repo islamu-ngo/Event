@@ -5,6 +5,7 @@ using Explore.Blazor.IntegrationTests.Fixtures;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Blazor.IntegrationTests.Endpoints;
@@ -117,9 +118,14 @@ public sealed class BffAuthenticationCredentialReplicaCutoverTests(BffKeycloakFi
 
     private static WebApplicationFactory<Program> ObserveRefresh(
         SecurityBlazorBffWebApplicationFactory factory, RefreshObservation observation) =>
-        factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
-            services.AddHttpClient("Event.Web.BffHosting.TokenRefresh")
-                .AddHttpMessageHandler(() => new RefreshObserver(observation))));
+        factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?> { ["Authentication:Provider"] = "keycloak" }));
+            builder.ConfigureTestServices(services =>
+                services.AddHttpClient("Event.Web.BffHosting.TokenRefresh")
+                    .AddHttpMessageHandler(() => new RefreshObserver(observation)));
+        });
 
     private sealed class RefreshObservation
     {
@@ -157,6 +163,7 @@ public sealed class BffAuthenticationCredentialReplicaCutoverTests(BffKeycloakFi
             "/auth/challenge?provider=keycloak&returnUrl=/dashboard", cancellationToken);
         await Assert.That(challenge.StatusCode).IsEqualTo(HttpStatusCode.Redirect);
         await Assert.That(challenge.Headers.Location is not null).IsTrue();
+        await Assert.That(challenge.Headers.Location!.IsAbsoluteUri).IsTrue();
 
         using var handler = new HttpClientHandler
         {

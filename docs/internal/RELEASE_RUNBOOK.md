@@ -8,6 +8,12 @@
 
 ## Complete release-impact metadata
 
+Before the license audit, CI restores the conditional Standalone container graph
+and the moderation launcher. It then uses ordinary Standalone assets for the
+solution build. When reproducing a missing-metadata failure, verify package and
+version coverage for these profiles before changing policy or relying on a warm
+local cache.
+
 Review complete changed-file metadata, including previous names for renames.
 A large PR must not bypass impact classification or lower its declared file count.
 See [the trusted metadata contract](CI_CD_GOVERNANCE.md#complete-pr-file-metadata).

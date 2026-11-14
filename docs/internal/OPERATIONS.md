@@ -13,6 +13,12 @@ Only the complete analysis for the selected head supplies scanner evidence.
 
 ## Complete release-impact metadata
 
+For dependency-audit reproduction, restore the Standalone container profile with
+`StandaloneContainerPublish=true`, restore its ordinary profile afterward, and
+restore `eng/moderation/MeasurementLauncher.csproj`. Use locked mode for all
+three operations. The conditional restore supplies deployment-only metadata;
+the second restore prevents conditional assets from leaking into ordinary builds.
+
 The release-impact validator reads runner-local file metadata, not an inline
 environment JSON payload. Investigate missing or truncated metadata rather than
 reducing the expected changed-file count.

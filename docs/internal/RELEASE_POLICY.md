@@ -8,6 +8,11 @@
 
 ## Complete release-impact metadata
 
+License admission covers every tracked product and engineering lock profile,
+including conditional deployment graphs. A pass using a populated developer
+cache does not establish clean-runner restore coverage. Missing package metadata
+remains a failure; profile servicing must not add audit exemptions.
+
 Review complete changed-file metadata, including previous names for renames.
 A large PR must not bypass impact classification or lower its declared file count.
 See [the trusted metadata contract](CI_CD_GOVERNANCE.md#complete-pr-file-metadata).

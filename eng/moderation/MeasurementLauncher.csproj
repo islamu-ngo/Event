@@ -8,6 +8,9 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../../src/Explore.Persistence/Explore.Persistence.csproj" />
     <ProjectReference Include="../../src/Explore.Infrastructure/Explore.Infrastructure.csproj" />
   </ItemGroup>

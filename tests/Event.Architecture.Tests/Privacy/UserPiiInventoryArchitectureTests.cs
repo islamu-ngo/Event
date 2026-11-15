@@ -186,6 +186,30 @@ public sealed class UserPiiInventoryArchitectureTests
     }
 
     [Test]
+    public async Task VisitorEnrollmentReceiptLinksAreSubjectOwnedHardDeletePii()
+    {
+        string[] copies =
+        [
+            "VisitorEnrollmentOperation.LocalSubjectId",
+            "VisitorEnrollmentOperation.PersonalActorId",
+            "VisitorEnrollmentOperation.ExternalLoginId",
+            "VisitorEnrollmentOperation.CredentialOperationId",
+            "VisitorEnrollmentOperation.TenantUserId",
+            "VisitorEnrollmentOperation.IntentDigest"
+        ];
+        UserPiiInventoryEntry[] receipts = UserPiiInventory.Entries
+            .Where(entry => copies.Contains(entry.Copy, StringComparer.Ordinal))
+            .ToArray();
+
+        await Assert.That(receipts.Select(entry => entry.Copy)).IsEquivalentTo(copies);
+        await Assert.That(receipts.All(entry =>
+            entry.OwnershipKey == "VisitorEnrollmentOperation.LocalSubjectId"
+            && entry.StorageBoundary == UserPiiStorageBoundary.PrimaryDatabase
+            && entry.Disposition == UserPiiDisposition.HardDelete))
+            .IsTrue();
+    }
+
+    [Test]
     public async Task PrivacyErasureSubjectIsRetainedPseudonymousAuthorityData()
     {
         UserPiiInventoryEntry entry = UserPiiInventory.Entries

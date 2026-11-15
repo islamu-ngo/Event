@@ -1,5 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="../Shared/ExternalDataProtectionTestAuthority.cs" Link="Fixtures/ExternalDataProtectionTestAuthority.cs" />
     <Compile Include="../Shared/SecretKitHttpAuthority.cs" Link="Fixtures/SecretKitHttpAuthority.cs" />
     <Compile Include="../Shared/Execution/TestExecutionProfile.cs" Link="Execution/TestExecutionProfile.cs" />

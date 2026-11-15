@@ -13,6 +13,25 @@ A workflow correction on a PR branch does not replace the trusted-base version
 used by `pull_request_target`; arrange an independently reviewed base update
 before relying on its rerun.
 
+## SDK and runtime servicing
+
+The source build pins SDK `10.0.404` with SDK roll-forward disabled, so a missing
+selected SDK fails instead of silently generating locks with another patch.
+Server runtime is `10.0.15`; the separate
+browser/WASM runtime pin remains `10.0.14`. All four application image recipes
+retain the immutable Microsoft image digests selected in repository commit
+`0985001decb4c3673622b0796610d1bd10c9f563`.
+This replaces the SDK-selected vulnerable `Microsoft.DotNet.ILCompiler 10.0.10`
+reported by GHSA-p3jp-9v83-76w9. Regenerate affected locks through native restore
+and keep audit enabled. Treat `CVE-2026-118747` /
+`GHSA-vmv3-wvjp-wqpj` as a separate `System.Formats.Cbor` package update:
+runtime servicing does not update an independently packaged reference. For the
+10.0 package line, require version `10.0.15` or later. Inspect the final package
+graph, update affected references, regenerate their locks and verify resolved
+versions before deployment. Rebuild and redeploy both split images
+and the self-contained Standalone image; changing an installed host runtime does
+not replace assemblies embedded in an existing image.
+
 ## Human administrator commit fences
 
 Tenant API-key revoke/details now acquire original S/P/H and repeat their existing

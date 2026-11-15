@@ -187,7 +187,10 @@ public sealed class LocalVisitorEnrollmentHttpTests
             .Where(row => row.VisitorEnrollmentOperationId == reservation.OperationId);
         var originalOperation = await ledger.Select(row => new
         {
-            row.Id, row.LocalSubjectId, row.Stage, row.ConcurrencyStamp
+            row.Id,
+            row.LocalSubjectId,
+            row.Stage,
+            row.ConcurrencyStamp
         }).SingleAsync();
 
         using var oldIntent = await client.PostAsJsonAsync("/api/auth/local/enrollment/register", original);
@@ -200,7 +203,10 @@ public sealed class LocalVisitorEnrollmentHttpTests
         await Assert.That(await CountsAsync(factory)).IsEqualTo(afterDisposal);
         var retainedOperation = await ledger.Select(row => new
         {
-            row.Id, row.LocalSubjectId, row.Stage, row.ConcurrencyStamp
+            row.Id,
+            row.LocalSubjectId,
+            row.Stage,
+            row.ConcurrencyStamp
         }).SingleAsync();
         await Assert.That(retainedOperation).IsEqualTo(originalOperation);
     }

@@ -157,6 +157,55 @@ public sealed class LocalVisitorEnrollmentHttpTests
     }
 
     [Test]
+    [Arguments(IdentityDatabaseTopology.Colocated)]
+    [Arguments(IdentityDatabaseTopology.External)]
+    public async Task CompletedCredentialOperationPreventsReservationAfterPrimaryReceiptDisposal(
+        IdentityDatabaseTopology topology)
+    {
+        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(topology: topology);
+        var factory = fixture.Native;
+        var client = fixture.Client;
+        client.DefaultRequestHeaders.Add(LocalVisitorBrowserProof.HeaderName, RandomHex());
+        var reservation = await ReserveAsync(client);
+        var original = new LocalVisitorRegistrationRequestDto(reservation.OperationId,
+            $"visitor-{Guid.CreateVersion7():N}", $"Aa1!{RandomHex()}", null, reservation.EnrollmentIntent);
+        using var registration = await client.PostAsJsonAsync("/api/auth/local/enrollment/register", original);
+        await Assert.That(registration.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await AssertPrivateAsync(registration);
+
+        // Model primary disposal while preserving the independent native credential ledger.
+        await using (var database = factory.CreateDatabase())
+        {
+            database.TenantContext = new SelectedTenant(PlatformDefaults.DefaultTenantId);
+            database.BindTenantLease();
+            await Assert.That(await database.Set<VisitorEnrollmentOperation>()
+                .Where(row => row.Id == reservation.OperationId).ExecuteDeleteAsync()).IsEqualTo(1);
+        }
+        var afterDisposal = await CountsAsync(factory);
+        await using var identity = factory.CreateIdentityDatabase();
+        var ledger = identity.Set<LocalIdentityCredentialOperation>().AsNoTracking()
+            .Where(row => row.VisitorEnrollmentOperationId == reservation.OperationId);
+        var originalOperation = await ledger.Select(row => new
+        {
+            row.Id, row.LocalSubjectId, row.Stage, row.ConcurrencyStamp
+        }).SingleAsync();
+
+        using var oldIntent = await client.PostAsJsonAsync("/api/auth/local/enrollment/register", original);
+        await Assert.That(oldIntent.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await AssertPrivateAsync(oldIntent);
+        using var reserveAgain = await client.PostAsJsonAsync("/api/auth/local/enrollment/reserve",
+            new LocalVisitorEnrollmentReservationRequestDto(reservation.OperationId));
+        await Assert.That(reserveAgain.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await AssertPrivateAsync(reserveAgain);
+        await Assert.That(await CountsAsync(factory)).IsEqualTo(afterDisposal);
+        var retainedOperation = await ledger.Select(row => new
+        {
+            row.Id, row.LocalSubjectId, row.Stage, row.ConcurrencyStamp
+        }).SingleAsync();
+        await Assert.That(retainedOperation).IsEqualTo(originalOperation);
+    }
+
+    [Test]
     public async Task ScheduledRecoveryCancelsExpiredReservationAndAcknowledgesCleanupThroughProductionScopes()
     {
         var clock = new EnrollmentClock();

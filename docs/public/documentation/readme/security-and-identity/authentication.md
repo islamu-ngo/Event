@@ -262,6 +262,11 @@ credential cannot sign in. Once membership admission commits, later enrollment
 closure does not undo it; recovery finishes that same account rather than
 creating a replacement.
 
+A completed enrollment operation cannot reserve a replacement account if its
+primary enrollment receipt is later removed while the Identity store retains
+the credential operation. Reusing that operation ID is rejected. Continue with
+the original account's sign-in or supported recovery path.
+
 Apply the shipped primary and selected Identity-store migrations and the
 attested Local writer profile upgrade before enabling enrollment. Unknown
 permission drift must be repaired through supported operator tooling rather

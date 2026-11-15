@@ -13,13 +13,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 
-public sealed class AuthorizationSurfaceGuardrailTests
+public sealed partial class AuthorizationSurfaceGuardrailTests
 {
     private static readonly Assembly ApplicationAssembly = typeof(AuthorizeResourceAttribute).Assembly;
     private static readonly Assembly ApiAssembly = typeof(EndpointClassificationAttribute).Assembly;
 
     private static readonly InventoryEntry[] NamedOperationExceptions =
     [
+        .. ReviewedHandlerAuthorities(),
         new(
             "Explore.Application.Features.Authentication.Continuation.Commands.JoinVerifiedTenantCommand",
             "original-verified-human-enrollment-owner",
@@ -615,7 +616,8 @@ public sealed class AuthorizationSurfaceGuardrailTests
     public async Task GuardrailProbes_ShouldRejectSyntheticViolations()
     {
         var mutatingRequests = AuthorizationSurfaceInventory.DiscoverMutatingRequests(
-            [typeof(SyntheticUnclassifiedCommand), typeof(SyntheticLocalLifecycleCommand), typeof(SyntheticProofPreviewQuery)]);
+            [typeof(SyntheticUnclassifiedCommand), typeof(SyntheticLocalLifecycleCommand), typeof(SyntheticProofPreviewQuery),
+                typeof(Explore.Application.Features.Moderation.Requests.Commands.SyntheticUnreviewedModerationCommand)]);
         var anonymousMutations = AuthorizationSurfaceInventory.DiscoverControllerActions(new[] { typeof(SyntheticAnonymousMutationController) })
             .AnonymousMutationSurfaces;
 
@@ -625,6 +627,8 @@ public sealed class AuthorizationSurfaceGuardrailTests
             .Contains("SyntheticAnonymousMutationController.Post");
         await Assert.That(mutatingRequests.UnprotectedMutatingRequests.Select(item => item.Id)).Contains(typeof(SyntheticLocalLifecycleCommand).FullName!);
         await Assert.That(mutatingRequests.UnprotectedMutatingRequests.Select(item => item.Id)).Contains(typeof(SyntheticProofPreviewQuery).FullName!);
+        await Assert.That(mutatingRequests.UnprotectedMutatingRequests.Select(item => item.Id))
+            .Contains(typeof(Explore.Application.Features.Moderation.Requests.Commands.SyntheticUnreviewedModerationCommand).FullName!);
         await Assert.That(mutatingRequests.UnprotectedMutatingRequests.Where(item =>
             NamedOperationExceptions.Any(entry => entry.Id == item.Id) || NamedOperationViolations.Contains(item.Id))).IsEmpty();
         await Assert.That(anonymousMutations.Any(item => item.IsReviewedLocalLifecycle)).IsFalse();

@@ -60,6 +60,12 @@ infrastructure diagnostics contain no candidate paths, configuration or secrets.
 They do not select or admit the utility: native non-link, regular-file and
 fingerprint checks remain authoritative, including when the observation succeeds.
 
+Native security execution selects the fixed system stat entry once per process.
+Only that infrastructure leaf alias may resolve; its entry ancestors and selected
+target ancestors must remain nonlinked, and the final basename must stay `stat`.
+Capture and both metadata invocations use the same selected executable.
+Candidate files, assemblies, manifests and policy inputs never receive alias resolution.
+
 The browser prerequisite uses `eng/tools/InstallAssuranceBrowser.cs` with its
 own generated lock at `eng/tools/InstallAssuranceBrowser/packages.lock.json`.
 The installer requires locked restore and retains the approved Playwright

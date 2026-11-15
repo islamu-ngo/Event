@@ -291,6 +291,12 @@ arguments directly. Preserve non-link candidate admission and bind any future
 utility selection to both measured and executed inputs. Do not retry with a link
 exception or assume that changing runner images proves compatibility.
 
+The native stat repair resolves only the fixed system entry and retains its
+same-basename executable for capture and both metadata operations. Unsupported
+dispatchers and linked entry/target ancestors fail closed. Verify real alias
+execution and unchanged managed/policy linked-input refusals before publication;
+the hosted workflow must still complete all registered profiles on the final head.
+
 Establish actual engine readiness with a separate bounded read-only uncached
 inventory request on the selected socket. Desktop proxy cache responses can
 precede VM startup; retain startup/readiness evidence separately. Preserve the

@@ -1948,6 +1948,8 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             == typeof(SecurityExecutionEvidence).Assembly.Location)).IsTrue();
         await Assert.That(bindingFiles.EnumerateArray().Any(file => file.GetProperty("path").GetString()!
             .EndsWith(".deps.json", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(bindingFiles.EnumerateArray().Any(file => file.GetProperty("path").GetString()
+            == ReleaseToolPaths.Stat)).IsTrue();
     }
 
     [Test]
@@ -3656,6 +3658,107 @@ public sealed class SecurityExecutionEvidenceProcessTests
                     // A disappeared or replaced PID is not an owned cleanup target.
                 }
             }
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
+public sealed class SecurityExecutionEvidenceToolSelectionTests
+{
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task StatSelectionRunsBothMetadataFormatsFromItsSelectedExecutable(bool utilityAlias)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string root = Path.Combine(Path.GetTempPath(), "native-stat-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string target = Path.Combine(Directory.CreateDirectory(Path.Combine(root, "target")).FullName, "stat");
+            File.Copy("/usr/bin/stat", target);
+            File.SetUnixFileMode(target, File.GetUnixFileMode("/usr/bin/stat"));
+            string entry = target;
+            if (utilityAlias)
+            {
+                entry = Path.Combine(Directory.CreateDirectory(Path.Combine(root, "entry")).FullName, "stat");
+                File.CreateSymbolicLink(entry, target);
+            }
+
+            string selected = ReleaseToolPaths.SelectStatExecutable(entry);
+
+            await Assert.That(selected).IsEqualTo(target);
+            await Assert.That((File.GetAttributes(selected) & FileAttributes.ReparsePoint) == 0).IsTrue();
+            foreach (string format in new[] { "%f", "%f|%u|%h|%d|%i|%s|%y|%w|%Hd|%Ld" })
+            {
+                var info = new ProcessStartInfo(selected)
+                {
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                info.Environment.Clear();
+                info.Environment["LC_ALL"] = "C";
+                info.Environment["TZ"] = "UTC";
+                foreach (string argument in new[] { "--format=" + format, "--", selected })
+                    info.ArgumentList.Add(argument);
+                using var process = Process.Start(info)!;
+                Task<string> output = process.StandardOutput.ReadToEndAsync();
+                Task<string> error = process.StandardError.ReadToEndAsync();
+                try
+                {
+                    await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+                }
+                finally
+                {
+                    if (!process.HasExited) process.Kill(entireProcessTree: true);
+                    await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+                }
+                await Assert.That(process.ExitCode).IsEqualTo(0);
+                await Assert.That(await error).IsEqualTo(string.Empty);
+                string[] fields = (await output).TrimEnd('\n').Split('|');
+                await Assert.That(fields.Length).IsEqualTo(format == "%f" ? 1 : 10);
+                await Assert.That(Convert.ToUInt32(fields[0], 16) & 0xf000).IsEqualTo(0x8000u);
+                if (fields.Length == 10)
+                    await Assert.That(long.Parse(fields[5], CultureInfo.InvariantCulture)).IsEqualTo(new FileInfo(selected).Length);
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    [Arguments("linked-parent")]
+    [Arguments("unsupported-dispatch")]
+    public async Task StatSelectionRefusesUnboundUtilityPaths(string variant)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string root = Path.Combine(Path.GetTempPath(), "native-stat-refusal-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string targetDirectory = Directory.CreateDirectory(Path.Combine(root, "target")).FullName;
+            string target = Path.Combine(targetDirectory, variant == "unsupported-dispatch" ? "other-tool" : "stat");
+            File.WriteAllText(target, "not an executable fixture");
+            string entryDirectory = Directory.CreateDirectory(Path.Combine(root, "entry")).FullName;
+            string entry = Path.Combine(entryDirectory, "stat");
+            if (variant == "linked-parent")
+            {
+                string linkedParent = Path.Combine(root, "linked");
+                Directory.CreateSymbolicLink(linkedParent, targetDirectory);
+                entry = Path.Combine(linkedParent, "stat");
+            }
+            else
+            {
+                File.CreateSymbolicLink(entry, target);
+            }
+
+            await Assert.That(() => ReleaseToolPaths.SelectStatExecutable(entry)).Throws<InvalidDataException>();
+        }
+        finally
+        {
             Directory.Delete(root, recursive: true);
         }
     }

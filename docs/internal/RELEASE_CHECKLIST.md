@@ -104,6 +104,10 @@ System-tool selection diagnostics are investigation evidence only. A stat link
 observation does not satisfy any execution lane or permit candidate verification
 after native source, link, file-type or fingerprint admission fails.
 
+For fixed-system stat selection, verify that the retained binding names the
+selected executable used by both metadata paths. Retain real utility-alias and
+candidate linked-input refusal controls; observation success alone is insufficient.
+
 Retain the selected candidate's completed CodeQL analysis result. A passing
 manual build followed by cancellation is incomplete scanner evidence; follow
 [the cancellation procedure](OPERATIONS.md#codeql-analysis-cancellation).

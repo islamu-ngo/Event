@@ -76,6 +76,9 @@ runtime lanes must not be presented as complete platform coverage. Its scope and
   executable binding or relax candidate input admission. Infrastructure selection
   repair requires measured identity and compatible invocation; a successful
   diagnostic command alone is not release execution evidence.
+  Only the fixed infrastructure stat leaf may resolve to a same-basename,
+  nonlinked target selected once per process. Candidate input link rejection
+  and the existing before/after executable fingerprints MUST remain unchanged.
 
 - Candidate B MUST retain a `security-execution.v1.json` sidecar from actual
   selected execution at exactly B, together with its contained report/log

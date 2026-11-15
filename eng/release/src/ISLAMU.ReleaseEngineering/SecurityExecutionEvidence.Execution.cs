@@ -1817,7 +1817,7 @@ public static partial class SecurityExecutionEvidence
         deadline.CancelAfter(TimeSpan.FromSeconds(5));
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("/usr/bin/stat")
+            StartInfo = new ProcessStartInfo(ReleaseToolPaths.Stat)
             {
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -3091,7 +3091,7 @@ public static partial class SecurityExecutionEvidence
     {
         foreach (string[] batch in paths.Chunk(64))
         {
-            var info = new ProcessStartInfo("/usr/bin/stat")
+            var info = new ProcessStartInfo(ReleaseToolPaths.Stat)
             {
                 UseShellExecute = false,
                 RedirectStandardOutput = true,

@@ -1008,7 +1008,7 @@ public static partial class SecurityExecutionEvidence
     internal static byte[] CaptureExecutionTools()
     {
         var paths = new HashSet<string>(StringComparer.Ordinal)
-            { ReleaseToolPaths.Dotnet, ReleaseToolPaths.Git, "/usr/bin/setsid", "/usr/bin/kill", "/usr/bin/stat" };
+            { ReleaseToolPaths.Dotnet, ReleaseToolPaths.Git, "/usr/bin/setsid", "/usr/bin/kill", ReleaseToolPaths.Stat };
         // The current host's default binding inputs remain stable across lazy loads.
         // This is an eligible binding closure; actual child execution is observed separately.
         foreach (string property in new[] { "TRUSTED_PLATFORM_ASSEMBLIES", "APP_CONTEXT_DEPS_FILES" })
@@ -1032,7 +1032,7 @@ public static partial class SecurityExecutionEvidence
                 var path when path == ReleaseToolPaths.Git => "git",
                 "/usr/bin/setsid" => "setsid",
                 "/usr/bin/kill" => "kill",
-                "/usr/bin/stat" => "stat",
+                var path when path == ReleaseToolPaths.Stat => "stat",
                 _ => "runtime"
             };
             throw new OwnedExecutionFailure($"native_tool_input_links_invalid_{source}");

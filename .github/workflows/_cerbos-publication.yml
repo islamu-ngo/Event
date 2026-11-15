@@ -23,10 +23,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
-      - uses: cerbos/cerbos-setup-action@d1418d9ea5db17f419a48e992edff39b01bd0756 # v1
+      - uses: cerbos/cerbos-setup-action@ab70afd62087d1f879de6240f34100ce58bd9c4c # v1
         with:
           version: "v0.53.0"
       - name: Validate the exact publication package

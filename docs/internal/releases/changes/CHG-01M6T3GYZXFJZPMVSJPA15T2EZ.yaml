@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6T3GYZXFJZPMVSJPA15T2EZ
+Title: "Synchronize identity email without private profile reads"
+Type: fix
+Scope: access
+Summary: "Correlate accounts by identity-only observations and update their email mirrors under the original transaction without reading private birth-date declarations or collection receipts."
+Group: identity-email-profile-read
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Detail: "Local identity synchronization correlates accounts without loading private profile columns. A single-use email mirror retains the original tenant, connection, transaction and concurrency snapshots; disposal removes its partial tracking state. No private declaration or receipt permission is added."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

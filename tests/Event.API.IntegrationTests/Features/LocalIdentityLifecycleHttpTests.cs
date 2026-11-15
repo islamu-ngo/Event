@@ -137,7 +137,7 @@ public sealed class LocalIdentityLifecycleHttpTests
         LocalIdentityLifecycleTransport handoff = await fixture.DrainOneAsync();
         await Assert.That(handoff.ExpiresAtUtc - fixture.Clock.GetUtcNow()).IsEqualTo(TimeSpan.FromMinutes(15));
         await using (var scope = fixture.Host.Services.CreateAsyncScope())
-            await scope.ServiceProvider.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(new Uri("https://lifecycle.test"), CancellationToken);
         await Assert.That(fixture.Smtp.Handoffs.Count).IsEqualTo(1);
         string password = LocalIdentityLifecycleHttpFixture.NewPassword();
         using (HttpResponseMessage consumed = await fixture.Client.PostAsJsonAsync(RecoveryPath + "/consume", RecoveryBody(handoff, password), CancellationToken))
@@ -165,7 +165,7 @@ public sealed class LocalIdentityLifecycleHttpTests
         LocalIdentityLifecycleTransport handoff = await fixture.DrainOneAsync();
         string password = LocalIdentityLifecycleHttpFixture.NewPassword();
         var original = await fixture.ReadIdentityAsync();
-        failure.Arm();
+        failure.Arm(fixture.Binding.LocalSubjectId);
         using (HttpResponseMessage failed = await fixture.Client.PostAsJsonAsync(RecoveryPath + "/consume", RecoveryBody(handoff, password), CancellationToken))
             await AssertProblemAsync(failed, HttpStatusCode.Conflict);
         await Assert.That(failure.Triggered).IsTrue();
@@ -198,7 +198,7 @@ public sealed class LocalIdentityLifecycleHttpTests
             new LocalEmailVerificationRequestDto { Identifier = fixture.Login.Identifier }, CancellationToken))
             await AssertPrivateEmptyAsync(accepted, HttpStatusCode.Accepted);
         LocalIdentityLifecycleTransport handoff = await fixture.DrainOneAsync();
-        failure.Arm();
+        failure.Arm(fixture.Binding.LocalSubjectId);
         using (HttpResponseMessage failed = await fixture.Client.PostAsJsonAsync(VerificationPath + "/consume", EmailBody(handoff), CancellationToken))
             await AssertProblemAsync(failed, HttpStatusCode.Conflict);
         await Assert.That(failure.Triggered).IsTrue();
@@ -253,6 +253,7 @@ public sealed class LocalIdentityLifecycleHttpTests
         string externalEmail = $"external-{Guid.CreateVersion7():N}@example.test";
         await using (ExploreDbContext seed = fixture.Native.CreateDatabase())
         {
+            seed.BindTenantLease();
             var external = new User
             {
                 Id = Guid.CreateVersion7(),
@@ -279,7 +280,7 @@ public sealed class LocalIdentityLifecycleHttpTests
             await AssertPrivateEmptyAsync(response, HttpStatusCode.Accepted);
         }
         await using var scope = fixture.Host.Services.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(CancellationToken);
+        await scope.ServiceProvider.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(new Uri("https://lifecycle.test"), CancellationToken);
         await Assert.That(fixture.Smtp.Handoffs.Count).IsEqualTo(0);
         await Assert.That(await fixture.ReadIdentityAsync()).IsEqualTo(identity);
     }
@@ -464,15 +465,18 @@ public sealed class LocalIdentityLifecycleHttpTests
 
     private sealed class FailMirrorSaveOnce : SaveChangesInterceptor
     {
-        private bool _armed;
+        private Guid? _subjectId;
         internal bool Triggered { get; private set; }
-        internal void Arm() => _armed = true;
+        internal void Arm(Guid subjectId) => _subjectId = subjectId;
         public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
             InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (_armed && eventData.Context!.ChangeTracker.Entries<User>().Any(entry => entry.State == EntityState.Modified))
+            // Recovery can save an unchanged email mirror after committing the native password.
+            // The tracked domain subject identifies synchronization even when no email value changed.
+            if (_subjectId is { } subjectId && eventData.Context is ExploreDbContext context
+                && context.ChangeTracker.Entries<User>().Any(entry => entry.Entity.Id == subjectId))
             {
-                _armed = false;
+                _subjectId = null;
                 Triggered = true;
                 throw new InvalidOperationException("Controlled Domain mirror write failure.");
             }

@@ -51,6 +51,8 @@ public class EndpointClassificationArchitectureTests
         "IncomingWebhooksController.RecordStripeConnectCallback",
         "LocalAuthController.Login",
         "LocalAuthController.Register",
+        "LocalVisitorEnrollmentController.Reserve",
+        "LocalVisitorEnrollmentController.Register",
         "RegistrationProviderCallbackController.RecordCallback"
     };
 

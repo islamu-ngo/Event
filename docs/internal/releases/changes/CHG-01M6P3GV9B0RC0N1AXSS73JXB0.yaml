@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6P3GV9B0RC0N1AXSS73JXB0
+Title: "Resolve lifecycle callback origins before selecting the identity writer"
+Type: fix
+Scope: access
+Summary: "Read the authoritative instance callback address through its ordinary settings owner before opening lifecycle delivery custody."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Read authoritative instance callback settings in a disposed ordinary scope before selecting LocalIdentityWriter; pass only the validated HTTPS origin."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: "Invalid explicit origins cannot fall back; mirror repair remains independent of delivery availability and existing SMTP admission remains authoritative."

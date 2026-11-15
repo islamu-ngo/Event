@@ -69,8 +69,14 @@ public static class PostgresNotificationFanoutAdmissionContract
         if (context.Database.CurrentTransaction is not null)
             throw new InvalidOperationException("A notification fanout claim round cannot run inside an ambient transaction.");
 
-        string query = $"SELECT * FROM {ClaimFunctionSql(context)}" +
-            "(@owner, @claimed, @duration, @take, @global_limit, @tenant_limit, @high, @low)";
+        string query = $"""
+            SELECT "RunId" AS run_id, "TenantId" AS tenant_id, "OccurrenceId" AS occurrence_id,
+                "LeaseToken" AS lease_token, "Fence" AS fence, "Generation" AS generation,
+                "CandidateCount" AS candidate_count, "LeaseContentionCount" AS lease_contention_count,
+                "CapacityDeferredCount" AS capacity_deferred_count, "UnavailableCount" AS unavailable_count
+            FROM {ClaimFunctionSql(context)}
+                (@owner, @claimed, @duration, @take, @global_limit, @tenant_limit, @high, @low)
+            """;
         object[] parameters =
         [
             new NpgsqlParameter("owner", owner),
@@ -98,7 +104,16 @@ public static class PostgresNotificationFanoutAdmissionContract
         if (observedAt.Kind != DateTimeKind.Utc)
             throw new ArgumentException("The fanout processor observation time must be UTC.", nameof(observedAt));
         return context.Database.SqlQueryRaw<NotificationFanoutProcessorSnapshot>(
-            $"SELECT * FROM {SnapshotFunctionSql(context)}({{0}})", observedAt).SingleAsync(cancellationToken);
+            $$"""
+            SELECT "DueOccurrenceCount" AS due_occurrence_count,
+                "DueCoreOccurrenceCount" AS due_core_occurrence_count,
+                "DueOptionalReminderCount" AS due_optional_reminder_count,
+                "ActiveClaimCount" AS active_claim_count, "ExpiredClaimCount" AS expired_claim_count,
+                "SupersededOccurrenceCount" AS superseded_occurrence_count,
+                "ProcessedRecipientCount" AS processed_recipient_count,
+                "OldestDueAt" AS oldest_due_at, "OptionalRemindersDeferred" AS optional_reminders_deferred
+            FROM {{SnapshotFunctionSql(context)}}({0})
+            """, observedAt).SingleAsync(cancellationToken);
     }
 
     public static string BuildSql(ExploreDbContext context)

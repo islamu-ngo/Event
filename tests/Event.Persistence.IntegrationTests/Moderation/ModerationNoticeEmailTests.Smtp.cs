@@ -44,7 +44,7 @@ public sealed partial class ModerationNoticeEmailTests
         var secrets = Substitute.For<ISecretResolver>();
         secrets.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(SecretResolutionResult.Unconfigured);
-        var capability = new EmailDeliveryCapabilityResolver(settings, secrets, new SecretBindingRepository(context));
+        var capability = new EmailDeliveryCapabilityResolver(settings, secrets, new SecretBindingRepository(context), fixture);
         var resolver = new SmtpConfigResolver(capability, fixture.Notice.Database, settings);
         var smtp = new SmtpEmailService(resolver, NullLogger<SmtpEmailService>.Instance,
             fixture.Notice.Clock, fixture.CreateAuthority(context));
@@ -100,7 +100,7 @@ public sealed partial class ModerationNoticeEmailTests
         var secrets = Substitute.For<ISecretResolver>();
         secrets.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(SecretResolutionResult.Unconfigured);
-        var capability = new EmailDeliveryCapabilityResolver(settings, secrets, new SecretBindingRepository(context));
+        var capability = new EmailDeliveryCapabilityResolver(settings, secrets, new SecretBindingRepository(context), fixture);
         var resolver = new SmtpConfigResolver(capability, fixture.Notice.Database, settings);
         var smtp = new SmtpEmailService(resolver, NullLogger<SmtpEmailService>.Instance,
             fixture.Notice.Clock, fixture.CreateAuthority(context));

@@ -6,6 +6,14 @@ description: Operate incoming callbacks and outgoing product webhooks as separat
 
 Incoming provider callbacks and outgoing product webhooks represent completely separate trust boundaries in ISLAMU Event. They use different authentication, replay windows, delivery engines, and recovery runbooks.
 
+The product event catalog is synchronized by application code using a separate
+Global database connection. PostgreSQL startup migration installs fixed catalog
+metadata permissions; serving hosts do not receive migration credentials.
+Synchronization can create definitions and update their mutable metadata while
+preserving event IDs, names and creation history. Catalog DELETE and direct
+access by the ordinary Runtime database identity remain denied. Unexpected
+permission changes are rejected rather than silently repaired.
+
 ---
 
 ## 1. Outgoing Delivery Modes

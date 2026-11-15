@@ -81,7 +81,8 @@ public sealed class AtprotoPublicationPayloadBuilderTests
             });
         var governance = Substitute.For<ILocationPrivacyGovernanceService>();
         var snapshotFactory = new AtprotoEventPublicationSnapshotFactory(
-            new PublicEventLocationDisclosureEvaluator(governance, new EventLocationDisclosureEvaluator()));
+            new PublicEventLocationDisclosureEvaluator(governance, new EventLocationDisclosureEvaluator()),
+            new global::Event.Testing.Settings.VisitorReadPolicyTestAuthority(tenantId).Policy);
         var builder = new AtprotoPublicationPayloadBuilder(snapshotFactory, configuration, settings);
 
         var result = await builder.BuildEventAsync(graph,

@@ -35,7 +35,8 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
     IConfiguration configuration,
     TimeProvider timeProvider,
     PrivacyIdentityFenceOperation identityFence,
-    IAtprotoParticipationMutationFactory participationMutations)
+    IAtprotoParticipationMutationFactory participationMutations,
+    ITenantUserRepository tenantUsers)
     : ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>
 {
     public async Task<AtprotoSessionBootstrapResult> ExecuteAsync(
@@ -184,6 +185,12 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
                     return BootstrapPersistenceOutcome.Failed("account_not_linked");
                 }
             }
+
+            if (!configuredAccount && IsExactLinkedLogin(currentLogin, accountKey)
+                && await tenantUsers.GetByTenantAndUserAsync(tenantId, currentLogin!.UserId, transactionToken).ConfigureAwait(false) is null
+                && !await TenantEnrollmentAdmissionOperation.IsOpenAsync(
+                    visitorAccessCapabilityResolver, tenantId, transactionToken).ConfigureAwait(false))
+                return BootstrapPersistenceOutcome.Failed("registration_closed");
 
             if (request.Classification is AtprotoSubjectClassification.Organization or AtprotoSubjectClassification.Group)
                 attempt.Current = await participationMutations.AcquireAsync(accountKey,

@@ -464,6 +464,8 @@ public sealed record TestingResourceIsolation(string RunId, string Root,
                 if (project.Name != "event-migrationservice")
                 {
                     projected.WithHttpEndpoint(name: "operations")
+                        .WithEndpoint("operations", endpoint => endpoint.TargetHost = "127.0.0.1")
+                        .WithEnvironment("EffectiveHostAuthority__InstanceHosts__0", "127.0.0.1")
                         .WithEnvironment("OperationalEndpoints__Address", "127.0.0.1")
                         .WithEnvironment("OperationalEndpoints__Port",
                             projected.GetEndpoint("operations").Property(EndpointProperty.TargetPort))

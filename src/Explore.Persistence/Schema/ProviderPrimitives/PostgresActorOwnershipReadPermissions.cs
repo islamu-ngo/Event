@@ -168,13 +168,14 @@ public static class PostgresActorOwnershipReadPermissions
     }
 
     private static string Catalogue(ExploreDbContext context, Source[] sources, PostgresNativeQueueEnrollment enrollment, bool complete) =>
-        $"({string.Join(" AND ", sources.Select(source => SourcePredicate(context, source, enrollment, complete)))})";
+        $"({string.Join(" AND ", sources.Select(source => SourcePredicate(context, source, enrollment, complete)))}) AND ({PostgresExternalTenantEnrollmentPermissions.OptionalCataloguePredicate(context, enrollment)})";
 
     private static string SourcePredicate(ExploreDbContext context, Source source, PostgresNativeQueueEnrollment enrollment, bool complete)
     {
         PostgresTenantMembershipMutationPermissions.TryGetRuntimeColumns(context, source.Type, out var baselineRead, out var baselineUpdate, out _);
         var allowed = source.Read.Concat(baselineRead).Distinct().Select(column => (Column: column, Privilege: "SELECT"))
-            .Concat(baselineUpdate.Select(column => (Column: column, Privilege: "UPDATE"))).ToArray();
+            .Concat(baselineUpdate.Select(column => (Column: column, Privilege: "UPDATE")))
+            .Concat(PostgresExternalTenantEnrollmentPermissions.RuntimeColumns(context, source.Type)).Distinct().ToArray();
         string expected = string.Join(',', allowed.Select(grant => $"({Text(grant.Column)},{Text(grant.Privilege)})"));
         string required = complete ? string.Join(" AND ", source.Read.Select(column => $"""
             EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl

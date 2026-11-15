@@ -1,3 +1,4 @@
+using Explore.Infrastructure.Geocoding;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -24,6 +25,43 @@ public sealed class PhotonStartupConfigurationContractTests
             .IsNull();
         await Assert.That(services.Any(IsPhotonNetworkRegistration)).IsFalse();
         await Assert.That(services.Any(IsPhotonOptionsValidatorRegistration)).IsTrue();
+        using var provider = services.BuildServiceProvider();
+        var bound = provider.GetRequiredService<IOptions<PhotonGeocodingOptions>>().Value;
+        await Assert.That(bound.RetryDelaysMilliseconds.SequenceEqual([200, 500])).IsTrue();
+    }
+
+    [Test]
+    [Arguments(200, 500, 5_000, 2, true)]
+    [Arguments(150, 400, 4_500, 2, true)]
+    [Arguments(200, 500, 700, 2, false)]
+    [Arguments(200, 500, 5_000, 1, false)]
+    public async Task ConfiguredRetryScheduleReplacesDefaultsAndKeepsBudgetValidation(
+        int first, int second, int timeout, int retries, bool valid)
+    {
+        var services = PhotonDeploymentContractHost.Compose(
+            Environments.Production,
+            Key("Geocoding:Provider", "None"),
+            Key("Geocoding:MaximumRetryCount", retries.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            Key("Geocoding:TotalTimeoutMilliseconds", timeout.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            Key("Geocoding:RetryDelaysMilliseconds:0", first.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            Key("Geocoding:RetryDelaysMilliseconds:1", second.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<PhotonGeocodingOptions>>();
+        if (!valid)
+        {
+            var failure = await Assert.ThrowsAsync<OptionsValidationException>(() =>
+            {
+                _ = options.Value;
+                return Task.CompletedTask;
+            });
+            await Assert.That(failure!.Failures).Contains(
+                "Geocoding:RetryDelaysMilliseconds must match the retry count and fit the total timeout.");
+            return;
+        }
+
+        var configured = options.Value;
+        await Assert.That(configured.MaximumRetryCount).IsEqualTo(retries);
+        await Assert.That(configured.RetryDelaysMilliseconds.SequenceEqual([first, second])).IsTrue();
     }
 
     [Test]

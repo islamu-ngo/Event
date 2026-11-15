@@ -325,7 +325,7 @@ internal sealed class OnboardingCompletionScenario
             logins, emails, privacy, new Explore.Application.Services.IdentityAccountResolver(UserRepository, logins,
                 emails, privacy, Microsoft.Extensions.Options.Options.Create(new Explore.Application.Configuration.IdentityCorrelationOptions())),
             new Explore.Application.Services.IdentityEmailSynchronizationOperation(emails),
-            SystemSettings, [new RejectionSource(this)], secret, audit, DeploymentModeProvider, jwt,
+            [new RejectionSource(this)], secret, audit, DeploymentModeProvider, jwt,
             NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork, GenerationReader, HostConfiguration,
             new Explore.Application.Services.PrivacyIdentityFenceOperation(new Services.FenceTestAuthority(),
                 new Services.EmptyRecognitionInventory(), TimeProvider.System, logins,

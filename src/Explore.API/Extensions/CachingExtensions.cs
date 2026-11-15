@@ -1,4 +1,5 @@
 using Explore.Application.Constants;
+using Explore.Application.Caching;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.API.Extensions;
@@ -28,7 +29,8 @@ public static class CachingExtensions
                 .Expire(TimeSpan.FromSeconds(30))
                 .SetVaryByHeader(TenantHeaderNames.TenantSlug, "Host", "Authorization")
                 .SetVaryByQuery("*")
-                .Tag("list-data"));
+                .Tag("list-data")
+                .Tag(CacheTags.TenantPublicReads));
 
             options.AddPolicy("EventDiscovery", builder => builder
                 .Expire(TimeSpan.FromSeconds(30))
@@ -39,32 +41,37 @@ public static class CachingExtensions
                     "Prefer")
                 .SetVaryByQuery("*")
                 .Tag("list-data")
-                .Tag("event-discovery"));
+                .Tag("event-discovery")
+                .Tag(CacheTags.TenantPublicReads));
 
             // DetailData: varies by Authorization for auth-aware HATEOAS links
             options.AddPolicy("DetailData", builder => builder
                 .Expire(TimeSpan.FromSeconds(60))
                 .SetVaryByHeader(TenantHeaderNames.TenantSlug, "Host", "Authorization")
                 .SetVaryByRouteValue("id")
-                .Tag("detail-data"));
+                .Tag("detail-data")
+                .Tag(CacheTags.TenantPublicReads));
 
             // TenantNav: tenant navigation links — short expiry, evicted on write by "tenant-nav" tag
             options.AddPolicy("TenantNav", builder => builder
                 .Expire(TimeSpan.FromMinutes(5))
                 .SetVaryByHeader(TenantHeaderNames.TenantSlug, "Host")
-                .Tag("tenant-nav"));
+                .Tag("tenant-nav")
+                .Tag(CacheTags.TenantPublicReads));
 
             // PublicExperienceShell: anonymous tenant shell, body ETagged by middleware and short-lived between setting edits.
             options.AddPolicy("PublicExperienceShell", builder => builder
                 .Expire(TimeSpan.FromSeconds(30))
                 .SetVaryByHeader(TenantHeaderNames.TenantSlug, "Host")
-                .Tag("public-experience-shell"));
+                .Tag("public-experience-shell")
+                .Tag(CacheTags.TenantPublicReads));
 
             options.AddPolicy("PublicHomeDiscovery", builder => builder
                 .Expire(TimeSpan.FromSeconds(30))
                 .SetVaryByHeader(TenantHeaderNames.TenantSlug, "Host")
                 .SetVaryByQuery("areaId", "mode")
-                .Tag("public-home-discovery"));
+                .Tag("public-home-discovery")
+                .Tag(CacheTags.TenantPublicReads));
 
             options.AddPolicy("PublicLegalDocuments", builder => builder
                 .Expire(TimeSpan.FromSeconds(30))
@@ -72,7 +79,8 @@ public static class CachingExtensions
                     TenantHeaderNames.TenantSlug,
                     "Host",
                     "Accept-Language")
-                .Tag("public-legal-documents"));
+                .Tag("public-legal-documents")
+                .Tag(CacheTags.TenantPublicReads));
 
             // SystemConfig: public first-run/runtime mode state for BFF startup.
             options.AddPolicy("SystemConfig", builder => builder
@@ -84,7 +92,8 @@ public static class CachingExtensions
             options.AddPolicy("SitemapData", builder => builder
                 .Expire(TimeSpan.FromMinutes(30))
                 .SetVaryByHeader(TenantHeaderNames.TenantSlug, "Host")
-                .Tag("seo-sitemap"));
+                .Tag("seo-sitemap")
+                .Tag(CacheTags.TenantPublicReads));
         });
 
         services.AddHybridCache(options =>

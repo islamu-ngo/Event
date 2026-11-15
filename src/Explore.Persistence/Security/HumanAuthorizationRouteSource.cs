@@ -76,7 +76,7 @@ public sealed class HumanAuthorizationRouteSource : IHumanAuthorizationRouteSour
         if (opened) await _context.Database.OpenConnectionAsync(cancellationToken);
         try
         {
-            var facts = await _queries.ReadAsync(null, cancellationToken);
+            var facts = await _queries.ReadAsync(null, RequireSelection, cancellationToken);
             RequireSelection();
             if (_context.Database.CurrentTransaction is not null || System.Transactions.Transaction.Current is not null)
                 throw new InvalidOperationException("human_route_observation_transaction_changed");
@@ -94,7 +94,7 @@ public sealed class HumanAuthorizationRouteSource : IHumanAuthorizationRouteSour
             PolicySourceSetFence.RequireSelectedLease(sourceSet, _selectedExecution, _context, transaction);
         // As with the principal source port, the parent supplies THIS owner's preceding source-set lease.
         await sourceSet.ValidateAsync(cancellationToken);
-        var facts = await _queries.ReadAsync(transaction, cancellationToken);
+        var facts = await _queries.ReadAsync(transaction, RequireSelection, cancellationToken);
         if (!ReferenceEquals(transaction, RequireOwner()))
             throw new InvalidOperationException("human_route_original_transaction_changed");
         await sourceSet.ValidateAsync(cancellationToken);
@@ -140,7 +140,7 @@ public sealed class HumanAuthorizationRouteSource : IHumanAuthorizationRouteSour
             if (source._selectedExecution is not null)
                 PolicySourceSetFence.RequireSelectedLease(sourceSet, source._selectedExecution, source._context, transaction);
             await sourceSet.ValidateAsync(cancellationToken);
-            var current = await source._queries.ReadAsync(transaction, cancellationToken);
+            var current = await source._queries.ReadAsync(transaction, source.RequireSelection, cancellationToken);
             if (!ReferenceEquals(transaction, source.RequireOwner()))
                 throw new InvalidOperationException("human_route_original_transaction_changed");
             await sourceSet.ValidateAsync(cancellationToken);

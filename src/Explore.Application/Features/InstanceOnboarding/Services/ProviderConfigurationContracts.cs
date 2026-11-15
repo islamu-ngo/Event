@@ -46,12 +46,12 @@ public interface IProviderConfigurationSetupSource : IProviderConfigurationMutat
 }
 
 public sealed record ProviderAuthenticationMaterialRequirements(AuthenticationProviderKind OriginalPrimary,
-    bool OriginalGoogleEnabled, bool KeycloakRelevant, bool GoogleRelevant);
+    bool KeycloakRelevant);
 
 /// <summary>Public connection coordinates and resolution status carry no credential values.</summary>
 public sealed record ProviderKeycloakMaterial(KeycloakConnectionStatus Status, Uri? Authority = null, string? ClientId = null);
 
-public sealed record ProviderConfigurationMaterials(ProviderKeycloakMaterial Keycloak, SecretResolutionStatus Google,
+public sealed record ProviderConfigurationMaterials(ProviderKeycloakMaterial Keycloak,
     bool? PublicationReady = null, ProviderAuthenticationMaterialRequirements? Authentication = null)
 {
     public override string ToString() => nameof(ProviderConfigurationMaterials);

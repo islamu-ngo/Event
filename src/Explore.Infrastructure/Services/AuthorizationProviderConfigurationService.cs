@@ -12,9 +12,6 @@ using Explore.Application.Utilities;
 using Explore.Domain.Constants;
 using Explore.Domain;
 using Microsoft.Extensions.DependencyInjection;
-using Grpc.Core;
-using Grpc.Health.V1;
-using Grpc.Net.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -23,7 +20,7 @@ namespace Explore.Infrastructure.Services;
 
 public class AuthorizationProviderConfigurationService : IAuthorizationProviderConfigurationService
 {
-    private readonly ISystemSettingRepository _systemSettingRepository;
+    private readonly IInstanceSystemSettingsReader _instanceSettings;
     private readonly IConfiguration _configuration;
     private readonly CerbosAdminEndpointValidator _adminEndpointValidator;
     private readonly IAuthorizationProviderModeCacheInvalidator _providerModeCacheInvalidator;
@@ -33,9 +30,10 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
     private readonly AuthorizationProviderBootstrapState _bootstrapState;
     private readonly ILogger<AuthorizationProviderConfigurationService> _logger;
     private readonly IPolicyMutationExecutionScopeFactory _scopeFactory;
+    private readonly ICerbosEndpointHealthProbe _endpointHealth;
 
     public AuthorizationProviderConfigurationService(
-        ISystemSettingRepository systemSettingRepository,
+        IInstanceSystemSettingsReader instanceSettings,
         IConfiguration configuration,
         CerbosAdminEndpointValidator adminEndpointValidator,
         IAuthorizationProviderModeCacheInvalidator providerModeCacheInvalidator,
@@ -44,9 +42,10 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
         IOptions<AuthorizationProviderDeploymentOptions> deploymentOptions,
         AuthorizationProviderBootstrapState bootstrapState,
         ILogger<AuthorizationProviderConfigurationService> logger,
-        IPolicyMutationExecutionScopeFactory scopeFactory)
+        IPolicyMutationExecutionScopeFactory scopeFactory,
+        ICerbosEndpointHealthProbe endpointHealth)
     {
-        _systemSettingRepository = systemSettingRepository;
+        _instanceSettings = instanceSettings;
         _configuration = configuration;
         _adminEndpointValidator = adminEndpointValidator;
         _providerModeCacheInvalidator = providerModeCacheInvalidator;
@@ -56,6 +55,7 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
         _bootstrapState = bootstrapState;
         _logger = logger;
         _scopeFactory = scopeFactory;
+        _endpointHealth = endpointHealth;
     }
 
     public Task<AuthorizationProviderConfigurationDto> ReadConfigurationAsync() =>
@@ -64,12 +64,18 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
     private async Task<AuthorizationProviderConfigurationDto> ReadConfigurationCoreAsync(
         ProviderConfigurationState? original, IConfiguration? deployment, bool? originalPublication = null)
     {
-        Task<SystemSetting?> Read(string key) => original is null
-            ? _systemSettingRepository.GetByKey(key) : Task.FromResult(original.System[key]?.ToEntity());
+        var observed = original is null
+            ? await _instanceSettings.ReadAsync([
+                GovernanceSettingKeys.Security.AuthorizationProvider,
+                GovernanceSettingKeys.Cerbos.GrpcEndpoint,
+                GovernanceSettingKeys.Cerbos.CustomAdminEndpoint])
+            : null;
+        SystemSetting? Read(string key) => original is null
+            ? observed!.SingleOrDefault(row => row.SettingKey == key) : original.System[key]?.ToEntity();
         var configuration = deployment ?? _configuration;
-        var providerSetting = await Read(GovernanceSettingKeys.Security.AuthorizationProvider);
-        var grpcEndpointSetting = await Read(GovernanceSettingKeys.Cerbos.GrpcEndpoint);
-        var adminEndpointSetting = await Read(GovernanceSettingKeys.Cerbos.CustomAdminEndpoint);
+        var providerSetting = Read(GovernanceSettingKeys.Security.AuthorizationProvider);
+        var grpcEndpointSetting = Read(GovernanceSettingKeys.Cerbos.GrpcEndpoint);
+        var adminEndpointSetting = Read(GovernanceSettingKeys.Cerbos.CustomAdminEndpoint);
 
         // Preserve operator's raw bootstrap value end-to-end. Deployment values prefill setup/admin
         // screens, but application-managed saved settings take precedence after an explicit save.
@@ -216,7 +222,8 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
                 && await _policyPackageService.IsPublicationReadyAsync();
         }
 
-        var providerSetting = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Security.AuthorizationProvider);
+        var providerSetting = (await _instanceSettings.ReadAsync(
+            [GovernanceSettingKeys.Security.AuthorizationProvider])).SingleOrDefault();
         return providerSetting is not null && !string.IsNullOrWhiteSpace(providerSetting.Value);
     }
 
@@ -309,53 +316,8 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
         }
     }
 
-    public async Task<bool> VerifyCerbosEndpointAsync(string grpcEndpoint, CancellationToken cancellationToken = default)
-    {
-        var normalizedEndpoint = GrpcEndpointNormalizer.Normalize(grpcEndpoint);
-        if (!GrpcEndpointNormalizer.IsValid(normalizedEndpoint))
-        {
-            return false;
-        }
-
-        try
-        {
-            using var channel = GrpcChannel.ForAddress(
-                normalizedEndpoint,
-                CerbosGrpcChannelOptionsFactory.Create());
-
-            var client = new Health.HealthClient(channel);
-            var response = await client.CheckAsync(
-                new HealthCheckRequest(),
-                deadline: DateTime.UtcNow.AddSeconds(5),
-                cancellationToken: cancellationToken);
-
-            var isHealthy = response.Status == HealthCheckResponse.Types.ServingStatus.Serving;
-            _logger.LogInformation("Cerbos gRPC health check completed with status {Status}", response.Status);
-            return isHealthy;
-        }
-        catch (RpcException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw new OperationCanceledException(cancellationToken);
-        }
-        catch (RpcException rpcEx)
-        {
-            _logger.LogWarning(
-                "Cerbos gRPC health check failed. GrpcStatusCode={GrpcStatusCode}",
-                rpcEx.StatusCode);
-            return false;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(
-                "Cerbos gRPC health check failed. FailureType={FailureType}",
-                ex.GetType().Name);
-            return false;
-        }
-    }
+    public Task<bool> VerifyCerbosEndpointAsync(string grpcEndpoint, CancellationToken cancellationToken = default) =>
+        _endpointHealth.VerifyAsync(grpcEndpoint, cancellationToken);
 
     public Task<bool> VerifyCerbosAdminEndpointAsync(string adminEndpoint, CancellationToken cancellationToken = default)
     {

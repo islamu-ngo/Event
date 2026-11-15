@@ -3508,3 +3508,74 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 
 **Promotion Consideration**:
 - [x] Stays in journal only; bounded launch-calibration lesson, not a new general test-runner policy.
+
+---
+
+[2026-11-06 Europe/Brussels] — Tenant scalar commands need explicit native owner selection
+
+**Context**: While implementing recoverable Local visitor signup, actual HTTP tests closed tenant enrollment through the existing authenticated administrator setting endpoint.
+
+**Symptom / Observation**: The setting PUT returned 401 despite a valid Local bearer and `AdminContext: IsTenantAdmin=true`. A test-only exception observer captured `System.UnauthorizedAccessException` at `VisitorSettingsOriginalStore.RequireOriginal`; sanitized `route-unresolved` logging did not mean routing had failed.
+
+**Root Cause**: `PolicyMutationCommandScope.Handles` included the scalar setting command types, but `Select` covered their Instance cases without their Tenant cases. Update, batch, reset, lock and unlock therefore fell through to an unselected owner. The original visitor store correctly requires the retained Standard policy execution owner, exact tenant, subject, credential lifetime and original command. Successful administrator authorization cannot replace that custody.
+
+**Resolution**: Commit `9d747dde5bfab26cf81db8288632d54c9a966ba1` selects the authenticated nonempty tenant's Standard owner before constructing those five handler graphs. Missing or empty tenant fails immediately; dedicated Email/Mixed selections and user preferences keep their existing paths. The original-store checks remain unchanged. `dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release -- --treenode-filter '/*/*/TenantScalarSettingsOwnerSelectionTests/*' --minimum-expected-tests 8` produced seven intended failures before repair and passed all eight afterward. Following the API Release build, `dotnet run --no-build --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release -- --treenode-filter '/*/*/VisitorAccessDiscoveryHttpTests/ClosingEnrollmentPreservesLocalParticipationAndUsesAdministratorHal' --minimum-expected-tests 2` passed both existing-account/HAL cases. Actual Local enrollment closure also passed both cases after its separate pending-receipt cancellation repair.
+
+**Why This Matters for Future Work**: A type being listed in `Handles` does not prove every scope variant selects a native owner. Trace the actual request through `Select` when an authenticated write fails an original-source guard. Fix missing selection rather than treating a null policy purpose as Standard or relaxing principal/connection checks.
+
+**References**:
+- `src/Explore.Application/Operations/PolicyMutationCommandScope.cs:123`
+- `src/Explore.Persistence/Services/VisitorSettingsOriginalStore.cs:201`
+- `tests/Event.Application.UnitTests/Operations/TenantScalarSettingsOwnerSelectionTests.cs`
+- `docs/internal/AUTHORIZATION.md` — Original resource and visitor Settings ownership.
+- Commit: `9d747dde5bfab26cf81db8288632d54c9a966ba1`.
+
+**Promotion Consideration**:
+- [x] Stays in journal only; a regression-specific lesson about existing native selection requirements.
+
+---
+
+[2026-11-13 Europe/Brussels] — Open SQLite connections can hide transaction-lock leaks
+
+**Context**: PR79 persistence assurance examined named-lock cleanup after implicit rollback. Existing tests either closed the original connection or acquired another lock on it after disposing the transaction.
+
+**Symptom / Observation**: A contender already waiting on another connection remained blocked after the owning EF transaction was disposed while its externally owned SQLite connection stayed open. The new witness failed with `OperationCanceledException` at the final semaphore wait, rather than entering after rollback.
+
+**Root Cause**: EF transaction interception covers commit, rollback and failure but has no disposal callback. Connection cleanup and later acquisition scavenging hid the missing release event. Disposing an EF wrapper around a borrowed physical transaction is a different boundary: that external transaction can remain active and must retain exclusion.
+
+**Resolution**: Published commit `57d529542cc3c2cbfb517e9accf28b3e39da2e08` on draft PR #86 makes the existing SQLite tracker observe EF transaction-disposed diagnostics. It releases only an already tracked physical transaction whose connection is null. Existing dictionary removal keeps repeated cleanup idempotent and preserves reverse release order. The original witness failed before repair; Release compilation and all 18 relational named-lock cases passed after it, including synchronous and asynchronous borrowed-wrapper negatives. Commands: `dotnet build tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-restore -m:1 -nr:false --verbosity quiet`; `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/RelationalNamedLockTests/*" --minimum-expected-tests 3 --maximum-parallel-tests 1 --output Detailed --show-stdout All`.
+
+**Why This Matters for Future Work**: A disposal regression must start the contender before ending its owner and leave the original connection open. Reacquiring afterward can trigger scavenging and falsely suggest that existing waiters were released. Wrapper disposal alone does not prove that a borrowed database transaction ended.
+
+**References**:
+- `src/Explore.Persistence/Database/ProviderPrimitives/SqliteNamedLockTransactionInterceptor.cs:30`
+- `tests/Event.Persistence.IntegrationTests/Database/RelationalNamedLockTests.cs:188`
+- `docs/internal/BACKUP_RESTORE_UPGRADE.md` — SQLite transaction lock disposal.
+- Commit: `57d529542cc3c2cbfb517e9accf28b3e39da2e08`.
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the operational behavior is already documented, and the reusable lesson is how to distinguish disposal from scavenging.
+
+---
+
+[2026-11-13 Europe/Brussels] — Role identity and policy literal rendering are distinct
+
+**Context**: PR79 native assurance exercised setup admission for a declared PostgreSQL login containing uppercase letters, a backslash, an apostrophe and a dollar sign under both standard-string modes.
+
+**Symptom / Observation**: Fixture installation first failed with `global_setup_completion_storage_not_ready` before either test body ran. After correcting role lookup, disabled standard strings produced SQLSTATE `42704` for a name missing its backslash. Explicit escape literals removed that failure, but both modes still rejected the installed trusted-settings policy with `trusted_setup_settings_storage_not_ready`.
+
+**Root Cause**: Three representations were conflated. `to_regrole` parses identifier text, so an exact declared role name must be quoted before conversion. Ordinary SQL value literals can consume backslashes when standard strings are disabled. Finally, `quote_literal` adds an escape prefix for backslashes while `pg_get_expr` emits an ordinary literal with mode-dependent backslash doubling; comparing those rendered strings rejected a valid policy despite preserving its value.
+
+**Resolution**: Commit `fb3f97939829fbb52cfe648d2cb3c2d21b5cbf89` quotes role identifiers, uses explicit escape literals for values, and renders only the expected identity literal to match the native policy deparser. Exact expression equality, fingerprints, closed privileges and original-owner checks remain required. Both real-owner mode cases passed, followed by the existing private-row, forbidden mutation, drift rejection and original-transaction control. Release compilation also passed. Commands: `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/TrustedSettingsLiteralModeNativeTests/*" --minimum-expected-tests 2 --maximum-parallel-tests 1 --output Detailed --show-stdout All`; `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/PostgresBootstrapStartupStorageTests/GlobalSetupSettingsRetainPrivateRowIsolationAndOriginalTransaction" --minimum-expected-tests 1 --maximum-parallel-tests 1 --output Detailed --show-stdout All`.
+
+**Why This Matters for Future Work**: Identifier parsing, SQL value encoding and deparser output each have separate contracts. A fixture-initialization failure is not evidence that the intended test body failed. Diagnose the failing representation on the original owner rather than loosening policy matching or broadening grants.
+
+**References**:
+- `src/Explore.Persistence/Schema/ProviderPrimitives/PostgresSetupLiveStoragePermissions.GlobalCompletion.cs:70`
+- `src/Explore.Persistence/Schema/ProviderPrimitives/PostgresSetupLiveStoragePermissions.TrustedSettings.cs:238`
+- `tests/Event.Persistence.IntegrationTests/Onboarding/TrustedSettingsLiteralModeNativeTests.cs:19`
+- `docs/internal/BACKUP_RESTORE_UPGRADE.md` — Exact PostgreSQL setup role names.
+- Commit: `fb3f97939829fbb52cfe648d2cb3c2d21b5cbf89`.
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the operational contract is documented, and this entry retains the separate failure mechanisms and native diagnostic evidence.

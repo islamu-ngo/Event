@@ -19,6 +19,15 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
         ITenantLifecycleAccessService lifecycle, IProblemDetailsService problems,
         IOptions<McpAdapterSettings> mcpOptions)
     {
+        if (IsVerifiedAccountOperation(context) && context.User.Identity?.IsAuthenticated == true)
+        {
+            // These exact actions resolve their own active target and account.
+            // Joining selects a fresh ordinary owner and enforces admission at commit.
+            context.Response.Headers.CacheControl = "private, no-store";
+            await next(context);
+            return;
+        }
+
         if (context.GetEndpoint()?.Metadata.GetMetadata<InstanceManagementAttribute>() is not null)
         {
             context.Response.Headers.CacheControl = "no-store";
@@ -26,10 +35,7 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
             return;
         }
 
-        var mcp = mcpOptions.Value;
-        bool tenantSurface = context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
-            || mcp.Enabled && !string.IsNullOrWhiteSpace(mcp.EndpointPath)
-                && context.Request.Path.StartsWithSegments(mcp.EndpointPath, StringComparison.OrdinalIgnoreCase);
+        bool tenantSurface = ApiTenantResolutionMiddleware.IsTenantSurface(context, mcpOptions.Value);
         bool privateSessionRead = IsPrivateAdministratorSessionRead(context.GetEndpoint());
         if (privateSessionRead && !tenantContext.IsResolved)
         {
@@ -93,6 +99,26 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
         return action is not null
             && action.ControllerTypeInfo.AsType() == typeof(UserController)
             && action.MethodInfo.Name == nameof(UserController.SyncUser);
+    }
+
+    internal static bool IsVerifiedAccountContinuation(HttpContext context)
+    {
+        var action = context.GetEndpoint()?.Metadata.GetMetadata<ControllerActionDescriptor>();
+        return HttpMethods.IsPost(context.Request.Method)
+            && action is not null
+            && action.ControllerTypeInfo.AsType() == typeof(VerifiedAccountContinuationController)
+            && action.MethodInfo.Name == nameof(VerifiedAccountContinuationController.Resolve);
+    }
+
+    internal static bool IsVerifiedAccountOperation(HttpContext context)
+    {
+        if (IsVerifiedAccountContinuation(context))
+            return true;
+        var action = context.GetEndpoint()?.Metadata.GetMetadata<ControllerActionDescriptor>();
+        return HttpMethods.IsPost(context.Request.Method)
+            && action is not null
+            && action.ControllerTypeInfo.AsType() == typeof(VerifiedTenantJoinController)
+            && action.MethodInfo.Name == nameof(VerifiedTenantJoinController.Join);
     }
 
     internal static bool IsPrivateAdministratorSessionRead(Endpoint? endpoint)

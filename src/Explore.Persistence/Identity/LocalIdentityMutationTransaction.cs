@@ -1,5 +1,8 @@
 using System.Data;
+using System.Runtime.ExceptionServices;
 using Explore.Application.Services;
+using Explore.Persistence.Database;
+using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -19,12 +22,14 @@ internal sealed class LocalIdentityMutationTransaction : IAsyncDisposable
     private readonly bool ownsIdentityTransaction;
     private readonly string? savepoint;
     private readonly PrivacyIdentityFenceOperation identityFence;
+    private readonly IAsyncDisposable? dispatchClaim;
     private bool completed;
     private bool nativeCommitDeferred;
 
     private LocalIdentityMutationTransaction(DbContext identity, ExploreDbContext application,
         IDbContextTransaction identityTransaction, IDbContextTransaction? applicationTransaction,
-        bool ownsIdentityTransaction, string? savepoint, PrivacyIdentityFenceOperation identityFence)
+        bool ownsIdentityTransaction, string? savepoint, PrivacyIdentityFenceOperation identityFence,
+        IAsyncDisposable? dispatchClaim)
     {
         this.identity = identity;
         this.application = application;
@@ -33,6 +38,7 @@ internal sealed class LocalIdentityMutationTransaction : IAsyncDisposable
         this.ownsIdentityTransaction = ownsIdentityTransaction;
         this.savepoint = savepoint;
         this.identityFence = identityFence;
+        this.dispatchClaim = dispatchClaim;
     }
 
     public static async Task<LocalIdentityMutationTransaction> BeginAsync(
@@ -45,23 +51,41 @@ internal sealed class LocalIdentityMutationTransaction : IAsyncDisposable
             || application.Database.CurrentTransaction is not null && !adopted)
             throw new InvalidOperationException("Local identity mutations cannot join an unrelated transaction.");
 
-        IDbContextTransaction native = shared && adopted
-            ? application.Database.CurrentTransaction!
-            : await identity.Database.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        IDbContextTransaction? native = null;
         IDbContextTransaction? primary = null;
+        IAsyncDisposable? dispatchClaim = null;
         string? savepoint = adopted ? $"local_identity_{Guid.CreateVersion7():N}" : null;
         try
         {
+            // Recognition and retained privacy coordination already surround this boundary.
+            // Exclude PostgreSQL source writers before establishing our Serializable snapshot;
+            // a trigger-time lock cannot protect earlier reads from a committed revision.
+            // Adopted transactions retain their original owner's existing coordination.
+            if (!adopted && application.Database.IsNpgsql())
+                dispatchClaim = await RelationalNamedLock.AcquireSessionAsync(application,
+                    EmailDispatchOutboxRepository.ClaimAdvisoryLockName, token).ConfigureAwait(false);
+            native = shared && adopted
+                ? application.Database.CurrentTransaction!
+                : await identity.Database.BeginTransactionAsync(IsolationLevel.Serializable, token);
             if (!shared && !adopted)
                 primary = await application.Database.BeginTransactionAsync(IsolationLevel.Serializable, token);
             if (savepoint is not null)
                 await application.Database.CurrentTransaction!.CreateSavepointAsync(savepoint, token);
-            return new(identity, application, native, primary, !(shared && adopted), savepoint, identityFence);
+            return new(identity, application, native, primary, !(shared && adopted), savepoint, identityFence,
+                dispatchClaim);
         }
-        catch
+        catch (Exception failure)
         {
-            if (primary is not null) await primary.DisposeAsync();
-            if (!(shared && adopted)) await native.DisposeAsync();
+            List<Exception> failures = [failure];
+            foreach (IAsyncDisposable? resource in new IAsyncDisposable?[]
+                { primary, shared && adopted ? null : native, dispatchClaim })
+            {
+                if (resource is null) continue;
+                try { await resource.DisposeAsync().ConfigureAwait(false); }
+                catch (Exception cleanupFailure) { failures.Add(cleanupFailure); }
+            }
+            if (failures.Count > 1)
+                throw new AggregateException("Local mutation acquisition and cleanup failures.", failures);
             throw;
         }
     }
@@ -130,14 +154,21 @@ internal sealed class LocalIdentityMutationTransaction : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        List<Exception> failures = [];
         try
         {
             if (!completed) await RollbackAsync(CancellationToken.None);
         }
-        finally
+        catch (Exception failure) { failures.Add(failure); }
+        foreach (IAsyncDisposable? resource in new IAsyncDisposable?[]
+            { applicationTransaction, ownsIdentityTransaction && !nativeCommitDeferred ? identityTransaction : null, dispatchClaim })
         {
-            if (applicationTransaction is not null) await applicationTransaction.DisposeAsync();
-            if (ownsIdentityTransaction && !nativeCommitDeferred) await identityTransaction.DisposeAsync();
+            if (resource is null) continue;
+            try { await resource.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception failure) { failures.Add(failure); }
         }
+        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1)
+            throw new AggregateException("Local mutation settlement and cleanup failures.", failures);
     }
 }

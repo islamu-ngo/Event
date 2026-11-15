@@ -1,6 +1,7 @@
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
+using Explore.Domain.ValueObjects;
 using Explore.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
@@ -71,8 +72,8 @@ public sealed class AtprotoTransientCleanupServiceTests(PostgreSqlContainerFixtu
         string assertionId = Guid.CreateVersion7().ToString();
         // The validator supplies final acceptance expiry, including its permitted clock skew.
         long acceptanceExpiry = now + 10_000;
-        var state = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest(), tenant, "opaque-state", now + 60_000);
-        var handoff = AtprotoTransientRecord.Create(AtprotoTransientPurpose.TenantHandoff, Digest(), tenant, "opaque-handoff", now + 60_000);
+        var state = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest(), AtprotoAuthenticationFlowTarget.Targeted(tenant), "opaque-state", now + 60_000);
+        var handoff = AtprotoTransientRecord.Create(AtprotoTransientPurpose.TenantHandoff, Digest(), AtprotoAuthenticationFlowTarget.Targeted(tenant), "opaque-handoff", now + 60_000);
         var probe = AtprotoTransientRecord.CreateHealthProbe(Digest(), "opaque-probe", now + 60_000);
         await using ExploreDbContext context = fixture.CreateDbContext();
         var transients = new AtprotoTransientStoreRepository(context, clock);
@@ -81,7 +82,7 @@ public sealed class AtprotoTransientCleanupServiceTests(PostgreSqlContainerFixtu
         await Assert.That(await transients.TryCreateAsync(handoff)).IsTrue();
         await Assert.That(await transients.TryCreateHealthProbeAsync(probe)).IsTrue();
         await Assert.That(await replays.TryClaimAsync(AtprotoTransientAssertionReplay.CreateFromAssertionId(assertionId, acceptanceExpiry))).IsTrue();
-        context.AtprotoTransientRecords.Add(AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest(), tenant, "expired", now));
+        context.AtprotoTransientRecords.Add(AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest(), AtprotoAuthenticationFlowTarget.Targeted(tenant), "expired", now));
         context.AtprotoTransientAssertionReplays.Add(AtprotoTransientAssertionReplay.CreateFromAssertionId(Guid.CreateVersion7().ToString(), now));
         await context.SaveChangesAsync();
         AtprotoTransientCleanupService service = CreateService(context, clock);
@@ -113,7 +114,7 @@ public sealed class AtprotoTransientCleanupServiceTests(PostgreSqlContainerFixtu
         await fixture.ResetAsync();
         var clock = new MutableTimeProvider(DateTimeOffset.UtcNow);
         await SeedExpiredAsync(1601, clock.GetUtcNow());
-        var live = AtprotoTransientRecord.Create(AtprotoTransientPurpose.TenantHandoff, Digest(), Guid.CreateVersion7(), "live", clock.GetUtcNow().AddMinutes(1).ToUnixTimeMilliseconds());
+        var live = AtprotoTransientRecord.Create(AtprotoTransientPurpose.TenantHandoff, Digest(), AtprotoAuthenticationFlowTarget.Targeted(Guid.CreateVersion7()), "live", clock.GetUtcNow().AddMinutes(1).ToUnixTimeMilliseconds());
         await using (ExploreDbContext writer = fixture.CreateDbContext())
             await new AtprotoTransientStoreRepository(writer, clock).TryCreateAsync(live);
         await using ExploreDbContext firstContext = fixture.CreateDbContext();
@@ -151,7 +152,7 @@ public sealed class AtprotoTransientCleanupServiceTests(PostgreSqlContainerFixtu
         Guid tenant = Guid.CreateVersion7();
         long expiry = now.AddMilliseconds(-10_001).ToUnixTimeMilliseconds();
         context.AtprotoTransientRecords.AddRange(Enumerable.Range(0, count).Select(_ =>
-            AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest(), tenant, "expired-opaque", expiry)));
+            AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest(), AtprotoAuthenticationFlowTarget.Targeted(tenant), "expired-opaque", expiry)));
         context.AtprotoTransientAssertionReplays.AddRange(Enumerable.Range(0, count).Select(_ =>
             AtprotoTransientAssertionReplay.CreateFromAssertionId(Guid.CreateVersion7().ToString(), expiry)));
         await context.SaveChangesAsync();

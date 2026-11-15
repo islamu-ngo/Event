@@ -212,6 +212,7 @@
 
 @code {
     private const string PersonClassification = "person";
+    private const string UnsupportedProviderMessage = "The requested authentication provider is unsupported. Choose Local Identity, Keycloak, or AT Protocol. Google sign-in is available through Keycloak.";
     private bool _isLoading = true;
     private bool _isAutoRedirecting;
     private bool _hasTriggeredRedirect;
@@ -234,7 +235,8 @@
 
     private IReadOnlyList<VisitorSignupDestinationDto> VisitorSignupDestinations =>
         _visitorAccess?.SignupDestinations?
-            .Where(destination => destination.Provider != AuthenticationProviderKind.Local && !string.IsNullOrWhiteSpace(destination.Url))
+            .Where(destination => (destination.Provider is AuthenticationProviderKind.Keycloak or AuthenticationProviderKind.Atproto)
+                && !string.IsNullOrWhiteSpace(destination.Url))
             .ToList() ?? [];
 
     protected override async Task OnInitializedAsync()
@@ -247,6 +249,13 @@
     {
         _isLoading = true;
         _errorMessage = null;
+        if (!string.IsNullOrWhiteSpace(_forcedProviderQuery)
+            && string.IsNullOrEmpty(MapProviderNameToQueryValue(_forcedProviderQuery)))
+        {
+            _errorMessage = UnsupportedProviderMessage;
+            _isLoading = false;
+            return;
+        }
 
         try
         {
@@ -256,12 +265,20 @@
                 throw new InvalidOperationException($"Authentication providers returned HTTP {(int)response.StatusCode}.");
             }
 
-            var providers = response.Content?.Providers ?? [];
+            var providers = (response.Content?.Providers ?? [])
+                .Where(provider => !string.IsNullOrEmpty(MapProviderNameToQueryValue(provider.Name))).ToList();
             _lifecycleLinks = response.Content?._links;
             _visitorAccess = response.Content?.VisitorAccess;
             _primaryProvider = response.Content?.PrimaryProvider
                 .Trim()
                 .ToLowerInvariant() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(_primaryProvider)
+                && string.IsNullOrEmpty(MapProviderNameToQueryValue(_primaryProvider)))
+            {
+                _errorMessage = UnsupportedProviderMessage;
+                _isLoading = false;
+                return;
+            }
 
             if (providers.Count == 0)
             {
@@ -532,8 +549,7 @@
         {
             "local" => 0,
             "keycloak" => 1,
-            "google" => 2,
-            "atproto" => 3,
+            "atproto" => 2,
             _ => 100
         };
     }
@@ -551,7 +567,6 @@
     {
         AuthenticationProviderKind.Keycloak => "keycloak",
         AuthenticationProviderKind.Atproto => "atproto",
-        AuthenticationProviderKind.Google => "google",
         _ => "external"
     };
 
@@ -559,7 +574,6 @@
     {
         AuthenticationProviderKind.Keycloak => "Keycloak",
         AuthenticationProviderKind.Atproto => "ATProto",
-        AuthenticationProviderKind.Google => "Google",
         _ => "an external provider"
     };
 
@@ -568,7 +582,6 @@
         return MapProviderNameToQueryValue(provider.Name) switch
         {
             "local" => Icons.Material.Filled.AccountCircle,
-            "google" => Icons.Material.Filled.AccountCircle,
             "atproto" => Icons.Material.Filled.AlternateEmail,
             _ => Icons.Material.Filled.Login
         };
@@ -659,10 +672,9 @@
         return providerName.ToLowerInvariant() switch
         {
             "keycloak" => "keycloak",
-            "google" => "google",
             "atproto" => "atproto",
             "local" => "local",
-            _ => providerName.ToLowerInvariant()
+            _ => string.Empty
         };
     }
 

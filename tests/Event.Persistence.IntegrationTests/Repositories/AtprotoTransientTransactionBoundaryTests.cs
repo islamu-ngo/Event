@@ -1,6 +1,7 @@
 using System.Transactions;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
+using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -210,7 +211,7 @@ public sealed class AtprotoTransientTransactionBoundaryTests(PostgreSqlContainer
         AtprotoTransientRecord.Create(
             AtprotoTransientPurpose.OAuthState,
             new string(digestCharacter, AtprotoTransientRecord.Sha256DigestLength),
-            Guid.CreateVersion7(),
+            AtprotoAuthenticationFlowTarget.Targeted(Guid.CreateVersion7()),
             "opaque-protected-test-payload",
             expiry.ToUnixTimeMilliseconds());
 

@@ -12,6 +12,7 @@ public sealed class ApiBackedAtprotoTransientStore(
     public const string HttpClientName = "AtprotoTransientBridge";
     private const int MaximumWireBytes = 80 * 1024;
     private const int MaximumCiphertextBytes = 64 * 1024;
+    private const int TargetedFlowKind = 1;
     private static readonly byte[] ProbeBody = "{\"purpose\":\"health_probe\"}"u8.ToArray();
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -36,7 +37,8 @@ public sealed class ApiBackedAtprotoTransientStore(
             tokenDigest = digest,
             tenantId,
             protectedPayload,
-            expiresAtUnixMilliseconds = expiry
+            expiresAtUnixMilliseconds = expiry,
+            flowKind = TargetedFlowKind
         }, JsonOptions);
         var result = await SendAsync("create", purpose, body, HttpStatusCode.Conflict, cancellationToken).ConfigureAwait(false);
         if (result is null) return false;
@@ -52,7 +54,8 @@ public sealed class ApiBackedAtprotoTransientStore(
         string digest = Digest(purpose, token);
         if (expectedTenantId == Guid.Empty || (purpose == "tenant_handoff" && expectedTenantId is null))
             throw new ArgumentException("ATProto handoff lookup requires its expected tenant.");
-        byte[] body = JsonSerializer.SerializeToUtf8Bytes(new { purpose, tokenDigest = digest, expectedTenantId }, JsonOptions);
+        byte[] body = JsonSerializer.SerializeToUtf8Bytes(new
+        { purpose, tokenDigest = digest, expectedTenantId, flowKind = TargetedFlowKind }, JsonOptions);
         var result = await SendAsync("read", purpose, body, HttpStatusCode.NotFound, cancellationToken).ConfigureAwait(false);
         if (result is not null) ValidateCandidate(result, purpose, digest, expectedTenantId);
         return result;
@@ -126,6 +129,7 @@ public sealed class ApiBackedAtprotoTransientStore(
         if (purpose is not ("oauth_state" or "tenant_handoff")
             || candidate.Id == Guid.Empty || candidate.Purpose != purpose || candidate.TokenDigest != digest
             || digest is not { Length: 64 } || digest.Any(c => !char.IsAsciiHexDigitLower(c))
+            || candidate.FlowKind != TargetedFlowKind
             || candidate.TenantId == Guid.Empty || (tenant.HasValue && candidate.TenantId != tenant.Value)
             || string.IsNullOrEmpty(candidate.ProtectedPayload)
             || Encoding.UTF8.GetByteCount(candidate.ProtectedPayload) > MaximumCiphertextBytes
@@ -152,7 +156,7 @@ public sealed class ApiBackedAtprotoTransientStore(
 }
 
 public sealed record BffAtprotoTransientCandidate(Guid Id, string Purpose, string TokenDigest, Guid TenantId,
-    string ProtectedPayload, long ExpiresAtUnixMilliseconds)
+    string ProtectedPayload, long ExpiresAtUnixMilliseconds, int FlowKind)
 {
     public override string ToString() => nameof(BffAtprotoTransientCandidate);
 }

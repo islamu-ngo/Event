@@ -18,7 +18,9 @@ public sealed class LocalIdentityCredentialOperationConfiguration
         builder.Property(operation => operation.ResetReason).HasMaxLength(LocalCredentialResetRequest.MaximumReasonLength);
         builder.Ignore(operation => operation.ApplicationUserId);
         Utc(builder.Property(operation => operation.CreatedAt));
-        Utc(builder.Property(operation => operation.VerifiedAt));
+        builder.Property(operation => operation.VerifiedAt).HasConversion(
+            value => value,
+            value => value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : null);
         builder.Property(operation => operation.UpdatedAt).HasConversion(
             value => value,
             value => value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : null);
@@ -31,18 +33,29 @@ public sealed class LocalIdentityCredentialOperationConfiguration
 
         builder.ToTable(table =>
         {
-            table.HasCheckConstraint("ck_local_credential_operation_kind", "kind BETWEEN 1 AND 2");
+            table.HasCheckConstraint("ck_local_credential_operation_kind", "kind BETWEEN 1 AND 3");
             table.HasCheckConstraint("ck_local_credential_operation_stage", "stage BETWEEN 1 AND 5");
             table.HasCheckConstraint(
                 "ck_local_credential_operation_reset_metadata",
-                "(kind = 1 AND previous_operation_id IS NULL AND previous_operation_concurrency_stamp IS NULL AND reset_reason IS NULL) "
+                "(kind IN (1, 3) AND previous_operation_id IS NULL AND previous_operation_concurrency_stamp IS NULL AND reset_reason IS NULL "
+                + "AND (kind <> 3 OR stage <> 2)) "
                 + "OR (kind = 2 AND previous_operation_id IS NOT NULL AND previous_operation_id <> id "
                 + "AND previous_operation_concurrency_stamp IS NOT NULL AND reset_reason IS NOT NULL "
                 + "AND TRIM(reset_reason) <> '' AND stage <> 1)");
             table.HasCheckConstraint(
                 "ck_local_credential_operation_timestamps",
-                "((kind = 1 AND verified_at >= created_at) OR (kind = 2 AND verified_at <= created_at)) "
+                "((kind = 1 AND verified_at IS NOT NULL AND verified_at >= created_at) "
+                + "OR (kind = 2 AND (verified_at IS NULL OR verified_at <= created_at)) "
+                + "OR (kind = 3 AND verified_at IS NULL)) "
                 + "AND (updated_at IS NULL OR updated_at >= created_at)");
+            table.HasCheckConstraint(
+                "ck_local_credential_operation_origin",
+                "((kind IN (1, 2) AND initiating_application_user_id IS NOT NULL) "
+                + "OR (kind = 3 AND initiating_application_user_id IS NULL)) AND "
+                + "((kind IN (1, 2) AND visitor_enrollment_operation_id IS NULL "
+                + "AND verified_by_application_user_id IS NOT NULL AND verified_at IS NOT NULL) "
+                + "OR (kind IN (2, 3) AND visitor_enrollment_operation_id IS NOT NULL "
+                + "AND verified_by_application_user_id IS NULL AND verified_at IS NULL))");
         });
     }
 

@@ -426,9 +426,16 @@ public sealed class AppHostOwnershipTests
                 var resources = builder.Resources.OfType<ProjectResource>().ToArray();
                 _ = resources.Single(resource => resource.Name == "explore-blazor-peer");
                 string root = builder.Configuration["ISLAMU_TEST_ROOT"]!;
+                string[] forbiddenBffInputs =
+                [
+                    "EVENT_DP_API_RING", "EVENT_DP_COMBINED_RING", "IDENTITY_DATABASE_RUNTIME_PASSWORD"
+                ];
                 foreach (var resource in resources)
                 {
                     var context = new EnvironmentCallbackContext(builder.ExecutionContext, resource);
+                    if (resource.Name is "explore-blazor" or "explore-blazor-peer")
+                        foreach (string key in forbiddenBffInputs)
+                            context.EnvironmentVariables[key] = Guid.NewGuid().ToString("N");
                     foreach (var callback in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
                         await callback.Callback(context);
                     if (resource.Name is "explore-api" or "event-migrationservice")
@@ -440,13 +447,17 @@ public sealed class AppHostOwnershipTests
                     }
                     if (resource.Name is "explore-blazor" or "explore-blazor-peer")
                     {
-                        await Assert.That(context.EnvironmentVariables.Keys.Any(key =>
-                            key.StartsWith("EVENT_DP_API_", StringComparison.Ordinal)
-                            || key.StartsWith("EVENT_DP_COMBINED_", StringComparison.Ordinal))).IsFalse();
-                        await Assert.That(context.EnvironmentVariables.Keys.Any(key =>
-                            key.StartsWith("IDENTITY_DATABASE_", StringComparison.OrdinalIgnoreCase)
-                            || key.Replace("__", ":", StringComparison.Ordinal)
-                                .StartsWith("IdentityDatabase:", StringComparison.OrdinalIgnoreCase))).IsFalse();
+                        foreach (string key in forbiddenBffInputs)
+                            await Assert.That(context.EnvironmentVariables[key]).IsEqualTo(string.Empty);
+                        await Assert.That(context.EnvironmentVariables.Where(entry =>
+                            entry.Key.StartsWith("EVENT_DP_API_", StringComparison.Ordinal)
+                            || entry.Key.StartsWith("EVENT_DP_COMBINED_", StringComparison.Ordinal))
+                            .All(entry => entry.Value is string { Length: 0 })).IsTrue();
+                        await Assert.That(context.EnvironmentVariables.Where(entry =>
+                            entry.Key.StartsWith("IDENTITY_DATABASE_", StringComparison.OrdinalIgnoreCase)
+                            || entry.Key.Replace("__", ":", StringComparison.Ordinal)
+                                .StartsWith("IdentityDatabase:", StringComparison.OrdinalIgnoreCase))
+                            .All(entry => entry.Value is string { Length: 0 })).IsTrue();
                         await Assert.That(resource.Annotations.OfType<EndpointAnnotation>().Any(endpoint => endpoint.Name == "https")).IsTrue();
                     }
                 }

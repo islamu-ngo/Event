@@ -624,6 +624,10 @@ public sealed class EventDiscoveryIdentityAuthorityTests
 
     private sealed class MembershipStore(Fixture fixture) : Store<TenantUser>, ITenantUserRepository
     {
+        public Task<TenantUser> CreateForExistingAccountAsync(TenantUser membership, CancellationToken ct = default) =>
+            Create(membership);
+        public Task<TenantUser?> GetForEnrollmentAsync(Guid tenant, Guid user, CancellationToken ct) =>
+            GetByTenantAndUserAsync(tenant, user, ct);
         public Task<bool> FenceActiveTenantUserAsync(Guid tenant, Guid user, CancellationToken ct = default) =>
             IsActiveTenantUserAsync(tenant, user, ct);
         public Task<bool> IsActiveTenantUserAsync(Guid tenant, Guid user, CancellationToken ct = default) =>

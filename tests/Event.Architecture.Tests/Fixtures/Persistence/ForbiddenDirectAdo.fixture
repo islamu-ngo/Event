@@ -1,8 +1,0 @@
-// ABOUTME: Synthetic architecture fixture representing forbidden repository-local direct ADO command creation.
-// ABOUTME: Exists only to prove the persistence capability-boundary scanner detects new violations.
-
-internal static class ForbiddenDirectAdoFixture
-{
-    public static DbCommand Create(DbConnection connection) =>
-        connection.CreateCommand();
-}

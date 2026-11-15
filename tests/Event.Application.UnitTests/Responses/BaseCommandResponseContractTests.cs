@@ -15,9 +15,11 @@ using Explore.Application.DTOs.SupportAccess;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Local.Models;
+using Explore.Application.Features.Moderation.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Commands;
 using Explore.Application.Features.Promotions;
 using Explore.Domain;
+using Explore.Domain.ValueObjects;
 using Explore.Application.Features.Promotions.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Serialization;
@@ -115,7 +117,7 @@ public sealed partial class BaseCommandResponseContractTests
     public async Task EveryDiscoveredDescendantHasExecutableFactoryAndApplicableWireScenarios()
     {
         await Assert.That(CreateDerivedFactoryScenarios().Select(scenario => scenario.ResponseType)
-            .Concat(CreateModerationFactoryScenarios().Select(scenario => scenario.ResponseType)))
+            .Concat(CreateNativeFactoryScenarios().Select(scenario => scenario.ResponseType)))
             .IsEquivalentTo(ConcreteDescendantTypes)
             .Because("Every concrete response needs executable success, failure, payload and invalid-state coverage.");
         await Assert.That(CreateDerivedWireScenarios().Select(scenario => scenario.ResponseType).Distinct())
@@ -876,6 +878,58 @@ public sealed partial class BaseCommandResponseContractTests
         ];
     }
 
+    private static NativeFactoryScenario[] CreateNativeFactoryScenarios() =>
+    [
+        new(typeof(LocalVisitorEnrollmentReservationCommandResponse), AssertReservationFactories),
+        new(typeof(ModerationAllegationResponse), AssertAllegationFactories),
+        new(typeof(ModerationAuthoritySourcesResponse), AssertAuthoritySourceFactories),
+        new(typeof(ModerationMachineSubjectResponse), AssertMachineSubjectFactories),
+        new(typeof(ModerationLifecycleResponse), AssertLifecycleFactories),
+        new(typeof(ModerationQualificationResponse), AssertQualificationFactories),
+        new(typeof(ModerationResourceSafetyResponse), AssertResourceSafetyFactories),
+        new(typeof(ModerationPolicyPublicationCandidateResponse), AssertPublicationCandidateFactories),
+        new(typeof(ModerationPolicyPublicationResponse), AssertPublicationFactories),
+        new(typeof(ModerationReadReceiptResponse), AssertReadReceiptFactories),
+        new(typeof(ModerationSubmissionReceiptResponse), AssertSubmissionReceiptFactories),
+    ];
+
+    private static async Task AssertReservationFactories()
+    {
+        var reservation = new LocalVisitorEnrollmentReservation(ResultId, SyntheticReveal, FixtureUtc);
+        LocalVisitorEnrollmentReservationCommandResponse success =
+            LocalVisitorEnrollmentReservationCommandResponse.Reserved(reservation);
+        await Assert.That(success.IsSuccess).IsTrue();
+        await Assert.That(success.Id).IsEqualTo(ResultId);
+        await Assert.That(success.Reservation).IsEqualTo(reservation);
+        await Assert.That(success.ToString()).DoesNotContain(SyntheticReveal);
+
+        BaseCommandResponse<Guid>[] failures =
+        [
+            BaseCommandResponse.Validation<Guid>(OneValidationError),
+            BaseCommandResponse.NotFound<Guid>(),
+            BaseCommandResponse.Conflict(RelatedId),
+            BaseCommandResponse.Authentication<Guid>(),
+            BaseCommandResponse.Authorization<Guid>(),
+            BaseCommandResponse.Quota<Guid>("quota.blocked", CreateQuota()),
+            BaseCommandResponse.Failure<Guid>("reservation_unavailable", errors: FeatureErrors),
+        ];
+        foreach (var failure in failures)
+        {
+            LocalVisitorEnrollmentReservationCommandResponse result =
+                LocalVisitorEnrollmentReservationCommandResponse.Failure(failure);
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.Id).IsEqualTo(failure.Id);
+            await Assert.That(result.FailureCode).IsEqualTo(failure.FailureCode);
+            await Assert.That(result.Message).IsEqualTo(failure.Message);
+            await Assert.That(result.Errors ?? []).IsEquivalentTo(failure.Errors ?? []);
+            await Assert.That(result.QuotaExceeded).IsEqualTo(failure.QuotaExceeded);
+            await Assert.That(result.Reservation).IsNull();
+        }
+        await Assert.That(() => LocalVisitorEnrollmentReservationCommandResponse.Failure(
+                BaseCommandResponse.Success(ResultId)))
+            .Throws<ArgumentException>();
+    }
+
     /// <summary>Supplies real payload values for public factories; native outcome callbacks cover the other response families.</summary>
     private static DerivedFactoryScenario[] CreateDerivedFactoryScenarios()
     {
@@ -1110,7 +1164,7 @@ public sealed partial class BaseCommandResponseContractTests
 
     private static LocalCredentialOperationStatus CreateCredentialOperation() => new(
         receipt: new LocalCredentialOperationReceipt(ResultId, LocalCredentialOperationKind.Create,
-            LocalCredentialOperationStage.ChangeRequired, RelatedId, TenantId, ChoiceId, RefundId, FixtureUtc),
+            LocalCredentialOperationStage.ChangeRequired, RelatedId, TenantId, ChoiceId, RefundId, FixtureUtc, null),
         operationConcurrencyStamp: ChoiceId, verifiedByApplicationUserId: RelatedId,
         verifiedAt: FixtureUtc, updatedAt: FixtureUtc, isCurrent: true,
         credentialState: LocalCredentialState.ChangeRequired, resetAudit: null);
@@ -1119,7 +1173,8 @@ public sealed partial class BaseCommandResponseContractTests
         new(SyntheticReveal, FixtureOffset.AddMinutes(5), difficulty: 18, version: 1);
 
     private static AtprotoTransientValue CreateTransientValue() => new(ResultId, AtprotoTransientPurpose.OAuthState,
-        new string('a', 64), TenantId, SyntheticReveal, FixtureOffset.AddMinutes(1).ToUnixTimeMilliseconds());
+        new string('a', 64), TenantId, SyntheticReveal, FixtureOffset.AddMinutes(1).ToUnixTimeMilliseconds(),
+        AtprotoAuthenticationFlowKind.Targeted);
 
     private static RegistrationOrderDto CreateOrder() => new()
     {

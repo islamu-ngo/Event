@@ -111,7 +111,7 @@ public sealed partial class ManagedTenantWorkerCreationPermissionsNativeTests
             $"GRANT UPDATE ({emailVerified}) ON {user} TO {globalRole}");
         await RequireDriftRejectedAsync($"GRANT SELECT ({email}) ON {pii} TO {globalRole}",
             $"REVOKE SELECT ({email}) ON {pii} FROM {globalRole}");
-        foreach (string property in new[] { "_dateOfBirth", "_birthDateCollectionReceiptId", "_birthDateRevision" })
+        foreach (string property in new[] { "_dateOfBirth", "_birthDateCollectionReceiptId" })
         {
             string column = identifiers.DelimitIdentifier(names.ColumnName(typeof(UserPii), property));
             await RequireDriftRejectedAsync($"GRANT SELECT ({column}) ON {pii} TO {globalRole}",
@@ -119,6 +119,13 @@ public sealed partial class ManagedTenantWorkerCreationPermissionsNativeTests
             await RequireDriftRejectedAsync($"GRANT UPDATE ({column}) ON {pii} TO {globalRole}",
                 $"REVOKE UPDATE ({column}) ON {pii} FROM {globalRole}");
         }
+        string revision = identifiers.DelimitIdentifier(names.ColumnName(typeof(UserPii), "_birthDateRevision"));
+        await RequireDriftRejectedAsync($"REVOKE SELECT ({revision}) ON {pii} FROM {globalRole}",
+            $"GRANT SELECT ({revision}) ON {pii} TO {globalRole}");
+        await RequireDriftRejectedAsync($"GRANT UPDATE ({revision}) ON {pii} TO {globalRole}",
+            $"REVOKE UPDATE ({revision}) ON {pii} FROM {globalRole}");
+        await RequireDriftRejectedAsync($"GRANT SELECT ({revision}) ON {pii} TO {globalRole} WITH GRANT OPTION",
+            $"REVOKE GRANT OPTION FOR SELECT ({revision}) ON {pii} FROM {globalRole}");
         await RequireDriftRejectedAsync($"GRANT SELECT (ctid) ON {user} TO {globalRole}",
             $"REVOKE SELECT (ctid) ON {user} FROM {globalRole}");
         await RequireDriftRejectedAsync($"GRANT UPDATE ({emailVerified}) ON {user} TO {globalRole} WITH GRANT OPTION",
@@ -363,7 +370,7 @@ public sealed partial class ManagedTenantWorkerCreationPermissionsNativeTests
         return ManagedTenantWorkerCreationInventory.Sources.Select(source => names.Table(source.Entity)).Distinct(StringComparer.Ordinal).ToArray();
     }
 
-    private static async Task EnsurePolicyProjectionAsync(ExploreDbContext migrator)
+    internal static async Task EnsurePolicyProjectionAsync(ExploreDbContext migrator)
     {
         var model = migrator.GetService<IDesignTimeModel>().Model;
         var entity = model.FindEntityType(typeof(ManagedTenantProvisioningPolicySetting))

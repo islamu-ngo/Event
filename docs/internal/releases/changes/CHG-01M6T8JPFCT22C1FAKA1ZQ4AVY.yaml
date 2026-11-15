@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6T8JPFCT22C1FAKA1ZQ4AVY
+Title: "Read instance delivery policy through its selected owner"
+Type: fix
+Scope: notifications
+Summary: "Keep disabled SMTP health available from tenantless Runtime scopes by reading base delivery policy through the existing independent instance capability while preserving tenant delegation and credential rules."
+Group: smtp-instance-policy-owner
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: "Read base SMTP delivery policy through the existing independent Global instance capability instead of a tenantless Runtime hierarchy read. Apply shared defaults before the unchanged tenant delegation and credential-scope branches. No Runtime privilege, provider routine or credential binding change is introduced."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/communications-and-notifications/email-smtp.md
+    Disposition: documented
+    Detail: "Disabled process SMTP health does not require a tenant selection or broader database privileges. Existing delivery enablement, tenant delegation and credential boundaries remain authoritative; no new setting or migration is required."

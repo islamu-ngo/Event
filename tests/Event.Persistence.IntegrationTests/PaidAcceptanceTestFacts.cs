@@ -16,7 +16,7 @@ internal static class PaidAcceptanceTestFacts
         DateTime acceptedAt,
         string currencyCode = "EUR",
         OrganizerPaymentRecipientSnapshot? recipient = null) => PaidOrderAcceptanceSnapshot.Create(
-            recipient?.OrganizerActorId ?? Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
             tenantId,
             tenantId,
             orderId,
@@ -25,7 +25,7 @@ internal static class PaidAcceptanceTestFacts
             $"disclosure:{compositionRevision}",
             PaidOrderAcceptanceSnapshot.CurrentAcceptanceTemplateIdentifier,
             PaidOrderAcceptanceSnapshot.CurrentAcceptanceTemplateText,
-            Guid.CreateVersion7(),
+            recipient?.OrganizerActorId ?? Guid.CreateVersion7(),
             "Example Organizer is the legal merchant for this order.",
             PaidCheckoutTenantDirectoryOperatorDisclosure.Create(
                 Guid.CreateVersion7(), Guid.CreateVersion7(), "Community Events", "Community Events ASBL",

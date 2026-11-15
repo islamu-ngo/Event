@@ -34,6 +34,12 @@ public sealed partial class ModerationRecognitionErasureRepository : IModeration
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Account);
+        ExploreDbContext.RecognitionContinuityOwner referenceOwner;
+        try { referenceOwner = context.CaptureRecognitionContinuityOwner(); }
+        catch (InvalidOperationException)
+        {
+            throw new ContinuityUnavailable(ModerationRecognitionContinuityFailure.NativeBoundaryRequired);
+        }
         await RequireContinuityBoundaryAsync(request.FreshSubjectId, token);
         await RequireSettledSubjectAsync(request.FreshSubjectId, token);
         // A new native credential UUID says nothing about an erased person's other identities.
@@ -208,12 +214,34 @@ public sealed partial class ModerationRecognitionErasureRepository : IModeration
             if (clock.GetUtcNow() >= result.CurrentUntil)
                 return await StageActionRecoveryAsync(request.FreshSubjectId, request.VerifiedBindingId, inventory,
                     PurposeFailure(inventory, ModerationRecognitionContinuityFailure.SourceUnavailable), token);
+            var additions = new List<ModerationRecognitionContinuityBinding>();
             foreach (var binding in bindings)
                 if (!await Rows<ModerationRecognitionContinuityBinding>().AnyAsync(row => row.Id == binding.Id, token)
                     && context.Entry(binding).State == EntityState.Detached)
-                    context.Set<ModerationRecognitionContinuityBinding>().Add(binding);
-            return await CompleteActionRecoveryAsync(request.FreshSubjectId, request.VerifiedBindingId,
+                    additions.Add(binding);
+            var completed = await CompleteActionRecoveryAsync(request.FreshSubjectId, request.VerifiedBindingId,
                 result with { Bindings = bindings.ToImmutableArray(), CurrentActions = selected.ToImmutableArray() }, token);
+            var staged = new List<ModerationRecognitionContinuityBinding>();
+            try
+            {
+                foreach (var binding in additions)
+                {
+                    staged.Add(binding);
+                    context.RetainRecognitionContinuityReference(referenceOwner, binding, completed.CurrentUntil, clock);
+                    context.Set<ModerationRecognitionContinuityBinding>().Add(binding);
+                }
+                return completed;
+            }
+            catch
+            {
+                foreach (var binding in staged)
+                {
+                    context.RevokeRecognitionContinuityReference(binding);
+                    if (context.Entry(binding).State == EntityState.Added)
+                        context.Entry(binding).State = EntityState.Detached;
+                }
+                throw;
+            }
         }
     }
 

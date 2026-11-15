@@ -68,6 +68,12 @@ internal static partial class ManagedProviderProvisioningDataModel
         new(typeof(LocalIdentityCredentialOperation), "Id", ["Id", "ConcurrencyStamp", "CreatedAt", "ExternalLoginId",
             "InitiatingApplicationUserId", "Kind", "LocalSubjectId", "PersonalActorId", "PreviousOperationConcurrencyStamp",
             "PreviousOperationId", "ResetReason", "Stage", "UpdatedAt", "VerifiedAt", "VerifiedByApplicationUserId"], false, [])
+        {
+            MappedProperties = ["Id", "ConcurrencyStamp", "CreatedAt", "ExternalLoginId", "InitiatingApplicationUserId",
+                "Kind", "LocalSubjectId", "PersonalActorId", "PreviousOperationConcurrencyStamp", "PreviousOperationId",
+                "ResetReason", "Stage", "UpdatedAt", "VerifiedAt", "VerifiedByApplicationUserId",
+                "VisitorEnrollmentOperationId"]
+        }
     ];
 
     // Read-only aggregate inputs. No worker payload, generation or reservation write

@@ -18,6 +18,34 @@ Testcontainers cases alongside these tests. Never restart or prune somebody
 else's runtime to prepare a test. Set `TMPDIR` to a disk-backed scratch location
 with sufficient free space.
 
+The daemon control client does not forward ambient tracing headers or baggage.
+This does not disable application tracing, change credentials or extend request
+deadlines. A successful read-only daemon probe proves transport only, not that
+the application graph started or that owned cleanup completed.
+
+Ensure the selected engine is actually running before starting assurance tests.
+Docker Desktop can answer version, info and container-list requests from cache
+while its VM is stopped; the first uncached inventory request can then wait for
+VM startup. Use a separately bounded read-only inventory check on that same
+endpoint and retain its readiness result. Do not reset the runtime or change
+global resource-saving settings. The asynchronous daemon client's five-second
+request budget and three-second connection allowance remain unchanged.
+A lost DELETE response leaves an unknown outcome: retain the failure and inspect
+the exact resource rather than replaying the mutation or declaring cleanup complete.
+
+Load probes use a dedicated process owner built and staged with the distributed
+test project. Use Linux x64 with glibc, accessible procfs child lists, pidfds and
+`close_range(CLOEXEC)` support; unsupported native behavior fails initialization.
+Build the project before using its output directory so the owner executable and
+runtime files are present.
+
+Cancellation or controller exit closes a private lease. The owner then terminates
+and reaps its descendants, including those whose parent exited or which changed
+sessions, without signalling unrelated process groups. Allow its separate
+ten-second cleanup budget; retain any primary and cleanup failures. Killing the
+owner itself with `SIGKILL` is outside that guarantee. Passing lifecycle tests
+does not establish application capacity or complete distributed assurance.
+
 Each case creates its own run ID, root directory, marker, data volumes, and
 dynamic ports. The fixture supplies `ISLAMU_TEST_RUN_ID` and `ISLAMU_TEST_ROOT`;
 do not point them at existing storage. The directory basename must match the
@@ -66,6 +94,21 @@ retaining the volume and root. Changed or symbolic ownership markers/paths also
 prevent directory cleanup. If cleanup fails, retain the error and inspect the exact
 run ID before removing anything. A compilation or discovery pass alone is not
 evidence that the application became healthy.
+
+The assurance parent can encounter unrelated containers whose named volumes
+have no source path in Docker's runtime listing. An explicitly empty volume
+source is accepted for these containers in known Docker states. Their validated
+volume names still block conflicting cleanup, and overlapping bind paths remain
+errors. This does not qualify an owned mount or permit deleting unrelated
+containers; owned mounts still require exact source-path evidence.
+
+For owned containers, the parent checks detailed inspection when Docker's list
+response omits a named volume's source path. Inspection must match the same
+container, image and mount identities before supplying that path. Foreign bind
+consumers are checked using the runtime paths from complete listings, including
+stopped containers. Configured paths can differ on Docker Desktop. Failed or
+partial responses prevent cleanup; they never mean that no consumers exist.
+Do not prune unrelated containers to make the check pass.
 
 On startup failure, cancellation reaches the actual host and cleanup waits for
 its execution to finish. If execution cannot be observed or does not settle

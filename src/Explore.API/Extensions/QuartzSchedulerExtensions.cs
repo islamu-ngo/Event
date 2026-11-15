@@ -495,6 +495,11 @@ public static class QuartzSchedulerExtensions
             TimeSpan.FromMinutes(1),
             desiredRecurringJobs);
 
+        AddSweepJob<VisitorEnrollmentRecoveryJob>(
+            quartz, QuartzSchedulerKeys.VisitorEnrollmentRecovery,
+            "Settles bounded Local visitor admission and canceled credential cleanup using original tenant writers.",
+            enabled: true, initialDelaySeconds: 60, TimeSpan.FromMinutes(1), desiredRecurringJobs);
+
         var idempotency = Bind<IdempotencyCleanupSettings>(configuration, IdempotencyCleanupSettings.SectionName);
         AddSweepJob<IdempotencyCleanupJob>(
             quartz,

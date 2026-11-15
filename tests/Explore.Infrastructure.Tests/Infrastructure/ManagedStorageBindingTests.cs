@@ -563,7 +563,7 @@ internal sealed class StorageTestEnvironment : IAsyncDisposable
         Producer = new ManagedStorageProducer(Bindings, Objects, Unit);
         Sessions = new StorageUploadSessionRepository(Context);
         Counters = new StorageUsageCounterRepository(Context);
-        Policy = new StoragePolicyResolver(database.Settings,
+        Policy = new StoragePolicyResolver(database.Settings, database,
             new FileStorageProviderResolver([new LocalFileStorageProvider(
                 Microsoft.Extensions.Options.Options.Create(Options), NullLogger<LocalFileStorageProvider>.Instance)]));
         Metrics = new BusinessMetrics(_services.GetRequiredService<IMeterFactory>());

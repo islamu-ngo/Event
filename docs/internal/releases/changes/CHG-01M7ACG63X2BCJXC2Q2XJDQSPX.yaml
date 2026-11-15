@@ -1,0 +1,29 @@
+Change-Id: CHG-01M7ACG63X2BCJXC2Q2XJDQSPX
+Title: "Let tenant creation keep its user row fence with one attested key-column grant"
+Type: fix
+Scope: access
+Summary: "Human tenant creation that assigns the creator as administrator can take its existing user row fence under the original Global owner."
+Group: tenant-creation-user-key-fence
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: "The fixed pre-release Global tenant-creation enrollment adds a direct UPDATE(users.id) grant. Old partial enrollments fail closed; re-enroll freshly through the installer rather than granting privileges manually."
+  Security:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: "The discovery no-op key UPDATE fence stays in place. Installer and readiness accept only a direct, non-grantable, Migrator-granted UPDATE on the users key column and reject missing, other-column, table-wide, PUBLIC, inherited or grant-option UPDATE. Runtime gains no User write; other User columns stay unwritable by Global."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: "Protect the Global credential as privileged: it now holds a fixed write on the user primary key used only for creation's row fence. No schema migration or setting is added."

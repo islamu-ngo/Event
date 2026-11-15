@@ -1,0 +1,27 @@
+Change-Id: CHG-01M7BSGAXXBGMA7PS8V25M4HC4
+Title: "Keep local administration usable with enrollment grants"
+Type: fix
+Scope: access
+Summary: "Recognize the complete declared enrollment storage profile during local administrator credential operations while retaining fresh privilege checks and rejection of widened identity access."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "Reuse the fresh absent-or-complete enrollment catalogue proof without granting new rights. Preserve local credential scalar denials, original sources, row and User fences, provenance, triggers and routines; reject live privilege drift after an earlier successful readiness check."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Explain that local administrator operations validate the current application permission profile, including installed enrollment rights, and require separate Runtime and Migrator credentials."

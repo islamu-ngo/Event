@@ -1,0 +1,37 @@
+Change-Id: CHG-01M6E4FYS3RM2B0TWQXHS5YJ4P
+Title: "Preserve embedded erasure history when adding recovery coordinates"
+Type: fix
+Scope: privacy
+Summary: "Upgrade populated SQLite authority stores through generated preparation and restoration migrations without replacing existing identities or retained erasure facts."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Backfill only missing store identities before SQLite rebuilds the counter.
+      Preserve retained coordinates and reject invalid existing identities or
+      counters through the final recovery constraint.
+  Migration:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Detail: >-
+      Apply both generated authority migrations before serving traffic.
+      Preparation alone is not a qualified runtime model; reversing both steps
+      drops recovery coordinates and is not an operational rollback.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/privacy-erasure.md
+    Disposition: documented
+    Detail: >-
+      Use the selected authority migrator with SQLite 3.42 or newer and preserve
+      matched backups. Existing identities and erasure history survive upgrade.

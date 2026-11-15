@@ -132,6 +132,34 @@ export async function getSetupSecretStatus() {
     }
 }
 
+/**
+ * Begins or explicitly reconciles the original server-held enrollment flow.
+ * No operation, tenant, proof or protected claim is supplied by the browser.
+ * @param {string|null} returnUrl
+ */
+export async function startLocalVisitorEnrollment(returnUrl) {
+    return visitorEnrollmentResult(await _bffMutate(
+        'POST', '/bff/auth/local/enrollment/start', { returnUrl }));
+}
+
+/**
+ * @param {{username:string,password:string,email:string|null}} request
+ */
+export async function registerLocalVisitorEnrollment(request) {
+    return visitorEnrollmentResult(await _bffMutate(
+        'POST', '/bff/auth/local/enrollment/register', request));
+}
+
+/** @private Releases only bounded public flow status, never API credentials. */
+function visitorEnrollmentResult(result) {
+    return {
+        ok: result.ok === true,
+        status: result.status,
+        state: typeof result.data?.status === 'string' ? result.data.status : null,
+        loginPath: typeof result.data?.loginPath === 'string' ? result.data.loginPath : null
+    };
+}
+
 /** @private Shared POST helper for BFF setup-secret mutations. */
 async function _bffPost(url, body) {
     return await _bffMutate('POST', url, body);

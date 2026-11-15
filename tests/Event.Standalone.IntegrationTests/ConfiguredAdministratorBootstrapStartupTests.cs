@@ -10,6 +10,8 @@ using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Domain;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.Repositories;
 using Explore.ServiceDefaults.Secrets;
 using Event.Standalone.Hosting;
 using Microsoft.AspNetCore.Builder;
@@ -17,6 +19,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -35,11 +38,11 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
     [Arguments(true)]
     public async Task SplitWaitsForMigrationThenRunsManifestAndPreparationExactlyOnceBeforeHttp(bool manifestFails)
     {
-        var timeline = new StartupTimeline();
+        await using var timeline = new StartupTimeline();
         timeline.Record("migration-dependency");
 
         var dataProtection = new ExternalDataProtectionTestAuthority("api").Input;
-        using var environment = new EnvironmentVariableScope(new Dictionary<string, string?>
+        using var environment = new EnvironmentVariableScope(WithDatabaseAuthorities(new Dictionary<string, string?>(ConfiguredValues())
         {
             ["SecretProvider__Provider"] = "Environment",
             ["EVENT_DP_API_RING"] = dataProtection.Ring,
@@ -53,9 +56,12 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
             ["Database__Runtime__Database"] = "event_test",
             ["Database__Migrator__Database"] = "event_test",
             ["Database__Runtime__Username"] = "event_test",
+            ["Database__Global__Username"] = "event_test_global",
+            ["Database__Global__Password"] =
+                Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
             ["Database__Runtime__Password"] =
                 Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
-        });
+        }));
         await using var authority = await SecretAuthorityBootstrap.OpenAsync(
             new ConfigurationBuilder().AddEnvironmentVariables().Build(), "Staging", SecretConsumerRole.Api,
             [new("/runtime/api/authentication/keycloak", "KEYCLOAK_ENDPOINT", "KEYCLOAK_ENDPOINT")],
@@ -109,9 +115,9 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
     }
 
     [Test]
-    public async Task StandaloneRunsMigrationSeedManifestAndPreparationExactlyOnceBeforeHttp()
+    public async Task StandaloneRunsManifestAndPreparationAfterExternalMigrationWithoutMigratorCredentials()
     {
-        var timeline = new StartupTimeline();
+        await using var timeline = new StartupTimeline();
         await using var factory = new StartupFactory(timeline, ConfiguredValues());
 
         using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -124,6 +130,13 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         await timeline.WaitForAsync("http", SignalTimeout);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(factory.Services.GetRequiredService<IConfiguration>()["Database:Migrator:Password"]).IsNull();
+        await Assert.ThrowsAsync<Microsoft.Extensions.Options.OptionsValidationException>(() =>
+        {
+            Explore.Persistence.Database.PrimaryDatabaseConfiguration.BindMigrator(
+                factory.Services.GetRequiredService<IConfiguration>());
+            return Task.CompletedTask;
+        });
         await Assert.That(timeline.Events).IsEquivalentTo(
             ["migration-seed", "manifest", "preparation", "bootstrap-created", "setup-authority", "token-authority", "cookie-authority", "http"],
             TUnit.Assertions.Enums.CollectionOrdering.Matching);
@@ -134,9 +147,38 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
     }
 
     [Test]
+    public async Task StandaloneManifestFailureAfterExternalMigrationBlocksPreparationAndHttp()
+    {
+        await using var timeline = new StartupTimeline();
+        var failure = new InvalidOperationException("Injected manifest startup failure.");
+        await using var factory = new StartupFactory(timeline, ConfiguredValues(), manifestFailure: failure);
+
+        Exception? thrown = null;
+        try
+        {
+            _ = factory.CreateClient();
+        }
+        catch (Exception exception)
+        {
+            thrown = exception;
+        }
+
+        await Assert.That(thrown).IsNotNull();
+        await Assert.That(FlattenMessages(thrown!)).Contains(failure.Message);
+        await Assert.That(timeline.Events).IsEquivalentTo(
+            ["migration-seed", "manifest"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
+        await Assert.That(timeline.Count("manifest")).IsEqualTo(1);
+        await Assert.That(timeline.Count("preparation")).IsEqualTo(0);
+        await Assert.That(timeline.Count("setup-authority")).IsEqualTo(0);
+        await Assert.That(timeline.Count("token-authority")).IsEqualTo(0);
+        await Assert.That(timeline.Count("cookie-authority")).IsEqualTo(0);
+        await Assert.That(timeline.Count("http")).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task InteractiveModePreparationIsAStartupNoOp()
     {
-        var timeline = new StartupTimeline();
+        await using var timeline = new StartupTimeline();
         await using var factory = new StartupFactory(timeline, InteractiveValues());
 
         using HttpClient client = factory.CreateClient();
@@ -144,7 +186,8 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         using HttpResponseMessage response = await client.GetAsync("/alive", requestTimeout.Token);
         await timeline.WaitForAsync("http", SignalTimeout);
 
-        var repository = factory.Services.GetRequiredService<BootstrapRepositoryProbe>();
+        await using var inspection = factory.Services.CreateAsyncScope();
+        var repository = inspection.ServiceProvider.GetRequiredService<BootstrapRepositoryProbe>();
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(timeline.Events).IsEquivalentTo(
             ["migration-seed", "manifest", "preparation", "setup-authority", "token-authority", "cookie-authority", "http"],
@@ -152,12 +195,14 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         await Assert.That(repository.CreateCount).IsEqualTo(0);
         await Assert.That(repository.UpdateCount).IsEqualTo(0);
         await Assert.That(repository.DeleteCount).IsEqualTo(0);
+        await using var database = await timeline.Database.CreateDbContextAsync();
+        await Assert.That(await new InstanceBootstrapStateRepository(database).GetCurrent()).IsNull();
     }
 
     [Test]
     public async Task StandaloneBootsCleanlyWithoutConfiguredOperatorIdentity()
     {
-        var timeline = new StartupTimeline();
+        await using var timeline = new StartupTimeline();
         await using var factory = new StartupFactory(timeline, ConfiguredValues(), includeOperatorIdentity: false);
 
         using HttpClient client = factory.CreateClient();
@@ -171,7 +216,7 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
     [Test]
     public async Task PreparationFailureBlocksSetupCookieTokenAndHttpAuthorityWithoutRetry()
     {
-        var timeline = new StartupTimeline();
+        await using var timeline = new StartupTimeline();
         await using var factory = new StartupFactory(timeline, new Dictionary<string, string?>
         {
             ["INSTANCE_BOOTSTRAP_MODE"] = "invalid"
@@ -233,10 +278,12 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         builder.Services.RemoveAll<IPrivacyErasureReplayService>();
         builder.Services.AddSingleton<IInstanceOperatorIdentity, OperatorIdentityProbe>();
         builder.Services.AddSingleton(timeline);
-        builder.Services.AddSingleton<BootstrapRepositoryProbe>();
-        builder.Services.AddSingleton<IInstanceBootstrapStateRepository>(services =>
+        builder.Services.AddScoped<BootstrapRepositoryProbe>();
+        builder.Services.AddScoped<IInstanceBootstrapStateRepository>(services =>
             services.GetRequiredService<BootstrapRepositoryProbe>());
-        builder.Services.AddSingleton<IUnitOfWork, UnitOfWorkProbe>();
+        builder.Services.AddScoped<IUnitOfWork, UnitOfWorkProbe>();
+        builder.Services.RemoveAll<IGlobalExploreDbContextFactory>();
+        builder.Services.AddSingleton<IGlobalExploreDbContextFactory>(timeline.Database);
         builder.Services.AddSingleton<ManifestProbe>();
         builder.Services.AddSingleton<IConfigurationManifestStartupRunner>(services =>
             services.GetRequiredService<ManifestProbe>());
@@ -291,6 +338,20 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
             ["INSTANCE_BOOTSTRAP_MODE"] = "Interactive"
         };
 
+    private static Dictionary<string, string?> WithDatabaseAuthorities(Dictionary<string, string?> values)
+    {
+        foreach (var role in Enum.GetValues<Explore.Persistence.Database.PrimaryDatabaseRole>())
+        {
+            values.TryAdd($"Database__{role}__Username", $"event_test_{role}");
+            if (role != Explore.Persistence.Database.PrimaryDatabaseRole.Migrator)
+                values.TryAdd($"Database__{role}__Password",
+                    Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
+        }
+        values["Database__Migrator__Password"] = null;
+        values["DATABASE_MIGRATOR_PASSWORD"] = null;
+        return values;
+    }
+
     private static string FlattenMessages(Exception exception)
     {
         var messages = new List<string>();
@@ -307,15 +368,17 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         private readonly StartupTimeline _timeline;
         private readonly IReadOnlyDictionary<string, string?> _bootstrapValues;
         private readonly bool _includeOperatorIdentity;
+        private readonly Exception? _manifestFailure;
         private readonly EnvironmentVariableScope _environment;
 
         public StartupFactory(
             StartupTimeline timeline,
             IReadOnlyDictionary<string, string?> bootstrapValues,
-            bool includeOperatorIdentity = true)
+            bool includeOperatorIdentity = true,
+            Exception? manifestFailure = null)
         {
             var dataProtection = new ExternalDataProtectionTestAuthority("combined").Input;
-            _environment = new(new Dictionary<string, string?>
+            _environment = new(WithDatabaseAuthorities(new Dictionary<string, string?>(bootstrapValues)
             {
                 ["SECRET_PROVIDER"] = "Environment",
                 ["EVENT_DP_COMBINED_RING"] = dataProtection.Ring,
@@ -327,13 +390,21 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
                 ["Database__Database"] = "event_test",
                 ["Database__Runtime__Database"] = "event_test",
                 ["Database__Migrator__Database"] = "event_test",
+                ["Database__Migrator__Password"] = null,
+                ["DATABASE_MIGRATOR_PASSWORD"] = null,
                 ["Database__Runtime__Username"] = "event_test",
+                ["Database__Global__Username"] = "event_test_global",
+                ["Database__Global__Password"] =
+                    Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
                 ["Database__Runtime__Password"] =
                     Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
-            });
+            }));
             _timeline = timeline;
             _bootstrapValues = bootstrapValues;
             _includeOperatorIdentity = includeOperatorIdentity;
+            _manifestFailure = manifestFailure;
+            // The external migration dependency has already completed before host startup.
+            _timeline.Record("migration-seed");
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -357,12 +428,17 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
                 services.RemoveAll<IConfigurationManifestPostMigrationSequence>();
                 services.AddSingleton<IConfigurationManifestPostMigrationSequence>(
                     new StandaloneSequenceProbe(_timeline));
+                services.RemoveAll<IConfigurationManifestStartupRunner>();
+                services.AddSingleton<IConfigurationManifestStartupRunner>(
+                    new ManifestProbe(_timeline) { Failure = _manifestFailure });
                 services.RemoveAll<IInstanceBootstrapStateRepository>();
-                services.AddSingleton<BootstrapRepositoryProbe>();
-                services.AddSingleton<IInstanceBootstrapStateRepository>(provider =>
+                services.AddScoped<BootstrapRepositoryProbe>();
+                services.AddScoped<IInstanceBootstrapStateRepository>(provider =>
                     provider.GetRequiredService<BootstrapRepositoryProbe>());
                 services.RemoveAll<IUnitOfWork>();
-                services.AddSingleton<IUnitOfWork, UnitOfWorkProbe>();
+                services.AddScoped<IUnitOfWork, UnitOfWorkProbe>();
+                services.RemoveAll<IGlobalExploreDbContextFactory>();
+                services.AddSingleton<IGlobalExploreDbContextFactory>(_timeline.Database);
                 services.RemoveAll<ISetupSecretProvider>();
                 services.AddSingleton<ISetupSecretProvider, SetupAuthorityProbe>();
                 services.RemoveAll<IPrivacyErasureReplayService>();
@@ -411,15 +487,14 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
     private sealed class StandaloneSequenceProbe(StartupTimeline timeline)
         : IConfigurationManifestPostMigrationSequence
     {
-        public Task RunAsync(
+        public async Task RunAsync(
             Func<CancellationToken, Task> migrateAndSeed,
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(migrateAndSeed);
             cancellationToken.ThrowIfCancellationRequested();
-            timeline.Record("migration-seed");
+            await migrateAndSeed(cancellationToken);
             timeline.Record("manifest");
-            return Task.CompletedTask;
         }
     }
 
@@ -440,75 +515,80 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         }
     }
 
-    private sealed class UnitOfWorkProbe(StartupTimeline timeline) : IUnitOfWork
+    private sealed class UnitOfWorkProbe(ExploreDbContext database, StartupTimeline timeline) : IUnitOfWork
     {
+        private readonly IUnitOfWork _inner = new EfCoreUnitOfWork(database);
+
         public Task<T> ExecuteReadCommittedAsync<T>(
-            Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
+            Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) =>
+            _inner.ExecuteReadCommittedAsync(operation, ct);
 
         public Task ExecuteInTransactionAsync(
             Func<CancellationToken, Task> operation,
-            CancellationToken ct = default) => operation(ct);
+            CancellationToken ct = default) => _inner.ExecuteInTransactionAsync(operation, ct);
 
         public Task<T> ExecuteInTransactionAsync<T>(
             Func<CancellationToken, Task<T>> operation,
-            CancellationToken ct = default) => operation(ct);
+            CancellationToken ct = default) => _inner.ExecuteInTransactionAsync(operation, ct);
 
         public Task<T> ExecuteSerializableAsync<T>(
+            Func<CancellationToken, Task<T>> operation,
+            CancellationToken ct = default) => _inner.ExecuteSerializableAsync(operation, ct);
+
+        public Task<T> ExecuteBootstrapConvergenceAsync<T>(
             Func<CancellationToken, Task<T>> operation,
             CancellationToken ct = default)
         {
             timeline.Record("preparation");
-            return operation(ct);
+            return _inner.ExecuteBootstrapConvergenceAsync(operation, ct);
         }
     }
 
-    private sealed class BootstrapRepositoryProbe(StartupTimeline timeline)
+    private sealed class BootstrapRepositoryProbe(ExploreDbContext database, StartupTimeline timeline)
         : IInstanceBootstrapStateRepository
     {
-        private int _createCount;
-        private int _updateCount;
-        private int _deleteCount;
+        private readonly InstanceBootstrapStateRepository _inner = new(database);
 
-        public int CreateCount => Volatile.Read(ref _createCount);
-        public int UpdateCount => Volatile.Read(ref _updateCount);
-        public int DeleteCount => Volatile.Read(ref _deleteCount);
+        public int CreateCount => timeline.Count("bootstrap-created");
+        public int UpdateCount => timeline.Count("bootstrap-updated");
+        public int DeleteCount => timeline.Count("bootstrap-deleted");
 
         public Task<InstanceBootstrapState?> GetCurrent(CancellationToken cancellationToken = default) =>
-            Task.FromResult<InstanceBootstrapState?>(null);
+            _inner.GetCurrent(cancellationToken);
 
         public Task<InstanceBootstrapState?> GetCurrentForUpdate(CancellationToken cancellationToken = default) =>
-            Task.FromResult<InstanceBootstrapState?>(null);
+            _inner.GetCurrentForUpdate(cancellationToken);
 
         public Task<InstanceBootstrapState?> GetById(Guid id) =>
-            Task.FromResult<InstanceBootstrapState?>(null);
+            _inner.GetById(id);
 
         public Task<IReadOnlyList<InstanceBootstrapState>> GetAll() =>
-            Task.FromResult<IReadOnlyList<InstanceBootstrapState>>([]);
+            _inner.GetAll();
 
         public Task<(IReadOnlyList<InstanceBootstrapState> Items, int TotalCount)> GetAllPaged(
             int pageNumber,
             int pageSize) =>
-            Task.FromResult<(IReadOnlyList<InstanceBootstrapState>, int)>(([], 0));
+            _inner.GetAllPaged(pageNumber, pageSize);
 
-        public Task<bool> Exists(Guid id) => Task.FromResult(false);
+        public Task<bool> Exists(Guid id) => _inner.Exists(id);
 
-        public Task<InstanceBootstrapState> Create(InstanceBootstrapState entity)
+        public async Task<InstanceBootstrapState> Create(InstanceBootstrapState entity)
         {
-            Interlocked.Increment(ref _createCount);
+            var created = await _inner.Create(entity);
             timeline.Record("bootstrap-created");
-            return Task.FromResult(entity);
+            return created;
         }
 
-        public Task Update(InstanceBootstrapState entity)
+        public async Task Update(InstanceBootstrapState entity)
         {
-            Interlocked.Increment(ref _updateCount);
-            return Task.CompletedTask;
+            await _inner.Update(entity);
+            timeline.Record("bootstrap-updated");
         }
 
-        public Task Delete(InstanceBootstrapState entity)
+        public async Task Delete(InstanceBootstrapState entity)
         {
-            Interlocked.Increment(ref _deleteCount);
-            return Task.CompletedTask;
+            await _inner.Delete(entity);
+            timeline.Record("bootstrap-deleted");
         }
     }
 
@@ -581,13 +661,58 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         public string PrivacyUrl => "https://standalone.example.test/privacy";
     }
 
-    private sealed class StartupTimeline
+    private sealed class StartupDatabase : IGlobalExploreDbContextFactory, IAsyncDisposable
+    {
+        private readonly string _root = Directory.CreateTempSubdirectory("bootstrap-startup-").FullName;
+        private readonly PrimaryDatabaseConnectionOptions _options;
+        private readonly GlobalExploreDbContextFactory _factory;
+
+        public StartupDatabase()
+        {
+            _options = new PrimaryDatabaseConnectionOptions
+            {
+                Role = PrimaryDatabaseRole.Global,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = Path.Combine(_root, "bootstrap.db")
+            };
+            _factory = new GlobalExploreDbContextFactory(_options);
+        }
+
+        public async Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
+        {
+            var database = await _factory.CreateDbContextAsync(cancellationToken);
+            try
+            {
+                await database.Database.EnsureCreatedAsync(cancellationToken);
+                return database;
+            }
+            catch
+            {
+                await database.DisposeAsync();
+                throw;
+            }
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            using var connection = new Microsoft.Data.Sqlite.SqliteConnection(
+                PrimaryDatabaseConfiguration.BuildConnectionString(_options).ConnectionString);
+            Microsoft.Data.Sqlite.SqliteConnection.ClearPool(connection);
+            Directory.Delete(_root, recursive: true);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class StartupTimeline : IAsyncDisposable
     {
         private readonly ConcurrentQueue<string> _events = [];
         private readonly ConcurrentDictionary<string, TaskCompletionSource> _signals =
             new(StringComparer.Ordinal);
 
+        public StartupDatabase Database { get; } = new();
         public string[] Events => _events.ToArray();
+
+        public ValueTask DisposeAsync() => Database.DisposeAsync();
 
         public void Record(string value)
         {

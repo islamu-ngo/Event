@@ -26,7 +26,8 @@ internal sealed class HumanAuthorizationRouteQueries(
     private readonly DbConnection _connection = connection.Connection;
     private static readonly JsonSerializerOptions Json = new() { AllowDuplicateProperties = false };
 
-    internal async Task<HumanAuthorizationRouteFacts> ReadAsync(DbTransaction? transaction, CancellationToken ct)
+    internal async Task<HumanAuthorizationRouteFacts> ReadAsync(
+        DbTransaction? transaction, Action requireSelection, CancellationToken ct)
     {
         if (selectedExecution is not null)
             return await IdentityWriterHumanSourceQueries.ReadRouteAsync(selectedExecution, _subject, ct);
@@ -62,44 +63,13 @@ internal sealed class HumanAuthorizationRouteQueries(
         if (!_context.Database.IsSqlite() && !_context.Database.IsSqlServer()
             && _context.Database.ProviderName != RelationalNamedLock.MySqlProvider)
             throw new NotSupportedException("human_route_provider_not_supported");
-        // Current reads matter on MySQL: a snapshot established earlier in this owner is not authority.
-        var sql = new HumanAuthorizationRouteSql(_context);
-        await using var read = _connection.CreateCommand();
-        read.Transaction = transaction;
-        read.CommandTimeout = _context.Database.GetCommandTimeout() ?? read.CommandTimeout;
-        for (int index = 0; index < HumanAuthorizationRouteFacts.Keys.Length; index++)
+        void RequireOriginal()
         {
-            var parameter = read.CreateParameter();
-            parameter.ParameterName = $"key{index}";
-            parameter.DbType = DbType.String;
-            parameter.Value = HumanAuthorizationRouteFacts.Keys[index];
-            read.Parameters.Add(parameter);
+            requireSelection();
+            if (!ReferenceEquals(transaction, _context.Database.CurrentTransaction?.GetDbTransaction()))
+                throw new InvalidOperationException("human_route_original_transaction_changed");
         }
-        var tenantParameter = read.CreateParameter();
-        tenantParameter.ParameterName = "tenant";
-        tenantParameter.DbType = DbType.Guid;
-        tenantParameter.Value = (object?)_tenant ?? DBNull.Value;
-        read.Parameters.Add(tenantParameter);
-        var system = new List<NativeSystem>();
-        var tenant = new List<NativeTenant>();
-        read.CommandText = sql.Query(false, transaction is not null);
-        await using (var rows = await read.ExecuteReaderAsync(ct))
-        {
-            while (await rows.ReadAsync(ct))
-                system.Add(new(rows.GetString(0), rows.GetString(1), rows.GetInt32(2),
-                    Convert.ToBoolean(rows.GetValue(3), System.Globalization.CultureInfo.InvariantCulture),
-                    rows.IsDBNull(4) ? null : rows.GetString(4), rows.IsDBNull(5) ? null : rows.GetString(5),
-                    rows.IsDBNull(6) ? null : rows.GetString(6)));
-        }
-        if (_tenant.HasValue)
-        {
-            read.CommandText = sql.Query(true, transaction is not null);
-            await using var rows = await read.ExecuteReaderAsync(ct);
-            while (await rows.ReadAsync(ct))
-                tenant.Add(new(rows.GetString(0), rows.GetString(1),
-                    Convert.ToBoolean(rows.GetValue(2), System.Globalization.CultureInfo.InvariantCulture)));
-        }
-        return Facts(system.ToArray(), tenant.ToArray());
+        return await HumanAuthorizationRouteProjection.ReadAsync(_context, _subject, _tenant, RequireOriginal, ct);
     }
 
     private HumanAuthorizationRouteFacts Facts(NativeSystem[] system, NativeTenant[] tenant)

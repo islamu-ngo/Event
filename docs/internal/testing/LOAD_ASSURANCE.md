@@ -183,6 +183,15 @@ source. Diagnostic capture reads headers first and bounds the body to four MiB
 under a separate three-second deadline. Only six finite candidate family names,
 finite metric kinds and admitted `seconds`/`bytes` units can survive projection;
 HELP and arbitrary labels are never retained. Unknown units remain unavailable.
+The actual private exporter emits the exact
+`dotnet_process_cpu_time_seconds_total` counter and
+`dotnet_process_memory_working_set_bytes` gauge without `# UNIT` declarations.
+Only these verified name/kind pairs qualify their embedded seconds/bytes units
+when a declaration is absent. An explicit declaration takes precedence;
+unknown declared units, other families and wrong kinds receive no inferred unit.
+The real private-listener wire regression exercises the exporter and parser
+together. This metadata qualification does not establish emitting-process or
+reset identity, or make a candidate capacity evidence.
 The candidate names are not proof that the live exporter emits them. Actual
 owned series, units and reset identity must be verified before replacing this
 candidate projection with qualified numeric interpretation.

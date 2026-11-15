@@ -1,0 +1,40 @@
+Change-Id: CHG-01M68P5HJZE08CMJN8K8XX60X3
+Title: Keep migration startup independent of serving writer passwords
+Type: fix
+Scope: self-hosting
+Summary: >-
+  Migration processes exclude serving local-identity writer passwords from
+  acquisition while retaining their alias masks, enrollment usernames and
+  selected migrator credential checks.
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Migration acquisition does not request either serving local-identity
+      writer password. Canonical and environment aliases remain null-masked,
+      including overlays over lower-priority configuration.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: >-
+      Correctly masked inherited serving passwords no longer abort migration
+      acquisition. Required migrator credentials still fail closed when
+      explicitly empty; usernames remain available for enrollment.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/secrets.md
+    Disposition: documented
+    Detail: >-
+      Use the selected migrator authority for migration startup and EF tooling
+      without supplying or unmasking serving writer passwords.

@@ -155,6 +155,7 @@ public class TenantController : EventControllerBase
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
     [HttpPost(Name = RouteNames.CreateTenant)]
+    [InstanceManagement]
     [EndpointSummary("Create new Tenant")]
     [EndpointDescription("Create a new tenant")]
     [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]

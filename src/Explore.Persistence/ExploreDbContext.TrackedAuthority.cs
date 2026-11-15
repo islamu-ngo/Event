@@ -171,7 +171,9 @@ public partial class ExploreDbContext
                             parent.State == EntityState.Added && parent.Metadata == foreignKey.PrincipalEntityType
                             && foreignKey.PrincipalKey.Properties.Select(property => parent.Property(property.Name).CurrentValue)
                                 .SequenceEqual(values));
-                        bool visible = pendingParent
+                        bool visible = NativeRecognitionContinuityForeignKeyVisible(entry,
+                            foreignKey.PrincipalEntityType, foreignKey.PrincipalKey.Properties, values)
+                            ?? (pendingParent
                             || (NativeHumanTenantForeignKeyVisible(entry, foreignKey.PrincipalEntityType,
                                     foreignKey.PrincipalKey.Properties, values)
                                 ?? NativeAiForeignKeyVisible(entry, foreignKey.PrincipalEntityType,
@@ -183,7 +185,7 @@ public partial class ExploreDbContext
                                 ?? NativePaymentReconciliationForeignKeyVisible(entry, foreignKey.PrincipalEntityType,
                                     foreignKey.PrincipalKey.Properties, values)
                                 ?? await IsTenantVisibleAsync(foreignKey.PrincipalEntityType,
-                                    foreignKey.PrincipalKey.Properties, values, cancellationToken));
+                                    foreignKey.PrincipalKey.Properties, values, cancellationToken)));
                         if (!visible)
                         {
                             // Storage attachments already treat a missing or foreign source

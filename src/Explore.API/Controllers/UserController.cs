@@ -79,6 +79,7 @@ public class UserController : EventControllerBase
     /// Call this endpoint after login/registration to ensure user exists in the system.
     /// </summary>
     [HttpPost("sync", Name = RouteNames.SyncUser)]
+    [TenantReadBootstrap]
     [Authorize]
     [SuppressIdempotencyResponseStorage]
     [EndpointSummary("Sync user from identity provider")]
@@ -130,6 +131,7 @@ public class UserController : EventControllerBase
     }
 
     [HttpGet(Name = RouteNames.GetCurrentUser)]
+    [TenantReadBootstrap]
     [Authorize]
     [ProducesResponseType(typeof(HalResource<UserDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -156,6 +158,7 @@ public class UserController : EventControllerBase
     /// Used by the BFF claims transformation to enrich the ClaimsPrincipal with admin claims.
     /// </summary>
     [HttpGet("admin-authority", Name = RouteNames.GetCurrentUserAdminAuthority)]
+    [TenantReadBootstrap]
     [Authorize]
     [EndpointSummary("Get current user's admin authority")]
     [EndpointDescription("Returns instance, tenant, organization, and group admin status for the authenticated user. Consumed by BFF and route authorization.")]

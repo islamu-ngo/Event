@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6NZ81FHVFNY5VTZBRBVXE8H
+Title: "read stored authorization readiness through its Global owner"
+Type: fix
+Scope: access
+Summary: "Observe requested stored authorization settings through an independent Global reader without promoting Runtime or acquiring mutation custody; preserve original provider mutation snapshots and the existing Cerbos health transport deadline."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "An independent Global read observes only requested detached stored rows. Runtime remains unpromoted; prepared mutations retain their captured state and original compiler ownership."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: "Authorization readiness can observe saved instance configuration without granting ordinary Runtime direct settings access. Missing stored values remain distinguishable from defaults."

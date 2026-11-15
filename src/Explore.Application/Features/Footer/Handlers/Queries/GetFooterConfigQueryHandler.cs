@@ -6,13 +6,24 @@ using Explore.Application.Features.Footer.Requests.Queries;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Services;
+using Explore.Domain.Settings.Documents;
+using Explore.Domain.Settings.Documents.Payloads;
+using Explore.Domain.ValueObjects;
+using Explore.Domain.Constants;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace Explore.Application.Features.Footer.Handlers.Queries;
 
 public sealed class GetFooterConfigQueryHandler(
     IHierarchicalSettingsResolver settingsResolver,
     IFooterLinkGroupRepository footerLinkGroupRepository,
-    ITenantContext tenantContext)
+    ITenantContext tenantContext,
+    IVisitorTenantReadAccessPolicy visitorRead,
+    ITenantDirectoryOperatorReadinessEvaluator directoryReadiness,
+    IInstanceOperatorIdentityReadinessEvaluator instanceReadiness,
+    ITypedSettingsDocumentResolver documents)
     : IQueryHandler<GetFooterConfigQuery, FooterConfigDto>
 {
     public async Task<FooterConfigDto> QueryAsync(
@@ -20,14 +31,30 @@ public sealed class GetFooterConfigQueryHandler(
     {
         var tenantId = tenantContext.TenantId;
 
-        var settingGroupTask = settingsResolver.ResolveGroupAsync<FooterSettingGroup>(
+        var instance = await instanceReadiness.EvaluateAsync(
+            InstanceOperatorIdentityCapability.PublicDisclosure, cancellationToken);
+        var result = new FooterConfigDto
+        {
+            Settings = new FooterSettingsDto { Enabled = false, Template = "minimal", ShowCookieSettingsLink = true },
+            InstanceOperator = instance.IsReady && instance.Identity is not null
+                ? PublicOperatorIdentityMapper.MapInstanceOperator(instance.Identity) : null
+        };
+        if (await visitorRead.CheckAsync(tenantId, cancellationToken) != VisitorTenantReadAccessDecision.Allowed)
+            return WithRevision(result);
+
+        var settingGroup = await settingsResolver.ResolveGroupAsync<FooterSettingGroup>(
             new SettingContext(TenantId: tenantId), cancellationToken);
-        var groupsTask = footerLinkGroupRepository.GetResolvedGroupsForTenantAsync(tenantId, cancellationToken);
-
-        await Task.WhenAll(settingGroupTask, groupsTask);
-
-        var settingGroup = settingGroupTask.Result;
-        var groups = groupsTask.Result;
+        var groups = await footerLinkGroupRepository.GetResolvedGroupsForTenantAsync(tenantId, cancellationToken);
+        var branding = await documents.ResolveTenantDocumentAsync<BrandingSettings>(
+            new SettingsResolutionContext(tenantId, RequestedDocuments: [SettingsDocumentKeys.Tenant.Branding]),
+            SettingsDocumentKeys.Tenant.Branding, cancellationToken);
+        var directory = await directoryReadiness.EvaluateAsync(
+            tenantId, TenantDirectoryOperatorIdentityCapability.PublicDisclosure, cancellationToken);
+        var settingContext = new SettingContext(TenantId: tenantId);
+        bool showCommunityGuidelines =
+            await settingsResolver.ResolveAsync<bool>(GovernanceSettingKeys.Events.UserSubmissionEnabled, settingContext, cancellationToken)
+            || await settingsResolver.ResolveAsync<bool>(GovernanceSettingKeys.Events.OrganizationSubmissionEnabled, settingContext, cancellationToken)
+            || await settingsResolver.ResolveAsync<bool>(GovernanceSettingKeys.Events.GroupSubmissionEnabled, settingContext, cancellationToken);
 
         var settings = new FooterSettingsDto
         {
@@ -41,10 +68,20 @@ public sealed class GetFooterConfigQueryHandler(
             ShowCookieSettingsLink = settingGroup.ShowCookieSettingsLink,
         };
 
-        return new FooterConfigDto
+        return WithRevision(result with
         {
+            TenantId = tenantId,
+            BrandDisplayName = branding?.Payload.DisplayName ?? string.Empty,
+            BrandLogoUrl = branding?.Payload.LogoUrl ?? string.Empty,
+            ShowCommunityGuidelinesLink = showCommunityGuidelines,
+            DirectoryOperator = directory.IsReady && directory.Identity is not null
+                && directory.DocumentRevision is { } revision && revision != Guid.Empty
+                    ? PublicOperatorIdentityMapper.MapDirectoryOperator(directory.Identity, revision) : null,
             Settings = settings,
             LinkGroups = groups.Select(FooterMapper.ToPublicGroup).ToList(),
-        };
+        });
     }
+
+    private static FooterConfigDto WithRevision(FooterConfigDto footer) =>
+        footer with { Revision = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(footer))) };
 }

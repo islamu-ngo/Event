@@ -89,19 +89,28 @@ public sealed partial class ModerationPolicyPublicationTests
             Inventory = ModerationCapabilityRegistry.Parse(json.ToJsonString());
         }
 
-        public ExploreDbContext Context(params IInterceptor[] interceptors)
+        public ExploreDbContext Context(params IInterceptor[] interceptors) =>
+            Context(PrimaryDatabaseRole.Runtime, interceptors);
+
+        public ExploreDbContext MaintenanceContext(params IInterceptor[] interceptors) =>
+            Context(PrimaryDatabaseRole.Global, interceptors);
+
+        private ExploreDbContext Context(PrimaryDatabaseRole role, params IInterceptor[] interceptors)
         {
             var builder = TestDbContextOptions.Create<ExploreDbContext>();
             PrimaryDatabaseProviderComposition.ConfigureApplication(builder, new Explore.Persistence.Database.PrimaryDatabaseConnectionOptions
             {
-                Role = Explore.Persistence.Database.PrimaryDatabaseRole.Runtime,
+                Role = role,
                 Provider = Explore.Persistence.Database.PrimaryDatabaseProvider.Sqlite,
                 Database = _connection.DataSource
             });
             builder.UseSqlite(_connection)
                 .UseSnakeCaseNamingConvention().AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance);
             if (interceptors.Length != 0) builder.AddInterceptors(interceptors);
-            return new(builder.Options) { TenantContext = this };
+            var context = new ExploreDbContext(builder.Options)
+            { TenantContext = role == PrimaryDatabaseRole.Runtime ? this : null };
+            context.BindTenantLease();
+            return context;
         }
 
         public static async Task<Database> CreateAsync(bool implementedInventory = false, bool physicalFile = false)

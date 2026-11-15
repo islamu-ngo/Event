@@ -1,0 +1,33 @@
+Change-Id: CHG-01M6E4FZ9Y2D9T5C4NTNCRJBB1
+Title: "Preserve the original narrative acceptance floor on SQLite"
+Type: fix
+Scope: access
+Summary: "Order retained SQLite acceptances by their persisted UTC timestamp and acknowledgement identity without changing tenant or material selection."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      A copied submission retains the original material floor after physical
+      narrative purge. Original filters, row fencing and final equality checks
+      remain in force; equal timestamps have a deterministic identity tie break.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented
+    Detail: >-
+      Reissuing copied material cannot extend narrative custody or recreate
+      purged plaintext. Other providers retain their typed timestamp ordering.

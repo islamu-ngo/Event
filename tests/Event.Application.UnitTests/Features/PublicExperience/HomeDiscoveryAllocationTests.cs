@@ -462,6 +462,7 @@ public sealed class HomeDiscoveryAllocationTests
                     Arg.Any<SettingContext>(), Arg.Any<CancellationToken>())
                 .Returns(JsonSerializer.Serialize(presets));
         var tenant = Substitute.For<ITenantContext>();
+        tenant.TenantId.Returns(Guid.CreateVersion7());
         var locations = Substitute.For<ILocationRepository>();
         if (area?.LocationIds is { } locationIds)
             locations.GetExistingTenantLocationIdsAsync(
@@ -469,7 +470,8 @@ public sealed class HomeDiscoveryAllocationTests
                 .Returns(locationIds.ToArray());
         return new GetHomeDiscoveryQueryHandler(
             reader, new ShellReader(), tenant, settings, locations,
-            clock ?? TimeProvider.System, NullLogger<GetHomeDiscoveryQueryHandler>.Instance);
+            clock ?? TimeProvider.System, NullLogger<GetHomeDiscoveryQueryHandler>.Instance,
+            new Event.Testing.Settings.VisitorReadPolicyTestAuthority(tenant.TenantId).Policy);
     }
 
     private sealed class ShellReader : IQueryHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto>

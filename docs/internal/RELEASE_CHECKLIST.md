@@ -13,6 +13,11 @@ Use this checklist before tagging or publishing a release. A release is not read
 
 ## Complete release-impact metadata
 
+Dependency servicing must regenerate and verify both Standalone lock profiles
+and the moderation launcher lock. Confirm that a clean CI cache receives
+deployment-only package metadata before license validation and that ordinary
+Standalone assets are restored before the solution build.
+
 Review complete changed-file metadata, including previous names for renames.
 A large PR must not bypass impact classification or lower its declared file count.
 See [the trusted metadata contract](CI_CD_GOVERNANCE.md#complete-pr-file-metadata).
@@ -94,6 +99,25 @@ success do not establish activation. Use the
 - [ ] Review [adopter help](../public/documentation/readme/configuration-and-operations/releases-and-changelog.md) separately from the entries-only changelog. Keep publication prospective/unverified until these activation gates are evidenced.
 
 ## Release Evidence Bundle
+
+System-tool selection diagnostics are investigation evidence only. A stat link
+observation does not satisfy any execution lane or permit candidate verification
+after native source, link, file-type or fingerprint admission fails.
+
+For fixed-system stat selection, verify that the retained binding names the
+selected executable used by both metadata paths. Retain real utility-alias and
+candidate linked-input refusal controls; observation success alone is insufficient.
+Retain missing-entry, dangling-target and directory rejection controls with
+fixed owned stat codes. Filesystem failures must not become path-bearing
+diagnostics or lose their reason as a generic execution failure.
+
+Retain native discovery/report identity evidence for fixture-backed tests.
+Verify decorated and undecorated classes join exactly, malformed constructor
+displays fail, and distinct UIDs cannot collapse to one accepted canonical tuple.
+
+Retain the selected candidate's completed CodeQL analysis result. A passing
+manual build followed by cancellation is incomplete scanner evidence; follow
+[the cancellation procedure](OPERATIONS.md#codeql-analysis-cancellation).
 
 Before candidate verification, retain the selected security workflow's
 `security-execution.v1.json` and every referenced report/log under
@@ -185,6 +209,9 @@ Use `Not applicable` only when the change has no release-impact category. If the
   ```
 
 - [ ] Required per-project tests pass; do not run solution-level `dotnet test`.
+- [ ] Browser prerequisites restore against the installer's own committed lock
+  without changing the shared tools lock; actual named browser cases still run
+  for the candidate. See [fixture prerequisites](CI_CD_GOVERNANCE.md#security-integration-fixture-execution).
 - [ ] Architecture tests pass:
 
   ```bash
@@ -232,6 +259,15 @@ Use `Not applicable` only when the change has no release-impact category. If the
 - [ ] Secret scanning, push protection, Dependabot security updates, dependency graph, and CodeQL alerts are enabled or explicitly waived at repository/organization level. Current credential rotation status is documented as restart-based when that is the proven behavior; do not imply live reload or zero-downtime rotation unless it is separately proven.
 
 ## CI/CD Evidence Contract
+
+- [ ] Native daemon transport changes retain the wire-level context-isolation
+  result and the selected daemon read-only result without diagnostic runtime
+  overrides, separately from actual workload and owned cleanup evidence.
+
+- [ ] Retain uncached selected-engine readiness evidence separately from the
+  actual production acquisition sequence and real-peer cancellation checks.
+  Cached proxy responses, blocking diagnostic passes or a longer readiness
+  allowance do not extend the client's request deadline or admit a runtime lane.
 
 - [ ] API-key issuance changes retain the five provider `Issuance.trx` reports,
   each with at least 14 executed cases and no failed or skipped issuance cases;

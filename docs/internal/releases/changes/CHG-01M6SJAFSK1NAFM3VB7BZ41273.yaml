@@ -1,0 +1,26 @@
+Change-Id: CHG-01M6SJAFSK1NAFM3VB7BZ41273
+Title: "Bind authentication transients to explicit flow kinds"
+Type: feat
+Scope: federation
+Summary: "Distinguish targeted authentication from restricted unscoped verification and preserve retained state across schema changes."
+Group: tenant-auth-flow
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+  Migration:
+    Reference: schemas/islamu-event.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented

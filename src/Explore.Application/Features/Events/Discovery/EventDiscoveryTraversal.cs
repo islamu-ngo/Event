@@ -4,6 +4,7 @@ using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Events.Requests.Queries;
@@ -25,11 +26,13 @@ public sealed class EventDiscoveryTraversal(
     IEventDiscoveryCursorProtector protector,
     IHierarchicalSettingsReader settings,
     ITenantContext tenant,
-    TimeProvider clock) : IQueryHandler<GetEventDiscoveryTraversalQuery, EventDiscoveryTraversalDto>
+    TimeProvider clock,
+    IVisitorTenantReadAccessPolicy visitorRead) : IQueryHandler<GetEventDiscoveryTraversalQuery, EventDiscoveryTraversalDto>
 {
     public async Task<EventDiscoveryTraversalDto> QueryAsync(
         GetEventDiscoveryTraversalQuery request, CancellationToken cancellationToken = default)
     {
+        await visitorRead.RequireAsync(tenant.TenantId, cancellationToken);
         var criteria = request.Criteria;
         string? cursor = request.Cursor;
         await new GetEventDiscoveryTraversalQueryValidator().ValidateAndThrowAsync(request, cancellationToken);

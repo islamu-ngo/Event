@@ -6,6 +6,8 @@ namespace Explore.API.Hateoas;
 /// </summary>
 public static class RouteNames
 {
+    public const string ResolveVerifiedAccountContinuation = nameof(ResolveVerifiedAccountContinuation);
+    public const string JoinVerifiedTenant = nameof(JoinVerifiedTenant);
     public const string GetModerationNoticeCorrection = nameof(GetModerationNoticeCorrection);
     public const string GrantModerationAdjudicatedCaseReadPurpose = nameof(GrantModerationAdjudicatedCaseReadPurpose);
     public const string RevokeModerationAdjudicatedCaseReadPurpose = nameof(RevokeModerationAdjudicatedCaseReadPurpose);
@@ -85,6 +87,8 @@ public static class RouteNames
     public const string ReconcileInstanceKeycloakOperation = nameof(ReconcileInstanceKeycloakOperation);
     public const string CancelInstanceKeycloakOperation = nameof(CancelInstanceKeycloakOperation);
     public const string LoginLocalIdentity = nameof(LoginLocalIdentity);
+    public const string ReserveLocalVisitorEnrollment = nameof(ReserveLocalVisitorEnrollment);
+    public const string RegisterLocalVisitor = nameof(RegisterLocalVisitor);
     public const string RequestLocalEmailVerification = nameof(RequestLocalEmailVerification);
     public const string ConfirmLocalEmail = nameof(ConfirmLocalEmail);
     public const string RequestLocalPasswordRecovery = nameof(RequestLocalPasswordRecovery);

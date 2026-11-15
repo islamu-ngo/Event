@@ -139,9 +139,9 @@ public sealed class NativeOperationArchitectureTests
             ["Keycloak:Authority"] = "https://authority.example.test",
             ["Keycloak:Realm"] = "ISLAMU",
             ["Keycloak:Audience"] = "islamu-event-api",
-            ["Database:Provider"] = "PostgreSql",
-            ["Database:Host"] = "localhost",
-            ["Database:Database"] = "event_composition_test",
+            ["Database:Provider"] = "Sqlite",
+            ["Database:Database"] = Path.Combine(Path.GetTempPath(),
+                $"native-composition-construction-{Guid.CreateVersion7():N}.db"),
             ["Instance:OperatorIdentity:OperatorId"] = Guid.CreateVersion7().ToString(),
             ["Instance:OperatorIdentity:PublicName"] = "Composition Test Operator",
             ["Instance:OperatorIdentity:LegalName"] = "Composition Test Operator ASBL",
@@ -158,7 +158,7 @@ public sealed class NativeOperationArchitectureTests
         // This construction-only host exercises real cryptography without an external key authority.
         builder.Services.AddSingleton<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(
             new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider());
-        // Testing omits database composition. Retain the real context and Global factory aliases;
+        // Testing omits automatic context registration. Retain the real context and Global factory aliases;
         // the credential-free SQLite Global pool is constructed but no connection or operation runs.
         builder.Services.AddDbContextFactory<ExploreDbContext>(options =>
             Microsoft.EntityFrameworkCore.SqliteDbContextOptionsBuilderExtensions.UseSqlite(options,

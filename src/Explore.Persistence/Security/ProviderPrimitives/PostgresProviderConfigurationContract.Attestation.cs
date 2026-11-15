@@ -187,7 +187,8 @@ public static partial class PostgresProviderConfigurationContract
             THEN RAISE EXCEPTION 'provider_configuration_authority_drift' USING ERRCODE = '55000'; END IF;
             IF pg_catalog.has_schema_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Schema)},'CREATE')
                 OR pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(typeof(SystemSetting)))}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(typeof(SystemSetting)))}::regclass,'INSERT,UPDATE,REFERENCES')
+                OR (pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(typeof(SystemSetting)))}::regclass,'INSERT,UPDATE,REFERENCES')
+                    AND ({PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(context, enrollment)}) IS NOT TRUE)
                 OR pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{anchor}::regclass,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                 OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{anchor}::regclass,'SELECT,INSERT,UPDATE,REFERENCES')
             THEN RAISE EXCEPTION 'provider_configuration_ambient_authority' USING ERRCODE = '55000'; END IF;

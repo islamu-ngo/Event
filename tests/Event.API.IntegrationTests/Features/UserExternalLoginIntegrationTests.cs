@@ -640,7 +640,7 @@ public class UserExternalLoginIntegrationTests
         var tenantUsers = Substitute.For<ITenantUserRepository>();
         tenantUsers.GetByTenantAndUserAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns((TenantUser?)null);
-        tenantUsers.Create(Arg.Any<TenantUser>()).Returns(call =>
+        tenantUsers.CreateForExistingAccountAsync(Arg.Any<TenantUser>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
             TenantUser value = call.Arg<TenantUser>();
             value.Id = Guid.CreateVersion7();
@@ -727,13 +727,13 @@ public class UserExternalLoginIntegrationTests
             onboarding,
             unitOfWork,
             new ImmediateSettingMutationLock(),
-            Substitute.For<IVisitorAccessCapabilityResolver>(),
+            services.GetRequiredService<IVisitorAccessCapabilityResolver>(),
             tenantContext,
             configuration,
             TimeProvider.System,
             new Explore.Application.Services.PrivacyIdentityFenceOperation(fenceAuthority, recognition,
                 TimeProvider.System, logins, services.GetRequiredService<IHumanActionCommitFinalizer>),
-            null!); // These legacy scenarios exercise Person login; membership participants have native-store coverage.
+            null!, tenantUsers); // These scenarios exercise Person login; membership participants have native-store coverage.
     }
 
     private async Task EnsureUserExistsAsync(Guid userId, string? email = null)

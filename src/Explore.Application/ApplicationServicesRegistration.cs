@@ -307,6 +307,9 @@ public static class ApplicationServicesRegistration
             provider.GetRequiredService<AuthProviderConfigurationService>());
         services.AddScoped<IVisitorAccessProviderReader, VisitorAccessProviderReader>();
         services.AddScoped<IVisitorAccessCapabilityResolver, VisitorAccessCapabilityResolver>();
+        services.AddScoped<ILocalVisitorEnrollmentService, LocalVisitorEnrollmentService>();
+        services.AddScoped<ILocalVisitorEnrollmentRecoveryService, LocalVisitorEnrollmentRecoveryService>();
+        services.AddScoped<IVisitorTenantReadAccessPolicy, VisitorTenantReadAccessPolicy>();
         services.AddScoped<IAccountAuthorityLifecycleEmailService, DefaultAccountAuthorityLifecycleEmailService>();
         services.AddScoped<IAnalyticsGovernanceService, AnalyticsGovernanceService>();
         services.AddScoped<
@@ -343,6 +346,8 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IFanoutAttendeeLocationAuthorizationService, FanoutAttendeeLocationAuthorizationService>();
         services.AddScoped<PrivacyErasureApplier>();
         services.AddScoped<RetainedAuthorityPrivacyErasureWorkflow>();
+        services.AddScoped<Func<RetainedAuthorityPrivacyErasureWorkflow>>(provider =>
+            () => provider.GetRequiredService<RetainedAuthorityPrivacyErasureWorkflow>());
         services.AddScoped<IPrivacyErasureService, PrivacyErasureService>();
         services.AddScoped<Explore.Application.Contracts.Moderation.IModerationRecognitionErasure,
             Explore.Application.Services.Moderation.ModerationRecognitionErasure>();

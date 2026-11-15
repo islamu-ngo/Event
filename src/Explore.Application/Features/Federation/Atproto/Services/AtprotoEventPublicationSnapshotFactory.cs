@@ -4,6 +4,8 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
+using Explore.Application.Exceptions;
 using Explore.Application.Features.Federation.Atproto.Models;
 using Explore.Application.Services;
 using Explore.Domain;
@@ -13,7 +15,8 @@ using Explore.Domain.Services.Registration;
 namespace Explore.Application.Features.Federation.Atproto.Services;
 
 public sealed partial class AtprotoEventPublicationSnapshotFactory(
-    PublicEventLocationDisclosureEvaluator locationDisclosureEvaluator)
+    PublicEventLocationDisclosureEvaluator locationDisclosureEvaluator,
+    IVisitorTenantReadAccessPolicy visitorRead)
 {
     public async Task<AtprotoEventPublicationSnapshotResult> CreateAsync(
         AtprotoEventPublicationEntityGraph graph,
@@ -22,6 +25,11 @@ public sealed partial class AtprotoEventPublicationSnapshotFactory(
     {
         ArgumentNullException.ThrowIfNull(graph);
         Event eventEntity = graph.Event;
+        var readDecision = await visitorRead.CheckPublicAsync(eventEntity.TenantId, cancellationToken);
+        if (readDecision == VisitorTenantReadAccessDecision.Unavailable)
+            throw new TenantVisitorReadAccessException(readDecision);
+        if (readDecision != VisitorTenantReadAccessDecision.Allowed)
+            return AtprotoEventPublicationSnapshotResult.Ineligible(["tenant_publication_unavailable"]);
         List<string> errors = ValidateGraph(graph, serverNowUtc);
         if (errors.Count != 0)
         {

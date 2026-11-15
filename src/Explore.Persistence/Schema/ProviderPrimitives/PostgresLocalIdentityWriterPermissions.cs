@@ -7,6 +7,7 @@ using Explore.Domain.Constants;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Security;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -59,33 +60,49 @@ internal static class PostgresLocalIdentityWriterPermissions
             if (await ScalarAsync(context, $"SELECT {Session(enrollment.MigratorLogin)}", cancellationToken) is not true)
                 throw new UnauthorizedAccessException("local_identity_writer_installer_wrong_identity");
             bool absent = await ScalarAsync(context, $"SELECT {Absent(sources, enrollment)}", cancellationToken) is true;
-            if (await ScalarAsync(context, $"SELECT {Catalogue(context, sources, enrollment, topology, store, !absent)}", cancellationToken) is not true)
+            bool current = await ScalarAsync(context, $"SELECT {Catalogue(context, sources, enrollment, topology, store, !absent)}", cancellationToken) is true;
+            Source[] previous = [];
+            if (!absent && !current)
+            {
+                previous = Sources(context, topology, store, previousInstalled: true);
+                var introduced = sources.Where(source => !previous.Any(old => old.Type == source.Type)).ToArray();
+                string introducedAbsent = introduced.Length == 0 ? "true" : Absent(introduced, enrollment);
+                if (await ScalarAsync(context,
+                    $"SELECT ({Catalogue(context, previous, enrollment, topology, store, true)}) AND ({introducedAbsent})",
+                    cancellationToken) is not true)
+                    throw new InvalidOperationException(Drift);
+            }
+            else if (!current)
                 throw new InvalidOperationException(Drift);
-            if (absent)
+            if (absent || !current)
             {
                 var names = context.GetService<ISqlGenerationHelper>();
                 foreach (var source in sources)
                 {
+                    var old = previous.SingleOrDefault(value => value.Type == source.Type);
                     await ExecuteAsync(context, $"GRANT USAGE ON SCHEMA {names.DelimitIdentifier(source.Schema)} TO {names.DelimitIdentifier(enrollment.WriterLogin)}", cancellationToken);
                     foreach (string privilege in new[] { "SELECT", "INSERT", "UPDATE" })
                     {
-                        var columns = source.Grants.Where(grant => grant.Privilege == privilege).Select(grant => names.DelimitIdentifier(grant.Column)).ToArray();
+                        var columns = source.Grants.Where(grant => grant.Privilege == privilege
+                                && (old is null || !old.Grants.Contains(grant)))
+                            .Select(grant => names.DelimitIdentifier(grant.Column)).ToArray();
                         if (columns.Length != 0)
                             await ExecuteAsync(context, $"GRANT {privilege} ({string.Join(',', columns)}) ON {source.Table} TO {names.DelimitIdentifier(enrollment.WriterLogin)}", cancellationToken);
                     }
-                    if (source.Delete)
+                    if (source.Delete && old?.Delete is not true)
                         await ExecuteAsync(context, $"GRANT DELETE ON {source.Table} TO {names.DelimitIdentifier(enrollment.WriterLogin)}", cancellationToken);
-                    if (source.Type == typeof(SystemSetting))
+                    if (absent && source.Type == typeof(SystemSetting))
                     {
-                        await PostgresLocalIdentitySystemSettingPolicies.InstallAsync(context, source.Table,
-                            enrollment.MigratorLogin, cancellationToken);
+                        if (await ScalarAsync(context, $"SELECT {PostgresLocalIdentitySystemSettingPolicies.Complete(source.Table, enrollment.MigratorLogin)}", cancellationToken) is not true)
+                            await PostgresLocalIdentitySystemSettingPolicies.InstallAsync(context, source.Table,
+                                enrollment.MigratorLogin, cancellationToken);
                         await ExecuteAsync(context, $"ALTER TABLE {source.Table} ENABLE ROW LEVEL SECURITY; ALTER TABLE {source.Table} FORCE ROW LEVEL SECURITY", cancellationToken);
                     }
-                    if (source.RowSecurity)
+                    if (source.RowSecurity && old?.RowSecurity is not true)
                         foreach (string policy in new[] { ReadPolicy, ReadRestriction })
                             await ExecuteAsync(context, $"CREATE POLICY {names.DelimitIdentifier(policy)} ON {source.Table} AS {(policy == ReadPolicy ? "PERMISSIVE" : "RESTRICTIVE")} FOR SELECT TO {names.DelimitIdentifier(enrollment.WriterLogin)} USING ({RowExpression(context, source, enrollment.WriterLogin, false)})", cancellationToken);
                 }
-                if (HasGlobalEligibility(topology, store))
+                if (absent && HasGlobalEligibility(topology, store))
                 {
                     var eligibility = sources.Single(source => source.Type == typeof(LocalIdentityEligibility));
                     string global = names.DelimitIdentifier(enrollment.ApplicationGlobalLogin!);
@@ -187,8 +204,10 @@ internal static class PostgresLocalIdentityWriterPermissions
         string expected = string.Join(',', sources.SelectMany(source => source.Grants.Select(grant =>
             $"({Text(source.Table)},{Text(grant.Column)},{Text(grant.Privilege)})")));
         string tables = "ARRAY[" + string.Join(',', sources.Select(source => Text(source.Table))) + "]::text[]";
-        string deletes = string.Join(',', sources.Where(source => source.Delete).Select(source => Text(source.Table)));
-        string allowedDelete = deletes.Length == 0 ? "false" : $"t.oid=ANY(ARRAY[{deletes}]::regclass[])";
+        // Resolve relations inside the selected-role branch, rather than parsing regclass literals during planning.
+        string deletes = string.Join(',', sources.Where(source => source.Delete)
+            .Select(source => $"pg_catalog.to_regclass({Text(source.Table)})"));
+        string allowedDelete = deletes.Length == 0 ? "false" : $"t.oid=ANY(ARRAY[{deletes}]::oid[])";
         string required = complete ? $"""
             AND NOT EXISTS (SELECT 1 FROM expected e WHERE NOT EXISTS (
                 SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl
@@ -277,6 +296,9 @@ internal static class PostgresLocalIdentityWriterPermissions
         string rowSecurity = source.Type == typeof(SystemSetting)
             ? complete ? "c.relrowsecurity AND c.relforcerowsecurity" : "NOT c.relrowsecurity AND NOT c.relforcerowsecurity"
             : source.RowSecurity ? "c.relrowsecurity AND c.relforcerowsecurity" : "NOT c.relrowsecurity AND NOT c.relforcerowsecurity";
+        if (!complete && source.Type == typeof(SystemSetting) && context is ExploreDbContext application
+            && enrollment.ApplicationGlobalLogin is { } global)
+            rowSecurity = $"({rowSecurity}) OR ({PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(application, global, enrollment.MigratorLogin)})";
         string policies = source.RowSecurity && complete
             ? string.Join(" AND ", new[] { ReadPolicy, ReadRestriction }.Select(policy =>
                 $"EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE {PolicyPredicate(context, source, enrollment.WriterLogin, policy)})"))
@@ -392,12 +414,34 @@ internal static class PostgresLocalIdentityWriterPermissions
         return $"({identity} AND {keyExpression} AND {selected})";
     }
 
-    private static Source[] Sources(DbContext context, IdentityDatabaseTopology topology, LocalIdentityWriterInventory.Store store)
+    private static Source[] Sources(DbContext context, IdentityDatabaseTopology topology, LocalIdentityWriterInventory.Store store,
+        bool previousInstalled = false)
     {
         var selected = LocalIdentityWriterInventory.Sources
             .Where(source => topology == IdentityDatabaseTopology.Colocated || source.Database == store).ToArray();
         foreach (var source in selected) LocalIdentityWriterInventory.RequireModel(context, source);
         var grants = selected.Select(source => (source.EntityType, Read: source.Select.ToArray(), Insert: source.Insert.ToArray(), Update: source.Update.ToArray(), Delete: source.AllowDelete)).ToList();
+        if (previousInstalled)
+        {
+            // Exact installed 605c3b2 profile, evaluated against the expanded schema.
+            // Compiler-added reads below were unchanged by visitor enrollment.
+            grants.RemoveAll(source => source.EntityType == typeof(VisitorEnrollmentOperation)
+                || source.EntityType == typeof(TenantUser)
+                || source.EntityType == typeof(IdentityUserClaim<Guid>)
+                || source.EntityType == typeof(IdentityUserLogin<Guid>));
+            grants = grants.Select(source =>
+            {
+                bool credential = source.EntityType == typeof(LocalIdentityCredentialOperation);
+                bool addedDelete = source.EntityType == typeof(LocalIdentityUser)
+                    || source.EntityType == typeof(LocalIdentityCredentialOperation)
+                    || source.EntityType == typeof(IdentityUserToken<Guid>)
+                    || source.EntityType == typeof(LocalIdentityEligibility);
+                return (source.EntityType,
+                    Read: credential ? source.Read.Where(property => property != "VisitorEnrollmentOperationId").ToArray() : source.Read,
+                    Insert: credential ? source.Insert.Where(property => property != "VisitorEnrollmentOperationId").ToArray() : source.Insert,
+                    source.Update, Delete: !addedDelete && source.Delete);
+            }).ToList();
+        }
         if (store == LocalIdentityWriterInventory.Store.Application)
         {
             grants.AddRange(HumanPrincipalSourceSql.Sources.Select(source => (source.Type, source.Columns, Array.Empty<string>(), Array.Empty<string>(), false)));
@@ -420,7 +464,8 @@ internal static class PostgresLocalIdentityWriterPermissions
             return new Source(group.Key, schema, context.GetService<ISqlGenerationHelper>().DelimitIdentifier(name, schema), columns,
                 [.. Grants(group.SelectMany(value => value.Read), "SELECT"), .. Grants(group.SelectMany(value => value.Insert), "INSERT"),
                     .. Grants(group.SelectMany(value => value.Update), "UPDATE")], group.Any(value => value.Delete),
-                selected.Any(value => value.EntityType == group.Key),
+                selected.Any(value => value.EntityType == group.Key)
+                    && !(previousInstalled && group.Key == typeof(TenantUser)),
                 group.Key == typeof(SystemSetting) || tenantTables.Any(table => table.TableName == name && (table.Schema ?? schema) == schema));
         }).ToArray();
     }

@@ -74,7 +74,8 @@ public sealed class AtprotoEventPublicationRepositoryTests(PostgreSqlContainerFi
             true, LocationPrivacyGovernanceReasonCode.Resolved, true, true, true,
             LocationDisclosureAudienceEnum.AnyCurrentRegistrant, TimeSpan.FromDays(30)));
         var snapshotFactory = new AtprotoEventPublicationSnapshotFactory(
-            new PublicEventLocationDisclosureEvaluator(governance, new EventLocationDisclosureEvaluator()));
+            new PublicEventLocationDisclosureEvaluator(governance, new EventLocationDisclosureEvaluator()),
+            new global::Event.Testing.Settings.VisitorReadPolicyTestAuthority(tenantId).Policy);
         var publicAddress = new ConfigurationBuilder().AddInMemoryCollection(
             new Dictionary<string, string?> { ["PUBLIC_BASE_URL"] = "https://publication.example.test" }).Build();
         var settings = SystemSettingRepository.CreateReadOnly(context, Substitute.For<ISettingMutationLock>());
@@ -98,7 +99,8 @@ public sealed class AtprotoEventPublicationRepositoryTests(PostgreSqlContainerFi
             .Returns<ModerationPublicEventCalendarAcquisition>(
                 _ => throw new InvalidOperationException("Pending calendar construction cannot acquire or expose payload."));
         var calendar = await new GetEventCalendarExportRequestHandler(
-            calendarOwner, tenant, disclosure, TimeProvider.System)
+            calendarOwner, tenant, disclosure, TimeProvider.System,
+            new Event.Testing.Settings.VisitorReadPolicyTestAuthority(tenant.TenantId).Policy)
             .QueryAsync(new GetEventCalendarExportRequest(eventId), CancellationToken.None);
         await using var pendingCalendar = calendar;
         await Assert.That(calendar).IsNotNull();

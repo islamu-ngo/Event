@@ -153,7 +153,8 @@ public sealed class AtprotoTransientApiFixture : IAsyncInitializer, IAsyncDispos
     }
 
     public byte[] ReadBody(string? digest = null, string purpose = Purpose, Guid? tenantId = null) =>
-        JsonSerializer.SerializeToUtf8Bytes(new { purpose, tokenDigest = digest ?? NewDigest(), expectedTenantId = tenantId });
+        JsonSerializer.SerializeToUtf8Bytes(new
+        { purpose, tokenDigest = digest ?? NewDigest(), expectedTenantId = tenantId, flowKind = 1 });
 
     public static string NewDigest() => Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
 

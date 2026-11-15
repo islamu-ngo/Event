@@ -14,10 +14,29 @@ namespace Explore.Blazor.Client.Tests.Pages.Auth;
 public sealed class LoginRedirectLocalAuthTests
 {
     [Test]
+    [Arguments("google")]
+    [Arguments("unsupported-provider")]
+    public async Task UnsupportedExplicitProviderCannotFallThroughToTheOnlySupportedProvider(string provider)
+    {
+        using var context = CreateContext(out _);
+        ConfigureProvider(context, "keycloak", "button");
+        var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
+        navigation.NavigateTo($"/login?provider={provider}");
+
+        var cut = context.Render<LoginRedirect>();
+
+        await Assert.That(cut.Find("[role=alert]").TextContent).Contains("unsupported");
+        await Assert.That(navigation.Uri).Contains($"/login?provider={provider}");
+        await cut.Find("button").ClickAsync(new MouseEventArgs());
+        await Assert.That(cut.Find("[role=alert]").TextContent).Contains("unsupported");
+        await Assert.That(navigation.Uri).Contains($"/login?provider={provider}");
+    }
+
+    [Test]
     public async Task LocalProviderOffersSignInWithoutPublicAccountCreation()
     {
         using var context = CreateContext(out _);
-        ConfigureLocalProvider(context);
+        ConfigureProvider(context);
         context.Services.GetRequiredService<BunitNavigationManager>().NavigateTo("/login");
 
         var cut = context.Render<LoginRedirect>();
@@ -34,7 +53,7 @@ public sealed class LoginRedirectLocalAuthTests
     public async Task LocalProviderRendersAccessibleCredentialFields()
     {
         using var context = CreateContext(out _);
-        ConfigureLocalProvider(context);
+        ConfigureProvider(context);
         var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
         navigation.NavigateTo("/login");
 
@@ -55,7 +74,7 @@ public sealed class LoginRedirectLocalAuthTests
     public async Task ValidLocalCredentialsPostToBffAndHardNavigateToSafeReturnPath()
     {
         using var context = CreateContext(out _);
-        ConfigureLocalProvider(context);
+        ConfigureProvider(context);
         string password = $"{Guid.NewGuid():N}Aa!";
         LocalBffLoginRequest? captured = null;
         var module = context.JSInterop.SetupModule("/js/bff.js");
@@ -88,7 +107,7 @@ public sealed class LoginRedirectLocalAuthTests
     public async Task FailedLocalLoginRendersOnlyStableGuidance()
     {
         using var context = CreateContext(out _);
-        ConfigureLocalProvider(context);
+        ConfigureProvider(context);
         string password = $"{Guid.NewGuid():N}Aa!";
         context.JSInterop.SetupModule("/js/bff.js")
             .Setup<LocalBffAuthenticationResponse?>(
@@ -114,7 +133,7 @@ public sealed class LoginRedirectLocalAuthTests
     public async Task LocalLoginMapsOnlyKnownFailureCodesToGuidance(string errorCode, string expectedGuidance)
     {
         using var context = CreateContext(out _);
-        ConfigureLocalProvider(context);
+        ConfigureProvider(context);
         string password = $"{Guid.NewGuid():N}Aa!";
         var response = JsonSerializer.SerializeToElement(new { RedirectUrl = (string?)null, ErrorCode = errorCode })
             .Deserialize<LocalBffAuthenticationResponse>();
@@ -143,22 +162,22 @@ public sealed class LoginRedirectLocalAuthTests
         return context;
     }
 
-    private static void ConfigureLocalProvider(BlazorTestContext context)
+    private static void ConfigureProvider(BlazorTestContext context, string name = "local", string type = "credentials")
     {
         var providerClient = new HttpClient(new StubHttpMessageHandler(_ =>
             new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = JsonContent.Create(new
                 {
-                    primaryProvider = "local",
+                    primaryProvider = name,
                     atprotoLoginEnabled = false,
                     providers = new[]
                     {
                         new
                         {
-                            name = "local",
-                            displayName = "Local Identity",
-                            type = "credentials",
+                            name,
+                            displayName = name == "local" ? "Local Identity" : "Keycloak",
+                            type,
                             recommended = true
                         }
                     }

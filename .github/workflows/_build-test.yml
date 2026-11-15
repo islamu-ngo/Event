@@ -94,9 +94,22 @@ jobs:
         if: ${{ inputs.run-fast-tests }}
         run: dotnet restore eng/security/Event.DataProtection.Operator/Event.DataProtection.Operator.csproj --locked-mode
 
+      - name: Restore Deployment and Moderation Profiles
+        if: ${{ inputs.run-fast-tests }}
+        run: |
+          dotnet restore src/Event.Standalone/Event.Standalone.csproj --locked-mode -p:StandaloneContainerPublish=true
+          dotnet restore src/Event.Standalone/Event.Standalone.csproj --locked-mode
+          dotnet restore eng/moderation/MeasurementLauncher.csproj --locked-mode
+
       - name: Restore .NET Tools
         if: ${{ inputs.run-fast-tests }}
         run: dotnet tool restore
+
+      - name: Restore Audited File-Based Tools
+        if: ${{ inputs.run-fast-tests }}
+        run: |
+          dotnet restore eng/tools/InstallAssuranceBrowser.cs --locked-mode
+          dotnet restore eng/tools/keycloak-lifecycle-grants.cs --locked-mode
 
       - name: NuGet Security Audit
         if: ${{ inputs.run-fast-tests }}

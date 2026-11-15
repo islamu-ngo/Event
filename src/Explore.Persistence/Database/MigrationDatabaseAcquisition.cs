@@ -38,7 +38,10 @@ public sealed class MigrationDatabaseAcquisition : IAsyncDisposable
             bootstrap, environmentName, SecretConsumerRole.Migration);
         string[] scope = folders.ToArray();
         var mappings = CreateMappings(selection.Provider, scope);
-        SecretAcquisitionEntry[] entries = mappings.Select(mapping => mapping.Entry).ToArray();
+        // Retain every mapping for null masks without acquiring serving-writer passwords.
+        SecretAcquisitionEntry[] entries = mappings.Where(mapping => mapping.Destination is not
+            ("Database:LocalIdentityWriter:Password" or "IdentityDatabase:LocalIdentityWriter:Password"))
+            .Select(mapping => mapping.Entry).ToArray();
         SecretAuthorityAcquisition owner = await SecretAuthorityBootstrap.OpenAsync(
             bootstrap, environmentName, SecretConsumerRole.Migration, entries,
             new SecretAuthorityLoginAttempt(), testingAuthority, cancellationToken).ConfigureAwait(false);

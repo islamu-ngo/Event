@@ -114,9 +114,9 @@ public sealed class BffAuthenticationCredentialReceiptTests
     private static AuthenticationCredentialAcquisitionReceipts CreateReceipts(Guid? profile)
     {
         var receipts = new AuthenticationCredentialAcquisitionReceipts(profile);
-        receipts.RecordAcquired(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc,
+        receipts.RecordAcquired(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc,
             AuthenticationCredentialAcquisitionReceipts.Authority.Environment);
-        receipts.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc, true);
+        receipts.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc, true);
         return receipts;
     }
 
@@ -161,6 +161,7 @@ public sealed class BffAuthenticationCredentialReceiptTests
     private static HttpClient CreateClient(WebApplicationFactory<Program> factory) =>
         factory.CreateClient(new WebApplicationFactoryClientOptions
         {
+            BaseAddress = new Uri("https://localhost"),
             AllowAutoRedirect = false,
             HandleCookies = true
         });

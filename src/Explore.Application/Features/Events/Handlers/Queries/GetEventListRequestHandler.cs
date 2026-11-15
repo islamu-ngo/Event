@@ -23,12 +23,13 @@ public class GetEventListRequestHandler(
     ILocationRepository locationRepository,
     TimeProvider clock,
     ILocationPrivacyGovernanceService locationPrivacy,
-    IEventLocationDisclosureService locationDisclosure)
+    IEventLocationDisclosureService locationDisclosure,
+    IVisitorTenantReadAccessPolicy visitorRead)
     : IQueryHandler<GetEventListRequest, PaginatedResult<EventListDto>>
 {
     private readonly EventDiscoveryLocalSource _source = new(
         eventRepository, actorRepository, objectStorageService, logger, moduleService, tenantContext,
-        quotaResolver, lifecycle, settingsResolver, locationRepository, clock, locationPrivacy, locationDisclosure);
+        quotaResolver, lifecycle, settingsResolver, locationRepository, clock, locationPrivacy, locationDisclosure, visitorRead);
 
     public Task<PaginatedResult<EventListDto>> QueryAsync(
         GetEventListRequest request, CancellationToken cancellationToken) =>

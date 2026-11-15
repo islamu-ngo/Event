@@ -328,7 +328,8 @@ public sealed class SecretKitDataProtectionAdmissionTests
         string ringJson = JsonSerializer.Serialize(ring with { Generation = 2 });
         string admissionJson = JsonSerializer.Serialize(admission with
         {
-            Generation = 2, RingSha256 = ExternalDataProtectionInput.Hash(ringJson)
+            Generation = 2,
+            RingSha256 = ExternalDataProtectionInput.Hash(ringJson)
         });
         var input = new ExternalDataProtectionInput(ringJson, admissionJson, ExternalDataProtectionInput.Hash(admissionJson), 1);
         var source = new FreshAuthority(input) { Fresh = input with { MinimumGeneration = 2 } };

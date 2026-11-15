@@ -37,6 +37,7 @@ public sealed class EventDiscoveryLocalSource
     private readonly TimeProvider _clock;
     private readonly ILocationPrivacyGovernanceService _locationPrivacy;
     private readonly IEventLocationDisclosureService _locationDisclosure;
+    private readonly IVisitorTenantReadAccessPolicy _visitorRead;
 
     public EventDiscoveryLocalSource(
         IEventRepository eventRepository,
@@ -51,7 +52,8 @@ public sealed class EventDiscoveryLocalSource
         ILocationRepository locationRepository,
         TimeProvider clock,
         ILocationPrivacyGovernanceService locationPrivacy,
-        IEventLocationDisclosureService locationDisclosure)
+        IEventLocationDisclosureService locationDisclosure,
+        IVisitorTenantReadAccessPolicy visitorRead)
     {
         _eventRepository = eventRepository;
         _actorRepository = actorRepository;
@@ -66,6 +68,7 @@ public sealed class EventDiscoveryLocalSource
         _clock = clock;
         _locationPrivacy = locationPrivacy;
         _locationDisclosure = locationDisclosure;
+        _visitorRead = visitorRead;
     }
 
     public async Task<PaginatedResult<EventListDto>> QueryAsync(GetEventListRequest request, CancellationToken cancellationToken)
@@ -83,6 +86,7 @@ public sealed class EventDiscoveryLocalSource
     public async Task<EventQuerySpecification?> PrepareAsync(
         GetEventListRequest request, CancellationToken cancellationToken)
     {
+        await _visitorRead.RequireAsync(_tenantContext.TenantId, cancellationToken);
         if (!await _lifecycle.IsPublicAsync(_tenantContext.TenantId, cancellationToken))
             return null;
 

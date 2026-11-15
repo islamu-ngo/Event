@@ -28,7 +28,7 @@ public sealed class UserMappingHandlerTests
     {
         var user = UserMapperTests.CreateUser();
         user.Actor!.Pii.ExternalProfilePictureUri = source;
-        var repository = UserRepository(user);
+        var repository = ProfileReader(user);
         var handler = new GetUserRequestHandler(repository, Substitute.For<IObjectStorageService>(),
             NullLogger<GetUserRequestHandler>.Instance, new InlineCache(), Substitute.For<IPrivacyErasureStateRepository>());
         var result = await handler.QueryAsync(new GetUserRequest(user.Id), CancellationToken.None);
@@ -47,7 +47,7 @@ public sealed class UserMappingHandlerTests
         await Assert.That(() => user.Actor!.Pii.ExternalProfilePictureUri = "private/raw-object-key")
             .Throws<ArgumentException>();
         var result = await new GetUserRequestHandler(
-            UserRepository(user), Substitute.For<IObjectStorageService>(),
+            ProfileReader(user), Substitute.For<IObjectStorageService>(),
             NullLogger<GetUserRequestHandler>.Instance, new InlineCache(),
             Substitute.For<IPrivacyErasureStateRepository>())
             .QueryAsync(new GetUserRequest(user.Id), CancellationToken.None);
@@ -109,11 +109,10 @@ public sealed class UserMappingHandlerTests
         await Assert.That(await handler.QueryAsync(request with { Provider = "local" }, CancellationToken.None)).IsNull();
     }
 
-    private static IUserRepository UserRepository(User user)
+    private static IUserProfileReader ProfileReader(User user)
     {
-        var repository = Substitute.For<IUserRepository>();
-        repository.GetById(user.Id).Returns(user);
-        repository.GetUserWithDetails(user.Id, Arg.Any<CancellationToken>()).Returns(user);
+        var repository = Substitute.For<IUserProfileReader>();
+        repository.GetAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
         return repository;
     }
 

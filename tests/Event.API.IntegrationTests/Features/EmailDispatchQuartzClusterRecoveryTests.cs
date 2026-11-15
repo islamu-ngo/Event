@@ -612,7 +612,6 @@ public sealed class EmailDispatchQuartzClusterRecoveryTests(QuartzPostgreSqlSche
         public Task<EmailDispatchOutbox?> TryClaimSpecificAsync(EmailDispatchSpecificClaimRequest request, CancellationToken cancellationToken) => inner.TryClaimSpecificAsync(request, cancellationToken);
         public Task<EventReminderStateChangeResult> SuppressEventRemindersInCurrentTransactionAsync(EventReminderSupersessionRequest request, CancellationToken cancellationToken) => inner.SuppressEventRemindersInCurrentTransactionAsync(request, cancellationToken);
         public Task<EventReminderStateChangeResult> RescheduleEventRemindersInCurrentTransactionAsync(EventReminderRescheduleRequest request, CancellationToken cancellationToken) => inner.RescheduleEventRemindersInCurrentTransactionAsync(request, cancellationToken);
-        public Task<IReadOnlyList<EmailDispatchOutbox>> GetRabbitMqPublishBatch(int batchSize, DateTime now, DateTime retryAttemptsBefore, CancellationToken cancellationToken) => inner.GetRabbitMqPublishBatch(batchSize, now, retryAttemptsBefore, cancellationToken);
         public Task<int> CountDueDispatchAsync(DateTime now, CancellationToken cancellationToken) => inner.CountDueDispatchAsync(now, cancellationToken);
         public Task<DateTime?> GetOldestDueCreatedAtAsync(DateTime now, CancellationToken cancellationToken) => inner.GetOldestDueCreatedAtAsync(now, cancellationToken);
         public Task<IReadOnlyDictionary<Guid, int>> CountDueDispatchByTenantAsync(DateTime now, int tenantLimit, CancellationToken cancellationToken) => inner.CountDueDispatchByTenantAsync(now, tenantLimit, cancellationToken);
@@ -639,8 +638,6 @@ public sealed class EmailDispatchQuartzClusterRecoveryTests(QuartzPostgreSqlSche
         public Task<int> SuppressAndRedactTenant(Guid tenantId, Guid? changedBy, DateTime redactedAt, CancellationToken cancellationToken) => inner.SuppressAndRedactTenant(tenantId, changedBy, redactedAt, cancellationToken);
         public Task<EmailDispatchStaleRecoveryResult> RecoverStaleProcessing(EmailDispatchStaleRecoveryRequest request, CancellationToken cancellationToken) => inner.RecoverStaleProcessing(request, cancellationToken);
         public Task<EmailDispatchPreHandoffReleaseOutcome> ReleaseClaimBeforeProviderHandoff(EmailDispatchPreHandoffRelease request, CancellationToken cancellationToken) => inner.ReleaseClaimBeforeProviderHandoff(request, cancellationToken);
-        public Task MarkRabbitMqPublishSucceeded(Guid id, DateTime publishedAt, CancellationToken cancellationToken) => inner.MarkRabbitMqPublishSucceeded(id, publishedAt, cancellationToken);
-        public Task MarkRabbitMqPublishFailed(Guid id, string failureCategory, DateTime attemptedAt, CancellationToken cancellationToken) => inner.MarkRabbitMqPublishFailed(id, failureCategory, attemptedAt, cancellationToken);
         public Task<EmailDispatchFailureSettlementOutcome> SettleProviderFailure(EmailDispatchFailureSettlement settlement, CancellationToken cancellationToken) => inner.SettleProviderFailure(settlement, cancellationToken);
         public Task<EmailDispatchAcceptedReconciliationOutcome> ReconcileProviderAccepted(EmailDispatchAcceptedSettlement settlement, CancellationToken cancellationToken) => inner.ReconcileProviderAccepted(settlement, cancellationToken);
     }

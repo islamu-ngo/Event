@@ -146,8 +146,6 @@ public sealed class GetInstanceOnboardingJourneyQueryHandler(
                 && !string.IsNullOrWhiteSpace(authentication.KeycloakClientId),
             AuthenticationProviderKind.Atproto => authentication.AtprotoLoginEnabled
                 && !string.IsNullOrWhiteSpace(authentication.AtprotoPublicUrl),
-            AuthenticationProviderKind.Google => authentication.GoogleSsoEnabled
-                && !string.IsNullOrWhiteSpace(authentication.GoogleClientId),
             _ => false
         };
         if (ready) return Ready;

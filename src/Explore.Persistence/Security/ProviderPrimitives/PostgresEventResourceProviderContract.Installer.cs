@@ -234,12 +234,19 @@ public static partial class PostgresEventResourceProviderContract
             {string.Join("\n", Sources.Select(type =>
             {
                 string insertDenial = $"pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT')";
+                string updateDenial = $"pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'UPDATE,REFERENCES')";
+                if (type == typeof(SystemSetting))
+                {
+                    string profile = PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(context, enrollment);
+                    insertDenial += $" AND ({profile}) IS NOT TRUE";
+                    updateDenial += $" AND ({profile}) IS NOT TRUE";
+                }
                 if (PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, type, out _, out var insert, out _)
                     && insert.Count != 0)
                     insertDenial += $" AND ({PostgresManagedTenantWorkerCreationPermissions.CompleteGlobalCataloguePredicate(context, enrollment)}) IS NOT TRUE";
                 return $"""
                     IF pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                        OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'UPDATE,REFERENCES')
+                        OR ({updateDenial})
                         OR ({insertDenial})
                     THEN RAISE EXCEPTION 'resource_provider_ambient_write' USING ERRCODE = '55000'; END IF;
                     """;

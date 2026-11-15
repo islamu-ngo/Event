@@ -20,6 +20,7 @@ public static class GovernanceSettingKeys
     public static class Tenants
     {
         public const string SelfServiceRegistration = "tenants.self_service_registration";
+        public const string UserRegistrationEnabled = "tenants.user_registration_enabled";
         public const string WhiteLabelingEnabled = "tenants.white_labeling_enabled";
     }
 

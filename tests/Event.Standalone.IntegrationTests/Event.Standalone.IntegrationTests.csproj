@@ -1,8 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
-  <ItemGroup>
     <Compile Include="../Shared/OperationalEndpointTestTransport.cs" Link="Fixtures/OperationalEndpointTestTransport.cs" />
     <Compile Include="../Shared/ExternalDataProtectionTestAuthority.cs" Link="Fixtures/ExternalDataProtectionTestAuthority.cs" />
     <Compile Include="../Shared/Execution/TestExecutionProfile.cs" Link="Execution/TestExecutionProfile.cs" />
@@ -20,6 +17,9 @@
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);CA1716</NoWarn>
   </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Event.Standalone\Event.Standalone.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />

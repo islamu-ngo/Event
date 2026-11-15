@@ -69,7 +69,7 @@ public sealed class LocalIdentitySelectedLifecycleTests
             .SingleAsync(row => row.Id == fixture.Receipt.OperationId, fixture.CancellationToken);
         Guid resetId = Guid.CreateVersion7();
         var result = await CreateStates(fixture, selected.Services, execution).ResetAsync(new LocalCredentialResetRequest(
-            operationId: resetId, initiatingApplicationUserId: fixture.Receipt.InitiatingApplicationUserId,
+            operationId: resetId, initiatingApplicationUserId: fixture.AdministratorId,
             localSubjectId: fixture.Receipt.LocalSubjectId, expectedCurrentOperationId: operation.Id,
             expectedCurrentOperationConcurrencyStamp: operation.ConcurrencyStamp, reason: "Supervised recovery"), fixture.CancellationToken);
         await Assert.That(result.Outcome).IsEqualTo(LocalCredentialResetOutcome.Reset);

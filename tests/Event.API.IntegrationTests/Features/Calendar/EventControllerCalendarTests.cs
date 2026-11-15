@@ -233,7 +233,8 @@ public sealed class EventControllerCalendarTests
                     };
                 return result;
             });
-        return await new GetEventCalendarExportRequestHandler(owner, tenant, locations, new CalendarClock())
+        return await new GetEventCalendarExportRequestHandler(owner, tenant, locations, new CalendarClock(),
+                new Event.Testing.Settings.VisitorReadPolicyTestAuthority(tenant.TenantId).Policy)
             .QueryAsync(new(export.EventId), CancellationToken.None);
     }
 

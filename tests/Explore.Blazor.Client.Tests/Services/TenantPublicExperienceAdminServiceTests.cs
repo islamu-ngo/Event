@@ -2,6 +2,122 @@ namespace Explore.Blazor.Client.Tests.Services;
 
 public class TenantPublicExperienceAdminServiceTests
 {
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task EnrollmentUsesItsOwnCategoryAndRequiresTheServerEditLink(bool hasEditLink)
+    {
+        _apiClient.GetTenantScopedSettingsAsync(Category, null, null, Arg.Any<CancellationToken>())
+            .Returns(new HalResourceOfSettingGroupResponseDto
+            {
+                Settings = [Setting("public_experience.visitor_access_mode", "FullRegistrationAndAuth")]
+            });
+        var enrollment = System.Text.Json.JsonSerializer.Deserialize<HalResourceOfSettingGroupResponseDto>(
+            """
+            {"category":"Tenant","settings":[{"key":"tenants.user_registration_enabled","value":"false","canEdit":true}],
+             "_links":{"edit":{"href":"/api/settings/tenant/Tenant","method":"PUT"}}}
+            """, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+        if (!hasEditLink)
+            enrollment._links.Clear();
+        _apiClient.GetTenantScopedSettingsAsync("Tenant", null, null, Arg.Any<CancellationToken>()).Returns(enrollment);
+
+        var model = await _service.GetSettingsAsync();
+
+        await Assert.That(model.IsAvailable).IsTrue();
+        await Assert.That(model.UserRegistrationEnabled).IsEqualTo(false);
+        await Assert.That(model.CanEditUserRegistration).IsEqualTo(hasEditLink);
+    }
+
+    [Test]
+    public async Task EnrollmentSaveCannotLeakIntoThePublicExperienceCategory()
+    {
+        var observed = new List<(string Category, UpdateSettingBatchDto Body)>();
+        _apiClient.UpdateTenantSettingsBatchAsync(Arg.Any<string>(), Arg.Any<UpdateSettingBatchDto>(),
+                null, null, Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                observed.Add((call.ArgAt<string>(0), call.ArgAt<UpdateSettingBatchDto>(1)));
+                return new BatchUpdateResponseDto { Success = true };
+            });
+        var result = await _service.SaveAsync(new TenantPublicExperienceAdminModel
+        {
+            IsAvailable = true,
+            VisitorAccessMode = VisitorAccessMode.FullRegistrationAndAuth,
+            CanEditUserRegistration = true,
+            UserRegistrationEnabled = false
+        });
+
+        await Assert.That(result.Success).IsTrue();
+        await Assert.That(observed.Count).IsEqualTo(1);
+        await Assert.That(observed[0].Category).IsEqualTo("Tenant");
+        await Assert.That(observed[0].Body.Values!.Single().Key).IsEqualTo("tenants.user_registration_enabled");
+        await Assert.That(observed[0].Body.Values!.Single().Value).IsEqualTo("false");
+    }
+
+    [Test]
+    [Arguments(409)]
+    [Arguments(503)]
+    public async Task EnrollmentConflictAfterPublicSaveReportsPartialPersistenceAndReloadsBothCategories(int statusCode)
+    {
+        var model = new TenantPublicExperienceAdminModel
+        {
+            IsAvailable = true,
+            VisitorAccessMode = VisitorAccessMode.DirectoryListingOnly,
+            CanEditVisitorAccessMode = true,
+            CanEditUserRegistration = true,
+            UserRegistrationEnabled = false
+        };
+        _apiClient.UpdateTenantSettingsBatchAsync(Category, Arg.Any<UpdateSettingBatchDto>(),
+            null, null, Arg.Any<CancellationToken>()).Returns(new BatchUpdateResponseDto { Success = true });
+        _apiClient.UpdateTenantSettingsBatchAsync("Tenant", Arg.Any<UpdateSettingBatchDto>(),
+            null, null, Arg.Any<CancellationToken>())
+            .ThrowsAsync(new ApiException("Enrollment save rejected", statusCode, string.Empty,
+                new Dictionary<string, IEnumerable<string>>(), null));
+        _apiClient.GetTenantScopedSettingsAsync(Category, null, null, Arg.Any<CancellationToken>())
+            .Returns(new HalResourceOfSettingGroupResponseDto
+            {
+                Settings = [Setting("public_experience.visitor_access_mode", "DirectoryListingOnly")]
+            });
+        _apiClient.GetTenantScopedSettingsAsync("Tenant", null, null, Arg.Any<CancellationToken>())
+            .Returns(new HalResourceOfSettingGroupResponseDto
+            {
+                Settings = [new EffectiveSettingDto { Key = "tenants.user_registration_enabled", Value = "true", CanEdit = false }]
+            });
+
+        var result = await _service.SaveAsync(model);
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(result.Message).Contains("may already be saved");
+        await Assert.That(result.AuthoritativeStateRestored).IsTrue();
+        await Assert.That(model.VisitorAccessMode).IsEqualTo(VisitorAccessMode.DirectoryListingOnly);
+        await Assert.That(model.UserRegistrationEnabled).IsEqualTo(true);
+        await Assert.That(model.CanEditUserRegistration).IsFalse();
+    }
+
+    [Test]
+    [Arguments("null")]
+    [Arguments("\"false\"")]
+    [Arguments("not-json")]
+    public async Task MalformedEnrollmentNeverBecomesAKnownEditableDefault(string raw)
+    {
+        _apiClient.GetTenantScopedSettingsAsync(Category, null, null, Arg.Any<CancellationToken>())
+            .Returns(new HalResourceOfSettingGroupResponseDto
+            {
+                Settings = [Setting("public_experience.visitor_access_mode", "FullRegistrationAndAuth")]
+            });
+        _apiClient.GetTenantScopedSettingsAsync("Tenant", null, null, Arg.Any<CancellationToken>())
+            .Returns(new HalResourceOfSettingGroupResponseDto
+            {
+                Settings = [new EffectiveSettingDto { Key = "tenants.user_registration_enabled", Value = raw, CanEdit = true }]
+            });
+
+        var model = await _service.GetSettingsAsync();
+
+        await Assert.That(model.IsAvailable).IsTrue();
+        await Assert.That(model.UserRegistrationEnabled).IsNull();
+        await Assert.That(model.CanEditUserRegistration).IsFalse();
+    }
+
     private const string Category = "PublicExperience";
 
     private readonly ISettingsClient _apiClient;

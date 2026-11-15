@@ -4,6 +4,9 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IActorRepository : IGenericRepository<Actor, Guid>
 {
+    /// <summary>Reads only the filtered personal actor's ID, user binding, type and deletion/suspension state for identity enrollment.</summary>
+    Task<Actor?> GetForIdentityEnrollmentAsync(Guid userId, CancellationToken cancellationToken);
+
     /// <summary>Gets the tracked scalar aggregate without private profile or related-owner graphs.</summary>
     Task<Actor?> GetForModerationAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Actor?> GetActorWithDetails(Guid id, CancellationToken cancellationToken = default);

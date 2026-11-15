@@ -1,0 +1,28 @@
+Change-Id: CHG-01M7ASWSYYFHWVP62E7JVXA6D9
+Title: "Preserve declared PostgreSQL role names in setup checks"
+Type: fix
+Scope: onboarding
+Summary: "Accept correctly enrolled PostgreSQL setup roles containing uppercase letters, backslashes, apostrophes and dollar signs while retaining exact trusted-settings policy checks under both standard-string modes."
+Group: exact-setup-role-admission
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: "Quoted role lookup and mode-independent literals preserve the exact declared identity. Policy expression equality, fingerprints, closed privileges and original-owner checks remain required."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: "Valid database accounts no longer need renaming or a standard-string setting change to pass setup readiness. No new grants, deployment settings or schema migration are introduced."

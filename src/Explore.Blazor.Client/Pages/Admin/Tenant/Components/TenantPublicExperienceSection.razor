@@ -68,9 +68,28 @@
                                HelperText="Controls new visitor participation and account onboarding. Existing-account and operator sign-in remain separate."
                                data-testid="visitor-access-mode-select">
                         <MudSelectItem T="VisitorAccessMode?" Value="VisitorAccessMode.FullRegistrationAndAuth">Registration and authentication</MudSelectItem>
+                        <MudSelectItem T="VisitorAccessMode?" Value="VisitorAccessMode.AuthenticatedOnly">Authenticated visitors only</MudSelectItem>
                         <MudSelectItem T="VisitorAccessMode?" Value="VisitorAccessMode.AnonymousOnly">Anonymous participation only</MudSelectItem>
                         <MudSelectItem T="VisitorAccessMode?" Value="VisitorAccessMode.DirectoryListingOnly">Directory listing only</MudSelectItem>
                     </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    @if (Model.UserRegistrationEnabled is { } registrationEnabled)
+                    {
+                        <MudSwitch T="bool"
+                                   Value="registrationEnabled"
+                                   ValueChanged="@((bool value) => Model.UserRegistrationEnabled = value)"
+                                   Disabled="@(!Model.IsAvailable || !Model.CanEditUserRegistration)"
+                                   Label="Allow new users to enroll"
+                                   data-testid="tenant-user-registration" />
+                        <MudText Typo="Typo.caption">Closing enrollment preserves existing-account sign-in and participation.</MudText>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
+                            Enrollment settings could not be loaded. Reload before changing registration.
+                        </MudAlert>
+                    }
                 </MudItem>
                 <MudItem xs="12" md="6">
                     <MudTextField T="string"

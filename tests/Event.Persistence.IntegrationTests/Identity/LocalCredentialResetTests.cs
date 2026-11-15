@@ -419,8 +419,9 @@ public sealed class LocalCredentialResetTests
     private static string NewPassword() => $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(24))}";
 
     private sealed record OperationSnapshot(Guid Id, LocalCredentialOperationKind Kind, LocalCredentialOperationStage Stage,
-        Guid InitiatorId, Guid PersonalActorId, Guid ExternalLoginId, Guid VerifiedBy, DateTime VerifiedAt,
-        DateTime CreatedAt, DateTime? UpdatedAt, Guid Stamp, Guid? PreviousId, Guid? PreviousStamp, string? Reason)
+        Guid? InitiatorId, Guid PersonalActorId, Guid ExternalLoginId, Guid? VerifiedBy, DateTime? VerifiedAt,
+        DateTime CreatedAt, DateTime? UpdatedAt, Guid Stamp, Guid? PreviousId, Guid? PreviousStamp, string? Reason,
+        Guid? VisitorEnrollmentOperationId)
     {
         public override string ToString() => nameof(OperationSnapshot);
     }
@@ -525,7 +526,8 @@ public sealed class LocalCredentialResetTests
                     InitiatorId: operation.InitiatingApplicationUserId, PersonalActorId: operation.PersonalActorId, ExternalLoginId: operation.ExternalLoginId,
                     VerifiedBy: operation.VerifiedByApplicationUserId, VerifiedAt: operation.VerifiedAt, CreatedAt: operation.CreatedAt,
                     UpdatedAt: operation.UpdatedAt, Stamp: operation.ConcurrencyStamp, PreviousId: operation.PreviousOperationId,
-                    PreviousStamp: operation.PreviousOperationConcurrencyStamp, Reason: operation.ResetReason)).ToArray());
+                    PreviousStamp: operation.PreviousOperationConcurrencyStamp, Reason: operation.ResetReason,
+                    VisitorEnrollmentOperationId: operation.VisitorEnrollmentOperationId)).ToArray());
         }
         internal async Task AssertUnchangedAsync(Snapshot before)
         {

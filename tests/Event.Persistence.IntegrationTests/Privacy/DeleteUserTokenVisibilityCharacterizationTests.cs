@@ -119,7 +119,7 @@ public sealed class DeleteUserTokenVisibilityPostgreSqlFixture : IAsyncInitializ
         new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("delete_user_token_visibility")
             .WithUsername("postgres")
-            .WithPassword("postgres")
+            .WithPassword(global::Event.Testing.PostgreSql.PostgresTestRoleBootstrap.ReadBootstrapPassword())
             .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
             .Build();
 

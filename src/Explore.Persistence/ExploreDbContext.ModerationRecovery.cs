@@ -16,13 +16,14 @@ public partial class ExploreDbContext
     private (Guid Id, long Revision, long Generation, long Position)? _stagedModerationRecoveryCoordinates;
     private Guid? _moderationRecoveryMutationTransactionId;
 
-    private bool HasLostModerationRecoveryAdvancement(Guid transactionId) =>
+    internal bool HasLostModerationRecoveryAdvancement(Guid transactionId) =>
         _moderationRecoveryMutationTransactionId == transactionId
         && (_stagedModerationRecovery is null
             || !IsOwnedModerationRecoveryAdvancement(Entry(_stagedModerationRecovery)));
 
-    private bool IsOwnedModerationRecoveryAdvancement(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry) =>
-        entry.Entity is ModerationRecoveryStoreState state
+    internal bool IsOwnedModerationRecoveryAdvancement(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry) =>
+        ReferenceEquals(entry.Context, this)
+        && entry.Entity is ModerationRecoveryStoreState state
         && entry.State is EntityState.Added or EntityState.Modified or EntityState.Unchanged
         && ReferenceEquals(state, _stagedModerationRecovery)
         && _stagedModerationRecoveryCoordinates == Coordinates(state)
@@ -56,7 +57,10 @@ public partial class ExploreDbContext
         if (!Database.IsRelational() || Database.CurrentTransaction is null)
             throw new InvalidOperationException("Canonical recovery advancement requires the native relational transaction.");
         await using var fence = await RelationalNamedLock.AcquireTransactionAsync(this, ModerationRecoveryWriterFence, token);
-        var persisted = await Set<ModerationRecoveryStoreState>().AsNoTracking().SingleOrDefaultAsync(token);
+        var stored = await Set<ModerationRecoveryStoreState>().AsNoTracking()
+            .Select(row => new { State = row, InstallationSlot = EF.Property<int>(row, "InstallationSlot") })
+            .SingleOrDefaultAsync(token);
+        var persisted = stored?.State;
         var tracked = ChangeTracker.Entries<ModerationRecoveryStoreState>().SingleOrDefault();
         ModerationRecoveryStoreState state;
         if (persisted is null)
@@ -81,6 +85,7 @@ public partial class ExploreDbContext
             {
                 state = persisted;
                 Attach(state);
+                Entry(state).Property<int>("InstallationSlot").CurrentValue = stored!.InstallationSlot;
             }
         }
         state.Advance(state.Revision, state.Position);

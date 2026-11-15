@@ -24,17 +24,11 @@ public sealed record AuthProviderConfigurationDto
     public bool AtprotoLoginEnabled { get; init; }
     public string AtprotoPublicUrl { get; init; } = string.Empty;
 
-    // Google SSO
-    public bool GoogleSsoEnabled { get; init; }
-    public string GoogleClientId { get; init; } = string.Empty;
-    public SecretOwnershipDto GoogleClientSecretOwnership { get; init; } = new();
+    public string? UnsupportedProviderMessage { get; init; }
 
     public global::Explore.Domain.Enums.PublicOnboardingPolicy KeycloakPublicOnboardingPolicy { get; init; }
     public string KeycloakPublicSignupUrl { get; init; } = string.Empty;
-    public global::Explore.Domain.Enums.PublicOnboardingPolicy GooglePublicOnboardingPolicy { get; init; }
-    public string GooglePublicSignupUrl { get; init; } = string.Empty;
 
     // Lock flags (for multi-tenant override control)
     public bool LockAtprotoLoginEnabled { get; init; }
-    public bool LockGoogleSsoEnabled { get; init; }
 }

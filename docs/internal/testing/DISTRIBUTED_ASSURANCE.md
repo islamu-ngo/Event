@@ -12,6 +12,170 @@ listener. The environment is `Assurance`, so production worker registration and
 rate limiters retain their normal enabled behavior rather than the `Testing`
 environment's substitutions.
 
+## Daemon context isolation
+
+The dedicated daemon handler does not propagate ambient activity headers or
+baggage to the privileged Unix API. This is handler-scoped: it does not replace
+the global propagator, clear the caller's activity or disable application
+tracing. Proxy, cookie, redirect, endpoint and daemon-identity rules remain
+unchanged, as do the three-second connect and five-second request bounds.
+
+`SecurityExecutionEvidenceDaemonTransportTests` checks header names on an actual
+local Unix peer under a synthetic W3C activity, decodes the response and preserves
+the caller activity. Its separate explicit version/info/container/image/image probe checks
+read-only acquisition on the selected daemon. Neither proves resource custody,
+workload completion, cleanup or registered candidate admission.
+
+## Engine readiness before bounded daemon exchanges
+
+`SelectedDaemon` retains asynchronous Unix connection, HTTP and response-body
+operations, a five-second request budget and a three-second connection allowance.
+GET retains incremental byte, JSON-depth and duplicate-property bounds.
+Cancellation after transmitting a mutation does not establish cleanup success.
+
+A Docker Desktop API proxy can serve version, info and container inventory from
+cache while its VM is stopped. Those successful responses do not establish that
+the engine can serve image inventory or execute a workload. On October 31, 2026,
+the selected runtime log showed image inventory starting the VM at 16:40:19 UTC;
+the engine became ready at 16:40:31 UTC, after both five-second probes expired.
+This explains that reproduction without attributing it to .NET socket completion.
+
+Establish actual engine readiness separately, before starting assurance requests:
+use a bounded read-only uncached inventory operation on the same selected socket.
+Record its status, duration and the runtime's startup transition separately from
+the subsequent native test results. This prerequisite neither extends the
+client's request deadline nor retries a failed mutation. Do not reset the daemon,
+change global resource-saving settings, substitute an endpoint or claim that a
+cached health response proves readiness. A ready-engine probe still does not
+prove resource custody, workload completion or owned cleanup.
+
+## Controlled cleanup child
+
+The configured-resource join retains foreign named-volume conflicts even when
+Docker reports an explicitly empty mount `Source` on an exited or dead foreign
+container. Such historical rows do not establish owned custody: their volume
+names still conflict with declared or retained volumes, and bind mounts on the
+same row still undergo canonical-path and overlap checks. Missing, null or
+malformed sources, live-container empty sources and owned empty sources remain
+rejected. All other mount-parser callers retain the strict canonical-source
+contract. Do not prune unrelated containers to make qualification pass.
+
+For a live container whose list response abbreviates a named-volume source,
+the parent obtains detailed inspection from the same selected daemon. The
+container ID, image ID and complete mount identity set must agree; only an
+explicitly empty volume source may be completed from that inspection. The
+strict configured-resource parser still requires the physical source, and
+foreign volume-name and bind-path conflicts remain disqualifying. Inspection
+never turns a foreign container into an owned resource.
+
+`ManagedCleanupChildTests.OwnedFixtureRemainsLiveUntilItsNativeOwnerStopsIt`
+is an explicit native diagnostic child, not an assurance journey. It starts
+the genuine Split fixture and remains pending until its owning native process
+controller stops it. Its bounded cancellation disposes the fixture when a
+controller fails to stop the invocation. Ordinary test execution does not
+select this child; its `NativeCleanupChild` category is separate from the
+registered runtime, browser and load profiles.
+
+A parent cleanup regression must use the child's actual discovered UID and
+candidate-qualified assembly inputs. It must observe genuine fixture,
+container and mount custody before forcing termination. The intentionally
+killed child cannot produce an admitted execution result. The parent must
+separately prove exclusive-resource cleanup and preservation of foreign
+consumers; merely observing the child's failure proves neither. Do not qualify
+modified child sources against a prior candidate or count this helper as a
+passing registered case.
+
+The parent diagnostic can select a separate clean checkout through
+`ISLAMU_NATIVE_CLEANUP_REPOSITORY` (an absolute repository path). This permits
+uncommitted parent regression work without representing dirty child inputs as
+the committed candidate. The selected checkout still passes the ordinary
+candidate, compiled-input and served-asset checks; the override grants no
+admission exception.
+
+Owning-assembly metadata is bounded to 32 MiB. The current native
+`Explore.Application.dll` contains 15,332,280 metadata bytes, so the former
+8 MiB cap rejected a genuine build before child execution. The larger bound
+does not change allowed metadata fields, duplicate rejection, candidate joins
+or output-index custody. Regression cases accept a 16 MiB metadata fixture and
+reject a 33 MiB fixture; this is build-admission proof, not runtime cleanup proof.
+
+Served package roots may come from owning project references. Admission follows
+only the bounded source-declared reference closure. Every traversed project needs
+a candidate-tracked lock and an unambiguous matching restore index; package version
+and content hash must agree. Roots outside that closure or with ambiguous identity
+are rejected. The fingerprint includes each traversed owner's lock and restore
+bytes. This proves input provenance, not native execution or resource cleanup.
+
+Native-tool metadata inspection can race the original process exiting. A single
+aggregated `managed_metadata_unavailable` is treated as disappearance only after
+the original process identity is no longer live. Aggregates from a still-live
+process or with independent failures remain errors. Disappearance never qualifies
+the tool.
+
+Cached image references use canonical registry/repository/tag or digest keys.
+Short Docker Hub names are expanded without changing requested tag or digest
+meaning. Equivalent aliases must resolve to the same initial cached image ID;
+conflicts fail closed. Native image inspection and original-image membership
+checks still run; normalization never pulls, retags or substitutes an image.
+
+Untagged-image cache sentinels (`<none>:<none>` in `RepoTags` and
+`<none>@<none>` in `RepoDigests`) grant no selectable reference. Their image IDs
+remain in the initial cache inventory. The same sentinel on multiple untagged
+images is not an alias conflict; wrong-field or malformed sentinel forms still
+fail closed.
+
+The fixture's native inspection parser stores container and image identities as
+bare 64-digit hexadecimal hashes. Managed container associations publish the
+image as a `sha256:` digest. Formatting belongs at that publication boundary;
+association equality compares the published digest. The regression composes
+the inspection parser with publication so a manually constructed identity cannot
+hide a mismatch. This composition check does not claim native resource cleanup.
+
+## Load-process custody
+
+`K6LoadRunner` launches workload and version probes through the separately staged
+`ISLAMU.ReleaseEngineering own-load-process` executable. The test project builds
+that executable and copies its complete output into `LoadProcessOwner/`; running
+an old test output directory does not rebuild the owner.
+
+The owner requires Linux x64, glibc, procfs child lists, pidfds, non-reaping
+`waitid`, and `close_range(CLOEXEC)`. Initialization checks the required behavior.
+It becomes a child subreaper in its own disposable process, never in the test
+host. Native spawn and exclusive waiting retain each child lifetime until its
+pidfd is acquired. Termination uses those descriptors, not numeric process-group
+signals. Repeated direct-child adoption covers descendants whose parent exited
+or which created a new session.
+
+The controller sends the executable, arguments and explicitly admitted environment
+over a bounded private stdin protocol. Workload output cannot inherit that
+protocol. Closing the sole stdin lease requests cancellation, including during
+startup or controller exit. Cleanup has its own ten-second budget and succeeds
+only after kernel `ECHILD` and actual EOF on both workload output pipes.
+Primary and cleanup failures remain separate; deadline expiry retains the
+runner's cancellation exception contract. Root CPU, RSS and timing measurements
+exclude helper startup and descendant cleanup.
+
+The owner cannot guarantee cleanup if it is itself killed with `SIGKILL`.
+Process-harness results establish only this lifecycle contract, not application
+readiness, offered-load correctness, capacity or final candidate admission.
+
+## Native benchmark compilation
+
+Baseline benchmark launches allow 600 seconds for BenchmarkDotNet's generated
+project build. The retained native SDK build completed in 3:00.93 after the
+default 120-second attempt timed out without executing any benchmarks. This
+allowance changes compilation time only: adaptive measurement settings,
+precision, worker provenance and result admission remain unchanged. Smoke
+launches retain their existing in-process Dry job. Command-contract tests do
+not establish a measured baseline.
+
+The native benchmark failure wrapper emits the first cause's exception type
+and stack frames without file information. BenchmarkDotNet validation retains
+this wrapper message but can suppress console output from setup. The wrapper
+never formats the original exception message or argument values; original
+causes remain privately retained. A setup failure is not a measurement or an
+admitted result.
+
 ## Ownership admission
 
 `TestingResourceIsolation.Admit` runs before dotenv loading and before the Aspire
@@ -87,6 +251,19 @@ awaits its actual execution if attachment fails. A task faulted with an
 is actually Canceled is accepted as completed cancellation.
 The testing facade's startup/stop tasks and lifecycle notification tokens alone
 are not used as proof that a pending hosted startup callback has finished.
+
+Volume-consumer checks read the selected Unix daemon's unfiltered
+`/v1.40/containers/json?all=true` runtime inventory. Container inspection can
+retain configured bind paths that differ from daemon runtime paths; it is not
+the consumer-location authority. Require HTTP 200 without Content-Range, disable
+redirects/cookies/proxy/tracing headers, and bound each response to 4 MiB. Parse two
+complete duplicate-free inventories, require equal exact container-ID sets, and
+retain the union of their consumers. A membership change permits one fresh
+attempt; failures remain attached if complete reobservation does not succeed.
+Volume names and canonical overlapping bind paths identify consumers regardless
+of whether they are running. The parent accepts explicitly empty foreign volume
+sources only with a known Docker state; owned sources still require the separate
+exact model/inspection join. Daemon errors do not prove resource absence.
 
 Current verification is incomplete: fresh Split and Standalone runs stop at
 `discovery_traversal_source_catalog_drift` during migration. The delayed

@@ -17,7 +17,7 @@ using NpgsqlTypes;
 namespace Explore.Persistence.Security;
 
 /// <summary>
-/// Executes principal source SQL on the caller's captured connection and transaction.
+/// Reads principal facts on the caller's captured connection and transaction.
 /// </summary>
 internal sealed class HumanPrincipalSourceQueries(
     ExploreDbContext _context, HumanCommitSubject _subject, PolicySourceSetPurpose _purpose,
@@ -63,6 +63,17 @@ internal sealed class HumanPrincipalSourceQueries(
             requireSelection();
             return facts;
         }
+        if (!_context.Database.IsNpgsql())
+        {
+            void RequireOriginal()
+            {
+                requireSelection();
+                if (!ReferenceEquals(transaction, _context.Database.CurrentTransaction?.GetDbTransaction()))
+                    throw new InvalidOperationException("human_principal_transaction_changed");
+            }
+            return await HumanPrincipalSourceProjection.ReadAsync(
+                _context, _context, _subject, _local, RequireOriginal, ct);
+        }
         JsonDocument? native = null;
         try
         {
@@ -83,50 +94,40 @@ internal sealed class HumanPrincipalSourceQueries(
                 command.CommandText = PostgresHumanPrincipalSourceContract.AdmissionSql(_context, _enrollment!);
                 await command.ExecuteNonQueryAsync(ct);
             }
-            var readSql = new HumanPrincipalSourceSql(_context, transaction is not null
-                && _context.Database.ProviderName == RelationalNamedLock.MySqlProvider);
-            string[] queries = readSql.Queries;
-            async Task<ImmutableArray<T>> Rows<T>(int index) => native is not null
-                ? native.RootElement.GetProperty($"q{index}").Deserialize<ImmutableArray<T>>(Json)
-                : await ReadRowsAsync<T>(queries[index], transaction, ct);
-            var users = await Rows<HumanPrincipalAccountFact>(0);
-            var bindings = await Rows<HumanPrincipalBindingFact>(1);
-            var platform = await Rows<HumanPrincipalPlatformGrantFact>(2);
-            var roles = await Rows<HumanPrincipalRoleFact>(3);
-            var members = await Rows<HumanPrincipalTenantMembershipFact>(4);
-            var grants = await Rows<HumanPrincipalTenantGrantFact>(5);
-            var tenants = await Rows<HumanPrincipalTenantFact>(6);
-            var organizations = await Rows<HumanPrincipalOwnerMembershipFact>(7);
-            var groups = await Rows<HumanPrincipalOwnerMembershipFact>(8);
-            var permissions = await Rows<HumanPrincipalPermissionFact>(9);
-            bool mappingsExist = native is not null
-                ? native.RootElement.GetProperty("PermissionMappingsExist").GetBoolean()
-                : !(await Rows<IntValue>(10)).IsEmpty;
+            ImmutableArray<T> Rows<T>(int index) =>
+                native!.RootElement.GetProperty($"q{index}").Deserialize<ImmutableArray<T>>(Json);
+            var users = Rows<HumanPrincipalAccountFact>(0);
+            var bindings = Rows<HumanPrincipalBindingFact>(1);
+            var platform = Rows<HumanPrincipalPlatformGrantFact>(2);
+            var roles = Rows<HumanPrincipalRoleFact>(3);
+            var members = Rows<HumanPrincipalTenantMembershipFact>(4);
+            var grants = Rows<HumanPrincipalTenantGrantFact>(5);
+            var tenants = Rows<HumanPrincipalTenantFact>(6);
+            var organizations = Rows<HumanPrincipalOwnerMembershipFact>(7);
+            var groups = Rows<HumanPrincipalOwnerMembershipFact>(8);
+            var permissions = Rows<HumanPrincipalPermissionFact>(9);
+            bool mappingsExist = native!.RootElement.GetProperty("PermissionMappingsExist").GetBoolean();
             var lists = new ImmutableArray<Guid>[4];
             for (int index = 0; index < lists.Length; index++)
             {
-                var rows = await Rows<GuidValue>(11 + index);
-                if (native is null && rows.IsEmpty && !mappingsExist)
-                    rows = await ReadRowsAsync<GuidValue>(readSql.FallbackQueries[index % 2], transaction, ct);
+                var rows = Rows<GuidValue>(11 + index);
                 lists[index] = rows.Select(row => row.Value).ToImmutableArray();
             }
             HumanPrincipalLocalSessionFacts? local = null;
             if (_local is not null)
             {
-                string[] localQueries = _sql.LocalQueries;
-                async Task<ImmutableArray<T>> LocalRows<T>(int index) => native is not null
-                    ? native.RootElement.GetProperty($"l{index}").Deserialize<ImmutableArray<T>>(Json)
-                    : await ReadRowsAsync<T>(localQueries[index], transaction, ct);
-                var accounts = await LocalRows<HumanPrincipalLocalAccountFact>(0);
-                string? metadata = (await LocalRows<StringValue>(1)).SingleOrDefault()?.Value;
+                ImmutableArray<T> LocalRows<T>(int index) =>
+                    native.RootElement.GetProperty($"l{index}").Deserialize<ImmutableArray<T>>(Json);
+                var accounts = LocalRows<HumanPrincipalLocalAccountFact>(0);
+                string? metadata = LocalRows<StringValue>(1).SingleOrDefault()?.Value;
                 LocalCredentialStateMetadata? state;
                 try { state = string.IsNullOrWhiteSpace(metadata) ? null : JsonSerializer.Deserialize<LocalCredentialStateMetadata>(metadata, Json); }
                 catch (JsonException) { state = null; }
                 catch (ArgumentException) { state = null; }
-                var operations = await LocalRows<HumanPrincipalLocalOperationFact>(2);
-                var actors = await LocalRows<HumanPrincipalPersonalActorFact>(3);
+                var operations = LocalRows<HumanPrincipalLocalOperationFact>(2);
+                var actors = LocalRows<HumanPrincipalPersonalActorFact>(3);
                 string? delivery = accounts is [var account] && !account.EmailConfirmed
-                    ? (await LocalRows<StringValue>(4)).SingleOrDefault()?.Value : null;
+                    ? LocalRows<StringValue>(4).SingleOrDefault()?.Value : null;
                 local = new(accounts, state, operations, actors,
                     delivery is null ? null : JsonSerializer.Deserialize<bool>(delivery));
             }
@@ -136,37 +137,6 @@ internal sealed class HumanPrincipalSourceQueries(
                 lists[0], lists[1], lists[2], lists[3], local);
         }
         finally { native?.Dispose(); }
-    }
-
-    private async Task<ImmutableArray<T>> ReadRowsAsync<T>(string sql, DbTransaction? transaction, CancellationToken ct)
-    {
-        await using var command = Command(transaction);
-        command.CommandText = sql + (transaction is not null
-            && _context.Database.ProviderName == RelationalNamedLock.MySqlProvider ? " FOR UPDATE" : "");
-        Parameters(command);
-        await using var reader = await command.ExecuteReaderAsync(ct);
-        var result = ImmutableArray.CreateBuilder<T>();
-        while (await reader.ReadAsync(ct))
-        {
-            var row = new Dictionary<string, object?>(StringComparer.Ordinal);
-            for (int index = 0; index < reader.FieldCount; index++)
-                row.Add(reader.GetName(index), await reader.IsDBNullAsync(index, ct) ? null : reader.GetValue(index));
-            // Normalize provider booleans and GUID storage without exposing entities or tracker state.
-            foreach (var property in typeof(T).GetProperties())
-            {
-                if (!row.TryGetValue(property.Name, out object? value) || value is null) continue;
-                if (property.PropertyType == typeof(bool))
-                    row[property.Name] = Convert.ToBoolean(value, System.Globalization.CultureInfo.InvariantCulture);
-                if (property.PropertyType == typeof(Guid) || property.PropertyType == typeof(Guid?))
-                    row[property.Name] = value is Guid guid ? guid : Guid.Parse((string)value);
-                if (property.PropertyType == typeof(DateTime) || property.PropertyType == typeof(DateTime?))
-                    row[property.Name] = DateTime.SpecifyKind(value is DateTime date ? date
-                        : DateTime.Parse((string)value, System.Globalization.CultureInfo.InvariantCulture), DateTimeKind.Utc);
-            }
-            result.Add(JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(row), Json)
-                ?? throw new InvalidOperationException("human_principal_row_invalid"));
-        }
-        return result.ToImmutable();
     }
 
     internal async Task LockPortableAsync(DbTransaction transaction, CancellationToken ct)
@@ -203,7 +173,6 @@ internal sealed class HumanPrincipalSourceQueries(
         }
     }
 
-    private sealed record IntValue(int Value);
     private sealed record GuidValue(Guid Value);
     private sealed record StringValue(string? Value);
 

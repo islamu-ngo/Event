@@ -8,6 +8,12 @@
 
 ## Complete release-impact metadata
 
+Before the license audit, CI restores the conditional Standalone container graph
+and the moderation launcher. It then uses ordinary Standalone assets for the
+solution build. When reproducing a missing-metadata failure, verify package and
+version coverage for these profiles before changing policy or relying on a warm
+local cache.
+
 Review complete changed-file metadata, including previous names for renames.
 A large PR must not bypass impact classification or lower its declared file count.
 See [the trusted metadata contract](CI_CD_GOVERNANCE.md#complete-pr-file-metadata).
@@ -16,6 +22,12 @@ used by `pull_request_target`; arrange an independently reviewed base update
 before relying on its rerun.
 
 ## Current procedure
+
+If CodeQL is cancelled, inspect the actual workflow conclusion and phase
+timestamps before interpreting the result. Follow
+[the operational procedure](OPERATIONS.md#codeql-analysis-cancellation)
+and retain a completed analysis for the candidate before satisfying its
+scanner gate. A successful traced build alone does not satisfy that gate.
 
 Until a trusted release bundle, release-engine verification, signer policy, provider
 protection evidence, and advisory dry run are implemented, operators MUST use
@@ -29,6 +41,12 @@ and included suite flags before interpreting a percentage; never combine
 different commits or label missing runtime lanes as complete. If publication fails,
 follow [coverage publication operations](OPERATIONS.md#codecov-coverage-publication);
 do not substitute coverage percentages for the checklist's required tests.
+
+Prepare the owned browser through the existing native installer and its
+dedicated committed lock, preserving other tools' locks. Follow
+[security fixture prerequisites](CI_CD_GOVERNANCE.md#security-integration-fixture-execution)
+when restore or download fails. Only actual case execution, not installation,
+can satisfy the browser portion of the candidate's assurance.
 
 For SDK/runtime servicing, verify the official release's CVE mapping and image
 digests, regenerate owned dependency locks with the selected SDK, and retain
@@ -260,6 +278,39 @@ execution sidecar and referenced reports have also been supplied:
 3. Keep these exact bytes for replay and tag-only clones. Missing, stale,
    duplicated, skipped, zero-test or digest-inconsistent evidence rejects
    candidate verification before a manifest is written.
+
+When acquisition fails before child launch, distinguish the selected daemon's
+read-only transport result from workload and cleanup evidence. Do not use
+diagnostic socket-completion or global tracing overrides to qualify the final
+candidate; the dedicated handler's context isolation must work normally.
+
+For a stat-role link rejection, retain the security workflow's system-stat
+observation before choosing a repair. Confirm the actual link chain, executable
+and invocation semantics; a resolved multicall target may not accept stat's
+arguments directly. Preserve non-link candidate admission and bind any future
+utility selection to both measured and executed inputs. Do not retry with a link
+exception or assume that changing runner images proves compatibility.
+
+The native stat repair resolves only the fixed system entry and retains its
+same-basename executable for capture and both metadata operations. Unsupported
+dispatchers and linked entry/target ancestors fail closed. Verify real alias
+execution and unchanged managed/policy linked-input refusals before publication;
+the hosted workflow must still complete all registered profiles on the final head.
+Capture the fixed `stat_tool_*` rejection code when selection fails.
+`stat_tool_selection_unavailable` identifies an inaccessible or missing
+filesystem target without exposing its path or underlying exception text.
+
+For a discovery identity mismatch, retain native JSON and a real TRX from the
+required witness. The supported constructor display form maps to the undecorated
+CLR class through one shared parser used by admission and proof generation.
+Do not rewrite authority inventories to display text or relax exact/subset joins.
+
+Establish actual engine readiness with a separate bounded read-only uncached
+inventory request on the selected socket. Desktop proxy cache responses can
+precede VM startup; retain startup/readiness evidence separately. Preserve the
+asynchronous client's five-second request and three-second connection allowances.
+A lost mutation response is an unknown outcome: inspect the qualified resource
+and preserve the error instead of adding retries or declaring cleanup complete.
 
 ```sh
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \

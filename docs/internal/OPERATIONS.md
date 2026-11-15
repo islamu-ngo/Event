@@ -2366,6 +2366,11 @@ uses it for measured bindings and execution. A target with an unsupported
 dispatcher basename or linked ancestor is refused. Do not introduce an ambient
 tool-path override or apply this infrastructure selection to candidate inputs.
 
+When discovery inventory matching fails, compare retained native discovery and
+TRX identities before editing the register. Fixture constructor display text is
+not an additional authority identifier. Unsupported decoration fails closed;
+do not use substring matching, case folding or duplicate elimination.
+
 For API-key issuance verification, inspect the `database-provider-<Provider>` CI
 artifact's `Issuance.trx` and the provider summary's API-key issuance outcome.
 The matrix runs at least 14 issuance cases on each migrated real engine. A passing

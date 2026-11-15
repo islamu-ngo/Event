@@ -2612,11 +2612,17 @@ public sealed class SecurityExecutionEvidenceExecutionTests
     [Arguments("canary-type")]
     [Arguments("canary-method")]
     [Arguments("canary-display")]
+    [Arguments("constructor-empty")]
+    [Arguments("constructor-unclosed")]
+    [Arguments("constructor-nested")]
+    [Arguments("constructor-trailing")]
+    [Arguments("constructor-collision")]
     public async Task DiscoveryAndExecutionMustHaveOneOrdinalUnambiguousIdentityJoin(string variant)
     {
         using var fixture = new NativeFixture();
         JsonArray tests = fixture.Discovery["tests"]!.AsArray();
         JsonNode first = tests[0]!;
+        string originalType = first["type"]!["typeName"]!.GetValue<string>();
         string canary = "private-identity-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
         switch (variant)
         {
@@ -2649,6 +2655,16 @@ public sealed class SecurityExecutionEvidenceExecutionTests
             case "canary-type": first["type"]!["typeName"] = canary; break;
             case "canary-method": first["type"]!["methodName"] = canary; break;
             case "canary-display": first["displayName"] = canary; break;
+            case "constructor-empty": first["type"]!["typeName"] = originalType + "()"; break;
+            case "constructor-unclosed": first["type"]!["typeName"] = originalType + "(NativeFixture"; break;
+            case "constructor-nested": first["type"]!["typeName"] = originalType + "(NativeFixture(Other))"; break;
+            case "constructor-trailing": first["type"]!["typeName"] = originalType + "(NativeFixture)extra"; break;
+            case "constructor-collision":
+                JsonNode duplicate = first.DeepClone();
+                duplicate["uid"] = "fresh constructor collision uid";
+                duplicate["type"]!["typeName"] = originalType + "(NativeFixture)";
+                tests.Add(duplicate);
+                break;
         }
 
         bool accepted = SecurityExecutionEvidence.TryCreateNativeProof(
@@ -2659,6 +2675,32 @@ public sealed class SecurityExecutionEvidenceExecutionTests
         await Assert.That(proof is null).IsTrue();
         await Assert.That(diagnostic).IsNotEqualTo(string.Empty);
         await Assert.That(diagnostic).DoesNotContain(canary);
+        if (variant == "constructor-collision")
+        {
+            bool parsed = (bool)typeof(SecurityExecutionEvidence)
+                .GetMethod("TryReadNativeDiscovery", BindingFlags.NonPublic | BindingFlags.Static)!
+                .Invoke(null, [Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()), null])!;
+            await Assert.That(parsed).IsFalse();
+        }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ConstructorDisplayDecorationPreservesExactClrReportIdentity(bool decorated)
+    {
+        using var fixture = new NativeFixture();
+        JsonNode first = fixture.Discovery["tests"]!.AsArray()[0]!;
+        if (decorated)
+            first["type"]!["typeName"] = first["type"]!["typeName"]!.GetValue<string>() + "(NativeFixture)";
+
+        bool accepted = SecurityExecutionEvidence.TryCreateNativeProof(
+            Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()), fixture.ReportBytes(),
+            fixture.RequiredTests, exactSelection: true, out byte[]? proof, out string diagnostic);
+
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(proof is not null).IsTrue();
+        await Assert.That(diagnostic).IsEqualTo(string.Empty);
     }
 
     private static string Digest(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();

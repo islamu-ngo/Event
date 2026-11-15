@@ -297,6 +297,11 @@ dispatchers and linked entry/target ancestors fail closed. Verify real alias
 execution and unchanged managed/policy linked-input refusals before publication;
 the hosted workflow must still complete all registered profiles on the final head.
 
+For a discovery identity mismatch, retain native JSON and a real TRX from the
+required witness. The supported constructor display form maps to the undecorated
+CLR class through one shared parser used by admission and proof generation.
+Do not rewrite authority inventories to display text or relax exact/subset joins.
+
 Establish actual engine readiness with a separate bounded read-only uncached
 inventory request on the selected socket. Desktop proxy cache responses can
 precede VM startup; retain startup/readiness evidence separately. Preserve the

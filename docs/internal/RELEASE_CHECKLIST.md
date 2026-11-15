@@ -108,6 +108,10 @@ For fixed-system stat selection, verify that the retained binding names the
 selected executable used by both metadata paths. Retain real utility-alias and
 candidate linked-input refusal controls; observation success alone is insufficient.
 
+Retain native discovery/report identity evidence for fixture-backed tests.
+Verify decorated and undecorated classes join exactly, malformed constructor
+displays fail, and distinct UIDs cannot collapse to one accepted canonical tuple.
+
 Retain the selected candidate's completed CodeQL analysis result. A passing
 manual build followed by cancellation is incomplete scanner evidence; follow
 [the cancellation procedure](OPERATIONS.md#codeql-analysis-cancellation).

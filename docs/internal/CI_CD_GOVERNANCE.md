@@ -66,6 +66,11 @@ target ancestors must remain nonlinked, and the final basename must stay `stat`.
 Capture and both metadata invocations use the same selected executable.
 Candidate files, assemblies, manifests and policy inputs never receive alias resolution.
 
+Native discovery may render a simple fixture constructor in `typeName`.
+The shared parser accepts only the complete `ClassName(SimpleFixtureName)` form
+and joins its CLR class, unchanged method and display name to the register and
+TRX. Opaque UIDs remain execution selectors; canonical identity collisions fail.
+
 The browser prerequisite uses `eng/tools/InstallAssuranceBrowser.cs` with its
 own generated lock at `eng/tools/InstallAssuranceBrowser/packages.lock.json`.
 The installer requires locked restore and retains the approved Playwright

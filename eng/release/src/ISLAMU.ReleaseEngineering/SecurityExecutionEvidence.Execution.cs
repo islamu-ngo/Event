@@ -3770,6 +3770,18 @@ public static partial class SecurityExecutionEvidence
             if (!BoundedIdentity(uid, 4096) || !BoundedIdentity(display, 16_384) ||
                 !BoundedIdentity(namespaceName, 2048) || !BoundedIdentity(typeName, 2048) ||
                 !BoundedIdentity(method, 2048) || !uids.Add(uid)) return false;
+            int constructor = typeName.IndexOf('(');
+            if (constructor >= 0)
+            {
+                if (!typeName.EndsWith(')')) return false;
+                string className = typeName[..constructor];
+                string fixtureName = typeName[(constructor + 1)..^1];
+                if (new[] { className, fixtureName }.Any(name => name.Length == 0 ||
+                    !(char.IsAsciiLetter(name[0]) || name[0] == '_') ||
+                    name.Any(character => !(char.IsAsciiLetterOrDigit(character) || character == '_'))))
+                    return false;
+                typeName = className;
+            }
             var identity = new SecurityControlRegister.RequiredTest(namespaceName + "." + typeName, method, display);
             if (!identities.Add(identity)) return false;
             discovered.Add(new NativeDiscoveredTest(uid, identity));

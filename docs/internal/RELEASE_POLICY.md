@@ -79,6 +79,10 @@ runtime lanes must not be presented as complete platform coverage. Its scope and
   Only the fixed infrastructure stat leaf may resolve to a same-basename,
   nonlinked target selected once per process. Candidate input link rejection
   and the existing before/after executable fingerprints MUST remain unchanged.
+  Recognized fixture constructor decoration in native discovery MUST map through
+  the shared complete grammar; register/report equality, opaque UID uniqueness
+  and canonical tuple uniqueness MUST remain unchanged. Constructor display
+  arguments do not replace or expand required authority witness identities.
 
 - Candidate B MUST retain a `security-execution.v1.json` sidecar from actual
   selected execution at exactly B, together with its contained report/log

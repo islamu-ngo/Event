@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6P12CB538T3T0X793FYDMFF
+Title: "Synchronize webhook catalogue through its Global storage owner"
+Type: fix
+Scope: webhooks
+Summary: "Use independent Global catalogue storage with fixed metadata permissions while preserving immutable identifiers and Runtime isolation."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/WEBHOOKS.md
+    Disposition: documented
+    Detail: "Independent Global catalogue calls retain original physical ownership and exact metadata ACL admission; Runtime access and catalogue DELETE remain denied."
+  Migration:
+    Reference: docs/internal/WEBHOOKS.md
+    Disposition: documented
+    Detail: "Canonical migration installs fixed SELECT/INSERT metadata columns and nine mutable UPDATE columns under the original Migrator."
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/webhooks.md
+    Disposition: documented
+    Detail: "Application synchronization preserves identifiers, names and creation history; altered permissions fail admission rather than being silently repaired."

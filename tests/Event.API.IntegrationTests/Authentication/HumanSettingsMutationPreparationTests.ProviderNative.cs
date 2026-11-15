@@ -142,8 +142,8 @@ public sealed partial class HumanSettingsMutationPreparationTests
         await Assert.That(afterValidation).IsTrue();
         await Assert.That(observer.Applied).IsFalse();
         await using var final = fixture.Native.CreateDatabase();
-        await Assert.That(await final.SystemSettings.AnyAsync(row => row.SettingKey == GovernanceSettingKeys.Authentication.GoogleClientId
-            && row.Value == "\"provider-native-after\"")).IsFalse();
+        await Assert.That(await final.SystemSettings.AnyAsync(row => row.SettingKey == GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl
+            && row.Value == "\"https://provider-native-after.example.test/signup\"")).IsFalse();
     }
 
     [Test]
@@ -164,13 +164,13 @@ public sealed partial class HumanSettingsMutationPreparationTests
         await SeedPlatformAdministratorAsync(fixture);
         await using (var seed = fixture.Native.CreateDatabase())
         {
-            const string key = GovernanceSettingKeys.Authentication.GoogleClientId;
+            const string key = GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl;
             await seed.SystemSettings.Where(row => row.SettingKey == key).ExecuteDeleteAsync();
             seed.SystemSettings.Add(new()
             {
                 Id = Guid.CreateVersion7(),
                 SettingKey = key,
-                Value = "\"before\"",
+                Value = "\"https://before.example.test/signup\"",
                 ValueType = SettingValueType.String,
                 Description = "Original provider metadata",
                 Category = "Original category",
@@ -195,7 +195,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
         }
         observer.AfterWrite = async (context, _, token) =>
         {
-            var row = context.SystemSettings.Where(row => row.SettingKey == GovernanceSettingKeys.Authentication.GoogleClientId);
+            var row = context.SystemSettings.Where(row => row.SettingKey == GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl);
             if (change == "metadata") await row.ExecuteUpdateAsync(set => set.SetProperty(item => item.Description, "replaced metadata"), token);
             if (change == "audit") await row.ExecuteUpdateAsync(set => set.SetProperty(item => item.UpdatedBy, Guid.CreateVersion7()), token);
             if (change == "lock") await row.ExecuteUpdateAsync(set => set.SetProperty(item => item.IsLocked, false), token);
@@ -274,7 +274,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
             Patch = new()
             {
                 Configuration = OptionalUpdate<AuthProviderConfigurationWriteDto>.Set(new()
-                { PrimaryProviderId = (int)AuthenticationProviderKind.Local, GoogleClientId = "provider-native-after" })
+                { PrimaryProviderId = (int)AuthenticationProviderKind.Local, KeycloakPublicSignupUrl = "https://provider-native-after.example.test/signup" })
             }
         }, default);
         await Assert.That(original.Source is IProviderConfigurationSetupSource).IsTrue();
@@ -341,8 +341,8 @@ public sealed partial class HumanSettingsMutationPreparationTests
         {
             using var independent = fixture.Native.CreateDatabase();
             return observer.Context!.Database.CurrentTransaction is null
-                && independent.SystemSettings.Any(row => row.SettingKey == GovernanceSettingKeys.Authentication.GoogleClientId
-                    && row.Value == "\"provider-native-after\"");
+                && independent.SystemSettings.Any(row => row.SettingKey == GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl
+                    && row.Value == "\"https://provider-native-after.example.test/signup\"");
         };
         var handler = ActivatorUtilities.CreateInstance<UpdateAuthProviderConfigurationCommandHandler>(request.Services);
         if (rejected)
@@ -430,7 +430,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
         Patch = new()
         {
             Configuration = OptionalUpdate<AuthProviderConfigurationWriteDto>.Set(new()
-            { PrimaryProviderId = (int)AuthenticationProviderKind.Local, GoogleClientId = "provider-native-after" })
+            { PrimaryProviderId = (int)AuthenticationProviderKind.Local, KeycloakPublicSignupUrl = "https://provider-native-after.example.test/signup" })
         }
     };
 
@@ -472,8 +472,8 @@ public sealed partial class HumanSettingsMutationPreparationTests
         services.RemoveAll<IRetainedSecretResolver>();
         services.AddScoped<IRetainedSecretResolver>(provider => ActivatorUtilities.CreateInstance<SecretResolver>(provider));
         services.RemoveAll<ISecretSource>();
-        services.AddSingleton<ISecretSource>(new ProviderAbsentMaterial(SecretSourceType.EnvironmentVariable));
-        services.AddSingleton<ISecretSource>(new ProviderAbsentMaterial(SecretSourceType.Infisical));
+        services.AddSingleton<ISecretSource>(new ProviderAbsentMaterial(SecretSourceType.EnvironmentVariable, observer));
+        services.AddSingleton<ISecretSource>(new ProviderAbsentMaterial(SecretSourceType.Infisical, observer));
         services.AddScoped<ProviderConfigurationSettingsWriter>();
         services.RemoveAll<IProviderConfigurationSettingsWriter>();
         services.AddScoped<IProviderConfigurationSettingsWriter>(provider => new NativeProviderWriter(
@@ -481,11 +481,16 @@ public sealed partial class HumanSettingsMutationPreparationTests
             provider.GetRequiredService<IVisitorAccessSettingsWriter>(), observer));
     }
 
-    private sealed class ProviderAbsentMaterial(SecretSourceType source) : ISecretSource
+    private sealed class ProviderAbsentMaterial(SecretSourceType source, NativeProviderObserver observer) : ISecretSource
     {
         public SecretSourceType SourceType => source;
         public Task<SecretResolutionResult> GetSecretAsync(SecretBinding binding, CancellationToken token = default)
-        { token.ThrowIfCancellationRequested(); return Task.FromResult(SecretResolutionResult.Unconfigured); }
+        {
+            token.ThrowIfCancellationRequested();
+            if (binding.SettingKey == SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret)
+                Interlocked.Increment(ref observer.GoogleMaterialRequests);
+            return Task.FromResult(SecretResolutionResult.Unconfigured);
+        }
         public Task<bool> ValidateAsync(SecretBinding binding, CancellationToken token = default) => Task.FromResult(false);
     }
 
@@ -495,6 +500,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
         internal VisitorAccessSettingsWriter? Visitor;
         internal ProviderConfigurationMutation? Mutation;
         internal bool Applied;
+        internal int GoogleMaterialRequests;
         internal bool Skip;
         internal Func<bool>? ObserveCommitted;
         internal bool? ActivatedAfterCommit;

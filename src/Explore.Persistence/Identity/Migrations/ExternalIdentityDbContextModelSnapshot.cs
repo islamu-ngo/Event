@@ -105,7 +105,7 @@ namespace Explore.Persistence.Identity.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("external_login_id");
 
-                    b.Property<Guid>("InitiatingApplicationUserId")
+                    b.Property<Guid?>("InitiatingApplicationUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("initiating_application_user_id");
 
@@ -142,13 +142,17 @@ namespace Explore.Persistence.Identity.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.Property<DateTime>("VerifiedAt")
+                    b.Property<DateTime?>("VerifiedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("verified_at");
 
-                    b.Property<Guid>("VerifiedByApplicationUserId")
+                    b.Property<Guid?>("VerifiedByApplicationUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("verified_by_application_user_id");
+
+                    b.Property<Guid?>("VisitorEnrollmentOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("visitor_enrollment_operation_id");
 
                     b.HasKey("Id")
                         .HasName("pk_local_identity_credential_operation");
@@ -158,13 +162,15 @@ namespace Explore.Persistence.Identity.Migrations
 
                     b.ToTable("local_identity_credential_operation", "islamu_identity", t =>
                         {
-                            t.HasCheckConstraint("ck_local_credential_operation_kind", "kind BETWEEN 1 AND 2");
+                            t.HasCheckConstraint("ck_local_credential_operation_kind", "kind BETWEEN 1 AND 3");
 
-                            t.HasCheckConstraint("ck_local_credential_operation_reset_metadata", "(kind = 1 AND previous_operation_id IS NULL AND previous_operation_concurrency_stamp IS NULL AND reset_reason IS NULL) OR (kind = 2 AND previous_operation_id IS NOT NULL AND previous_operation_id <> id AND previous_operation_concurrency_stamp IS NOT NULL AND reset_reason IS NOT NULL AND TRIM(reset_reason) <> '' AND stage <> 1)");
+                            t.HasCheckConstraint("ck_local_credential_operation_origin", "((kind IN (1, 2) AND initiating_application_user_id IS NOT NULL) OR (kind = 3 AND initiating_application_user_id IS NULL)) AND ((kind IN (1, 2) AND visitor_enrollment_operation_id IS NULL AND verified_by_application_user_id IS NOT NULL AND verified_at IS NOT NULL) OR (kind IN (2, 3) AND visitor_enrollment_operation_id IS NOT NULL AND verified_by_application_user_id IS NULL AND verified_at IS NULL))");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_reset_metadata", "(kind IN (1, 3) AND previous_operation_id IS NULL AND previous_operation_concurrency_stamp IS NULL AND reset_reason IS NULL AND (kind <> 3 OR stage <> 2)) OR (kind = 2 AND previous_operation_id IS NOT NULL AND previous_operation_id <> id AND previous_operation_concurrency_stamp IS NOT NULL AND reset_reason IS NOT NULL AND TRIM(reset_reason) <> '' AND stage <> 1)");
 
                             t.HasCheckConstraint("ck_local_credential_operation_stage", "stage BETWEEN 1 AND 5");
 
-                            t.HasCheckConstraint("ck_local_credential_operation_timestamps", "((kind = 1 AND verified_at >= created_at) OR (kind = 2 AND verified_at <= created_at)) AND (updated_at IS NULL OR updated_at >= created_at)");
+                            t.HasCheckConstraint("ck_local_credential_operation_timestamps", "((kind = 1 AND verified_at IS NOT NULL AND verified_at >= created_at) OR (kind = 2 AND (verified_at IS NULL OR verified_at <= created_at)) OR (kind = 3 AND verified_at IS NULL)) AND (updated_at IS NULL OR updated_at >= created_at)");
                         });
                 });
 

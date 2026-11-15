@@ -109,6 +109,30 @@ source of requirement categories and remediation authority. Value-free operator
 form metadata supplies authoritative choices; persisted identity and revision remain
 in the existing document. See [SELF_HOSTING.md](SELF_HOSTING.md#2-operator-identity-governance--readiness-gate).
 
+## Tenant user enrollment
+
+`tenants.user_registration_enabled` is a lockable Boolean policy from instance
+to tenant scope, defaulting to `true` when a successful authoritative snapshot
+contains no value. A locked instance value wins over a tenant override.
+`TenantUserRegistrationPolicy` accepts JSON Boolean values only; malformed or
+unavailable configuration cannot be treated as an open-registration default.
+This controls users joining an existing tenant and is independent of
+`tenants.self_service_registration`, which controls creating tenants.
+
+The complete visitor authority group includes enrollment, visitor mode and
+provider facts. Current capability resolution and final native settings writes
+resolve the same inherited scalar. Closing enrollment removes signup destinations
+while preserving usable Local, Keycloak and AT Protocol sign-in and
+account-required participation. Local signup is not advertised until its callable
+registration endpoint is available. `AuthenticatedOnly` governs read privacy;
+enrollment remains a separate policy.
+
+Tenant administrators edit enrollment through the `Tenant` settings category.
+The browser requires the server's category edit link and the setting's editable
+state. Public-experience and enrollment category saves are separate requests;
+rejection refreshes authoritative settings and does not pretend earlier category
+writes were rolled back.
+
 ## Anonymous Registration Intake Controls
 
 `AnonymousRegistrationRateLimiting` resolves final host configuration from
@@ -320,6 +344,10 @@ is required. See the [operator procedure](../public/self-hosting/operator-identi
 > **Source Anchors:** `src/Explore.Persistence/Database/PrimaryDatabaseConfiguration.cs`, `src/Event.MigrationService/Extensions/ConfigurationExtensions.cs`, `src/Event.Standalone/Program.cs`, `src/Event.Standalone/appsettings.json`, `src/Event.Standalone/Dockerfile`, `Explore.API/Extensions/ConfigurationExtensions.cs`, `Explore.API/Controllers/ListmonkIntegrationSettingsController.cs`, `Explore.API/Controllers/PlatformMonetizationSettingsController.cs`, `Explore.Application/Configuration/PromotionCodeLookupOptions.cs`, `Explore.Application/DTOs/Integrations/ListmonkIntegrationSettingsDto.cs`, `Explore.Application/Features/PlatformMonetization/`, `Explore.Infrastructure/Integrations/Listmonk/ListmonkSyncService.cs`, `Explore.Infrastructure/Services/Registration/PromotionCodeDigestService.cs`, `Explore.Blazor/Extensions/ConfigurationExtension.cs`, `Explore.Blazor/Extensions/YarpProxyExtensions.cs`, `Event.Web.BffHosting/Authentication/EventBffKeycloakAuthenticationOptions.cs`, `Event.Web.BffHosting/Proxy/EventApiBaseAddressResolver.cs`, `Explore.Application/Features/EventReporting/EventReportSubmissionOptions.cs`, `Explore.Application/Services/AccountAuthorityLifecycleEmailOptions.cs`, `Explore.Application/Notifications/AccountAuthorityKind.cs`, `Explore.Application/Notifications/NotificationRoutingOptions.cs`, `Explore.Infrastructure/Configuration/ModerationProviderOptions.cs`, `Explore.Infrastructure/Configuration/OspreyProviderOptions.cs`, `Explore.Infrastructure/Configuration/CoopProviderOptions.cs`, `Explore.API/Services/CoopWebhookSignatureValidator.cs`, `Explore.Infrastructure/Services/HierarchicalSettingsResolver.cs`, `Explore.Infrastructure/Services/Keycloak/KeycloakLifecycleEmailOptions.cs`, `Explore.Infrastructure/Services/Keycloak/KeycloakAccountAuthorityLifecycleEmailService.cs`, `Explore.Infrastructure/Storage/LocalFileStorageProvider.cs`, `Explore.Infrastructure/Storage/S3ConfigResolver.cs`, `Explore.Infrastructure/StorageReconciliationSettings.cs`, `Explore.Infrastructure/Mail/SmtpConfigResolver.cs`, `Explore.Infrastructure/Services/SetupSecretProvider.cs`, `Explore.Domain/Constants/GovernanceSettingKeys.cs`, `Explore.Domain/Constants/InfrastructureSecretSettingKeys.cs`, `Explore.Domain/Secrets/SecretDefinitionRegistry.cs`, `docs/SECRETS.md`
 
 ## Environment Variables & Secrets Authority
+
+The default database schema does not require a special tenant configuration for
+migration. `ExploreDatabaseMigrator` binds its own absent-tenant execution lease;
+changing `Database:Schema` is not a remedy for a missing migration lease.
 
 The authoritative reference catalogue of all deployment, identity, database, and integration environment variables is maintained in the **public documentation**:
 
@@ -1141,6 +1169,16 @@ Browser/admin DTOs expose only `ApiUsernameConfigured` and `ApiKeyConfigured`
 flags, never raw credential values. Rotate credentials through the authorized
 Listmonk integration API.
 
+The `listmonk-integration` process health check has no selected tenant. It reads
+the five ordinary instance keys through `IInstanceSystemSettingsReader`, using
+the existing independent Global context, shared merge defaults and setting
+serializer. Credential references and values stay with `ISecretResolver` at
+instance scope. Ordinary Runtime still requires a selected tenant; tenant
+settings endpoints, connection tests and synchronization retain their existing
+tenant resolution. Disabled instance integration is Healthy; enabled but
+incompletely configured integration is Degraded. Health exposes configuration
+flags and secret-resolution states, never provider URLs or credential values.
+
 Quartz `integration-sync-drain` uses the existing `IntegrationSyncProcessor` section; the name is retained to avoid a configuration rename, not because a hosted processor still exists. `Enabled` registers or removes the owned job, `PollingIntervalSeconds` controls its interval, `BatchSize` bounds one pass, `ProcessingLeaseTimeoutSeconds` controls stale-claim recovery, and the retry-delay/max-attempt keys remain Infrastructure state-machine controls. An unkeyed Listmonk request with an uncertain outcome is parked and requires evidence-based operator recovery; changing retry settings never makes it eligible for blind replay.
 
 `IntegrationSyncProcessor:HealthDueWarningThreshold` defaults to `1000`; `HealthStaleWarningThreshold` and `HealthAmbiguousWarningThreshold` default to `1`. These positive bounded thresholds drive the aggregate `queue-drains` readiness check and never expose tenant, subscriber, or provider identity.
@@ -1206,8 +1244,14 @@ enable Event delivery or relay to external inboxes. See
 anchors and the separate optional-image licensing boundary.
 
 `EmailDeliveryPolicy` owns pure state and credential-scope rules. The Infrastructure
-`EmailDeliveryCapabilityResolver` uses the existing hierarchical settings resolver and
-selected secret authority. The SMTP adapter builds a fresh transport configuration on
+`EmailDeliveryCapabilityResolver` reads its instance policy through
+`IInstanceSystemSettingsReader`, then applies the shared hierarchy defaults.
+This independent instance capability preserves Global read ownership when the
+caller is a tenantless Runtime health scope. Delegated tenant policy still uses
+the ordinary hierarchical reader with the requested tenant; locks, enablement
+and credential-scope rules are unchanged. This adds no Runtime table grants.
+The resolver continues to use the selected secret authority.
+The SMTP adapter builds a fresh transport configuration on
 each resolution; it no longer caches plaintext SMTP configurations. Existing settings
 and secret-authority cache lifetimes still apply across replicas.
 
@@ -1369,6 +1413,50 @@ The PDS worker calls CarpaNet only for committed outbox rows. Event creation/upd
 Admin-host classification runs after trusted forwarded-header processing. Reverse proxies must forward `X-Forwarded-Host`, `X-Forwarded-Proto`, and `X-Forwarded-For` so the BFF sees the browser-facing host, scheme, and client IP.
 
 ### Storage Static Configuration
+
+`StoragePolicyResolver` reads the instance policy image through
+`IInstanceSystemSettingsReader` on its independent Global context. The shared
+settings merge preserves defaults, locks, delegation and the instance upload
+ceiling; permitted tenant overrides still use the selected Runtime tenant reader.
+The `storage` process health check can therefore resolve instance policy without
+selecting a request tenant or expanding Runtime permissions.
+
+Default-provider S3 detection uses the explicit `IInstanceS3ConfigResolver`
+capability. It resolves ordinary instance S3 fields through the same instance
+reader and credentials through `ISecretResolver` with a null tenant owner.
+It cannot adopt the requesting tenant's S3 configuration or cache entry.
+`S3ConfigResolver` is shared by the two scoped ports; its instance cache entry
+is separate from tenant entries, and instance invalidation clears all entries
+while generation checks prevent stale in-flight publication. Existing tenant
+S3 resolution and retained storage bindings keep their original scope.
+
+Storage probes retain separate instance-readiness and tenant-transport evidence.
+`IStorageProbeTenantSettingsReader` opens an independent ordinary Runtime context
+through `ITenantExploreDbContextFactory`, sealed to the captured request tenant.
+This also applies when the probe's original source owner is tenantless Global.
+It does not rebind that owner or relax `PostgresOrdinarySettingsContract`'s
+selected-scope guard. Detached tenant overrides and the captured instance rows
+use the existing hierarchy merge; source-generation and snapshot checks still
+reject drift at each handoff.
+`IStorageProbeSecretBindingsReader` reads the fixed two-key binding image through
+the existing storage-configuration read capability on the original source owner.
+It never acquires the configuration writer or expands direct table access.
+Detached instance and tenant winners pass through
+`IRetainedSecretResolver.CaptureAsync`'s selected-binding overload, which retains
+authority admission without selecting repository rows again. Canonical mapped
+binding metadata joins the source snapshot, including nonwinning rows.
+Capture performs no external secret read while the native source owner holds
+locks. After that owner returns idle, the probe resolves both
+retained reference pairs without selecting current bindings or using the S3
+configuration cache. Its captured instance rows and instance readiness feed the
+policy resolver; only the original tenant configuration reaches the transport.
+Each handoff rechecks both credential material/revision witnesses and the original
+source image. An unconfigured instance value remains a captured unconfigured
+observation; invalid or unavailable resolution fails closed.
+The original support-forwarding header names and value sequences remain bound
+from before the first await. Changing them rejects the action even when its
+forwarding observation was already captured. Closing or breaking the retained
+physical connection permanently expires its custody; reopening cannot restore it.
 
 Local-first storage is deployment-managed. The filesystem root is bound from static configuration and is not a tenant/admin database setting.
 
@@ -2040,7 +2128,7 @@ Storage naming rules:
 
 ## Blazor Server Compatibility Mapping
 
-`Explore.Blazor.Extensions.ConfigurationExtensions` maps Keycloak, Google, and API base URL keys for the BFF host.
+`Explore.Blazor.Extensions.ConfigurationExtensions` maps supported Keycloak, AT Protocol and API base URL keys for the BFF host.
 
 API base URL is public deployment configuration (`API_ENDPOINT`); the BFF does not acquire a broad `/blazor` folder. Aspire service discovery supplies its local API endpoint.
 
@@ -2048,7 +2136,8 @@ Important behavior:
 
 - `KEYCLOAK_CLIENT_ID` maps to `Keycloak:ClientId`; when a Keycloak authority is resolved and no client id is provided, the BFF defaults to `islamu-event-blazor`.
 - `Keycloak:ClientSecret` is explicitly overridden when `KEYCLOAK_BLAZOR_CLIENT_SECRET` (Infisical) is present.
-- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` map to `Google:ClientId` and `Google:ClientSecret`.
+- Direct Google runtime inputs are retired. Google sign-in uses Keycloak's broker;
+  neither flat nor structured Google client aliases establish a runtime scheme.
 
 Compose and local Aspire pass `KEYCLOAK_BLAZOR_CLIENT_SECRET` only to BFF or
 Combined runtime under Environment authority; Infisical consumers acquire it
@@ -2128,7 +2217,7 @@ Platform monetization is application-managed instance data, not an `appsettings`
 | AI assistant | `ai_assistant.*` | No credential value; scope metadata selects a secret reference. |
 | Support access | `support_access.*` | none |
 
-`SecretDefinitionRegistry` declares exact runtime coordinates and `SecretAcquisitionPolicy` admits them for each consumer. Keycloak and Cerbos use purpose-specific runtime roots, while existing service roots such as `/storage`, `/postgresql`, `/smtp`, `/analytics` and `/ai` remain. The BFF acquires Google values only from `/runtime/bff/oidc/google`; broad provider folders are not runtime authority.
+`SecretDefinitionRegistry` declares exact runtime coordinates and `SecretAcquisitionPolicy` admits them for each consumer. Keycloak and Cerbos use purpose-specific runtime roots, while existing service roots such as `/storage`, `/postgresql`, `/smtp`, `/analytics` and `/ai` remain. The retained Google definition protects historical binding custody; `/runtime/bff/oidc/google` is excluded from active acquisition. Runtime environment projection masks the retired Google aliases for every consumer.
 
 ### External Link Transport Policy
 
@@ -2284,7 +2373,9 @@ Post-onboarding management note:
 - Instance admins can update authentication provider governance values through `PATCH /api/instance/settings/auth-provider`.
 - Instance admins can update the active authorization provider through `PATCH /api/instance/settings/authz-provider`.
 - Setup and instance-admin policy sync endpoints accept an optional complete one-time Admin API username/password pair. An empty request selects deployment credentials; partial pairs are rejected.
-- Secret values (`keycloak`/`google` client secrets) continue to use secret-setting storage, not plain governance values.
+- Keycloak client credentials remain deployment-owned. Retained Google credential
+  references are historical custody and never become plain governance values or
+  a callable authentication provider.
 
 ## Settings Cascade Rules
 
@@ -2405,7 +2496,11 @@ restore evidence belong to the operator deployment manifest described in
 The API compatibility projection maps every documented `GEOCODING_*` key to
 the authoritative `Geocoding:*` options section. Comma-separated country codes and
 retry delays become indexed configuration values. Explicit structured
-`Geocoding:*` values take precedence. Aspire forwards the same contract to both
+`Geocoding:*` values take precedence. Infrastructure clears the initialized retry
+schedule before binding an explicit collection, so configured delays replace
+`200,500` rather than being appended to it. An absent schedule retains those
+defaults; retry-count and total-timeout validation still applies.
+Aspire forwards the same contract to both
 split API and standalone topologies; Compose forwards it through the
 `geocoding-env` anchor.
 

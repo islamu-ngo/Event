@@ -284,8 +284,8 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
                 var resolver = Owner._services.GetRequiredService<IRetainedSecretResolver>();
                 using var bindings = JsonDocument.Parse(state.Bindings);
                 foreach (string key in ProviderConfigurationState.SecretKeys.Where(key =>
-                    key == SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret
-                        ? requirements.GoogleRelevant : requirements.KeycloakRelevant))
+                    key != SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret
+                        && requirements.KeycloakRelevant))
                 {
                     RequireCustody();
                     if (!SecretAcquisitionPolicy.AllowsRoot(materialCoordinates!.Consumer,
@@ -348,8 +348,7 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
             await RequireSourcesAsync(token);
             RequireTime();
             return new(new(keycloak.Status, keycloak.Authority, keycloak.BlazorClientId),
-                (results.GetValueOrDefault(SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret)
-                    ?? SecretResolutionResult.Unconfigured).Status, publicationReady, requirements);
+                publicationReady, requirements);
         }
 
         public async Task RequireExternalSourcesAsync(CancellationToken token)

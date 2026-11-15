@@ -24,6 +24,7 @@ public sealed class RegistrationProviderCallbackController(
     private const long MaxBodyBytes = 256 * 1024;
 
     [HttpPost("{provider}/{bindingId:guid}/callback", Name = RouteNames.RegistrationProviderCallback)]
+    [TenantReadBootstrap]
     [EndpointSummary("Record Registration Provider Callback")]
     [EndpointDescription("Accepts signed provider-hosted registration submission callbacks and queues bounded durable processing.")]
     [AllowAnonymous]

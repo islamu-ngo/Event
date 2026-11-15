@@ -373,6 +373,22 @@ mechanisms below.
 
 ## Provider probe support and cache activation
 
+Instance readiness and the requesting tenant's transport settings are observed
+separately. Instance and setup probes retain their original instance authority
+while a tenant-bound reader observes the captured request tenant's overrides.
+This requires no additional database grants or configuration; a changed scope
+or settings image rejects the probe.
+Credential references are observed through the existing bounded storage read
+capability. The probe does not require direct access to the secret-binding table;
+external secret material is resolved only after source transactions finish.
+An explicit tenant provider does not depend on unused instance credentials.
+Instance credentials are consulted only when the effective policy needs instance
+S3 autodetection. Once consulted, their retained reference, availability and
+revision must remain unchanged through the probe's later handoffs; required
+unavailable credentials still reject the probe.
+Changing support-forwarding metadata or losing the retained database connection
+ends that probe; reconnecting does not resume its authority.
+
 Write probes keep the original signed administrator or genuine setup request,
 current credentials and provider binding through each remote handoff. Database
 transactions are not held during remote calls. Observation preflight does not

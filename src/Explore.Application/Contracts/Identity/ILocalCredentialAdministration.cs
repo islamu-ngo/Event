@@ -153,15 +153,20 @@ public sealed record LocalCredentialOperationStatus
 {
     public LocalCredentialOperationStatus(
         LocalCredentialOperationReceipt receipt, Guid operationConcurrencyStamp,
-        Guid verifiedByApplicationUserId, DateTime verifiedAt, DateTime? updatedAt,
+        Guid? verifiedByApplicationUserId, DateTime? verifiedAt, DateTime? updatedAt,
         bool isCurrent, LocalCredentialState? credentialState, LocalCredentialResetReceipt? resetAudit)
     {
         ArgumentNullException.ThrowIfNull(receipt);
-        if (operationConcurrencyStamp == Guid.Empty || verifiedByApplicationUserId == Guid.Empty)
+        bool visitorOrigin = receipt.VisitorEnrollmentOperationId.HasValue;
+        if (operationConcurrencyStamp == Guid.Empty || verifiedByApplicationUserId == Guid.Empty
+            || (visitorOrigin
+                ? verifiedByApplicationUserId.HasValue || verifiedAt.HasValue
+                : !verifiedByApplicationUserId.HasValue || !verifiedAt.HasValue))
         {
-            throw new ArgumentException("Operation and verification identifiers are required.");
+            throw new ArgumentException("Verification provenance must match the original credential authority.");
         }
-        if (verifiedAt.Kind != DateTimeKind.Utc || (updatedAt.HasValue && updatedAt.Value.Kind != DateTimeKind.Utc))
+        if ((verifiedAt.HasValue && verifiedAt.Value.Kind != DateTimeKind.Utc)
+            || (updatedAt.HasValue && updatedAt.Value.Kind != DateTimeKind.Utc))
         {
             throw new ArgumentException("UTC audit times are required.");
         }
@@ -173,6 +178,9 @@ public sealed record LocalCredentialOperationStatus
         if (isCurrent && !((credentialState == LocalCredentialState.ProvisioningPending
                     && receipt.Kind == LocalCredentialOperationKind.Create
                     && receipt.Stage == LocalCredentialOperationStage.ProvisioningPending)
+                || (credentialState == LocalCredentialState.RegistrationPending
+                     && receipt.Kind == LocalCredentialOperationKind.VisitorCreate
+                     && receipt.Stage == LocalCredentialOperationStage.ProvisioningPending)
                 || (credentialState == LocalCredentialState.ChangeRequired
                     && receipt.Stage == LocalCredentialOperationStage.ChangeRequired)
                 || (credentialState == LocalCredentialState.Ready
@@ -197,8 +205,8 @@ public sealed record LocalCredentialOperationStatus
 
     public LocalCredentialOperationReceipt Receipt { get; }
     public Guid OperationConcurrencyStamp { get; }
-    public Guid VerifiedByApplicationUserId { get; }
-    public DateTime VerifiedAt { get; }
+    public Guid? VerifiedByApplicationUserId { get; }
+    public DateTime? VerifiedAt { get; }
     public DateTime? UpdatedAt { get; }
     public bool IsCurrent { get; }
     public LocalCredentialState? CredentialState { get; }
@@ -482,7 +490,8 @@ public sealed record LocalCredentialProvisioningSnapshot
 public enum LocalCredentialOperationKind
 {
     Create = 1,
-    Reset = 2
+    Reset = 2,
+    VisitorCreate = 3
 }
 
 public enum LocalCredentialOperationStage
@@ -554,13 +563,15 @@ public sealed record LocalCredentialOperationReceipt
         Guid operationId,
         LocalCredentialOperationKind kind,
         LocalCredentialOperationStage stage,
-        Guid initiatingApplicationUserId,
+        Guid? initiatingApplicationUserId,
         Guid localSubjectId,
         Guid personalActorId,
         Guid externalLoginId,
-        DateTime createdAt)
+        DateTime createdAt,
+        Guid? visitorEnrollmentOperationId)
     {
         if (operationId == Guid.Empty || initiatingApplicationUserId == Guid.Empty
+            || visitorEnrollmentOperationId == Guid.Empty
             || localSubjectId == Guid.Empty || personalActorId == Guid.Empty || externalLoginId == Guid.Empty)
         {
             throw new ArgumentException("Credential receipt identifiers must be nonempty.");
@@ -570,6 +581,14 @@ public sealed record LocalCredentialOperationReceipt
             throw new ArgumentOutOfRangeException(nameof(kind), "Unknown credential operation kind.");
         if (!Enum.IsDefined(stage))
             throw new ArgumentOutOfRangeException(nameof(stage), "Unknown credential operation stage.");
+        if (kind == LocalCredentialOperationKind.VisitorCreate
+            ? initiatingApplicationUserId.HasValue || !visitorEnrollmentOperationId.HasValue
+                || stage == LocalCredentialOperationStage.ChangeRequired
+            : !initiatingApplicationUserId.HasValue
+                || kind == LocalCredentialOperationKind.Create && visitorEnrollmentOperationId.HasValue)
+        {
+            throw new ArgumentException("Credential origin must retain its administrator or visitor enrollment authority.");
+        }
         if (createdAt.Kind != DateTimeKind.Utc)
             throw new ArgumentException("A UTC creation time is required.", nameof(createdAt));
 
@@ -581,17 +600,19 @@ public sealed record LocalCredentialOperationReceipt
         PersonalActorId = personalActorId;
         ExternalLoginId = externalLoginId;
         CreatedAt = createdAt;
+        VisitorEnrollmentOperationId = visitorEnrollmentOperationId;
     }
 
     public Guid OperationId { get; }
     public LocalCredentialOperationKind Kind { get; }
     public LocalCredentialOperationStage Stage { get; }
-    public Guid InitiatingApplicationUserId { get; }
+    public Guid? InitiatingApplicationUserId { get; }
     public Guid LocalSubjectId { get; }
     public Guid ApplicationUserId => LocalSubjectId;
     public Guid PersonalActorId { get; }
     public Guid ExternalLoginId { get; }
     public DateTime CreatedAt { get; }
+    public Guid? VisitorEnrollmentOperationId { get; }
 
     public override string ToString() => nameof(LocalCredentialOperationReceipt);
 }

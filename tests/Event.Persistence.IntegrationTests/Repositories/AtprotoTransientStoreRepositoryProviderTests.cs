@@ -1,6 +1,7 @@
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
+using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
@@ -27,12 +28,12 @@ public sealed class AtprotoTransientStoreRepositoryProviderTests(AdmissionAuthor
         }
         DateTimeOffset now = DateTimeOffset.UtcNow;
         Guid tenant = Guid.CreateVersion7();
-        AtprotoTransientRecord record = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest, tenant, "opaque", now.AddMinutes(1).ToUnixTimeMilliseconds());
+        AtprotoTransientRecord record = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, Digest, AtprotoAuthenticationFlowTarget.Targeted(tenant), "opaque", now.AddMinutes(1).ToUnixTimeMilliseconds());
         await using (ExploreDbContext writer = await CreateContextAsync(provider))
         {
             var repository = new AtprotoTransientStoreRepository(writer, new FixedTimeProvider(now));
             await Assert.That(await repository.TryCreateAsync(record)).IsTrue();
-            AtprotoTransientRecord duplicate = AtprotoTransientRecord.Create(record.Purpose, record.TokenDigest, tenant, "overwrite", record.ExpiresAtUnixMilliseconds);
+            AtprotoTransientRecord duplicate = AtprotoTransientRecord.Create(record.Purpose, record.TokenDigest, AtprotoAuthenticationFlowTarget.Targeted(tenant), "overwrite", record.ExpiresAtUnixMilliseconds);
             await Assert.That(await repository.TryCreateAsync(duplicate)).IsFalse();
         }
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -81,7 +82,7 @@ public sealed class AtprotoTransientStoreRepositoryProviderTests(AdmissionAuthor
         DateTimeOffset now = DateTimeOffset.FromUnixTimeMilliseconds(2_000_000_000_000);
         Guid tenant = Guid.CreateVersion7();
         AtprotoTransientRecord record = AtprotoTransientRecord.Create(
-            AtprotoTransientPurpose.OAuthState, Digest, tenant, payload, now.AddMinutes(1).ToUnixTimeMilliseconds());
+            AtprotoTransientPurpose.OAuthState, Digest, AtprotoAuthenticationFlowTarget.Targeted(tenant), payload, now.AddMinutes(1).ToUnixTimeMilliseconds());
 
         await using (ExploreDbContext writer = await CreateContextAsync(provider))
         {

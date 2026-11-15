@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6P1MXSMC7AWG3VSK68XX244
+Title: "Enroll Global public tenant directory reads during canonical migration"
+Type: fix
+Scope: access
+Summary: "Restore public tenant discovery through the existing fixed directory capability without granting private table access or migration authority to serving hosts."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Global inherits the existing public directory read purpose without SET or ADMIN authority; private tables remain isolated."
+  Migration:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Canonical migration enrolls the configured Global login instead of relying on shared-fixture membership."
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: "Public discovery exposes active tenant identifiers, slugs and public domain coordinates without serving-host migration authority."

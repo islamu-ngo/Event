@@ -1,12 +1,12 @@
 
 using System.Collections.Immutable;
-using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Domain.Services;
 
 namespace Explore.Application.Services;
 
@@ -34,12 +34,13 @@ public sealed class VisitorAccessCapabilityResolver(
         GovernanceSettingKeys.Authentication.KeycloakPublicOnboardingPolicy,
         GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl,
         GovernanceSettingKeys.Authentication.PrimaryProviderId,
-        GovernanceSettingKeys.PublicExperience.VisitorAccessMode);
+        GovernanceSettingKeys.PublicExperience.VisitorAccessMode,
+        GovernanceSettingKeys.Tenants.UserRegistrationEnabled);
 
     public async Task<VisitorAccessCapability> ResolveAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         if (!await lifecycle.IsPublicAsync(tenantId, cancellationToken))
-            return new VisitorAccessCapability(VisitorAccessMode.DirectoryListingOnly, false, []);
+            return new VisitorAccessCapability(VisitorAccessMode.DirectoryListingOnly, false, [], false);
 
         var current = await settings.ReadAsync(tenantId,
             AuthoritySettingKeys, cancellationToken);
@@ -49,38 +50,21 @@ public sealed class VisitorAccessCapabilityResolver(
             setting.SettingKey == GovernanceSettingKeys.PublicExperience.VisitorAccessMode);
         var mode = ResolveMode(instance, tenant);
         var providers = providerReader.ReadProviders(current.System);
-        return EvaluateProposedState(new VisitorAccessPolicyState(mode, providers));
+        return EvaluateProposedState(new VisitorAccessPolicyState(mode, providers, ResolveRegistrationEnabled(
+            current.System.SingleOrDefault(setting => setting.SettingKey == GovernanceSettingKeys.Tenants.UserRegistrationEnabled),
+            current.Tenant.SingleOrDefault(setting => setting.SettingKey == GovernanceSettingKeys.Tenants.UserRegistrationEnabled))));
     }
 
     /// <summary>Resolves scalar mode inheritance for current or complete proposed native settings.</summary>
     public static VisitorAccessMode ResolveMode(SystemSetting? instanceSetting, TenantSetting? tenantSetting)
-    {
-        string? raw = instanceSetting?.IsLocked == true
-            ? instanceSetting.Value
-            : tenantSetting?.Value ?? instanceSetting?.Value;
-        if (raw is null)
-        {
-            return VisitorAccessMode.FullRegistrationAndAuth;
-        }
-
-        string? value;
-        try
-        {
-            value = JsonSerializer.Deserialize<string>(raw);
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidOperationException("The persisted visitor access mode is invalid.", exception);
-        }
-
-        return Enum.TryParse(value, out VisitorAccessMode mode)
-               && Enum.IsDefined(mode)
-               && string.Equals(mode.ToString(), value, StringComparison.Ordinal)
-            ? mode
-            : throw new InvalidOperationException("The persisted visitor access mode is invalid.");
-    }
+        => VisitorReadPolicy.ResolveMode(instanceSetting?.Value, instanceSetting?.IsLocked == true,
+            tenantSetting?.Value);
 
     public VisitorAccessCapability Evaluate(VisitorAccessPolicyState proposedState) => EvaluateProposedState(proposedState);
+
+    public static bool ResolveRegistrationEnabled(SystemSetting? instanceSetting, TenantSetting? tenantSetting)
+        => TenantUserRegistrationPolicy.ResolveEnabled(instanceSetting?.Value, instanceSetting?.IsLocked == true,
+            tenantSetting?.Value);
 
     /// <summary>Evaluates complete final facts without reads, writes, discovery or SMTP inference.</summary>
     public static VisitorAccessCapability EvaluateProposedState(VisitorAccessPolicyState proposedState)
@@ -90,9 +74,9 @@ public sealed class VisitorAccessCapabilityResolver(
             throw new InvalidOperationException("The proposed visitor access mode is invalid.");
         }
 
-        if (proposedState.Mode != VisitorAccessMode.FullRegistrationAndAuth)
+        if (proposedState.Mode is not (VisitorAccessMode.FullRegistrationAndAuth or VisitorAccessMode.AuthenticatedOnly))
         {
-            return new(proposedState.Mode, false, []);
+            return new(proposedState.Mode, false, [], proposedState.UserRegistrationEnabled);
         }
 
         var destinations = new List<VisitorSignupDestination>();
@@ -106,16 +90,22 @@ public sealed class VisitorAccessCapabilityResolver(
 
             switch (provider.Provider)
             {
+                case AuthenticationProviderKind.Local:
+                    allowsExistingAccountLogin = true;
+                    if (proposedState.UserRegistrationEnabled)
+                        destinations.Add(new(provider.Provider, "/auth/local/register"));
+                    break;
                 case AuthenticationProviderKind.Atproto:
                     // Provider-selected handle authorization leads to passwordless platform
                     // enrollment through AtprotoJitAccountProvisioningOperation, not Local signup.
                     allowsExistingAccountLogin = true;
-                    destinations.Add(new(provider.Provider, "/login?provider=atproto"));
+                    if (proposedState.UserRegistrationEnabled)
+                        destinations.Add(new(provider.Provider, "/login?provider=atproto"));
                     break;
                 case AuthenticationProviderKind.Keycloak:
-                case AuthenticationProviderKind.Google:
                     allowsExistingAccountLogin = true;
-                    if (provider.PublicOnboardingPolicy == PublicOnboardingPolicy.Allowed
+                    if (proposedState.UserRegistrationEnabled
+                        && provider.PublicOnboardingPolicy == PublicOnboardingPolicy.Allowed
                         && Uri.TryCreate(provider.SignupUrl, UriKind.Absolute, out var destination)
                         && destination.Scheme == Uri.UriSchemeHttps
                         && string.IsNullOrEmpty(destination.UserInfo))
@@ -123,10 +113,9 @@ public sealed class VisitorAccessCapabilityResolver(
                         destinations.Add(new(provider.Provider, destination.AbsoluteUri));
                     }
                     break;
-                    // Local is operator-only; unknown authorities cannot create public capabilities.
             }
         }
 
-        return new(proposedState.Mode, allowsExistingAccountLogin, destinations);
+        return new(proposedState.Mode, allowsExistingAccountLogin, destinations, proposedState.UserRegistrationEnabled);
     }
 }

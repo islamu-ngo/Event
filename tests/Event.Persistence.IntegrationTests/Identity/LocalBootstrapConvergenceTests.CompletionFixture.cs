@@ -300,7 +300,7 @@ public sealed partial class LocalBootstrapConvergenceTests
                 logins, emails, privacyState,
                 new IdentityAccountResolver(Users, logins, emails, privacyState, Options.Create(new IdentityCorrelationOptions())),
                 new IdentityEmailSynchronizationOperation(emails),
-                Settings, [provider], setup, new ObservedAudit(events), deployment, metadata,
+                [provider], setup, new ObservedAudit(events), deployment, metadata,
                 NullLogger<InstanceOnboardingCompletionOperation>.Instance, owner, Generation, Configuration,
                 fence, new Explore.Persistence.Services.EventDiscoveryEnrollmentGate(Context), receipts, operatorOptions, writer);
             SaveProfile = new SaveInstanceOnboardingProfileCommandHandler(BootstrapRepository, Settings,
@@ -328,7 +328,10 @@ public sealed partial class LocalBootstrapConvergenceTests
                 emails, new IdentityEmailSynchronizationOperation(emails), new ActorRepository(Context),
                 tenantContext, lifecycle, new Explore.Persistence.Services.IdentitySynchronizationBootstrapReader(Context), operation, cache, owner,
                 NullLogger<SyncUserCommandHandler>.Instance, fence, new EventDiscoveryEnrollmentGate(Context),
-                new Explore.Persistence.Security.HumanSecuritySourceGate(Context))
+                new Explore.Persistence.Security.HumanSecuritySourceGate(Context),
+                scope.ServiceProvider.GetRequiredService<IVisitorAccessCapabilityResolver>(),
+                 new RelationalSettingMutationLock(Context, owner),
+                new Explore.Persistence.Identity.IdentityEmailMirrorWriter(Context, Users))
                 .ExecuteAsync(new SyncUserCommand
                 {
                     AccountKey = Account,

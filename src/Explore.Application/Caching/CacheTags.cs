@@ -4,6 +4,7 @@ namespace Explore.Application.Caching;
 
 public static class CacheTags
 {
+    public const string TenantPublicReads = "tenant-public-reads";
     public const string Events = "events";
     public const string EventLists = "events:list";
     public const string EventDetails = "events:detail";

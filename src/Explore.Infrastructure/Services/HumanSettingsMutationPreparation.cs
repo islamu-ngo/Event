@@ -485,6 +485,8 @@ public sealed partial class HumanSettingsMutationPreparation(
         IAtprotoFederationSettingsMutationStore? federationStore = null;
         IOrdinarySettingsSource? ordinarySource = null;
         IAtprotoFederationSettingsSource? federationSource = null;
+        IVisitorSettingsOriginalStore? visitorStore = null;
+        VisitorSettingsOriginal? visitorOriginal = null;
         try
         {
             if (scope is SettingScope.Instance or SettingScope.Tenant)
@@ -492,6 +494,7 @@ public sealed partial class HumanSettingsMutationPreparation(
             var subject = humanScope.Subject ?? throw new UnauthorizedAccessException("An original human is required.");
             var request = httpContext.HttpContext ?? throw new UnauthorizedAccessException("An original authenticated request is required.");
             var authenticatedPrincipal = request.User;
+            var requestServices = request.RequestServices;
             var lifetime = await lifetimeObserver.ObserveAsync(authenticatedPrincipal, token)
                 ?? throw new UnauthorizedAccessException("Original credential lifetime evidence is required.");
             Guid ambientTenant = tenantContext.TenantId;
@@ -507,7 +510,8 @@ public sealed partial class HumanSettingsMutationPreparation(
                 coordination?.RequireCurrent();
                 if (!ReferenceEquals(humanScope.Subject, subject) || tenantContext.TenantId != ambientTenant
                     || !ReferenceEquals(httpContext.HttpContext, request)
-                    || !ReferenceEquals(request.User, authenticatedPrincipal))
+                    || !ReferenceEquals(request.User, authenticatedPrincipal)
+                    || !ReferenceEquals(request.RequestServices, requestServices))
                     throw new UnauthorizedAccessException("The original Settings execution custody has changed.");
             }
             RequireCustody();
@@ -560,6 +564,24 @@ public sealed partial class HumanSettingsMutationPreparation(
                 ordinarySource = await ordinaryStore.ObserveAsync(ordinary!, subject, token);
             if (federationStore is not null)
                 federationSource = await federationStore.ObserveAsync(ordinary!, subject, token);
+            // Provider, mixed, plan and import producers retain their separate originals.
+            // Only the actual scalar command or standalone visitor envelope enters here.
+            if (original is UpdateSettingCommand or UpdateSettingBatchCommand or ResetSettingCommand
+                or LockSettingCommand or UnlockSettingCommand or SetInstanceTenantSettingCommand
+                or LockInstanceTenantSettingCommand or UnlockInstanceTenantSettingCommand
+                or ImmutableArray<VisitorAccessSettingMutation>)
+            {
+                var visitorEffects = effects.Where(effect => VisitorAccessSettingMutationGuard.Handles(effect.Key))
+                    .ToImmutableArray();
+                if (!visitorEffects.IsEmpty)
+                {
+                    var instant = clock.GetUtcNow().UtcDateTime;
+                    visitorOriginal = new VisitorSettingsOriginal(original, visitorEffects, subject, selectedTenant,
+                        auditActor ?? subject.PrincipalId, new DateTime(instant.Ticks - instant.Ticks % 10, DateTimeKind.Utc));
+                    visitorStore = services.GetRequiredService<IVisitorSettingsOriginalStore>();
+                    await visitorStore.ObserveAsync(visitorOriginal, new VisitorSource(this, subject, RequireCustody), token);
+                }
+            }
 
             void RequirePrincipal(HumanPrincipalSourceFacts facts)
             {
@@ -684,6 +706,8 @@ public sealed partial class HumanSettingsMutationPreparation(
                     await ordinaryStore!.AcquireAsync(ordinarySource, cancellationToken);
                 if (federationSource is not null)
                     await federationStore!.AcquireAsync(federationSource, cancellationToken);
+                if (visitorOriginal is not null)
+                    await visitorStore!.AcquireAsync(visitorOriginal, cancellationToken);
                 var principal = await principalSource.AcquireAsync(exclusion, cancellationToken);
                 var currentRoute = routeSource is null ? null : await routeSource.AcquireAsync(exclusion, cancellationToken);
                 var support = await supportSource.AcquireAsync(exclusion, principal, cancellationToken: cancellationToken);
@@ -698,6 +722,13 @@ public sealed partial class HumanSettingsMutationPreparation(
                     RequireCustody();
                     // Data awaits precede the original human-source reads and all terminal
                     // deadline checks. No callback can replace the private writer's expected image.
+                    if (visitorOriginal is not null)
+                    {
+                        if (terminal)
+                            await visitorStore!.RequireCompleteAsync(visitorOriginal, finalToken);
+                        else
+                            await visitorStore!.VerifyAsync(visitorOriginal, finalToken);
+                    }
                     if (federationSource is not null)
                     {
                         if (terminal)
@@ -736,6 +767,8 @@ public sealed partial class HumanSettingsMutationPreparation(
                 OrdinaryStore = ordinaryStore,
                 FederationSource = federationSource,
                 FederationStore = federationStore,
+                VisitorOriginal = visitorOriginal,
+                VisitorStore = visitorStore,
                 Coordination = coordination
             };
         }
@@ -743,7 +776,8 @@ public sealed partial class HumanSettingsMutationPreparation(
         {
             await FinishSettingsAttemptAsync(failure, false, coordination,
                 () => { if (federationSource is not null) federationStore!.Expire(federationSource); },
-                () => { if (ordinarySource is not null) ordinaryStore!.Expire(ordinarySource); });
+                () => { if (ordinarySource is not null) ordinaryStore!.Expire(ordinarySource); },
+                () => { if (visitorOriginal is not null) visitorStore!.Close(visitorOriginal); });
             throw;
         }
     }
@@ -814,6 +848,7 @@ public sealed partial class HumanSettingsMutationPreparation(
         return issued.Cleanup ??= FinishSettingsAttemptAsync(failure, settled, issued.TakeCoordination(),
             () => { if (issued.OrdinarySource is not null) issued.OrdinaryStore!.Expire(issued.OrdinarySource); },
             () => { if (issued.FederationSource is not null) issued.FederationStore!.Expire(issued.FederationSource); },
+            () => { if (issued.VisitorOriginal is not null) issued.VisitorStore!.Close(issued.VisitorOriginal); },
             () => { if (issued.TypedOriginal is not null) issued.TypedStore!.Close(issued.TypedOriginal); },
             () => { if (issued.ResourceProviderOriginal is not null) issued.ResourceProviderStore!.Close(issued.ResourceProviderOriginal); });
     }
@@ -852,6 +887,8 @@ public sealed partial class HumanSettingsMutationPreparation(
             OrdinaryStore = parent.OrdinaryStore,
             FederationSource = parent.FederationSource,
             FederationStore = parent.FederationStore,
+            VisitorOriginal = parent.VisitorOriginal,
+            VisitorStore = parent.VisitorStore,
             ValidateOwner = async token =>
             {
                 RequireActive(parent);
@@ -1171,6 +1208,8 @@ public sealed partial class HumanSettingsMutationPreparation(
         internal IOrdinarySettingsMutationStore? OrdinaryStore { get; init; }
         internal IAtprotoFederationSettingsSource? FederationSource { get; init; }
         internal IAtprotoFederationSettingsMutationStore? FederationStore { get; init; }
+        internal VisitorSettingsOriginal? VisitorOriginal { get; init; }
+        internal IVisitorSettingsOriginalStore? VisitorStore { get; init; }
         internal SettingsCoordination? Coordination { get; set; }
         internal object LifetimeSync { get; } = new();
         internal Task? Cleanup { get; set; }

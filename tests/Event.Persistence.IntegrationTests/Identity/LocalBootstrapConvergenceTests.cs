@@ -462,7 +462,6 @@ public sealed partial class LocalBootstrapConvergenceTests
                 new IdentityAccountResolver(new UserRepository(application), logins, identityEmails,
                     privacyState, Options.Create(new IdentityCorrelationOptions())),
                 new IdentityEmailSynchronizationOperation(identityEmails),
-                systemSettings,
                 [provider], setup, new InstanceBootstrapAuditLogger(NullLogger<InstanceBootstrapAuditLogger>.Instance),
                 deployment, new RuntimeMetadataRefresh(),
                 NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork,

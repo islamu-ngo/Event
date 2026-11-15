@@ -10,6 +10,35 @@ namespace Explore.Blazor.IntegrationTests.Configuration;
 public sealed class SecretKitBffPreparationTests
 {
     [Test]
+    [Arguments(SecretConsumerRole.Bff)]
+    [Arguments(SecretConsumerRole.Combined)]
+    public async Task PublicKeycloakMetadataWithoutCredentialLeavesOptionalOidcUnconfigured(
+        SecretConsumerRole consumer)
+    {
+        using var authority = Configuration(new()
+        {
+            ["KEYCLOAK_ENDPOINT"] = "https://identity.example.test",
+            ["KEYCLOAK_REALM"] = Guid.NewGuid().ToString("N"),
+            ["KEYCLOAK_CLIENT_ID"] = Guid.NewGuid().ToString("N")
+        });
+        await using var owner = SecretAuthorityAcquisition.OpenLocal(
+            new(SecretAuthorityKind.Environment, "Testing", consumer), authority);
+        var output = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["AUTHENTICATION_PROVIDER"] = "Local"
+        });
+        var receipts = new AuthenticationCredentialAcquisitionReceipts();
+
+        await output.AddPreparedBffConfigurationAsync(owner, receipts);
+
+        using var published = (ConfigurationRoot)output.Build();
+        await Assert.That(published["Authentication:Provider"]).IsEqualTo("Local");
+        await Assert.That(published["Keycloak:ClientSecret"]).IsNull();
+        await Assert.That(published["Keycloak:Authority"]).IsNull();
+        await Assert.That(receipts.Snapshot()).IsEmpty();
+    }
+
+    [Test]
     [Arguments(false)]
     [Arguments(true)]
     public async Task OrdinaryEndpointAndProviderIntentSurviveWithoutCredentialFallback(bool aspireReference)
@@ -74,6 +103,9 @@ public sealed class SecretKitBffPreparationTests
     {
         using var authority = Configuration(new()
         {
+            ["KEYCLOAK_ENDPOINT"] = "https://identity.example.test",
+            ["KEYCLOAK_REALM"] = Guid.NewGuid().ToString("N"),
+            ["KEYCLOAK_CLIENT_ID"] = Guid.NewGuid().ToString("N"),
             ["GOOGLE_CLIENT_SECRET"] = Guid.NewGuid().ToString("N")
         });
         await using var owner = SecretAuthorityAcquisition.OpenLocal(
@@ -86,6 +118,39 @@ public sealed class SecretKitBffPreparationTests
         using var published = (ConfigurationRoot)output.Build();
         await Assert.That(published["Google:ClientSecret"]).IsNull();
         await Assert.That(receipts.Snapshot().Any()).IsFalse();
+    }
+
+    [Test]
+    [Arguments(SecretConsumerRole.Bff)]
+    [Arguments(SecretConsumerRole.Combined)]
+    public async Task CompleteKeycloakGroupPublishesCredentialAndAcquisitionEvidence(SecretConsumerRole consumer)
+    {
+        string realm = Guid.NewGuid().ToString("N");
+        string clientId = Guid.NewGuid().ToString("N");
+        string secret = Guid.NewGuid().ToString("N");
+        using var authority = Configuration(new()
+        {
+            ["KEYCLOAK_ENDPOINT"] = "https://identity.example.test",
+            ["KEYCLOAK_REALM"] = realm,
+            ["KEYCLOAK_CLIENT_ID"] = clientId,
+            ["KEYCLOAK_BLAZOR_CLIENT_SECRET"] = secret
+        });
+        await using var owner = SecretAuthorityAcquisition.OpenLocal(
+            new(SecretAuthorityKind.Environment, "Testing", consumer), authority);
+        var output = new ConfigurationBuilder();
+        var receipts = new AuthenticationCredentialAcquisitionReceipts();
+
+        await output.AddPreparedBffConfigurationAsync(owner, receipts);
+
+        using var published = (ConfigurationRoot)output.Build();
+        await Assert.That(published["Keycloak:Authority"])
+            .IsEqualTo($"https://identity.example.test/realms/{realm}");
+        await Assert.That(published["Keycloak:ClientId"]).IsEqualTo(clientId);
+        await Assert.That(published["Keycloak:ClientSecret"]).IsEqualTo(secret);
+        var receipt = receipts.Snapshot().Single();
+        await Assert.That(receipt.Consumer).IsEqualTo(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc);
+        await Assert.That(receipt.Authority).IsEqualTo(AuthenticationCredentialAcquisitionReceipts.Authority.Environment);
+        await Assert.That(published["KEYCLOAK_BLAZOR_CLIENT_SECRET"]).IsNull();
     }
 
     [Test]

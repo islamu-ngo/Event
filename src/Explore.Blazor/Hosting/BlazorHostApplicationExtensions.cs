@@ -150,17 +150,31 @@ public static class BlazorHostApplicationExtensions
             }
         });
 
+        static bool IsOperationalPath(HttpContext context) =>
+            context.Request.Path.Equals("/health", StringComparison.OrdinalIgnoreCase)
+            || context.Request.Path.Equals("/metrics", StringComparison.OrdinalIgnoreCase);
+
         pipeline.UseWhen(
-            context => !context.Request.Path.StartsWithSegments(
+            context => !IsOperationalPath(context)
+                && !AtprotoOAuthEndpointExtensions.IsPublicationPath(context.Request.Path)
+                && !context.Request.Path.StartsWithSegments(
                 "/bff",
                 StringComparison.OrdinalIgnoreCase),
             branch => branch.UseStatusCodePagesWithReExecute(
                 "/errors/{0}",
                 createScopeForStatusCodePages: true));
-        pipeline.UseHttpsRedirection();
+        // Operational requests must reach their physical-listener guard without
+        // being redirected onto the public HTTPS listener.
+        // OAuth publication endpoints own their HTTP rejection and must not
+        // redirect or re-execute that response through the public error routes.
+        pipeline.UseWhen(
+            context => !IsOperationalPath(context)
+                && !AtprotoOAuthEndpointExtensions.IsPublicationPath(context.Request.Path),
+            branch => branch.UseHttpsRedirection());
         pipeline.UseStartupRedirectMiddleware(app);
         pipeline.UsePathTenantResolverMiddleware();
         pipeline.UseLocalCredentialPrivacyHeaders();
+        pipeline.UseLocalVisitorEnrollmentPrivacyHeaders();
         pipeline.UseRouting();
         pipeline.UseAuthentication();
         pipeline.UseAdmissionCheckInBffTransport();

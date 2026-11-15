@@ -1,5 +1,6 @@
 using Explore.API.Middleware;
 using Explore.Application.Exceptions;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -36,6 +37,21 @@ internal sealed class GlobalExceptionHandler(
     {
         var (statusCode, title, detail, code) = exception switch
         {
+            TenantVisitorReadAccessException { Decision: VisitorTenantReadAccessDecision.AuthenticationRequired } => (
+                StatusCodes.Status401Unauthorized,
+                "Authentication required",
+                "Authentication is required to access this resource.",
+                "tenant_authentication_required"),
+            TenantVisitorReadAccessException { Decision: VisitorTenantReadAccessDecision.NotFound } => (
+                StatusCodes.Status404NotFound,
+                "Resource not found",
+                "The requested resource was not found.",
+                "tenant_not_found"),
+            TenantVisitorReadAccessException { Decision: VisitorTenantReadAccessDecision.Unavailable } => (
+                StatusCodes.Status503ServiceUnavailable,
+                "Tenant read policy unavailable",
+                "Read admission could not be evaluated. Try again later.",
+                "tenant_read_policy_unavailable"),
             BadRequestException => (
                 StatusCodes.Status400BadRequest,
                 "Bad request",
@@ -66,6 +82,11 @@ internal sealed class GlobalExceptionHandler(
                 "Configuration manifest export too large",
                 "The configuration manifest export exceeds the maximum supported size.",
                 tooLargeException.FailureCode),
+            ConcurrencyConflictException { Code: CommandResponseResultMapper.VisitorAccessAccountRequiredConflict } => (
+                StatusCodes.Status409Conflict,
+                "Visitor policy conflict",
+                "The visitor policy change conflicts with the current participation configuration.",
+                CommandResponseResultMapper.VisitorAccessAccountRequiredConflict),
             ConcurrencyConflictException concurrencyConflictException => (
                 StatusCodes.Status409Conflict,
                 "Concurrency conflict",
@@ -132,13 +153,15 @@ internal sealed class GlobalExceptionHandler(
             httpContext.TraceIdentifier, httpContext.Items["CorrelationId"] as string);
 
         httpContext.Response.StatusCode = statusCode;
-        if (exception is AdmissionCheckInUnavailableException or EventDiscoveryUnavailableException
+        if (exception is TenantVisitorReadAccessException or AdmissionCheckInUnavailableException or EventDiscoveryUnavailableException
             or EventDiscoveryCursorInvalidException or EventDiscoveryCursorExpiredException
             or EventDiscoveryRestartRequiredException)
         {
             httpContext.Response.Headers[HeaderNames.CacheControl] = "no-store";
             httpContext.Response.Headers["Referrer-Policy"] = "no-referrer";
         }
+        if (exception is TenantVisitorReadAccessException && statusCode == StatusCodes.Status401Unauthorized)
+            httpContext.Response.Headers.WWWAuthenticate = "Bearer";
         if (exception is AdmissionRecoveryRateLimitExceededException recoveryRateLimit)
         {
             httpContext.Response.Headers.RetryAfter =

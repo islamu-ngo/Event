@@ -20,18 +20,22 @@ public sealed class ModerationRecognitionErasure(
     public async Task<PrivacyErasureIntent?> AppendAsync(PrivacyErasureRequest request, byte[] receiptHash,
         DateTimeOffset receiptExpiresAt, CancellationToken token)
     {
-        try { return await AppendOnceAsync(request, receiptHash, receiptExpiresAt, token); }
+        PrivacyErasureIntent? observed = null;
+        try { return await AppendOnceAsync(request, receiptHash, receiptExpiresAt, fact => observed = fact, token); }
         catch (Exception exception) when (!token.IsCancellationRequested
             && exception is TimeoutException or IOException or OperationCanceledException)
         {
-            // The first complete capture remains immutable. A fresh gate and native transaction
-            // reread it and the authority's exact idempotent request, never trust a lost acknowledgement.
-            return await AppendOnceAsync(request, receiptHash, receiptExpiresAt, token);
+            // The observed fact locates committed evidence; it is never proof of completion itself.
+            if (observed is not null && await settings.ExecuteOrderedGroupsAsync(
+                [[ModerationRecognitionKeyRing.SecretSettingKey]],
+                ct => repository.ReconcileRetainedAsync(observed, ct), token))
+                return observed;
+            return await AppendOnceAsync(request, receiptHash, receiptExpiresAt, fact => observed = fact, token);
         }
     }
 
     private Task<PrivacyErasureIntent?> AppendOnceAsync(PrivacyErasureRequest request, byte[] receiptHash,
-        DateTimeOffset receiptExpiresAt, CancellationToken token) =>
+        DateTimeOffset receiptExpiresAt, Action<PrivacyErasureIntent> observeAppend, CancellationToken token) =>
         settings.ExecuteOrderedGroupsAsync<PrivacyErasureIntent?>(
             [[ModerationRecognitionKeyRing.SecretSettingKey]], async cancellation =>
             {
@@ -61,6 +65,7 @@ public sealed class ModerationRecognitionErasure(
                         // The retained authority owns exact request idempotency. Its ambiguous
                         // acknowledgement is retried only through a new full fenced acquisition.
                         var appended = await authority.AppendAsync(request, ct);
+                        observeAppend(appended);
                         await lease.BindAsync(appended, ct);
                         return appended;
                     }, cancellation);

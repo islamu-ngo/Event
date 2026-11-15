@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -12,20 +13,23 @@ namespace Explore.Application.Features.Events.Handlers.Queries;
 public sealed class GetAttendeeEventCalendarExportRequestHandler(
     IEventRepository eventRepository,
     IEventSessionRepository eventSessionRepository,
-    IEventLocationDisclosureService eventLocationDisclosureService)
+    IEventLocationDisclosureService eventLocationDisclosureService,
+    ITenantContext tenantContext,
+    IVisitorTenantReadAccessPolicy visitorReadAccess)
     : IQueryHandler<GetAttendeeEventCalendarExportRequest, AttendeeEventCalendarExportDto?>
 {
     public async Task<AttendeeEventCalendarExportDto?> QueryAsync(
         GetAttendeeEventCalendarExportRequest request,
         CancellationToken cancellationToken)
     {
-        Event? entity = await eventRepository.GetEventWithDetails(request.EventId);
+        await visitorReadAccess.RequireAsync(tenantContext.TenantId, cancellationToken);
+        Event? entity = await eventRepository.GetEventWithDetails(request.EventId, cancellationToken);
         if (entity is null || entity.EventStatusId != (int)EventStatusEnum.Published)
         {
             return null;
         }
 
-        EventSession? primarySession = (await eventSessionRepository.GetSessionsByEvent(request.EventId))
+        EventSession? primarySession = (await eventSessionRepository.GetSessionsByEvent(request.EventId, cancellationToken))
             .Where(session => session.ContributesToPublicScheduleSummary())
             .OrderBy(session => session.StartTime)
             .FirstOrDefault();

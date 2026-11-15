@@ -8,11 +8,34 @@ internal static class Program
     {
         if (args.Length < 2)
         {
-            Console.Error.WriteLine("Usage: Explore.AssuranceAudit <repository-root> --changed-from <git-ref> | --portfolio <msbuild-json> [...] | <relative-test-path> [...]");
+            Console.Error.WriteLine("Usage: Explore.AssuranceAudit <repository-root> --changed-from <git-ref> | --portfolio <msbuild-json> [...] | --persistence <policy-json> <msbuild-json> [...] | <relative-test-path> [...]");
             return 2;
         }
 
         string repositoryRoot = Path.GetFullPath(args[0]);
+        if (args[1] == "--persistence")
+        {
+            if (args.Length < 4)
+            {
+                Console.Error.WriteLine("Persistence audit requires an exact capability policy and evaluated compilation inputs.");
+                return 2;
+            }
+            try
+            {
+                var findings = PersistenceCapabilityAudit.AnalyzeEvaluatedProjects(repositoryRoot,
+                    args[3..].Select(path => File.ReadAllText(Path.GetFullPath(path, repositoryRoot))),
+                    File.ReadAllText(Path.GetFullPath(args[2], repositoryRoot)));
+                foreach (var finding in findings) Console.Error.WriteLine(finding);
+                Console.WriteLine("Persistence audit: {0} diagnostic(s).", findings.Count);
+                return findings.Count == 0 ? 0 : 1;
+            }
+            catch (Exception error) when (error is IOException or InvalidDataException or System.Text.Json.JsonException
+                or InvalidOperationException or KeyNotFoundException or ArgumentException or FormatException or BadImageFormatException)
+            {
+                Console.Error.WriteLine("persistence-input: cannot audit incomplete or invalid evaluated compilation inputs.");
+                return 2;
+            }
+        }
         if (args[1] == "--portfolio")
         {
             if (args.Length < 3)

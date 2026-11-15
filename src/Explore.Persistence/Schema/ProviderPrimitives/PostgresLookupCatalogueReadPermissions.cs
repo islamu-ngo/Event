@@ -29,6 +29,7 @@ public static class PostgresLookupCatalogueReadPermissions
         (typeof(Role), RuntimeRoleReadProperties.ToArray()),
         (typeof(OrganizationPosition), ["Id", "MasterCode", "FullName", "Description"]),
         (typeof(ActorType), ["Id", "MasterCode", "FullName", "Description"]),
+        (typeof(AuthenticationProvider), ["Id", "MasterCode", "FullName", "Description"]),
         (typeof(DidCustodyType), ["Id", "MasterCode", "FullName", "Description"]),
         (typeof(FileType), ["Id", "MasterCode", "FullName", "Description"]),
         (typeof(TagType), ["Id", "MasterCode", "FullName", "Description"]),
@@ -149,6 +150,7 @@ public static class PostgresLookupCatalogueReadPermissions
     private static string PermissionPredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
         (string Schema, string Table, string[] Columns)[] sources, bool requireComplete)
     {
+        const string externalCatalogueReference = "(SELECT ready FROM external_enrollment_catalogue)";
         string runtime = Text(enrollment.RuntimeLogin);
         string values = SourceValues(sources);
         string schemas = "ARRAY[" + string.Join(",", sources.Select(source => source.Schema).Distinct().Select(Text)) + "]::text[]";
@@ -164,12 +166,14 @@ public static class PostgresLookupCatalogueReadPermissions
             if (!PostgresTenantCreationPermissions.TryGetGlobalColumns(context, lookup.Type, out var columns, out _))
                 return Array.Empty<string>();
             var source = Mapping(context, lookup.Type, lookup.Properties);
+            columns = columns.Concat(PostgresSetupLiveStoragePermissions.GlobalCompletionColumns(context, lookup.Type)
+                .Where(grant => grant.Privilege == "SELECT").Select(grant => grant.Column)).Distinct(StringComparer.Ordinal).ToArray();
             return columns.Where(column => source.Columns.Contains(column, StringComparer.Ordinal))
                 .Select(column => $"(source.table_name={Text(source.Table)} AND a.attname={Text(column)})");
         }).ToArray();
         string creatorColumns = creatorReads.Length == 0 ? "false" : string.Join(" OR ", creatorReads);
         string creatorProof = creatorReads.Length == 0 ? "true"
-            : PostgresTenantCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment);
+            : PostgresTenantCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment, externalCatalogueReference);
         string complete = requireComplete ? $"""
             AND NOT EXISTS (SELECT 1 FROM ({values}) source(table_name, allowed_columns)
                 CROSS JOIN LATERAL unnest(source.allowed_columns) expected(name)
@@ -181,6 +185,9 @@ public static class PostgresLookupCatalogueReadPermissions
                             AND acl.privilege_type = 'SELECT' AND NOT acl.is_grantable))
             """ : "";
         return $"""
+            (WITH external_enrollment_catalogue AS MATERIALIZED
+                (SELECT ({PostgresExternalTenantEnrollmentPermissions.OptionalCataloguePredicate(context, enrollment)}) AS ready)
+            SELECT (
             EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = {runtime} AND rolcanlogin)
             AND NOT EXISTS (SELECT 1 FROM ({values}) source(table_name, allowed_columns)
                 LEFT JOIN pg_catalog.pg_class c ON c.oid = pg_catalog.to_regclass(source.table_name)
@@ -207,9 +214,13 @@ public static class PostgresLookupCatalogueReadPermissions
                                     'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                                 OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "table_name", false)})
                                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
+                                    CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                                     WHERE a.attrelid = pg_catalog.to_regclass(table_name) AND a.attnum <> 0 AND NOT a.attisdropped
-                                        AND pg_catalog.has_column_privilege(r.oid, a.attrelid, a.attnum,
-                                            'SELECT,INSERT,UPDATE,REFERENCES')))))
+                                        AND (pg_catalog.has_column_privilege(r.oid,a.attrelid,a.attnum,permission.privilege || ' WITH GRANT OPTION')
+                                            OR (pg_catalog.has_column_privilege(r.oid,a.attrelid,a.attnum,permission.privilege)
+                                                AND NOT ({PostgresExternalTenantEnrollmentPermissions.RuntimeColumnPredicate(context, typeof(UserPii),
+                                                    enrollment.RuntimeLogin, "r.oid", "a.attrelid", "a.attname", "permission.privilege")})))))))
+            AND ({externalCatalogueReference})
             AND NOT EXISTS (SELECT 1 FROM unnest({otherLogins}) login
                 WHERE pg_catalog.pg_has_role(login, {runtime}, 'MEMBER')
                     OR pg_catalog.pg_has_role({runtime}, login, 'MEMBER'))
@@ -234,6 +245,7 @@ public static class PostgresLookupCatalogueReadPermissions
                                                     WHERE acl.grantee=0 AND acl.privilege_type='SELECT')))))))
             AND ({creatorProof}) IS TRUE
             {complete}
+            ))
             """;
     }
 

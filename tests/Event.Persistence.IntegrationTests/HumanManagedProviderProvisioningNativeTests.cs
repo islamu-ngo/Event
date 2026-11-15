@@ -186,7 +186,7 @@ public sealed class HumanManagedProviderProvisioningNativeTests(PostgreSqlContai
             });
             seed.Set<LocalIdentityCredentialOperation>().Add(new(new LocalCredentialOperationReceipt(
                 operation, LocalCredentialOperationKind.Create, LocalCredentialOperationStage.ProvisioningPending,
-                external.Human, subject, actor, login, external.At), Guid.CreateVersion7()));
+                external.Human, subject, actor, login, external.At, null), Guid.CreateVersion7()));
             seed.Set<IdentityUserToken<Guid>>().Add(new()
             {
                 UserId = subject,

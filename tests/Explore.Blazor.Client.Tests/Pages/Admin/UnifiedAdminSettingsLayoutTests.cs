@@ -575,7 +575,7 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
     public async Task UnifiedAdminSettingsLayout_DeploymentManagedAuthorization_KeepsAuthenticationSaveAvailable()
     {
         _instanceOnboardingService.GetAuthProviderConfigurationAsAdminAsync()
-            .Returns(new AuthProviderConfigurationDto { PrimaryProviderId = 1, GoogleSsoEnabled = true });
+            .Returns(new AuthProviderConfigurationDto { PrimaryProviderId = 1, AtprotoLoginEnabled = true });
         _instanceOnboardingService.GetAuthorizationProviderConfigurationAsAdminAsync()
             .Returns(new AuthorizationProviderConfigurationDto
             {

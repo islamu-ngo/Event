@@ -14,6 +14,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Storage;
+using Explore.Infrastructure.Secrets;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
@@ -248,7 +249,7 @@ public sealed partial class StorageProbeOriginalActionTests
 
     // Only the external secret source and S3 SDK are substituted. Selection, retained
     // reference capture, real ticket validation, source fences and physical owners are native.
-    private sealed class ProbeRemote : ISecretSource
+    private sealed class ProbeRemote : ISecretSource, ISecretRevisionOwner
     {
         internal ExploreDbContext? Owner { get; set; }
         internal string Credential { get; set; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -261,6 +262,8 @@ public sealed partial class StorageProbeOriginalActionTests
         internal int Puts { get; private set; }
         internal int Deletes { get; private set; }
         public SecretSourceType SourceType => SecretSourceType.EnvironmentVariable;
+        public bool IsRevisionCurrent(SecretBinding binding, string? revision) =>
+            binding.SourceType == SourceType && string.Equals(revision, Revision, StringComparison.Ordinal);
 
         internal void Register(IServiceCollection services)
         {

@@ -152,6 +152,44 @@ public sealed class SecurityExecutionEvidenceOwnedCommandTests
 public sealed class SecurityExecutionEvidenceBenchmarkRetentionTests
 {
     [Test]
+    [Arguments("missing-process")]
+    [Arguments("unsettled-cleanup")]
+    [Arguments("unsettled-observer")]
+    [Arguments("unsettled-resources")]
+    [Arguments("settled")]
+    [Arguments("settled-failure")]
+    public async Task ChildTemporaryEvidenceSurvivesUntilEveryCleanupPrerequisiteSettles(string variant)
+    {
+        string root = Directory.CreateTempSubdirectory("child-cleanup-prerequisites-").FullName;
+        try
+        {
+            string temporary = Path.Combine(root, "child");
+            Directory.CreateDirectory(temporary);
+            string sentinel = Path.Combine(temporary, "evidence.bin");
+            string foreign = Path.Combine(root, "foreign.bin");
+            byte[] original = RandomNumberGenerator.GetBytes(32);
+            File.WriteAllBytes(sentinel, original);
+            File.WriteAllBytes(foreign, original);
+            SecurityExecutionEvidence.OwnedNativeProcessResult? process = new(
+                variant == "settled-failure" ? 1 : 0, false, false, false, false,
+                variant != "unsettled-cleanup", [], [])
+            { ObserverSettled = variant != "unsettled-observer" };
+            if (variant == "missing-process") process = null;
+
+            bool removed = SecurityExecutionEvidence.TryRemoveOwnedChildTemporary(
+                temporary, process, variant != "unsettled-resources");
+
+            bool settled = variant is "settled" or "settled-failure";
+            await Assert.That(removed).IsEqualTo(settled);
+            await Assert.That(Directory.Exists(temporary)).IsEqualTo(!settled);
+            if (!settled)
+                await Assert.That(File.ReadAllBytes(sentinel).AsSpan().SequenceEqual(original)).IsTrue();
+            await Assert.That(File.ReadAllBytes(foreign).AsSpan().SequenceEqual(original)).IsTrue();
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Test]
     [Arguments(false)]
     [Arguments(true)]
     public async Task PrivateBenchmarkOriginalsSurviveSuccessfulChildCleanupWithTheirExactDigests(bool baseline)

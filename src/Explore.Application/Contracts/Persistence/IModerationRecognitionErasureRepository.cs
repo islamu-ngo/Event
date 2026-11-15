@@ -15,6 +15,8 @@ public interface IModerationRecognitionErasureRepository
     Task ComputeAsync(PrivacyErasureRequest request, CancellationToken token);
     Task<IModerationRecognitionErasureLease> AcquireAppendAsync(PrivacyErasureRequest request, CancellationToken token);
     Task VerifyPurgeAsync(PrivacyErasureIntent fact, CancellationToken token);
+    /// <summary>Authenticates an observed append against committed authority before repairing its primary binding.</summary>
+    Task<bool> ReconcileRetainedAsync(PrivacyErasureIntent observed, CancellationToken token);
     Task<ModerationRecognitionPending?> FindAsync(Guid intentId, CancellationToken token);
     Task<ModerationRecognitionPending?> FindReceiptAsync(byte[] hash, CancellationToken token);
     Task<IReadOnlyList<ModerationRecognitionPending>> ReadReceivedAfterAsync(Guid? afterId, int limit, CancellationToken token);

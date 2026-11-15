@@ -11,7 +11,10 @@ using Explore.Application.Models;
 using Explore.Domain.Constants;
 using Explore.Infrastructure.Authentication;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Privacy.ErasureAuthority;
+using Explore.Persistence.Schema;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
@@ -47,8 +50,12 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
         bool verified = true, bool emailEnabled = true,
         IdentityDatabaseTopology topology = IdentityDatabaseTopology.Colocated,
         IInterceptor? interceptor = null, bool rateLimiting = false,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        string? publicBaseUrl = "https://lifecycle.test", string? storedPublicBaseUrl = null,
+        IInterceptor[]? selectedInterceptors = null)
     {
+        IInterceptor[] writerInterceptors = interceptor is null
+            ? selectedInterceptors ?? [] : [interceptor, .. selectedInterceptors ?? []];
         var fixture = new LocalIdentityLifecycleHttpFixture();
         try
         {
@@ -65,6 +72,20 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
                 host.Value = "\"smtp.lifecycle.test\"";
                 var from = await seed.SystemSettings.SingleAsync(row => row.SettingKey == GovernanceSettingKeys.Email.FromAddress, CancellationToken);
                 from.Value = "\"events@lifecycle.test\"";
+                if (storedPublicBaseUrl is not null)
+                {
+                    var address = await seed.SystemSettings.SingleOrDefaultAsync(
+                        row => row.SettingKey == GovernanceSettingKeys.Domains.PublicBaseUrl, CancellationToken);
+                    if (address is null)
+                        seed.SystemSettings.Add(new()
+                        {
+                            SettingKey = GovernanceSettingKeys.Domains.PublicBaseUrl,
+                            Value = JsonSerializer.Serialize(storedPublicBaseUrl),
+                            Category = "domains"
+                        });
+                    else
+                        address.Value = JsonSerializer.Serialize(storedPublicBaseUrl);
+                }
                 await seed.SaveChangesAsync(CancellationToken);
             }
             fixture.Login = await fixture.Native.SeedLocalUserAsync(verified);
@@ -73,11 +94,56 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
                 builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
                     new Dictionary<string, string?>
                     {
-                        ["PublicBaseUrl"] = "https://lifecycle.test",
+                        ["PUBLIC_BASE_URL"] = null,
+                        ["PublicBaseUrl"] = publicBaseUrl,
+                        ["App:PublicBaseUrl"] = null,
+                        ["Application:PublicBaseUrl"] = null,
                         ["EffectiveHostAuthority:CanonicalOrigin"] = "https://localhost"
                     }));
                 builder.ConfigureTestServices(services =>
                 {
+                    if (writerInterceptors.Length > 0)
+                    {
+                        // Co-located intake enlists the writer in the authority's transaction.
+                        // Acknowledgement failures must observe its physical commit owner too.
+                        services.RemoveAll<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>();
+                        services.AddDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>((provider, options) =>
+                        {
+                            EmbeddedPrivacyErasureAuthorityDbContextFactory.ConfigureCoLocated(options,
+                                PrimaryDatabaseConfiguration.Bind(provider.GetRequiredService<IConfiguration>(),
+                                    PrimaryDatabaseRole.Runtime));
+                            options.AddInterceptors(writerInterceptors);
+                        });
+                        // Selected lifecycle owners use their own native pools, not the ordinary context options.
+                        services.RemoveAll<LocalIdentityWriterDbContextFactory>();
+                        services.AddSingleton(provider =>
+                        {
+                            var configuration = provider.GetRequiredService<IConfiguration>();
+                            var applicationWriter = PrimaryDatabaseConfiguration.Bind(
+                                configuration, PrimaryDatabaseRole.LocalIdentityWriter);
+                            var externalWriter = topology == IdentityDatabaseTopology.External
+                                ? IdentityDatabaseConfiguration.BindExternal(configuration, PrimaryDatabaseRole.LocalIdentityWriter)
+                                : null;
+                            PostgresLocalIdentityWriterEnrollment? applicationEnrollment =
+                                applicationWriter.Provider == PrimaryDatabaseProvider.PostgreSql
+                                    ? new(PrimaryDatabaseConfiguration.BindUsername(configuration, PrimaryDatabaseRole.Migrator),
+                                        PrimaryDatabaseConfiguration.BindUsername(configuration, PrimaryDatabaseRole.Runtime),
+                                        applicationWriter.Username!,
+                                        PrimaryDatabaseConfiguration.BindUsername(configuration, PrimaryDatabaseRole.Global))
+                                    : null;
+                            PostgresLocalIdentityWriterEnrollment? identityEnrollment =
+                                externalWriter?.Provider == PrimaryDatabaseProvider.PostgreSql
+                                    ? new(configuration["IdentityDatabase:Migrator:Username"]
+                                            ?? configuration["IDENTITY_DATABASE_MIGRATOR_USERNAME"] ?? string.Empty,
+                                        configuration["IdentityDatabase:Runtime:Username"]
+                                            ?? configuration["IDENTITY_DATABASE_RUNTIME_USERNAME"] ?? string.Empty,
+                                        new Npgsql.NpgsqlConnectionStringBuilder(externalWriter.ConnectionString).Username!)
+                                    : null;
+                            return new LocalIdentityWriterDbContextFactory(applicationWriter, externalWriter,
+                                applicationEnrollment: applicationEnrollment, identityEnrollment: identityEnrollment,
+                                interceptors: writerInterceptors);
+                        });
+                    }
                     services.Insert(0, ServiceDescriptor.Singleton<IExceptionHandler>(fixture._requestFailures));
                     // Disable timer scheduling, not the production processor. Tests explicitly drain admitted work
                     // and synchronously observe SMTP completion instead of waiting for a background polling interval.
@@ -153,7 +219,8 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
     {
         await using var scope = Host.Services.CreateAsyncScope();
         int before = Smtp.Handoffs.Count;
-        await scope.ServiceProvider.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(CancellationToken);
+        await scope.ServiceProvider.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>()
+            .DrainAsync(new Uri("https://lifecycle.test"), CancellationToken);
         await Assert.That(Smtp.Handoffs.Count).IsEqualTo(before + 1);
         return Smtp.Handoffs[^1];
     }
@@ -202,6 +269,7 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
     internal sealed class RecordingSmtp : ILocalIdentityLifecycleSmtpTransport
     {
         internal List<LocalIdentityLifecycleTransport> Handoffs { get; } = [];
+        internal List<Uri> Callbacks { get; } = [];
         public Task<EmailResult> SendAsync(LocalIdentityLifecycleTransport handoff, Guid attemptId,
             Uri callbackUri, SmtpConfiguration configuration, CancellationToken cancellationToken)
         {
@@ -209,6 +277,7 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
             if (configuration.Host != "smtp.lifecycle.test" || callbackUri.AbsolutePath != "/auth/local-account-recovery")
                 throw new InvalidOperationException("Lifecycle transport did not use the configured global authority.");
             Handoffs.Add(handoff);
+            Callbacks.Add(callbackUri);
             return Task.FromResult(EmailResult.Ok());
         }
     }

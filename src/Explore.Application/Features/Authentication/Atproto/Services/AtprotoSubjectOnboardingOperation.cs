@@ -98,7 +98,7 @@ public sealed class AtprotoSubjectOnboardingOperation(
             return AtprotoSubjectOnboardingResult.Succeeded(represented.Id, null);
         }
 
-        tenantUser ??= await tenantUsers.Create(new TenantUser { TenantId = tenantId, Tenant = tenant, UserId = user.Id, User = user, ActorId = userActor.Id, Actor = userActor, StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = at, CreatedAt = at, CreatedBy = user.Id }).ConfigureAwait(false);
+        tenantUser ??= await tenantUsers.CreateForExistingAccountAsync(new TenantUser { TenantId = tenantId, Tenant = tenant, UserId = user.Id, User = user, ActorId = userActor.Id, Actor = userActor, StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = at, CreatedAt = at, CreatedBy = user.Id }, cancellationToken).ConfigureAwait(false);
         if (tenantUser.ActorId is null)
         {
             tenantUser.ActorId = userActor.Id; tenantUser.Actor = userActor; tenantUser.UpdatedAt = at; tenantUser.UpdatedBy = user.Id;

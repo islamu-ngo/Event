@@ -86,6 +86,7 @@ public static class HttpClientExtensions
             client.BaseAddress = new Uri(apiBaseUrl);
             client.Timeout = TimeSpan.FromSeconds(20);
         }).ConfigureApiTransport(environment, profile, allowAutoRedirect: false)
+          .RedactLoggedHeaders(static _ => true)
           .RemoveAllResilienceHandlers();
 #pragma warning restore EXTEXP0001
 

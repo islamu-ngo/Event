@@ -7,6 +7,9 @@ namespace Explore.Application.Contracts.Persistence;
 /// </summary>
 public interface IAtprotoFederationGlobalReadRepository
 {
+    /// <summary>Observes the active population without hydrating tenant records.</summary>
+    Task<IReadOnlyList<Guid>> GetActiveTenantIdsAsync(CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AtprotoFederationInstanceSetting>> GetInstanceAsync(
         IReadOnlyCollection<string> keys,
         CancellationToken cancellationToken = default);

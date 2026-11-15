@@ -1,0 +1,27 @@
+Change-Id: CHG-01M7BYEC05NWRDKQQGVDYXKEW8
+Title: "Keep support administration usable with membership fences"
+Type: fix
+Scope: access
+Summary: "Recognize the declared tenant parent fence in API-key storage checks while preserving support membership and actor-only authority boundaries."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "Recognize only mapped membership columns through the existing fresh API-key ACL, role, source and policy checks. Preserve external catalogue validation, support membership-or-actor completeness, private support scalar denials and rejection of partial or widened authority."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Explain that support administration recognizes the installed membership tenant parent fence while rejecting incomplete or broadened permission profiles and protecting private sessions and audit records."

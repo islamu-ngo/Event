@@ -34,7 +34,8 @@ public sealed class EventDiscoveryCandidateReader(
     AtprotoEventGovernanceResolver governanceResolver,
     ITenantContext tenantContext,
     TimeProvider clock,
-    ITenantLifecycleAccessService lifecycle)
+    ITenantLifecycleAccessService lifecycle,
+    IVisitorTenantReadAccessPolicy visitorRead)
 {
     private const int SourceWindow = 128;
 
@@ -42,6 +43,7 @@ public sealed class EventDiscoveryCandidateReader(
         GetEventListRequest criteria, EventDiscoveryTraversalLimits limits,
         CancellationToken cancellationToken = default)
     {
+        await visitorRead.RequireAsync(tenantContext.TenantId, cancellationToken);
         var now = criteria.OperationNow ?? clock.GetUtcNow();
         criteria = criteria with { OperationNow = now };
         if (!await lifecycle.IsPublicAsync(tenantContext.TenantId, cancellationToken))
@@ -148,6 +150,7 @@ public sealed class EventDiscoveryCandidateReader(
         GetEventListRequest criteria, IReadOnlyList<EventDiscoverySnapshotItem> membership,
         CancellationToken cancellationToken = default)
     {
+        await visitorRead.RequireAsync(tenantContext.TenantId, cancellationToken);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(membership.Count, EventDiscoveryTraversalLimits.PageSizeCeiling);
         if (membership.Any(item => item.TenantId != Guid.Empty && item.TenantId != tenantContext.TenantId))
             return null;

@@ -7,6 +7,14 @@ namespace Event.Testing.PostgreSql;
 /// <summary>Provisions declared native test roles before application hosting starts.</summary>
 internal static class PostgresTestRoleBootstrap
 {
+    internal static string ReadBootstrapPassword()
+    {
+        string? password = Environment.GetEnvironmentVariable("DATABASE_MIGRATOR_PASSWORD");
+        return !string.IsNullOrWhiteSpace(password)
+            ? password
+            : throw new InvalidOperationException("Native PostgreSQL tests require explicit DATABASE_MIGRATOR_PASSWORD injection.");
+    }
+
     internal static async Task ProvisionAsync(string administratorConnectionString,
         PostgresNativeQueueEnrollment enrollment,
         IReadOnlyDictionary<PrimaryDatabaseRole, (string Username, string Password)> purposeLogins,

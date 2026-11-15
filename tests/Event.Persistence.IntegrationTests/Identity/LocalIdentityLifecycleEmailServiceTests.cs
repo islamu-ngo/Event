@@ -7,6 +7,7 @@ using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Persistence;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -321,6 +322,8 @@ public sealed class LocalIdentityLifecycleEmailServiceTests
         await RequestAsync(fixture);
         var disabled = Signal(); var release = Signal(); var admissionAttempted = Signal();
         await using var disabling = fixture.Open();
+        await using var sourceGate = new HumanSecuritySourceGate(disabling.Application);
+        _ = await sourceGate.AcquireAsync(fixture.CancellationToken);
         Task hold = disabling.MutationLock.ExecuteOrderedGroupsAsync([EmailDeliverySettingKeys.All], async token =>
         {
             await new EfCoreUnitOfWork(disabling.Application).ExecuteSerializableAsync(async inner =>
@@ -329,15 +332,31 @@ public sealed class LocalIdentityLifecycleEmailServiceTests
                     "false", mutationLock: disabling.MutationLock, cancellationToken: inner);
                 return true;
             }, token);
+            // The disable is committed. Retain SMTP keys while releasing the source gate
+            // before the competing drain reaches admission.
+            await sourceGate.DisposeAsync();
             disabled.TrySetResult();
             await release.Task.WaitAsync(token);
             return true;
         }, fixture.CancellationToken);
+        await Task.WhenAny(disabled.Task, hold).WaitAsync(fixture.CancellationToken);
+        if (hold.IsCompleted) await hold;
         await disabled.Task.WaitAsync(fixture.CancellationToken);
         await using var draining = fixture.Open((_, _) => { admissionAttempted.TrySetResult(); return Task.CompletedTask; });
-        Task drain = draining.Processor.DrainAsync(fixture.CancellationToken);
-        await admissionAttempted.Task.WaitAsync(fixture.CancellationToken);
-        release.TrySetResult();
+        Task drain = draining.Processor.DrainAsync(new Uri("https://instance.test"), fixture.CancellationToken);
+        try
+        {
+            await Task.WhenAny(admissionAttempted.Task, drain).WaitAsync(fixture.CancellationToken);
+            if (drain.IsCompleted) await drain;
+            await Assert.That(admissionAttempted.Task.IsCompletedSuccessfully).IsTrue();
+            await admissionAttempted.Task.WaitAsync(fixture.CancellationToken);
+            await Assert.That(drain.IsCompleted).IsFalse();
+        }
+        finally
+        {
+            release.TrySetResult();
+            await hold.WaitAsync(fixture.CancellationToken);
+        }
         await Task.WhenAll(hold, drain).WaitAsync(fixture.CancellationToken);
         await Assert.That(fixture.Smtp.Handoffs.Count).IsEqualTo(0);
         await Assert.That((await ReadAsync(fixture)).DeliveryState).IsEqualTo(LocalIdentityLifecycleDeliveryState.Pending);
@@ -357,7 +376,7 @@ public sealed class LocalIdentityLifecycleEmailServiceTests
     private static async Task DrainAsync(LocalLifecycleDeliveryFixture fixture)
     {
         await using var scope = fixture.Open();
-        await scope.Processor.DrainAsync(fixture.CancellationToken);
+        await scope.Processor.DrainAsync(new Uri("https://instance.test"), fixture.CancellationToken);
     }
     private static async Task<LocalIdentityLifecycleOperation> ReadAsync(LocalLifecycleDeliveryFixture fixture)
     {

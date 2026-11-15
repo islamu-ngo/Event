@@ -20,7 +20,7 @@ internal static class HumanMixedSettingsSourceQueries
         {
             var facts = await HumanEmailSourceSqlite.ReadAsync(context,
                 context.Database.CurrentTransaction?.GetDbTransaction(), subject, lifetime, forwarding,
-                tenant, route: typedOriginal is not null, token);
+                tenant, route: typedOriginal is not null, requireSelection, token);
             string image = typedOriginal is null
                 ? await MixedSettingsDataImage.ReadSqliteAsync(context, original!, tenant, token)
                 : await MixedSettingsDataImage.ReadTypedSqliteAsync(context, typedOriginal, token);

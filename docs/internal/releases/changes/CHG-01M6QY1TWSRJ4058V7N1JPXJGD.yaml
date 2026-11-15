@@ -1,0 +1,25 @@
+Change-Id: CHG-01M6QY1TWSRJ4058V7N1JPXJGD
+Title: "keep the footer usable when operator identity is missing"
+Type: fix
+Scope: accessibility
+Summary: "Return safe general footer content independently of legal-identity readiness. Render a minimal footer on unavailable data, keep verified operator roles separate, and reject stale tenant responses."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/FOOTER_MANAGEMENT.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/FOOTER_MANAGEMENT.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/FOOTER_MANAGEMENT.md
+    Disposition: documented
+  OpenAPI:
+    Reference: docs/internal/FOOTER_MANAGEMENT.md
+    Disposition: documented
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented

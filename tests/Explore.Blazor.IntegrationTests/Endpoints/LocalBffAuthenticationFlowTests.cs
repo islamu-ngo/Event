@@ -44,6 +44,7 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
         });
         _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
+            BaseAddress = new Uri("https://localhost"),
             AllowAutoRedirect = false,
             HandleCookies = true
         });
@@ -181,6 +182,7 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
         }));
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
+            BaseAddress = new Uri("https://localhost"),
             AllowAutoRedirect = false,
             HandleCookies = true
         });

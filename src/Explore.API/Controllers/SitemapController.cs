@@ -33,6 +33,7 @@ public sealed class SitemapController(
     ];
 
     [HttpGet(Name = RouteNames.GetSitemap)]
+    [TenantMachinePublicRead]
     [AllowAnonymous]
     [OutputCache(PolicyName = "SitemapData")]
     [EndpointSummary("Get XML sitemap")]

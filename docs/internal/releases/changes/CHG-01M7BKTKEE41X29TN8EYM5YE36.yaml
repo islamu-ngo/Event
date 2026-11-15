@@ -1,0 +1,26 @@
+Change-Id: CHG-01M7BKTKEE41X29TN8EYM5YE36
+Title: "Permit the existing tenant parent authority fence"
+Type: fix
+Scope: access
+Summary: "Declare Runtime UPDATE on Tenant.Id under the membership mutation owner so original-tenant enrollment can retain its existing no-op parent fence without provider or tenant-status write authority."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "Declare only the new Runtime UPDATE(Tenant.Id) fence addition under the membership owner; preserve existing read ownership, original transaction checks, partial-installation rejection and User fences. The technical anchor records the credential-only primary-key update risk."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Exceptions;
 using Explore.Application.Features.Federation.Atproto.Models;
 using Explore.Application.Features.Federation.Atproto.Services;
 using Explore.Application.Services;
@@ -12,6 +13,34 @@ namespace Event.Application.UnitTests.Features.Federation;
 
 public sealed class AtprotoEventPublicationSnapshotFactoryTests
 {
+    private static readonly Guid TenantId = Guid.CreateVersion7();
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task PrivateTenantCannotProduceMachinePublicSnapshotEvenForAuthenticatedPublisher(bool authenticated)
+    {
+        var graph = CreateGraph();
+        var factory = CreateFactory(VisitorAccessMode.AuthenticatedOnly, authenticated);
+
+        var result = await factory.CreateAsync(graph, new(2026, 7, 18, 12, 0, 0, TimeSpan.Zero));
+
+        await Assert.That(result.IsEligible).IsFalse();
+        await Assert.That(result.Snapshot).IsNull();
+    }
+
+    [Test]
+    public async Task UnavailableReadPolicyCannotMasqueradeAsProvenPublicationIneligibility()
+    {
+        var graph = CreateGraph();
+        var factory = CreateFactory((VisitorAccessMode)int.MaxValue);
+
+        var denial = await Assert.ThrowsAsync<TenantVisitorReadAccessException>(
+            () => factory.CreateAsync(graph, new(2026, 7, 18, 12, 0, 0, TimeSpan.Zero)));
+
+        await Assert.That(denial!.Decision).IsEqualTo(VisitorTenantReadAccessDecision.Unavailable);
+    }
+
     [Test]
     public async Task CreateAsync_PublicPersistedEvent_BuildsImmutableSnapshot()
     {
@@ -282,7 +311,8 @@ public sealed class AtprotoEventPublicationSnapshotFactoryTests
         }
     }
 
-    private static AtprotoEventPublicationSnapshotFactory CreateFactory()
+    private static AtprotoEventPublicationSnapshotFactory CreateFactory(
+        VisitorAccessMode mode = VisitorAccessMode.FullRegistrationAndAuth, bool authenticated = false)
     {
         ILocationPrivacyGovernanceService governance = Substitute.For<ILocationPrivacyGovernanceService>();
         governance.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -294,12 +324,13 @@ public sealed class AtprotoEventPublicationSnapshotFactoryTests
                 true,
                 LocationDisclosureAudienceEnum.AnyCurrentRegistrant,
                 TimeSpan.FromDays(30)));
-        return new(new(governance, new EventLocationDisclosureEvaluator()));
+        return new(new(governance, new EventLocationDisclosureEvaluator()),
+            new global::Event.Testing.Settings.VisitorReadPolicyTestAuthority(TenantId, mode, authenticated).Policy);
     }
 
     private static AtprotoEventPublicationEntityGraph CreateGraph()
     {
-        Guid tenantId = Guid.CreateVersion7();
+        Guid tenantId = TenantId;
         var actor = new Actor
         {
             Id = Guid.CreateVersion7(),

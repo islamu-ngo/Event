@@ -1,5 +1,6 @@
 using System.Data;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -264,7 +265,7 @@ public sealed class LocalIdentityExecutionScopeFactoryTests
     }
 
     internal static async Task<ServiceProvider> ComposeAsync(LocalCredentialFirstUseTests.Fixture fixture,
-        IdentityDatabaseTopology topology, IInterceptor[]? interceptors = null)
+        IdentityDatabaseTopology topology, IInterceptor[]? interceptors = null, ITenantContext? tenantContext = null)
     {
         await using var original = fixture.Provider.CreateAsyncScope();
         var application = original.ServiceProvider.GetRequiredService<ExploreDbContext>();
@@ -283,6 +284,8 @@ public sealed class LocalIdentityExecutionScopeFactoryTests
 
         var services = new ServiceCollection();
         services.AddLogging();
+        if (tenantContext is not null)
+            services.AddSingleton(tenantContext);
         services.AddSingleton(writer);
         services.AddPooledDbContextFactory<ExploreDbContext>(options => options
             .UseSqlite(applicationConnection).UseSnakeCaseNamingConvention());

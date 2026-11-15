@@ -10,7 +10,7 @@ namespace Explore.Application.Services;
 
 /// <summary>Retains the original Global owner and ordered source custody around retained erasure.</summary>
 public sealed class PrivacyErasureService(
-    IServiceProvider provider,
+    Func<RetainedAuthorityPrivacyErasureWorkflow> currentWorkflow,
     IPolicyMutationExecutionScopeFactory scopes) : IPrivacyErasureService
 {
     public Task<PrivacyErasureStartDto> EraseUserAsync(
@@ -25,11 +25,11 @@ public sealed class PrivacyErasureService(
         }, cancellationToken);
 
     public Task<Guid?> AuthenticateReceiptAsync(string receipt, CancellationToken cancellationToken) =>
-        provider.GetRequiredService<RetainedAuthorityPrivacyErasureWorkflow>()
+        currentWorkflow()
             .AuthenticateReceiptAsync(receipt, cancellationToken);
 
     public Task<PrivacyErasureStatusDto?> GetStatusAsync(Guid intentId, CancellationToken cancellationToken) =>
-        provider.GetRequiredService<RetainedAuthorityPrivacyErasureWorkflow>()
+        currentWorkflow()
             .GetStatusAsync(intentId, cancellationToken);
 
     private async Task<TResult> ExecuteMutationAsync<TResult>(

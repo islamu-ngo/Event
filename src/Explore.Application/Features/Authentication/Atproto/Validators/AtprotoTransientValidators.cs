@@ -1,5 +1,6 @@
 using System.Text;
 using Explore.Domain;
+using Explore.Domain.ValueObjects;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
 using Explore.Application.Features.Authentication.Atproto.Requests.Queries;
 using FluentValidation;
@@ -12,7 +13,13 @@ public sealed class CreateAtprotoTransientCommandValidator : AbstractValidator<C
     {
         RuleFor(x => x.Purpose).Must(AtprotoTransientValidation.IsOrdinaryPurpose);
         RuleFor(x => x.TokenDigest).Must(AtprotoTransientValidation.IsDigest);
-        RuleFor(x => x.TenantId).NotEmpty();
+        RuleFor(x => x).Must(request => request.FlowKind switch
+        {
+            AtprotoAuthenticationFlowKind.Targeted => request.TenantId.HasValue && request.TenantId != Guid.Empty,
+            AtprotoAuthenticationFlowKind.UnscopedVerification =>
+                request.Purpose == AtprotoTransientPurpose.OAuthState && request.TenantId is null,
+            _ => false
+        });
         RuleFor(x => x.ProtectedPayload).Must(payload => !string.IsNullOrWhiteSpace(payload)
             && Encoding.UTF8.GetByteCount(payload) <= AtprotoTransientRecord.MaximumProtectedPayloadBytes);
         RuleFor(x => x).Must(request =>
@@ -30,9 +37,14 @@ public sealed class ReadAtprotoTransientQueryValidator : AbstractValidator<ReadA
     {
         RuleFor(x => x.Purpose).Must(AtprotoTransientValidation.IsOrdinaryPurpose);
         RuleFor(x => x.TokenDigest).Must(AtprotoTransientValidation.IsDigest);
-        RuleFor(x => x.ExpectedTenantId).Must(id => id != Guid.Empty);
-        RuleFor(x => x).Must(request => request.Purpose == AtprotoTransientPurpose.OAuthState
-            || request.ExpectedTenantId.HasValue);
+        RuleFor(x => x).Must(request => request.FlowKind switch
+        {
+            AtprotoAuthenticationFlowKind.Targeted => request.ExpectedTenantId != Guid.Empty
+                && (request.Purpose == AtprotoTransientPurpose.OAuthState || request.ExpectedTenantId.HasValue),
+            AtprotoAuthenticationFlowKind.UnscopedVerification =>
+                request.Purpose == AtprotoTransientPurpose.OAuthState && request.ExpectedTenantId is null,
+            _ => false
+        });
     }
 }
 

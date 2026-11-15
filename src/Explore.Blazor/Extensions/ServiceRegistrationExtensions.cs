@@ -91,6 +91,7 @@ public static class ServiceRegistrationExtensions
         });
         services.AddSingleton<ISetupSecretCookieProtector, SetupSecretCookieProtector>();
         services.AddSingleton<LocalCredentialChallengeCookie>();
+        services.AddScoped<LocalVisitorEnrollmentFlowStore>();
         services.AddScoped<ISetupSecretResolver, SetupSecretResolver>();
         services.AddScoped<IStorageUploadSessionStore, StorageUploadSessionStore>();
         services.AddScoped<IBffSupportAccessSessionStore, BffSupportAccessSessionStore>();

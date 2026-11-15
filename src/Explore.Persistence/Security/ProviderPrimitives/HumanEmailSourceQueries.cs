@@ -30,7 +30,7 @@ internal static class HumanEmailSourceQueries
         if (context.Database.IsSqlite())
         {
             var facts = await HumanEmailSourceSqlite.ReadAsync(context, transaction, subject, lifetime,
-                forwarding, tenant, route, ct);
+                forwarding, tenant, route, requireSelection, ct);
             requireSelection();
             return facts;
         }

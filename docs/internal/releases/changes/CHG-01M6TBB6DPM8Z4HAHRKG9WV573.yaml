@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6TBB6DPM8Z4HAHRKG9WV573
+Title: "Allow first-use Local password replacement at the instance root"
+Type: fix
+Scope: access
+Summary: "Complete challenge-authorized Local password replacement without a tenant selection in multi-tenant deployments while retaining token isolation and unrelated tenant gates."
+Group: local-root-credential-replacement
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Detail: "Exempt only the exact credential-replacement POST from tenant resolution and lifecycle routing. Dedicated replacement-challenge authentication, token isolation, consumed-authority rejection and private response handling remain authoritative; unrelated methods and paths remain tenant-gated."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "First-use Local password replacement works at the instance root in multi-tenant deployments without a tenant header. A valid replacement challenge is required and successful replacement still requires a fresh login. No configuration or migration is needed."

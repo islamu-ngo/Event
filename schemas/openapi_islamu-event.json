@@ -75707,6 +75707,348 @@
         "x-rate-limit-policy": "public_transactional"
       }
     },
+    "/api/auth/local/enrollment/reserve": {
+      "post": {
+        "tags": [
+          "LocalVisitorEnrollment"
+        ],
+        "summary": "Reserve a browser-bound Local enrollment",
+        "operationId": "ReserveLocalVisitorEnrollment",
+        "parameters": [
+          {
+            "name": "X-Local-Enrollment-Proof",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalVisitorEnrollmentReservationRequestDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalVisitorEnrollmentReservationRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalVisitorEnrollmentReservation"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalVisitorEnrollmentReservation"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalVisitorEnrollmentReservation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Public",
+        "x-rate-limit-policy": "Write"
+      }
+    },
+    "/api/auth/local/enrollment/register": {
+      "post": {
+        "tags": [
+          "LocalVisitorEnrollment"
+        ],
+        "summary": "Register the originally reserved Local visitor",
+        "operationId": "RegisterLocalVisitor",
+        "parameters": [
+          {
+            "name": "X-Local-Enrollment-Proof",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalVisitorRegistrationRequestDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalVisitorRegistrationRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Public",
+        "x-rate-limit-policy": "Write"
+      }
+    },
     "/api/location": {
       "get": {
         "tags": [
@@ -133271,6 +133613,355 @@
         "x-endpoint-class": "Authenticated"
       }
     },
+    "/api/auth/account-continuation": {
+      "post": {
+        "tags": [
+          "VerifiedAccountContinuation"
+        ],
+        "summary": "Resolve the verified account's tenant destination",
+        "description": "Reads an exact validated Local or Keycloak account binding without enrolling an account or membership.",
+        "operationId": "ResolveVerifiedAccountContinuation",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifiedAccountContinuationResult"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifiedAccountContinuationResult"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifiedAccountContinuationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ],
+        "x-endpoint-class": "Authenticated",
+        "x-rate-limit-policy": "Write"
+      }
+    },
+    "/api/auth/tenant-join": {
+      "post": {
+        "tags": [
+          "VerifiedTenantJoin"
+        ],
+        "summary": "Join the explicitly selected tenant with an existing verified account",
+        "operationId": "JoinVerifiedTenant",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ],
+        "x-endpoint-class": "Authenticated",
+        "x-rate-limit-policy": "Write"
+      }
+    },
     "/api/visibilitytype": {
       "get": {
         "tags": [
@@ -141434,14 +142125,11 @@
           "atprotoPublicUrl": {
             "type": "string"
           },
-          "googleSsoEnabled": {
-            "type": "boolean"
-          },
-          "googleClientId": {
-            "type": "string"
-          },
-          "googleClientSecretOwnership": {
-            "$ref": "#/components/schemas/SecretOwnershipDto"
+          "unsupportedProviderMessage": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "keycloakPublicOnboardingPolicy": {
             "$ref": "#/components/schemas/PublicOnboardingPolicy"
@@ -141449,16 +142137,7 @@
           "keycloakPublicSignupUrl": {
             "type": "string"
           },
-          "googlePublicOnboardingPolicy": {
-            "$ref": "#/components/schemas/PublicOnboardingPolicy"
-          },
-          "googlePublicSignupUrl": {
-            "type": "string"
-          },
           "lockAtprotoLoginEnabled": {
-            "type": "boolean"
-          },
-          "lockGoogleSsoEnabled": {
             "type": "boolean"
           }
         }
@@ -141489,28 +142168,13 @@
           "atprotoPublicUrl": {
             "type": "string"
           },
-          "googleSsoEnabled": {
-            "type": "boolean"
-          },
-          "googleClientId": {
-            "type": "string"
-          },
           "lockAtprotoLoginEnabled": {
-            "type": "boolean"
-          },
-          "lockGoogleSsoEnabled": {
             "type": "boolean"
           },
           "keycloakPublicOnboardingPolicy": {
             "$ref": "#/components/schemas/PublicOnboardingPolicy"
           },
           "keycloakPublicSignupUrl": {
-            "type": "string"
-          },
-          "googlePublicOnboardingPolicy": {
-            "$ref": "#/components/schemas/PublicOnboardingPolicy"
-          },
-          "googlePublicSignupUrl": {
             "type": "string"
           }
         },
@@ -157342,6 +158006,45 @@
       "FooterConfigDto": {
         "type": "object",
         "properties": {
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "brandDisplayName": {
+            "type": "string"
+          },
+          "brandLogoUrl": {
+            "type": "string"
+          },
+          "showCommunityGuidelinesLink": {
+            "type": "boolean"
+          },
+          "directoryOperator": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TenantDirectoryOperatorPublicDto"
+              }
+            ]
+          },
+          "instanceOperator": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/InstanceOperatorPublicDto"
+              }
+            ]
+          },
           "settings": {
             "$ref": "#/components/schemas/FooterSettingsDto"
           },
@@ -164747,43 +165450,11 @@
           "atprotoPublicUrl": {
             "type": "string"
           },
-          "googleSsoEnabled": {
-            "type": "boolean"
-          },
-          "googleClientId": {
-            "type": "string"
-          },
-          "googleClientSecretOwnership": {
-            "type": "object",
-            "properties": {
-              "mode": {
-                "type": "string"
-              },
-              "source": {
-                "type": "string"
-              },
-              "badge": {
-                "type": "string"
-              },
-              "description": {
-                "type": "string"
-              },
-              "editable": {
-                "type": "boolean"
-              },
-              "configured": {
-                "type": "boolean"
-              },
-              "resolutionStatus": {
-                "type": [
-                  "null",
-                  "string"
-                ]
-              },
-              "bootstrapAvailable": {
-                "type": "boolean"
-              }
-            }
+          "unsupportedProviderMessage": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "keycloakPublicOnboardingPolicy": {
             "$ref": "#/components/schemas/PublicOnboardingPolicy"
@@ -164791,16 +165462,7 @@
           "keycloakPublicSignupUrl": {
             "type": "string"
           },
-          "googlePublicOnboardingPolicy": {
-            "$ref": "#/components/schemas/PublicOnboardingPolicy"
-          },
-          "googlePublicSignupUrl": {
-            "type": "string"
-          },
           "lockAtprotoLoginEnabled": {
-            "type": "boolean"
-          },
-          "lockGoogleSsoEnabled": {
             "type": "boolean"
           },
           "_links": {
@@ -174306,11 +174968,17 @@
             "format": "uuid"
           },
           "verifiedByApplicationUserId": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
           },
           "verifiedAt": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "date-time"
           },
           "updatedAt": {
@@ -180384,6 +181052,139 @@
           "footerConfig": {
             "type": "object",
             "properties": {
+              "tenantId": {
+                "type": [
+                  "null",
+                  "string"
+                ],
+                "format": "uuid"
+              },
+              "revision": {
+                "type": "string"
+              },
+              "brandDisplayName": {
+                "type": "string"
+              },
+              "brandLogoUrl": {
+                "type": "string"
+              },
+              "showCommunityGuidelinesLink": {
+                "type": "boolean"
+              },
+              "directoryOperator": {
+                "required": [
+                  "documentRevision",
+                  "publicName",
+                  "legalName",
+                  "operatorKindCode",
+                  "jurisdictionCountryCode",
+                  "publicContactEmail",
+                  "legalNoticeUrl",
+                  "privacyUrl"
+                ],
+                "type": "object",
+                "properties": {
+                  "documentRevision": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "publicName": {
+                    "type": "string"
+                  },
+                  "legalName": {
+                    "type": "string"
+                  },
+                  "operatorKindCode": {
+                    "type": "string"
+                  },
+                  "jurisdictionCountryCode": {
+                    "type": "string"
+                  },
+                  "registrationIdentifier": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "publicContactEmail": {
+                    "type": "string"
+                  },
+                  "legalNoticeUrl": {
+                    "type": "string"
+                  },
+                  "termsUrl": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "privacyUrl": {
+                    "type": "string"
+                  }
+                }
+              },
+              "instanceOperator": {
+                "required": [
+                  "operatorId",
+                  "publicName",
+                  "legalName",
+                  "isOfficialInstance",
+                  "officialOrigin",
+                  "operatorKindCode",
+                  "jurisdictionCountryCode",
+                  "publicContactEmail",
+                  "websiteUrl",
+                  "legalNoticeUrl",
+                  "termsUrl",
+                  "privacyUrl"
+                ],
+                "type": "object",
+                "properties": {
+                  "operatorId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "publicName": {
+                    "type": "string"
+                  },
+                  "legalName": {
+                    "type": "string"
+                  },
+                  "isOfficialInstance": {
+                    "type": "boolean"
+                  },
+                  "officialOrigin": {
+                    "type": "string"
+                  },
+                  "operatorKindCode": {
+                    "type": "string"
+                  },
+                  "jurisdictionCountryCode": {
+                    "type": "string"
+                  },
+                  "registrationIdentifier": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "publicContactEmail": {
+                    "type": "string"
+                  },
+                  "websiteUrl": {
+                    "type": "string"
+                  },
+                  "legalNoticeUrl": {
+                    "type": "string"
+                  },
+                  "termsUrl": {
+                    "type": "string"
+                  },
+                  "privacyUrl": {
+                    "type": "string"
+                  }
+                }
+              },
               "settings": {
                 "type": "object",
                 "properties": {
@@ -185000,6 +185801,9 @@
             "type": "boolean"
           },
           "allowsExistingAccountLogin": {
+            "type": "boolean"
+          },
+          "userRegistrationEnabled": {
             "type": "boolean"
           },
           "signupDestinations": {
@@ -189622,7 +190426,8 @@
       "LocalCredentialOperationKind": {
         "enum": [
           "Create",
-          "Reset"
+          "Reset",
+          "VisitorCreate"
         ],
         "type": "string"
       },
@@ -189635,7 +190440,8 @@
           "localSubjectId",
           "personalActorId",
           "externalLoginId",
-          "createdAt"
+          "createdAt",
+          "visitorEnrollmentOperationId"
         ],
         "type": "object",
         "properties": {
@@ -189650,7 +190456,10 @@
             "$ref": "#/components/schemas/LocalCredentialOperationStage"
           },
           "initiatingApplicationUserId": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
           },
           "localSubjectId": {
@@ -189672,6 +190481,13 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "visitorEnrollmentOperationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -189704,11 +190520,17 @@
             "format": "uuid"
           },
           "verifiedByApplicationUserId": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
           },
           "verifiedAt": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "date-time"
           },
           "updatedAt": {
@@ -189784,7 +190606,8 @@
         "enum": [
           "ProvisioningPending",
           "ChangeRequired",
-          "Ready"
+          "Ready",
+          "RegistrationPending"
         ],
         "type": "string"
       },
@@ -190128,6 +190951,70 @@
           }
         },
         "additionalProperties": false
+      },
+      "LocalVisitorEnrollmentReservation": {
+        "required": [
+          "operationId",
+          "enrollmentIntent",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "enrollmentIntent": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "LocalVisitorEnrollmentReservationRequestDto": {
+        "required": [
+          "operationId"
+        ],
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "LocalVisitorRegistrationRequestDto": {
+        "required": [
+          "operationId",
+          "username",
+          "password",
+          "email",
+          "enrollmentIntent"
+        ],
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "enrollmentIntent": {
+            "type": "string"
+          }
+        }
       },
       "LocationAddressSourceEnum": {
         "enum": [
@@ -220984,6 +221871,33 @@
           }
         }
       },
+      "VerifiedAccountContinuationOutcome": {
+        "type": "integer"
+      },
+      "VerifiedAccountContinuationResult": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/VerifiedAccountContinuationOutcome"
+          },
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "tenantSlug": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hasMultipleTenants": {
+            "type": "boolean"
+          }
+        }
+      },
       "VerifyCerbosEndpointRequest": {
         "type": "object",
         "properties": {
@@ -221071,6 +221985,9 @@
           "allowsExistingAccountLogin": {
             "type": "boolean"
           },
+          "userRegistrationEnabled": {
+            "type": "boolean"
+          },
           "signupDestinations": {
             "type": "array",
             "items": {
@@ -221083,7 +222000,8 @@
         "enum": [
           "FullRegistrationAndAuth",
           "AnonymousOnly",
-          "DirectoryListingOnly"
+          "DirectoryListingOnly",
+          "AuthenticatedOnly"
         ],
         "type": "string"
       },
@@ -223416,6 +224334,9 @@
       "name": "LocalPasswordRecovery"
     },
     {
+      "name": "LocalVisitorEnrollment"
+    },
+    {
       "name": "Location"
     },
     {
@@ -223717,6 +224638,12 @@
     },
     {
       "name": "UserProfileImage"
+    },
+    {
+      "name": "VerifiedAccountContinuation"
+    },
+    {
+      "name": "VerifiedTenantJoin"
     },
     {
       "name": "VisibilityType"

@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -42,7 +43,17 @@ public sealed partial class LocalIdentityWriterPermissionsNativeTests
     public Task CleanupDiagnosticFailureRetainsTheOriginalAuthenticationFailureWithoutReplayingTheAttempt() =>
         ExerciseConfiguredAuthenticationAsync(failAfterBookkeeping: true, failDuringCleanup: true);
 
-    private static async Task ExerciseConfiguredAuthenticationAsync(bool failAfterBookkeeping, bool failDuringCleanup = false)
+    [Test]
+    public Task LocalCreationReadsRecognitionContinuityWithoutMutatingItsCaptureState() =>
+        ExerciseConfiguredAuthenticationAsync(failAfterBookkeeping: false, requireContinuityReadOnly: true);
+
+    [Test]
+    public Task LocalCreationReadsGeneratedProfileRevisionWithoutReadingPrivateBirthDateMaterial() =>
+        ExerciseConfiguredAuthenticationAsync(failAfterBookkeeping: false, requireProfileReadBoundary: true);
+
+    private static async Task ExerciseConfiguredAuthenticationAsync(bool failAfterBookkeeping,
+        bool failDuringCleanup = false, bool requireContinuityReadOnly = false,
+        bool requireProfileReadBoundary = false, DispatchSourceBeforeBeginProbe? dispatchSource = null)
     {
         await using var fixture = new NativeFixture(IdentityDatabaseTopology.Colocated);
         // Admission failures here remain fixture prerequisites, not evidence about authentication.
@@ -85,8 +96,9 @@ public sealed partial class LocalIdentityWriterPermissionsNativeTests
 
         var services = new ServiceCollection();
         services.AddLogging();
+        dispatchSource?.Configure(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
         services.AddSingleton(new LocalIdentityWriterDbContextFactory(writerOptions, poolSize: 1,
-            applicationEnrollment: enrollment));
+            applicationEnrollment: enrollment, interceptors: dispatchSource is null ? null : [dispatchSource]));
         var runtime = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime);
         services.AddPooledDbContextFactory<ExploreDbContext>(options =>
         {
@@ -121,6 +133,32 @@ public sealed partial class LocalIdentityWriterPermissionsNativeTests
                 address, "Native", "Authentication"), token);
             await Assert.That(creation.Outcome).IsEqualTo(LocalCredentialCreateOutcome.Created);
             var receipt = creation.Receipt!;
+            if (requireContinuityReadOnly)
+            {
+                var pending = application.Set<ModerationRecognitionPending>()
+                    .IgnoreQueryFilters(["ModerationRecognition"])
+                    .Where(row => row.SubjectId == receipt.LocalSubjectId);
+                var material = application.Set<ModerationRecognitionCaptureItem>()
+                    .IgnoreQueryFilters(["ModerationRecognition"])
+                    .Where(row => row.ErasureSubjectId == receipt.LocalSubjectId);
+                await Assert.That(await pending.AsNoTracking().ToArrayAsync(token)).IsEmpty();
+                await Assert.That(await material.AsNoTracking().ToArrayAsync(token)).IsEmpty();
+                var pendingDelete = await Assert.ThrowsAsync<PostgresException>(() => pending.ExecuteDeleteAsync(token));
+                await Assert.That(pendingDelete!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+                var materialDelete = await Assert.ThrowsAsync<PostgresException>(() => material.ExecuteDeleteAsync(token));
+                await Assert.That(materialDelete!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+                var pendingUpdate = await Assert.ThrowsAsync<PostgresException>(() => pending.ExecuteUpdateAsync(
+                    setters => setters.SetProperty(row => row.Revision, row => row.Revision), token));
+                await Assert.That(pendingUpdate!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+                var materialUpdate = await Assert.ThrowsAsync<PostgresException>(() => material.ExecuteUpdateAsync(
+                    setters => setters.SetProperty(row => row.DroppedAt, row => row.DroppedAt), token));
+                await Assert.That(materialUpdate!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+                await Assert.That(application.ContextId).IsEqualTo(contextId);
+                await Assert.That(connector.ProcessID).IsEqualTo(backend);
+                await RequireSessionAsync(application, enrollment.WriterLogin);
+                execution.RequireCurrent(application, application);
+                return;
+            }
             var user = new User
             {
                 Id = receipt.LocalSubjectId,
@@ -150,6 +188,24 @@ public sealed partial class LocalIdentityWriterPermissionsNativeTests
             });
             await application.SaveChangesAsync(token);
             application.ChangeTracker.Clear();
+            if (requireProfileReadBoundary)
+            {
+                var profile = application.UserPii.Where(row => row.UserId == receipt.LocalSubjectId);
+                long revision = await profile.Select(row => EF.Property<long>(row, "_birthDateRevision"))
+                    .SingleAsync(token);
+                await Assert.That(revision).IsEqualTo(0);
+                var birthDate = await Assert.ThrowsAsync<PostgresException>(() =>
+                    profile.Select(row => EF.Property<DateOnly?>(row, "_dateOfBirth")).SingleAsync(token));
+                await Assert.That(birthDate!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+                var collectionReceipt = await Assert.ThrowsAsync<PostgresException>(() =>
+                    profile.Select(row => EF.Property<Guid?>(row, "_birthDateCollectionReceiptId")).SingleAsync(token));
+                await Assert.That(collectionReceipt!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+                await Assert.That(application.ContextId).IsEqualTo(contextId);
+                await Assert.That(connector.ProcessID).IsEqualTo(backend);
+                await RequireSessionAsync(application, enrollment.WriterLogin);
+                execution.RequireCurrent(application, application);
+                return;
+            }
             var provisioning = await states.ReadProvisioningAsync(receipt.OperationId, token);
             var activated = await states.ActivateChangeRequiredAsync(new LocalCredentialActivationRequest(receipt.OperationId,
                 provisioning!.OperationConcurrencyStamp), token);
@@ -159,6 +215,63 @@ public sealed partial class LocalIdentityWriterPermissionsNativeTests
             int beforeAttempts = await application.LocalIdentityUsers.AsNoTracking().Where(row => row.Id == receipt.LocalSubjectId)
                 .Select(row => row.AccessFailedCount).SingleAsync(token);
             await Assert.That(before.State).IsEqualTo(LocalIdentityEligibilityState.ChangeRequired);
+
+            if (dispatchSource is not null)
+            {
+                var account = await application.LocalIdentityUsers.AsNoTracking()
+                    .SingleAsync(row => row.Id == receipt.LocalSubjectId, token);
+                DateTimeOffset now = DateTimeOffset.UtcNow;
+                string password = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}";
+                dispatchSource.Arm(application);
+                var replacement = new LocalCredentialReplacementRequest(
+                    new LocalCredentialReplacementAuthority(new LocalCredentialReplacementSubject(
+                        receipt.LocalSubjectId, receipt.OperationId, account.SecurityStamp!), now, now.AddMinutes(5)),
+                    password);
+                if (dispatchSource.Failure is { } expected)
+                {
+                    var observed = await Assert.ThrowsAsync<OperationCanceledException>(() => states.ReplaceAsync(replacement, token));
+                    await Assert.That(observed).IsSameReferenceAs(expected);
+                }
+                else
+                {
+                    var replaced = await states.ReplaceAsync(replacement, token);
+                    await Assert.That(replaced).IsEqualTo(LocalCredentialReplacementOutcome.Replaced);
+                }
+                await Assert.That(dispatchSource.BeforeBeginObserved).IsTrue();
+                await Assert.That(dispatchSource.BeforeCommitObserved)
+                    .IsEqualTo(dispatchSource.Failure is null || dispatchSource.FailBeforeCommit);
+                await dispatchSource.RequireAvailableAsync(token);
+                var committed = await application.LocalIdentityUsers.AsNoTracking()
+                    .SingleAsync(row => row.Id == receipt.LocalSubjectId, token);
+                if (dispatchSource.Failure is null)
+                {
+                    await Assert.That(committed.SecurityStamp).IsNotEqualTo(account.SecurityStamp);
+                    await Assert.That(manager.PasswordHasher.VerifyHashedPassword(committed, committed.PasswordHash!, password))
+                        .IsNotEqualTo(PasswordVerificationResult.Failed);
+                }
+                else
+                {
+                    await Assert.That(committed.PasswordHash).IsEqualTo(account.PasswordHash);
+                    await Assert.That(committed.SecurityStamp).IsEqualTo(account.SecurityStamp);
+                    await Assert.That(committed.ConcurrencyStamp).IsEqualTo(account.ConcurrencyStamp);
+                    await Assert.That((await application.Set<LocalIdentityCredentialOperation>().AsNoTracking()
+                        .SingleAsync(row => row.Id == receipt.OperationId, token)).Stage)
+                        .IsEqualTo(LocalCredentialOperationStage.ChangeRequired);
+                }
+                await Assert.That((await application.Set<LocalIdentityEligibility>().AsNoTracking()
+                    .SingleAsync(row => row.LocalSubjectId == receipt.LocalSubjectId, token)).State)
+                    .IsEqualTo(dispatchSource.Failure is null
+                        ? LocalIdentityEligibilityState.Ready : LocalIdentityEligibilityState.ChangeRequired);
+                await Assert.That(application.Database.CurrentTransaction).IsNull();
+                await Assert.That(application.ContextId).IsEqualTo(contextId);
+                await Assert.That(application.Database.GetDbConnection()).IsSameReferenceAs(connector);
+                await Assert.That(connector.ProcessID).IsEqualTo(backend);
+                await RequireSessionAsync(application, enrollment.WriterLogin);
+                execution.RequireCurrent(application, application);
+                HumanSecuritySourceGate.RequireCurrent(application);
+                LocalIdentityLifecycleGateCustody.RequireHeld(application);
+                return;
+            }
 
             var signer = new LocalJwtTokenGenerator(Options.Create(new LocalIdentityOptions
             { JwtKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)) }), TimeProvider.System);

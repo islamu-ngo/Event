@@ -68,6 +68,8 @@ public sealed class ModerationCaseIntakeCommitter(
 
         ModerationCaseIssuedReceipt? staged = null;
         var published = false;
+        var contextId = context.ContextId;
+        var connection = context.Database.GetDbConnection();
         try
         {
             // Like the native unit of work, open the manual transaction inside the provider
@@ -79,18 +81,35 @@ public sealed class ModerationCaseIntakeCommitter(
                 {
                     await using var transaction = await context.Database.BeginTransactionAsync(
                         IsolationLevel.Serializable, cancellationToken);
-                    if (!CallerUnchanged(tenantId, callerId)) return false;
+                    var nativeTransaction = transaction.GetDbTransaction();
+                    if (!CallerUnchanged(tenantId, callerId) || context.ContextId != contextId
+                        || !ReferenceEquals(context.Database.GetDbConnection(), connection))
+                        return false;
                     staged = await mint(cancellationToken);
                     if (staged is null || staged.Receipt.TenantId != tenantId
                         || staged.Receipt.CallerUserId != callerId
-                        || (staged.Receipt.RelationshipKind == Explore.Domain.ModerationCaseRelationshipKind.CaseReadGrant) != readPurpose
-                        || HasForeignIssuanceWork(staged))
+                        || (staged.Receipt.RelationshipKind == Explore.Domain.ModerationCaseRelationshipKind.CaseReadGrant) != readPurpose)
                         return false;
+                    var issued = staged;
+                    var source = context.ChangeTracker.Entries<ModerationCaseTargetSource>()
+                        .SingleOrDefault(entry => entry.Entity.Id == issued.Receipt.SourceId)?.Entity;
+                    bool OwnsIssuanceWork() =>
+                        context.ContextId == contextId
+                        && ReferenceEquals(context.Database.CurrentTransaction, transaction)
+                        && ReferenceEquals(context.Database.GetDbConnection(), connection)
+                        && ReferenceEquals(transaction.GetDbTransaction(), nativeTransaction)
+                        && ReferenceEquals(nativeTransaction.Connection, connection)
+                        && connection.State == ConnectionState.Open
+                        && context.Entry(issued.Receipt).State is EntityState.Added or EntityState.Modified or EntityState.Unchanged
+                        && (source is null || context.Entry(source).State is EntityState.Added or EntityState.Modified or EntityState.Unchanged)
+                        && !context.HasLostModerationRecoveryAdvancement(transaction.TransactionId)
+                        && !HasForeignIssuanceWork(issued, source);
+                    if (!OwnsIssuanceWork()) return false;
                     await context.SaveChangesAsync(cancellationToken);
                     await context.FlushDisclosureAsync(cancellationToken);
                     if (!await issuer.RecheckIssuanceAsync(cancellationToken)
                         || !CallerUnchanged(tenantId, callerId)
-                        || HasForeignIssuanceWork(staged) || context.ChangeTracker.HasChanges()
+                        || !OwnsIssuanceWork() || context.ChangeTracker.HasChanges()
                         || System.Transactions.Transaction.Current is not null
                         || clock.GetUtcNow() < staged.Receipt.IssuedAt
                         || clock.GetUtcNow() >= staged.Receipt.ExpiresAt
@@ -110,9 +129,17 @@ public sealed class ModerationCaseIntakeCommitter(
                 }
                 catch (TimeoutException) { return false; }
             });
-            if (!committed) return null;
+            if (!committed || staged is not { } publication) return null;
+            cancellationToken.ThrowIfCancellationRequested();
+            var publicationTime = clock.GetUtcNow();
+            if (!CallerUnchanged(tenantId, callerId) || context.ContextId != contextId
+                || !ReferenceEquals(context.Database.GetDbConnection(), connection)
+                || publicationTime < publication.Receipt.IssuedAt
+                || publicationTime >= publication.Receipt.ExpiresAt
+                || publication.Receipt.ExpiresAt == DateTimeOffset.MaxValue)
+                return null;
             published = true;
-            return staged;
+            return publication;
         }
         finally
         {
@@ -282,11 +309,12 @@ public sealed class ModerationCaseIntakeCommitter(
         currentUser.IsAuthenticated && currentUser.UserId == callerId && machine.Current is null
         && context.TenantFilterTenantId == tenantId && !context.IsTenantFilterBypassed;
 
-    private bool HasForeignIssuanceWork(ModerationCaseIssuedReceipt issued) =>
+    private bool HasForeignIssuanceWork(ModerationCaseIssuedReceipt issued, ModerationCaseTargetSource? ownedSource) =>
         context.ChangeTracker.Entries().Any(entry => entry.Entity switch
         {
             ModerationCaseTargetReceipt receipt => !ReferenceEquals(receipt, issued.Receipt),
-            ModerationCaseTargetSource source => source.Id != issued.Receipt.SourceId,
+            ModerationCaseTargetSource source => !ReferenceEquals(source, ownedSource) || source.Id != issued.Receipt.SourceId,
+            ModerationRecoveryStoreState => !context.IsOwnedModerationRecoveryAdvancement(entry),
             _ => true
         });
 

@@ -146,7 +146,8 @@ public static partial class PostgresResolverConfigurationContract
             IF pg_catalog.has_schema_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Schema)},'CREATE')
                 OR pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},pg_catalog.to_regclass({table}),
                     'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},pg_catalog.to_regclass({table}),'INSERT,UPDATE,REFERENCES')
+                OR (pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},pg_catalog.to_regclass({table}),'INSERT,UPDATE,REFERENCES')
+                    AND ({PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(context, enrollment)}) IS NOT TRUE)
                 OR pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},pg_catalog.to_regclass({anchor}),
                     'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                 OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},pg_catalog.to_regclass({anchor}),'SELECT,INSERT,UPDATE,REFERENCES')

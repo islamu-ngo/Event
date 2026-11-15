@@ -336,6 +336,7 @@ public sealed class OrganizationMappingHandlerTests
     internal sealed class ActorStore : Store<Actor, Guid>, IActorRepository
     {
         public List<Actor> Items { get; } = [];
+        public Task<Actor?> GetForIdentityEnrollmentAsync(Guid userId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Actor?> GetForModerationAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public override Task<Actor> Create(Actor entity) { Items.Add(entity); return Task.FromResult(entity); }
         public Task<Actor?> GetActorWithDetails(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();

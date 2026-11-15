@@ -41,6 +41,9 @@ public static class QuartzSchedulerKeys
     public static readonly JobKey EmailDispatchRecoveryScan =
         new(ScheduledJobNames.EmailDispatchRecoveryScan, RecurringGroup);
 
+    public static readonly JobKey VisitorEnrollmentRecovery =
+        new(ScheduledJobNames.VisitorEnrollmentRecovery, RecurringGroup);
+
     public static readonly JobKey EventReminderDispatch =
         new(ScheduledJobNames.EventReminderDispatch, OnDemandGroup);
 
@@ -121,6 +124,7 @@ public static class QuartzSchedulerKeys
     {
         EmailDispatchDrain,
         EmailDispatchRecoveryScan,
+        VisitorEnrollmentRecovery,
         IdempotencyCleanup,
         AtprotoTransientCleanup,
         EventDiscoverySnapshotPurge,

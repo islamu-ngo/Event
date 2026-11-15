@@ -15,6 +15,25 @@ namespace Event.Application.UnitTests.Services;
 public sealed class VisitorAccessCapabilityResolverTests
 {
     [Test]
+    [Arguments(AuthenticationProviderKind.Local, VisitorAccessMode.FullRegistrationAndAuth)]
+    [Arguments(AuthenticationProviderKind.Keycloak, VisitorAccessMode.FullRegistrationAndAuth)]
+    [Arguments(AuthenticationProviderKind.Atproto, VisitorAccessMode.FullRegistrationAndAuth)]
+    [Arguments(AuthenticationProviderKind.Local, VisitorAccessMode.AuthenticatedOnly)]
+    [Arguments(AuthenticationProviderKind.Keycloak, VisitorAccessMode.AuthenticatedOnly)]
+    [Arguments(AuthenticationProviderKind.Atproto, VisitorAccessMode.AuthenticatedOnly)]
+    public async Task ClosedRegistrationPreservesSupportedExistingAccountAccess(
+        AuthenticationProviderKind provider, VisitorAccessMode mode)
+    {
+        var capability = VisitorAccessCapabilityResolver.EvaluateProposedState(new(
+            mode, [new(provider, true, true, PublicOnboardingPolicy.Allowed, "https://identity.example.test/signup")],
+            userRegistrationEnabled: false));
+
+        await Assert.That(capability.AllowsExistingAccountLogin).IsTrue();
+        await Assert.That(capability.AllowsAccountRequiredParticipation).IsTrue();
+        await Assert.That(capability.SignupDestinations).IsEmpty();
+    }
+
+    [Test]
     public async Task ResolverUsesOneCoherentSnapshotAndObservesTheNextSnapshotOnTheNextResolution()
     {
         Guid tenantId = Guid.CreateVersion7();
@@ -27,6 +46,8 @@ public sealed class VisitorAccessCapabilityResolverTests
             {
                 SystemSetting[] rows =
                 [
+                    new() { SettingKey = GovernanceSettingKeys.Authentication.PrimaryProviderId,
+                        Value = JsonSerializer.Serialize((int)AuthenticationProviderKind.Keycloak) },
                     new() { SettingKey = GovernanceSettingKeys.PublicExperience.VisitorAccessMode,
                         Value = "\"FullRegistrationAndAuth\"" },
                     new() { SettingKey = GovernanceSettingKeys.Authentication.AtprotoLoginEnabled,
@@ -51,15 +72,16 @@ public sealed class VisitorAccessCapabilityResolverTests
     }
 
     [Test]
-    public async Task LocalOnlyNeverCreatesPublicSignupEvenWhenDeclaredAllowed()
+    public async Task LocalExistingAccountAccessIncludesTheCallableBrowserSignup()
     {
         var capability = Evaluate(Provider(AuthenticationProviderKind.Local, PublicOnboardingPolicy.Allowed));
 
         await Assert.That(capability.AllowsNewNativeAllocation).IsTrue();
         await Assert.That(capability.AllowsAnonymousParticipation).IsTrue();
-        await Assert.That(capability.AllowsAccountRequiredParticipation).IsFalse();
-        await Assert.That(capability.AllowsExistingAccountLogin).IsFalse();
-        await Assert.That(capability.SignupDestinations).IsEmpty();
+        await Assert.That(capability.AllowsAccountRequiredParticipation).IsTrue();
+        await Assert.That(capability.AllowsExistingAccountLogin).IsTrue();
+        await Assert.That(capability.SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Local);
+        await Assert.That(capability.SignupDestinations.Single().Url).IsEqualTo("/auth/local/register");
     }
 
     [Test]
@@ -72,8 +94,11 @@ public sealed class VisitorAccessCapabilityResolverTests
         await Assert.That(capability.AllowsAnonymousParticipation).IsTrue();
         await Assert.That(capability.AllowsAccountRequiredParticipation).IsTrue();
         await Assert.That(capability.AllowsExistingAccountLogin).IsTrue();
-        await Assert.That(capability.SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Atproto);
-        await Assert.That(capability.SignupDestinations.Single().Url).IsEqualTo("/login?provider=atproto");
+        await Assert.That(capability.SignupDestinations.Length).IsEqualTo(2);
+        await Assert.That(capability.SignupDestinations.Single(destination => destination.Provider == AuthenticationProviderKind.Local).Url)
+            .IsEqualTo("/auth/local/register");
+        await Assert.That(capability.SignupDestinations.Single(destination => destination.Provider == AuthenticationProviderKind.Atproto).Url)
+            .IsEqualTo("/login?provider=atproto");
     }
 
     [Test]
@@ -84,7 +109,7 @@ public sealed class VisitorAccessCapabilityResolverTests
     {
         var capability = Evaluate(Provider(AuthenticationProviderKind.Keycloak, policy));
 
-        await Assert.That(capability.AllowsAccountRequiredParticipation).IsFalse();
+        await Assert.That(capability.AllowsAccountRequiredParticipation).IsTrue();
         await Assert.That(capability.AllowsExistingAccountLogin).IsTrue();
         await Assert.That(capability.SignupDestinations).IsEmpty();
     }
@@ -110,7 +135,7 @@ public sealed class VisitorAccessCapabilityResolverTests
     {
         var capability = Evaluate(Provider(AuthenticationProviderKind.Keycloak, PublicOnboardingPolicy.Allowed) with { SignupUrl = url });
 
-        await Assert.That(capability.AllowsAccountRequiredParticipation).IsFalse();
+        await Assert.That(capability.AllowsAccountRequiredParticipation).IsTrue();
         await Assert.That(capability.AllowsExistingAccountLogin).IsTrue();
         await Assert.That(capability.SignupDestinations).IsEmpty();
     }
@@ -122,6 +147,8 @@ public sealed class VisitorAccessCapabilityResolverTests
     [Arguments(AuthenticationProviderKind.Keycloak, true, false)]
     [Arguments(AuthenticationProviderKind.Google, false, true)]
     [Arguments(AuthenticationProviderKind.Google, true, false)]
+    [Arguments(AuthenticationProviderKind.Local, false, true)]
+    [Arguments(AuthenticationProviderKind.Local, true, false)]
     public async Task DisabledOrTenantUnusableProvidersContributeNeitherLoginNorOnboarding(
         AuthenticationProviderKind provider, bool enabled, bool tenantUsable)
     {
@@ -133,7 +160,7 @@ public sealed class VisitorAccessCapabilityResolverTests
     }
 
     [Test]
-    public async Task AggregatesAllUsableProvidersRatherThanChoosingFirstOrPrimary()
+    public async Task AggregatesSupportedProvidersAndIgnoresRetiredGoogle()
     {
         var capability = Evaluate(
             Provider(AuthenticationProviderKind.Local),
@@ -143,9 +170,21 @@ public sealed class VisitorAccessCapabilityResolverTests
 
         await Assert.That(capability.SignupDestinations.Length).IsEqualTo(2);
         await Assert.That(capability.SignupDestinations.Select(destination => destination.Provider))
+            .Contains(AuthenticationProviderKind.Local);
+        await Assert.That(capability.SignupDestinations.Select(destination => destination.Provider))
             .Contains(AuthenticationProviderKind.Atproto);
         await Assert.That(capability.SignupDestinations.Select(destination => destination.Provider))
-            .Contains(AuthenticationProviderKind.Google);
+            .DoesNotContain(AuthenticationProviderKind.Google);
+    }
+
+    [Test]
+    public async Task RetiredGoogleCannotProvideLoginOrSignupEvenWhenStoredPolicyAllowsIt()
+    {
+        var capability = Evaluate(Provider(AuthenticationProviderKind.Google, PublicOnboardingPolicy.Allowed));
+
+        await Assert.That(capability.AllowsExistingAccountLogin).IsFalse();
+        await Assert.That(capability.AllowsAccountRequiredParticipation).IsFalse();
+        await Assert.That(capability.SignupDestinations).IsEmpty();
     }
 
     [Test]
@@ -283,13 +322,13 @@ public sealed class VisitorAccessCapabilityResolverTests
         var proposedProviders = new[]
         {
             Provider(AuthenticationProviderKind.Keycloak, PublicOnboardingPolicy.Denied),
-            Provider(AuthenticationProviderKind.Google, PublicOnboardingPolicy.Allowed)
+            Provider(AuthenticationProviderKind.Atproto, PublicOnboardingPolicy.Allowed)
         };
         var after = Evaluate(proposedProviders);
 
         await Assert.That(before.AllowsAccountRequiredParticipation).IsTrue();
         await Assert.That(after.AllowsAccountRequiredParticipation).IsTrue();
-        await Assert.That(after.SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Google);
+        await Assert.That(after.SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Atproto);
         await Assert.That(before.SignupDestinations.Single().Provider).IsEqualTo(AuthenticationProviderKind.Keycloak);
     }
 

@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6P0G22E3D3EFW8K9T4NA9W9
+Title: "Read effect readiness through independent Global aggregate owners"
+Type: fix
+Scope: observability
+Summary: "Restore cross-tenant effect readiness with fixed status and timing reads while preserving tenant mutation ownership and Runtime isolation."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Independent Global observers receive fixed status and timing columns; retained content, tenant ownership and mutations remain excluded."
+  Migration:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "The canonical migrator installs and attests the fixed aggregate read permissions and paired tenant-boundary policies."
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: "Readiness rejects changed grants or tenant-bound sessions instead of reporting an unauthorized queue as empty."

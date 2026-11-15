@@ -958,13 +958,7 @@ internal sealed partial class ModerationQualificationAuthority(
     {
         if (context.TenantFilterTenantId != tenantId || context.IsTenantFilterBypassed)
             return false;
-        if (context.Database.ProviderName != RelationalNamedLock.PostgreSqlProvider)
-            return true;
-        await using var command = context.Database.GetDbConnection().CreateCommand();
-        command.Transaction = context.Database.CurrentTransaction?.GetDbTransaction();
-        command.CommandText = "SELECT current_setting('app.current_tenant_id', true)";
-        var value = await command.ExecuteScalarAsync(token);
-        return Guid.TryParse(value?.ToString(), out var actual) && actual == tenantId;
+        return await PostgresTenantSessionProbe.MatchesAsync(context, context.Database.CurrentTransaction, tenantId, token);
     }
 }
 

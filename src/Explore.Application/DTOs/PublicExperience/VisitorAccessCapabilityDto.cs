@@ -11,6 +11,7 @@ public sealed record VisitorAccessCapabilityDto
     public bool AllowsAnonymousParticipation { get; init; }
     public bool AllowsAccountRequiredParticipation { get; init; }
     public bool AllowsExistingAccountLogin { get; init; }
+    public bool UserRegistrationEnabled { get; init; }
     private IReadOnlyList<VisitorSignupDestinationDto> _signupDestinations = Array.AsReadOnly(Array.Empty<VisitorSignupDestinationDto>());
     public IReadOnlyList<VisitorSignupDestinationDto> SignupDestinations
     {
@@ -25,6 +26,7 @@ public sealed record VisitorAccessCapabilityDto
         AllowsAnonymousParticipation = capability.AllowsAnonymousParticipation,
         AllowsAccountRequiredParticipation = capability.AllowsAccountRequiredParticipation,
         AllowsExistingAccountLogin = capability.AllowsExistingAccountLogin,
+        UserRegistrationEnabled = capability.UserRegistrationEnabled,
         SignupDestinations = capability.SignupDestinations
             .Select(destination => new VisitorSignupDestinationDto(destination.Provider, destination.Url))
             .ToArray()

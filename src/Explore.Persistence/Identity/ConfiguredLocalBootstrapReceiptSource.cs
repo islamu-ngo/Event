@@ -169,6 +169,7 @@ internal sealed class ConfiguredLocalBootstrapReceiptSource : ILocalBootstrapRec
                     candidate.PersonalActorId,
                     candidate.ExternalLoginId,
                     candidate.CreatedAt,
+                    candidate.VisitorEnrollmentOperationId,
                     candidate.ConcurrencyStamp
                 }).SingleOrDefaultAsync(token).ConfigureAwait(false);
             if (operation is null)
@@ -182,7 +183,7 @@ internal sealed class ConfiguredLocalBootstrapReceiptSource : ILocalBootstrapRec
             var current = new LocalCredentialProvisioningSnapshot(
                 new LocalCredentialOperationReceipt(operation.Id, operation.Kind, operation.Stage,
                     operation.InitiatingApplicationUserId, operation.LocalSubjectId, operation.PersonalActorId,
-                    operation.ExternalLoginId, operation.CreatedAt),
+                    operation.ExternalLoginId, operation.CreatedAt, operation.VisitorEnrollmentOperationId),
                 operation.ConcurrencyStamp, user.Email, user.FirstName, user.LastName, user.EmailConfirmed, user.UserName);
             RequireCustody();
             token.ThrowIfCancellationRequested();

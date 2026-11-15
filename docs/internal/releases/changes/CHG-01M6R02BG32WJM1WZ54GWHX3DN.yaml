@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6R02BG32WJM1WZ54GWHX3DN
+Title: "resolve bootstrap credentials before binding storage"
+Type: fix
+Scope: self-hosting
+Summary: "Resolve bootstrap-classified credentials from their registered reference in the selected secret authority without querying database binding metadata, preserving authority lifetime checks and ordinary runtime binding resolution."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: "Persisted metadata cannot redirect bootstrap credentials or rescue missing canonical material. Selected-authority lifetime fences remain enforced; Runtime gains no secret_bindings privileges."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: "Configured Local administrator bootstrap reads the initial password independently of binding storage. Operators must supply the registered selected-authority reference rather than grant Runtime direct binding-table access."

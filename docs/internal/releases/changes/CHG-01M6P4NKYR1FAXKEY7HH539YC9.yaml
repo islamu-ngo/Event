@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6P4NKYR1FAXKEY7HH539YC9
+Title: "Read Jetstream readiness through independent policy owners"
+Type: fix
+Scope: federation
+Summary: "Resolve stored deployment policy and active tenant identifiers through independent Global read owners without promoting the background Runtime caller."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Independent instance-policy and Global federation reads preserve pre/post admission, tenant selection rules and ordinary Runtime table denial."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: "Only enabled active tenants qualify; dedicated capability rows, tenant overrides and instance locks remain authoritative without new database grants."

@@ -50,7 +50,7 @@ public sealed class ProfileCompletionServiceTests
         var request = transport.Requests.Single();
         using var body = JsonDocument.Parse(request.Body);
         await Assert.That(body.RootElement.GetProperty("birthDate").GetString()).IsEqualTo("2000-02-29");
-        await Assert.That(body.RootElement.GetProperty("expectedRevision").GetString()).IsEqualTo("7");
+        await Assert.That(body.RootElement.GetProperty("expectedRevision").GetInt64()).IsEqualTo(7L);
         await Assert.That(request.Nomination).IsNotNull();
         await Assert.That(request.Path).Contains("/private-birth-date");
     }

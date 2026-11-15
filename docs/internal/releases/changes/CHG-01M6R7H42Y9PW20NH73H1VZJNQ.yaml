@@ -1,0 +1,25 @@
+Change-Id: CHG-01M6R7H42Y9PW20NH73H1VZJNQ
+Title: "Retain original data custody for visitor settings updates"
+Type: fix
+Scope: access
+Summary: "Restore authorized standalone visitor settings updates using their original data snapshot and transaction, canonical row verification and fixed native storage permissions."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented

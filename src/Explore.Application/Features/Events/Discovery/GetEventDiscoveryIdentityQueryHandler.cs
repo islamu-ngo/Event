@@ -20,13 +20,15 @@ public sealed class GetEventDiscoveryIdentityQueryHandler(
     ITenantContext tenantContext,
     IUserContext userContext,
     ITenantLifecycleAccessService lifecycle,
-    TimeProvider clock)
+    TimeProvider clock,
+    IVisitorTenantReadAccessPolicy visitorRead)
     : IQueryHandler<GetEventDiscoveryIdentityQuery, EventDiscoveryIdentityDto>
 {
     public Task<EventDiscoveryIdentityDto> QueryAsync(
         GetEventDiscoveryIdentityQuery request, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteSerializableAsync(async token =>
         {
+            await visitorRead.RequireAsync(tenantContext.TenantId, token);
             Guid tenant = tenantContext.TenantId;
             if (tenant == Guid.Empty || request.EventId == Guid.Empty)
                 throw new NotFoundException("Event discovery identity", request.EventId);

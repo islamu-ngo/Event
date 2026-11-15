@@ -11,15 +11,18 @@ public class GetPublicImageRequestHandler : IQueryHandler<GetPublicImageRequest,
     private readonly IStorageObjectContentReader _contentReader;
     private readonly IStorageObjectRepository _storageObjects;
     private readonly ITenantLifecycleAccessService _lifecycle;
+    private readonly IVisitorTenantReadAccessPolicy _visitorReadAccess;
 
     public GetPublicImageRequestHandler(
         IStorageObjectContentReader contentReader,
         IStorageObjectRepository storageObjects,
-        ITenantLifecycleAccessService lifecycle)
+        ITenantLifecycleAccessService lifecycle,
+        IVisitorTenantReadAccessPolicy visitorReadAccess)
     {
         _contentReader = contentReader;
         _storageObjects = storageObjects;
         _lifecycle = lifecycle;
+        _visitorReadAccess = visitorReadAccess;
     }
 
     public async Task<StorageObjectContentResult?> QueryAsync(
@@ -28,6 +31,8 @@ public class GetPublicImageRequestHandler : IQueryHandler<GetPublicImageRequest,
         var storageObject = await _storageObjects.GetById(request.StorageObjectId);
         if (storageObject is null || !await _lifecycle.IsPublicAsync(storageObject.TenantId, cancellationToken))
             return null;
+
+        await _visitorReadAccess.RequireAsync(storageObject.TenantId, cancellationToken);
 
         return await _contentReader.OpenAsync(
             request.StorageObjectId,

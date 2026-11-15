@@ -1,6 +1,6 @@
 # I-VSD: Tenant Authentication Routing, Registration And Footer Resilience
 
-Last Updated: 2026-11-05 Europe/Brussels
+Last Updated: 2026-11-15 Europe/Brussels
 
 ## Review Metadata
 
@@ -9,13 +9,14 @@ Last Updated: 2026-11-05 Europe/Brussels
 - Report kind: implementation-plan-review
 - Report status: current
 - Disposition: plan-aligned
-- Evidence cutoff: 2026-11-05
-- Reviewed input: design ER-20261105-1 on develop b6ad1594b7f92ac3399a5a8bf8d241e4f8d69c66 and the working-tree artifacts below.
+- Evidence cutoff: 2026-11-15 for delivery allocation; 2026-11-05 for the original product design review.
+- Reviewed input: product design ER-20261105-1 on develop b6ad1594b7f92ac3399a5a8bf8d241e4f8d69c66; delivery revision ER-20261115-PRSCOPES-2 in the canonical artifacts below.
 - Supersedes: the 2026-11-03 revision of this same report, whose current/plan-aligned label did not establish complete server enforcement.
 - Decision authority: user's default-open registration, unconditional useful footer, public browsing/private option, global auth routes/tenant affinity and explicit execution-ready/breaking-change direction.
 - Binding: [plan](../../dev/active/tenant-auth-routing-and-footer-resilience/tenant-auth-routing-and-footer-resilience-plan.md), [tasks](../../dev/active/tenant-auth-routing-and-footer-resilience/tenant-auth-routing-and-footer-resilience-tasks.md), [context](../../dev/active/tenant-auth-routing-and-footer-resilience/tenant-auth-routing-and-footer-resilience-context.md). Material findings were re-evaluated after the independent source/plan reviews; the hashes below bind this assessment to the final design, not merely its date.
-- Plan SHA-256: 72722d00e559d077e6e3e012fbc5bbcfbafbce7f83d72598c267709d1419a42c
-- Tasks SHA-256: 0a0cf6a2d3ecad39bbcf1f13ebb0a8d8a17071bd7955800b28ebef4259a22b5b
+- Canonical plan SHA-256 at this review: f320812eb2f4d5a4208c72f94d37f7fae45a9126dac998bc876fed3e1ee71db7
+- Canonical tasks SHA-256 at this review: fc14e732124cf52f99770b7935d8988352e25b4d04fc700e157653ce9d3e3fc0
+- Historical 2026-11-05 design binding: plan 72722d00e559d077e6e3e012fbc5bbcfbafbce7f83d72598c267709d1419a42c; tasks 0a0cf6a2d3ecad39bbcf1f13ebb0a8d8a17071bd7955800b28ebef4259a22b5b. These remain historical hashes, not hashes of the delivery ledger.
 
 ## Executive Summary
 
@@ -32,6 +33,35 @@ Plan alignment concerns the stated design and mitigation ownership. It is not ev
 ## Scope
 
 Seven-phase implementation of server visitor privacy, tenant registration policy, Local/federated enrollment, footer data/rendering, root and auth continuity, and final qualification. All original requirements remain in the same triad. No compatibility shim, credential reset, production deployment or unrelated session/migration repair is authorized by this report.
+
+### Delivery Allocation Review, 2026-11-15
+
+The seven product phases now have five dependency-ordered PR scopes. PR #87
+contains the accumulated tenant privacy, registration, Local enrollment, joining
+and footer delivery. Account continuation, complete session handoff, root
+navigation and the newly identified privacy-disposal work remain required future
+scopes in the same canonical programme. Preserving their design, dirty source or
+authored tests does not establish delivery by the first merge.
+
+| Finding / mitigation | Accumulated PR evidence boundary | Retained later acceptance |
+|---|---|---|
+| F001 / M001, public access | Published public-read and routing foundations | Complete route matrix in PR-ROOT-NAVIGATION |
+| F002 / M002, confidential reads | Shipped read, cache, export and native privacy boundaries retain their verification limits | The sixteen-copy inventory and native disposal-purpose gap belong to PR-PRIVACY-DISPOSAL |
+| F003 / M003, registration closure | Shipped Local enrollment and joining, existing-account access and closure races | Remaining exact-account and federated enrollment in PR-ACCOUNT-CONTINUATION |
+| F004 / M004, safe footer | Shipped minimum footer, role separation and tenant/cache ownership | Final cross-capability regression coverage remains required |
+| F005 / M005, destination authority | Published joining and routing foundations only | Exact-account continuation, then PR-SESSION-HANDOFF and PR-ROOT-NAVIGATION |
+| F006 / M006, credential custody | Shipped Local credential admission, recovery, replay and restricted native rights | Remaining account verification and handoff consumers; disposal authority and retention in PR-PRIVACY-DISPOSAL |
+
+This allocation retains S01-S16 and every accepted mitigation. Each later scope
+must reconcile its actual merged predecessors before becoming ready. No finding
+is closed by this delivery review. CI failures and unrun native/browser/provider
+acceptance remain recorded in the canonical context.
+
+On 2026-11-15 the user elected to perform the force merge themselves and asked
+the agent to finish committing the current delivery instead of pursuing perfect
+CI. That decision does not turn failed or unrun checks into passing evidence,
+certify runtime behavior, authorize a history rewrite by the agent, or move
+future implementation into PR #87.
 
 ## Claim Boundary
 
@@ -141,3 +171,4 @@ Direct export/media/cached reads; closing signup breaking existing participation
 | 2026-11-05 | historical current | stale | Source-grounded CTO review found missing authority and fallback contracts. |
 | 2026-11-05 | stale | draft | ER-20261105-1 resolves server privacy, enrollment, recovery, footer and origin contracts; final content binding pending. |
 | 2026-11-05 | draft | current / plan-aligned | Re-evaluated F001–F006 against final source-grounded design, recorded both READY rechecks and bound final plan/tasks hashes; no implementation or runtime proof claimed. |
+| 2026-11-15 | current / original design binding | current / delivery-aligned | Mapped the six mitigation owners to five canonical PR scopes, preserved original design hashes and verification limits, and recorded the user's commit-only handoff. No finding closure or merge/runtime certification. |

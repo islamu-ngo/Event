@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using Explore.Blazor.IntegrationTests.Fixtures;
 using Explore.Blazor.Services;
@@ -39,6 +40,7 @@ public sealed class BffApiProxyAntiforgeryTests : IAsyncDisposable
 
         _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
+            BaseAddress = new Uri("https://localhost"),
             AllowAutoRedirect = false,
             HandleCookies = true
         });
@@ -133,6 +135,52 @@ public sealed class BffApiProxyAntiforgeryTests : IAsyncDisposable
         await Assert.That(_upstream.LastApiKey).IsNull();
         await Assert.That(string.IsNullOrEmpty(_upstream.LastTenantId)).IsTrue();
         await Assert.That(string.IsNullOrEmpty(_upstream.LastTenantSlug)).IsTrue();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task TenantJoinProxyRequiresAntiforgeryAndUsesOnlyServerHeldBearer(bool validCsrf)
+    {
+        string serverToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        string browserToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        string authHeader = TestAuthHandler.CreateAuthHeaderValue(Guid.CreateVersion7(), "Existing account",
+            ("auth_provider", "local"), ("test:access_token", serverToken));
+        using var statusRequest = new HttpRequestMessage(HttpMethod.Get, "/auth/status");
+        statusRequest.Headers.Add(TestAuthHandler.AuthHeaderName, authHeader);
+        using var status = await _client.SendAsync(statusRequest);
+        await Assert.That(status.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        string[] cookies = status.Headers.GetValues("Set-Cookie").ToArray();
+        string? token = cookies.Select(ReadXsrfToken).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+        await Assert.That(string.IsNullOrWhiteSpace(token)).IsFalse();
+        _upstream.ResetCapture();
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/tenant-join");
+        request.Headers.Add(TestAuthHandler.AuthHeaderName, authHeader);
+        request.Headers.Add("Cookie", BuildCookieHeader(cookies));
+        if (validCsrf) request.Headers.Add("X-CSRF-TOKEN", token);
+        request.Headers.Authorization = new("Bearer", browserToken);
+        request.Headers.Add("X-API-Key", browserToken);
+        request.Headers.Add("X-Tenant-Id", Guid.CreateVersion7().ToString("D"));
+        request.Headers.Add("X-Tenant-Slug", "browser-controlled-tenant");
+        request.Content = JsonContent.Create(new { });
+
+        using var response = await _client.SendAsync(request);
+
+        await Assert.That(response.StatusCode).IsEqualTo(
+            validCsrf ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
+        if (!validCsrf)
+        {
+            await Assert.That(_upstream.LastPathAndQuery).IsNull();
+            return;
+        }
+        await Assert.That(_upstream.LastPathAndQuery).IsEqualTo("/api/auth/tenant-join");
+        await Assert.That(_upstream.LastAuthorization).IsEqualTo("Bearer " + serverToken);
+        await Assert.That(_upstream.LastApiKey).IsNull();
+        await Assert.That(string.IsNullOrEmpty(_upstream.LastTenantId)).IsTrue();
+        await Assert.That(string.IsNullOrEmpty(_upstream.LastTenantSlug)).IsTrue();
+        await Assert.That((await response.Content.ReadAsStringAsync()).Contains(
+            serverToken, StringComparison.Ordinal)).IsFalse();
     }
 
     [Test]

@@ -46,7 +46,9 @@ no retired bootstrap script or runtime publisher is restored by this topology.
 PostgreSQL startup uses separately selected Runtime, Migrator and Global
 database authorities. Migration authority installs policies, provider
 adjustments and purpose capabilities before runtime admission; request
-contexts cannot repair policies or inherit the migration login. Global
+contexts cannot repair policies or inherit the migration login. Policy installers
+use a migration-owned execution context whose absent tenant lease is explicitly
+bound; this also applies to the default schema. Global
 credentials own an independent pool and receive only the execution groups
 required by enabled consumers. Missing credentials, privileges or matching
 policy stamps reject admission without credential fallback. SQLite and other

@@ -41,6 +41,7 @@ public sealed class AtprotoTransientStoreController(
 {
     [SuppressIdempotencyResponseStorage]
     [HttpPost("probe", Name = RouteNames.ProbeAtprotoTransient)]
+    [TenantReadBootstrap]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<ActionResult> Probe(CancellationToken cancellationToken)
     {
@@ -56,6 +57,7 @@ public sealed class AtprotoTransientStoreController(
 
     [SuppressIdempotencyResponseStorage]
     [HttpPost("create", Name = RouteNames.CreateAtprotoTransient)]
+    [TenantReadBootstrap]
     [ProducesResponseType<AtprotoTransientResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<AtprotoTransientResponse>> Create([FromBody] CreateAtprotoTransientRequest request,
         CancellationToken cancellationToken)
@@ -66,6 +68,7 @@ public sealed class AtprotoTransientStoreController(
 
     [SuppressIdempotencyResponseStorage]
     [HttpPost("read", Name = RouteNames.ReadAtprotoTransient)]
+    [TenantReadBootstrap]
     [ProducesResponseType<AtprotoTransientResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<AtprotoTransientResponse>> Read([FromBody] ReadAtprotoTransientRequest request,
         CancellationToken cancellationToken)
@@ -76,6 +79,7 @@ public sealed class AtprotoTransientStoreController(
 
     [SuppressIdempotencyResponseStorage]
     [HttpPost("consume", Name = RouteNames.ConsumeAtprotoTransient)]
+    [TenantReadBootstrap]
     [ProducesResponseType<AtprotoTransientResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<AtprotoTransientResponse>> Consume([FromBody] ConsumeAtprotoTransientRequest request,
         CancellationToken cancellationToken)

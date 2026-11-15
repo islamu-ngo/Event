@@ -699,10 +699,77 @@ public sealed class ReleasePublishWorkflowTests
         await Assert.That(ancestry.ExitCode).IsEqualTo(0).Because(ancestry.Error);
     }
 
-    private static YamlMappingNode LoadWorkflow()
+    [Test]
+    [Arguments("security-tests.yml", "security-tests", "run-tests", true)]
+    [Arguments("security-tests.yml", "security-tests", "run-tests", false)]
+    [Arguments("codeql.yml", "detect-codeql-changes", "run-analysis", true)]
+    [Arguments("codeql.yml", "detect-codeql-changes", "run-analysis", false)]
+    public async Task ChangeSelectionRetainsSourceMovedToPublicDocsAndSkipsDocsOnly(
+        string workflowFile, string jobId, string outputName, bool moveSource)
+    {
+        var steps = (YamlSequenceNode)Mapping(Mapping(LoadWorkflow(workflowFile), "jobs"), jobId)
+            .Children[new YamlScalarNode("steps")];
+        YamlMappingNode selection = steps.Children.Cast<YamlMappingNode>().Single(step =>
+            step.Children.TryGetValue(new YamlScalarNode("id"), out YamlNode? id) &&
+            ((YamlScalarNode)id).Value == "changes");
+        string directory = Path.Combine(Path.GetTempPath(), $"islamu-ci-selection-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string source = moveSource
+                ? "src/Explore.Application/Authorization/RequestAuthorization.cs"
+                : "docs/public/original.md";
+            var environment = new Dictionary<string, string>
+            {
+                ["SOURCE_PATH"] = source,
+                ["EVENT_NAME"] = "pull_request",
+                ["MERGE_GROUP_BASE_SHA"] = "",
+                ["PUSH_BEFORE_SHA"] = "",
+                ["RUNNER_TEMP"] = directory,
+                ["GITHUB_OUTPUT"] = Path.Combine(directory, "output"),
+                ["GITHUB_STEP_SUMMARY"] = Path.Combine(directory, "summary"),
+                ["SECURITY_ENGINE"] = typeof(ISLAMU.ReleaseEngineering.Program).Assembly.Location,
+                ["GIT_CONFIG_NOSYSTEM"] = "1",
+                ["GIT_CONFIG_GLOBAL"] = "/dev/null",
+                ["GIT_AUTHOR_NAME"] = "Selection fixture",
+                ["GIT_AUTHOR_EMAIL"] = "fixture@example.invalid",
+                ["GIT_COMMITTER_NAME"] = "Selection fixture",
+                ["GIT_COMMITTER_EMAIL"] = "fixture@example.invalid",
+            };
+            ProcessResult result = await RunBash("""
+                set -euo pipefail
+                git init --initial-branch=develop
+                git config diff.renames true
+                git config commit.gpgsign false
+                mkdir -p "$(dirname "$SOURCE_PATH")" docs/public
+                printf 'unchanged selection fixture\n' > "$SOURCE_PATH"
+                git add .
+                git commit -m baseline
+                export PR_BASE_SHA="$(git rev-parse HEAD)"
+                git mv "$SOURCE_PATH" docs/public/moved.md
+                git commit -m move
+                export GITHUB_SHA="$(git rev-parse HEAD)"
+                git diff --name-status --find-renames "$PR_BASE_SHA" "$GITHUB_SHA" > rename-witness
+                dotnet() { command dotnet "$SECURITY_ENGINE" "${@:2}"; }
+
+                """ + Text(selection, "run"), directory: directory, environment: environment);
+
+            await Assert.That(result.ExitCode).IsEqualTo(0).Because(result.Output + result.Error);
+            await Assert.That(File.ReadAllText(Path.Combine(directory, "rename-witness")).Trim())
+                .IsEqualTo($"R100\t{source}\tdocs/public/moved.md");
+            await Assert.That(File.ReadAllText(environment["GITHUB_OUTPUT"]).Trim())
+                .IsEqualTo($"{outputName}={moveSource.ToString().ToLowerInvariant()}");
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static YamlMappingNode LoadWorkflow(string fileName = "release-publish.yml")
     {
         var stream = new YamlStream();
-        using var reader = File.OpenText(Path.Combine(RepositoryRoot(), ".github", "workflows", "release-publish.yml"));
+        using var reader = File.OpenText(Path.Combine(RepositoryRoot(), ".github", "workflows", fileName));
         stream.Load(reader);
         if (stream.Documents.Count != 1) throw new InvalidOperationException("Expected one workflow document.");
         return (YamlMappingNode)stream.Documents[0].RootNode;

@@ -7,7 +7,8 @@ public enum LocalCredentialState
 {
     ProvisioningPending = 1,
     ChangeRequired = 2,
-    Ready = 3
+    Ready = 3,
+    RegistrationPending = 4
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

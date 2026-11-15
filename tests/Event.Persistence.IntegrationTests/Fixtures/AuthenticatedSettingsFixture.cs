@@ -77,7 +77,8 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
         Func<ExploreDbContext, Dictionary<string, string?>, Task>? configurePostgres,
         Action<SanitizedRequestFailure>? requestFailureObserver = null,
         Action<Dictionary<string, string?>>? configure = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        DeploymentMode deploymentMode = DeploymentMode.SingleTenant)
     {
         await EnvironmentOwner.WaitAsync(TestContext.Current!.Execution.CancellationToken);
         var fixture = new AuthenticatedSettingsFixture(createDatabase);
@@ -104,7 +105,7 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
                 ["SecretProvider:Provider"] = "Environment",
                 ["PrivacyErasure:Authority:Topology"] = "CoLocated",
                 ["IdentityDatabase:Topology"] = "Colocated",
-                ["Deployment:Mode"] = "SingleTenant",
+                ["Deployment:Mode"] = deploymentMode.ToString(),
                 ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),
                 ["PublicBaseUrl"] = "https://settings.example.test",
                 ["EffectiveHostAuthority:CanonicalOrigin"] = "https://settings.example.test",
@@ -173,7 +174,7 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
             if (!await seed.InstanceBootstrapStates.AnyAsync())
             {
                 var bootstrap = InstanceBootstrapState.CreateInteractivePending(
-                    Guid.CreateVersion7(), DeploymentMode.SingleTenant, DateTime.UtcNow);
+                    Guid.CreateVersion7(), deploymentMode, DateTime.UtcNow);
                 bootstrap.CompleteInteractive(bootstrapActor, DateTime.UtcNow);
                 seed.InstanceBootstrapStates.Add(bootstrap);
             }
@@ -217,10 +218,19 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
             var login = await fixture.CreateLocalAdministratorAsync(bootstrapActor);
             using var response = await fixture.client.PostAsJsonAsync("/api/auth/local/login", login);
             if (response.StatusCode != HttpStatusCode.OK)
+            {
+                using var failure = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                string? publicCode = failure.RootElement.TryGetProperty("code", out var code)
+                    && code.ValueKind == JsonValueKind.String ? code.GetString() : null;
+                if (publicCode is { Length: > 96 } || publicCode?.Any(character =>
+                    !char.IsAsciiLetterOrDigit(character) && character is not ('_' or '-')) == true)
+                    publicCode = null;
                 throw new InvalidOperationException($"Real Local settings login failed: {response.StatusCode}; "
+                    + $"public code: {publicCode ?? "absent"}; "
                     + $"types: {string.Join(",", observedFailure?.ExceptionTypes ?? [])}; "
                     + $"SQL states: {string.Join(",", observedFailure?.SqlStates ?? [])}; "
                     + $"methods: {string.Join(",", observedFailure?.Methods ?? [])}.");
+            }
             using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             if (!body.RootElement.GetProperty("success").GetBoolean())
                 throw new InvalidOperationException("Real Local settings login was rejected.");

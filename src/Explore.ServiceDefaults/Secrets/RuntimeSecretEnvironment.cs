@@ -34,7 +34,11 @@ public static class RuntimeSecretEnvironment
         foreach (SecretAcquisitionEntry entry in entries)
         {
             string name = entry.ConfigurationKey;
-            if (!SecretAcquisitionPolicy.AllowsRoot(consumer, entry.Folder)
+            // Native BFF endpoints share public Keycloak coordinates with the API registry.
+            bool bffMetadata = consumer == SecretConsumerRole.Bff
+                && entry.Folder == "/runtime/api/authentication/keycloak"
+                && name is "KEYCLOAK_ENDPOINT" or "KEYCLOAK_REALM" or "KEYCLOAK_CLIENT_ID";
+            if (!SecretAcquisitionPolicy.AllowsRoot(consumer, entry.Folder) && !bffMetadata
                 || Forbidden(entry.ConfigurationKey, consumer))
             {
                 target[name] = string.Empty;
@@ -55,7 +59,7 @@ public static class RuntimeSecretEnvironment
             {
                 "DATABASE_RUNTIME_USERNAME", "DATABASE_GLOBAL_USERNAME", "DATABASE_MIGRATOR_USERNAME",
                 "DATABASE_INSTANCE_KEY_READ_USERNAME", "DATABASE_INSTANCE_KEY_WRITE_USERNAME",
-                "DATABASE_PLATFORM_KEY_REPORT_USERNAME",
+                "DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME", "DATABASE_PLATFORM_KEY_REPORT_USERNAME",
                 "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME", "DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME",
                 "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME", "IDENTITY_DATABASE_RUNTIME_USERNAME",
                 "IDENTITY_DATABASE_MIGRATOR_USERNAME", "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"
@@ -68,6 +72,7 @@ public static class RuntimeSecretEnvironment
             {
                 ("Database:InstanceKeyRead:Username", "DATABASE_INSTANCE_KEY_READ_USERNAME"),
                 ("Database:InstanceKeyWrite:Username", "DATABASE_INSTANCE_KEY_WRITE_USERNAME"),
+                ("Database:InstanceKeyIssuance:Username", "DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME"),
                 ("Database:PlatformKeyReport:Username", "DATABASE_PLATFORM_KEY_REPORT_USERNAME")
             })
             {
@@ -106,7 +111,7 @@ public static class RuntimeSecretEnvironment
         if (consumer is SecretConsumerRole.Bff or SecretConsumerRole.Combined)
         {
             foreach (string name in new[] { "KEYCLOAK_ENDPOINT", "KEYCLOAK_REALM", "KEYCLOAK_CLIENT_ID",
-                "KEYCLOAK_BLAZOR_CLIENT_ID", "GOOGLE_CLIENT_ID", "API_ENDPOINT", "AUTHENTICATION_PROVIDER",
+                "KEYCLOAK_BLAZOR_CLIENT_ID", "API_ENDPOINT", "AUTHENTICATION_PROVIDER",
                 "AUTHENTICATION_CREDENTIAL_PROFILE_REVISION" })
                 if (provider == SecretAuthorityKind.Environment && operatorInputs[name] is { } value
                     && (!target.TryGetValue(name, out object? existing) || existing is string { Length: 0 }))
@@ -173,6 +178,9 @@ public static class RuntimeSecretEnvironment
     private static bool Forbidden(string name, SecretConsumerRole consumer)
     {
         string normalized = name.Replace("__", "_", StringComparison.Ordinal).Replace(':', '_').ToUpperInvariant();
+        if (normalized is "GOOGLE_CLIENT_ID" or "GOOGLE_CLIENTID"
+            or "GOOGLE_CLIENT_SECRET" or "GOOGLE_CLIENTSECRET")
+            return true;
         if (consumer is not (SecretConsumerRole.Api or SecretConsumerRole.Combined)
             && normalized is "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD" or "DATABASE_LOCALIDENTITYWRITER_PASSWORD"
                 or "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD" or "IDENTITYDATABASE_LOCALIDENTITYWRITER_PASSWORD")
@@ -196,7 +204,7 @@ public static class RuntimeSecretEnvironment
         if (consumer == SecretConsumerRole.Api || consumer == SecretConsumerRole.Migration)
             return normalized is "KEYCLOAK_BLAZOR_CLIENT_SECRET" or "KEYCLOAK_CLIENTSECRET"
                 or "KEYCLOAK_CLIENT_SECRET" or "KEYCLOAK_BLAZORCLIENTSECRET"
-                or "GOOGLE_CLIENT_SECRET" or "GOOGLE_CLIENTSECRET" or "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS";
+                or "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS";
         if (consumer == SecretConsumerRole.Bff)
             return normalized.StartsWith("DATABASE", StringComparison.Ordinal)
                 || normalized.StartsWith("POSTGRES", StringComparison.Ordinal)

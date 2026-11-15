@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6RD479GMJ8BK869GVZAT2K4
+Title: "retain User insert ownership across setup saves"
+Type: fix
+Scope: onboarding
+Summary: "Complete administrator and personal actor creation in the original Global transaction without granting User identifier updates."
+Group: onboarding-user-creation
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: "Record successful User inserts only after persistence and source-custody validation, bound to the original connection and physical transaction. Save failure and EF savepoint rollback invalidate the evidence. Existing-user fences and Global UPDATE denials remain effective; Runtime receives no additional rights."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: "Administrator and personal-actor creation remain atomic across separate repository saves. No permission expansion, migration, credential or configuration change is required."

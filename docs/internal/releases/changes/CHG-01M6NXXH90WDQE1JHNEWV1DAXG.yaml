@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6NXXH90WDQE1JHNEWV1DAXG
+Title: "preserve public Keycloak metadata for browser hosts"
+Type: fix
+Scope: access
+Summary: "Preserve the three explicitly projected public Keycloak coordinates for Environment browser hosts without admitting API credentials or changing Infisical folder ownership."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Only public endpoint, realm and client ID survive the BFF projection. API credentials remain filtered and Infisical ownership remains unchanged."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Environment browser hosts retain explicitly supplied public Keycloak metadata while optional confidential-client configuration remains independent."

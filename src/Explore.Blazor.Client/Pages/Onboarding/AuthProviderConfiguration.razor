@@ -61,6 +61,11 @@
                 <MudAlert Severity="Severity.Success" Class="mb-4">@_successMessage</MudAlert>
             }
 
+            @if (!string.IsNullOrWhiteSpace(_model.UnsupportedProviderMessage))
+            {
+                <p role="status" data-testid="unsupported-auth-provider">@_model.UnsupportedProviderMessage</p>
+            }
+
             @if (IsKeycloakPrimary
                 && _model.KeycloakDetectedFromEnvironment == true
                 && !_showAdvancedConfig)
@@ -271,77 +276,6 @@
                         </div>
                     </details>
 
-                    @* ── Google SSO ── *@
-                    @if (!IsAtprotoPrimary)
-                    {
-                    <details class="auth-provider-configuration__provider">
-                        <summary class="auth-provider-configuration__provider-summary"
-                                 aria-labelledby="google-provider-title"
-                                 aria-describedby="google-provider-description"
-                                 title="Users authenticate with their Google account. Requires a Google Cloud project with OAuth credentials configured.">
-                            <h2 class="auth-provider-configuration__provider-heading">
-                                <span id="google-provider-title">Google SSO</span>
-                                <span id="google-provider-description" class="sr-only">
-                                    Users authenticate with their Google account. Requires a Google Cloud project with OAuth credentials configured.
-                                </span>
-                            </h2>
-                        </summary>
-                        <div class="auth-provider-configuration__provider-content">
-                            <MudStack Spacing="2">
-                                <MudSwitch T="bool?" @bind-Value="_model.GoogleSsoEnabled" Color="Color.Primary">
-                                    Enable Google SSO
-                                </MudSwitch>
-
-                                @if (_model.GoogleSsoEnabled == true)
-                                {
-                                    <MudTextField Variant="Variant.Outlined" T="string"
-                                                  Label="Google Client ID (Required)"
-                                                  @bind-Value="_model.GoogleClientId"
-                                                  Placeholder="123456789.apps.googleusercontent.com" />
-                                    <MudAlert Severity="@(_model.GoogleClientSecretOwnership?.Configured == true ? Severity.Info : Severity.Warning)" Dense="true">
-                                        <MudText Typo="Typo.body2">
-                                            @(_model.GoogleClientSecretOwnership?.Configured == true
-                                                ? T("ui.onboarding.authentication.google_secret.configured", "The Google client secret is configured by deployment.")
-                                                : T("ui.onboarding.authentication.google_secret.not_configured", "The Google client secret is not confirmed configured by deployment."))
-                                        </MudText>
-                                        <MudText Typo="Typo.body2">
-                                            @T("ui.onboarding.authentication.google_secret.remedy", "Configure or rotate it in Google and the selected secret authority, restart affected replicas, then reload this page and verify sign-in. This page cannot edit the client secret.")
-                                        </MudText>
-                                    </MudAlert>
-                                }
-
-                                <section class="auth-provider-configuration__visitor-onboarding"
-                                         aria-labelledby="onboarding-google-public-heading">
-                                    <MudText Id="onboarding-google-public-heading" Typo="Typo.subtitle2" HtmlTag="h3">
-                                        Google visitor signup
-                                    </MudText>
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                        Configure new public visitor accounts separately from operator and existing-account sign-in.
-                                    </MudText>
-                                    <MudSelect T="PublicOnboardingPolicy?"
-                                               Label="Public onboarding policy"
-                                               @bind-Value="_model.GooglePublicOnboardingPolicy"
-                                               Variant="Variant.Outlined"
-                                               data-testid="onboarding-google-public-policy">
-                                        <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingUnknown)">Unknown - do not advertise signup</MudSelectItem>
-                                        <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingAllowed)">Allowed</MudSelectItem>
-                                        <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingDenied)">Denied</MudSelectItem>
-                                    </MudSelect>
-                                    @if (_model.GooglePublicOnboardingPolicy == PublicOnboardingAllowed)
-                                    {
-                                        <MudTextField T="string"
-                                                      Label="Public signup URL"
-                                                      @bind-Value="_model.GooglePublicSignupUrl"
-                                                      Variant="Variant.Outlined"
-                                                      Required="true"
-                                                      HelperText="Use the exact public HTTPS account-registration destination." />
-                                        @PublicSignupUrlWarning(_model.GooglePublicSignupUrl)
-                                    }
-                                </section>
-                            </MudStack>
-                        </div>
-                    </details>
-                    }
                 </div>
 
                 @* ── Actions ── *@
@@ -350,7 +284,7 @@
 </div>
     </ChildContent>
     <SummaryContent>
-        <p>Choose Local Identity, Keycloak, or passwordless AT Protocol as the primary provider. AT Protocol and Google remain optional only when Local Identity or Keycloak is primary.</p>
+        <p>Choose Local Identity, Keycloak, or passwordless AT Protocol as the primary provider. Google sign-in is available through Keycloak's identity broker.</p>
     </SummaryContent>
     <HelpContent>
         <p>Provider secrets are sent only to the server and are cleared from the form after one-time bootstrap requests.</p>
@@ -446,17 +380,11 @@
     private bool HasAtprotoCredentials =>
         !string.IsNullOrWhiteSpace(_model.AtprotoPublicUrl);
 
-    private bool HasGoogleCredentials =>
-        !string.IsNullOrWhiteSpace(_model.GoogleClientId) &&
-        _model.GoogleClientSecretOwnership?.Configured == true;
-
     private bool CanSave =>
         !_submitState.IsSubmitting &&
         (!IsKeycloakPrimary || HasKeycloakCredentials) &&
         (_model.AtprotoLoginEnabled != true || HasAtprotoCredentials) &&
-        (_model.GoogleSsoEnabled != true || HasGoogleCredentials) &&
-        HasValidPublicSignupConfiguration(_model.KeycloakPublicOnboardingPolicy, _model.KeycloakPublicSignupUrl) &&
-        HasValidPublicSignupConfiguration(_model.GooglePublicOnboardingPolicy, _model.GooglePublicSignupUrl);
+        HasValidPublicSignupConfiguration(_model.KeycloakPublicOnboardingPolicy, _model.KeycloakPublicSignupUrl);
 
     private IReadOnlyList<OnboardingWorkspace.StepDescriptor> WorkspaceSteps
     {
@@ -676,7 +604,6 @@
         if (providerId == AtprotoProviderId)
         {
             _model.AtprotoLoginEnabled = true;
-            _model.GoogleSsoEnabled = false;
         }
     }
 

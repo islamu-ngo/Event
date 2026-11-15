@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6RXDEXCBDE337D9YW1W9JDF
+Title: "Resolve instance storage policy with original ownership"
+Type: fix
+Scope: self-hosting
+Summary: "Process storage health reads instance governance independently of request tenants, and captured probes retain separate instance readiness and tenant transport evidence."
+Group: storage-instance-policy
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: "Instance storage governance and S3 readiness use independent instance capabilities without promoting Runtime. Captured probes retain distinct instance readiness and tenant transport references, perform external resolution after releasing source locks, and revalidate material, revision and provenance at each handoff."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: "Storage process readiness resolves instance policy without a request tenant. Tenant overrides cannot determine instance S3 readiness. No new credential, database grant, configuration or migration is required."

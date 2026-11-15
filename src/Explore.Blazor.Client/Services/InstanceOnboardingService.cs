@@ -809,14 +809,9 @@ public sealed class InstanceOnboardingService(
                 KeycloakClientId = config.KeycloakClientId,
                 AtprotoLoginEnabled = config.AtprotoLoginEnabled,
                 AtprotoPublicUrl = config.AtprotoPublicUrl,
-                GoogleSsoEnabled = config.GoogleSsoEnabled,
-                GoogleClientId = config.GoogleClientId,
                 LockAtprotoLoginEnabled = config.LockAtprotoLoginEnabled,
-                LockGoogleSsoEnabled = config.LockGoogleSsoEnabled,
                 KeycloakPublicOnboardingPolicy = config.KeycloakPublicOnboardingPolicy,
-                KeycloakPublicSignupUrl = config.KeycloakPublicSignupUrl,
-                GooglePublicOnboardingPolicy = config.GooglePublicOnboardingPolicy,
-                GooglePublicSignupUrl = config.GooglePublicSignupUrl
+                KeycloakPublicSignupUrl = config.KeycloakPublicSignupUrl
             }
         }
     };

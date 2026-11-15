@@ -50,7 +50,19 @@ public sealed class PrivacyErasureModelCompositionTests
             .ToArray();
         await Assert.That(workflows.Length).IsEqualTo(1);
         await Assert.That(workflows[0].ImplementationType)
+            .IsEqualTo(typeof(PrivacyErasureService));
+        await Assert.That(workflows[0].Lifetime).IsEqualTo(ServiceLifetime.Scoped);
+
+        ServiceDescriptor core = services.Single(descriptor =>
+            descriptor.ServiceType == typeof(RetainedAuthorityPrivacyErasureWorkflow));
+        await Assert.That(core.ImplementationType)
             .IsEqualTo(typeof(RetainedAuthorityPrivacyErasureWorkflow));
+        await Assert.That(core.Lifetime).IsEqualTo(ServiceLifetime.Scoped);
+
+        ServiceDescriptor deferredRead = services.Single(descriptor =>
+            descriptor.ServiceType == typeof(Func<RetainedAuthorityPrivacyErasureWorkflow>));
+        await Assert.That(deferredRead.Lifetime).IsEqualTo(ServiceLifetime.Scoped);
+        await Assert.That(deferredRead.ImplementationFactory).IsNotNull();
     }
 
     [Test]

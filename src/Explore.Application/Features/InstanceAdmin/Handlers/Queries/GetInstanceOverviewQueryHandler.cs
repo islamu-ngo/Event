@@ -271,11 +271,6 @@ public sealed class GetInstanceOverviewQueryHandler(
             providers.Add("ATProto");
         }
 
-        if (configuration.GoogleSsoEnabled)
-        {
-            providers.Add("Google");
-        }
-
         return providers.Count == 0 ? "None" : string.Join(", ", providers);
     }
 

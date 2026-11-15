@@ -327,6 +327,12 @@ token maintenance. Missing selected fields cannot fall back to application JSON,
 command-line passwords or a raw connection string. An explicitly empty field is
 an error, not permission to choose another alias.
 
+Migration startup and EF tooling retain database-role usernames for enrollment
+without acquiring the serving local-identity writer passwords. Those password
+aliases remain masked even when inherited host configuration contains them.
+Supply valid credentials for the selected migrator; unmasking another process's
+writer password is not a recovery procedure.
+
 For Development/Testing model scaffolding without credentials, pass
 `--DesignTime:ModelOnly=true` after the EF argument separator and explicitly
 select the model's provider. This path does not contact the secret authority.

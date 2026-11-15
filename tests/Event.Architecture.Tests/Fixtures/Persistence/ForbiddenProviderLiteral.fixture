@@ -1,8 +1,0 @@
-// ABOUTME: Synthetic architecture fixture representing a forbidden repository-local provider-name branch.
-// ABOUTME: Exists only to prove provider selection cannot leak into repository behavior.
-
-internal static class ForbiddenProviderLiteralFixture
-{
-    public static bool IsPostgres(ExploreDbContext context) =>
-        context.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL";
-}

@@ -9,6 +9,7 @@ public static partial class PostgresTenantMembershipMutationPermissions
 {
     private static readonly (Type Type, string[] Read, string[] Update, bool Delete)[] Runtime =
     [
+        (typeof(Tenant), [], ["Id"], false),
         (typeof(TenantUser), ["Id", "TenantId", "UserId", "IsDeleted", "StatusId"],
             ["StatusId", "RemovedAt", "RemovedBy", "IsDeleted", "DeletedAt", "DeletedBy", "UpdatedAt", "UpdatedBy"], false),
         (typeof(TenantUserProfile), ["TenantId", "TenantUserId"], [], true),

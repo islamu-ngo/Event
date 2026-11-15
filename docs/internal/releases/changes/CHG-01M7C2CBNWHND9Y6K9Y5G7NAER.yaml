@@ -1,0 +1,27 @@
+Change-Id: CHG-01M7C2CBNWHND9Y6K9Y5G7NAER
+Title: "Recognize declared tenant grants in metadata checks"
+Type: fix
+Scope: discovery
+Summary: "Recognize existing Runtime membership and enrollment columns during discovery metadata validation while retaining original-owner and exact privilege checks."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "Recognize fixed mapped Runtime column intersections without adding grants or composed admission predicates. Preserve original physical ownership, identity and tenant binding, required rights, role and policy checks, direct Migrator provenance, grant-option denial and PUBLIC exclusions."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Explain that discovery metadata validation recognizes existing membership and enrollment storage rights while still rejecting broadened privilege profiles; do not repair mismatches with broad manual grants."

@@ -1,0 +1,42 @@
+Change-Id: CHG-01M68S6GMTGRCVNA3337AAX0MB
+Title: Restore co-located privacy authority recovery coordinates
+Type: fix
+Scope: database
+Summary: >-
+  Restore missing PostgreSQL co-located authority recovery counters and UUIDv7
+  store identity through an additive generated migration so the current model
+  can migrate without bypassing pending-model validation.
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Restore the existing positive recovery coordinates, revision concurrency
+      token and UUIDv7 identity constraint without changing erasure facts,
+      retained sequence boundaries or authority-first workflow ownership.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: >-
+      Apply generated migration 20261031102545 through the selected migration
+      owner before traffic. Existing rows receive counter defaults of one and
+      a generated store identity. Down drops these coordinates and is not a
+      data-preserving operational rollback.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/privacy-erasure.md
+    Disposition: documented
+    Detail: >-
+      Take matched primary and authority backups, run the selected migration
+      service before traffic, and use the documented recovery procedure instead
+      of downgrading the adopted recovery schema.

@@ -12,6 +12,64 @@ namespace Event.Distributed.IntegrationTests;
 public sealed partial class AppHostRuntimeTests
 {
     [Test]
+    [Explicit]
+    public async Task NativeVolumeConsumerInventoryUsesSelectedDaemonRuntimePaths()
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        string absent = Guid.NewGuid().ToString("N");
+        _ = await OwnedAppHostFixture.ReadVolumeConsumersAsync(
+            "islamu-absent-" + absent, "/islamu-absent-" + absent,
+            OwnedAppHostFixture.ReadRuntimeContainerInventoryAsync, deadline.Token);
+    }
+
+    [Test]
+    public async Task VolumeConsumerInventoryRequiresCompleteBoundedHttpResponse()
+    {
+        foreach (var response in new (HttpStatusCode Status, bool Range, bool Oversized, bool Accepted)[]
+        {
+            (HttpStatusCode.OK, false, false, true),
+            (HttpStatusCode.PartialContent, false, false, false),
+            (HttpStatusCode.Found, false, false, false),
+            (HttpStatusCode.NoContent, false, false, false),
+            (HttpStatusCode.OK, true, false, false),
+            (HttpStatusCode.OK, false, true, false)
+        })
+        {
+            using var handler = new VolumeInventoryResponseHandler(response.Status, response.Range, response.Oversized);
+            using var client = new HttpClient(handler, disposeHandler: false);
+            string? inventory = null;
+            Exception? failure = null;
+            try { inventory = await OwnedAppHostFixture.ReadRuntimeContainerInventoryAsync(client, CancellationToken.None); }
+            catch (Exception exception) { failure = exception; }
+            if (response.Accepted)
+            {
+                await Assert.That(failure).IsNull();
+                await Assert.That(inventory).IsEqualTo("[]");
+            }
+            else
+            {
+                await Assert.That(inventory).IsNull();
+                await Assert.That(failure is InvalidOperationException or HttpRequestException).IsTrue();
+            }
+        }
+    }
+
+    private sealed class VolumeInventoryResponseHandler(HttpStatusCode status, bool range, bool oversized) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Method != HttpMethod.Get || request.RequestUri?.PathAndQuery != "/v1.40/containers/json?all=true")
+                throw new InvalidOperationException("test_runtime_inventory_request_invalid");
+            var response = new HttpResponseMessage(status)
+            {
+                Content = new StringContent(oversized ? new string(' ', 4 * 1024 * 1024 + 1) : "[]")
+            };
+            if (range) response.Content.Headers.ContentRange = new(0, 1, 4);
+            return Task.FromResult(response);
+        }
+    }
+
+    [Test]
     public async Task ManagedResourcePidRequiresExactResourceInstanceAndTypedProperty()
     {
         var selected = new ProjectResource("explore-api");
@@ -242,34 +300,8 @@ public sealed partial class AppHostRuntimeTests
         }).Throws<InvalidOperationException>();
         await Assert.That(inspectionFailure!.Message).IsEqualTo("test_resource_container_identity_unknown:postgres:native-inspection");
 
-        OwnedAppHostFixture.RequireVolumeConsumerInspectionSucceeded(0, "no such container: permission denied");
-        (string Error, string Category)[] inspectionErrors =
-        [
-            ("", "empty"),
-            (" \t\n", "empty"),
-            ("no such container", "no-such-marker"),
-            ("PeRmIsSiOn DeNiEd", "permission-marker"),
-            ("access denied; permission denied", "permission-marker"),
-            ("cannot connect", "connection-marker"),
-            ("connection refused; connection reset", "connection-marker"),
-            ("no such container; permission denied", "multiple-markers"),
-            (sentinel, "other"),
-            (new string('x', 8193) + " permission denied " + sentinel, "oversize")
-        ];
-        InvalidOperationException? bulkInspectionFailure = null;
-        foreach (var observation in inspectionErrors)
-        {
-            var classified = await Assert.That(() =>
-                OwnedAppHostFixture.RequireVolumeConsumerInspectionSucceeded(125, observation.Error)).Throws<InvalidOperationException>();
-            await Assert.That(classified!.Message == "test_resource_volume_consumers_unknown:stage=bulk-inspect:exit=125:stderr=" + observation.Category
-                && !classified.Message.Contains(sentinel, StringComparison.Ordinal)).IsTrue();
-            if (observation.Category == "permission-marker") bulkInspectionFailure ??= classified;
-        }
-        var boundedExit = await Assert.That(() =>
-            OwnedAppHostFixture.RequireVolumeConsumerInspectionSucceeded(int.MinValue, sentinel)).Throws<InvalidOperationException>();
-        await Assert.That(boundedExit!.Message)
-            .IsEqualTo("test_resource_volume_consumers_unknown:stage=bulk-inspect:exit=-2147483648:stderr=other");
         var consumerReadFailures = await VerifyCompleteConsumerReobservationAsync(sentinel);
+        Exception bulkInspectionFailure = consumerReadFailures[0];
 
         string initialId = new('a', 64), extraId = new('b', 64);
         var baseline = (Containers: (IReadOnlySet<string>)new HashSet<string> { initialId },
@@ -386,20 +418,17 @@ public sealed partial class AppHostRuntimeTests
         string own = new('a', 64), neighbour = new('b', 64), added = new('c', 64);
         const string volume = "probe-volume", mountpoint = "/native/owned-volume";
         var failures = new List<Exception>();
-        object named = new { Type = "volume", Name = volume };
+        object named = new { Type = "volume", Name = volume, Source = "" };
         object unrelated = new { Type = "volume", Name = "other-volume" };
-        string Row(string id, params object[] mounts) => JsonSerializer.Serialize(new object[] { id, mounts });
-        (string Kind, string[] Ids, int ExitCode, string Output, string Error, Exception? Failure) Inventory(params string[] ids) =>
-            ("ps", ids, 0, string.Join('\n', ids), "", null);
-        (string Kind, string[] Ids, int ExitCode, string Output, string Error, Exception? Failure) Inspect(
-            string[] ids, string output, int exitCode = 0, string error = "") => ("inspect", ids, exitCode, output, error, null);
+        string Row(string id, params object[] mounts) => JsonSerializer.Serialize(new { Id = id, Mounts = mounts });
+        string Inventory(params string[] rows) => "[" + string.Join(',', rows) + "]";
 
         async Task<Exception?> ExerciseAsync(string name, string[]? expectedConsumers, bool foreign,
-            params (string Kind, string[] Ids, int ExitCode, string Output, string Error, Exception? Failure)[] observations)
+            params object[] observations)
         {
-            var pending = new Queue<(string Kind, string[] Ids, int ExitCode, string Output, string Error, Exception? Failure)>(observations);
+            var pending = new Queue<object>(observations);
             bool invalidRequest = false;
-            Task<(int ExitCode, string Output, string Error)> ExecuteAsync(string[] arguments, CancellationToken token)
+            Task<string> ReadAsync(CancellationToken token)
             {
                 token.ThrowIfCancellationRequested();
                 if (!pending.TryDequeue(out var observation))
@@ -407,23 +436,12 @@ public sealed partial class AppHostRuntimeTests
                     invalidRequest = true;
                     throw new InvalidOperationException("test_consumer_control_unexpected_request");
                 }
-                bool valid = observation.Kind == "ps"
-                    ? arguments.SequenceEqual(new[] { "ps", "--no-trunc", "-aq" })
-                    : arguments.Take(5).SequenceEqual(new[] { "inspect", "--type", "container", "--format", "[{{json .ID}},{{json .Mounts}}]" })
-                        && arguments.Length == 5 + observation.Ids.Length
-                        && arguments.Skip(5).ToHashSet(StringComparer.Ordinal).SetEquals(observation.Ids);
-                if (!valid)
-                {
-                    invalidRequest = true;
-                    throw new InvalidOperationException("test_consumer_control_membership_request_invalid");
-                }
-                return observation.Failure is { } original
-                    ? Task.FromException<(int, string, string)>(original)
-                    : Task.FromResult((observation.ExitCode, observation.Output, observation.Error));
+                return observation is Exception original
+                    ? Task.FromException<string>(original) : Task.FromResult((string)observation);
             }
             string[]? consumers = null;
             Exception? failure = null;
-            try { consumers = await OwnedAppHostFixture.ReadVolumeConsumersAsync(volume, mountpoint, ExecuteAsync, CancellationToken.None); }
+            try { consumers = await OwnedAppHostFixture.ReadVolumeConsumersAsync(volume, mountpoint, ReadAsync, CancellationToken.None); }
             catch (Exception exception) { failure = exception; }
             if (invalidRequest) throw new InvalidOperationException("test_consumer_control_protocol_invalid:" + name, failure);
             if (expectedConsumers is null)
@@ -445,63 +463,45 @@ public sealed partial class AppHostRuntimeTests
             return null;
         }
 
-        await ExerciseAsync("stable", [own], false, Inventory(own), Inspect([own], Row(own, named)), Inventory(own));
+        await ExerciseAsync("stable", [own], false, Inventory(Row(own, named)), Inventory(Row(own, named)));
         await ExerciseAsync("empty", [], false, Inventory(), Inventory());
-        await ExerciseAsync("failed-partial-discarded", [], false,
-            Inventory(own, neighbour), Inspect([own, neighbour], Row(neighbour, named) + sentinel, 1, "no such container"),
-            Inventory(neighbour), Inventory(neighbour), Inspect([neighbour], Row(neighbour, unrelated)), Inventory(neighbour));
         foreach (object mount in new object[] { named,
             new { Type = "bind", Source = mountpoint }, new { Type = "bind", Source = "/native" },
             new { Type = "bind", Source = mountpoint + "/child" } })
         {
-            string rows = Row(own, unrelated) + "\n" + Row(added, mount);
-            await ExerciseAsync("missing-result-new-consumer", [added], true,
-                Inventory(own), Inspect([own], "", 1, "no such container"), Inventory(own, added),
-                Inventory(own, added), Inspect([own, added], rows), Inventory(own, added));
+            string rows = Inventory(Row(own, unrelated), Row(added, mount));
             await ExerciseAsync("successful-result-new-consumer", [added], true,
-                Inventory(own), Inspect([own], Row(own, unrelated)), Inventory(own, added),
-                Inventory(own, added), Inspect([own, added], rows), Inventory(own, added));
+                Inventory(Row(own, unrelated)), rows, rows, rows);
+            await ExerciseAsync("same-membership-new-mount", [added], true,
+                Inventory(Row(added, unrelated)), Inventory(Row(added, mount)));
         }
-        await ExerciseAsync("same-membership-contradiction", null, false,
-            Inventory(own), Inspect([own], "", 1, "no such container"), Inventory(own));
-        (int Exit, string Error)[] rejectedInspections = [(1, "permission denied"), (125, "no such container"),
-            (1, "no such container; cannot connect"), (1, sentinel)];
-        foreach (var rejected in rejectedInspections)
-            await ExerciseAsync("unrecognized-error", null, false,
-                Inventory(own), Inspect([own], "", rejected.Exit, rejected.Error));
-        await ExerciseAsync("second-attempt-missing", null, false,
-            Inventory(own), Inspect([own], "", 1, "no such container"), Inventory(neighbour),
-            Inventory(neighbour), Inspect([neighbour], "", 1, "no such container"));
         await ExerciseAsync("repeated-drift", null, false,
-            Inventory(own), Inspect([own], Row(own, unrelated)), Inventory(neighbour),
-            Inventory(neighbour), Inspect([neighbour], Row(neighbour, unrelated)), Inventory(added));
-        foreach (string malformed in new[] { "{}", Row(own), Row(own) + "\n" + Row(own), Row(added) })
-            await ExerciseAsync("incomplete-inspection", null, false, Inventory(own, neighbour), Inspect([own, neighbour], malformed));
-        await ExerciseAsync("duplicate-complete-coverage", null, false,
-            Inventory(own), Inspect([own], Row(own) + "\n" + Row(own)));
+            Inventory(Row(own)), Inventory(Row(neighbour)), Inventory(Row(neighbour)), Inventory(Row(added)));
+        foreach (string malformed in new[] { "{}", "[", sentinel, Inventory(Row(own), Row(own)),
+            Inventory(Row("invalid")), "[{\"Id\":\"" + own + "\",\"Mounts\":[],\"Mounts\":[]}]" })
+        {
+            var failure = await ExerciseAsync("incomplete-inventory", null, false, malformed);
+            await Assert.That(failure!.Message.Contains(sentinel, StringComparison.Ordinal)).IsFalse();
+        }
         foreach (object malformed in new object[] { 42, new { Type = (string?)null }, new { Type = "unknown" },
             new { Type = "npipe", Source = "/native" }, new { Type = "volume" }, new { Type = "volume", Name = (string?)null },
             new { Type = "volume", Name = "" }, new { Type = "volume", Name = "invalid/name" }, new { Type = "bind" },
             new { Type = "bind", Source = (string?)null }, new { Type = "bind", Source = "relative" },
             new { Type = "tmpfs" }, new { Type = "tmpfs", Source = mountpoint },
             new { Type = "tmpfs", Source = "", Name = volume } })
-            await ExerciseAsync("malformed-mount", null, false, Inventory(own), Inspect([own], Row(own, malformed)));
-        await ExerciseAsync("valid-nonconsumers", [], false, Inventory(own), Inspect([own], Row(own, unrelated,
-            new { Type = "bind", Source = "/native/owned-volumes" }, new { Type = "tmpfs", Source = "" })), Inventory(own));
-        foreach (var invalid in new[] { Inventory("invalid"), Inventory(own, own) })
-            await ExerciseAsync("inventory-invalid", null, false, invalid);
-        await ExerciseAsync("inventory-failed", null, false, ("ps", Array.Empty<string>(), 1, "", "", null));
+            await ExerciseAsync("malformed-mount", null, false, Inventory(Row(own, malformed)));
+        string nonconsumers = Inventory(Row(own, unrelated,
+            new { Type = "bind", Source = "/native/owned-volumes" }, new { Type = "tmpfs", Source = "" }));
+        await ExerciseAsync("valid-nonconsumers", [], false, nonconsumers, nonconsumers);
         var fatal = new InvalidOperationException("test_consumer_original_failure");
         var preserved = await ExerciseAsync("fatal-after-transient", null, false,
-            Inventory(own), Inspect([own], "", 1, "no such container"), Inventory(neighbour),
-            ("ps", Array.Empty<string>(), 0, "", "", fatal));
+            Inventory(Row(own)), Inventory(Row(neighbour)), fatal);
         await Assert.That(preserved is AggregateException aggregate
             && aggregate.Flatten().InnerExceptions.Any(item => ReferenceEquals(item, fatal))
             && aggregate.Flatten().InnerExceptions.Any(item => item.Message ==
-                "test_resource_volume_consumers_unknown:stage=bulk-inspect:exit=1:stderr=no-such-marker")).IsTrue();
+                "test_resource_volume_consumers_unknown:stage=inventory-bracket:reason=membership-changed")).IsTrue();
         var canceled = new OperationCanceledException("test_consumer_budget_canceled", new CancellationToken(true));
-        var cancellation = await ExerciseAsync("canceled-read", null, false,
-            ("ps", Array.Empty<string>(), 0, "", "", canceled));
+        var cancellation = await ExerciseAsync("canceled-read", null, false, canceled);
         await Assert.That(ReferenceEquals(cancellation, canceled)).IsTrue();
         return [.. failures];
     }
@@ -640,15 +640,28 @@ public sealed partial class AppHostRuntimeTests
                 expiredSettlement.Token)).Throws<OperationCanceledException>();
             await Assert.That(!pendingReader.Task.IsCompleted
                 && incomplete!.CancellationToken == expiredSettlement.Token).IsTrue();
-            // Controlled typed identities exercise association custody, not actual daemon creation.
-            var containerIdentity = new OwnedAppHostFixture.ContainerCleanupIdentity(selectedContainer, "owned-container-instance",
-                new string('a', 64), "sha256:" + new string('b', 64), new HashSet<string>(), string.Empty, 0, [], false);
+            // Compose the native parser and publication contracts without claiming actual daemon creation.
+            string inspection = JsonSerializer.Serialize(new object[]
+            {
+                new string('a', 64), "/owned-container-instance", "sha256:" + new string('b', 64),
+                new Dictionary<string, string>
+                {
+                    ["islamu.assurance.owner"] = owner.RunId,
+                    ["islamu.assurance.resource"] = selectedContainer.Name
+                },
+                Array.Empty<object>(), true, 0
+            });
+            bool parsed = OwnedAppHostFixture.TryReadContainerIdentity([selectedContainer], selectedContainer,
+                "owned-container-instance", owner.RunId, new string('b', 64), new HashSet<string>(),
+                new HashSet<string>(), new HashSet<string>(), inspection, out var capturedIdentity, out string reason);
+            await Assert.That(parsed).IsTrue().Because(reason);
+            var containerIdentity = capturedIdentity!;
             await Task.WhenAll(observation.PublishContainerAsync(containerIdentity, CancellationToken.None),
                 observation.PublishContainerAsync(containerIdentity, CancellationToken.None));
             await Assert.That(async () => await observation.PublishContainerAsync(containerIdentity with
             { Resource = new ContainerResource(selectedContainer.Name) }, CancellationToken.None)).Throws<InvalidOperationException>();
             await Assert.That(async () => await observation.PublishContainerAsync(containerIdentity with
-            { Image = "sha256:" + new string('c', 64) }, CancellationToken.None)).Throws<InvalidOperationException>();
+            { Image = new string('c', 64) }, CancellationToken.None)).Throws<InvalidOperationException>();
             string containerLead = Directory.GetFiles(owner.Root, "managed-launch-container-*.json").Single();
             using (var associationDocument = JsonDocument.Parse(await File.ReadAllBytesAsync(containerLead)))
             {
@@ -659,7 +672,7 @@ public sealed partial class AppHostRuntimeTests
                     && association.EnumerateObject().Count() == 5
                     && association.GetProperty("Resource").GetString() == selectedContainer.Name
                     && association.GetProperty("ContainerId").GetString() == containerIdentity.Id
-                    && association.GetProperty("ImageId").GetString() == containerIdentity.Image
+                    && association.GetProperty("ImageId").GetString() == "sha256:" + containerIdentity.Image
                     && association.GetProperty("Present").GetBoolean()
                     && instanceDigest is { Length: 64 }
                     && instanceDigest.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f')
@@ -1230,6 +1243,16 @@ public sealed partial class AppHostRuntimeTests
             using var client = owner.CreateHttpClient(topology == "Split" ? "explore-api" : "event-standalone", "operations");
             using var response = await client.GetAsync("/health", deadline.Token);
             await Assert.That(response.IsSuccessStatusCode).IsTrue();
+            using var metrics = await client.GetAsync("/metrics", deadline.Token);
+            await Assert.That(metrics.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            await Assert.That(metrics.Content.Headers.ContentType?.MediaType is
+                "text/plain" or "application/openmetrics-text").IsTrue();
+            string exposition = await metrics.Content.ReadAsStringAsync(deadline.Token);
+            var definitions = K6LoadRunner.ParseRuntimeMetricInventory(exposition);
+            await Assert.That(definitions.Count(metric => metric.Name == "dotnet_process_cpu_time_seconds_total"
+                && metric.Kind == "counter" && metric.Unit == "seconds")).IsEqualTo(1);
+            await Assert.That(definitions.Count(metric => metric.Name == "dotnet_process_memory_working_set_bytes"
+                && metric.Kind == "gauge" && metric.Unit == "bytes")).IsEqualTo(1);
         }
         catch (Exception exception) { failure = exception; }
         using var evidenceDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));

@@ -4,6 +4,10 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Handlers.Commands;
 using Explore.Application.Responses;
+using Explore.Application.Configuration;
+using Explore.Application.Settings;
+using Explore.Domain.Constants;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -65,9 +69,21 @@ public sealed class LocalIdentityLifecycleDeliveryWorker(
                     "Local lifecycle mirror repair failed; durable receipt retained.");
             }
         }
+        Uri? origin;
+        await using (var address = scopes.CreateAsyncScope())
+        {
+            origin = await PublicAddressResolver.ResolveAsync(
+                address.ServiceProvider.GetRequiredService<IConfiguration>(),
+                token => address.ServiceProvider.GetRequiredService<IHierarchicalSettingsReader>()
+                    .ResolveAsync<string>(GovernanceSettingKeys.Domains.PublicBaseUrl,
+                        new SettingContext { RequireAuthoritativeReads = true }, token),
+                cancellationToken);
+        }
+        if (origin is not { Scheme: "https" }) return;
+
         await using var delivery = scopes.CreateAsyncScope();
         await using var deliveryIdentity = await delivery.ServiceProvider.GetRequiredService<ILocalIdentityExecutionScopeFactory>()
             .CreateAsync(cancellationToken);
-        await deliveryIdentity.Services.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(cancellationToken);
+        await deliveryIdentity.Services.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(origin, cancellationToken);
     }
 }

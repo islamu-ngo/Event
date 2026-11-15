@@ -3676,15 +3676,15 @@ public sealed class SecurityExecutionEvidenceCandidateTests
     }
 
     [Test]
-    [Arguments("wrong-candidate")]
-    [Arguments("dirty-worktree")]
-    [Arguments("dirty-index")]
-    [Arguments("untracked-input")]
-    [Arguments("assume-unchanged-input")]
-    [Arguments("skip-worktree-input")]
-    [Arguments("missing-repository")]
-    [Arguments("invalid-candidate")]
-    public async Task ClaimedCandidateCannotReplaceTheActualCleanSourceInputs(string variant)
+    [Arguments("wrong-candidate", "candidate_source_head_mismatch")]
+    [Arguments("dirty-worktree", "candidate_source_worktree_dirty")]
+    [Arguments("dirty-index", "candidate_source_worktree_dirty")]
+    [Arguments("untracked-input", "candidate_source_worktree_dirty")]
+    [Arguments("assume-unchanged-input", "candidate_source_index_invalid")]
+    [Arguments("skip-worktree-input", "candidate_source_index_invalid")]
+    [Arguments("missing-repository", "candidate_source_invalid")]
+    [Arguments("invalid-candidate", "candidate_source_invalid")]
+    public async Task ClaimedCandidateCannotReplaceTheActualCleanSourceInputs(string variant, string expectedDiagnostic)
     {
         using var fixture = new SourceFixture();
         string repository = fixture.Root;
@@ -3714,6 +3714,7 @@ public sealed class SecurityExecutionEvidenceCandidateTests
         await Assert.That(accepted).IsFalse();
         await Assert.That(identity is null).IsTrue();
         await Assert.That(diagnostic).IsNotEqualTo(string.Empty);
+        await Assert.That(diagnostic).IsEqualTo(expectedDiagnostic);
     }
 
     internal sealed class SourceFixture : IDisposable

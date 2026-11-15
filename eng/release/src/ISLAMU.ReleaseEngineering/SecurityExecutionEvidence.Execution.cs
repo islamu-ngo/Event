@@ -3206,17 +3206,37 @@ public static partial class SecurityExecutionEvidence
                 !Directory.Exists(repositoryRoot)) return false;
             string head = ReadCandidateGitAsync(repositoryRoot, "rev-parse", "--verify", "HEAD")
                 .GetAwaiter().GetResult().TrimEnd('\n');
-            if (head != expectedCandidate) return false;
+            if (head != expectedCandidate)
+            {
+                diagnostic = "candidate_source_head_mismatch";
+                return false;
+            }
             string tree = ReadCandidateGitAsync(repositoryRoot, "rev-parse", "--verify", expectedCandidate + "^{tree}")
                 .GetAwaiter().GetResult().TrimEnd('\n');
-            if (tree.Length != expectedCandidate.Length || !LowerHex(tree) ||
-                ReadCandidateGitAsync(repositoryRoot, "status", "--porcelain=v1", "-z", "--untracked-files=all",
-                    "--ignore-submodules=none").GetAwaiter().GetResult().Length != 0) return false;
+            if (tree.Length != expectedCandidate.Length || !LowerHex(tree))
+            {
+                diagnostic = "candidate_source_tree_invalid";
+                return false;
+            }
+            if (ReadCandidateGitAsync(repositoryRoot, "status", "--porcelain=v1", "-z", "--untracked-files=all",
+                    "--ignore-submodules=none").GetAwaiter().GetResult().Length != 0)
+            {
+                diagnostic = "candidate_source_worktree_dirty";
+                return false;
+            }
             string[] entries = ReadCandidateGitAsync(repositoryRoot, "ls-files", "-v", "-z")
                 .GetAwaiter().GetResult().Split('\0', StringSplitOptions.RemoveEmptyEntries);
-            if (entries.Length == 0 || entries.Any(entry => !entry.StartsWith("H ", StringComparison.Ordinal))) return false;
+            if (entries.Length == 0 || entries.Any(entry => !entry.StartsWith("H ", StringComparison.Ordinal)))
+            {
+                diagnostic = "candidate_source_index_invalid";
+                return false;
+            }
             if (ReadCandidateGitAsync(repositoryRoot, "rev-parse", "--verify", "HEAD")
-                    .GetAwaiter().GetResult().TrimEnd('\n') != expectedCandidate) return false;
+                    .GetAwaiter().GetResult().TrimEnd('\n') != expectedCandidate)
+            {
+                diagnostic = "candidate_source_head_changed";
+                return false;
+            }
             identity = new(expectedCandidate, tree);
             diagnostic = string.Empty;
             return true;
@@ -3224,6 +3244,9 @@ public static partial class SecurityExecutionEvidence
         catch (Exception exception) when (exception is IOException or InvalidDataException or InvalidOperationException or
             ArgumentException or Win32Exception or TimeoutException or OperationCanceledException or UnauthorizedAccessException)
         {
+            diagnostic = exception is TimeoutException or OperationCanceledException
+                ? "candidate_source_git_timeout"
+                : "candidate_source_git_unavailable";
             return false;
         }
     }

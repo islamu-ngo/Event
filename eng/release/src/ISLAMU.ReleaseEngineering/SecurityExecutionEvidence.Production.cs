@@ -923,8 +923,8 @@ public static partial class SecurityExecutionEvidence
     private static OwnedInputs CaptureOwnedInputs(OwnedExecutionRequest request, IEnumerable<OwnedEntry> entries)
     {
         OwnedEntry[] selectedEntries = entries.ToArray();
-        if (!TryReadCandidateSource(request.Repository, request.Candidate, out var source, out _))
-            throw new OwnedExecutionFailure("candidate_source_invalid");
+        if (!TryReadCandidateSource(request.Repository, request.Candidate, out var source, out string sourceDiagnostic))
+            throw new OwnedExecutionFailure(sourceDiagnostic);
         var managed = new List<object>();
         string engine = typeof(SecurityExecutionEvidence).Assembly.Location;
         if (!TryCaptureProjectManagedInputs(Path.GetDirectoryName(engine)!, request.Candidate, [Path.GetFileName(engine)],

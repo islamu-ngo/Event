@@ -30,6 +30,14 @@ different commits or label missing runtime lanes as complete. If publication fai
 follow [coverage publication operations](OPERATIONS.md#codecov-coverage-publication);
 do not substitute coverage percentages for the checklist's required tests.
 
+For SDK/runtime servicing, verify the official release's CVE mapping and image
+digests, regenerate owned dependency locks with the selected SDK, and retain
+the affected build and deployment evidence. Follow
+[the servicing baseline](OPERATIONS.md#sdk-and-runtime-servicing) and
+[operator rebuild instructions](../public/documentation/readme/self-hosting/docker-standalone.md).
+Do not treat framework pruning or a Dockerfile static check as a completed
+application image rebuild or a deployed-runtime verification.
+
 Generate the existing durable evidence bundle only as the checklist directs:
 
 ```sh

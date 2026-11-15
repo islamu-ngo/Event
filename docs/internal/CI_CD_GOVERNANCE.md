@@ -65,6 +65,10 @@ Only that infrastructure leaf alias may resolve; its entry ancestors and selecte
 target ancestors must remain nonlinked, and the final basename must stay `stat`.
 Capture and both metadata invocations use the same selected executable.
 Candidate files, assemblies, manifests and policy inputs never receive alias resolution.
+Selector failures use the existing owned-execution rejection path with fixed
+`stat_tool_*` codes. Missing or inaccessible filesystem targets produce
+`stat_tool_selection_unavailable`; underlying exception messages and paths are
+not part of the diagnostic.
 
 Native discovery may render a simple fixture constructor in `typeName`.
 The shared parser accepts only the complete `ClassName(SimpleFixtureName)` form

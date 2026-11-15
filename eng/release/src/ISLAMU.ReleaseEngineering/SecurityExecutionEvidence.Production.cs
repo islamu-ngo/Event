@@ -461,7 +461,7 @@ public static partial class SecurityExecutionEvidence
 
     private sealed record OwnedExecutionRequest(string Repository, string Output, string Candidate, string RunId,
         int Attempt, string Event, string Temporary, string DockerHost, string RyukDisabled);
-    private sealed class OwnedExecutionFailure(string code) : Exception
+    internal sealed class OwnedExecutionFailure(string code) : Exception
     {
         internal string Code { get; } = code;
     }

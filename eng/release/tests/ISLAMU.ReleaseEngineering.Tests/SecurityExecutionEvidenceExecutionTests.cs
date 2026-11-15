@@ -3772,9 +3772,12 @@ public sealed class SecurityExecutionEvidenceToolSelectionTests
     }
 
     [Test]
-    [Arguments("linked-parent")]
-    [Arguments("unsupported-dispatch")]
-    public async Task StatSelectionRefusesUnboundUtilityPaths(string variant)
+    [Arguments("linked-parent", "stat_tool_selection_linked")]
+    [Arguments("unsupported-dispatch", "stat_tool_dispatch_unsupported")]
+    [Arguments("missing-entry", "stat_tool_selection_unavailable")]
+    [Arguments("dangling-target", "stat_tool_selection_unavailable")]
+    [Arguments("directory", "stat_tool_selection_invalid")]
+    public async Task StatSelectionRefusesUnboundUtilityPaths(string variant, string expectedCode)
     {
         if (!OperatingSystem.IsLinux()) return;
         string root = Path.Combine(Path.GetTempPath(), "native-stat-refusal-" + Guid.NewGuid().ToString("N"));
@@ -3792,12 +3795,29 @@ public sealed class SecurityExecutionEvidenceToolSelectionTests
                 Directory.CreateSymbolicLink(linkedParent, targetDirectory);
                 entry = Path.Combine(linkedParent, "stat");
             }
-            else
+            else if (variant == "directory")
             {
+                Directory.CreateDirectory(entry);
+            }
+            else if (variant != "missing-entry")
+            {
+                if (variant == "dangling-target") File.Delete(target);
                 File.CreateSymbolicLink(entry, target);
             }
 
-            await Assert.That(() => ReleaseToolPaths.SelectStatExecutable(entry)).Throws<InvalidDataException>();
+            Exception? failure = null;
+            try
+            {
+                ReleaseToolPaths.SelectStatExecutable(entry);
+            }
+            catch (Exception rejected)
+            {
+                failure = rejected;
+            }
+            await Assert.That(failure).IsNotNull();
+            await Assert.That(failure is SecurityExecutionEvidence.OwnedExecutionFailure).IsTrue();
+            await Assert.That(((SecurityExecutionEvidence.OwnedExecutionFailure)failure!).Code)
+                .IsEqualTo(expectedCode);
         }
         finally
         {

@@ -107,6 +107,9 @@ after native source, link, file-type or fingerprint admission fails.
 For fixed-system stat selection, verify that the retained binding names the
 selected executable used by both metadata paths. Retain real utility-alias and
 candidate linked-input refusal controls; observation success alone is insufficient.
+Retain missing-entry, dangling-target and directory rejection controls with
+fixed owned stat codes. Filesystem failures must not become path-bearing
+diagnostics or lose their reason as a generic execution failure.
 
 Retain native discovery/report identity evidence for fixture-backed tests.
 Verify decorated and undecorated classes join exactly, malformed constructor

@@ -79,6 +79,8 @@ runtime lanes must not be presented as complete platform coverage. Its scope and
   Only the fixed infrastructure stat leaf may resolve to a same-basename,
   nonlinked target selected once per process. Candidate input link rejection
   and the existing before/after executable fingerprints MUST remain unchanged.
+  Selector refusal MUST retain a closed owned stat code; inaccessible filesystem
+  selection MUST omit raw paths and exception text.
   Recognized fixture constructor decoration in native discovery MUST map through
   the shared complete grammar; register/report equality, opaque UID uniqueness
   and canonical tuple uniqueness MUST remain unchanged. Constructor display

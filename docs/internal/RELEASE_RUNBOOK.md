@@ -296,6 +296,9 @@ same-basename executable for capture and both metadata operations. Unsupported
 dispatchers and linked entry/target ancestors fail closed. Verify real alias
 execution and unchanged managed/policy linked-input refusals before publication;
 the hosted workflow must still complete all registered profiles on the final head.
+Capture the fixed `stat_tool_*` rejection code when selection fails.
+`stat_tool_selection_unavailable` identifies an inaccessible or missing
+filesystem target without exposing its path or underlying exception text.
 
 For a discovery identity mismatch, retain native JSON and a real TRX from the
 required witness. The supported constructor display form maps to the undecorated

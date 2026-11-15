@@ -2365,6 +2365,11 @@ The native selector retains one fixed-system stat target for the process and
 uses it for measured bindings and execution. A target with an unsupported
 dispatcher basename or linked ancestor is refused. Do not introduce an ambient
 tool-path override or apply this infrastructure selection to candidate inputs.
+Selection refusals retain the closed codes `stat_tool_entry_invalid`,
+`stat_tool_selection_linked`, `stat_tool_dispatch_unsupported`,
+`stat_tool_selection_invalid` and `stat_tool_selection_unavailable` through
+the owned execution boundary. The unavailable code covers filesystem access
+failures without disclosing an exception message or target path.
 
 When discovery inventory matching fails, compare retained native discovery and
 TRX identities before editing the register. Fixture constructor display text is

@@ -197,3 +197,17 @@ canonical provider configuration: all seven graphs remain in one Serializable
 guards remain unchanged. This qualifies reader semantics; it does not qualify
 default-batch production write throughput. Rollback and broader workstream
 assurance remain separate gates.
+
+## Email admission state transitions
+
+PostgreSQL email admission retains its existing transaction advisory lock and
+only issues processor-state INSERT or UPDATE statements for initialization or
+a real high/low watermark deferral transition. An unchanged poll must not advance
+the MixedSettings source revision: its BEFORE STATEMENT trigger also runs for
+conflicted inserts and zero-row updates. Processor `UpdatedAt` records a state
+change rather than an idle poll heartbeat. Real transitions still update it.
+The original creator User key fence, source trigger and Serializable transaction
+remain intact; no retry or privilege change replaces those controls. Three native
+controls pass: before/after-snapshot original creator fencing and a real
+low-watermark deferral transition. The original worker recovery witness remains
+pending.

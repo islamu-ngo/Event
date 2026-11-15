@@ -65,6 +65,15 @@ projection permission contract before visitor settings storage. Both features
 use that single permission owner. Existing partial or altered permission
 catalogues continue to fail admission rather than being silently repaired.
 
+The PostgreSQL email worker now avoids writing unchanged processor state on each
+idle poll. This prevents an empty poll from unnecessarily invalidating a
+concurrent tenant creation transaction. The processor update timestamp changes
+when its deferral state changes; it is not a worker heartbeat. Initial state
+creation and real deferral transitions still persist. Three controlled native
+checks pass; the complete delivery/restart check remains pending before acceptance.
+Do not remove tenant creation's account fence or add database grants to work
+around a concurrency failure.
+
 The BFF can read the instance's non-sensitive resolver configuration before
 selecting a tenant. Private or malformed tenant visitor settings cannot block
 that routing bootstrap. Tenant content still enforces its own visitor policy,

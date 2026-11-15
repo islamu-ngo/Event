@@ -149,3 +149,13 @@ inventory and ownership closure. Owner grant options are permitted; PUBLIC and
 other nonowner executors are rejected. No database observation is cached.
 Fresh development-native initialization installs this routine inventory; existing
 drift is rejected instead of silently repaired.
+
+Local Administration uses the same representation in
+`local_administration_assert_catalogue()`. Its stored lifecycle entries and
+statement triggers authenticate the helper against the source-derived body,
+metadata and owner-only ACL, then evaluate the complete catalogue predicate.
+Independent `RequireReadyAsync` and installer checks remain inline with exact
+body verification. The routine inventory includes the void helper, and the
+installer excludes it from the Runtime and temporary Migrator execution grants.
+Source, privacy, index, foreign-key, policy, attempt, epoch and settlement checks
+remain part of their original contracts.

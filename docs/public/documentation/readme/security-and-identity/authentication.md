@@ -54,6 +54,12 @@ checks.
 Initialize a fresh development-native profile with the current installer; an
 absent or changed private assertion is rejected instead of silently repaired.
 
+Local credential lifecycle operations use the same private assertion pattern.
+Every stored operation still checks current database state, including the
+identity, privacy and lifecycle storage contracts. The helper receives no
+application-login execution grant; admission and installation continue to verify
+the complete expected contract independently.
+
 Fresh PostgreSQL initialization installs the complete provisioning-policy
 projection permission contract before visitor settings storage. Both features
 use that single permission owner. Existing partial or altered permission

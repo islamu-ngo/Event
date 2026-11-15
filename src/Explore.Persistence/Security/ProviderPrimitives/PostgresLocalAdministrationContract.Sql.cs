@@ -19,7 +19,8 @@ public static partial class PostgresLocalAdministrationContract
         ("apply", "jsonb", "p_request jsonb", "jsonb"),
         ("complete", "jsonb,jsonb", "p_request jsonb,p_disclosed jsonb", "jsonb"),
         ("changed", "", "", "trigger"),
-        ("settlement", "", "", "trigger")
+        ("settlement", "", "", "trigger"),
+        (CatalogueGuardName, "", "", "void")
     ];
 
     private static string Caller(PostgresNativeQueueEnrollment enrollment) => $"""
@@ -291,6 +292,7 @@ public static partial class PostgresLocalAdministrationContract
             "complete" => CompleteBody(context, enrollment),
             "changed" => ChangedBody(context, enrollment),
             "settlement" => SettlementBody(context),
+            CatalogueGuardName => CatalogueGuardBody(context, enrollment),
             _ => throw new InvalidOperationException("local_administration_routine_inventory_drift")
         }));
 }

@@ -154,7 +154,7 @@ public static partial class PostgresLocalAdministrationContract
         await using var command = context.Database.GetDbConnection().CreateCommand();
         command.Transaction = context.Database.CurrentTransaction?.GetDbTransaction();
         // No private-table reads here: the caller has EXECUTE, not scalar authority.
-        command.CommandText = $"DO $ready$ BEGIN {Guard(context, enrollment)} {ExactBodies(context, enrollment)} END $ready$;";
+        command.CommandText = $"DO $ready$ BEGIN {CatalogueGuard(context, enrollment)} {ExactBodies(context, enrollment)} END $ready$;";
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

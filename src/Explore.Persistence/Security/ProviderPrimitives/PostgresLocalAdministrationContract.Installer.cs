@@ -35,8 +35,7 @@ public static partial class PostgresLocalAdministrationContract
             CREATE FUNCTION {FunctionSql(context, function.Name)}({function.Arguments}) RETURNS {function.Result}
                 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $body${function.Body}$body$;
             REVOKE ALL ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature}) FROM PUBLIC;
-            GRANT EXECUTE ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature})
-                TO {(function.Result == "trigger" ? migrator : RuntimeRole)};
+            {(function.Result == "void" ? "" : $"GRANT EXECUTE ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature}) TO {(function.Result == "trigger" ? migrator : RuntimeRole)};")}
             COMMENT ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature}) IS {Text(Stamp + Hash(function.Body))};
             """));
         string triggers = string.Join("\n", Inventory.Select(source => $"""
@@ -59,7 +58,7 @@ public static partial class PostgresLocalAdministrationContract
                 SELECT count(*) INTO existing FROM pg_catalog.pg_roles WHERE rolname IN ({roles});
                 IF existing <> 0 THEN
                     IF existing <> 3 THEN RAISE EXCEPTION 'local_administration_partial_roles' USING ERRCODE = '55000'; END IF;
-                    {Guard(context, enrollment)}
+                    {CatalogueGuard(context, enrollment)}
                     {ExactBodies(context, enrollment)}
                     RETURN;
                 END IF;
@@ -96,7 +95,7 @@ public static partial class PostgresLocalAdministrationContract
                 REVOKE EXECUTE ON FUNCTION {FunctionSql(context, "changed")}() FROM {migrator};
                 REVOKE EXECUTE ON FUNCTION {FunctionSql(context, "settlement")}() FROM {migrator};
                 PERFORM pg_catalog.set_config('role','none',true);
-                {Guard(context, enrollment)}
+                {CatalogueGuard(context, enrollment)}
                 {ExactBodies(context, enrollment)}
             END $bootstrap$;
             """;

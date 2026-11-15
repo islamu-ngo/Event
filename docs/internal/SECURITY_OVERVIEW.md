@@ -130,3 +130,22 @@ no exemption. Six real Local HTTP cases pass across both deployment modes,
 including administrator writes, ordinary/anonymous refusals and unchanged
 public-content/sibling-path denials. Full native worker recovery is a separate
 qualification requirement.
+
+## Private PostgreSQL catalogue assertions
+
+The principal-source contract stores its complete catalogue assertion in
+`human_principal_source_assert_catalogue()`. Same-owner stored
+entries verify its source-derived SHA-256, stamp, exact routine metadata and
+owner-only execution ACL before each fresh invocation. The full original
+catalogue predicate remains in the helper; target, caller and epoch fences stay
+in their original entries. PostgreSQL can compile a statement trigger separately
+for each target relation, so moving fixed assertions out of the trigger avoids
+replicating those assertion sites in each trigger instance.
+
+Independent C# admissions, cross-contract source assertions and installer checks
+retain inline catalogue evaluation and exact-body verification. They receive no
+private helper execution grant. The helper is part of the authoritative routine
+inventory and ownership closure. Owner grant options are permitted; PUBLIC and
+other nonowner executors are rejected. No database observation is cached.
+Fresh development-native initialization installs this routine inventory; existing
+drift is rejected instead of silently repaired.

@@ -21,7 +21,7 @@ namespace Event.Persistence.IntegrationTests.Database;
 
 [NotInParallel]
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
-public sealed class PostgresHumanPrincipalSourceContractTests(PostgreSqlContainerFixture fixture)
+public sealed partial class PostgresHumanPrincipalSourceContractTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
     [Arguments(PrimaryDatabaseRole.Runtime, 1)]

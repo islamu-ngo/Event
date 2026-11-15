@@ -45,6 +45,15 @@ recognizes the existing tenant parent fence without granting additional access.
 A changed or broadened permission profile still stops the operation; restore
 the reviewed profile rather than adding broad manual grants.
 
+PostgreSQL principal-source operations share a private catalogue assertion
+to avoid repeating its fixed checks in every table's trigger instance. Each
+operation still verifies the assertion's expected code and permissions, then
+evaluates current database state. Application logins cannot invoke that private
+routine directly; independent admission and installation retain their full
+checks.
+Initialize a fresh development-native profile with the current installer; an
+absent or changed private assertion is rejected instead of silently repaired.
+
 Fresh PostgreSQL initialization installs the complete provisioning-policy
 projection permission contract before visitor settings storage. Both features
 use that single permission owner. Existing partial or altered permission

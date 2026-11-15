@@ -19,6 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="NetArchTest.Rules" />
     <PackageReference Include="TUnit" />
   </ItemGroup>

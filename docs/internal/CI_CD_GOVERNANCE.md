@@ -34,6 +34,18 @@ separate runtime evidence and are never inferred from Harness results.
 
 ## Security integration fixture execution
 
+The selected SDK servicing baseline is recorded in
+[Operations](OPERATIONS.md#sdk-and-runtime-servicing). This branch provisions
+Chromium through the file-based `eng/tools/InstallAssuranceBrowser.cs` entrypoint.
+Its dedicated `eng/tools/InstallAssuranceBrowser/packages.lock.json` owns the
+installer's package graph without colliding with the neighboring tools lock.
+The provisioner runs as a framework-dependent tool with `PublishAot=false`;
+its lock must not require a native compiler for one developer host architecture.
+Regenerate it with the selected SDK, then verify locked restore and the portable
+package graph. Tools that use native AOT still require a serviced compiler for
+[GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9).
+Playwright remains at its separately approved version; auditing stays enabled.
+
 The existing `security-execution.v1.json` packet is governed by the embedded
 `executionRequirements` in `eng/security/security-control-register.json`.
 Producer and validator derive each registered lane's project, closed host

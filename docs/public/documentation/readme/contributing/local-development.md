@@ -12,13 +12,31 @@ This guide helps developers set up a local development workstation to contribute
 
 To build and run the complete solution from source, install:
 
-- **.NET 10 SDK** (v10.0.403 or compatible)
+- **.NET 10 SDK** (v10.0.404 selected by `global.json`)
 - **Docker Engine / Docker Desktop** (v24+ with Compose v2)
 - **.NET Aspire CLI**:
   ```bash
   dotnet tool install -g Aspire.Cli
   ```
 - **Git**
+
+SDK and runtime servicing do not update independently versioned packages.
+For `CVE-2026-118747`, inspect `System.Formats.Cbor` references separately and
+update affected packages to a fixed version listed in the advisory (`10.0.15`
+or later for the 10.0 line), then regenerate and inspect their dependency locks.
+SDK roll-forward is disabled, so install the exact selected SDK. Use it when
+generating dependency locks: another SDK can select different
+implicit framework assets and make CI's locked restore fail. This repository pin
+does not update the SDK/runtime installed on your workstation.
+
+Aspire has a separate servicing lifecycle. AppHost and its Hosting/Testing
+packages select `13.6.5` for `GHSA-4g86-54fm-h9h8` and `GHSA-f7vh-h5g3-7jrh`.
+Restore the matching locks, rebuild and restart AppHost. Service a globally
+installed Aspire CLI separately; repository pins do not modify it.
+
+The package-owned orchestration path may emit `ASPIRE010`. Keep the warning
+visible rather than suppressing it or changing orchestration ownership solely
+to remove the message.
 
 ---
 

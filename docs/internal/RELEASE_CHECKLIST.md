@@ -28,7 +28,7 @@ before relying on its rerun.
 ## Release Model
 
 - [ ] Verify the selected SDK, shared runtime and digest-pinned container bases
-  against [the servicing baseline](OPERATIONS.md#complete-release-impact-metadata).
+  against [the servicing baseline](OPERATIONS.md#sdk-and-runtime-servicing).
   Retain regenerated dependency locks and actual restored/build evidence.
   A clean pruned package graph does not certify the runtime inside an old image.
 

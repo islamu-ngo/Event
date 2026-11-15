@@ -192,7 +192,7 @@ Check:
 - High-leverage tests are prioritized (concurrency races, state machines, row locking, zero-PII log sinks) over low-value getter/setter mocks.
 - Unit tests cover domain/application logic; integration tests cover persistence/API behavior.
 - Architecture tests enforce conventions; BFF tests cover cookie/token/header behavior.
-- Each phase uses one Release build and at most one fastest relevant non-browser project test, with no app-running or manual/browser verification lane.
+- Verification follows the planner's [gates](../../implementation-plan/resources/quality-gates.md#verification-gates): required invariant checks, targeted phase build/test on one provider, every PR's applicable acceptance checks, then final cross-capability programme acceptance. Retain required UI/runtime checks at the PR gate, the Tier 4 documentation exemption, sequential resource profiles and explicitly scoped user overrides.
 - Obsolete compatibility tests are deleted when breaking changes are accepted.
 
 ## 11. Sequencing, Delivery Safety, and the 4-Point "Right-Sizing" Rule

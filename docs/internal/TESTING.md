@@ -162,7 +162,23 @@ To eliminate the 50% test diagnosis and 15% container troubleshooting bottleneck
 |---|---|---|---|---|
 | **Ring 1: Inner Loop** | Subtask level (during active coding) | **< 2s** | In-memory TUnit slicing (`--treenode-filter`) in `Event.Domain.UnitTests` or `Event.Application.UnitTests`. **0 containers, 0 network, 0 DB lag**. | Instant Red/Green validation of business logic, state machines, and invariants. |
 | **Ring 2: Phase Exit Gate** | Phase boundary (before phase commit) | **< 15s** | Release build (`dotnet build -c Release -v q`) + at most **one** selected project test against **one designated provider** (e.g. SQLite in-memory or single PostgreSQL container). | Ensure project-level integrity without matrix delays. |
-| **Ring 3: Plan Exit Gate** | Workstream boundary (before PR) | Minutes | Full 5-database matrix (PostgreSQL, SQLite, SQL Server, MySQL), EF Core migrations, and `Event.Architecture.Tests`. | Catch multi-dialect edge cases and architecture drift once before PR submission. |
+| **Ring 3: PR Acceptance / Programme Exit** | Each PR before merge; final cross-capability gate when ready | Minutes | Affected provider matrix, EF migrations, architecture and other scope-required checks. | Verify every independently merged outcome and then the combined programme promises. |
+
+Each programme retains one canonical plan/tasks/context triad, grouped into PR
+scopes, phases and tasks. Each PR has its own acceptance boundary: run all checks
+required by its actual changed contracts before merge, including applicable
+provider/migration, security, public-contract and UI/runtime checks. Do not defer
+the first validation of already merged changes to a later PR or run unrelated
+architectural-layer suites. Final programme acceptance covers cross-capability
+behavior after its prerequisites exist.
+
+Record explicit programme-specific user verification overrides, including their
+scope, unrun checks and resulting limits; they are not general permission to omit
+another PR's checks. Preserve unchanged passing evidence and rerun only invalidated
+checks after code/integration changes. Tier 4 documentation and agent-context-only
+changes use metadata, relative links, scenario review and diff checks, with no .NET
+build/test, provider matrix, browser, app or containers. This does not waive product
+checks when executable behavior changes.
 
 ### Fast-Loop In-Memory Slicing vs Containerized Persistence Testing
 

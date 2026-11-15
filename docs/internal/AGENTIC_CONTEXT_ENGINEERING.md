@@ -4,9 +4,9 @@
 # Agentic Context Engineering & AI Workflow Architecture
 
 > **Audience:** Contributors | AI Agents | Platform Architects | Maintainers  
-> **Status:** Authoritative & Implemented
-> **Last Verified:** 2026-11-13 Europe/Brussels<br>
-> **Source Anchors:** [`AGENTS.md`](../../AGENTS.md), [`.agents/CONTEXT_ENGINEERING.md`](../../.agents/CONTEXT_ENGINEERING.md), [`.agents/contract/intents.yaml`](../../.agents/contract/intents.yaml), [`implementation-plan`](../../.agents/skills/implementation-plan/SKILL.md), [`senior-cto-feedback`](../../.agents/skills/senior-cto-feedback/SKILL.md), [`implement-tasks`](../../.agents/skills/implement-tasks/SKILL.md), [`conventional-commit`](../../.agents/skills/conventional-commit/SKILL.md), [`plan-tracking`](../../.agents/skills/plane-compose/resources/plan-tracking.md), [`i-vsd`](../../.agents/skills/i-vsd/SKILL.md), [`docs/QUICK_REFERENCE.md`](QUICK_REFERENCE.md)
+> **Status:** Authored policy. The multi-PR programme lifecycle (Sections 2 and 5) is documented here and in its owning skill resources; it hasn't yet been exercised end to end as an operational pilot, so treat runtime behavior as unproven until a pilot records evidence.
+> **Last Updated:** 2026-11-14 Europe/Brussels<br>
+> **Source Anchors:** [`AGENTS.md`](../../AGENTS.md), [`pr-scope-contract`](../../.agents/skills/implementation-plan/resources/pr-scope-contract.md), [`pr-execution-lifecycle`](../../.agents/skills/implement-tasks/resources/pr-execution-lifecycle.md), [`.agents/CONTEXT_ENGINEERING.md`](../../.agents/CONTEXT_ENGINEERING.md), [`.agents/contract/intents.yaml`](../../.agents/contract/intents.yaml), [`implementation-plan`](../../.agents/skills/implementation-plan/SKILL.md), [`senior-cto-feedback`](../../.agents/skills/senior-cto-feedback/SKILL.md), [`implement-tasks`](../../.agents/skills/implement-tasks/SKILL.md), [`conventional-commit`](../../.agents/skills/conventional-commit/SKILL.md), [`plan-tracking`](../../.agents/skills/plane-compose/resources/plan-tracking.md), [`i-vsd`](../../.agents/skills/i-vsd/SKILL.md), [`docs/QUICK_REFERENCE.md`](QUICK_REFERENCE.md)
 
 ---
 
@@ -22,7 +22,7 @@ This system enforces six core design tenets:
 2. **Zero-Turn Structural Injection**: When graph tooling is available, pre-flight blast-radius slices reduce manual traversal by injecting callers, callees, impacted flows, and tests on Turn 1.
 3. **Behavior-Bound Test-First Invariants**: Requirements are written as observable system behavior (RFC 2119 + `WHEN`/`THEN` Scenarios) and mapped directly to failing Red tests at pre-agreed public seams *before* production code is touched.
 4. **Portable Root Contract With A Scoped Twin Pair**: `AGENTS.md` is the portable authority. Reciprocal path-rule twins currently cover only `.agents/rules` and `.omo/rules`; Claude, Cursor, Copilot, Gemini, and other harness adapters remain separate drift-prone integration surfaces.
-5. **Phase-Atomic Declarative Git Delivery**: Planning pre-authors a self-sufficient phase packet containing exact commit metadata, wholly owned paths, inspection/staging/path-limited commit commands, and post-commit verification. Parallel contributors use dedicated task branches (`feat/<task-name>`) or isolated worktrees (`.worktrees/<task-name>`), while every verified phase closes atomically with literal commit paths without recording commit hashes in markdown (the Git commit log is the single source of truth).
+5. **Phase-Atomic Declarative Git Delivery**: Planning pre-authors a self-sufficient phase packet containing exact commit metadata, wholly owned paths, inspection/staging/path-limited commit commands, and post-commit verification. A programme is split into independently mergeable PR scopes; each selected scope runs on its own branch (`feat/EVENT-<item>-<programme>-<scope>`) in an isolated worktree (`.worktrees/<programme>--<scope>`) or, on explicit user mandate, in the current checkout. Every verified phase closes atomically with literal commit paths without recording commit hashes in markdown (the Git commit log is the single source of truth).
 6. **Self-Contained Human Interaction & Zero Plan-Opening UX**: Prompts, feedback requests, milestone reports, and approval inquiries must be completely self-contained. The active implementation plan (`dev/active/<task>/`) is internal machine working memory, not the developer console. Agents must never force developers to open plan files to understand bare IDs (e.g. *"P04/P06 with P03 gates open"*); all decisions must be presented as inline, actionable Decision Briefs.
 
 ```mermaid
@@ -100,18 +100,22 @@ flowchart TD
     end
 
     subgraph Stage4["Stage 4: Implementation Execution & Autonomous Domain Guardrails"]
-        CTOSkill --> ExecTrigger["User Combines /goal + implement-tasks:\n• Research: Tavily MCP & Context7 MCP\n• Structure: Code-Review-Graph MCP\n• Execution-start push mints EVENT-XXX (+ M-plan Sub-items, Version Module)\n• Branch feat/EVENT-XXX-<task> + Worktree symlink: ln -s ../../event event\n• Plane state per pull request, never per phase\n• Conventions: Clean Architecture & Enterprise Patterns\n• Pre-Release Freedom: Zero backward compatibility baggage"]
-        ExecTrigger --> AutoExecution["Autonomous Domain Execution Loop\n• Topology Discovery (Worktree vs In-Tree)\n• clean-architecture-rules\n• cqrs-guidelines\n• dotnet-efcore-guidelines\n• auth-patterns & outbox-pattern\n• debug-issue & refactor-safely\n• Fast TUnit Slicing (--treenode-filter)"]
+        CTOSkill --> ExecTrigger["User Combines /goal + implement-tasks:\n• Research: Tavily MCP & Context7 MCP\n• Structure: Code-Review-Graph MCP\n• Execution-start push mints EVENT-XXX (+ M-plan Sub-items, Version Module)\n• Select active or Ready PR scope (merged, reconciled predecessors)\n• Branch feat/EVENT-<item>-<programme>-<scope> + event/ symlink\n• Plane state per pull request, never per phase\n• Conventions: Clean Architecture & Enterprise Patterns\n• Pre-Release Freedom: Zero backward compatibility baggage"]
+        ExecTrigger --> AutoExecution["Autonomous Domain Execution Loop\n• Scoped extraction, or canonical section in-tree on explicit mandate\n• clean-architecture-rules\n• cqrs-guidelines\n• dotnet-efcore-guidelines\n• auth-patterns & outbox-pattern\n• debug-issue & refactor-safely\n• Fast TUnit Slicing (--treenode-filter)"]
         AutoExecution --> PhaseVerification["Phase Verification\n• One Release build\n• At most one selected project test\n• Three-Tier Failure Triage (Class A/B/C)"]
         PhaseVerification --> PhaseCommit["Immediate Phase Commit\n• Execute pre-authored declarative tasks.md contract\n• Refs: EVENT-XXX of the PR's item\n• No conventional-commit skill reload\n• Commit owned paths directly (no hash logging)"]
-        PhaseCommit --> MorePhases{"More approved phases?"}
+        PhaseCommit --> MorePhases{"More phases in this PR scope?"}
         MorePhases -->|"Yes"| AutoExecution
     end
 
-    subgraph Stage5["Stage 5: Workstream Completion & Knowledge Graduation"]
-        MorePhases -->|"No"| FinalReview["Final Workstream Review & Teaching Summary\n• Comprehensive technical explanation\n• No unrelated shared-tree files committed\n• Dual-documentation parity (public vs internal)"]
-        FinalReview --> KnowledgeGraduation["Knowledge Graduation & Ring 3 Gate\n• dev/backlog/, ADRs, dev/_journal/\n• Plane preflight (validate --offline, push --work-only --dry-run)\n• PR item to Review Needed (PR [EVENT-XXX] links Development panel)\n• Full 5-DB Matrix & Architecture Tests\n• Pre-PR Rebase (origin/develop)"]
-        KnowledgeGraduation --> PRSubmission["PR Creation & Worktree Parking\n• Pre-flight ## Release Impact checklist + ## Issues [EVENT-XXX]\n• Park .worktrees/<task> for bot/CI review\n• Halt & Partitioned Status Brief\n• Post-merge: item Done, fold active-<task>.yaml into workitems.yaml, teardown worktree"]
+    subgraph Stage5["Stage 5: PR Scope Exit, Reconciliation & Finalization"]
+        MorePhases -->|"No"| FinalReview["PR Scope Review & Teaching Summary\n• Pre-review reconciliation against original intent\n• Comprehensive technical explanation\n• No unrelated shared-tree files committed\n• Dual-documentation parity (public vs internal)"]
+        FinalReview --> KnowledgeGraduation["Knowledge Graduation & Ring 3 Gate\n• dev/backlog/, ADRs, dev/_journal/\n• Plane preflight (validate --offline, push --work-only --dry-run)\n• PR item to Review Needed (PR [EVENT-XXX] links Development panel)\n• Mandatory acceptance gate: checks affected by this PR\n• Update branch against target (no force-push)"]
+        KnowledgeGraduation --> PRSubmission["PR Creation & Worktree Parking\n• Pre-flight ## Release Impact checklist + ## Issues [EVENT-XXX]\n• Park .worktrees/<programme>--<scope> for review\n• Halt & Partitioned Status Brief"]
+        PRSubmission --> MergeRecon["On merge direction: post-merge reconciliation\n• Final reviewed evidence, squash/rebase aware\n• Retain unmet obligations, refresh future contracts\n• Cleanup only with current user authorization"]
+        MergeRecon --> MoreScopes{"Retained programme scopes?"}
+        MoreScopes -->|"Yes: next readiness evaluation"| ExecTrigger
+        MoreScopes -->|"No"| Retire["Final programme acceptance\n• Fold active YAML into workitems.yaml\n• Graduate knowledge, retire canonical triad"]
     end
 ```
 
@@ -141,7 +145,7 @@ flowchart TD
 
     subgraph S3["Session 3: The Implementer"]
         M3["Model Tier: High Reasoning\nSkill: implement-tasks\nEnvironment: Fresh Clean Session + Worktree Isolation"]
-        A3["• Verifies Section 0 review approval\n• Topology discovery (Worktree vs In-Tree)\n• Executes plan mv & copies AGENTS.local.md (never moved)\n• Red -> Green -> Refactor test-first loops\n• Closes phases with planned Conventional Commits\n• Knowledge graduation & Pre-flight PR with Release Impact\n• Parks worktree intact for bot/CI review (deferred teardown)"]
+        A3["• Verifies Section 0 review approval\n• Selects one PR scope; resumes or recovers an existing owner first\n• Extracts a scoped copy (canonical triad stays in root); copies AGENTS.local.md (never moved)\n• Red -> Green -> Refactor test-first loops\n• Closes phases with planned Conventional Commits\n• Knowledge graduation & Pre-flight PR with Release Impact\n• Parks worktree intact for bot/CI review (cleanup needs separate authorization)"]
     end
 
     S1 -->|Pristine Triad| S2
@@ -156,7 +160,7 @@ flowchart TD
    - **Planning (Session 1)**: Use the highest available reasoning model (`xhigh` / high reasoning effort) to maximize cross-module foresight, architectural synthesis, and contract precision.
    - **Review (Session 2)**: Use equal or higher reasoning effort (`xhigh` for Tiers 0–1 Sovereign/Security; `high` for Tiers 2–4). A reviewer must match or exceed the author's reasoning power to spot subtle concurrency races, transaction boundary leaks, and tenant isolation gaps.
    - **Implementation (Session 3)**: Use high reasoning models (`high`) optimized for fast, accurate code generation, precision typing, and test-first execution loops.
-4. **Hermetic Worktree Environment & Local Overrides Mirroring (`AGENTS.local.md`)**: When the implementing agent initializes an isolated worktree (`.worktrees/<task-name>`), it moves the plan triad (`plan mv`) to guarantee a single source of truth, and inspects for uncommitted local developer overrides (`AGENTS.local.md`). If present, `AGENTS.local.md` is **copied (never moved)** into the worktree root. This ensures gitignored machine settings (such as dedicated scratch mounts, environment flags, and local paths) remain active during execution without polluting git or stripping the root repository of its developer configuration. Furthermore, the worktree remains **parked and intact** upon PR creation so any subsequent bot review comments or CI check failures can be resolved in-place with zero setup friction, deferring teardown until explicit user confirmation after merge.
+4. **Hermetic Worktree Environment & Local Overrides Mirroring (`AGENTS.local.md`)**: When the implementing agent initializes an isolated worktree (`.worktrees/<task-name>`), it leaves the canonical programme triad in the main checkout, writes a scoped execution copy holding only the selected PR's tasks and the shared contracts that govern them, marks the canonical section a delegated snapshot, and inspects for uncommitted local developer overrides (`AGENTS.local.md`). If present, `AGENTS.local.md` is **copied (never moved)** into the worktree root. This ensures gitignored machine settings (such as dedicated scratch mounts, environment flags, and local paths) remain active during execution without polluting git or stripping the root repository of its developer configuration. Furthermore, the worktree remains **parked and intact** upon PR creation so any subsequent bot review comments or CI check failures can be resolved in-place with zero setup friction, Cleanup is a separate operation that needs the user's current authorization after post-merge reconciliation.
 
 ---
 
@@ -178,9 +182,9 @@ flowchart TD
     StandardIntake --> BlastRadius
     AutonomousIntake --> DevDocsInit
     
-    BlastRadius --> DevDocsInit["4. DEV-DOC INITIALIZATION\nCreate dev/active/<task>/\n• plan.md: RFC 2119 + WHEN/THEN Scenarios\n• tasks.md: TDD Tasks + Declarative Commit Contracts\n• context.md: Ephemeral session pause memory"]
+    BlastRadius --> DevDocsInit["4. DEV-DOC INITIALIZATION\nCreate dev/active/<programme>/\n• plan.md: RFC 2119 + WHEN/THEN Scenarios + PR scopes\n• tasks.md: PR registry, TDD Tasks + Commit Contracts\n• context.md: Ephemeral session pause memory"]
     
-    DevDocsInit --> TDDExecution["5. BEHAVIOR-BOUND TDD EXECUTION\n(Driven by implement-tasks + /goal)\n• Topology Discovery (Worktree vs In-Tree)\n• Task N.1 (Red): Failing Invariant Tests + Compilable Stubs\n• Task N.2 (Green): Minimal Production Logic\n• Task N.3 (Refactor): Clean Architecture & DI Slicing"]
+    DevDocsInit --> TDDExecution["5. BEHAVIOR-BOUND TDD EXECUTION\n(Driven by implement-tasks + /goal)\n• PR scope selection & topology\n• Task N.1 (Red): Failing Invariant Tests + Compilable Stubs\n• Task N.2 (Green): Minimal Production Logic\n• Task N.3 (Refactor): Clean Architecture & DI Slicing"]
     
     TDDExecution --> LayerVerification["6. 3-RING PROGRESSIVE VERIFICATION\n• Ring 1 (Inner Loop, <2s): dotnet run -- --treenode-filter\n• Ring 2 (Phase Exit, <15s): 1 Release Build + 1 Project Test\n• Tier 0–2: Capture QA Evidence to .omo/evidence/"]
     
@@ -189,11 +193,11 @@ flowchart TD
     FailureOwnership -->|"No failure"| PhaseCommit["8. PHASE COMMIT\n• Stage owned paths\n• Commit via declarative tasks.md contract\n• No skill reload, no hash logging"]
     FailureOwnership -->|"Class B: Caller ripple (<15m align / Decision Brief)"| PhaseCommit
     FailureOwnership -->|"Class C: Pre-existing baseline rot (quarantine in context.md)"| PhaseCommit
-    PhaseCommit --> MorePhases{"More phases?"}
+    PhaseCommit --> MorePhases{"More phases in the selected PR?"}
     MorePhases -->|"Yes"| TDDExecution
-    MorePhases -->|"No"| ReviewTeaching["9. GRADUATION, PR & TEACHING SUMMARY\n• Graduate task to dev/backlog/, ADRs, dev/_journal/\n• Ring 3 Gate: 5-DB Matrix & Pre-PR Rebase\n• Pre-flight ## Release Impact PR\n• Park worktree intact for bot/CI review\n• Comprehensive Teaching Summary"]
+    MorePhases -->|"No"| ReviewTeaching["9. PR SCOPE EXIT & TEACHING SUMMARY\n• Graduate durable decisions/lessons (ADRs, dev/_journal/)\n• PR acceptance gate: checks affected by this PR\n• Pre-review reconciliation\n• Pre-flight ## Release Impact PR\n• Park scope worktree for review\n• Comprehensive Teaching Summary"]
     
-    ReviewTeaching --> Done(["Work Complete, PR Submitted & Parked"])
+    ReviewTeaching --> Done(["PR Scope Submitted & Parked"])
 ```
 
 ### Criticality Tier Matrix
@@ -263,7 +267,7 @@ Harness injection order does not change repository authority. Root [`AGENTS.md`]
 Substantial or multi-session development tasks are governed by the **Dev-Doc Triad** in `dev/active/<task>/`. This structure enforces strict separation of concerns between architecture, execution, and ephemeral session memory.
 
 > [!NOTE]
-> **Local Working Memory & Gitignore Isolation**: Active workstreams in `dev/active/*` are gitignored to eliminate commit churn, task-checkbox noise, and branch merge conflicts. Agents and developers access, create, and update these files directly using native harness file tools by deterministic path. Only durable architectural decisions graduate to `docs/internal/adr/`, durable findings to `dev/_journal/`, and completed workstreams to `dev/backlog/`.
+> **Local Working Memory & Gitignore Isolation**: Active workstreams in `dev/active/*` are gitignored to eliminate commit churn, task-checkbox noise, and branch merge conflicts. Agents and developers access, create, and update these files directly using native harness file tools by deterministic path. Only durable architectural decisions graduate to `docs/internal/adr/`, durable findings to `dev/_journal/`, and only explicitly optional follow-ups to `dev/backlog/`. Required work stays in the programme until it's delivered or the user removes it.
 
 ```mermaid
 stateDiagram-v2
@@ -298,17 +302,31 @@ stateDiagram-v2
     InImplementation --> PhaseVerified: Phase Tasks [x] & Verification Resolved
     PhaseVerified --> PhaseCommitted: Staged Owned Paths & Committed
     PhaseCommitted --> InImplementation: Next Approved Phase
-    PhaseCommitted --> Graduated: All Phases Verified
-    Graduated --> [*]: Moved to dev/backlog/ & Ready for PR
+    PhaseCommitted --> ScopeInReview: PR Scope Phases Done, Reconciled, PR Opened
+    ScopeInReview --> ScopeMerged: Merge Verified & Post-Merge Reconciled
+    ScopeMerged --> InImplementation: Next Readiness-Evaluated PR Scope
+    ScopeMerged --> Retired: All Obligations Resolved & Final Acceptance
+    Retired --> [*]: Durable Knowledge Graduated
 ```
+
+### Programme, PR Scope, Phase And Task Hierarchy
+
+The canonical unit is the **root programme** in `dev/active/<programme>/`. It contains **independently mergeable PR scopes** with stable IDs such as `PR-FOUNDATION`; each scope contains **phases**; each phase contains **tasks** and its verified commit packets. A phase, session or commit is never a PR. The [PR scope contract](../../.agents/skills/implementation-plan/resources/pr-scope-contract.md) owns the registry fields and readiness rules, and the [PR execution lifecycle](../../.agents/skills/implement-tasks/resources/pr-execution-lifecycle.md) owns execution, reconciliation, cleanup and recovery. This section only summarizes them.
+
+- **One live ledger per delegated scope.** The scoped execution copy is the live detailed ledger. The canonical selected checklist becomes a marked **delegated snapshot** naming its owner and location. On an explicit in-tree user mandate, the canonical section stays live and no copy is made.
+- **Selection.** Resume an existing Implementing or In review scope, or its pending finalization, first. Otherwise evaluate the earliest Planned candidate whose required predecessors are merged and reconciled, and mark it Ready only when its readiness conditions hold. A missing worktree triggers recovery, never recreation. Old checked tasks never choose topology or prove delivery.
+- **Extraction.** The scoped copy carries the selected tasks plus original intent, shared invariants, architecture decisions, I-VSD mitigations, merged predecessor contracts, downstream interfaces, verification, release/docs needs and explicit user overrides.
+- **Two reconciliation checkpoints.** Before review and after merge, compare original intent with actual delivery. Post-merge reconciliation uses final reviewed evidence and native merge metadata, so squash and rebase merges count without original-tip ancestry. Patch only the selected canonical section and justified shared decisions, preserve independent future-section edits, and keep unmet required acceptance as a retained obligation.
+- **Retention.** Intermediate merges keep the canonical triad and the shared `active-*.yaml`. Retirement happens only after every retained obligation is resolved or explicitly removed by the user, final reconciliation is current, and durable knowledge has graduated.
+- **Larger programmes** keep the same single triad; more than 6 new Plane items still needs explicit approval.
 
 ### Triad Single Responsibility Matrix
 
 | Artifact | Authoritative Responsibility | Strictly Forbidden Content | Update Frequency |
 |---|---|---|---|
 | `*-plan.md` | High-level architecture, design decisions, RFC 2119 contracts, `WHEN`/`THEN` scenarios, phase exit criteria, rollback handling. | Granular task checklists, `- [ ]` checkboxes, dynamic statuses (`IN PROGRESS`), ephemeral session progress. | Only when architectural direction or scope shifts. |
-| `*-tasks.md` | Hot execution ledger, granular Red/Green/Refactor tasks, exact phase-owned paths, verification commands, declarative planned commit contracts, and task statuses (`[ ]`, `[x]`). | Long architectural narratives, trade-off debates, session handoff logs, commit hash recording. | During planning, after each subtask, and after each phase commit. |
-| `*-context.md` | Ephemeral working memory for session pauses/handoffs, quick resume state, active blockers, loaded evidence ledger, validation baseline results. | Duplicate task checklists, full source code copies, redundant documentation paste, commit hash recording. | At start of session, on blockers, and before handoff/pause. |
+| `*-tasks.md` | PR scope registry (delivery, reconciliation, cleanup, delegation, PR identity, retained obligations), hot execution ledger for undelegated scopes or delegated snapshots, granular Red/Green/Refactor tasks, exact phase-owned paths, verification commands, declarative planned commit contracts, and task statuses (`[ ]`, `[x]`). | Long architectural narratives, trade-off debates, session handoff logs, commit hash recording. | During planning, after each subtask, and after each phase commit. |
+| `*-context.md` | Programme resume pointer and ephemeral working memory for session pauses/handoffs, quick resume state, active blockers, loaded evidence ledger, validation baseline results. | Duplicate task checklists, full source code copies, redundant documentation paste, commit hash recording. | At start of session, on blockers, and before handoff/pause. |
 ### The Triad As The Sole Inter-Session Serialization Protocol
 
 Because implementation workflows span distinct sessions (Planner $\rightarrow$ Adversarial Review $\rightarrow$ Implementer), **the Dev-Doc Triad (`plan.md`, `context.md`, `tasks.md`) serves as the stateless serialization wire between agents**.
@@ -381,7 +399,7 @@ Because `plane-compose v0.5.2` parses all `event/work/*.yaml` files on `push`/`v
 2. **Ephemeral Active Task Files (`event/work/active-<task-slug>.yaml`)**:
    - For new in-flight workstreams, agents author a temporary, focused (< 15 KB) task file from `event/templates/active-workitem.yaml` (templates live outside `work/*.yaml` so Plane never ingests placeholder templates as live tickets). It holds only the items the plan's **Plane Tracking Plan** creates, each with `parent:` set to its capability Epic UUID.
    - **Canonical ID Minting (`id_writer.py`)**: Omit `id:` initially on brand-new active items and push once via `plane push --work-only` at execution start, before cutting the Git branch (`v0.5.2` only writes canonical `EVENT-XXX` back into YAML when `id:` was omitted; custom user slugs skip writeback).
-   - **Retirement by Folding**: When the plan's last pull request merges and its items are `Done`, move the file's blocks (with their `id:`) into `work/workitems.yaml` and delete the active file. The next dry run shows no change, because `.plane/state.json` tracks items by ID, not by file. No `plane pull` is needed: on `EVENT` a full pull takes about `items ÷ 50` minutes and needs repairs before the next push, so it is a maintainer-scheduled resync only.
+   - **Retirement by Folding**: Intermediate PR merges keep the active file. Only after the programme's final scope merges, every retained obligation is reconciled and its items are `Done`, move the file's blocks (with their `id:`) into `work/workitems.yaml` and delete the active file. The next dry run shows no change, because `.plane/state.json` tracks items by ID, not by file. No `plane pull` is needed: on `EVENT` a full pull takes about `items ÷ 50` minutes and needs repairs before the next push, so it is a maintainer-scheduled resync only.
 
 ### Plan-Driven Plane Tracking (Right-Sized, One Item per Merged Pull Request)
 
@@ -392,7 +410,7 @@ Plane is useful only when its board matches how work actually merges. Flooding i
 | Trivial (typo, link fix, one-line config) | 1 | `0` (the commit uses `Changelog: skip`; no item) |
 | **S** — one capability | 1 | `1` Work Item under the capability Epic |
 | **M** — one capability, several PRs | 2–5 | `1` parent Work Item (no branch of its own) + `1` Sub-item per PR |
-| **L** — a program of capabilities | many | one S or M Work Item per capability under an **existing** Epic |
+| **L** — a program of capabilities | many | one S or M Work Item per capability under an **existing** Epic; still one canonical programme triad |
 
 - **Budget**: more than `6` new items, or a new Epic, needs the user's approval in the plan's Decision Brief.
 - **Floor**: every merged pull request links to an item; substantial work is never untracked.
@@ -407,8 +425,8 @@ Each skill owns one stage of the lifecycle:
 | Planning | `implementation-plan` | Writes the §0 **Plane Tracking Plan** table and `active-<task>.yaml` locally (`state: Backlog`, `id:` omitted, `parent:` = Epic UUID, no assignees). M-plan Sub-items are listed in the plan only. Nothing is pushed. |
 | Review | `senior-cto-feedback` | Audits the Tracking Plan for flooding and under-tracking, rewrites it in place, and sets `state: Ready` locally on approval. |
 | Execution start | `implement-tasks` | Validates, dry-runs and pushes to mint `EVENT-XXX`; creates M-plan Sub-items as `Todo` under the parent UUID; moves the S item or the parent to `In Progress` with the driving developer as assignee; adds Version Module membership through MCP. |
-| Each pull request | `implement-tasks` | M: Sub-item `In Progress` at PR start. PR opened: `Review Needed`. Changes requested: `Changes Requested`. Merged: `Done` (the parent after its last Sub-item). Blocked: `Waiting Dependency` + `blocked_by` + one MCP comment. |
-| Close | `implement-tasks` | Folds `active-<task>.yaml` into `workitems.yaml` and deletes it. |
+| Each pull request | `implement-tasks` | M: Sub-item `In Progress` at PR start. PR opened after review reconciliation: `Review Needed`. Changes requested: `Changes Requested`. Verified merge plus reconciled acceptance: `Done`; the parent completes after every Sub-item and retained obligation. Blocked: `Waiting Dependency` + `blocked_by` + one MCP comment. |
+| Close | `implement-tasks` | After the final scope's reconciled acceptance only, folds `active-<task>.yaml` into `workitems.yaml` and deletes it. Intermediate merges never retire it. |
 
 The plan's `tasks.md` carries a **Plane Tracking** checklist with exactly these moments, so state changes happen at pull-request boundaries and never per phase.
 
@@ -507,37 +525,42 @@ When presenting a newly authored or re-baselined implementation plan (Stage 2 ex
 
 When the developer executes or resumes an approved task plan using `/goal` combined with `implement-tasks`, the agent orchestrates execution through a strict, multi-stage protocol:
 
-#### 1. Topology Discovery & Execution Context (Worktree vs In-Tree)
+#### 1. PR Scope Selection & Execution Topology
 
-Before executing or resuming, the agent discovers the active execution topology for `<task>`:
+The agent reads canonical `dev/active/<programme>/*-context.md` first, resolves the active scope in `*-tasks.md`, and verifies actual user approval. Selection and readiness follow the [PR scope contract](../../.agents/skills/implementation-plan/resources/pr-scope-contract.md#selection-and-readiness); the commands and setup follow the [PR execution lifecycle](../../.agents/skills/implement-tasks/resources/pr-execution-lifecycle.md#selection-and-topology). Existing ownership always wins over default setup:
 
-| Topology Scenario | Conditions & Detection | Working Context (`Cwd`) | Task Triad Path | Action Protocol |
-|---|---|---|---|---|
-| **Case A: Isolated Worktree In-Flight** | `.worktrees/<task>` exists (`git worktree list`) | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Resume in-place**: Skip setup steps and resume directly inside existing worktree on `feat/<EVENT-XXX-<task>|<task>>`. If `AGENTS.local.md` exists in root and is missing in worktree, copy it: `cp AGENTS.local.md .worktrees/<task>/`. Discover Plane link: if `event/` is absent, symlink `ln -s ../../event event`. |
-| **Case B: In-Tree / Develop In-Flight** | `dev/active/<task>` exists in repo root with work already in progress (`[x]` tasks, commits, or explicit develop mandate) | Repository root (`.`) | `dev/active/<task>/` | **Respect in-tree execution**: Resume directly in the root workspace on the active branch. Do NOT create a worktree or move files. `event/` exists locally in root. |
-| **Case C: Fresh Worktree Setup (Default New)** | Brand-new plan; `dev/active/<task>` at root; `.worktrees/<task>` does not exist | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Authoritative worktree isolation**: Run the execution-start Plane steps first (validate, dry-run, push `event/work/active-<task>.yaml` with `id:` omitted) so the canonical `EVENT-XXX` of the first pull request's item is known. Add branch and worktree (`feat/EVENT-XXX-<task>`; `feat/<task>` only for a trivial untracked change), move the plan directory, copy developer overrides, and symlink Plane project:<br>`git fetch origin develop && git worktree add -b feat/<EVENT-XXX-task> .worktrees/<task> origin/develop`<br>`mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/`<br>`[ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/`<br>`ln -s ../../event .worktrees/<task>/event` |
-| **Case D: Grand Multi-Cohort Execution (Hub-and-Spoke)** | Whole-codebase migrations spanning dozens of cohorts (e.g. 100+ entities) | `.worktrees/<task>` (Lead Hub)<br>`.worktrees/<task>--<cohort>` (Spokes) | `.worktrees/<task>/dev/active/<task>/` | **Hub-and-Spoke with Hyphenated Namespacing & Bounded Pooling**: Lead hub worktree acts as orchestrator and commit aggregator on `feat/<task>`. Spoke cohorts execute in temporary worktrees namespaced as `.worktrees/<task>--<cohort>` on `feat/<task>--<cohort>` with strict `*-ownership.md` disjoint paths.<br>**Prune-As-You-Go Rule**: Active worktrees are bounded to $\le 3–5$. Once a spoke cohort is verified and integrated into the hub branch, the agent **immediately prunes** the spoke worktree (`git worktree remove` and `git branch -d`). Spokes get no Plane items of their own: cohorts that integrate into the hub branch ride on the hub pull request's item. Only a cohort that merges as its own pull request becomes a Sub-item (then link `event/` into that spoke). |
+| Situation | Working Context (`Cwd`) | Live Ledger | Action Protocol |
+|---|---|---|---|
+| **Recorded execution worktree exists** | `.worktrees/<programme>--<scope>` | Scoped copy in that worktree | **Resume in place** on its recorded branch. Don't recreate it or move the canonical triad. Copy root `AGENTS.local.md` only if missing; link `event/` if absent. |
+| **Recorded owner but missing worktree, branch or source revision** | None until recovered | Unresolved | **Recover, don't duplicate**: inventory recoverable work and reconcile ownership before any setup. |
+| **User explicitly selects the current checkout** | Repository root (`.`) on its current branch | Canonical selected section | **In-tree mandate**: execute the canonical section directly. No second live copy. Old `[x]` tasks alone never imply this topology. |
+| **Ready scope, no previous delegation** | `.worktrees/<programme>--<scope>` | New scoped copy | **Fresh isolation**: run the scope's execution-start Plane steps, verify prerequisite merge evidence, add the worktree from the updated merged target on `feat/EVENT-<item>-<programme>-<scope>`, write the scoped copy, mark the canonical section a delegated snapshot, copy overrides and link `event/`. |
+| **Legacy plan without a scope registry** | Unchanged until normalized | To be determined | Inventory actual delivery, dirty work, remaining requirements, PRs and location; normalize one selected scope before execution. No bulk migration. |
+| **Hub-and-spoke inside the selected PR** | Lead plus `.worktrees/<programme>--<scope>--<cohort>` | Lead's ledger | Bounded to the selected PR: disjoint literal ownership packets, at most 3 to 5 active worktrees, projects verified one at a time. Only selected-scope changes integrate into the lead; future PRs start from the merged target. Spokes that ride the lead PR get no Plane items. Removing an integrated spoke needs current authorization and preservation checks; resource pressure doesn't authorize deletion. |
 
 > [!IMPORTANT]
-> **Single Source of Truth via `plan mv`**: Moving the triad from `dev/active/<task>` into `.worktrees/<task>/dev/active/<task>` guarantees a single source of truth, eliminates split-brain task lists, and ensures automatic garbage collection upon worktree removal.
+> **Canonical Programme Stays Put**: The complete triad remains under `dev/active/<programme>/` in the main checkout and is never moved into a worktree or replaced wholesale by an execution copy. One selected PR has exactly one live detailed ledger.
+>
+> **Local Secrets**: In an isolated directory, root `.env` may be copied only if missing, with `install -m 600`, without printing it, and only where local overrides permit. Missing secrets come from the selected approved authority. `.env`, keys and tokens are never logged or staged.
 >
 > **Local Overrides Mirroring (`AGENTS.local.md`)**: `AGENTS.local.md` is **copied, never moved**. Because it contains machine-specific paths and flags, copying preserves developer overrides inside the isolated worktree while keeping the repository root intact for concurrent sessions.
 >
-> **Concurrent Multi-Agent Task Isolation & Boundary Blindness**: When multiple independent agents work on different tasks concurrently (e.g. Agent 1 on `mapping-and-cqs-migration`, Agent 2 on `ticket-transfers`), each agent is **strictly confined to its own task namespace** (`.worktrees/<task-name>*`). When listing or checking worktrees, agents must filter by their task name (`git worktree list | grep "/<task-name>"`). Agents are **strictly forbidden** from inspecting, reading, modifying, or pruning any worktree belonging to another task.
+> **Concurrent Multi-Agent Task Isolation & Boundary Blindness**: When multiple independent agents work on different tasks concurrently (e.g. Agent 1 on `mapping-and-cqs-migration`, Agent 2 on `ticket-transfers`), each agent is **strictly confined to its own programme namespace** (`.worktrees/<programme>*`). When listing or checking worktrees, agents must filter by that exact namespace (`git worktree list | grep "/<programme>--"`). Agents are **strictly forbidden** from inspecting, reading, modifying, or pruning any worktree belonging to another task.
 
 #### 2. Resume Protocol & Working Memory Discipline
 
 When cold-starting or resuming an in-flight workstream:
-1. **Holistic Orientation (Read Once per Session)**: On session start, read `*-context.md` (`## Quick Resume`, active milestones, blockers), `*-tasks.md` (identify active phase and unchecked `[ ]` tasks), and `*-plan.md` to establish the holistic mental model (system architecture, cross-cutting invariants, and downstream phase contracts). Agents must **never** implement blind to future phase dependencies.
-2. **Execution Economy (Inner Loop Zooming)**: Once oriented, the agent does **NOT** reread the entire plan on every turn. It zooms directly into the active phase heading in `*-plan.md` and manages granular progress through `*-tasks.md`.
-3. **Re-Orientation Triggers**: The agent re-reads the full plan or downstream phases immediately if an unexpected blocker arises, domain model friction occurs, cross-phase contracts conflict, or the developer redirects requirements.
-4. **Inner Loop Baseline Sanity**: Run a fast Ring 1 sliced test in the target execution context (`Cwd`) before modifying code to verify the baseline is green.
+1. **Scoped Orientation**: On session start, read `*-context.md` (resume pointer, blockers), resolve the selected scope in `*-tasks.md`, then load only that scope's named design headings, shared invariants and downstream contracts. In the execution location, inspect `git log -n 5 --oneline`, dirty files and the index. Agents never implement blind to the dependency contracts the selected scope affects.
+2. **Execution Economy**: Don't reread the whole programme every session. Load the active phase plus the design and contracts it references.
+3. **Re-Orientation Triggers**: Expand retrieval when a concrete contradiction, changed dependency, blocker or developer redirect needs it.
+4. **Baseline Sanity**: Establish upstream freshness and the required baseline once before a product edit. Never pull into a dirty shared checkout or switch it for a comparison. Documentation-only scopes use document checks instead of a sliced test.
 
 #### 3. Anti-Sprawl Task Ledger & Rolling Context Compaction Guardrails
 
-- Active plan files live inside the resolved task folder (`.worktrees/<task>/dev/active/<task>/` or `dev/active/<task>/`).
-- **Permitted Mutations**: Executing agents check off completed tasks (`[x]`) and append atomic verification sub-bullets under an active task.
-- **Strictly Forbidden Sprawl**: Agents are strictly FORBIDDEN from creating new phase headings or inflating `tasks.md` with runtime finding tasks (which causes runaway 50+ item sprawls). New findings, bugs, or ideas belong in `context.md` notes or `dev/backlog/` graduation—never dynamically injected as feature scope without explicit developer alignment via a Decision Brief.
+- The live ledger is the scoped copy in the execution worktree, or the canonical selected section for an explicit in-tree mandate. Never edit both.
+- **Permitted Mutations**: Check off completed tasks, append atomic verification sub-bullets, and keep implemented tasks, verification disposition and successful commits distinct.
+- **Necessary Discovered Work**: Track work the selected outcome genuinely needs under that outcome, with acceptance, dependencies and owned paths, before verification. Material scope or trust changes need a Decision Brief first.
+- **No Sprawl**: Don't inflate the ledger with unrelated findings. Optional unrelated ideas may graduate to `dev/backlog/`; required scope stays visible in the programme unless the user removes it.
 - **Rolling Context Compaction Invariant (< 200–300 lines / < 15KB)**:
   `*-context.md` is strictly **ephemeral working memory**, NOT a permanent historical log. In multi-phase or multi-cohort migrations, agents must NEVER accumulate dozens of pages of detailed commit logs, compiler traces, or test output digests in `context.md` (which exhausts token budgets upon cold resume). Once a phase or cohort is integrated and committed to Git:
   1. Summarize the completed milestone into a concise 1-line checkpoint under `## Quick Resume`.
@@ -553,7 +576,7 @@ Each phase follows a rigorous Red $\rightarrow$ Green $\rightarrow$ Refactor cyc
 4. **Three-Tier Failure Triage**:
    - **Class A (Direct Feature Regressions)**: Failing assertions in code touched by this feature. Must resolve in-phase before commit.
    - **Class B (Feature-Induced Integration Ripple)**: Unmodified callers/fixtures broken by changed contracts. If minor (< 15m), align immediately. If structural/cross-domain, pause with a Decision Brief before absorbing.
-   - **Class C (Pre-Existing Baseline Rot)**: Environment quirks, unmigrated table assumptions, or failures reproducing on clean `origin/develop`. Run differential baseline check (`git -C <repo-root> test ...`). If reproducing on clean develop, log under `## Quarantined Baseline Failures` in `*-context.md` and quarantine immediately. Never derail the task to fix pre-existing baseline rot.
+   - **Class C (Pre-Existing Baseline Rot)**: Environment quirks, unmigrated table assumptions, or failures reproducing on clean `origin/develop`. Run the same real `dotnet test --project ...` in a clean authorized comparison location (`git test` isn't a command). If it reproduces on the clean base, log under `## Quarantined Baseline Failures` in `*-context.md` and quarantine immediately. Never derail the task to fix pre-existing baseline rot.
 5. **Declarative Phase Commit**: Stage owned files (`git add -- <paths>`) and commit using the planned Conventional Commit contract from `tasks.md` without loading `conventional-commit` or logging commit hashes in markdown.
 6. **Reconcile Ledger**: Batch task checkbox updates in `tasks.md`.
 
@@ -567,34 +590,29 @@ Representative `tasks.md` declarative commit contract:
 - **Files:** `src/Registration/HoldConfirmation.cs`, `tests/Registration/HoldConfirmationTests.cs`
 ```
 
-#### 5. Mid-Flight Workstream Slicing & Grand Migration Slicing Trigger
+#### 5. PR Scope Boundaries & Mid-Flight Re-Scoping
 
-- **Mid-Flight Slicing Trigger**: If an approved plan spans > 3 functional domains or integration repairs reveal that downstream phases will trigger wide structural refactoring, the agent MUST proactively propose slicing the workstream via a Decision Brief:
-  - **Ship Completed Phases**: Open a PR for completed, verified, green phases now to lock in value.
-  - **Follow-up Worktree**: Spin off remaining phases into a clean follow-up worktree and plan.
-- **Grand Migration Staged Slicing**: When executing whole-framework or whole-codebase migrations spanning > 20 capability cohorts (e.g. `mapping-and-cqs-migration`), agents and architects must proactively structure the initiative into **Staged Vertical PRs** (e.g., *PR 1: Foundation & Lookups*, *PR 2: Core Domain*, *PR 3: System & Special Consumers*). This prevents massive 100+ commit mega-PRs that overwhelm reviewer capacity and risk deployment stalls.
+- **Planned Boundaries**: Planning splits the programme into independently mergeable PR scopes (for example *PR-FOUNDATION*, *PR-CORE-DOMAIN*, *PR-CONSUMERS* for a large migration). A large PR renamed as a scope fails readiness when smaller independently mergeable outcomes exist.
+- **Mid-Flight Re-Scoping**: If execution shows the selected scope is too large, propose a split via a Decision Brief. Verified phases can ship as the current PR; the remaining required work becomes a retained obligation or a new scope in the **same** canonical programme, never a separate plan or a backlog move to meet a size threshold.
 
 #### 6. Knowledge Graduation Gate (Mandatory Before PR)
 
 Before declaring work complete or pushing, the agent promotes durable knowledge within the execution context:
-- **Deferred Work**: Create `dev/backlog/<topic-slug>.md` with problem statement and acceptance criteria.
+- **Optional Follow-Ups**: Only explicitly optional work goes to `dev/backlog/<topic-slug>.md`. Unmet requested work stays in the programme as a retained obligation.
 - **Architectural Decisions**: Create an ADR in `docs/internal/adr/ADR-<topic-slug>.md`. New ADRs use descriptive slugs (for example, `ADR-plane-project-management-standardization.md`); the numbered `ADR-0NN-*` files are historical and keep their names.
 - **Lessons & Quirks**: Append to `dev/_journal/domains/<domain>.md` or `dev/_journal/journal.md`.
 - Stage and commit graduation files on the task branch so they merge into `develop`.
 
-#### 7. Ring 3 Plan Exit Gate, Mass-Failure Circuit Breaker & Pre-PR Rebase
+#### 7. PR Acceptance Gate, Mass-Failure Circuit Breaker & Branch Update
 
-1. **Ring 3 Plan Exit Gate**: Run full 5-database provider matrix, EF Core migrations, and `Event.Architecture.Tests` once at workstream completion before PR creation.
+1. **Mandatory PR Acceptance Gate**: Every selected PR runs the architecture, affected provider matrix, migration, public-contract, security, UI/runtime and documentation checks its actual changes require, before merge. The first validation of merged behavior is never deferred just because later scopes remain. **Final programme acceptance** then verifies cross-capability promises once their prerequisites exist. Tier 4 Markdown scopes use metadata, link, format and scenario checks only. An explicit user verification override is recorded with its boundaries, unrun checks and limits, never generalized beyond what the user said. Projects still run sequentially under the selected execution profile.
 2. **Mass-Failure Circuit Breaker (> 10 Failures)**: If Ring 3 execution yields > 10 failures, the agent MUST NOT generate dozens of individual subtasks or start fixing them one-by-one. Cluster failures by root cause (shared fixture, missing test migration, secret binding, or base divergence). If failures stem from pre-existing baseline rot (Class C), quarantine them. If caused by widespread architectural mismatch, pause and deliver a Decision Brief.
-3. **Pre-PR Rebase (Concurrency Conflict Protection)**:
-   ```bash
-   git fetch origin develop && git rebase origin/develop
-   ```
-   Resolve any conflicts inside the execution context, verify tests, and complete rebase (`git rebase --continue`).
+3. **Branch Update**: Fetch and update the isolated branch against the current target with native Git inside the execution context. Don't rewrite published history, force-push or rebase published commits without current explicit authority. If integration changes code, rerun only invalidated checks.
+4. **Pre-Review Reconciliation**: Compare original intent with delivered scope, record changed contracts, checks, limits and incomplete criteria, and patch only the selected canonical section.
 
 #### 8. Pull Request Creation & Parked Worktree Lifecycle Protocol
 
-1. **Push Branch**: `git push -u origin <branch> --force-with-lease`
+1. **Push Branch**: `git push -u origin <branch>`. A rejected push needs diagnosis, never an automatic `--force-with-lease`. An in-tree mandate on `develop` doesn't authorize publishing unrelated commits or inventing a branch.
 2. **Pre-Flight PR Release Impact Generation (Zero CI Failures)**:
    Never use a bare `gh pr create --fill` that omits metadata. PR descriptions MUST contain the `## Release Impact` checklist mandated by `.ci/scripts/validate-release-impact-pr.cs`. Inspect changed files against category rules:
    - `security` (auth, cerbos, keycloak, cla, secrets): `- [x] Security/auth impact documented`
@@ -606,24 +624,22 @@ Before declaring work complete or pushing, the agent promotes durable knowledge 
    Always provide a non-empty `Details:` section explaining the impact, release-note location, or why no release note is needed.
    Submit the PR using:
    ```bash
-   gh pr create --base develop --title "<type>(<scope>): <title>" --body "<body-with-release-impact>"
+   gh pr create --base <target> --title "<type>(<scope>): <title>" --body "<body-with-release-impact>"
    ```
 3. **Park the Worktree (NEVER Delete Upon PR Creation)**:
-   Never delete `.worktrees/<task-name>` upon PR creation. The worktree must remain parked and intact so that any subsequent bot reviews (Copilot, CodeQL) or CI check failures can be resolved immediately in-place with zero setup overhead.
+   Never delete `.worktrees/<programme>--<scope>` upon PR creation. The worktree must remain parked and intact so that any subsequent bot reviews (Copilot, CodeQL) or CI check failures can be resolved immediately in-place with zero setup overhead.
 4. **Halt and Deliver Partitioned Status Brief**:
    Immediately after PR creation, the agent must halt its execution and deliver a self-contained status brief:
    - PR URL and branch name.
-   - Confirmation of worktree status (e.g. parked at `.worktrees/<task-name>`).
+   - Confirmation of worktree status (e.g. parked at `.worktrees/<programme>--<scope>`), retained obligations and the next scope. The agent doesn't start the next PR in the same invocation.
    - **Partitioned Workstream Summary**:
      - *Delivered Features*: Capabilities and behaviors added by the approved plan.
      - *Integration Repairs*: Necessary mechanical adjustments to fixtures/callers matching new contracts.
      - *Quarantined Baseline Issues*: Pre-existing repo rot or flaky suites logged in `context.md` / `dev/backlog/` and excluded from this PR.
-   - Notification that CI checks and automated bot reviewers are running.
-   - Clear instruction to user: notify agent of any review comments or CI failures; OR confirm PR approval/merge to trigger teardown.
-5. **Worktree Teardown (Only Upon Explicit User Confirmation)**:
-   Only when the user confirms that the PR is approved/merged or explicitly instructs to clean up:
-   - From root workspace: `git worktree remove .worktrees/<task-name>`
-   - Ephemeral plan files in `dev/active/<task-name>` vanish cleanly with the worktree.
+   - Observed CI and automated reviewer status; label unavailable or unstarted checks honestly.
+   - Clear instruction to user: report review comments or CI failures, or give merge/finalization direction.
+5. **Post-Merge Reconciliation**: On merge direction, verify the actual merged state with native evidence (`gh pr view <number> --json state,mergedAt,mergeCommit,baseRefName,headRefName,url` plus refreshed target history). Approval or Closed unmerged is not delivery; squash and rebase merges are proven by merge metadata and target content, not original-tip ancestry. Reconcile final reviewed changes, keep unmet acceptance as retained obligations, and correct affected future contracts.
+6. **Authorized Cleanup (Separate Operation)**: Cleanup needs the user's current authorization naming the worktree and/or branches. First account for owned tracked and untracked work, ignored discoveries and context (a clean `git status` doesn't cover ignored files), and local overrides and credentials. Then, from outside the worktree, `git worktree remove .worktrees/<programme>--<scope>`. Local and remote branch deletion are separately authorized; a `git branch -d` refusal after a squash merge isn't permission to force-delete. Interrupted cleanup resumes only the remaining operations. Removing a worktree never retires the canonical programme.
 
 ---
 
@@ -673,15 +689,15 @@ flowchart TD
         R2Scope["Scope: Single Modified Project + Release Build\nLatency Budget: < 15 seconds\nInfrastructure: 1 Designated provider (e.g. SQLite / single Postgres)\nSuites: Sequential single project (dotnet build -c Release -m:1 -nr:false)"]
     end
 
-    subgraph Ring3["Ring 3: Plan Exit Gate (Workstream Level)"]
-        R3Scope["Scope: Full Multi-Provider Matrix & System Rules\nLatency Budget: Workstream Exit Only\nInfrastructure: Full 5-Database Matrix + Testcontainers\nSuites: Event.Persistence.IntegrationTests, Event.Architecture.Tests, Migrations"]
+    subgraph Ring3["Ring 3: PR Acceptance Gate + Final Programme Acceptance"]
+        R3Scope["Scope: Checks affected by each PR, then cross-capability programme checks\nLatency Budget: Once per PR scope, once at programme end\nInfrastructure: Affected provider matrix + Testcontainers\nSuites: Event.Persistence.IntegrationTests, Event.Architecture.Tests, Migrations"]
     end
 
     Ring1 -->|Subtask Green| Ring1
     Ring1 -->|All Phase Subtasks Green| Ring2
     Ring2 -->|Phase Committed| NextPhase["Next Phase Subtasks"]
     NextPhase --> Ring1
-    Ring2 -->|All Plan Phases Complete| Ring3
+    Ring2 -->|All PR Scope Phases Complete| Ring3
     Ring3 --> PRReady(["Ready for PR Submission"])
 ```
 
@@ -706,7 +722,7 @@ flowchart TD
 3. **No Tautological Assertions**: Expected values must originate from an independent known-good literal or specification. Assertions that recompute expected values using the same formula as production code (`Assert.Equal(items.Sum(x => x.Price), result.Total)`) are strictly forbidden.
 4. **No Interface Bypassing**: Tests must verify state transitions through the public interface. A test must not bypass the domain aggregate to assert directly against raw database tables.
 5. **Mock Boundary Rule**: Mock **ONLY** external third-party infrastructure (payment gateways, external email delivery, system clock, random generators). **NEVER mock internal domain entities, aggregate roots, repositories, or native CQS handlers.** Use real domain entities and in-memory or Testcontainers-backed databases.
-6. **The 3-Ring Progressive Verification Hierarchy**: Subtasks run fast in-memory sliced tests (< 2s). Phase exits run single-project Release builds + single designated provider tests (< 15s). Multi-database provider matrices, migration checks, and architecture rules run strictly at plan exit.
+6. **The 3-Ring Progressive Verification Hierarchy**: Subtasks run fast in-memory sliced tests (< 2s). Phase exits run single-project Release builds + single designated provider tests (< 15s). Each PR runs the affected provider matrix, migration and architecture checks at its acceptance gate before merge, and final programme acceptance covers cross-capability promises. Tier 4 docs scopes skip .NET suites; explicit user overrides apply only within their stated boundaries.
 7. **The Yak-Shaving Quarantine Rule**: Unrelated pre-existing test suite rot or container flakiness is quarantined and logged under `*-context.md` / `dev/backlog/`, never repaired during unrelated feature work.
 8. **Pure Domain Invariants over Persistence Queries**: 90%+ of algorithmic, normalization, validation, and state-machine checks live in `Event.Domain.UnitTests` without Docker dependencies.
 
@@ -807,7 +823,7 @@ dotnet test --project tests/<TargetProject>/<TargetProject>.csproj --configurati
 dotnet build tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release -m:1 -nr:false --verbosity quiet
 dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --no-build --verbosity quiet
 
-# 4. Immediate phase close on dedicated task branch (feat/<task-name>):
+# 4. Immediate phase close on the PR scope branch (feat/EVENT-<item>-<programme>-<scope>):
 git status --short
 # Stage exact files owned by this phase
 git add -- <phase-owned-path-1> <phase-owned-path-2>
@@ -820,20 +836,20 @@ git status --short
 # 5. Markdown & Diff Integrity Check (Tier 4 / Documentation tasks):
 git diff --check -- .agents/ docs/ dev/
 
-# 6. Fresh Worktree Setup (Case C default):
+# 6. Fresh PR scope worktree (Ready scope, no previous delegation; canonical triad stays in root):
 git fetch origin develop
-git worktree add -b feat/<task-name> .worktrees/<task-name> origin/develop
-mkdir -p .worktrees/<task-name>/dev/active && mv dev/active/<task-name> .worktrees/<task-name>/dev/active/
-[ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/
+git worktree add -b feat/EVENT-<item>-<programme>-<scope> .worktrees/<programme>--<scope> origin/develop
+[ ! -f .worktrees/<programme>--<scope>/AGENTS.local.md ] && [ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<programme>--<scope>/
+# Write the scoped plan/tasks/context copy with native edit tools; mark the canonical section a delegated snapshot.
 
-# 7. Pre-PR Rebase (inside execution context):
-git fetch origin develop && git rebase origin/develop
+# 7. Branch update (inside execution context; no published-history rewrite or force-push without authority):
+git fetch origin develop
 
 # 8. PR Creation with Pre-Flight Release Impact (inside execution context):
-gh pr create --base develop --title "<type>(<scope>): <title>" --body "<body-with-release-impact>"
+gh pr create --base <target> --title "<type>(<scope>): <title>" --body "<body-with-release-impact>"
 
-# 9. Deferred Worktree Teardown (from root workspace, only after merge):
-git worktree remove .worktrees/<task-name>
+# 9. Cleanup (from root, only after post-merge reconciliation and current user authorization):
+git worktree remove .worktrees/<programme>--<scope>
 ```
 
 ### Critical Negative Constraints (What is FORBIDDEN)
@@ -848,11 +864,13 @@ git worktree remove .worktrees/<task-name>
 > - ❌ **NO UI Authorization Inspection**: Blazor client affordances must be gated strictly by inspecting HAL `_links` presence, never by local role/claim checking.
 > - ❌ **NO Cryptic Shorthand or Plan-Opening Overhead**: Agents must never prompt the developer with bare phase/task IDs or gates (e.g., *"Proceed with P04/P06 while keeping P03 gates open?"*). All prompts and reports must be self-contained Decision Briefs so the developer never has to open `dev/active/<task>/...` to understand a question or decision.
 > - ❌ **NO Moving of `AGENTS.local.md`**: When establishing an isolated worktree, `AGENTS.local.md` must be copied, never moved. The root machine configuration must remain intact across multiple worktrees and tasks.
-> - ❌ **NO Deleting Worktrees Upon PR Creation**: The worktree `.worktrees/<task-name>` must remain parked and intact so bot reviews (Copilot, CodeQL) or CI check failures can be resolved immediately in-place with zero setup overhead. Teardown is strictly deferred until PR merge or explicit user confirmation.
-> - ❌ **NO Unbounded Worktree Accumulation**: In multi-cohort or Hub-and-Spoke tasks, agents must never leave dozens of inactive spoke worktrees sitting on disk. Prune spoke worktrees immediately upon successful integration into the hub branch, bounding active worktrees to $\le 3–5$.
-> - ❌ **NO Cross-Task Worktree Tampering**: Agents must never inspect, modify, or delete worktrees or branches outside their assigned `<task-name>` prefix. `git worktree list` commands must strictly grep for their own task prefix (`git worktree list | grep "/<task-name>"`).
+> - ❌ **NO Deleting Worktrees Upon PR Creation**: The worktree `.worktrees/<programme>--<scope>` must remain parked and intact so bot reviews (Copilot, CodeQL) or CI check failures can be resolved in place. Cleanup is a separate operation that needs post-merge reconciliation and the user's current authorization.
+> - ❌ **NO Unbounded Worktree Accumulation**: Hub-and-spoke work stays inside the selected PR with at most 3 to 5 active worktrees. Integrated spokes are removed only with current authorization and preservation checks.
+> - ❌ **NO Force As A Shortcut**: Never force-push, force-delete a branch or prune siblings to unblock work. A rejected push or `git branch -d` refusal needs diagnosis.
+> - ❌ **NO Moving Or Wholesale Replacing The Canonical Triad**: `dev/active/<programme>/` stays in the main checkout; reconciliation patches only the selected section.
+> - ❌ **NO Cross-Programme Worktree Tampering**: Agents must never inspect, modify, or delete worktrees or branches outside their `<programme>` namespace. `git worktree list` output must be filtered to that namespace.
 > - ❌ **NO Context Ledger Inflation**: Agents must never allow `*-context.md` to balloon into a multi-megabyte or hundreds-of-lines log of every commit. Use rolling checkpoints (< 200–300 lines) and delegate durable records to `dev/_journal/` or the Git commit graph.
-> - ❌ **NO Dynamic Scope Creep in `tasks.md`**: Executing agents must never create new phase headings or add runtime finding tasks to `tasks.md` (which causes runaway 50+ item sprawls). New findings belong in `context.md` notes or `dev/backlog/` graduation.
+> - ❌ **NO Dynamic Scope Creep in `tasks.md`**: Only work the selected outcome genuinely needs is tracked under it, with acceptance and owned paths; material scope changes need a Decision Brief. Unrelated optional ideas go to `dev/backlog/`, and required work is never moved there to shrink a PR.
 > - ❌ **NO Yak-Shaving Unrelated Test Rot**: Never derail feature tasks to fix pre-existing failures in unrelated test suites. Isolate on clean base, log under `*-context.md` / `dev/backlog/`, and quarantine.
 
 ---

@@ -26,13 +26,17 @@ Use an image rebuilt with the pinned Blazor `10.0.14` security packages for
 `GHSA-g27p-qf6j-c96c`. A shared-runtime update alone does not replace packaged
 dependencies; source builds must use the matching project dependency locks.
 
-Server images also require the `10.0.15` runtime servicing release for
-`CVE-2026-118747` / `GHSA-vmv3-wvjp-wqpj`. Source builds select SDK `10.0.404`
-and verified container digests. Rebuild and redeploy the Standalone image, or
-both API and Blazor images in a split deployment. Standalone contains its own
-runtime; updating only the Docker host's .NET installation does not service
-an existing image. This runtime update is separate from the Blazor package
-versions above.
+Server images select the `10.0.15` runtime servicing release. Separately,
+`CVE-2026-118747` / `GHSA-vmv3-wvjp-wqpj` affects the `System.Formats.Cbor`
+package: a runtime update does not replace an affected packaged dependency.
+Check the published package graph and update affected references to a fixed
+version (`10.0.15` or later for the 10.0 line), then regenerate their locks.
+Source builds select SDK `10.0.404`
+and the container digests recorded in the repository's Dockerfiles. Rebuild and
+redeploy the Standalone image, or both API and Blazor images in a split deployment.
+Standalone contains its own runtime; updating only the Docker host's .NET
+installation does not service an existing image. This runtime update is separate
+from the Blazor package versions above.
 
 You can complete Local administrator setup and use the core without SMTP,
 Mailpit or a credential email address. Public operator contact and legal identity

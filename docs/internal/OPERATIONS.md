@@ -27,13 +27,22 @@ A workflow correction on a PR branch does not replace the trusted-base version
 used by `pull_request_target`; arrange an independently reviewed base update
 before relying on its rerun.
 
-The source build pins SDK `10.0.404` and server runtime `10.0.15`; the separate
+## SDK and runtime servicing
+
+The source build pins SDK `10.0.404` with SDK roll-forward disabled, so a missing
+selected SDK fails instead of silently generating locks with another patch.
+Server runtime is `10.0.15`; the separate
 browser/WASM runtime pin remains `10.0.14`. All four application image recipes
-retain verified immutable Microsoft image digests.
+retain the immutable Microsoft image digests selected in repository commit
+`0985001decb4c3673622b0796610d1bd10c9f563`.
 This replaces the SDK-selected vulnerable `Microsoft.DotNet.ILCompiler 10.0.10`
 reported by GHSA-p3jp-9v83-76w9. Regenerate affected locks through native restore
-and keep audit enabled. Server runtime `10.0.15` also services
-`CVE-2026-118747` / `GHSA-vmv3-wvjp-wqpj`. Rebuild and redeploy both split images
+and keep audit enabled. Treat `CVE-2026-118747` /
+`GHSA-vmv3-wvjp-wqpj` as a separate `System.Formats.Cbor` package update:
+runtime servicing does not update an independently packaged reference. For the
+10.0 package line, require version `10.0.15` or later. Inspect the final package
+graph, update affected references, regenerate their locks and verify resolved
+versions before deployment. Rebuild and redeploy both split images
 and the self-contained Standalone image; changing an installed host runtime does
 not replace assemblies embedded in an existing image.
 
@@ -46,9 +55,8 @@ Package pruning is not proof that a deployed shared framework is serviced.
 
 A trusted-base Release Impact run still uses the base branch SDK even when the
 PR head is patched. The servicing change must reach that trusted base before
-its rerun can establish recovery. Keep the maintainer's decision to wait for the
-existing PR; do not execute head code in `pull_request_target`, suppress NU1903,
-or create a separate SDK PR to bypass that boundary.
+its rerun can establish recovery. Do not execute head code in
+`pull_request_target` or suppress an advisory to bypass that boundary.
 
 ## Native browser prerequisites
 
@@ -4057,7 +4065,26 @@ dotnet run --project eng/agent-workflow/src/ISLAMU.AgentWorkflow/ISLAMU.AgentWor
 
 ### Verification Policy
 
-All agent and contributor verification compiles once sequentially per project (`dotnet build <Project.csproj> --configuration Release -m:1 -nr:false --verbosity quiet`) and executes test projects one at a time with `--no-build`:
+The execution unit is one independently mergeable PR within a persistent canonical
+programme (programme → PR scope → phase → task). Keep the canonical triad in the
+main checkout, delegate only the selected scope and required shared contracts, and
+stop at its reconciled review handoff. After merge, reconcile final reviewed
+delivery before separately authorized cleanup; intermediate merges retain the
+programme and shared active tracking file. See the
+[scope contract](../../.agents/skills/implementation-plan/resources/pr-scope-contract.md)
+and [native lifecycle](../../.agents/skills/implement-tasks/resources/pr-execution-lifecycle.md).
+
+Each PR must satisfy its applicable acceptance checks before merge, including
+affected-provider matrices, migrations, architecture and relevant runtime/contract
+checks. Later PRs cannot own the first validation of behavior already merged.
+Final programme acceptance verifies cross-capability promises when prerequisites
+exist. Preserve explicit user verification overrides, their scope, omitted checks
+and limitations; never silently generalize them. Documentation/agent-context-only
+Tier 4 changes use metadata, links, scenario consistency and diff checks, with no
+.NET build/test, app/browser startup or containers. Record exact commands/outcomes,
+and rerun passed checks only after relevant changes invalidate their evidence.
+
+For executable changes, agent and contributor verification compiles once sequentially per project (`dotnet build <Project.csproj> --configuration Release -m:1 -nr:false --verbosity quiet`) and executes test projects one at a time with `--no-build`:
 
 - **Execution Profiles (`ISLAMU_EXECUTION_PROFILE`)**: `constrained` (1 container, `2` or `1` unit workers, `Directory.Build.props` sets `UseSharedCompilation=false` + `BuildInParallel=false`), `balanced` (default adaptive host RAM profile), or `performance` (unthrottled CPU scaling on dedicated high-RAM machines).
 - **Constrained SDK Environment Variables**: Pair `ISLAMU_EXECUTION_PROFILE=constrained` with `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1`, `MSBUILDDISABLENODEREUSE=1`, `DOTNET_GCConserveMemory=5`, and a disk-backed `0700` `TMPDIR` (e.g. `$HOME/.cache/agent-tmp`) so Roslyn VBCSCompiler/MSBuild workers terminate promptly and Linux `/tmp` `tmpfs` never exhausts host RAM.

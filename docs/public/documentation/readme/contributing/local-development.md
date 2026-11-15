@@ -12,7 +12,7 @@ This guide helps developers set up a local development workstation to contribute
 
 To build and run the complete solution from source, install:
 
-- **.NET 10 SDK** (v10.0.404, matching `global.json`)
+- **.NET 10 SDK** (v10.0.404 selected by `global.json`)
 - **Docker Engine / Docker Desktop** (v24+ with Compose v2)
 - **.NET Aspire CLI**:
   ```bash
@@ -20,25 +20,23 @@ To build and run the complete solution from source, install:
   ```
 - **Git**
 
-Use the pinned SDK and patched runtime/WASM `10.0.15` together. The repository
-and its four application container recipes select these versions to replace
-the vulnerable SDK-selected compiler/runtime reported by
-`GHSA-p3jp-9v83-76w9`. Preserve dependency auditing and update lockfiles through
-native restore when changing this toolchain; do not bypass an audit failure.
-This pin does not update an SDK or runtime already installed on your host.
+SDK and runtime servicing do not update independently versioned packages.
+For `CVE-2026-118747`, inspect `System.Formats.Cbor` references separately and
+update affected packages to a fixed version listed in the advisory (`10.0.15`
+or later for the 10.0 line), then regenerate and inspect their dependency locks.
+SDK roll-forward is disabled, so install the exact selected SDK. Use it when
+generating dependency locks: another SDK can select different
+implicit framework assets and make CI's locked restore fail. This repository pin
+does not update the SDK/runtime installed on your workstation.
 
-Aspire has its own servicing lifecycle. This source tree selects AppHost SDK
-and Hosting/Testing packages `13.6.5`, including fixes for
-`GHSA-4g86-54fm-h9h8` and `GHSA-f7vh-h5g3-7jrh`. Updating .NET alone does not
-replace those dependencies. Restore the committed locks, rebuild AppHost and
-restart it after updating the source tree. If you installed the Aspire CLI
-globally, update it separately to a supported fixed release; repository
-package pins do not modify that installation.
+Aspire has a separate servicing lifecycle. AppHost and its Hosting/Testing
+packages select `13.6.5` for `GHSA-4g86-54fm-h9h8` and `GHSA-f7vh-h5g3-7jrh`.
+Restore the matching locks, rebuild and restart AppHost. Service a globally
+installed Aspire CLI separately; repository pins do not modify it.
 
-The build may report `ASPIRE010`: this source tree resolves its orchestration
-dependencies from NuGet rather than delegating them to the CLI bundle.
-Direct AppHost launch remains supported. The warning is retained; do not
-silence it or change orchestration ownership merely to hide the message.
+The package-owned orchestration path may emit `ASPIRE010`. Keep the warning
+visible rather than suppressing it or changing orchestration ownership solely
+to remove the message.
 
 ---
 

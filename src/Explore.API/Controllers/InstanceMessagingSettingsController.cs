@@ -141,6 +141,7 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
     }
 
     [HttpPatch("smtp", Name = RouteNames.UpdateInstanceSmtpSettings)]
+    [InstanceManagement]
     [PrivateNoStore]
     [EndpointSummary("Update Instance SMTP Settings")]
     [EndpointDescription("Updates instance SMTP settings. Requires instance administrator.")]

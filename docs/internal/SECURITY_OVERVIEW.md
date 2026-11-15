@@ -119,3 +119,14 @@ credential relations retain their blanket denial of Runtime scalar access.
 Recognition grants no new privilege and does not waive original-source,
 transaction, row, User, trigger or routine checks. Executable lifecycle routines
 must reject privilege drift even after an earlier successful readiness check.
+
+Instance SMTP PATCH is marked as an exact `InstanceManagement` action. Tenant
+resolution, public lifecycle and visitor admission defer to that method metadata;
+the marker grants no mutation authority. Class authentication and the handler's
+fresh actor/instance-administrator checks remain mandatory, followed by the
+selected email writer's original authority. Empty patches and direct delivery
+disabling remain rejected. Unmarked messaging actions and sibling paths receive
+no exemption. Six real Local HTTP cases pass across both deployment modes,
+including administrator writes, ordinary/anonymous refusals and unchanged
+public-content/sibling-path denials. Full native worker recovery is a separate
+qualification requirement.

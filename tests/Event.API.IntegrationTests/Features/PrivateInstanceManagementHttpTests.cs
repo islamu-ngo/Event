@@ -20,6 +20,72 @@ namespace Event.API.IntegrationTests.Features;
 public sealed class PrivateInstanceManagementHttpTests
 {
     [Test]
+    [Arguments(false, "administrator", HttpStatusCode.OK)]
+    [Arguments(true, "administrator", HttpStatusCode.OK)]
+    [Arguments(false, "ordinary", HttpStatusCode.Forbidden)]
+    [Arguments(true, "ordinary", HttpStatusCode.Forbidden)]
+    [Arguments(false, "anonymous", HttpStatusCode.Unauthorized)]
+    [Arguments(true, "anonymous", HttpStatusCode.Unauthorized)]
+    public async Task InstanceSmtpWriteRetainsAdministratorAuthorityWithoutPublicTenant(
+        bool multiTenant, string authority, HttpStatusCode expected)
+    {
+        var token = TestContext.Current!.Execution.CancellationToken;
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            { ["Deployment:Mode"] = multiTenant ? "MultiTenant" : "SingleTenant" })));
+        using var client = configured.CreateClient(new WebApplicationFactoryClientOptions
+        { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
+        if (authority != "anonymous")
+        {
+            var credential = await factory.SeedLocalUserAsync(emailConfirmed: true);
+            if (authority == "administrator")
+            {
+                await using var database = factory.CreateDatabase();
+                database.BindTenantLease();
+                var user = await database.Users.SingleAsync(user => user.Pii!.Email == credential.Identifier, token);
+                database.PlatformUserRoles.Add(new PlatformUserRole
+                {
+                    Id = Guid.CreateVersion7(),
+                    UserId = user.Id,
+                    User = user,
+                    RoleId = (int)RoleEnum.Admin,
+                    Role = null!,
+                    GrantedAt = DateTime.UtcNow,
+                    GrantedBy = user.Id
+                });
+                await database.SaveChangesAsync(token);
+            }
+            using var login = await client.PostAsJsonAsync("/api/auth/local/login", credential, token);
+            login.EnsureSuccessStatusCode();
+            using var body = JsonDocument.Parse(await login.Content.ReadAsStringAsync(token));
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+                "Bearer", body.RootElement.GetProperty("token").GetString());
+        }
+        await using (var database = factory.CreateDatabase())
+        {
+            database.BindTenantLease();
+            if (multiTenant)
+            {
+                var bootstrap = await database.InstanceBootstrapStates.SingleOrDefaultAsync(token);
+                bootstrap?.TransitionDeploymentMode(DeploymentMode.MultiTenant);
+            }
+            (await database.Tenants.SingleAsync(tenant => tenant.Id == PlatformDefaults.DefaultTenantId, token))
+                .TenantStatusId = (int)TenantStatusEnum.Provisioning;
+            await database.SaveChangesAsync(token);
+        }
+
+        using var write = await client.PatchAsJsonAsync("/api/instance/settings/smtp",
+            new PatchInstanceSmtpSettingsDto { DeliveryEnabled = OptionalUpdate<bool>.Set(true) }, token);
+        await Assert.That(write.StatusCode).IsEqualTo(expected);
+        using var publicRead = await client.GetAsync("/api/PublicExperience/settings", token);
+        await Assert.That(publicRead.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        using var unrelated = await client.PatchAsJsonAsync("/api/instance/settings/smtp/details",
+            new PatchInstanceSmtpSettingsDto { DeliveryEnabled = OptionalUpdate<bool>.Set(true) }, token);
+        await Assert.That(unrelated.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+    }
+
+    [Test]
     [Arguments(false, "setup", HttpStatusCode.OK)]
     [Arguments(true, "setup", HttpStatusCode.OK)]
     [Arguments(false, "administrator", HttpStatusCode.OK)]

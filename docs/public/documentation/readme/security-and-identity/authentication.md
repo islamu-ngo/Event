@@ -56,6 +56,13 @@ that routing bootstrap. Tenant content still enforces its own visitor policy,
 and changing resolver configuration still requires authenticated administrative
 authority. This correction needs no new configuration, credentials or migration.
 
+Instance administrators can update SMTP delivery settings before a tenant is
+public. The exact SMTP write uses instance management admission while retaining
+sign-in and current instance-administrator authorization. Ordinary accounts
+cannot change it, and disabling delivery still requires its preview and
+confirmation workflow. This does not make other messaging routes public.
+This needs no new configuration, credential or database grant.
+
 Each deployment has exactly one **primary authentication provider**:
 
 * **Local Identity** uses ASP.NET Core Identity inside ISLAMU Event. It is the

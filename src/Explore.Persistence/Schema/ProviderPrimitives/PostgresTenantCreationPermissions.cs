@@ -276,6 +276,11 @@ public static class PostgresTenantCreationPermissions
             PostgresUserTenantMembershipReadPermissions.TryGetGlobalReadColumns(context, source.Type, out var columns);
             return columns.Select(column => $"({global},{Text(source.Table)},{Text(column)},'SELECT',false)");
         });
+        var administrativeReads = sources.SelectMany(source =>
+        {
+            PostgresAdministrativeAuthorityReadPermissions.TryGetGlobalReadColumns(context, source.Type, out var columns);
+            return columns.Select(column => $"({global},{Text(source.Table)},{Text(column)},'SELECT',false)");
+        });
         var membershipMutations = sources.SelectMany(source =>
         {
             PostgresTenantMembershipMutationPermissions.TryGetRuntimeColumns(context, source.Type,
@@ -307,7 +312,7 @@ public static class PostgresTenantCreationPermissions
         // source intersection without installing it or admitting an inherited role union.
         var role = sources.Single(source => source.Type == typeof(Role));
         PostgresLookupCatalogueReadPermissions.TryGetRuntimeReadColumns(context, typeof(Role), out var runtimeRoleColumns);
-        string expected = "VALUES " + string.Join(',', globalGrants.Concat(workerGrants).Concat(membershipReads).Concat(membershipMutations).Concat(tenantKeyParents).Concat(actorOwnershipReads).Concat(externalEnrollment).Concat(bootstrapGrants).Concat(runtimeRoleColumns.Select(column =>
+        string expected = "VALUES " + string.Join(',', globalGrants.Concat(workerGrants).Concat(membershipReads).Concat(administrativeReads).Concat(membershipMutations).Concat(tenantKeyParents).Concat(actorOwnershipReads).Concat(externalEnrollment).Concat(bootstrapGrants).Concat(runtimeRoleColumns.Select(column =>
             $"({runtime},{Text(role.Table)},{Text(column)},'SELECT',false)")));
         string tables = "ARRAY[" + string.Join(',', sources.Select(source => Text(source.Table))) + "]::text[]";
         string required = complete ? $"""
@@ -348,6 +353,7 @@ public static class PostgresTenantCreationPermissions
                                             AND acl.grantor=t.relowner AND acl.privilege_type=permission.privilege AND NOT acl.is_grantable)
                                         AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=0 AND acl.privilege_type=permission.privilege))))))
                 AND ({sourceProofs}) AND ({PostgresManagedTenantWorkerCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment, workerCataloguePredicate)})
+                AND ({PostgresAdministrativeAuthorityReadPermissions.OptionalGlobalCataloguePredicate(context, enrollment)})
                 AND ({PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment, externalCataloguePredicate)})
                 AND ({externalCataloguePredicate ?? PostgresExternalTenantEnrollmentPermissions.OptionalCataloguePredicate(context, enrollment)})
                 AND ({PostgresSetupLiveStoragePermissions.OptionalGlobalCompletionCataloguePredicate(context, enrollment)}) {required})
@@ -375,6 +381,7 @@ public static class PostgresTenantCreationPermissions
         string recognizedPolicies = string.Join(" OR ", Policies(source)
             .Select(policy => PolicyPredicate(source, enrollment.GlobalLogin, policy))
             .Concat(PostgresUserTenantMembershipReadPermissions.GlobalSourcePolicies(context, source.Type, enrollment.GlobalLogin))
+            .Concat(PostgresAdministrativeAuthorityReadPermissions.GlobalSourcePolicies(context, source.Type, enrollment.GlobalLogin))
             .Select(predicate => "(" + predicate + ")"));
         string policies = $"NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid=pg_catalog.to_regclass({Text(source.Table)}) AND p.polname IN ({Text(ReadPolicy)},{Text(InsertPolicy)},{Text(DocumentInsertPolicy)}) AND NOT ({(ownedPolicies.Length == 0 ? "false" : ownedPolicies)}))";
         if (complete)
@@ -573,7 +580,8 @@ public static class PostgresTenantCreationPermissions
         string.Join(" AND ", sources.Select(source =>
         {
             PostgresUserTenantMembershipReadPermissions.TryGetGlobalReadColumns(context, source.Type, out var membershipColumns);
-            var preexistingReads = membershipColumns.Concat(source.Type == typeof(Tenant)
+            PostgresAdministrativeAuthorityReadPermissions.TryGetGlobalReadColumns(context, source.Type, out var administrativeColumns);
+            var preexistingReads = membershipColumns.Concat(administrativeColumns).Concat(source.Type == typeof(Tenant)
                 ? new[] { source.Columns["Id"].Name } : []).Distinct(StringComparer.Ordinal);
             string baseline = string.Join(" OR ", preexistingReads.Select(column =>
                     $"a.attname={Text(column)} AND acl.privilege_type='SELECT'")

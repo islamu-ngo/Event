@@ -159,3 +159,41 @@ body verification. The routine inventory includes the void helper, and the
 installer excludes it from the Runtime and temporary Migrator execution grants.
 Source, privacy, index, foreign-key, policy, attempt, epoch and settlement checks
 remain part of their original contracts.
+
+## Administrative scope enumeration
+
+`AdministrativeAuthorityRepository` owns an independent Global context for each
+read. `AdministrativeAuthorityQuery` uses EF Core on every provider: exact user
+and platform role for instance administration; active, nondeleted membership and
+unrevoked grant for tenant administration; exact member and optional tenant for
+organization/group administration. Membership and participation tenant keys
+must match. Named Tenant-filter removal retains SoftDelete; projections remain
+primitive and distinct. Tenant lifecycle and participation approval remain the
+responsibility of their existing application decisions.
+
+`PostgresAdministrativeAuthorityReadPermissions` installs 26 fixed SELECT
+columns across seven grant/member/participation/root relations and five exact
+Global SELECT policies on model-declared tenant relations. Existing
+PlatformUserRole, Role and TenantUser reads are reused. It adds no database
+helper role, execution grant, application write, role switch or RLS bypass.
+Creator, worker, actor and physical-open readiness proofs recognize only these
+source-owned descriptors; complete catalogue proofs remain independent of their
+composed callers. The installer pins its original connection/transaction and
+accepts only fresh or complete declarations, rejecting partial, broadened or
+obsolete installations rather than repairing them.
+
+The four former administrative decision routines and their roles are retired
+on fresh development enrollment. Startup refuses their presence; no live DROP
+or automatic conversion is performed. The selected Global application
+credential can read the declared metadata across tenants; C# selects the exact
+subject and owns human authorization. This is the existing shared-credential
+trust boundary, not a human authorization claim granted by storage permissions.
+
+Native qualification covers 25 administrative behavior cases, eight installation
+drift controls and the original actual-Global repository witness. That witness
+bounds only its dedicated Migrator seed commands with `MaxBatchSize(1)` after
+canonical provider configuration: all seven graphs remain in one Serializable
+`SaveChangesAsync`, and the Global factory, 30-second command timeout and security
+guards remain unchanged. This qualifies reader semantics; it does not qualify
+default-batch production write throughput. Rollback and broader workstream
+assurance remain separate gates.

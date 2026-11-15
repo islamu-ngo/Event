@@ -201,7 +201,8 @@ public static class ExploreDatabaseMigrator
             await PostgresUserTenantMembershipReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
         if (queueEnrollment is not null)
             await PostgresExternalLoginReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
-        await PostgresAdministrativeAuthorityContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresAdministrativeAuthorityReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
         await PostgresActorConsolidationContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresManagedTenantDomainContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresNotificationFanoutAdmissionContract.ApplyAsync(executionDatabase, cancellationToken);

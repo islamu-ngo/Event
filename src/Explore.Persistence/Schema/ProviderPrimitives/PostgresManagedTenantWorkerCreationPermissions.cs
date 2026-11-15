@@ -184,6 +184,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
         enrollment.Validate();
         string schema = new HumanPrincipalSourceSql(context).Schema;
         string[] relations = Sources(context).Select(source => source.Table)
+            .Concat(PostgresAdministrativeAuthorityReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresAtprotoFederationSettingPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresIntegrationSyncReadPermissions.GlobalCatalogueRelations(context))
             .Concat(PostgresEmailRetentionReadPermissions.GlobalCatalogueRelations(context))
@@ -201,6 +202,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
         string[] proofs =
         [
             CompleteGlobalCataloguePredicate(context, enrollment),
+            PostgresAdministrativeAuthorityReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresAtprotoFederationSettingPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresIntegrationSyncReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
             PostgresEmailRetentionReadPermissions.CompleteGlobalCataloguePredicate(context, enrollment),
@@ -395,6 +397,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
         if (source.Type == typeof(AtprotoFederationTenantSetting))
             return [PostgresAtprotoFederationSettingPermissions.GlobalTenantPolicy(context, enrollment.GlobalLogin)];
         return [.. PostgresTenantCreationPermissions.GlobalSourcePolicies(context, source.Type, enrollment.GlobalLogin),
+            .. PostgresAdministrativeAuthorityReadPermissions.GlobalSourcePolicies(context, source.Type, enrollment.GlobalLogin),
             .. PostgresUserTenantMembershipReadPermissions.GlobalSourcePolicies(context, source.Type, enrollment.GlobalLogin)];
     }
 
@@ -488,6 +491,8 @@ public static class PostgresManagedTenantWorkerCreationPermissions
             }
             PostgresUserTenantMembershipReadPermissions.TryGetGlobalReadColumns(context, item.Entity, out var membershipRead);
             baseline.AddRange(membershipRead.Select(column => new Grant(column, "SELECT")));
+            PostgresAdministrativeAuthorityReadPermissions.TryGetGlobalReadColumns(context, item.Entity, out var administrativeRead);
+            baseline.AddRange(administrativeRead.Select(column => new Grant(column, "SELECT")));
             if (item.Entity == typeof(User))
             {
                 baseline.AddRange(PostgresUserTenantNavigationReadPermissions.GlobalReadColumns(context).Select(column => new Grant(column, "SELECT")));

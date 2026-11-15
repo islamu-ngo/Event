@@ -1021,9 +1021,12 @@ public static partial class SecurityExecutionEvidence
             paths.UnionWith(configured);
         }
         string[] files = paths.Order(StringComparer.Ordinal).ToArray();
-        if (files.Length > 65_536 || files.Any(path => !NoInputLinks(path)) ||
-            !AreRegularCandidateInputsAsync(files).GetAwaiter().GetResult())
-            throw new OwnedExecutionFailure("native_tool_inputs_invalid");
+        if (files.Length > 65_536)
+            throw new OwnedExecutionFailure("native_tool_input_count_invalid");
+        if (files.Any(path => !NoInputLinks(path)))
+            throw new OwnedExecutionFailure("native_tool_input_links_invalid");
+        if (!AreRegularCandidateInputsAsync(files).GetAwaiter().GetResult())
+            throw new OwnedExecutionFailure("native_tool_input_type_invalid");
         var captured = new List<object>();
         long total = 0;
         foreach (string path in files)
@@ -1031,9 +1034,10 @@ public static partial class SecurityExecutionEvidence
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
             long size = stream.Length;
             if (size > 1_073_741_824 || (total = checked(total + size)) > 17_179_869_184)
-                throw new OwnedExecutionFailure("native_tool_inputs_invalid");
+                throw new OwnedExecutionFailure("native_tool_input_size_invalid");
             string digest = Convert.ToHexStringLower(SHA256.HashData(stream));
-            if (stream.Length != size || !NoInputLinks(path)) throw new OwnedExecutionFailure("native_tool_inputs_invalid");
+            if (stream.Length != size || !NoInputLinks(path))
+                throw new OwnedExecutionFailure("native_tool_input_changed");
             captured.Add(new { path, bytes = size, sha256 = digest });
         }
         return JsonSerializer.SerializeToUtf8Bytes(new { schemaVersion = 1, files = captured });

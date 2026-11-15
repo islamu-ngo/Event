@@ -6,21 +6,21 @@ Summary: "Select SDK 10.0.404, server runtime 10.0.15 and WASM runtime 10.0.14 w
 Supersedes: []
 Impacts:
   Breaking:
-    Reference: docs/API_CHANGELOG.md
+    Reference: docs/internal/API_CHANGELOG.md
     Disposition: not-applicable
   Security:
     Reference: docs/internal/OPERATIONS.md
     Disposition: documented
-    Detail: "Select the serviced SDK and deployed server runtime for CVE-2026-118747 while retaining the independently selected WASM runtime floor."
+    Detail: "Service the SDK, deployed server runtime and independent WASM floor. CVE-2026-118747 requires a separate System.Formats.Cbor package update when applicable; runtime servicing does not replace that package."
   Migration:
-    Reference: docs/RELEASE_RUNBOOK.md
+    Reference: docs/internal/RELEASE_RUNBOOK.md
     Disposition: not-applicable
   Configuration:
     Reference: docs/internal/OPERATIONS.md
     Disposition: documented
     Detail: "Select SDK 10.0.404 and matching immutable Microsoft image bases; give the existing file-based browser installer its own locked NuGet graph instead of sharing a neighboring lock. No environment schema or authority change."
   OpenAPI:
-    Reference: docs/API_CHANGELOG.md
+    Reference: docs/internal/API_CHANGELOG.md
     Disposition: not-applicable
   Operator:
     Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md

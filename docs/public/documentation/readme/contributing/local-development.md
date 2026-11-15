@@ -20,8 +20,11 @@ To build and run the complete solution from source, install:
   ```
 - **Git**
 
-The selected SDK and .NET 10.0.15 runtime service `CVE-2026-118747`. SDK
-roll-forward is disabled, so install the exact selected SDK. Use it when
+SDK and runtime servicing do not update independently versioned packages.
+For `CVE-2026-118747`, inspect `System.Formats.Cbor` references separately and
+update affected packages to a fixed version listed in the advisory (`10.0.15`
+or later for the 10.0 line), then regenerate and inspect their dependency locks.
+SDK roll-forward is disabled, so install the exact selected SDK. Use it when
 generating dependency locks: another SDK can select different
 implicit framework assets and make CI's locked restore fail. This repository pin
 does not update the SDK/runtime installed on your workstation.

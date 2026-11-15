@@ -2356,6 +2356,11 @@ Candidate verification requires the exact tested revision, not a renamed PR
 merge SHA. [Security Verification](SECURITY_VERIFICATION.md) defines the packet,
 CLI and remaining operational admission obligations.
 
+For `native_tool_input_links_invalid_stat`, inspect the workflow's finite
+system-stat observation for its actual link chain, target and invocation.
+Do not infer a target from `ubuntu-latest`, resolve candidate inputs as a repair,
+or treat successful system diagnostics as permission to bypass native admission.
+
 For API-key issuance verification, inspect the `database-provider-<Provider>` CI
 artifact's `Issuance.trx` and the provider summary's API-key issuance outcome.
 The matrix runs at least 14 issuance cases on each migrated real engine. A passing

@@ -100,6 +100,10 @@ success do not establish activation. Use the
 
 ## Release Evidence Bundle
 
+System-tool selection diagnostics are investigation evidence only. A stat link
+observation does not satisfy any execution lane or permit candidate verification
+after native source, link, file-type or fingerprint admission fails.
+
 Retain the selected candidate's completed CodeQL analysis result. A passing
 manual build followed by cancellation is incomplete scanner evidence; follow
 [the cancellation procedure](OPERATIONS.md#codeql-analysis-cancellation).

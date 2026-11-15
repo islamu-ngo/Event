@@ -54,6 +54,12 @@ require the retired inline path-glob list to remain in the workflow shell script
 
 ## Security integration fixture execution
 
+The security workflow observes the fixed system `/usr/bin/stat` link chain,
+resolved target, version line and entry mode before execution. These finite
+infrastructure diagnostics contain no candidate paths, configuration or secrets.
+They do not select or admit the utility: native non-link, regular-file and
+fingerprint checks remain authoritative, including when the observation succeeds.
+
 The browser prerequisite uses `eng/tools/InstallAssuranceBrowser.cs` with its
 own generated lock at `eng/tools/InstallAssuranceBrowser/packages.lock.json`.
 The installer requires locked restore and retains the approved Playwright

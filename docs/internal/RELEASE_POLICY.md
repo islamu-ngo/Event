@@ -72,6 +72,11 @@ runtime lanes must not be presented as complete platform coverage. Its scope and
 
 ## Release sources and exact identity
 
+- System utility link-chain and invocation observations MUST NOT replace native
+  executable binding or relax candidate input admission. Infrastructure selection
+  repair requires measured identity and compatible invocation; a successful
+  diagnostic command alone is not release execution evidence.
+
 - Candidate B MUST retain a `security-execution.v1.json` sidecar from actual
   selected execution at exactly B, together with its contained report/log
   artifacts. Both required lanes MUST be nonzero, completed and passing.

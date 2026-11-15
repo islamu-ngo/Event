@@ -284,6 +284,13 @@ read-only transport result from workload and cleanup evidence. Do not use
 diagnostic socket-completion or global tracing overrides to qualify the final
 candidate; the dedicated handler's context isolation must work normally.
 
+For a stat-role link rejection, retain the security workflow's system-stat
+observation before choosing a repair. Confirm the actual link chain, executable
+and invocation semantics; a resolved multicall target may not accept stat's
+arguments directly. Preserve non-link candidate admission and bind any future
+utility selection to both measured and executed inputs. Do not retry with a link
+exception or assume that changing runner images proves compatibility.
+
 Establish actual engine readiness with a separate bounded read-only uncached
 inventory request on the selected socket. Desktop proxy cache responses can
 precede VM startup; retain startup/readiness evidence separately. Preserve the

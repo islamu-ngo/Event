@@ -421,7 +421,7 @@ public sealed class RedisBffTicketStoreTests(RedisBffTicketStoreTests.Authority 
                 .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.Redis)
                 .Build();
             await container.StartAsync();
-            var connectionOptions = new ConfigurationOptions { Password = password };
+            var connectionOptions = new ConfigurationOptions { Password = password, AllowAdmin = true };
             connectionOptions.EndPoints.Add(container.Hostname, container.GetMappedPublicPort(6379));
             Connection = await ConnectionMultiplexer.ConnectAsync(connectionOptions);
             protection = ExternalDataProtectionProvider.Create(Source.Read(), "bff", TimeProvider.System);

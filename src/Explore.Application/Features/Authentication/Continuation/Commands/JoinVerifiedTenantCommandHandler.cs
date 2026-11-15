@@ -8,7 +8,7 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 
-namespace Explore.Application.Features.Authentication.Continuation;
+namespace Explore.Application.Features.Authentication.Continuation.Commands;
 
 public sealed class JoinVerifiedTenantCommandHandler(
     IHumanCommitScopePreparation humanScope,

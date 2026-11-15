@@ -89,7 +89,10 @@ internal sealed partial class LocalIdentityCredentialStateStore
                 RequireCurrent();
                 if (applicationDbContext.ChangeTracker.HasChanges() || identityDbContext.ChangeTracker.HasChanges()
                     || await ReadVisitorPrimaryReceiptAsync(enrollmentOperationId, tenant, token).ConfigureAwait(false)
-                        is not null)
+                        is not null
+                    || await identityDbContext.Set<LocalIdentityCredentialOperation>().AsNoTracking()
+                        .AnyAsync(row => row.VisitorEnrollmentOperationId == enrollmentOperationId, token)
+                        .ConfigureAwait(false))
                     throw new UnauthorizedAccessException("Visitor reservation lost its original allocation evidence.");
                 RequireCurrent();
 

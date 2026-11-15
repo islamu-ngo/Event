@@ -33,7 +33,7 @@ package resolution, framework-provided assemblies and self-contained/container
 runtime bytes have distinct ownership. Pruning an obsolete package reference
 does not establish that a deployed runtime is patched. The selected source and
 image baseline is maintained in
-[Operations](OPERATIONS.md#complete-release-impact-metadata).
+[Operations](OPERATIONS.md#sdk-and-runtime-servicing).
 
 This policy governs the future release engine. It does not replace the current manual
 [Release Checklist](RELEASE_CHECKLIST.md) before activation. In a conflict, this
@@ -72,6 +72,20 @@ runtime lanes must not be presented as complete platform coverage. Its scope and
   MUST NOT self-promote or influence authoritative attestation.
 
 ## Release sources and exact identity
+
+- System utility link-chain and invocation observations MUST NOT replace native
+  executable binding or relax candidate input admission. Infrastructure selection
+  repair requires measured identity and compatible invocation; a successful
+  diagnostic command alone is not release execution evidence.
+  Only the fixed infrastructure stat leaf may resolve to a same-basename,
+  nonlinked target selected once per process. Candidate input link rejection
+  and the existing before/after executable fingerprints MUST remain unchanged.
+  Selector refusal MUST retain a closed owned stat code; inaccessible filesystem
+  selection MUST omit raw paths and exception text.
+  Recognized fixture constructor decoration in native discovery MUST map through
+  the shared complete grammar; register/report equality, opaque UID uniqueness
+  and canonical tuple uniqueness MUST remain unchanged. Constructor display
+  arguments do not replace or expand required authority witness identities.
 
 - Candidate B MUST retain a `security-execution.v1.json` sidecar from actual
   selected execution at exactly B, together with its contained report/log

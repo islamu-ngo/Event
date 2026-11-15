@@ -24,6 +24,14 @@ including the Standalone container lock, moderation launcher, browser installer,
 migration scaffolder and Keycloak lifecycle tool. CI restores those owners
 without executing the tools. A final ordinary solution restore resets generated
 assets for subsequent builds while retaining profile-specific packages in the cache.
+The fast lane also restores `eng/tools/InstallAssuranceBrowser.cs` and
+`eng/tools/keycloak-lifecycle-grants.cs` in locked mode before the audit. The
+browser tool's separate lock and the Keycloak tool's `eng/tools/packages.lock.json`
+contribute packages independently of runtime lane selection. Regenerate that
+Keycloak lock through its owning file app when its referenced Domain project
+changes; never retain an obsolete dependency closure or hand-edit package hashes.
+Restore populates package license metadata; it does not run either tool, download
+browsers or attest browser execution.
 
 `Build & Test` consumes `select-build-test-changes` from the existing release
 engineering executable. The workflow accepts exactly seven unique boolean
@@ -46,6 +54,27 @@ require the retired inline path-glob list to remain in the workflow shell script
 
 ## Security integration fixture execution
 
+The security workflow observes the fixed system `/usr/bin/stat` link chain,
+resolved target, version line and entry mode before execution. These finite
+infrastructure diagnostics contain no candidate paths, configuration or secrets.
+They do not select or admit the utility: native non-link, regular-file and
+fingerprint checks remain authoritative, including when the observation succeeds.
+
+Native security execution selects the fixed system stat entry once per process.
+Only that infrastructure leaf alias may resolve; its entry ancestors and selected
+target ancestors must remain nonlinked, and the final basename must stay `stat`.
+Capture and both metadata invocations use the same selected executable.
+Candidate files, assemblies, manifests and policy inputs never receive alias resolution.
+Selector failures use the existing owned-execution rejection path with fixed
+`stat_tool_*` codes. Missing or inaccessible filesystem targets produce
+`stat_tool_selection_unavailable`; underlying exception messages and paths are
+not part of the diagnostic.
+
+Native discovery may render a simple fixture constructor in `typeName`.
+The shared parser accepts only the complete `ClassName(SimpleFixtureName)` form
+and joins its CLR class, unchanged method and display name to the register and
+TRX. Opaque UIDs remain execution selectors; canonical identity collisions fail.
+
 The browser prerequisite uses `eng/tools/InstallAssuranceBrowser.cs` with its
 own generated lock at `eng/tools/InstallAssuranceBrowser/packages.lock.json`.
 The installer requires locked restore and retains the approved Playwright
@@ -55,22 +84,23 @@ lock and causes `NU1005`. Verify the ordinary installer command against its
 committed lock before interpreting a prerequisite failure as a browser or
 runtime regression. Installation alone is not browser execution evidence.
 
-The installer lock also captures the selected SDK's implicit ILCompiler and
-ILLink dependencies. An SDK security update must regenerate this dedicated
-lock through native restore and pass a subsequent locked restore without
-changing the neighboring tool lock. The selected SDK servicing baseline is
-recorded in [Operations](OPERATIONS.md#complete-release-impact-metadata).
-Inspect the regenerated compiler/linker versions; retain at least the 10.0.14
-patched floor for
+The selected SDK servicing baseline is recorded in
+[Operations](OPERATIONS.md#sdk-and-runtime-servicing). This branch provisions
+Chromium through the file-based `eng/tools/InstallAssuranceBrowser.cs` entrypoint.
+Its dedicated `eng/tools/InstallAssuranceBrowser/packages.lock.json` owns the
+installer's package graph without colliding with the neighboring tools lock.
+The provisioner runs as a framework-dependent tool with `PublishAot=false`;
+its lock must not require a native compiler for one developer host architecture.
+Regenerate it with the selected SDK, then verify locked restore and the portable
+package graph. Tools that use native AOT still require a serviced compiler for
 [GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9).
 Playwright remains at its separately approved version; auditing stays enabled.
 
 Release-impact validation executes the trusted base checkout. A patched SDK
 on the pull-request head does not upgrade that checkout: its SDK pin must
-receive the reviewed servicing change before the protected job can use the
-patched compiler. The accepted execution decision waits for the existing PR
-to merge; do not open a separate SDK PR, switch this job to untrusted head
-code or suppress the advisory to make the check pass.
+receive the reviewed servicing change before the protected job can use it.
+Do not switch this job to untrusted head code or suppress an advisory to
+make the check pass.
 
 The existing `security-execution.v1.json` packet is governed by the embedded
 `executionRequirements` in `eng/security/security-control-register.json`.

@@ -1,7 +1,8 @@
+using Explore.Blazor.Services.Auth;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace Explore.Blazor.Services.Auth;
+namespace Explore.Blazor.Extensions;
 
 public static class BffSessionAuthorityRegistration
 {

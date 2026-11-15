@@ -12,6 +12,11 @@ The central package baseline pins `Microsoft.AspNetCore.Components.Web`,
 transitive framework packages. Restore and publish from these pins and locks;
 an installed shared runtime does not replace a packaged NuGet dependency.
 
+Architecture, API, BFF and standalone integration test hosts declare
+`Microsoft.AspNetCore.App` directly. Native restore then models their actual shared-framework dependency
+and prunes the corresponding transitive framework packages from their locks;
+dependency audit remains enabled.
+
 ## Application authority and database defence
 
 C# Domain/Application workflows own authorization, business rules, concurrency

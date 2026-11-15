@@ -546,6 +546,15 @@ settlement separately. A later legitimate Ready lockout publication must not
 strand acknowledgement. No visitor password, raw proof or bearer is persisted
 in the receipt, and no enrollment response issues a browser session.
 
+If the primary enrollment receipt is absent, reservation also checks the selected
+Identity store's `LocalIdentityCredentialOperation` ledger for that operation ID.
+Any retained native operation refuses fresh allocation before new identifiers
+are generated, inside the original lifecycle custody and Serializable owner.
+An exact replay with an existing primary receipt keeps its original path.
+The HTTP controls cover completed enrollment followed by primary-receipt removal
+for colocated and external Identity stores; they do not attest native PostgreSQL
+erasure or receipt-disposal coverage.
+
 The recovery reader releases only operation, tenant, stage, generation and
 deadline metadata. Its fixed Global SELECT footprint also includes the nullable
 cleanup completion timestamp solely to exclude drained cancellations.

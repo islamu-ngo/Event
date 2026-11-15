@@ -461,7 +461,7 @@ public static partial class SecurityExecutionEvidence
 
     private sealed record OwnedExecutionRequest(string Repository, string Output, string Candidate, string RunId,
         int Attempt, string Event, string Temporary, string DockerHost, string RyukDisabled);
-    private sealed class OwnedExecutionFailure(string code) : Exception
+    internal sealed class OwnedExecutionFailure(string code) : Exception
     {
         internal string Code { get; } = code;
     }
@@ -923,8 +923,8 @@ public static partial class SecurityExecutionEvidence
     private static OwnedInputs CaptureOwnedInputs(OwnedExecutionRequest request, IEnumerable<OwnedEntry> entries)
     {
         OwnedEntry[] selectedEntries = entries.ToArray();
-        if (!TryReadCandidateSource(request.Repository, request.Candidate, out var source, out _))
-            throw new OwnedExecutionFailure("candidate_source_invalid");
+        if (!TryReadCandidateSource(request.Repository, request.Candidate, out var source, out string sourceDiagnostic))
+            throw new OwnedExecutionFailure(sourceDiagnostic);
         var managed = new List<object>();
         string engine = typeof(SecurityExecutionEvidence).Assembly.Location;
         if (!TryCaptureProjectManagedInputs(Path.GetDirectoryName(engine)!, request.Candidate, [Path.GetFileName(engine)],
@@ -1008,7 +1008,7 @@ public static partial class SecurityExecutionEvidence
     internal static byte[] CaptureExecutionTools()
     {
         var paths = new HashSet<string>(StringComparer.Ordinal)
-            { ReleaseToolPaths.Dotnet, ReleaseToolPaths.Git, "/usr/bin/setsid", "/usr/bin/kill", "/usr/bin/stat" };
+            { ReleaseToolPaths.Dotnet, ReleaseToolPaths.Git, "/usr/bin/setsid", "/usr/bin/kill", ReleaseToolPaths.Stat };
         // The current host's default binding inputs remain stable across lazy loads.
         // This is an eligible binding closure; actual child execution is observed separately.
         foreach (string property in new[] { "TRUSTED_PLATFORM_ASSEMBLIES", "APP_CONTEXT_DEPS_FILES" })
@@ -1021,9 +1021,24 @@ public static partial class SecurityExecutionEvidence
             paths.UnionWith(configured);
         }
         string[] files = paths.Order(StringComparer.Ordinal).ToArray();
-        if (files.Length > 65_536 || files.Any(path => !NoInputLinks(path)) ||
-            !AreRegularCandidateInputsAsync(files).GetAwaiter().GetResult())
-            throw new OwnedExecutionFailure("native_tool_inputs_invalid");
+        if (files.Length > 65_536)
+            throw new OwnedExecutionFailure("native_tool_input_count_invalid");
+        string? linkedInput = files.FirstOrDefault(path => !NoInputLinks(path));
+        if (linkedInput is not null)
+        {
+            string source = linkedInput switch
+            {
+                var path when path == ReleaseToolPaths.Dotnet => "dotnet",
+                var path when path == ReleaseToolPaths.Git => "git",
+                "/usr/bin/setsid" => "setsid",
+                "/usr/bin/kill" => "kill",
+                var path when path == ReleaseToolPaths.Stat => "stat",
+                _ => "runtime"
+            };
+            throw new OwnedExecutionFailure($"native_tool_input_links_invalid_{source}");
+        }
+        if (!AreRegularCandidateInputsAsync(files).GetAwaiter().GetResult())
+            throw new OwnedExecutionFailure("native_tool_input_type_invalid");
         var captured = new List<object>();
         long total = 0;
         foreach (string path in files)
@@ -1031,9 +1046,10 @@ public static partial class SecurityExecutionEvidence
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
             long size = stream.Length;
             if (size > 1_073_741_824 || (total = checked(total + size)) > 17_179_869_184)
-                throw new OwnedExecutionFailure("native_tool_inputs_invalid");
+                throw new OwnedExecutionFailure("native_tool_input_size_invalid");
             string digest = Convert.ToHexStringLower(SHA256.HashData(stream));
-            if (stream.Length != size || !NoInputLinks(path)) throw new OwnedExecutionFailure("native_tool_inputs_invalid");
+            if (stream.Length != size || !NoInputLinks(path))
+                throw new OwnedExecutionFailure("native_tool_input_changed");
             captured.Add(new { path, bytes = size, sha256 = digest });
         }
         return JsonSerializer.SerializeToUtf8Bytes(new { schemaVersion = 1, files = captured });

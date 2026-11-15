@@ -26,7 +26,7 @@ The finishing chat response must follow this structure:
 ### Key Decisions Made
 - **[Decision 1 — e.g. Architectural Boundary]**: [Decision summary, e.g., Enforced server-side HAL link affordances and moved validation out of Blazor UI into CQRS command pipeline.]
 - **[Decision 2 — e.g. Breaking Change / Simplification]**: [Eliminated deprecated route aliases and legacy adapter shims in favor of clean V1 contracts.]
-- **[Decision 3 — Sequencing / Right-Sizing]**: [Retained all requested capabilities in the same plan; sequenced integration, UI and qualification into later phases with reviewable commit/PR boundaries.]
+- **[Decision 3 — Sequencing / Right-Sizing]**: [Retained all requested capabilities in the same programme; organized them into stable, independently mergeable PR scopes (e.g. PR-FOUNDATION, PR-CLIENT) with readiness conditions and per-PR acceptance gates.]
 - **[Decision 4 — e.g. Invariant Verification]**: [Mandated failing Red-phase tests for concurrency race on order capture before handler implementation.]
 
 ---
@@ -36,12 +36,13 @@ The finishing chat response must follow this structure:
 #### 1. Implementation Plan (`<task>-plan.md`)
 - **Architecture & Boundaries**: [Key modifications made in Section 5]
 - **Behavioral Scenarios**: [Added/refined WHEN/THEN specifications in Section 3]
-- **Phasing & Exit Criteria**: [Restructured phases, clarified exit criteria]
+- **PR Scopes, Phasing & Exit Criteria**: [Restructured PR scopes and their phases, clarified readiness, acceptance and exit criteria]
 - **Breaking Changes**: [Explicitly documented deleted legacy paths in Section 12]
 - **Metadata**: Updated CTO Review status to `Applied & Aligned (YYYY-MM-DD)`
 
 #### 2. Context (`<task>-context.md`)
-- **Quick Resume & Status**: [Synchronized active status, updated NEXT pointer to Phase 1 Red task]
+- **Quick Resume & Status**: [Synchronized active status; NEXT names the active PR scope, or the earliest Planned candidate and its readiness conditions]
+- **Delegated Scope Amendments**: [Amendments recorded for live owners of Implementing/In review scopes, or "none delegated"]
 - **Key Decisions**: [Recorded architectural forks, breaking change positions, and scoping boundaries]
 - **Validation Baseline**: [Updated targeted test commands and baseline verification checks]
 - **Blockers & Risks**: [Removed stale items, documented active dependency gates]
@@ -50,7 +51,7 @@ The finishing chat response must follow this structure:
 - **Test-First Invariant Ordering**: [Restructured tasks into explicit Task N.1 Red Phase (failing tests) -> Task N.2 Green Phase (handler) -> Task N.3 Refactor]
 - **Anti-Tautology**: [Replaced shallow mock assertions with domain invariant and contract assertions]
 - **Atomic Commit Contracts**: [Authored complete Conventional Commit packets for every phase, with path-limited git commands and benefit-led titles]
-- **Scope Right-Sizing**: [Preserved all requested outcomes; divided oversized increments into dependency-ordered phases without moving required work to backlog.]
+- **PR Registry & Right-Sizing**: [Preserved all requested outcomes; registry lists every scope; divided oversized increments into dependency-ordered PR scopes without moving required work to backlog.]
 
 ---
 
@@ -62,19 +63,19 @@ The finishing chat response must follow this structure:
 ---
 
 ### Execution Readiness & Next Step
-[Clear, direct guidance on the exact next step for the developer or implementing agent to run, e.g.:
-"The triad is fully refined and execution-ready. Begin implementation with **Phase 1, Task 1.1** (authoring the failing invariant tests in `tests/...`). Run:
-`dotnet test --treenode-filter '/*/*/*<TestClass>/*'`"]
+[Clear, direct guidance on the exact next step for the developer or implementing agent, naming the PR scope rather than a hard-coded first phase, e.g.:
+"The triad is refined. **PR-FOUNDATION (persistence foundation)** is the earliest Planned scope; it becomes Ready once its readiness conditions hold. Run /implement-tasks to resume the active scope or start that scope; its first task authors the failing invariant tests in `tests/...`."
+If a scope is already Implementing or In review, name it, its owner and any amendments recorded for them.]
 ```
 
 ## Answer Style Rules
 
-- **Scope preservation**: Report which later phases own every remaining requested outcome. A completed early increment is not completion of the whole plan; backlog creation is not a right-sizing result.
+- **Scope preservation**: Report which later PR scopes own every remaining requested outcome. A merged early PR is not completion of the whole programme; backlog creation is not a right-sizing result.
 
 - **Zero review markdown files**: Never create `*-cto-review.md` in `dev/active/<task>/`.
 - **Direct in-place edits**: Always edit the triad files (`plan.md`, `context.md`, `tasks.md`) directly before delivering the chat response.
 - **Durable triad preservation (Never chat-only)**: Chat is strictly an executive summary. All technical rigor, scorecards, worst-break invariants, and risk mitigations MUST be written into `plan.md`, `context.md`, and `tasks.md` first. Never leave critical review insights only in ephemeral chat.
 - **Start with the verdict**: Be decisive and direct.
 - **High-signal, bounded length**: Crisp and clear—do not overwhelm the user with walls of text, but never skip critical technical details (concrete class names, endpoints, test classes).
-- **Concrete evidence**: Cite real project paths, types, commands, and phase numbers.
+- **Concrete evidence**: Cite real project paths, types, commands, and PR scope IDs with descriptive names alongside phase numbers.
 - **No generic praise**: Provide blunt, senior architectural leadership.

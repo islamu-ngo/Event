@@ -56,6 +56,7 @@ namespace Event.Architecture.Tests
         "Explore.Application.Responses.CreateExternalApiKeyCommandResponse",
         "Explore.Application.Responses.EventAddOnPublicationResponse",
         "Explore.Application.Responses.LocalCredentialIssueCommandResponse",
+        "Explore.Application.Responses.LocalVisitorEnrollmentReservationCommandResponse",
         "Explore.Application.Responses.WebhookProviderPortalAccessCommandResponse",
     ];
 

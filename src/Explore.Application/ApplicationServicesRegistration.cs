@@ -346,6 +346,8 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IFanoutAttendeeLocationAuthorizationService, FanoutAttendeeLocationAuthorizationService>();
         services.AddScoped<PrivacyErasureApplier>();
         services.AddScoped<RetainedAuthorityPrivacyErasureWorkflow>();
+        services.AddScoped<Func<RetainedAuthorityPrivacyErasureWorkflow>>(provider =>
+            () => provider.GetRequiredService<RetainedAuthorityPrivacyErasureWorkflow>());
         services.AddScoped<IPrivacyErasureService, PrivacyErasureService>();
         services.AddScoped<Explore.Application.Contracts.Moderation.IModerationRecognitionErasure,
             Explore.Application.Services.Moderation.ModerationRecognitionErasure>();

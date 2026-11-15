@@ -1817,7 +1817,7 @@ public static partial class SecurityExecutionEvidence
         deadline.CancelAfter(TimeSpan.FromSeconds(5));
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("/usr/bin/stat")
+            StartInfo = new ProcessStartInfo(ReleaseToolPaths.Stat)
             {
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -3091,7 +3091,7 @@ public static partial class SecurityExecutionEvidence
     {
         foreach (string[] batch in paths.Chunk(64))
         {
-            var info = new ProcessStartInfo("/usr/bin/stat")
+            var info = new ProcessStartInfo(ReleaseToolPaths.Stat)
             {
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -3206,17 +3206,37 @@ public static partial class SecurityExecutionEvidence
                 !Directory.Exists(repositoryRoot)) return false;
             string head = ReadCandidateGitAsync(repositoryRoot, "rev-parse", "--verify", "HEAD")
                 .GetAwaiter().GetResult().TrimEnd('\n');
-            if (head != expectedCandidate) return false;
+            if (head != expectedCandidate)
+            {
+                diagnostic = "candidate_source_head_mismatch";
+                return false;
+            }
             string tree = ReadCandidateGitAsync(repositoryRoot, "rev-parse", "--verify", expectedCandidate + "^{tree}")
                 .GetAwaiter().GetResult().TrimEnd('\n');
-            if (tree.Length != expectedCandidate.Length || !LowerHex(tree) ||
-                ReadCandidateGitAsync(repositoryRoot, "status", "--porcelain=v1", "-z", "--untracked-files=all",
-                    "--ignore-submodules=none").GetAwaiter().GetResult().Length != 0) return false;
+            if (tree.Length != expectedCandidate.Length || !LowerHex(tree))
+            {
+                diagnostic = "candidate_source_tree_invalid";
+                return false;
+            }
+            if (ReadCandidateGitAsync(repositoryRoot, "status", "--porcelain=v1", "-z", "--untracked-files=all",
+                    "--ignore-submodules=none").GetAwaiter().GetResult().Length != 0)
+            {
+                diagnostic = "candidate_source_worktree_dirty";
+                return false;
+            }
             string[] entries = ReadCandidateGitAsync(repositoryRoot, "ls-files", "-v", "-z")
                 .GetAwaiter().GetResult().Split('\0', StringSplitOptions.RemoveEmptyEntries);
-            if (entries.Length == 0 || entries.Any(entry => !entry.StartsWith("H ", StringComparison.Ordinal))) return false;
+            if (entries.Length == 0 || entries.Any(entry => !entry.StartsWith("H ", StringComparison.Ordinal)))
+            {
+                diagnostic = "candidate_source_index_invalid";
+                return false;
+            }
             if (ReadCandidateGitAsync(repositoryRoot, "rev-parse", "--verify", "HEAD")
-                    .GetAwaiter().GetResult().TrimEnd('\n') != expectedCandidate) return false;
+                    .GetAwaiter().GetResult().TrimEnd('\n') != expectedCandidate)
+            {
+                diagnostic = "candidate_source_head_changed";
+                return false;
+            }
             identity = new(expectedCandidate, tree);
             diagnostic = string.Empty;
             return true;
@@ -3224,6 +3244,9 @@ public static partial class SecurityExecutionEvidence
         catch (Exception exception) when (exception is IOException or InvalidDataException or InvalidOperationException or
             ArgumentException or Win32Exception or TimeoutException or OperationCanceledException or UnauthorizedAccessException)
         {
+            diagnostic = exception is TimeoutException or OperationCanceledException
+                ? "candidate_source_git_timeout"
+                : "candidate_source_git_unavailable";
             return false;
         }
     }
@@ -3747,6 +3770,18 @@ public static partial class SecurityExecutionEvidence
             if (!BoundedIdentity(uid, 4096) || !BoundedIdentity(display, 16_384) ||
                 !BoundedIdentity(namespaceName, 2048) || !BoundedIdentity(typeName, 2048) ||
                 !BoundedIdentity(method, 2048) || !uids.Add(uid)) return false;
+            int constructor = typeName.IndexOf('(');
+            if (constructor >= 0)
+            {
+                if (!typeName.EndsWith(')')) return false;
+                string className = typeName[..constructor];
+                string fixtureName = typeName[(constructor + 1)..^1];
+                if (new[] { className, fixtureName }.Any(name => name.Length == 0 ||
+                    !(char.IsAsciiLetter(name[0]) || name[0] == '_') ||
+                    name.Any(character => !(char.IsAsciiLetterOrDigit(character) || character == '_'))))
+                    return false;
+                typeName = className;
+            }
             var identity = new SecurityControlRegister.RequiredTest(namespaceName + "." + typeName, method, display);
             if (!identities.Add(identity)) return false;
             discovered.Add(new NativeDiscoveredTest(uid, identity));

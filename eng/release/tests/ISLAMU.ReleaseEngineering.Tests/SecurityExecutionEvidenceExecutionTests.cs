@@ -1948,6 +1948,8 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             == typeof(SecurityExecutionEvidence).Assembly.Location)).IsTrue();
         await Assert.That(bindingFiles.EnumerateArray().Any(file => file.GetProperty("path").GetString()!
             .EndsWith(".deps.json", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(bindingFiles.EnumerateArray().Any(file => file.GetProperty("path").GetString()
+            == ReleaseToolPaths.Stat)).IsTrue();
     }
 
     [Test]
@@ -2610,11 +2612,17 @@ public sealed class SecurityExecutionEvidenceExecutionTests
     [Arguments("canary-type")]
     [Arguments("canary-method")]
     [Arguments("canary-display")]
+    [Arguments("constructor-empty")]
+    [Arguments("constructor-unclosed")]
+    [Arguments("constructor-nested")]
+    [Arguments("constructor-trailing")]
+    [Arguments("constructor-collision")]
     public async Task DiscoveryAndExecutionMustHaveOneOrdinalUnambiguousIdentityJoin(string variant)
     {
         using var fixture = new NativeFixture();
         JsonArray tests = fixture.Discovery["tests"]!.AsArray();
         JsonNode first = tests[0]!;
+        string originalType = first["type"]!["typeName"]!.GetValue<string>();
         string canary = "private-identity-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
         switch (variant)
         {
@@ -2647,6 +2655,16 @@ public sealed class SecurityExecutionEvidenceExecutionTests
             case "canary-type": first["type"]!["typeName"] = canary; break;
             case "canary-method": first["type"]!["methodName"] = canary; break;
             case "canary-display": first["displayName"] = canary; break;
+            case "constructor-empty": first["type"]!["typeName"] = originalType + "()"; break;
+            case "constructor-unclosed": first["type"]!["typeName"] = originalType + "(NativeFixture"; break;
+            case "constructor-nested": first["type"]!["typeName"] = originalType + "(NativeFixture(Other))"; break;
+            case "constructor-trailing": first["type"]!["typeName"] = originalType + "(NativeFixture)extra"; break;
+            case "constructor-collision":
+                JsonNode duplicate = first.DeepClone();
+                duplicate["uid"] = "fresh constructor collision uid";
+                duplicate["type"]!["typeName"] = originalType + "(NativeFixture)";
+                tests.Add(duplicate);
+                break;
         }
 
         bool accepted = SecurityExecutionEvidence.TryCreateNativeProof(
@@ -2657,6 +2675,32 @@ public sealed class SecurityExecutionEvidenceExecutionTests
         await Assert.That(proof is null).IsTrue();
         await Assert.That(diagnostic).IsNotEqualTo(string.Empty);
         await Assert.That(diagnostic).DoesNotContain(canary);
+        if (variant == "constructor-collision")
+        {
+            bool parsed = (bool)typeof(SecurityExecutionEvidence)
+                .GetMethod("TryReadNativeDiscovery", BindingFlags.NonPublic | BindingFlags.Static)!
+                .Invoke(null, [Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()), null])!;
+            await Assert.That(parsed).IsFalse();
+        }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ConstructorDisplayDecorationPreservesExactClrReportIdentity(bool decorated)
+    {
+        using var fixture = new NativeFixture();
+        JsonNode first = fixture.Discovery["tests"]!.AsArray()[0]!;
+        if (decorated)
+            first["type"]!["typeName"] = first["type"]!["typeName"]!.GetValue<string>() + "(NativeFixture)";
+
+        bool accepted = SecurityExecutionEvidence.TryCreateNativeProof(
+            Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()), fixture.ReportBytes(),
+            fixture.RequiredTests, exactSelection: true, out byte[]? proof, out string diagnostic);
+
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(proof is not null).IsTrue();
+        await Assert.That(diagnostic).IsEqualTo(string.Empty);
     }
 
     private static string Digest(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
@@ -3661,6 +3705,127 @@ public sealed class SecurityExecutionEvidenceProcessTests
     }
 }
 
+public sealed class SecurityExecutionEvidenceToolSelectionTests
+{
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task StatSelectionRunsBothMetadataFormatsFromItsSelectedExecutable(bool utilityAlias)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string root = Path.Combine(Path.GetTempPath(), "native-stat-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string target = Path.Combine(Directory.CreateDirectory(Path.Combine(root, "target")).FullName, "stat");
+            File.Copy("/usr/bin/stat", target);
+            File.SetUnixFileMode(target, File.GetUnixFileMode("/usr/bin/stat"));
+            string entry = target;
+            if (utilityAlias)
+            {
+                entry = Path.Combine(Directory.CreateDirectory(Path.Combine(root, "entry")).FullName, "stat");
+                File.CreateSymbolicLink(entry, target);
+            }
+
+            string selected = ReleaseToolPaths.SelectStatExecutable(entry);
+
+            await Assert.That(selected).IsEqualTo(target);
+            await Assert.That((File.GetAttributes(selected) & FileAttributes.ReparsePoint) == 0).IsTrue();
+            foreach (string format in new[] { "%f", "%f|%u|%h|%d|%i|%s|%y|%w|%Hd|%Ld" })
+            {
+                var info = new ProcessStartInfo(selected)
+                {
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                info.Environment.Clear();
+                info.Environment["LC_ALL"] = "C";
+                info.Environment["TZ"] = "UTC";
+                foreach (string argument in new[] { "--format=" + format, "--", selected })
+                    info.ArgumentList.Add(argument);
+                using var process = Process.Start(info)!;
+                Task<string> output = process.StandardOutput.ReadToEndAsync();
+                Task<string> error = process.StandardError.ReadToEndAsync();
+                try
+                {
+                    await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+                }
+                finally
+                {
+                    if (!process.HasExited) process.Kill(entireProcessTree: true);
+                    await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+                }
+                await Assert.That(process.ExitCode).IsEqualTo(0);
+                await Assert.That(await error).IsEqualTo(string.Empty);
+                string[] fields = (await output).TrimEnd('\n').Split('|');
+                await Assert.That(fields.Length).IsEqualTo(format == "%f" ? 1 : 10);
+                await Assert.That(Convert.ToUInt32(fields[0], 16) & 0xf000).IsEqualTo(0x8000u);
+                if (fields.Length == 10)
+                    await Assert.That(long.Parse(fields[5], CultureInfo.InvariantCulture)).IsEqualTo(new FileInfo(selected).Length);
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    [Arguments("linked-parent", "stat_tool_selection_linked")]
+    [Arguments("unsupported-dispatch", "stat_tool_dispatch_unsupported")]
+    [Arguments("missing-entry", "stat_tool_selection_unavailable")]
+    [Arguments("dangling-target", "stat_tool_selection_unavailable")]
+    [Arguments("directory", "stat_tool_selection_invalid")]
+    public async Task StatSelectionRefusesUnboundUtilityPaths(string variant, string expectedCode)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string root = Path.Combine(Path.GetTempPath(), "native-stat-refusal-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string targetDirectory = Directory.CreateDirectory(Path.Combine(root, "target")).FullName;
+            string target = Path.Combine(targetDirectory, variant == "unsupported-dispatch" ? "other-tool" : "stat");
+            File.WriteAllText(target, "not an executable fixture");
+            string entryDirectory = Directory.CreateDirectory(Path.Combine(root, "entry")).FullName;
+            string entry = Path.Combine(entryDirectory, "stat");
+            if (variant == "linked-parent")
+            {
+                string linkedParent = Path.Combine(root, "linked");
+                Directory.CreateSymbolicLink(linkedParent, targetDirectory);
+                entry = Path.Combine(linkedParent, "stat");
+            }
+            else if (variant == "directory")
+            {
+                Directory.CreateDirectory(entry);
+            }
+            else if (variant != "missing-entry")
+            {
+                if (variant == "dangling-target") File.Delete(target);
+                File.CreateSymbolicLink(entry, target);
+            }
+
+            Exception? failure = null;
+            try
+            {
+                ReleaseToolPaths.SelectStatExecutable(entry);
+            }
+            catch (Exception rejected)
+            {
+                failure = rejected;
+            }
+            await Assert.That(failure).IsNotNull();
+            await Assert.That(failure is SecurityExecutionEvidence.OwnedExecutionFailure).IsTrue();
+            await Assert.That(((SecurityExecutionEvidence.OwnedExecutionFailure)failure!).Code)
+                .IsEqualTo(expectedCode);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
 public sealed class SecurityExecutionEvidenceCandidateTests
 {
     [Test]
@@ -3676,15 +3841,15 @@ public sealed class SecurityExecutionEvidenceCandidateTests
     }
 
     [Test]
-    [Arguments("wrong-candidate")]
-    [Arguments("dirty-worktree")]
-    [Arguments("dirty-index")]
-    [Arguments("untracked-input")]
-    [Arguments("assume-unchanged-input")]
-    [Arguments("skip-worktree-input")]
-    [Arguments("missing-repository")]
-    [Arguments("invalid-candidate")]
-    public async Task ClaimedCandidateCannotReplaceTheActualCleanSourceInputs(string variant)
+    [Arguments("wrong-candidate", "candidate_source_head_mismatch")]
+    [Arguments("dirty-worktree", "candidate_source_worktree_dirty")]
+    [Arguments("dirty-index", "candidate_source_worktree_dirty")]
+    [Arguments("untracked-input", "candidate_source_worktree_dirty")]
+    [Arguments("assume-unchanged-input", "candidate_source_index_invalid")]
+    [Arguments("skip-worktree-input", "candidate_source_index_invalid")]
+    [Arguments("missing-repository", "candidate_source_invalid")]
+    [Arguments("invalid-candidate", "candidate_source_invalid")]
+    public async Task ClaimedCandidateCannotReplaceTheActualCleanSourceInputs(string variant, string expectedDiagnostic)
     {
         using var fixture = new SourceFixture();
         string repository = fixture.Root;
@@ -3714,6 +3879,7 @@ public sealed class SecurityExecutionEvidenceCandidateTests
         await Assert.That(accepted).IsFalse();
         await Assert.That(identity is null).IsTrue();
         await Assert.That(diagnostic).IsNotEqualTo(string.Empty);
+        await Assert.That(diagnostic).IsEqualTo(expectedDiagnostic);
     }
 
     internal sealed class SourceFixture : IDisposable

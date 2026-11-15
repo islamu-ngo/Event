@@ -4,6 +4,15 @@ description: Operate Local Identity, Keycloak, or passwordless AT Protocol authe
 
 # Authentication Architecture
 
+## AT Protocol OAuth publication
+
+Use the deployment's HTTPS public origin for `/oauth/client-metadata.json` and
+`/oauth/jwks.json`. Requests over HTTP return 404 without redirecting or publishing
+OAuth metadata. Check the HTTPS URL when diagnosing provider discovery; an HTTP
+404 is the expected transport protection.
+
+## Provider configuration
+
 In Split deployments, AppHost preserves the public Keycloak endpoint, realm and
 client ID it supplies to the browser host. Public metadata alone leaves the
 optional confidential client unconfigured; a configured client secret still
@@ -294,6 +303,11 @@ unconfirmed, and enrollment does not require SMTP. A rejected or unfinished
 credential cannot sign in. Once membership admission commits, later enrollment
 closure does not undo it; recovery finishes that same account rather than
 creating a replacement.
+
+A completed enrollment operation cannot reserve a replacement account if its
+primary enrollment receipt is later removed while the Identity store retains
+the credential operation. Reusing that operation ID is rejected. Continue with
+the original account's sign-in or supported recovery path.
 
 Apply the shipped primary and selected Identity-store migrations and the
 attested Local writer profile upgrade before enabling enrollment. Unknown

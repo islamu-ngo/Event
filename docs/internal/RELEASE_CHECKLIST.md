@@ -29,7 +29,7 @@ before relying on its rerun.
 ## Release Model
 
 - [ ] Verify the selected SDK, shared runtime and digest-pinned container bases
-  against [the servicing baseline](OPERATIONS.md#complete-release-impact-metadata).
+  against [the servicing baseline](OPERATIONS.md#sdk-and-runtime-servicing).
   Retain regenerated dependency locks and actual restored/build evidence.
   A clean pruned package graph does not certify the runtime inside an old image.
 
@@ -100,6 +100,21 @@ success do not establish activation. Use the
 - [ ] Review [adopter help](../public/documentation/readme/configuration-and-operations/releases-and-changelog.md) separately from the entries-only changelog. Keep publication prospective/unverified until these activation gates are evidenced.
 
 ## Release Evidence Bundle
+
+System-tool selection diagnostics are investigation evidence only. A stat link
+observation does not satisfy any execution lane or permit candidate verification
+after native source, link, file-type or fingerprint admission fails.
+
+For fixed-system stat selection, verify that the retained binding names the
+selected executable used by both metadata paths. Retain real utility-alias and
+candidate linked-input refusal controls; observation success alone is insufficient.
+Retain missing-entry, dangling-target and directory rejection controls with
+fixed owned stat codes. Filesystem failures must not become path-bearing
+diagnostics or lose their reason as a generic execution failure.
+
+Retain native discovery/report identity evidence for fixture-backed tests.
+Verify decorated and undecorated classes join exactly, malformed constructor
+displays fail, and distinct UIDs cannot collapse to one accepted canonical tuple.
 
 Retain the selected candidate's completed CodeQL analysis result. A passing
 manual build followed by cancellation is incomplete scanner evidence; follow

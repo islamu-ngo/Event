@@ -1,55 +1,47 @@
 ---
 name: senior-cto-feedback
-description: "Load for Senior CTO critique, architectural audit, risk review, sequencing correction, or refinement of an existing implementation-plan triad; edits the requested plan/context/tasks in place without creating a worktree or review file. Not for open-ended CTO advice, product implementation, or implementation workspace setup."
+description: "Load for Senior CTO critique, architectural audit, risk review, sequencing correction, or refinement of an existing implementation-plan triad or multi-PR programme; edits the requested plan/context/tasks in place without creating a worktree or review file. Not for open-ended CTO advice, writing a new plan, product implementation, or implementation workspace setup."
 type: workflow
 enforcement: suggest
 priority: high
 ---
-## Resources
-- [../../../AGENTS.md](../../../AGENTS.md)
-- [resources/output-template.md](resources/output-template.md) — load for the chat reporting template and high-signal summary structure.
-- [resources/plan-rewrite-guidance.md](resources/plan-rewrite-guidance.md) — load for exact section patterns and triad update rules when rewriting plan.md, context.md, and tasks.md.
-- [resources/review-rubric.md](resources/review-rubric.md) — load for 3D scorecard, Socratic stress-testing, and 4-point right-sizing rules.
-- [resources/input-contract.md](resources/input-contract.md) — load to verify triad and I-VSD input completeness before editing.
-- [resources/islamu-event-guardrails.md](resources/islamu-event-guardrails.md) — load when auditing tenant boundaries, clean architecture, or HAL affordances.
-- [resources/enterprise-self-hostable-checklist.md](resources/enterprise-self-hostable-checklist.md) — load when assessing self-hosting configuration, migrations, or operational runbooks.
-- [resources/severity-model.md](resources/severity-model.md) — load when classifying blocker, critical, or major architectural risks.
 
 ## Rules
 
-1. **Direct Triad Refinement — In Place Only**: Update the user-requested `plan.md`, `context.md`, and `tasks.md` in their existing location. Do not create worktrees, create or switch branches, relocate planning artifacts, or execute implementation during review. Never write `*-cto-review.md` or separate feedback files.
-
-Review depth is defined in [output-template.md](resources/output-template.md).
-
-2. **Autonomous Execution Without Approval**: Do NOT pause or block to ask the user for approval before editing the triad. Directly apply the architectural, sequencing, testing, and commit contract improvements.
-3. **Reader-First Chat Reporting**: When finishing, report back to the user with a crisp, high-signal summary following [resources/output-template.md](resources/output-template.md) and [reader-first writing](../conventional-commit/resources/reader-first-writing.md#progress-and-completion-reports). Lead with the executive verdict, concrete architectural decisions made, and modifications applied across the triad, explaining technical reasons before mechanisms. Preserve exact identifiers, boundaries, and trade-offs without making the user open the plan files.
-4. **Follow I-VSD Integration**: Bind updates to exact plan/tasks and I-VSD revisions. If architectural refinements change provider authority, affected stakeholders, or `IVSD-*` mappings, mark the I-VSD report `stale` in the triad metadata and record the revalidation need; do not fabricate approval.
-5. **Codebase Reality Over Aspiration**: Distinguish verified codebase reality from plan aspiration. Verify claims against real repository files using `code-review-graph` before codifying them in the triad.
-6. **Socratic Stress-Testing & "Worst Break" Catastrophic Scenario**: Identify the single most catastrophic production failure mode. Mandate that Phase Red in `tasks.md` contains dedicated failing invariant tests proving it is prevented before handler implementation.
-7. **3-Dimensional Evaluation Model**: Enforce Completeness (capabilities, I-VSD mitigations), Correctness (boundary conditions, concurrency races, negative failure paths), and Coherence (Clean Architecture, HAL link affordances, tenant isolation, transactional outbox).
-8. **Invariant-First & Anti-Tautology Verification**: Enforce strict Test-First Invariant order in `tasks.md` (failing Red Phase tests before Green Phase implementation for core domain invariants, concurrency, and security). Prohibit tautological mock-mirroring (`Received(1)` on internal services) or framework boilerplate.
-9. **Greenfield Breaking Change Posture**: ISLAMU Event is pre-v1 with 0 external adopters. Reject backward-compatibility shims, deprecated aliases, and adapter baggage. Directly simplify contracts and delete obsolete paths in the plan.
-10. **4-Point "Right-Sizing" Rule**: When 2+ sizing signals match (independent concerns, an oversized increment, big-bang layer mixing, or independently shippable value), divide implementation into dependency-ordered phases and atomic commit/PR increments within the same triad. Preserve every requested outcome in later phases; never move required work to backlog. Assess the 8-10-task signal per proposed increment, not across the whole multiphase plan. Only explicit user direction can reduce requested scope. When right-sizing changes how many pull requests the plan merges, update the Plane Tracking Plan to match (one item per PR; an S plan that becomes multi-PR turns into a parent plus Sub-items).
-11. **Planned Commit Readiness**: Ensure every implementation phase in `tasks.md` has a self-sufficient declarative Conventional Commit contract (or atomic sequence) with exact metadata, paths, inspection commands, `git add`, path-limited `git commit`, and verification. These are instructions for later implementation, not actions to execute during review. Preserve explicit user implementation constraints.
-12. **Knowledge Graduation**: Keep required scope in later phases of the same triad, not backlog. Graduate durable architectural decisions to `docs/internal/adr/` and lessons to `dev/_journal/`. Only explicit user direction can remove a requested outcome.
-13. **Zero-Loss Information Preservation**: Eliminating separate review files does NOT mean discarding review intelligence. Every critical finding, 3D evaluation scorecard, Socratic stress-test challenge, ranked risk with minimum acceptable fix, "Worst Break" failure mode, and architectural trade-off MUST be permanently written into its dedicated section in `plan.md` (§0, §2, §5, §7.1, §12, §13/§14.2), `context.md` (Key Decisions, Review State), and `tasks.md` (Phase Red Invariant Tests). Chat output is strictly an executive summary of what is already durably preserved in the triad.
-14. **Plane Tracking Plan Audit**: Audit the plan's §0 **Plane Tracking Plan** and `event/work/active-<task-slug>.yaml` against [plan-tracking](../plane-compose/resources/plan-tracking.md) and [taxonomy §4.1](../../../docs/internal/project-management/work-item-taxonomy-and-granularity-report.md#41-tracking-budget-per-implementation-plan-plan--plane-mapping). Fail the plan when it **floods** Plane (an item per phase, test, doc, review, verification gate, or commit; more than `6` new items or a new Epic without the user's approval) or **under-tracks** it (several separately merged PRs under one item without Sub-items, two providers or capabilities in one item, or substantial work with no item). Also check: an existing item was searched for and reused where one fits; every new item has `parent:` = the right capability Epic UUID, Surface + Domain labels (not the retiring `Docs` label), `priority` as functional criticality, a Version Module, `state: Backlog`, no `assignees:`, and `id:` omitted while unpushed; Sub-items are listed in the plan, not yet in YAML; each phase names the PR and item it lands under; and no commit or PR logs sit in `description:`. Rewrite a wrong Tracking Plan in place. On `Applied & Aligned`, set the active item to `state: Ready` in YAML (local only; execution pushes it).
+1. **In place, review only.** Edit the requested canonical `plan.md`, `context.md` and `tasks.md` at their existing path. Never write `*-cto-review.md`, create worktrees or branches, relocate artifacts, execute implementation, or treat an execution copy as canonical.
+2. **Apply without approval pauses**, but never overwrite active delegated work. Refine Planned or Ready scopes and shared decisions freely; for an Implementing or In review scope, its canonical section is a delegated snapshot. Record proposed amendments for its live owner instead ([PR scope contract](../implementation-plan/resources/pr-scope-contract.md#two-reconciliation-checkpoints)).
+3. **Reality over aspiration.** Verify architectural claims against repository code with `code-review-graph` before codifying them; separate verified, inferred and missing evidence.
+4. **Bounded PR scopes.** Apply [right-sizing](resources/review-rubric.md) per PR scope: each stable scope ID is an independently mergeable outcome with prerequisites, readiness conditions, owned paths, acceptance and verification. Split a renamed large PR when smaller mergeable outcomes exist. Keep every requested outcome in the same triad with rolling later detail; never move required scope to backlog. Only explicit user direction removes scope.
+5. **Correct, invariant-first verification.** Name the worst break and require Red invariant-breaker tests before implementation where invariants, concurrency, tenancy or security are at stake; reject mock-mirroring. Enforce the planner's [verification gates](../implementation-plan/resources/quality-gates.md#verification-gates): targeted phase gates, a mandatory per-PR acceptance gate, final programme acceptance, the Tier 4 exemption and recorded user overrides.
+6. **3D evaluation.** Completeness (capabilities, I-VSD mitigations), Correctness (boundaries, races, failure paths), Coherence (Clean Architecture, HAL affordances, tenant isolation, outbox).
+7. **Greenfield.** Delete obsolete paths; reject shims and deprecated aliases.
+8. **Executable commits.** Every phase keeps self-sufficient declarative Conventional Commit contracts with exact paths; these are later instructions, never actions taken during review. Preserve explicit user constraints.
+9. **I-VSD binding.** Bind edits to the reviewed plan/tasks and I-VSD revisions. Changes to provider authority, stakeholders, defaults or `IVSD-*` mappings mark the report `stale`; never fabricate approval.
+10. **Plane audit.** One item per separately merged PR; fail flooding or under-tracking and rewrite the Tracking Plan using the [audit checklist](resources/plan-rewrite-guidance.md#plane-tracking-plan-audit).
+11. **Zero-loss preservation.** Every finding, scorecard, worst break, ranked risk and trade-off is written into its [triad destination](resources/plan-rewrite-guidance.md#zero-loss-information-preservation-where-review-data-lives); chat only summarizes it.
+12. **Reader-first report.** Lead with the verdict and decisions, then mechanisms, following [output template](resources/output-template.md) and [reader-first writing](../conventional-commit/resources/reader-first-writing.md#progress-and-completion-reports).
 
 ## Workflow
 
-1. **Ingest Triad In Place**: Resolve the exact directory the user requested and read its plan, context, and tasks without changing checkout or branch. Verify architectural claims against actual repository code using `code-review-graph`.
-2. **Audit Architecture**: Evaluate against the 3D Scorecard, 4-Point Right-Sizing, Worst Break failure scenario, and greenfield breaking change principles.
-3. **Directly Update Triad**:
-   - `plan.md`: Refine architecture, tighten sequence, define RFC 2119 behavior scenarios, remove legacy shims, update metadata CTO review status to `Applied & Aligned (YYYY-MM-DD)`.
-   - `context.md`: Synchronize active status, next step, key decisions, validation baseline, and blockers.
-   - `tasks.md`: Restructure into Test-First Invariant ordering (Red -> Green -> Refactor), right-size phases, embed exact atomic commit contracts.
-   - *Never write any `*-cto-review.md` file.*
-4. **Report to Chat**: Output the crisp, high-signal summary following [resources/output-template.md](resources/output-template.md) (verdict, decisions made, changes applied across the triad, top risks resolved, and execution readiness).
+1. Check inputs with the [input contract](resources/input-contract.md); read the triad in place and identify delegated scopes and their owners.
+2. Audit with the 3D scorecard, per-PR right-sizing, worst break and greenfield posture.
+3. Update the triad per [rewrite guidance](resources/plan-rewrite-guidance.md); set CTO review to `Applied & Aligned (YYYY-MM-DD)`.
+4. Report in chat using the output template.
+
+## Resources
+
+- [plan-rewrite-guidance](resources/plan-rewrite-guidance.md) - section patterns, delegation-safe rewrites, Plane audit.
+- [input-contract](resources/input-contract.md) - input completeness, I-VSD and PR registry checks.
+- [review-rubric](resources/review-rubric.md) - 3D scorecard, Socratic stress tests, right-sizing signals.
+- [output-template](resources/output-template.md) - chat report shape.
+- [islamu-event-guardrails](resources/islamu-event-guardrails.md) - tenant, Clean Architecture or HAL audits.
+- [enterprise-self-hostable-checklist](resources/enterprise-self-hostable-checklist.md) - self-hosting, migrations, runbooks.
+- [severity-model](resources/severity-model.md) - blocker, critical or major classification.
 
 ## Verification
 
-- Confirm zero `*-cto-review.md` files exist in `dev/active/<task>/`.
-- Confirm the updated triad remains at the exact requested path and no review branch/worktree was created.
-- Confirm every requested outcome remains assigned to a phase; no required scope was moved to backlog for right-sizing.
-- Validate triad consistency: `plan.md`, `context.md`, and `tasks.md` agree on status, next steps, and phase breakdown.
-- Ensure frontmatter adheres to [../_SKILL_SCHEMA.md](../_SKILL_SCHEMA.md).
+- No `*-cto-review.md` exists; the triad stays at the requested path; no branch or worktree was created.
+- Every requested outcome maps to a PR scope; none moved to backlog.
+- No delegated live section was overwritten; amendments to it are recorded for its owner.
+- Plan, context and tasks agree on registry state, status, next scope and phases.
+- Frontmatter follows [../_SKILL_SCHEMA.md](../_SKILL_SCHEMA.md).

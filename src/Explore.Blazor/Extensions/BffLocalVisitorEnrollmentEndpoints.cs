@@ -14,27 +14,29 @@ public static class BffLocalVisitorEnrollmentEndpoints
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public static IApplicationBuilder UseLocalVisitorEnrollmentPrivacyHeaders(this IApplicationBuilder app) =>
-        app.Use(async (context, next) =>
+        app.Use(ApplyPrivacyHeadersAsync);
+
+    private static async Task ApplyPrivacyHeadersAsync(HttpContext context, RequestDelegate next)
+    {
+        if (context.Request.Path.StartsWithSegments(Prefix, StringComparison.OrdinalIgnoreCase))
         {
-            if (context.Request.Path.StartsWithSegments(Prefix, StringComparison.OrdinalIgnoreCase))
+            context.Response.OnStarting(() =>
             {
-                context.Response.OnStarting(() =>
-                {
-                    context.Response.Headers.CacheControl = "no-store, private";
-                    context.Response.Headers["Referrer-Policy"] = "no-referrer";
-                    context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
-                    return Task.CompletedTask;
-                });
-                if (context.Request.ContentLength > BodyLimit)
-                {
-                    context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
-                    return;
-                }
-                if (context.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
-                    limit.MaxRequestBodySize = BodyLimit;
+                context.Response.Headers.CacheControl = "no-store, private";
+                context.Response.Headers["Referrer-Policy"] = "no-referrer";
+                context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+                return Task.CompletedTask;
+            });
+            if (context.Request.ContentLength > BodyLimit)
+            {
+                context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+                return;
             }
-            await next(context);
-        });
+            if (context.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
+                limit.MaxRequestBodySize = BodyLimit;
+        }
+        await next(context);
+    }
 
     public static WebApplication MapLocalVisitorEnrollmentEndpoints(this WebApplication app)
     {

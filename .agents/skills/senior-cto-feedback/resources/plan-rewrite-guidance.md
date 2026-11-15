@@ -25,7 +25,11 @@ A better implementation plan should be:
 - explicit about each phase's exact default commit message and rare override conditions,
 - explicit about what future agents must keep updating.
 
-Preserve the complete requested scope in the same plan/context/tasks triad. Organize large work into dependency-ordered phases with explicit prerequisites, owned paths, acceptance criteria, verification and atomic commit/PR outcomes. A multiphase plan is not a single PR: retain later UI, integration, packaging and qualification work in later phases. Do not create or populate backlog files to satisfy a size threshold. Only explicit user direction can remove a requested outcome; completion still requires every retained outcome.
+Preserve the complete requested scope in the same canonical plan/context/tasks triad, organized as programme -> PR scope -> phase -> task under the [PR scope contract](../../implementation-plan/resources/pr-scope-contract.md). Each PR scope has a stable ID, an independently mergeable outcome, prerequisites, readiness conditions, owned paths, acceptance, its PR acceptance gate and rollback. Retain later UI, integration, packaging and qualification work in later scopes with rolling detail. Do not create or populate backlog files to satisfy a size threshold. Only explicit user direction can remove a requested outcome; completion still requires every retained outcome.
+
+## Delegation-Safe Rewrites
+
+Read the `tasks.md` PR registry before editing. Planned and Ready scopes, shared decisions and future dependencies may be rewritten directly. An Implementing or In review scope is a **delegated snapshot**: its live ledger belongs to the execution owner. Do not rewrite that section; record the proposed amendment, its reason and its effect on later scopes in `context.md` for the owner to reconcile, and leave the scope's registry fields unchanged. If a review finding invalidates active delegated work, report it as a blocker for that owner rather than editing around them. Never replace the canonical triad with an execution copy.
 
 ## Rewrite The Whole Workstream
 
@@ -35,7 +39,7 @@ When improving a workstream:
 
 1. tighten `...-plan.md` to reflect the real architecture and sequence;
 2. update `...-context.md` so the current status, next step, and risks match the rewritten plan;
-3. update `...-tasks.md` so each phase and verification step maps to the rewritten plan;
+3. update `...-tasks.md` so each undelegated PR scope, phase and verification step maps to the rewritten plan and the registry reflects scope changes;
 4. remove or rename tasks that no longer match the recommended direction;
 5. compare the rewrite against I-VSD refresh triggers and synchronize review state;
 6. close every phase with an immediate, phase-owned `conventional-commit` task after verification, including a concrete planning-authored default message; never retain a final-only catch-all commit or implementation-time message placeholder.
@@ -54,6 +58,7 @@ Every piece of architectural analysis, risk profiling, adversarial stress-testin
 | **"The Worst Break" Catastrophic Failure Mode** | `plan.md` §7.1 Testing Strategy / §9 Security & `tasks.md` Phase Red Tasks | Documents the catastrophic production failure mode in the testing strategy, and immediately translates it into failing Invariant-Breaker specification tests in Phase Red before implementation. |
 | **Ranked Top Risks & Minimum Acceptable Fixes**<br>(Blocker, Critical, Major) | `plan.md` §13/§14.2 Risk Register & `context.md` Known Risks | Preserves ranked risks with concrete mitigations, severity tiers, and verification triggers in the risk register rather than an isolated review document. |
 | **Breaking Deletions & Legacy Elimination** | `plan.md` §12 Migration & Compatibility Plan & `context.md` Key Decisions | Explicitly records obsolete code, endpoints, tables, and adapter shims marked for outright deletion under greenfield development principles. |
+| **PR Scope Boundaries & Readiness** | `plan.md` §6 scope definitions & `tasks.md` PR Registry | Stable scope IDs, independently mergeable outcomes, prerequisites and readiness conditions survive across sessions; delegated snapshots are left for their live owner. |
 | **Test-First Sequences & Atomic Commits** | `tasks.md` Phase Checklist & Planned Commit Contracts | Turns architectural advice into an executable, verifiable sequence of Red -> Green -> Refactor tasks with path-limited Conventional Commits. |
 | **Plane Tracking Plan** | `plan.md` §0 Plane Tracking Plan, `tasks.md` Plane Tracking checkboxes & `event/work/active-<task-slug>.yaml` | Right-sizes the items the plan owns (one per separately merged PR; no phase, test, or review items; at most 6 new items without approval), fixes Epic parent, labels, priority, and module, and sets state `Backlog` -> `Ready` on approval so plan approval and the Plane board agree. |
 
@@ -101,39 +106,28 @@ Last Updated: YYYY-MM-DD Europe/Brussels
 
 ## 5. Architecture And Design Decisions
 
-## 6. Implementation Phases
+## 6. PR Scopes And Implementation Phases
+
+## PR-FOUNDATION: <independently mergeable outcome>
+Prerequisites / consumed contracts:
+Readiness conditions:
+Owned paths and exclusions:
+Acceptance and PR acceptance gate:
+Release / docs impact and rollback:
 
 ### Phase 1 — Foundation
 Goal:
 Files:
 Phase-owned paths:
-Tests:
+Phase gate:
 Exit criteria:
 Phase-close commit outcome: <benefit-led phase outcome>
 
-### Phase 2 — Contract and Application
-Goal:
-Files:
-Phase-owned paths:
-Tests:
-Exit criteria:
-Phase-close commit outcome:
+## PR-CONTRACT: <outcome>
+(same scope fields; phases nested beneath)
 
-### Phase 3 — UI/BFF
-Goal:
-Files:
-Phase-owned paths:
-Tests:
-Exit criteria:
-Phase-close commit outcome:
-
-### Phase 4 — Operations, Docs, and Hardening
-Goal:
-Files:
-Phase-owned paths:
-Tests:
-Exit criteria:
-Phase-close commit outcome:
+## PR-CLIENT: <outcome>
+(same scope fields; rolling detail allowed until it is the next candidate)
 
 ## 7. Testing Strategy
 ## 8. Documentation, Configuration, And Operations Impact
@@ -164,6 +158,7 @@ Last Updated: YYYY-MM-DD Europe/Brussels
 ### ⚠️ BLOCKERS
 
 ## Quick Resume
+## Programme Resume Pointer
 ## Key Files And Responsibilities
 ## Key Decisions
 ## Constraints And Rules To Remember
@@ -174,7 +169,7 @@ Last Updated: YYYY-MM-DD Europe/Brussels
 
 Rewrite rules:
 
-- `NEXT` must match the first realistic implementation slice from the revised plan.
+- `NEXT` and Quick Resume must name the active PR scope (an Implementing or In review scope or its pending finalization) or, failing that, the earliest Planned candidate and its readiness conditions; never a hard-coded first phase or first unchecked historical task.
 - blockers must be current, not historical clutter.
 - key decisions must include any breaking-change choice and operator impact.
 
@@ -188,10 +183,12 @@ Ensure the tasks file is execution-grade:
 Last Updated: YYYY-MM-DD Europe/Brussels
 
 ## Status Summary
+## PR Registry
 ## Implementation Maintenance Rules
-## Phase 1: ...
-## Phase 2: ...
-### Phase N Verification — one Release build and at most one project test
+## PR-<OUTCOME>: ... (readiness; live or delegated snapshot)
+### Phase 1: ...
+### Phase 2: ...
+### Phase N Verification — targeted phase gate (Tier 4: documentation checks)
 ### Phase N Commit(s) — immediately after verification
 *(Note: If Phase N is large or touches dozens/hundreds of files across multiple concerns, sequence multiple atomic commit contracts instead of one monolithic umbrella commit).*
 #### Planned Commit Contract [or Contract 1 of N for multi-commit phases]
@@ -206,14 +203,15 @@ Last Updated: YYYY-MM-DD Europe/Brussels
 #### Commit Tasks
 - During implementation, stage exact phase-owned paths using `git add -- <paths>` and execute the declarative commit contract. Preserve unrelated work.
 - Load `conventional-commit` only when a permitted material divergence override replaces the default contract.
-## Remaining Required Work By Phase
+### PR-<OUTCOME> Acceptance Gate — before review handoff
+## Retained Obligations By PR Scope
 ```
 
 Rewrite rules:
 
-- every major plan phase should appear in tasks;
+- every PR scope and major plan phase should appear in tasks, grouped under its scope ID, with every scope in the registry;
 - every risky boundary should have observable acceptance criteria in its owning implementation task;
-- each phase should name exactly one Release build and at most one fastest relevant non-browser project test at the end;
+- each phase should name its targeted phase gate, and each PR its acceptance gate, per the planner's [verification gates](../../implementation-plan/resources/quality-gates.md#verification-gates);
 - each phase should list exact phase-owned paths and place its commit task(s) immediately after verification;
 - each phase commit should contain declarative metadata: type, scope, title, description, changelog treatment, trailers, and commit paths;
 - if a phase is large (touching dozens or hundreds of files) or spans multiple separable concerns, mandate an ordered sequence of atomic commit contracts rather than one monolithic umbrella commit;
@@ -221,7 +219,7 @@ Rewrite rules:
 - the implementing agent executes that self-sufficient contract without reloading `conventional-commit`;
 - overrides should be rare and are the only execution path that loads `conventional-commit`;
 - phase-attributable failures block commit and must be resolved before phase completion;
-- no task should start the app/browser or use Playwright, Chrome DevTools MCP, E2E, Aspire/Docker startup, live-service smoke, or a manual runtime walkthrough;
+- runtime, browser, container or provider-matrix checks appear only where a matched intent, path rule or the PR's changed surface requires them, in that PR's acceptance gate; remove such checks nothing requires, and never remove a required one;
 - delete stale tasks created for a direction you are now rejecting.
 
 ## Breaking Change Rewrite Pattern
@@ -250,22 +248,22 @@ Docs:
 - Update `<doc files>`.
 ```
 
-## Multiphase Delivery Guidance
+## Multi-PR Delivery Guidance
 
-Preserve the complete requested scope in the same plan/context/tasks triad. Organize large work into dependency-ordered phases with explicit prerequisites, owned paths, acceptance criteria, verification and atomic commit/PR outcomes. A multiphase plan is not a single PR: retain later UI, integration, packaging and qualification work in later phases. Do not create or populate backlog files to satisfy a size threshold. Only explicit user direction can remove a requested outcome; completion still requires every retained outcome.
+A multiphase plan is not automatically a single PR, and a phase is never a PR. When right-sizing finds separable, independently mergeable outcomes, give each a stable PR scope ID inside the same programme triad, with explicit prerequisites and readiness conditions, and update the Plane Tracking Plan to one item per PR. Keep together changes whose separate merge would leave contradictory or unusable intermediate states, and record why.
 
-The following are possible commit/PR increments inside one implementation plan,
-not separate workstreams or instructions to remove later scope. Use boundaries
-appropriate to the target and keep source/caller/test/docs slices coherent:
+The following are possible PR scopes inside one programme, not separate
+workstreams or instructions to remove later scope. Use boundaries appropriate
+to the target and keep source/caller/test/docs slices coherent:
 
 
-1. PR 1 — data/foundation
+1. PR-FOUNDATION — data/foundation
    - domain entities,
    - EF configuration,
    - migrations,
    - repository changes,
    - persistence tests.
-2. PR 2 — application/API contract
+2. PR-CONTRACT — application/API contract
    - commands/queries,
    - validators,
    - controllers,
@@ -273,20 +271,30 @@ appropriate to the target and keep source/caller/test/docs slices coherent:
    - ProblemDetails,
    - OpenAPI,
    - API integration tests.
-3. PR 3 — client/BFF/UI
+3. PR-CLIENT — client/BFF/UI
    - generated client update,
    - Blazor services,
    - components/pages,
    - BFF endpoints,
    - component/BFF tests.
-4. PR 4 — operations/docs/internal/cleanup
+4. PR-OPERATIONS — operations/docs/internal/cleanup
    - configuration docs,
    - self-hosting docs,
    - operations docs,
    - cleanup obsolete compatibility paths,
    - delete obsolete tests.
 
-These are implementation risk boundaries, not permission for a final umbrella commit or review-time implementation. Each boundary closes with its own verified, phase-owned Conventional Commit during implementation.
+These are implementation risk boundaries, not permission for a final umbrella commit or review-time implementation. Each scope passes its own acceptance gate before merge (for example, PR-FOUNDATION runs its applicable provider matrix and migrations), and each phase inside it closes with its own verified, phase-owned Conventional Commit.
+
+## Plane Tracking Plan Audit
+
+Audit plan §0 **Plane Tracking Plan** and `event/work/active-<task-slug>.yaml` against [plan-tracking](../../plane-compose/resources/plan-tracking.md) and [taxonomy §4.1](../../../../docs/internal/project-management/work-item-taxonomy-and-granularity-report.md#41-tracking-budget-per-implementation-plan-plan--plane-mapping).
+
+- **Fail flooding:** an item per phase, test, doc, review, verification gate or commit; more than `6` new items or a new Epic without the user's approval.
+- **Fail under-tracking:** several separately merged PRs under one item without Sub-items, two providers or capabilities in one item, or substantial work with no item.
+- **Check:** an existing item was searched for and reused where one fits; every new item has `parent:` = the right capability Epic UUID, Surface + Domain labels (not the retiring `Docs` label), `priority` as functional criticality, a Version Module, `state: Backlog`, no `assignees:`, and `id:` omitted while unpushed; Sub-items are listed in the plan, not yet in YAML; each PR scope names its item; no commit or PR logs sit in `description:`.
+- **Right-sizing changes:** when the number of merged PRs changes, update the Tracking Plan to match (an S plan that becomes multi-PR turns into a parent plus Sub-items).
+- Rewrite a wrong Tracking Plan in place. On `Applied & Aligned`, set the active item to `state: Ready` in YAML (local only; execution pushes it). This marks plan readiness for tracking only; individual PR scopes still become Ready only through their own readiness check.
 
 ## Test-First Invariant Rewrite Pattern (for `tasks.md`)
 

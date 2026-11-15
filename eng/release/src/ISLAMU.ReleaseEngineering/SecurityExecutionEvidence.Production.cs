@@ -1023,8 +1023,20 @@ public static partial class SecurityExecutionEvidence
         string[] files = paths.Order(StringComparer.Ordinal).ToArray();
         if (files.Length > 65_536)
             throw new OwnedExecutionFailure("native_tool_input_count_invalid");
-        if (files.Any(path => !NoInputLinks(path)))
-            throw new OwnedExecutionFailure("native_tool_input_links_invalid");
+        string? linkedInput = files.FirstOrDefault(path => !NoInputLinks(path));
+        if (linkedInput is not null)
+        {
+            string source = linkedInput switch
+            {
+                var path when path == ReleaseToolPaths.Dotnet => "dotnet",
+                var path when path == ReleaseToolPaths.Git => "git",
+                "/usr/bin/setsid" => "setsid",
+                "/usr/bin/kill" => "kill",
+                "/usr/bin/stat" => "stat",
+                _ => "runtime"
+            };
+            throw new OwnedExecutionFailure($"native_tool_input_links_invalid_{source}");
+        }
         if (!AreRegularCandidateInputsAsync(files).GetAwaiter().GetResult())
             throw new OwnedExecutionFailure("native_tool_input_type_invalid");
         var captured = new List<object>();

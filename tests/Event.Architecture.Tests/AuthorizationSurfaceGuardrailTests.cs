@@ -21,6 +21,22 @@ public sealed class AuthorizationSurfaceGuardrailTests
     private static readonly InventoryEntry[] NamedOperationExceptions =
     [
         new(
+            "Explore.Application.Features.Authentication.Continuation.Commands.JoinVerifiedTenantCommand",
+            "original-verified-human-enrollment-owner",
+            "The retained human security gate and prepared subject must match the canonical account key and selected tenant. Identity and discovery fences, current visitor admission and the original settlement owner govern membership creation and final admission."),
+        new(
+            "Explore.Application.Features.Authentication.Continuation.ResolveVerifiedAccountContinuationQuery",
+            "verified-authentication-adapter-read",
+            "Verified authentication adapters supply the canonical account key. The read-only handler verifies the persisted provider binding ordinally and excludes deleted users and inactive memberships before selecting a destination; it creates no account, membership or credential."),
+        new(
+            "Explore.Application.Features.Authentication.Local.Requests.Commands.ReserveLocalVisitorEnrollmentCommand",
+            "original-browser-enrollment-owner",
+            "The handler requires a UUIDv7 operation and bounded browser-proof digest. The selected Local enrollment owner retains that proof and tenant, checks the current Local provider and visitor admission, and protects the original reservation intent."),
+        new(
+            "Explore.Application.Features.Authentication.Local.Requests.Commands.RegisterLocalVisitorCommand",
+            "original-browser-enrollment-owner",
+            "The handler requires a bounded browser-proof digest. The selected enrollment owner verifies the protected original operation, proof and tenant before its retained credential and membership workflow; a completed replay cannot replace credentials or allocate another account."),
+        new(
             "Explore.Application.Features.Tenants.Requests.Commands.DeleteTenantCommand",
             "original-human-tenant-deletion-owner",
             "DeleteTenantCommandHandler delegates deletion to IHumanTenantMutationPreparation.ExecuteDeletionAsync, which retains the original request and selected human tenant owner before persistence."),
@@ -459,6 +475,8 @@ public sealed class AuthorizationSurfaceGuardrailTests
         new("InstanceOnboardingController.ValidateSecret", "PublicOrSignatureGated", "Existing anonymous mutation surface explicitly preserved by Phase 0 inventory; Task 0.3 must verify public/signature/setup boundary or add authorization."),
         new("LocalAuthController.Login", "PublicOrSignatureGated", "Anonymous credential verification is protected by the dedicated write rate policy, generic failures, runtime primary-provider gating, and lockout; idempotency replay would retain issued credentials."),
         new("LocalAuthController.Register", "PublicOrSignatureGated", "Anonymous account creation is protected by validation, normalized uniqueness, the dedicated write rate policy, runtime primary-provider gating, and rollback on token/sync failure."),
+        new("LocalVisitorEnrollmentController.Reserve", "PublicOrSignatureGated", "The exact reservation action requires a UUIDv7 operation and original browser proof through the selected tenant-bound Local enrollment owner. Dedicated write rate limiting, private no-store responses and suppressed idempotency storage remain enforced."),
+        new("LocalVisitorEnrollmentController.Register", "PublicOrSignatureGated", "The exact completion action requires the protected original reservation and matching browser proof, operation and tenant. Its retained enrollment owner controls credential creation and replay; dedicated write rate limiting, private no-store responses and suppressed idempotency storage remain enforced."),
         new("RegistrationProviderCallbackController.RecordCallback", "PublicOrSignatureGated", "Existing anonymous mutation surface explicitly preserved by Phase 0 inventory; Task 0.3 must verify public/signature/setup boundary or add authorization."),
     ];
     private static readonly InventoryEntry[] NamedAnonymousMutationViolations = [];

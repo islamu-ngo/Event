@@ -1,4 +1,5 @@
 #:project ../../src/Explore.Domain/Explore.Domain.csproj
+#:property PublishAot=false
 
 using System.Text.Json;
 using Explore.Domain.Keycloak;

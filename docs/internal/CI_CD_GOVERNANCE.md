@@ -39,9 +39,10 @@ The selected SDK servicing baseline is recorded in
 Chromium through the file-based `eng/tools/InstallAssuranceBrowser.cs` entrypoint.
 Its dedicated `eng/tools/InstallAssuranceBrowser/packages.lock.json` owns the
 installer's package graph without colliding with the neighboring tools lock.
-Regenerate it with the selected SDK, then verify the entrypoint's locked restore
-and its SDK-selected compiler/linker dependencies. Retain at least the
-10.0.14 patched floor for
+The provisioner runs as a framework-dependent tool with `PublishAot=false`;
+its lock must not require a native compiler for one developer host architecture.
+Regenerate it with the selected SDK, then verify locked restore and the portable
+package graph. Tools that use native AOT still require a serviced compiler for
 [GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9).
 Playwright remains at its separately approved version; auditing stays enabled.
 

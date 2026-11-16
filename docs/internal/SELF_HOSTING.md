@@ -43,6 +43,15 @@ explicit Global credential projection.
 External provider setup and signed Cerbos publication precede runtime readiness;
 no retired bootstrap script or runtime publisher is restored by this topology.
 
+Local Aspire profiles declare Cerbos storage through the PostgreSQL hosting
+integration. Its connection health check participates in Cerbos's existing
+healthy-dependency wait; a running database container alone cannot release
+that wait. The selected operator credentials, PostgreSQL 18 image, database
+name, existing data volume and initialization binding remain unchanged.
+`AppHostCompositionContractTests` checks this dependency in both Split and
+Standalone models without launching infrastructure. Managed startup and
+metrics scraping remain separate runtime acceptance checks.
+
 PostgreSQL startup uses separately selected Runtime, Migrator and Global
 database authorities. Migration authority installs policies, provider
 adjustments and purpose capabilities before runtime admission; request

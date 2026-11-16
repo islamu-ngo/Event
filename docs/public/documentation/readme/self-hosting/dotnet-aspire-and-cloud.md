@@ -13,10 +13,16 @@ description: Use Aspire locally and adapt declared resources to adopter-owned cl
 To run the complete platform orchestrator during local development:
 
 ```bash
-aspire run --apphost Explore.AppHost/Explore.AppHost.csproj
+aspire start --apphost src/Explore.AppHost/Explore.AppHost.csproj
 ```
 
 The AppHost declares resources, dependency ordering, service discovery, configuration injection, health checks, and restart relationships (see [Local Development Guide](../contributing/local-development.md)). Use the Aspire dashboard and resource logs to inspect startup. Ports in Aspire are assigned dynamically; do not assume static Docker Compose port numbers.
+
+The local Cerbos service waits for its PostgreSQL server's connection health
+check before starting. A container marked Running is insufficient. Existing
+database credentials, data volume and initialization remain selected by the
+same operator configuration; no replacement credential or manual retry is
+required by this readiness ordering.
 
 ---
 

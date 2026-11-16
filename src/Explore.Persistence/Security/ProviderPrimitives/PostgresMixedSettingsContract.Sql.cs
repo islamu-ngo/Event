@@ -441,6 +441,7 @@ public static partial class PostgresMixedSettingsContract
         ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         // ExactBodies stays in the invoker; embedding it here would recursively enumerate this body.
+        yield return (CatalogueGuardName, "", "", "void", CatalogueGuardBody(context, enrollment));
         yield return ("ready", "uuid", "p_tenant uuid", "void", $"""
             BEGIN
                 {Guard(context, enrollment)}

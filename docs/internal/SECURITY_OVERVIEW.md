@@ -263,3 +263,32 @@ remain intact; no retry or privilege change replaces those controls. Three nativ
 controls pass: before/after-snapshot original creator fencing and a real
 low-watermark deferral transition. The original worker recovery witness remains
 pending.
+
+## Private settings and provisioning catalogue assertions
+
+`PostgresMixedSettingsContract` stores its complete catalogue assertion once in
+`mixed_settings_assert_catalogue()`. Existing runtime guard sites first verify
+that function's owner, execution flags, search path, language, private ACL and
+body digest. The expected SHA-256 digest is generated from the C# declaration
+and embedded in each caller; a replacement function cannot establish its own
+identity by changing its body comment. The caller then executes the complete
+assertion again. PostgreSQL can reuse the compiled assertion without caching an
+authorization result or retaining another large assertion in every routine.
+
+Only the existing MixedSettings owner can execute this helper. Installation
+and runtime entry share the same metadata witness: the owner must retain
+effective `EXECUTE`, and no nonowner may hold an execution ACL. Owner grant
+options follow the canonical privilege contract rather than a stricter local
+ACL representation. A null ACL is expanded to PostgreSQL defaults, so default
+public execution cannot pass as a private definition. Installation
+derives permanent function grants from the privilege manifest, excluding the
+implicit owner grant; temporary Migrator grants for trigger creation are still
+revoked. Original-session installer and Migrator readiness checks remain inline,
+and exact generated-body admission stays outside runtime body generation.
+Source triggers still attest before acquiring their existing lock and changing
+the revision. Terminal settlement still checks only its private receipt.
+
+Missing, replaced, restamped or broadened helper definitions fail before protected
+effects. Reinstallation diagnoses drift without repairing it. Trusted schema
+administration retains the existing deployment trust boundary; this refactor
+adds no runtime DDL permission, role, pool policy or resource-limit exception.

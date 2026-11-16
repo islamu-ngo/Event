@@ -111,6 +111,18 @@ cannot change it, and disabling delivery still requires its preview and
 confirmation workflow. This does not make other messaging routes public.
 This needs no new configuration, credential or database grant.
 
+Native PostgreSQL mixed-settings checks use one private catalogue assertion
+instead of retaining its compiled definition separately in every operation.
+Each protected entry validates that assertion and runs the permission checks
+again. Runtime, Global and email-purpose database identities cannot invoke the
+private assertion directly; their existing application operations retain their
+reviewed permissions.
+
+Freshly provision development-native profiles with the current migrator before
+starting this revision. Startup and later operations reject an absent, modified
+or broadened assertion, and reinstallation does not silently repair it. No new
+credential or larger database memory allowance is required by this change.
+
 Each deployment has exactly one **primary authentication provider**:
 
 * **Local Identity** uses ASP.NET Core Identity inside ISLAMU Event. It is the

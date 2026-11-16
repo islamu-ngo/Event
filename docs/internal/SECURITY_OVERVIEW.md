@@ -27,6 +27,58 @@ proof never grants configuration authority.
 
 The approved lifecycle-email plan adds dispatch-time privacy authorization without changing SMTP into an authority. Email may target only a current verified tenant member or an authorization-bound same-tenant managed tenant-administrator invitation. Incompatible pre-1.0 delivery ledgers are reset instead of receiving a synthetic legacy authority; inbox notifications and unrelated business/audit/settings data remain preserved. Consent, preference, disclosure, deletion, and supersession may narrow a snapshotted policy before provider handoff, never broaden it.
 
+## Human Event-provider checkpoint admission
+
+`RegistrationProviderDeferredCheckpointJournal` retains credential-refresh and
+access-validation observations until the original authenticated operation owns
+its Serializable transaction. Provider transport does not open that transaction
+or replay itself during settlement. The selected human, tenant, command,
+physical context and transaction remain part of admission.
+
+`ISerializableAttemptOwner.ExecuteWithOriginalPrivacyAsync` retains the original
+privacy identity fence through that owner's final admissions and physical
+settlement. A co-located SQLite authority joins the existing transaction; it
+does not create a second transaction or commit independently. A separate
+authority retains its own original gate around the complete primary attempt.
+This lets imported-form publication recheck subject erasure at the owning
+commit. Authority setup failures prevent business execution, and failures
+after acknowledged primary commit retain committed-cleanup semantics rather
+than becoming rollback evidence.
+
+External-form import also acquires the selected context's discovery-enrollment
+session gate before the primary transaction begins and retains it through
+settlement. Existing human-source custody precedes that acquisition. The
+transaction's form-creation save therefore uses the same original connector
+and enrollment lease rather than acquiring a missing gate after `BEGIN`.
+
+Provider checkpoint and form mutations also advance Event classification
+revisions. `HumanEventProviderSourceFence` captures persisted Event scalar images
+for the target and the observed connections' existing form/version ancestry
+before business mutation. `HumanEventProviderSourceWriteGuard` accepts a revision
+successor only from native classification and ordinary concurrency preparation,
+then publishes its prepared image only after `SavedChanges`. Multiple successful
+saves extend that private chain. Failed or incomplete saves cannot supply
+commit evidence, and newly encountered roots cannot become replacement
+baselines. Shared-connection fanout advances sibling revisions without granting
+permission to change their business fields.
+
+Resetting the owning human attempt detaches its write guard and discards that
+transaction's evidence. A later command in the same application scope must
+acquire its own guard. Final authority comparison precedes business-image
+validation, preserving authorization refusal for changed Event ownership,
+routes and unproven Event revisions.
+
+The context-installed save interceptor requires a native prepared image for
+every changed Event, including mutations introduced by `SavingChanges`
+callbacks. Callback registration order does not select the guard's position.
+Unobserved classification carriers reject. Final admission first applies the
+existing command-specific business-source transition rules and then compares
+fresh persisted Event images against successful-save evidence. Preparation and
+acquisition still require the original Event revision; final admission compares
+the fresh revision against the proven successor while retaining the original
+principal, route, support and lifetime checks. A lost commit acknowledgment
+remains an unknown outcome and does not authorize transport or mutation replay.
+
 ## Authentication-provider reference visibility
 
 `PostgresLookupCatalogueReadPermissions` owns Runtime reads of the fixed

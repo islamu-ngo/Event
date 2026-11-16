@@ -3,6 +3,7 @@ using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Exceptions;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -239,6 +240,15 @@ public sealed partial class NativeEventPublicActionsHttpTests
     private sealed class AdministrativeAfterBodyOwner(
         ISerializableAttemptOwner inner, Func<CancellationToken, Task> afterBody) : ISerializableAttemptOwner
     {
+        public Task<T> ExecuteWithOriginalPrivacyAsync<T>(IOriginalPrivacyIdentityFenceAuthority privacy,
+            Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
+            inner.ExecuteWithOriginalPrivacyAsync(privacy, async token =>
+            {
+                var result = await operation(token);
+                await afterBody(token);
+                return result;
+            }, cancellationToken);
+
         public Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
             inner.ExecuteAsync(async token =>
             {

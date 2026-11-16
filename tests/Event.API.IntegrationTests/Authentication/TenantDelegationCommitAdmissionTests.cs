@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Models.Common;
@@ -112,6 +113,15 @@ public sealed class TenantDelegationCommitAdmissionTests
     private sealed class AfterOriginalBody(EfCoreUnitOfWork inner, Func<CancellationToken, Task> afterBody)
         : IUnitOfWork, ISerializableAttemptOwner
     {
+        public Task<T> ExecuteWithOriginalPrivacyAsync<T>(IOriginalPrivacyIdentityFenceAuthority privacy,
+            Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
+            ((ISerializableAttemptOwner)inner).ExecuteWithOriginalPrivacyAsync(privacy, async token =>
+            {
+                var result = await operation(token);
+                await afterBody(token);
+                return result;
+            }, cancellationToken);
+
         public Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
             ((ISerializableAttemptOwner)inner).ExecuteAsync(async token =>
             {

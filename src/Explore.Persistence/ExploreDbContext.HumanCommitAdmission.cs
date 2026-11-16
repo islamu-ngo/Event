@@ -92,6 +92,7 @@ public partial class ExploreDbContext
 
     internal void ResetHumanCommitAdmissions()
     {
+        HumanEventProviderWrites?.Detach();
         _humanCommitAdmissions.Clear();
         HumanCommitAttemptOwnsTransaction = false;
     }

@@ -4,6 +4,21 @@ description: Operate Local Identity, Keycloak, or passwordless AT Protocol authe
 
 # Authentication Architecture
 
+## Event registration-provider operations
+
+When an authenticated operator manages an Event's external registration
+provider, credential-refresh and access-validation timestamps settle with that
+operation's database changes. Expired authority or changed provider inputs
+reject settlement and roll back those timestamps. A successful remote read
+alone does not mean the Event operation committed.
+
+A connection shared by several Events may advance their content revisions
+during an authorized update. This does not permit changing another Event's
+title or other business fields. If a commit acknowledgment is lost, the outcome
+is uncertain: inspect the operation's persisted state before attempting another
+action. The server does not automatically replay provider transport to resolve
+that uncertainty. Background-worker checkpoint behavior remains immediate.
+
 ## AT Protocol OAuth publication
 
 Use the deployment's HTTPS public origin for `/oauth/client-metadata.json` and

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.DTOs.EventTemplate;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventTemplates.Requests.Commands;
@@ -200,6 +201,14 @@ public sealed class MutationScopeHumanGateTests
     private sealed class ObservedAttempt(ISerializableAttemptOwner actual, ExploreDbContext context,
         CommandObservation observation) : ISerializableAttemptOwner
     {
+        public async Task<T> ExecuteWithOriginalPrivacyAsync<T>(IOriginalPrivacyIdentityFenceAuthority privacy,
+            Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default)
+        {
+            bool observed = observation.BeforeAttempt(context);
+            try { return await actual.ExecuteWithOriginalPrivacyAsync(privacy, operation, cancellationToken); }
+            finally { if (observed) observation.AfterSettlement(context); }
+        }
+
         public async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default)
         {

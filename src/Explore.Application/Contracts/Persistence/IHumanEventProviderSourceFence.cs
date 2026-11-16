@@ -31,6 +31,8 @@ public interface IHumanEventProviderSourceLease
     HumanEventProviderSourceFacts Facts { get; }
     /// <summary>Fresh physical reads and closed own-transition validation, never a tracked snapshot.</summary>
     Task<HumanEventProviderSourceFacts> ValidateAsync(CancellationToken cancellationToken = default);
+    /// <summary>Validates permitted business transitions and successful native Event revision provenance.</summary>
+    Task<Guid> ValidateEventCommitAsync(CancellationToken cancellationToken = default);
 }
 
 public enum HumanEventProviderOperation

@@ -1,3 +1,5 @@
+using Explore.Application.Contracts.PrivacyErasure;
+
 namespace Explore.Application.Contracts.Persistence;
 
 /// <summary>
@@ -7,4 +9,8 @@ namespace Explore.Application.Contracts.Persistence;
 public interface ISerializableAttemptOwner
 {
     Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default);
+
+    /// <summary>Retains the original privacy gate through this owner's physical settlement without replay.</summary>
+    Task<T> ExecuteWithOriginalPrivacyAsync<T>(IOriginalPrivacyIdentityFenceAuthority privacy,
+        Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default);
 }

@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Explore.Persistence;
@@ -143,16 +144,21 @@ public partial class ExploreDbContext : DbContext
     /// </summary>
     public ICurrentUserService? CurrentUserService { get; set; }
 
-    public ExploreDbContext(DbContextOptions<ExploreDbContext> options) : base(WithDisclosureInterceptor(options))
+    public ExploreDbContext(DbContextOptions<ExploreDbContext> options) : base(WithPersistenceInterceptors(options))
     {
     }
 
-    private static DbContextOptions<ExploreDbContext> WithDisclosureInterceptor(DbContextOptions<ExploreDbContext> options)
+    private static DbContextOptions<ExploreDbContext> WithPersistenceInterceptors(DbContextOptions<ExploreDbContext> options)
     {
-        var interceptor = Explore.Persistence.Database.EventDiscoveryDisclosureTransactionInterceptor.Instance;
-        return options.FindExtension<CoreOptionsExtension>()?.Interceptors?.Contains(interceptor) == true
+        IInterceptor[] required =
+        [
+            Explore.Persistence.Database.EventDiscoveryDisclosureTransactionInterceptor.Instance,
+            Security.HumanEventProviderSourceWriteGuard.SaveInterceptor
+        ];
+        var missing = required.Except(options.FindExtension<CoreOptionsExtension>()?.Interceptors ?? []).ToArray();
+        return missing.Length == 0
             ? options
-            : new DbContextOptionsBuilder<ExploreDbContext>(options).AddInterceptors(interceptor).Options;
+            : new DbContextOptionsBuilder<ExploreDbContext>(options).AddInterceptors(missing).Options;
     }
 
     public void EnableTenantFilterBypass(string reason)

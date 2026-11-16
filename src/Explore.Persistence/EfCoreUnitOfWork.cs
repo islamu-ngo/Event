@@ -2,8 +2,10 @@ using System.Data;
 using System.Data.Common;
 using System.Runtime.ExceptionServices;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Exceptions;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -88,6 +90,54 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, IPrivacyIdentityEnro
         return ExecuteCoreAsync(operation, IsolationLevel.Serializable, cancellationToken, allowReplay: false);
     }
 
+    async Task<T> ISerializableAttemptOwner.ExecuteWithOriginalPrivacyAsync<T>(
+        IOriginalPrivacyIdentityFenceAuthority privacy, Func<CancellationToken, Task<T>> operation,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(privacy);
+        ArgumentNullException.ThrowIfNull(operation);
+        if (!_dbContext.Database.IsRelational() || _dbContext.Database.CurrentTransaction is not null
+            || ExecutionStrategy.Current?.RetriesOnFailure == true)
+            throw new InvalidOperationException("Original privacy settlement requires an idle single-attempt owner.");
+        if (privacy is EmbeddedPrivacyErasureAuthorityRepository embedded
+            && embedded.UsesOriginalApplicationContext(_dbContext))
+            return await ExecuteCoreAsync(operation, IsolationLevel.Serializable, cancellationToken,
+                allowReplay: false, joinedPrivacy: embedded);
+
+        bool primaryCommitted = false;
+        Exception? primaryFailure = null;
+        try
+        {
+            return await privacy.ExecuteOriginalEnrollmentAsync(async token =>
+            {
+                try
+                {
+                    var result = await ((ISerializableAttemptOwner)this).ExecuteAsync(operation, token);
+                    primaryCommitted = true;
+                    return result;
+                }
+                catch (Exception failure)
+                {
+                    primaryFailure = failure;
+                    throw;
+                }
+            }, cancellationToken);
+        }
+        catch (Exception failure)
+        {
+            if (primaryCommitted)
+                throw new TransactionCommittedCleanupException(failure);
+            if (primaryFailure is not null && !ReferenceEquals(primaryFailure, failure))
+            {
+                var evidence = new AggregateException(primaryFailure, failure);
+                if (primaryFailure is TransactionCommittedCleanupException)
+                    throw new TransactionCommittedCleanupException(evidence);
+                throw new HumanMutationOutcomeUnknownException(evidence);
+            }
+            throw;
+        }
+    }
+
     public Task<T> ExecuteBootstrapConvergenceAsync<T>(
         Func<CancellationToken, Task<T>> operation,
         CancellationToken ct = default) =>
@@ -147,7 +197,8 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, IPrivacyIdentityEnro
         IsolationLevel? isolationLevel,
         CancellationToken ct,
         Func<CancellationToken, Task>? beforeCommit = null,
-        bool allowReplay = true)
+        bool allowReplay = true,
+        EmbeddedPrivacyErasureAuthorityRepository? joinedPrivacy = null)
     {
         // Co-located SQLite shares the authority write transaction: the gate
         // commits both contexts after this operation returns.
@@ -239,24 +290,35 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, IPrivacyIdentityEnro
                 try
                 {
                     _dbContext.HumanCommitAttemptOwnsTransaction = !allowReplay;
-                    var result = await operation(ct);
-                    if (beforeCommit is not null)
-                        await _dbContext.SaveChangesAsync(ct);
-                    if (_dbContext.StorageReferenceTransactionFailed)
-                        throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
-                            "The storage reference transaction has failed.");
-                    await _dbContext.FlushDisclosureAsync(ct);
-                    await _dbContext.ValidateTrustedSetupSettingsSourcesAsync(ct);
-                    await _dbContext.ValidateHumanCommitAdmissionsAsync(ct);
-                    if (beforeCommit is not null)
-                        await beforeCommit(ct);
-                    _dbContext.ValidateHumanCommitAdmissionTimes();
-                    _dbContext.ValidateTrustedSetupSettingsTimes();
-                    AdmissionTargetTransaction.RequireCurrentIfHeld(_dbContext);
-                    commitAttempted = true;
-                    await transaction.CommitAsync(ct);
-                    commitAcknowledged = true;
-                    return result;
+                    return joinedPrivacy is null ? await SettleAsync()
+                        : await joinedPrivacy.ExecuteJoinedOriginalEnrollmentAsync(
+                            _dbContext, _ => SettleAsync(), ct);
+
+                    async Task<T> SettleAsync()
+                    {
+                        var result = await operation(ct);
+                        if (beforeCommit is not null)
+                            await _dbContext.SaveChangesAsync(ct);
+                        if (_dbContext.StorageReferenceTransactionFailed)
+                            throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
+                                "The storage reference transaction has failed.");
+                        await _dbContext.FlushDisclosureAsync(ct);
+                        await _dbContext.ValidateTrustedSetupSettingsSourcesAsync(ct);
+                        await _dbContext.ValidateHumanCommitAdmissionsAsync(ct);
+                        if (beforeCommit is not null)
+                            await beforeCommit(ct);
+                        _dbContext.ValidateHumanCommitAdmissionTimes();
+                        _dbContext.ValidateTrustedSetupSettingsTimes();
+                        AdmissionTargetTransaction.RequireCurrentIfHeld(_dbContext);
+                        commitAttempted = true;
+                        await transaction.CommitAsync(ct);
+                        commitAcknowledged = true;
+                        return result;
+                    }
+                }
+                catch (Exception ex) when (commitAcknowledged)
+                {
+                    throw new TransactionCommittedCleanupException(ex);
                 }
                 catch (Exception ex) when (!allowReplay && commitAttempted
                     && (!IsSerializableRetryConflict(ex)

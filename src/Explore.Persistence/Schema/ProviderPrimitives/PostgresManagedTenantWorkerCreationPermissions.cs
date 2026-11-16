@@ -362,7 +362,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
                             AND a.attnotnull=expected_column.required AND a.attidentity='' AND a.attgenerated=''))
                 WHERE a.attrelid IS NULL)
             """;
-        var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var metadata = context.GetTenantTableInventory()
             .SingleOrDefault(table => table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
         string tenant = metadata is null ? "NOT c.relrowsecurity AND NOT c.relforcerowsecurity" : $"""
             c.relrowsecurity AND c.relforcerowsecurity AND EXISTS (SELECT 1 FROM pg_catalog.pg_policy p
@@ -443,7 +443,7 @@ public static class PostgresManagedTenantWorkerCreationPermissions
     private static Source[] MapSources(ExploreDbContext context,
         IEnumerable<ManagedTenantWorkerCreationInventory.Source> inventory)
     {
-        var tenants = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenants = context.GetTenantTableInventory();
         return inventory.Select(item =>
         {
             var entity = context.Model.FindEntityType(item.Entity) ?? throw new InvalidOperationException("worker_creation_model_missing");

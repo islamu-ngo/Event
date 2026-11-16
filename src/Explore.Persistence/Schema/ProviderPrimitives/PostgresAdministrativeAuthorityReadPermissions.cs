@@ -280,7 +280,7 @@ public static class PostgresAdministrativeAuthorityReadPermissions
     private static Source[] ReadSources(ExploreDbContext context)
     {
         var names = context.GetService<ISqlGenerationHelper>();
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         return Inventory.Select(item =>
         {
             var entity = context.Model.FindEntityType(item.Type) ?? throw new InvalidOperationException("administrative_scope_model_missing");

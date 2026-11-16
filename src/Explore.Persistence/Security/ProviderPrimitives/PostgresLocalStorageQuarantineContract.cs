@@ -54,7 +54,7 @@ public static class PostgresLocalStorageQuarantineContract
         command.CommandTimeout = 5;
         var functions = Functions(context);
         var reads = ReadColumns();
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string quarantine = Table(context, typeof(LocalStorageQuarantine));
         var predicates = new List<string>
         {
@@ -222,7 +222,7 @@ public static class PostgresLocalStorageQuarantineContract
         var sql = context.GetService<ISqlGenerationHelper>();
         string schema = sql.DelimitIdentifier(Schema(context));
         string quarantine = Table(context, typeof(LocalStorageQuarantine));
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string[] quarantineColumns = context.Model.FindEntityType(typeof(LocalStorageQuarantine))!
             .GetProperties().Select(property => Column(context, typeof(LocalStorageQuarantine), property.Name)).ToArray();
         string reads = string.Join("\n", ReadColumns().Select(read =>

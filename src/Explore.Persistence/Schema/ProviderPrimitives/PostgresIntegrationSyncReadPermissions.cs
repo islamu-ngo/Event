@@ -215,7 +215,7 @@ public static class PostgresIntegrationSyncReadPermissions
         if (entity.BaseType is not null || entity.GetDerivedTypes().Any() || entity.GetComplexProperties().Any()
             || entity.FindPrimaryKey()?.Properties is not [var key] || key.Name != nameof(IntegrationSyncOutbox.Id))
             throw new InvalidOperationException(Drift);
-        var tenant = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var tenant = context.GetTenantTableInventory()
             .Single(value => value.TableName == table && (value.Schema ?? schema) == schema);
         if (tenant.AllowsNullTenant || tenant.ParentJoin is not null) throw new InvalidOperationException(Drift);
         var columns = Properties.Select(name =>

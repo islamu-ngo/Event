@@ -243,7 +243,7 @@ public static partial class PostgresAiActorContextReadContract
 
         internal IReadOnlyDictionary<Type, string> Policies(ExploreDbContext owner)
         {
-            var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(owner.Model);
+            var tenantTables = owner.GetTenantTableInventory();
             return Sources.Keys.ToDictionary(type => type, type =>
             {
                 var entity = owner.Model.FindEntityType(type)!;

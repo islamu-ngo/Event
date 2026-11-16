@@ -52,6 +52,15 @@ name, existing data volume and initialization binding remain unchanged.
 Standalone models without launching infrastructure. Managed startup and
 metrics scraping remain separate runtime acceptance checks.
 
+Permission and policy builders reuse a validated, read-only tenant-table
+inventory owned by each `ExploreDbContext` and its exact EF model reference.
+This removes repeated traversal of the same entity, navigation and query-filter
+metadata during startup. The snapshot contains model metadata only: each
+consumer still resolves its target schema and performs its live catalogue,
+connection, permission and tenant checks. It neither records admission results
+nor shares state between contexts. The public arbitrary-model derivation remains
+uncached so callers inspecting a mutable model observe its current shape.
+
 PostgreSQL startup uses separately selected Runtime, Migrator and Global
 database authorities. Migration authority installs policies, provider
 adjustments and purpose capabilities before runtime admission; request

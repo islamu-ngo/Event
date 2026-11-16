@@ -104,7 +104,7 @@ public static partial class PostgresConfigurationImportLegalSourceContract
     private static string TenantFingerprint(ExploreDbContext context, Type type)
     {
         string tableName = context.Model.FindEntityType(type)!.GetTableName()!;
-        var table = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var table = context.GetTenantTableInventory()
             .SingleOrDefault(candidate => candidate.TableName == tableName)
             ?? throw new InvalidOperationException("configuration_import_legal_source_tenant_rls_model_required");
         return PostgresTenantRowLevelSecurityModel.BuildPolicyFingerprintPrefix(table, Schema(context, type));

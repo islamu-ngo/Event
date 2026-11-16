@@ -25,7 +25,7 @@ public static partial class PostgresManagedProviderProvisioningContract
                     .Select(column => sql.Quote(column.Name)).ToArray();
                 return columns.Length == 0 ? "" : $"GRANT {privilege} ({string.Join(",", columns)}) ON {sql.Name(relation.Name)} TO {OwnerRole};";
             }))));
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string policies = string.Join("\n", Sources.Where(relation => tenantTables.Any(table =>
                 table.TableName == context.Model.FindEntityType(relation.Type)!.GetTableName()))
             .Select(relation => $"CREATE POLICY {Policy} ON {sql.Table(relation.Type)} FOR ALL TO {OwnerRole} USING (true) WITH CHECK (true);"));

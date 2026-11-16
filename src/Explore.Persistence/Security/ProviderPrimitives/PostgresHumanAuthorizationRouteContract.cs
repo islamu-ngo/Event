@@ -115,7 +115,7 @@ public static class PostgresHumanAuthorizationRouteContract
                     AND f.prolang = (SELECT oid FROM pg_catalog.pg_language WHERE lanname = 'plpgsql'))
             THEN RAISE EXCEPTION 'human_route_routine_drift' USING ERRCODE = '55000'; END IF;
             """));
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string policies = string.Join("\n", HumanAuthorizationRouteSql.Sources.Select(source =>
         {
             string table = sql.Table(source.Type);

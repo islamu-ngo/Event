@@ -184,7 +184,7 @@ public static partial class PostgresConfigurationImportReceiptContract
             OR {string.Join(" OR ", relations.Select(relation => Schema(context, relation.Type)).Distinct(StringComparer.Ordinal)
                 .Select(name => $"NOT pg_catalog.has_schema_privilege('{OwnerRole}', {Text(name)}, 'USAGE')"))}
             """;
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         var policies = relations.Select(relation =>
         {
             Type type = relation.Type;

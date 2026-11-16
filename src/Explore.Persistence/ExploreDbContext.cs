@@ -1,8 +1,10 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence.Schema;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace Explore.Persistence;
 
@@ -13,8 +15,21 @@ public partial class ExploreDbContext : DbContext
     private bool _tenantLeaseBound;
     private Guid? _tenantLeaseId;
     private ITenantContext? _tenantLeaseIdentity;
+    private (IModel Model, IReadOnlyList<TenantTableMetadata> Tables)? _tenantTableInventory;
     internal bool IsPostgresRuntimeReady { get; set; }
     internal bool IsConfigurationInstanceImportOwner { get; private set; }
+
+    /// <summary>Retains only validated immutable metadata for this context's exact initialized model.</summary>
+    internal IReadOnlyList<TenantTableMetadata> GetTenantTableInventory()
+    {
+        var model = Model;
+        if (_tenantTableInventory is { } prepared && ReferenceEquals(prepared.Model, model))
+            return prepared.Tables;
+
+        var tables = Array.AsReadOnly(PostgresTenantRowLevelSecurityModel.GetTenantTables(model).ToArray());
+        _tenantTableInventory = (model, tables);
+        return tables;
+    }
 
     internal void BindConfigurationInstanceImportOwner()
     {

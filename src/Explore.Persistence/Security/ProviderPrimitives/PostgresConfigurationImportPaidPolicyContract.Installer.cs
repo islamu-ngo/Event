@@ -175,7 +175,7 @@ public static partial class PostgresConfigurationImportPaidPolicyContract
                     $"WHERE {ParentMatch(context, type, table)} AND {TargetPredicate(context, "policy.", allowPage: false)} " +
                     $"AND policy.{Column(context, typeof(PaidEventPolicyVersion), "IsActive")} " +
                     $"AND policy.{Column(context, typeof(PaidEventPolicyVersion), "ActiveUniquenessSlot")} = 0)";
-            var tenantTable = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+            var tenantTable = context.GetTenantTableInventory()
                 .Single(candidate => candidate.TableName == context.Model.FindEntityType(type)!.GetTableName());
             return (Table: table, Predicate: predicate, Check: check,
                 TenantFingerprint: PostgresTenantRowLevelSecurityModel.BuildPolicyFingerprintPrefix(tenantTable, Schema(context, type)),

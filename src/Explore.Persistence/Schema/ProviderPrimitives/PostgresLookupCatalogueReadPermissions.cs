@@ -58,7 +58,7 @@ public static class PostgresLookupCatalogueReadPermissions
                 _ => typeof(string)
             })))
             throw new InvalidOperationException("global_lookup_model_shape_drift");
-        var tenantTable = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var tenantTable = context.GetTenantTableInventory()
             .SingleOrDefault(table => table.TableName == entity.GetTableName());
         if (type == typeof(EventType)
             ? tenantTable is not { AllowsNullTenant: true, ParentJoin: null, TenantIdColumn: not null }

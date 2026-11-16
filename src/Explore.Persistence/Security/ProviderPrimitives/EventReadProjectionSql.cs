@@ -155,7 +155,7 @@ internal static class EventReadProjectionSql
     internal static string PublicSourceGuard(ExploreDbContext context, HumanPrincipalSourceSql names,
         IReadOnlyDictionary<Type, HashSet<string>> sources, string migratorLogin, string diagnosticPrefix)
     {
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         return $"""
             IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n WHERE n.nspname = {Text(names.Schema)}
                 AND n.nspowner = pg_catalog.to_regrole({Text(migratorLogin)})::oid)

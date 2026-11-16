@@ -260,7 +260,7 @@ public static class PostgresInventoryHoldExpiryReadPermissions
     private static Source[] Sources(ExploreDbContext context)
     {
         var names = context.GetService<ISqlGenerationHelper>();
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         return Inventory.Select(item =>
         {
             var entity = context.Model.FindEntityType(item.Type) ?? throw new InvalidOperationException("hold_expiry_model_missing");

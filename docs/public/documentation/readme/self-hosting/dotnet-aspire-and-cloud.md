@@ -24,6 +24,14 @@ database credentials, data volume and initialization remain selected by the
 same operator configuration; no replacement credential or manual retry is
 required by this readiness ordering.
 
+Allow the migration service to finish migrations and lookup seeding before
+checking application readiness. Startup now avoids repeating preparation of
+unchanged application model metadata; this requires no new credentials or
+database permissions. Verify the application's private operations health and
+metrics endpoints after startup. These checks establish application readiness
+and metric exposition; delivery recovery and log collection require their own
+operational checks.
+
 ---
 
 ## Cloud Adaptation Considerations

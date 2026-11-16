@@ -264,7 +264,7 @@ internal static class ActorPublisherCatalogProof
     internal static string SourceGuard(ExploreDbContext context, HumanPrincipalSourceSql names,
         IReadOnlyCollection<Type> sources, PostgresNativeQueueEnrollment enrollment, string diagnosticPrefix)
     {
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         return $"""
             IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n WHERE n.nspname = {Text(names.Schema)}
                 AND n.nspowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid)

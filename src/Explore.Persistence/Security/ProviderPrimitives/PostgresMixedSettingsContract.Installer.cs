@@ -14,7 +14,7 @@ public static partial class PostgresMixedSettingsContract
         var contract = Privileges(context, enrollment);
         string roles = string.Join(",", Roles.Select(Text));
         string migrator = sql.Quote(enrollment.MigratorLogin);
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         var policySources = Sources(context).Where(source => tenantTables.Any(table =>
             table.TableName == context.Model.FindEntityType(source.Type)!.GetTableName())).ToArray();
         string memberships = string.Join("\n", contract.Memberships.Select(edge => $"""

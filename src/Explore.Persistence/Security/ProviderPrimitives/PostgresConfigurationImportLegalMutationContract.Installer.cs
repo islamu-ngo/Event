@@ -228,7 +228,7 @@ public static partial class PostgresConfigurationImportLegalMutationContract
                     """;
                 check = "false";
             }
-            var tenantTable = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+            var tenantTable = context.GetTenantTableInventory()
                 .SingleOrDefault(candidate => candidate.TableName == context.Model.FindEntityType(type)!.GetTableName())
                 ?? throw new InvalidOperationException("configuration_import_legal_tenant_rls_model_required");
             string tenantFingerprint = PostgresTenantRowLevelSecurityModel.BuildPolicyFingerprintPrefix(

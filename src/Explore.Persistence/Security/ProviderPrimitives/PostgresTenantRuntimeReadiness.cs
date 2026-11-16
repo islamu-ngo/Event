@@ -80,7 +80,7 @@ internal static class PostgresTenantRuntimeReadiness
             """;
         string? defaultSchema = context.GetService<Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptions>()
             .FindExtension<Explore.Persistence.Database.RelationalNamespaceOptionsExtension>()?.TargetSchema;
-        var tables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tables = context.GetTenantTableInventory();
         var schemas = command.CreateParameter();
         schemas.ParameterName = "schemas";
         schemas.Value = tables.Select(table => table.Schema ?? defaultSchema ?? "public").ToArray();

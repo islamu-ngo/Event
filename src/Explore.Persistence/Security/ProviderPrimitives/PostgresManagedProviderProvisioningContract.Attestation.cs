@@ -18,7 +18,7 @@ public static partial class PostgresManagedProviderProvisioningContract
     private static string SourceCatalog(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var sql = new HumanPrincipalSourceSql(context);
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         var writers = ProvisioningSharedWriterAssertions.Inventory(context, enrollment);
         string assertions = string.Join("\n", writers.Select(writer => writer.PrecedesProvisioning
             ? writer.AssertInstalled(context) : writer.AssertInstalledOrMigrationAbsent(context, enrollment)));
@@ -119,7 +119,7 @@ public static partial class PostgresManagedProviderProvisioningContract
     private static string Guard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var sql = new HumanPrincipalSourceSql(context);
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         bool creatorIntersection = Sources.Any(relation =>
             PostgresTenantCreationPermissions.TryGetGlobalColumns(context, relation.Type, out _, out _)
             || PostgresTenantCreationPermissions.GlobalUpdateColumns(context, relation.Type).Count != 0);

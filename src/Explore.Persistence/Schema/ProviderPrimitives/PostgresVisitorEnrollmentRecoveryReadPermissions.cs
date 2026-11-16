@@ -252,7 +252,7 @@ public static class PostgresVisitorEnrollmentRecoveryReadPermissions
         if (entity.BaseType is not null || entity.GetDerivedTypes().Any() || entity.GetComplexProperties().Any()
             || entity.FindPrimaryKey()?.Properties is not [var key] || key.Name != nameof(VisitorEnrollmentOperation.Id))
             throw new InvalidOperationException("visitor_recovery_model_shape_drift");
-        var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var metadata = context.GetTenantTableInventory()
             .SingleOrDefault(value => value.TableName == table && (value.Schema ?? schema) == schema);
         if (metadata is null || metadata.AllowsNullTenant || metadata.ParentJoin is not null)
             throw new InvalidOperationException("visitor_recovery_tenant_shape_drift");

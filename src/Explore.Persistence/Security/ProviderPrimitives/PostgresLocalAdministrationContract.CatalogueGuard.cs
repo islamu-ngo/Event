@@ -41,7 +41,7 @@ public static partial class PostgresLocalAdministrationContract
     {
         RequireInventory(context);
         var sql = new HumanPrincipalSourceSql(context);
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         return string.Join("\n", Inventory.Select(source =>
         {
             var entity = context.Model.FindEntityType(source.Type)!;
@@ -148,7 +148,7 @@ public static partial class PostgresLocalAdministrationContract
                         '{Stamp}' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(f.prosrc,'UTF8')),'hex'))
             THEN RAISE EXCEPTION 'local_administration_routine_drift' USING ERRCODE = '55000'; END IF;
             """));
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string policies = string.Join("\n", Inventory.Select(source =>
         {
             string table = Text(sql.Table(source.Type));

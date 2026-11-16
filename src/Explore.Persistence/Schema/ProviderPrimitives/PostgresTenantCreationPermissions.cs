@@ -368,7 +368,7 @@ public static class PostgresTenantCreationPermissions
                 AND pg_catalog.format_type(a.atttypid,a.atttypmod)={Text(column.StoreType)}
                 AND a.attnotnull={(column.Required ? "true" : "false")} AND a.attidentity='' AND a.attgenerated='')
             """));
-        var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model).SingleOrDefault(table =>
+        var metadata = context.GetTenantTableInventory().SingleOrDefault(table =>
             table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
         string basePolicy = metadata is null ? "NOT c.relrowsecurity AND NOT c.relforcerowsecurity" : $"""
             c.relrowsecurity AND c.relforcerowsecurity AND EXISTS (SELECT 1 FROM pg_catalog.pg_policy p
@@ -636,7 +636,7 @@ public static class PostgresTenantCreationPermissions
 
     private static Source[] Sources(ExploreDbContext context)
     {
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         return Inventory.Select(item =>
         {
             var entity = context.Model.FindEntityType(item.Type) ?? throw new InvalidOperationException("tenant_creation_model_missing");

@@ -43,7 +43,7 @@ public static partial class PostgresIdempotencyReceiptContract
         var entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(IdempotencyRecord))!;
         if (!entity.GetProperties().Select(property => property.Name).Order(StringComparer.Ordinal)
                 .SequenceEqual(ReceiptFields.Order(StringComparer.Ordinal))
-            || PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+            || context.GetTenantTableInventory()
                 .Any(table => table.TableName == entity.GetTableName()))
             throw new InvalidOperationException("idempotency_receipt_source_mapping_changed");
         string table = Text(sql.Table(typeof(IdempotencyRecord)));

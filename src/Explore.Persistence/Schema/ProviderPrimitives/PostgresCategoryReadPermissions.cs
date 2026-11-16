@@ -290,7 +290,7 @@ public static class PostgresCategoryReadPermissions
 
     private static string TenantPolicy(ExploreDbContext context, Source source, string runtimeLogin)
     {
-        var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var metadata = context.GetTenantTableInventory()
             .Single(table => table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
         if (metadata.AllowsNullTenant || metadata.ParentJoin is not null
             || metadata.TenantIdColumn != source.Columns.Single(column => column.Property == nameof(Category.TenantId)).Name)

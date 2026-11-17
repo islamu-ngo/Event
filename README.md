@@ -182,14 +182,9 @@ resources.
 3. Check the authoritative [Quick Reference (Invariants)](docs/internal/QUICK_REFERENCE.md), [Clean Architecture Invariants](docs/internal/ARCHITECTURE.md), and [Governance Standards](docs/internal/GOVERNANCE.md).
 4. AI-assisted coding agents must strictly follow [`AGENTS.md`](AGENTS.md) and [`.agents/contract/intents.yaml`](.agents/contract/intents.yaml).
 
-### ✍️ Contributor License Agreement & Community Protection
+### ✍️ Contributor License Agreement
 
-All non-bot contributors must sign the [ISLAMU Contributor License Agreement][cla-link] before a pull request can be merged. Signing is handled automatically directly in your PR with a simple comment reply—see [`legal/CLA.md`][cla-link] for full terms.
-
-> **🛡️ Why We Have a CLA & Why You Can Trust It:**
-> * **Community-First Invariant:** Contributors retain ownership of their contributions. The CLA grants ISLAMU inbound rights so the non-profit can offer alternative licensing for enterprise compliance on private internal networks.
-> * **The Anti-SaaS Covenant:** ISLAMU is bound by a strict governance commitment **never to grant an alternative license permitting a third party to operate a closed-source, proprietary SaaS or cloud service**. 
-> * **Universal Parity:** Any company offering ISLAMU Event as a public SaaS must do so under `AGPL-3.0-or-later`, guaranteeing that all SaaS improvements are shared back with the community. Your contributions will never be locked behind a proprietary vendor wall.
+All non-bot contributors must sign the [ISLAMU Contributor License Agreement][cla-link] before a pull request can be merged. You keep ownership of your contributions, ISLAMU Event stays `AGPL-3.0-or-later` under the Anti-SaaS Covenant, and [`legal/CLA.md`][cla-link] serves as the single authoritative source for all inbound licensing, cross-project open-source reuse, and signing terms.
 
 ---
 
@@ -264,7 +259,7 @@ Feel free to ask questions, report bugs, participate in discussions, share ideas
 
 If you discover a security vulnerability in ISLAMU Event, please report it responsibly instead of opening a public issue. We take all legitimate reports seriously and will investigate them promptly. See the [Security Policy][security-policy] for more info.
 
-To disclose any security issues, please email us at [contact@openislamu.org][contact-email].
+To disclose any security issues, please email us at [security@openislamu.org][security-email].
 
 ### Security fixes from forks
 
@@ -322,9 +317,9 @@ We appreciate these generally available public-repository tools. They are not pr
 ## ISLAMU Solutions
 
 - [ISLAMU Event][github-repo-link]: Event Platform & Management System.
-- [ISLAMU Configurator][configurator-github-repo-link]: Offline Configuration Preparation Utility.
+- [ISLAMU Configurator][configurator-github-repo-link]: Universal, Offline-first Software Configuration Assistant.
 - [I-VSD][ivsd-github-repo-link]: Islamic Value Sensitive Design: A Framework for Provider-Mediated Software Solutions
-- [SecretKit][secretkit-repo-link]: Unified secret management SDK for .NET
+- [SecretKit][secretkit-repo-link]: Unified Secret Management SDK for .NET
 
 ## 🙏 Acknowledgement
 
@@ -408,10 +403,10 @@ This project is licensed under the terms of [GNU AGPL-3.0-or-later][license-link
 ISLAMU Event operates on a transparent three-pillar model designed for universal community parity and sustainable open-source governance:
 
 1. **Community Commons (`AGPL-3.0-or-later`):** 100% Free & Open Source for everyone. Any organization or hoster can run a SaaS or self-host under AGPLv3. All SaaS modifications must be published openly, ensuring complete community parity.
-2. **Enterprise Internal-Use License (Anti-SaaS):** For enterprises whose internal compliance policies ban AGPL copyleft on private internal infrastructure. This license waives Section 13 network copyleft for private on-premises/VPC deployments and internal corporate events, while **strictly forbidding external SaaS or commercial cloud hosting**. Paid for commercial corporations (funding security audits and maintainers); gratis ($0) for verified non-profits and educational institutions.
+2. **Enterprise Organizational-Use License (Anti-SaaS):** For organizations whose compliance policies ban AGPL copyleft on internal infrastructure. Waives Section 13 network copyleft for operating ISLAMU Event (self-managed or on privately dedicated infrastructure) solely for that organization's own operations and end-user services, while **strictly forbidding multi-tenant SaaS or hosted cloud service delivery for third-party organizations**. Paid for commercial corporations; gratis ($0) for verified non-profits and educational institutions.
 3. **Official Partner Program:** For certified agencies, hosters, and integrators. Partners operate on the exact same 100% AGPLv3 codebase (no proprietary code privilege). Commercial value is generated through quality certification, trust branding, and official directory listings.
 
-For the full ethical and strategic design analysis, see the [I-VSD Strategy Review](islamic-value-sensitive-design/governance/i-vsd-licensing-and-commercial-strategy.md).
+For inbound contributor terms and cross-project open-source reuse boundaries, see [`legal/CLA.md`][cla-link] and the [I-VSD Strategy Review](islamic-value-sensitive-design/governance/i-vsd-licensing-and-commercial-strategy.md).
 
 ### Standalone Core And Optional Services
 
@@ -439,6 +434,7 @@ The AGPL-3.0-or-later license and any alternative license offered by ISLAMU appl
 [privacy-policy]: https://openislamu.org/privacy
 [license-link]: LICENSE
 [contact-email]: mailto:contact@openislamu.org
+[security-email]: mailto: security@openislamu.org
 
 [github-repo-link]: https://github.com/islamu-ngo/Event
 [github-issues-link]: https://github.com/islamu-ngo/Event/issues/new

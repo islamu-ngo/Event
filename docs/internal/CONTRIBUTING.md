@@ -78,10 +78,8 @@ Before opening a PR:
 
 
 ## Contributor Legal Status
- 
-Every non-bot contributor must sign the [ISLAMU Event Contributor License Agreement](../../legal/CLA.md) by posting the exact CLA signature comment on the pull request. The CLA gives the ISLAMU project steward broad inbound rights to maintain, provide, and relicense ISLAMU Event under alternative terms when sustainability, enterprise internal-use on-premises compliance, nonprofit, humanitarian, public-sector, or procurement-restricted needs require it.
 
-**Anti-SaaS Governance Invariant:** The Project Steward is bound never to license ISLAMU Event under terms that allow a third-party closed-source SaaS. Any entity operating a public SaaS must do so under `AGPL-3.0-or-later`, preserving universal community parity. See [I-VSD Strategy Review](../../islamic-value-sensitive-design/governance/i-vsd-licensing-and-commercial-strategy.md).
+Every non-bot contributor must sign the [ISLAMU Contributor License Agreement](../../legal/CLA.md)—the single authoritative source for inbound licensing, Anti-SaaS boundaries, and cross-project open-source reuse—by posting the CLA comment on the pull request (or providing written/signed email confirmation accepted by the Project Steward). See [I-VSD Strategy Review](../../islamic-value-sensitive-design/governance/i-vsd-licensing-and-commercial-strategy.md) for governance context.
 
 The `Contributor License Agreement` workflow records v1.0 signatures in `signatures/v1.0/cla.json` on the dedicated `cla-signatures` branch. A pre-flight script short-circuits the full action when all commit authors are already signed or allowlisted. It uses `pull_request_target` and `issue_comment` metadata only; it must not checkout, build, test, cache, restore packages, or execute pull-request head code.
 

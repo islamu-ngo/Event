@@ -3,24 +3,24 @@
 
 # I-VSD Strategy Review — Open-Source Licensing, Anti-SaaS Governance, and Commercial Model
 
-Last Updated: 2026-08-27
+Last Updated: 2026-11-17
 
 ## Review Metadata
 - Mode: standalone
-- Subject: ISLAMU Event Licensing, Dual-Licensing Architecture, and Commercial Sustainability
+- Subject: ISLAMU Event Licensing, Dual-Licensing Architecture, Cross-Project Reuse, and Commercial Sustainability
 - Workstream: licensing-and-commercial-strategy
 - Report kind: strategy-review
 - Report status: current
 - Disposition: advisory
-- Evidence cutoff: 2026-08-27
-- Reviewed input revision: Git HEAD (`legal/CLA.md`, `docs/legal/IP_GOVERNANCE.md`, `docs/DUAL_VERSIONING.md`)
+- Evidence cutoff: 2026-11-17
+- Reviewed input revision: Git HEAD (`legal/CLA.md`, `docs/internal/legal/IP_GOVERNANCE.md`, `docs/internal/legal/CONTRIBUTION_GOVERNANCE.md`)
 - Supersedes: none
 
 ## Scope
 
 This review evaluates the strategic, legal-architectural, and moral governance models for distributing and commercializing ISLAMU Event. It analyzes:
-1. The public `AGPL-3.0-or-later` distribution model and community reciprocity.
-2. The mechanism for offering non-AGPL alternative terms under the Contributor License Agreement (`legal/CLA.md`) for enterprise compliance.
+1. The public `AGPL-3.0-or-later` distribution model and community reciprocity for ISLAMU Event.
+2. The mechanism for offering non-AGPL alternative terms under the Contributor License Agreement (`legal/CLA.md`) for enterprise compliance, and cross-project open-source reuse across distinct ISLAMU-stewarded projects (`MIT` minimum notice/disclaimer floor, never public domain).
 3. The risk of proprietary SaaS forks creating asymmetric market advantage over the open community.
 4. The commercialization policy for alternative enterprise licenses (paid vs. gratis).
 5. The boundaries of the "Official Partner" program.
@@ -81,11 +81,12 @@ This document represents provider-responsibility design reasoning and Islamic Va
 
 ## Recommendations
 
-### IVSD-M001: Mandatory Anti-SaaS Covenant in Alternative Licenses
-Every alternative commercial or institutional license issued under the CLA must include an explicit **Anti-SaaS Covenant**:
-1. **Permitted Scope:** Licensee is granted the right to run, modify, and integrate the software *solely for internal organizational operations and private events*.
-2. **Forbidden Scope:** Licensee is *expressly prohibited from offering the software as a multi-tenant cloud service, managed service, API service, or commercial SaaS to external third parties*.
-3. **Parity Enforcement:** Any entity wishing to offer a commercial SaaS must use `AGPL-3.0-or-later`, guaranteeing that all SaaS vendors must publish their source code and contribute equally to the public commons.
+### IVSD-M001: Mandatory Anti-SaaS Covenant in Bilateral Alternative Licenses & Cross-Project Open-Source Boundaries
+Every bilateral alternative commercial or institutional license issued for ISLAMU Event under the CLA must include an explicit **Anti-SaaS Covenant**:
+1. **Permitted Scope:** Licensee is granted the right to run, modify, and integrate the software (self-managed or on privately dedicated infrastructure) *solely for the licensee organization's own events and internal organizational operations* (including external attendees registering for that organization's own events).
+2. **Forbidden Scope:** Licensee is *expressly prohibited from offering ISLAMU Event as a multi-tenant cloud service, hosted event platform, or commercial SaaS to external third-party organizations*.
+3. **Parity Enforcement:** Any entity wishing to offer ISLAMU Event as a commercial multi-tenant SaaS must use `AGPL-3.0-or-later`, guaranteeing that all SaaS vendors must publish their source code and contribute equally to the public commons.
+4. **Bounded Cross-Project Open-Source Reuse (OSI-Approved, MIT Minimum — No Public Domain):** Under `legal/CLA.md`, ISLAMU may reuse, extract, or adapt relevant portions of Contributions inside any other distinct open-source project stewarded by ISLAMU under any OSI-approved open-source license meeting the MIT-level notice and disclaimer floor (excluding public-domain dedications and notice-waiving terms such as `CC0-1.0`, `Unlicense`, `WTFPL`, `0BSD`, and `MIT-0`), provided substantially all of ISLAMU Event itself is never re-released under a permissive license. This boundary is disclosed upfront in `legal/CLA.md` so contributors understand when extracted portions in permissive companion repositories carry those repository terms while ISLAMU Event itself remains `AGPL-3.0-or-later`.
 
 ### IVSD-M002: Establish the "Enterprise On-Premises / Internal-Use License"
 Formally standardize a bilateral enterprise license that:
@@ -104,7 +105,7 @@ The Official Partner program must operate strictly on top of the public AGPLv3 c
 - No partner receives exclusive proprietary software extensions from the ISLAMU foundation.
 
 ### Rejected Alternatives
-- **Permissive Dual-Licensing (MIT/Apache):** *Rejected.* Would allow commercial actors to create proprietary closed-source SaaS forks without contributing back, destroying community parity.
+- **Product-Level Permissive Dual-Licensing of ISLAMU Event (MIT/Apache):** *Rejected.* Re-releasing the entire ISLAMU Event application under MIT/Apache would allow commercial actors to create proprietary closed-source SaaS forks without contributing back, destroying community parity. (By contrast, bounded extraction of relevant shared modules/code into distinct OSI-licensed ISLAMU ecosystem repositories meeting the MIT notice/disclaimer floor is explicitly permitted and disclosed in `legal/CLA.md`.)
 - **Universal Gratis Alternative Licensing for Corporations:** *Rejected.* Exploitative of volunteer and nonprofit maintainer labor; deprives the project of sustainability funds needed for security audits.
 - **ISLAMU Operating a First-Party Proprietary SaaS:** *Rejected.* Creates direct conflict of interest with community hosters and compromises the nonprofit mission.
 
@@ -152,7 +153,7 @@ The Official Partner program must operate strictly on top of the public AGPLv3 c
 
 ## Evidence Reviewed
 
-- `legal/CLA.md` (ISLAMU Event Contributor License Agreement v1.0)
+- `legal/CLA.md` (ISLAMU Contributor License Agreement v1.0)
 - `docs/legal/IP_GOVERNANCE.md` (IP Protection, Clean-Room Governance, And Audit Readiness)
 - `docs/DUAL_VERSIONING.md` (Commercial and FOSS dependency separation precedent)
 - `.ci/scripts/validate-dependency-license-policy.cs` (Automated license compliance rules)
@@ -180,3 +181,4 @@ The Official Partner program must operate strictly on top of the public AGPLv3 c
 | Date | Previous status | New status | Trigger | Evidence/replacement |
 |---|---|---|---|---|
 | 2026-08-27 | *none* | `current` | Initial strategy review requested under I-VSD | Analysis of `legal/CLA.md`, `IP_GOVERNANCE.md`, and community anti-monopoly requirements |
+| 2026-11-17 | `current` | `current` | CLA cross-project open-source reuse refinement | Updated `legal/CLA.md` and `IVSD-M001` to support cross-project open-source reuse (`MIT`–`AGPL-3.0-or-later`, no public domain) across distinct ISLAMU projects while preserving ISLAMU Event's Anti-SaaS protection |

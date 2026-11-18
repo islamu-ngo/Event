@@ -37,6 +37,10 @@ public static class ApiHostStartupExtensions
         if (!state.IsOpenApiGeneration)
             app.Services.ValidateNativeOperations();
 
+        if (!state.IsOpenApiGeneration
+            && app.Services.GetService<IGlobalExploreDbContextFactory>() is GlobalExploreDbContextFactory globalFactory)
+            await globalFactory.PrepareTenantCreationSourcesAsync(app.Configuration, shutdownCts.Token);
+
         var appLifetime = app.Lifetime;
         var appLogger = app.Logger;
         appLifetime.ApplicationStopping.Register(() =>
@@ -94,7 +98,7 @@ public static class ApiHostStartupExtensions
                                 "Skipping database migrations because provider {ProviderName} is non-relational.",
                                 db.Database.ProviderName ?? "(unknown)");
                             if (agentBrowser)
-                                await LookupTableSeeder.SeedAsync(db, cancellationToken);
+                                await LookupTableSeeder.SeedAsync(db, logger, cancellationToken);
                             else
                                 await DatabaseSeeder.SeedAsync(
                                     db,

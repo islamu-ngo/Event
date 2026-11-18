@@ -148,6 +148,14 @@ again. This bounds planner duplication without retaining observed permission
 results. Native witnesses cover complete graph commit and rollback, unverified
 email, tenant isolation, denied authority drift and same-connector recovery.
 
+The human tenant creator's User key fence grants only direct, non-grantable
+UPDATE on Id. Its catalogue check recognizes the worker's separately declared
+User updates only when the complete worker catalogue is valid in that statement.
+An absent-or-complete optional proof cannot authorize those columns. The worker
+descriptor remains the source of its column inventory; the creator adds no
+grants and retains the required Id grant, blanket table/PUBLIC/grant-option
+denials, inherited-role rejection and rejection of unrelated columns.
+
 The anonymous instance resolver GET is an exact `TenantReadBootstrap` action.
 Its existing path exemption already allows routing before tenant binding and
 lifecycle selection; the marker also keeps the visitor-content gate from
@@ -292,3 +300,38 @@ Missing, replaced, restamped or broadened helper definitions fail before protect
 effects. Reinstallation diagnoses drift without repairing it. Trusted schema
 administration retains the existing deployment trust boundary; this refactor
 adds no runtime DDL permission, role, pool policy or resource-limit exception.
+
+API startup compiles the creator's source-declared manifest and executable
+assertion SQL through the selected built-in `GlobalExploreDbContextFactory`.
+That factory owns one immutable program for its lifetime and attaches it on
+every pool rental. Compilation opens no connection and observes no readiness.
+The program matches both runtime and design-time model references, namespace
+configuration presence and exact model/target schemas, all five enrolled login
+names, and identity topology. OpenAPI and non-PostgreSQL paths do not compile it;
+Testing uses the same startup path. A custom factory or manually constructed
+context retains the existing local compilation path, as does an input mismatch.
+No process-wide dictionary or migrator-process priming is involved.
+
+`HumanTenantCreationGraphWriter` prepares a fresh execution delegate for every
+attempt. It executes both statements before writing and again during registered
+commit admission. The retained delegate holds
+immutable SQL text and the original context; it never retains an observed
+catalogue result, command, task or cancellation token. Each invocation creates its
+own commands and ownership observations, checks its current cancellation token,
+and verifies the context, tenant selection, Global backend and physical transaction
+across both awaits. The writer's existing effects fence also rejects replacement
+of the original transaction between admissions. The standalone
+`PostgresTenantCreationPermissions.RequireCurrentAsync` entry prepares and executes
+one assertion for independent callers.
+
+The creator commit callback rechecks its completed graph and original EF
+transaction owner immediately after awaited issuer admission, before executing
+another catalogue command. Its native replacement witness requires a distinct EF
+transaction owner and PostgreSQL transaction ID on the same backend; a changed
+ADO.NET transaction object reference is not assumed.
+
+Within each policy-source acquisition, principal read and authorization-route
+read, the source-declared admission SQL is also constructed once and executed at
+both existing sides of the native operation. Commands, parameters, transaction
+ownership and live database checks retain their original order. Only immutable
+text is reused within the invocation.

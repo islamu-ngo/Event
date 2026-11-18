@@ -17,6 +17,7 @@ public partial class ExploreDbContext : DbContext
     private ITenantContext? _tenantLeaseIdentity;
     private (IModel Model, IReadOnlyList<TenantTableMetadata> Tables)? _tenantTableInventory;
     internal bool IsPostgresRuntimeReady { get; set; }
+    internal PostgresTenantCreationPermissions.SourceProgram? TenantCreationSources { get; set; }
     internal bool IsConfigurationInstanceImportOwner { get; private set; }
 
     /// <summary>Retains only validated immutable metadata for this context's exact initialized model.</summary>

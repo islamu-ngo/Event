@@ -69,6 +69,17 @@ recognizes the existing tenant parent fence without granting additional access.
 A changed or broadened permission profile still stops the operation; restore
 the reviewed profile rather than adding broad manual grants.
 
+The PostgreSQL API prepares tenant-creation permission-check SQL during startup
+using its configured Global database factory. Each attempt still runs the
+complete checks both before writing and before commit. Preparing the SQL does
+not cache permission decisions: changed permissions or a replaced database owner
+still stop the operation, and a failed transaction does not publish a partial
+tenant graph.
+Commit validation retains the original transaction through awaited authorization
+checks, including when a replacement uses the same database connection.
+The API prepares its own expected SQL even when migrations run in a separate
+process; this preparation neither opens a connection nor establishes readiness.
+
 PostgreSQL principal-source operations share a private catalogue assertion
 to avoid repeating its fixed checks in every table's trigger instance. Each
 operation still verifies the assertion's expected code and permissions, then
@@ -84,10 +95,32 @@ identity, privacy and lifecycle storage contracts. The helper receives no
 application-login execution grant; admission and installation continue to verify
 the complete expected contract independently.
 
+Administrative scope discovery uses the application's independently selected
+Global connection and ordinary EF queries. It checks the exact user, matching
+tenant keys, current membership and role facts, and excludes revoked or deleted
+memberships as appropriate. Organization and group discovery can be limited to
+one exact tenant; results contain only distinct scope identifiers. Existing
+tenant lifecycle and participation approval decisions remain separate.
+
+PostgreSQL initialization grants only the declared primitive metadata reads
+needed for these queries. It preserves tenant row-level security and ordinary
+Runtime restrictions, and adds no privileged administrative function or helper
+role. Initialize a fresh development-native profile with the current installer:
+obsolete administrative roles/functions, partial permissions or broadened
+policies stop initialization instead of being silently repaired. This changes
+no operator credentials, configuration keys or API endpoints.
+
 Fresh PostgreSQL initialization installs the complete provisioning-policy
 projection permission contract before visitor settings storage. Both features
 use that single permission owner. Existing partial or altered permission
 catalogues continue to fail admission rather than being silently repaired.
+
+Human tenant creation and managed worker enrollment can coexist without
+invalidating the startup lookup cache. The creator retains its narrow User
+key-update grant. It recognizes the worker's additional declared columns only
+while the complete worker permission catalogue remains valid. Partial or
+altered worker enrollment still prevents admission; no manual grants or
+startup permission bypass are required.
 
 The PostgreSQL email worker now avoids writing unchanged processor state on each
 idle poll. This prevents an empty poll from unnecessarily invalidating a
@@ -473,6 +506,12 @@ request a new tenant without selecting an existing tenant first. Authentication
 and the existing server-side creation policy still apply. This exception belongs
 to that exact write action; tenant collection reads, navigation, and ordinary
 tenant resources retain their tenant-resolution requirements.
+
+Creation writes the new tenant, its initial documents, optional administrator
+membership and discovery revision in one transaction. A failed write leaves no
+partial tenant graph. The initial discovery epoch remains one; existing tenants
+retain their normal concurrency protection. This flow requires no additional
+Runtime database privileges for the instance administrator.
 
 Tenant creation through both `/api/tenant` and the multi-tenant instance-admin
 route `/api/admin/instance/tenants` uses the platform user linked to the authenticated

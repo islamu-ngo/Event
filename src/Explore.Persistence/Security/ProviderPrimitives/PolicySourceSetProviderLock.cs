@@ -39,14 +39,15 @@ internal sealed class PolicySourceSetProviderLock(
     internal async Task AcquirePostgresAsync(DbTransaction transaction, CancellationToken ct)
     {
         await using var command = Command(transaction);
-        command.CommandText = PostgresPolicySourceSetContract.AdmissionSql(_context, _enrollment!);
+        string admissionSql = PostgresPolicySourceSetContract.AdmissionSql(_context, _enrollment!);
+        command.CommandText = admissionSql;
         await command.ExecuteNonQueryAsync(ct);
         command.CommandText = $"SELECT {PostgresPolicySourceSetContract.AcquireFunctionSql(_context)}(@purpose, @tenant)";
         command.Parameters.Add(new NpgsqlParameter("purpose", NpgsqlDbType.Integer) { Value = (int)_purpose });
         command.Parameters.Add(new NpgsqlParameter("tenant", NpgsqlDbType.Uuid) { Value = (object?)_tenant ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(ct);
         command.Parameters.Clear();
-        command.CommandText = PostgresPolicySourceSetContract.AdmissionSql(_context, _enrollment!);
+        command.CommandText = admissionSql;
         await command.ExecuteNonQueryAsync(ct);
     }
 

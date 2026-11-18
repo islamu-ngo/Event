@@ -36,11 +36,12 @@ internal sealed class HumanAuthorizationRouteQueries(
             await using var command = _connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandTimeout = _context.Database.GetCommandTimeout() ?? command.CommandTimeout;
+            string admissionSql = PostgresPolicySourceSetContract.AdmissionSql(_context, _enrollment!)
+                + PostgresHumanAuthorizationRouteContract.AdmissionSql(_context, _enrollment!);
             async Task AttestAsync()
             {
                 command.Parameters.Clear();
-                command.CommandText = PostgresPolicySourceSetContract.AdmissionSql(_context, _enrollment!)
-                    + PostgresHumanAuthorizationRouteContract.AdmissionSql(_context, _enrollment!);
+                command.CommandText = admissionSql;
                 await command.ExecuteNonQueryAsync(ct);
             }
             await AttestAsync();

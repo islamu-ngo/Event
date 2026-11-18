@@ -430,6 +430,8 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
             .Select(entry => ((User)entry.Entity).Id).ToArray();
         Guid[] newActors = entries.Where(entry => entry.State == EntityState.Added && entry.Entity is Actor)
             .Select(entry => ((Actor)entry.Entity).Id).ToArray();
+        Guid[] newTenants = entries.Where(entry => entry.State == EntityState.Added && entry.Entity is Tenant)
+            .Select(entry => ((Tenant)entry.Entity).Id).ToArray();
         _newActors.UnionWith(newActors);
         _newRecords.UnionWith(entries.Where(entry => entry.State == EntityState.Added && entry.Entity is AtprotoRecord)
             .Select(entry => ((AtprotoRecord)entry.Entity).Id));
@@ -574,10 +576,13 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         // source-row classification and implicit source INSERT foreign-key locks.
         // Independent inserters must not both take shared Tenant FK locks and
         // then try to convert them to write locks at terminal finalization.
+        // New parents have no committed audience to fence. Their INSERT and foreign
+        // keys establish ownership; completed creation receipts still govern finalization.
         await FenceTenantParentsAsync(_tenants
             .Concat(entries.Where(entry => entry.Entity is ITenantEntity
                     && TenantSources.Contains(entry.Metadata.ClrType))
-                .SelectMany(entry => Keys(entry, nameof(ITenantEntity.TenantId)))), cancellationToken);
+                .SelectMany(entry => Keys(entry, nameof(ITenantEntity.TenantId))))
+            .Except(newTenants), cancellationToken);
 
         foreach (var checkOwner in ownerChecks)
             await checkOwner();

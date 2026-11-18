@@ -73,6 +73,46 @@ public sealed class IdentityEmailResolutionTests
         await Assert.That(RecipientEmailAddressResolver.Resolve(user, user.Id).HasVerifiedEmail).IsFalse();
     }
 
+    [Test]
+    public async Task RecipientProjectionPrefersContactMatchAndRejectsDeletedMissingOrUnverified()
+    {
+        Guid userId = Guid.CreateVersion7();
+        Guid lowerClaimId = Guid.Parse("01900000-0000-7000-8000-000000000001");
+        Guid higherClaimId = Guid.Parse("01900000-0000-7000-8000-000000000002");
+
+        await Assert.That(RecipientEmailAddressResolver.Resolve((EmailRecipient?)null, userId).SkipReason)
+            .IsEqualTo(RecipientEmailAddressResolver.RecipientDeletedOrMissing);
+        await Assert.That(RecipientEmailAddressResolver.Resolve(
+            new EmailRecipient(Guid.CreateVersion7(), false, "a@example.test", [new(lowerClaimId, "a@example.test")]), userId).SkipReason)
+            .IsEqualTo(RecipientEmailAddressResolver.RecipientDeletedOrMissing);
+        await Assert.That(RecipientEmailAddressResolver.Resolve(
+            new EmailRecipient(userId, true, "a@example.test", [new(lowerClaimId, "a@example.test")]), userId).SkipReason)
+            .IsEqualTo(RecipientEmailAddressResolver.RecipientDeletedOrMissing);
+        await Assert.That(RecipientEmailAddressResolver.Resolve(
+            new EmailRecipient(userId, false, "a@example.test", []), userId).SkipReason)
+            .IsEqualTo(RecipientEmailAddressResolver.RecipientEmailUnverified);
+
+        RecipientEmailAddressResolution contactPreferred = RecipientEmailAddressResolver.Resolve(
+            new EmailRecipient(userId, false, "  PREFERRED@Example.Test ",
+            [
+                new(lowerClaimId, "other@example.test"),
+                new(higherClaimId, "preferred@example.test")
+            ]),
+            userId);
+        await Assert.That(contactPreferred.HasVerifiedEmail).IsTrue();
+        await Assert.That(contactPreferred.Email).IsEqualTo("preferred@example.test");
+
+        RecipientEmailAddressResolution lowestIdFallback = RecipientEmailAddressResolver.Resolve(
+            new EmailRecipient(userId, false, "unmatched@example.test",
+            [
+                new(higherClaimId, "second@example.test"),
+                new(lowerClaimId, "first@example.test")
+            ]),
+            userId);
+        await Assert.That(lowestIdFallback.HasVerifiedEmail).IsTrue();
+        await Assert.That(lowestIdFallback.Email).IsEqualTo("first@example.test");
+    }
+
     private static User CreateUser(bool verified) => new()
     {
         Id = Guid.CreateVersion7(),

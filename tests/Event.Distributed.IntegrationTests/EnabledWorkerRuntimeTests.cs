@@ -11,6 +11,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Event.Distributed.IntegrationTests;
@@ -42,7 +43,7 @@ public sealed class EnabledWorkerRuntimeTests
             Guid userId = await owner.AuthenticateBootstrapAsync(api, cancellationToken);
             Guid tenantId = await CreateActiveTenantAsync(owner, api, cancellationToken);
             using (var enabled = await api.PatchAsJsonAsync("/api/instance/settings/smtp",
-                new { deliveryEnabled = true }, cancellationToken))
+                new { deliveryEnabled = new { hasValue = true, value = true } }, cancellationToken))
                 enabled.EnsureSuccessStatusCode();
 
             var tenantFactory = new TenantExploreDbContextFactory(DatabaseOptions(owner, PrimaryDatabaseRole.Runtime));
@@ -150,8 +151,7 @@ public sealed class EnabledWorkerRuntimeTests
     {
         await using var context = await factory.CreateDbContextAsync(tenantId, cancellationToken);
         context.CurrentUserService = new SeedActor(userId);
-        var recipient = await context.Users.Include(user => user.IdentityEmailClaims).ThenInclude(claim => claim.Evidence)
-            .SingleAsync(user => user.Id == userId, cancellationToken);
+        var recipient = await EmailDeliveryRecipientReader.ReadAsync(context, userId, cancellationToken);
         var address = RecipientEmailAddressResolver.Resolve(recipient, userId);
         await Assert.That(address.HasVerifiedEmail).IsTrue();
         var membership = await context.TenantUsers.SingleAsync(row => row.TenantId == tenantId

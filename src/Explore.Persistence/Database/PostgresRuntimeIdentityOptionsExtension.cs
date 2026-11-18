@@ -4,8 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Explore.Persistence.Database;
 
 /// <summary>
-/// Retains only the declared Runtime login for exact policy admission. Connection
-/// identity or the presence of a shared interceptor does not establish Runtime purpose.
+/// Retains only the declared Runtime or email policy mutation login for exact policy
+/// admission. Connection identity or the presence of a shared interceptor does not
+/// establish that purpose.
 /// </summary>
 internal sealed class PostgresRuntimeIdentityOptionsExtension(string? declaredLogin) : IDbContextOptionsExtension
 {

@@ -18,6 +18,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Services;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -657,7 +658,7 @@ internal static class K6LoadRunner
                 fixture.RunId, cancellationToken);
 
             using (var enabled = await writer.PatchAsJsonAsync("/api/instance/settings/smtp",
-                new { deliveryEnabled = true }, cancellationToken))
+                new { deliveryEnabled = new { hasValue = true, value = true } }, cancellationToken))
                 enabled.EnsureSuccessStatusCode();
             using var currentUser = await ReadNativeJsonAsync(writer, HttpMethod.Get, "/api/user", null, cancellationToken);
             var dispatch = await SeedDrainWitnessAsync(fixture, dataset.TenantId,
@@ -1044,8 +1045,7 @@ internal static class K6LoadRunner
         }, poolSize: 2);
         await using var context = await factory.CreateDbContextAsync(tenantId, cancellationToken);
         context.CurrentUserService = new K6SeedActor(userId);
-        var recipient = await context.Users.Include(user => user.IdentityEmailClaims).ThenInclude(claim => claim.Evidence)
-            .SingleAsync(user => user.Id == userId, cancellationToken);
+        var recipient = await EmailDeliveryRecipientReader.ReadAsync(context, userId, cancellationToken);
         var address = RecipientEmailAddressResolver.Resolve(recipient, userId);
         if (!address.HasVerifiedEmail) throw new InvalidOperationException("load_dispatch_verified_recipient_required");
         var membership = await context.TenantUsers.SingleAsync(row => row.TenantId == tenantId && row.UserId == userId

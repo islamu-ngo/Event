@@ -18,7 +18,11 @@ internal static class PostgresTenantRuntimeReadiness
         var options = context.GetService<IDbContextOptions>();
         string? declaredRuntimeLogin = options.FindExtension<PostgresRuntimeIdentityOptionsExtension>()?.DeclaredLogin;
         string runtimePolicyException = declaredRuntimeLogin is null
-            ? "FALSE" : PostgresDiscoveryMetadataPermissions.RuntimePolicyException(context, declaredRuntimeLogin);
+            ? "FALSE"
+            : $$"""
+                ({{PostgresDiscoveryMetadataPermissions.RuntimePolicyException(context, declaredRuntimeLogin)}})
+                OR ({{PostgresEmailDeliveryPolicyContract.MutationPolicyException(context, declaredRuntimeLogin)}})
+                """;
         string globalPolicyException = enrolledGlobalLogin is null
             ? "FALSE"
             : $"""

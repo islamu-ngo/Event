@@ -21,9 +21,8 @@ public sealed class NativeCategoryTypeHttpTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
-        using (var scope = factory.Services.CreateScope())
+        await using (var db = factory.CreateMigratorContext())
         {
-            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             db.CategoryTypes.AddRange(
                 new CategoryType { Id = 8008, MasterCode = "TEST_FIRST", FullName = "Test First", Description = "First lookup item" },
                 new CategoryType { Id = 8002, MasterCode = "TEST_SECOND", FullName = "Test Second" });
@@ -70,9 +69,8 @@ public sealed class NativeCategoryTypeHttpTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
-        using (var scope = factory.Services.CreateScope())
+        await using (var db = factory.CreateMigratorContext())
         {
-            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             db.CategoryTypes.RemoveRange(db.CategoryTypes);
             await db.SaveChangesAsync();
         }

@@ -11,10 +11,14 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
+using Explore.Persistence.Security;
 using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Event.Persistence.IntegrationTests.Repositories;
 
@@ -768,24 +772,31 @@ public sealed partial class EmailDispatchOutboxTransitionRepositoryTests(Postgre
         Guid reminderId;
         Guid[] coreIds;
         var now = DateTime.UtcNow;
-        await using (var firstContext = fixture.CreateDbContext())
+        await using (var seed = OpenMigrator())
         {
-            var tenant = await SeedTenantAsync(firstContext, "claim-hysteresis");
-            var coreA = await SeedDispatchAsync(firstContext, tenant.Id, EmailDispatchStatus.Pending);
-            var coreB = await SeedDispatchAsync(firstContext, tenant.Id, EmailDispatchStatus.Pending);
-            var reminder = await SeedDispatchAsync(firstContext, tenant.Id, EmailDispatchStatus.Pending);
+            await ExploreDatabaseMigrator.ApplyGlobalOutboxAdmissionMembershipsAsync(
+                seed, fixture.NativeQueueEnrollment);
+            var tenant = await SeedTenantAsync(seed, "claim-hysteresis");
+            var coreA = await SeedDispatchAsync(seed, tenant.Id, EmailDispatchStatus.Pending);
+            var coreB = await SeedDispatchAsync(seed, tenant.Id, EmailDispatchStatus.Pending);
+            var reminder = await SeedDispatchAsync(seed, tenant.Id, EmailDispatchStatus.Pending);
             reminder.Kind = EmailDispatchKind.EventReminder;
-            await firstContext.SaveChangesAsync();
+            await seed.SaveChangesAsync();
             reminderId = reminder.Id;
             coreIds = [coreA.Id, coreB.Id];
-
-            await new EmailDispatchOutboxRepository(firstContext).ClaimPendingBatchAsync(
-                CreateBatchClaimRequest(now, batchSize: 1, highWatermark: 2, lowWatermark: 1),
-                CancellationToken.None);
         }
 
-        await using (var settlementContext = fixture.CreateDbContext())
+        var admission = new EmailDispatchAdmission(
+            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1),
+            new TenantExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime), poolSize: 1));
+        await admission.ClaimPendingBatchAsync(
+            CreateBatchClaimRequest(now, batchSize: 1, highWatermark: 2, lowWatermark: 1),
+            CancellationToken.None);
+
+        await using (var settlementContext = OpenMigrator())
         {
+            await Assert.That((await settlementContext.EmailDispatchProcessorStates.AsNoTracking()
+                .SingleAsync()).OptionalRemindersDeferred).IsTrue();
             var coreRows = await settlementContext.EmailDispatchOutbox.IgnoreQueryFilters()
                 .Where(row => coreIds.Contains(row.Id))
                 .ToListAsync();
@@ -799,13 +810,27 @@ public sealed partial class EmailDispatchOutboxTransitionRepositoryTests(Postgre
             await settlementContext.SaveChangesAsync();
         }
 
-        await using var resumedContext = fixture.CreateDbContext();
-        var resumedClaim = await new EmailDispatchOutboxRepository(resumedContext).ClaimPendingBatchAsync(
+        var resumedClaim = await admission.ClaimPendingBatchAsync(
             CreateBatchClaimRequest(now.AddMinutes(1), batchSize: 1, highWatermark: 2, lowWatermark: 1),
             CancellationToken.None);
 
         await Assert.That(resumedClaim.Single().Id).IsEqualTo(reminderId);
-        await Assert.That((await resumedContext.EmailDispatchProcessorStates.AsNoTracking().SingleAsync()).OptionalRemindersDeferred).IsFalse();
+        await using var observation = OpenMigrator();
+        await Assert.That((await observation.EmailDispatchProcessorStates.AsNoTracking().SingleAsync()).OptionalRemindersDeferred).IsFalse();
+
+        ExploreDbContext OpenMigrator()
+        {
+            var options = TestDbContextOptions.Create<ExploreDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureApplication(
+                options, fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+            options.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
+            options.UseNpgsql(provider => provider.ExecutionStrategy(
+                dependencies => new NonRetryingExecutionStrategy(dependencies)));
+            var context = new ExploreDbContext(options.Options) { TenantContext = null };
+            context.EnableTenantFilterBypass("Native email hysteresis fixture setup and observation.");
+            context.BindTenantLease();
+            return context;
+        }
     }
 
     [Test]

@@ -290,12 +290,12 @@ public sealed class NativeCategoryTypeCategoriesTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory();
         await SeedAsync(factory);
-        using (var scope = factory.Services.CreateScope())
+        await using (var db = factory.CreateMigratorContext())
         {
-            scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>()
-                .SetTenant(PlatformDefaults.DefaultTenantId);
-            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-            db.CategoryTypeCategories.RemoveRange(await db.CategoryTypeCategories.ToListAsync());
+            db.CategoryTypeCategories.RemoveRange(
+                await db.CategoryTypeCategories
+                    .Where(link => link.TenantId == PlatformDefaults.DefaultTenantId)
+                    .ToListAsync());
             await db.SaveChangesAsync();
         }
 
@@ -370,8 +370,7 @@ public sealed class NativeCategoryTypeCategoriesTests
 
     private static async Task<SeedData> SeedAsync(AuthenticatedWebApplicationFactory factory)
     {
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var db = factory.CreateMigratorContext();
         var status = await db.TenantStatuses.SingleAsync(item => item.Id == (int)TenantStatusEnum.Active);
         var tenant = new Tenant
         {

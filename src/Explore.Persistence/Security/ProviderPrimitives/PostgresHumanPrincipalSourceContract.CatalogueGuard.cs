@@ -9,42 +9,21 @@ public static partial class PostgresHumanPrincipalSourceContract
 
     // Stored entries run as OwnerRole. Independent callers retain the inline catalogue
     // assertion and exact body checks because they cannot execute this private helper.
-    private static string Guard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) => $"""
-        {CatalogueGuardWitness(context, enrollment)}
-        PERFORM {new HumanPrincipalSourceSql(context).Name(CatalogueGuardName)}();
-        """;
+    private static string Guard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        PostgresContractAttestationSql.BuildGuardInvocationSql(
+            CatalogueGuardWitness(context, enrollment),
+            new HumanPrincipalSourceSql(context).Name(CatalogueGuardName));
 
-    private static string CatalogueGuardWitness(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
-    {
-        string function = new HumanPrincipalSourceSql(context).Name(CatalogueGuardName);
-        string fingerprint = Hash(CatalogueGuardBody(context, enrollment));
-        return $"""
-            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc f
-                WHERE f.oid = pg_catalog.to_regprocedure({Text(function + "()")})
-                    AND f.proowner = pg_catalog.to_regrole('{OwnerRole}')::oid
-                    AND f.prokind = 'f' AND f.prosecdef AND f.provolatile = 'v' AND f.proparallel = 'u'
-                    AND NOT f.proleakproof AND NOT f.proisstrict AND NOT f.proretset
-                    AND f.prorettype = 'pg_catalog.void'::regtype AND f.pronargs = 0
-                    AND f.proargtypes = ''::pg_catalog.oidvector AND f.pronargdefaults = 0
-                    AND f.proargdefaults IS NULL AND f.provariadic = 0 AND f.prosupport = 0
-                    AND f.proallargtypes IS NULL AND f.proargmodes IS NULL AND f.proargnames IS NULL
-                    AND f.proconfig = ARRAY['search_path=pg_catalog']::text[]
-                    AND f.prolang = (SELECT oid FROM pg_catalog.pg_language WHERE lanname = 'plpgsql')
-                    AND pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(f.prosrc,'UTF8')),'hex') = {Text(fingerprint)}
-                    AND pg_catalog.obj_description(f.oid,'pg_proc') = {Text(Stamp + fingerprint)}
-                    AND pg_catalog.has_function_privilege(f.proowner,f.oid,'EXECUTE')
-                    AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(
-                        COALESCE(f.proacl,pg_catalog.acldefault('f',f.proowner))) a
-                        WHERE a.privilege_type <> 'EXECUTE' OR a.grantee <> f.proowner))
-            THEN RAISE EXCEPTION 'human_principal_catalogue_guard_drift' USING ERRCODE = '55000'; END IF;
-            """;
-    }
+    private static string CatalogueGuardWitness(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        PostgresContractAttestationSql.BuildCatalogueGuardWitnessSql(
+            new HumanPrincipalSourceSql(context).Name(CatalogueGuardName),
+            OwnerRole,
+            Hash(CatalogueGuardBody(context, enrollment)),
+            Stamp,
+            "human_principal_catalogue_guard_drift");
 
-    private static string CatalogueGuardBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) => $"""
-        BEGIN
-            {CatalogueGuard(context, enrollment)}
-        END;
-        """;
+    private static string CatalogueGuardBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        PostgresContractAttestationSql.BuildCatalogueGuardBodySql(CatalogueGuard(context, enrollment));
 
     private static string CatalogueGuard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
@@ -54,23 +33,11 @@ public static partial class PostgresHumanPrincipalSourceContract
             [(Observe, Signature, "jsonb"), (Acquire, Signature, "jsonb"),
                 (Session, SessionSignature, "jsonb"), (Write, "", "trigger"), (SettingWrite, "", "trigger"),
                 (CatalogueGuardName, "", "void")];
-        // Resolve the source-declared set in an uncorrelated subquery on every
-        // assertion, rather than repeating name resolution for every catalog row.
-        string routineIds = "SELECT pg_catalog.to_regprocedure(expected.signature) FROM (VALUES "
-            + string.Join(",", routines.Select(routine =>
-                $"({Text(sql.Name(routine.Name) + "(" + routine.Signature + ")")})"))
-            + ") expected(signature)";
-        string routineChecks = string.Join("\n", routines.Select(routine => $"""
-            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc f
-                WHERE f.oid = pg_catalog.to_regprocedure({Text(sql.Name(routine.Name) + "(" + routine.Signature + ")")})
-                    AND f.provolatile = 'v' AND f.proparallel = 'u' AND NOT f.proleakproof
-                    AND NOT f.proisstrict AND NOT f.proretset AND f.proargdefaults IS NULL
-                    AND f.prorettype = 'pg_catalog.{routine.Result}'::regtype
-                    AND f.prolang = (SELECT oid FROM pg_catalog.pg_language WHERE lanname = 'plpgsql')
-                    AND pg_catalog.obj_description(f.oid,'pg_proc') =
-                        '{Stamp}' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(f.prosrc,'UTF8')),'hex'))
-            THEN RAISE EXCEPTION 'human_principal_routine_drift' USING ERRCODE = '55000'; END IF;
-            """));
+        string routineIds = PostgresContractAttestationSql.RoutineSignatureIdsSql(
+            context, routines, routine => (routine.Name, routine.Signature), (c, name) => new HumanPrincipalSourceSql(c).Name(name));
+        string routineChecks = PostgresContractAttestationSql.BuildRoutineMetadataChecksSql(
+            context, routines, routine => routine, (c, name) => new HumanPrincipalSourceSql(c).Name(name),
+            Stamp, "human_principal_routine_drift");
         var tenantTables = context.GetTenantTableInventory();
         string policies = string.Join("\n", Sources.Select(source =>
         {
@@ -149,31 +116,8 @@ public static partial class PostgresHumanPrincipalSourceContract
                     AND c.contype = 'c' AND c.convalidated AND pg_catalog.pg_get_expr(c.conbin,c.conrelid) = '(id = 1)')
                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_trigger t WHERE t.tgrelid = pg_catalog.to_regclass({Text(anchor)}) AND NOT t.tgisinternal)
                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite r WHERE r.ev_class = pg_catalog.to_regclass({Text(anchor)}))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname IN ({roles})
-                    AND pg_catalog.shobj_description(r.oid,'pg_authid') IS DISTINCT FROM '{Stamp}role:' || r.rolname)
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n CROSS JOIN pg_catalog.pg_roles r
-                    WHERE r.rolname IN ({roles}) AND pg_catalog.has_schema_privilege(r.oid,n.oid,'CREATE'))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname IN ({roles})
-                    AND NOT pg_catalog.has_schema_privilege(r.oid,{Text(sql.Schema)},'USAGE'))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_class t JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
-                    CROSS JOIN pg_catalog.pg_roles r WHERE r.rolname IN ({roles})
-                        AND n.nspname <> {Text(sql.Schema)} AND n.nspname NOT IN ('pg_catalog','information_schema')
-                        AND n.nspname NOT LIKE 'pg_toast%' AND t.relkind IN ('r','p','v','m','f')
-                        AND (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                            OR pg_catalog.has_any_column_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,REFERENCES')))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_class t CROSS JOIN pg_catalog.pg_roles r
-                    WHERE r.rolname IN ({roles}) AND t.relkind = 'S' AND pg_catalog.has_sequence_privilege(r.oid,t.oid,'USAGE,SELECT,UPDATE'))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_database d CROSS JOIN pg_catalog.pg_roles r
-                    WHERE r.rolname IN ({roles}) AND pg_catalog.has_database_privilege(r.oid,d.oid,'CREATE'))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_shdepend d WHERE d.refclassid = 'pg_catalog.pg_authid'::regclass
-                    AND d.refobjid IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles}))
-                    AND d.deptype = 'o' AND (d.classid <> 'pg_catalog.pg_proc'::regclass
-                        OR d.dbid <> (SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database())
-                        OR d.objid NOT IN ({routineIds})))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_proc f WHERE f.oid NOT IN ({routineIds})
-                    AND (f.proowner IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles}))
-                        OR EXISTS (SELECT 1 FROM pg_catalog.aclexplode(f.proacl) a
-                            WHERE a.grantee IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles})))))
+                OR {PostgresContractAttestationSql.BuildAuthorityRoleAndNamespaceHygieneConditions(
+                    sql.Schema, null, roles, Stamp, routineIds, checkNamespaceOwner: false)}
             THEN RAISE EXCEPTION 'human_principal_authority_drift' USING ERRCODE = '55000'; END IF;
             """;
     }

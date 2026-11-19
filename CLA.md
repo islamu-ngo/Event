@@ -17,6 +17,7 @@ To re-run the CLA check after signing, post a comment containing only `recheck`.
 ## Related Documents
 
 - **Authoritative CLA Text:** [`legal/CLA.md`](legal/CLA.md)
+- **Organizational-Use (Anti-SaaS) License:** [`legal/ISLAMU-organizational-use-license.txt`](legal/ISLAMU-organizational-use-license.txt)
 - **Contribution Guidelines:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - **CLA Automation Governance:** [`docs/internal/legal/CONTRIBUTION_GOVERNANCE.md`](docs/internal/legal/CONTRIBUTION_GOVERNANCE.md)
 - **IP & Clean-Room Governance:** [`docs/internal/legal/IP_GOVERNANCE.md`](docs/internal/legal/IP_GOVERNANCE.md)

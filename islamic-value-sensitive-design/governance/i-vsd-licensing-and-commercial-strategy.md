@@ -154,6 +154,7 @@ The Official Partner program must operate strictly on top of the public AGPLv3 c
 ## Evidence Reviewed
 
 - `legal/CLA.md` (ISLAMU Contributor License Agreement v1.0)
+- `legal/ISLAMU-organizational-use-license.txt` (ISLAMU Organizational-Use [Anti-SaaS] License Agreement v1.0 operational draft)
 - `docs/legal/IP_GOVERNANCE.md` (IP Protection, Clean-Room Governance, And Audit Readiness)
 - `docs/DUAL_VERSIONING.md` (Commercial and FOSS dependency separation precedent)
 - `.ci/scripts/validate-dependency-license-policy.cs` (Automated license compliance rules)
@@ -163,7 +164,7 @@ The Official Partner program must operate strictly on top of the public AGPLv3 c
 
 ## Missing Evidence
 
-- Draft text of the commercial bilateral enterprise agreement (to be authored with legal counsel).
+- Formal Belgian legal counsel sign-off on `legal/ISLAMU-organizational-use-license.txt` and `legal/CLA.md`.
 - Operational partner certification guidelines and quality rubric (to be authored during partner program launch).
 
 ---

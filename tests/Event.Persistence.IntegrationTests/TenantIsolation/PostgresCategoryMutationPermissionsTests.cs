@@ -110,6 +110,42 @@ public sealed class PostgresCategoryMutationPermissionsTests(PostgreSqlContainer
     }
 
     [Test]
+    public async Task CanonicalRuntimeUpdatesDetachedCategoryReadModelWithoutWritingImmutableColumns()
+    {
+        var (tenantA, _, _, _, _) = await SeedAsync();
+
+        await using var runtime = Open(PrimaryDatabaseRole.Runtime, tenantA);
+        await runtime.Database.OpenConnectionAsync();
+        await PostgresCategoryMutationPermissions.RequireReadyAsync(runtime, fixture.NativeQueueEnrollment);
+
+        var categoryRepo = new CategoryRepository(runtime);
+        var created = await categoryRepo.Create(new Category
+        {
+            Id = Guid.CreateVersion7(),
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            MasterCode = $"DETACHED_{Guid.CreateVersion7():N}",
+            FullName = "Detached category",
+            TenantId = tenantA,
+            Tenant = null!
+        });
+
+        // UpdateCategoryCommandHandler reads through the AsNoTracking repository projection and then
+        // saves the mutated detached instance, so the immutable key columns must stay out of the UPDATE.
+        runtime.ChangeTracker.Clear();
+        var loaded = await categoryRepo.GetById(created.Id);
+        await Assert.That(loaded).IsNotNull();
+        loaded!.FullName = "Updated detached category";
+        await categoryRepo.Update(loaded);
+
+        runtime.ChangeTracker.Clear();
+        var persisted = await categoryRepo.GetById(created.Id);
+        await Assert.That(persisted!.FullName).IsEqualTo("Updated detached category");
+        await Assert.That(persisted.TenantId).IsEqualTo(tenantA);
+        // SaveChanges advances the optimistic stamp; the unchanged identity and tenant stay intact.
+        await Assert.That(persisted.ConcurrencyStamp).IsNotEqualTo(created.ConcurrencyStamp);
+    }
+
+    [Test]
     [Arguments("table-update")]
     [Arguments("immutable-column-update")]
     [Arguments("delete-grant-option")]

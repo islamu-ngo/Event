@@ -158,6 +158,34 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
         await _dbContext.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// Prepares an entity for an UPDATE that writes only the columns the caller marks as modified.
+    /// Detached entities are attached without pending changes so immutable key, tenant and ownership
+    /// columns never enter the generated statement, while a same-key tracked instance keeps its
+    /// original stored values for concurrency checks.
+    /// </summary>
+    protected EntityEntry<T> TrackForNarrowUpdate(T entity)
+    {
+        RequireTenantMutationScope(entity);
+        T? tracked = FindTrackedMatch(entity);
+        EntityEntry<T> entry;
+        if (tracked is null)
+        {
+            entry = _dbContext.Entry(entity);
+        }
+        else
+        {
+            entry = _dbContext.Entry(tracked);
+            if (!ReferenceEquals(tracked, entity))
+            {
+                entry.CurrentValues.SetValues(entity);
+            }
+        }
+
+        entry.State = EntityState.Unchanged;
+        return entry;
+    }
+
     private T? FindTrackedMatch(T entity)
     {
         var entityType = _dbContext.Model.FindEntityType(typeof(T))

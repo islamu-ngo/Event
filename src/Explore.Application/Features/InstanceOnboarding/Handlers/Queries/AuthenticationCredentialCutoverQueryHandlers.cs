@@ -13,7 +13,7 @@ namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 public sealed class InspectAuthenticationCredentialCleanupQueryHandler(
     IUserContext userContext,
     IAdminContext adminContext,
-    IInstanceBootstrapStateRepository bootstrapRepository,
+    IInstanceBootstrapStateReader bootstrapReader,
     IAuthenticationCredentialCutoverCoordinator coordinator,
     TimeProvider timeProvider)
     : IQueryHandler<InspectAuthenticationCredentialCleanupQuery, AuthenticationCredentialCleanupInventoryDto>
@@ -24,7 +24,7 @@ public sealed class InspectAuthenticationCredentialCleanupQueryHandler(
         try
         {
             var (instanceId, _) = await AuthenticationCredentialCutoverHandlerSupport
-                .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapRepository, cancellationToken);
+                .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapReader, cancellationToken);
             if (request.OperationId == Guid.Empty)
                 throw new ValidationException("Authentication credential cutover operation ID is required.");
             var inventory = await coordinator.InspectCleanupAsync(
@@ -53,7 +53,7 @@ public sealed class InspectAuthenticationCredentialCleanupQueryHandler(
 public sealed class GetCurrentAuthenticationCredentialCutoverQueryHandler(
     IUserContext userContext,
     IAdminContext adminContext,
-    IInstanceBootstrapStateRepository bootstrapRepository,
+    IInstanceBootstrapStateReader bootstrapReader,
     IAuthenticationCredentialCutoverRepository repository)
     : IQueryHandler<GetCurrentAuthenticationCredentialCutoverQuery, AuthenticationCredentialCutoverDto?>
 {
@@ -62,7 +62,7 @@ public sealed class GetCurrentAuthenticationCredentialCutoverQueryHandler(
         CancellationToken cancellationToken)
     {
         var (instanceId, _) = await AuthenticationCredentialCutoverHandlerSupport
-            .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapRepository, cancellationToken);
+            .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapReader, cancellationToken);
         var head = await repository.GetHeadAsync(instanceId, cancellationToken);
         if (head is null)
             return null;
@@ -74,7 +74,7 @@ public sealed class GetCurrentAuthenticationCredentialCutoverQueryHandler(
 public sealed class GetAuthenticationCredentialCutoverQueryHandler(
     IUserContext userContext,
     IAdminContext adminContext,
-    IInstanceBootstrapStateRepository bootstrapRepository,
+    IInstanceBootstrapStateReader bootstrapReader,
     IAuthenticationCredentialCutoverRepository repository)
     : IQueryHandler<GetAuthenticationCredentialCutoverQuery, AuthenticationCredentialCutoverDto?>
 {
@@ -83,7 +83,7 @@ public sealed class GetAuthenticationCredentialCutoverQueryHandler(
         CancellationToken cancellationToken)
     {
         var (instanceId, _) = await AuthenticationCredentialCutoverHandlerSupport
-            .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapRepository, cancellationToken);
+            .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapReader, cancellationToken);
         if (request.OperationId == Guid.Empty)
             throw new ValidationException("Authentication credential cutover operation ID is required.");
         var operation = await repository.GetAsync(instanceId, request.OperationId, cancellationToken);

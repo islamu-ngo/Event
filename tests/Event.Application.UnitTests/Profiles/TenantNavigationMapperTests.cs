@@ -53,7 +53,7 @@ public sealed class TenantNavigationMapperTests
             new() { TenantId = TenantId, Slug = tenant.Slug }
         });
         var lifecycle = new TenantLifecycleAccessService(tenants, Substitute.For<IAdminContext>(),
-            Substitute.For<IInstanceBootstrapStateRepository>(), directory);
+            Substitute.For<IInstanceBootstrapStateReader>(), directory);
         var handler = new GetTenantNavLinksQueryHandler(repository, Context(), lifecycle);
 
         var result = await handler.QueryAsync(new(), default);

@@ -114,7 +114,7 @@ public sealed class ConfiguredAdministratorBootstrapStartupConcurrencyTests
                 TermsUrl = "https://example.test/terms",
                 PrivacyUrl = "https://example.test/privacy"
             }),
-            repository);
+            new Event.Persistence.IntegrationTests.Fixtures.TestInstanceBootstrapStateReader(repository));
         return new ConfiguredAdministratorBootstrapStartupRunner(
             provider,
             repository,

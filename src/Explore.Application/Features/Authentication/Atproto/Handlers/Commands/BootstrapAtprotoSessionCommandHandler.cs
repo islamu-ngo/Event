@@ -23,7 +23,7 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
     IAtprotoSessionTokenIssuer tokenIssuer,
     ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>> claimAdministratorHandler,
     IUserExternalLoginRepository externalLoginRepository,
-    IInstanceBootstrapStateRepository bootstrapRepository,
+    IInstanceBootstrapStateReader bootstrapReader,
     IAuthenticationProviderDispatcher authenticationProviderDispatcher,
     IAuthProviderConfigurationService authProviderConfiguration,
     AtprotoJitAccountProvisioningOperation jitAccountProvisioning,
@@ -113,7 +113,7 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
 
         var login = await externalLoginRepository
             .GetByProviderAndKey(accountKey).ConfigureAwait(false);
-        InstanceBootstrapState? bootstrap = await bootstrapRepository
+        InstanceBootstrapState? bootstrap = await bootstrapReader
             .GetCurrent(cancellationToken).ConfigureAwait(false);
         // Pending configured setup admits only its verified claimant. After completion,
         // replay that claim only for its exact linked owner, not unrelated visitors.

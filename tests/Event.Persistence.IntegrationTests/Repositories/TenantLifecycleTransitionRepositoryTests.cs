@@ -309,7 +309,7 @@ public sealed class TenantLifecycleTransitionRepositoryTests(PostgreSqlContainer
 
     private TransitionInstanceTenantLifecycleCommandHandler ActivationHandler(ExploreDbContext db, ISettingMutationLock mutationLock, TenantDirectoryOperatorReadinessEvaluator readiness) => new(
         new TenantRepository(db, enrollment: fixture.NativeQueueEnrollment), new TenantLifecycleLogRepository(db), new EmailDispatchOutboxRepository(db), CurrentOperator(), mutationLock,
-        new TenantActivationCapacityPolicy(new InstanceBootstrapStateRepository(db), new TenantRepository(db), new ManagedTenantProvisioningOperationRepository(db), Options.Create(new ManagedControlPlaneOptions())), readiness,
+        new TenantActivationCapacityPolicy(new Event.Persistence.IntegrationTests.Fixtures.TestInstanceBootstrapStateReader(db), new TenantRepository(db), new ManagedTenantProvisioningOperationRepository(db), Options.Create(new ManagedControlPlaneOptions())), readiness,
         () => new HumanSecuritySourceGate(db));
 
     private sealed class GatedMutationLock(ISettingMutationLock inner, bool hold) : ISettingMutationLock

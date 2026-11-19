@@ -530,6 +530,8 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         services.AddSingleton(Options.Create(OperatorIdentityOptions()));
         services.AddScoped<ExploreDbContext>(_ => database.Context);
         services.AddScoped<IInstanceBootstrapStateRepository, InstanceBootstrapStateRepository>();
+        services.AddScoped<IInstanceBootstrapStateReader>(sp =>
+            new RepositoryBootstrapReader(sp.GetRequiredService<IInstanceBootstrapStateRepository>()));
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
         services.AddScoped<IEventDiscoveryEnrollmentGate, EventDiscoveryEnrollmentGate>();
         services.ConfigureInfrastructureServices(configuration);
@@ -555,7 +557,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         var provider = new ConfiguredAdministratorBootstrapProvider(
             ConfiguredConfiguration(),
             Options.Create(new InstanceOperatorIdentityOptions()),
-            database.Repository);
+            new RepositoryBootstrapReader(database.Repository));
 
         var snapshot = provider.ReadConfiguration();
 
@@ -569,7 +571,13 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
     private static ConfiguredAdministratorBootstrapProvider CreateProvider(
         IInstanceBootstrapStateRepository repository,
         IConfiguration configuration) =>
-        new(configuration, Options.Create(OperatorIdentityOptions()), repository);
+        new(configuration, Options.Create(OperatorIdentityOptions()), new RepositoryBootstrapReader(repository));
+
+    private sealed class RepositoryBootstrapReader(IInstanceBootstrapStateRepository repository) : IInstanceBootstrapStateReader
+    {
+        public Task<InstanceBootstrapState?> GetCurrent(CancellationToken cancellationToken = default) =>
+            repository.GetCurrent(cancellationToken);
+    }
 
     private static async Task AssertReason(
         IInstanceBootstrapStateRepository repository,

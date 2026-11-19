@@ -405,7 +405,7 @@ public sealed partial class LocalBootstrapConvergenceTests
 
         private ConfiguredAdministratorBootstrapProvider BootstrapProvider(AsyncServiceScope scope) => new(
             Configuration,
-            OperatorOptions, new InstanceBootstrapStateRepository(Application(scope)));
+            OperatorOptions, new TestInstanceBootstrapStateReader(new InstanceBootstrapStateRepository(Application(scope))));
 
         internal async Task PrepareAsync()
         {
@@ -481,7 +481,7 @@ public sealed partial class LocalBootstrapConvergenceTests
             return new InstanceOnboardingGenerationReader(
                 SystemSettingRepository.CreateReadOnly(application, new RelationalSettingMutationLock(application, unitOfWork)),
                 scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>(),
-                new InstanceBootstrapStateRepository(application), Configuration);
+                new Event.Persistence.IntegrationTests.Fixtures.TestInstanceBootstrapStateReader(application), Configuration);
         }
 
         internal async Task AssertCompletedAsync(Guid? expectedSubject = null)

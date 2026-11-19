@@ -11,7 +11,7 @@ using Explore.Domain.Enums;
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
 public sealed class CompleteInstanceOnboardingCommandHandler(
-    IInstanceBootstrapStateRepository bootstrapRepository,
+    IInstanceBootstrapStateReader bootstrapReader,
     IUserRepository userRepository,
     IDeploymentModeProvider deploymentModeProvider,
     InstanceOnboardingCompletionOperation completionOperation)
@@ -21,7 +21,7 @@ public sealed class CompleteInstanceOnboardingCommandHandler(
         CompleteInstanceOnboardingCommand request,
         CancellationToken cancellationToken)
     {
-        var bootstrap = await bootstrapRepository.GetCurrent(cancellationToken);
+        var bootstrap = await bootstrapReader.GetCurrent(cancellationToken);
         if (bootstrap?.Status == InstanceBootstrapStatus.Completed)
         {
             const string message = "Instance onboarding has already been completed.";

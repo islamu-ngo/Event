@@ -362,3 +362,19 @@ for those keys through the dedicated reader while retaining `ISecretBindingRepos
 for tenant-scoped overrides and other keys, so anonymous startup discovery
 (`GET /api/instanceonboarding/auth-provider-configuration`) succeeds without
 granting `Runtime` direct `SELECT` access on `secret_bindings`.
+
+## Native category and lookup-catalogue permissions
+
+`PostgresLookupCatalogueReadPermissions` includes `CategoryType` (`Id`,
+`MasterCode`, `FullName`, `Description`) alongside the global lookup catalogue
+for fixed Runtime column reads. `PostgresCategoryMutationPermissions` installs
+and attests the optional-complete Runtime DML contract for `Category`
+(column-scoped `INSERT` on six columns, `UPDATE` on `ConcurrencyStamp`,
+`MasterCode`, `FullName`, and `ParentId`, and `DELETE` under mandatory
+`tenant_isolation` RLS) and `CategoryTypeCategories` (column-scoped `SELECT`,
+`INSERT`, `UPDATE` on `CategoryId` and `CategoryTypeId`, and RLS-enforced
+`DELETE`), while `CategoryTypeCategoriesRepository.Update` keeps `TenantId`
+unmodified. Immutable `Id` and `TenantId` remain non-updatable by Runtime,
+`Global`, `PUBLIC`, and grant options stay denied, and both
+`PostgresCategoryReadPermissions` and `EventReadProjectionSql` compose the
+complete catalogue predicate while rejecting any partial or widened grants.

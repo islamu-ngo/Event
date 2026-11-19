@@ -45,6 +45,14 @@ granting the ordinary API runtime database role direct table access to
 stored secret bindings. Tenant-scoped and non-provider secret bindings retain
 their existing isolation boundaries.
 
+Native PostgreSQL category and category-type endpoints use least-privilege,
+tenant-isolated Runtime permissions for category writes and category-type lookup
+reads without changing tenant isolation or granting global bypasses. Reprovision
+fresh development-native PostgreSQL profiles with the current migrator so these
+fixed lookup and category mutation grants are installed together; partial or
+modified permission profiles fail closed at startup rather than being repaired
+in place.
+
 The browser host also obtains public tenant-routing configuration through the
 API's independent settings reader. Saved routing values and existing defaults
 remain authoritative; this bootstrap read requires no administrator credential

@@ -13,6 +13,33 @@ public class CategoryTypeCategoriesRepository : GenericRepository<CategoryTypeCa
         _dbContext = dbContext;
     }
 
+    public override async Task Update(CategoryTypeCategories entity)
+    {
+        if (entity.TenantId == Guid.Empty
+            || _dbContext.TenantFilterTenantId != entity.TenantId
+            || _dbContext.IsTenantFilterBypassed)
+        {
+            throw new InvalidOperationException("tracked_tenant_authority_mismatch");
+        }
+
+        var tracked = _dbContext.CategoryTypeCategories.Local.FirstOrDefault(item => item.Id == entity.Id);
+        var entry = tracked is not null ? _dbContext.Entry(tracked) : _dbContext.Entry(entity);
+        if (tracked is not null)
+        {
+            tracked.CategoryId = entity.CategoryId;
+            tracked.CategoryTypeId = entity.CategoryTypeId;
+        }
+        else if (entry.State == EntityState.Detached)
+        {
+            _dbContext.CategoryTypeCategories.Attach(entity);
+        }
+
+        entry.Property(item => item.CategoryId).IsModified = true;
+        entry.Property(item => item.CategoryTypeId).IsModified = true;
+        entry.Property(item => item.TenantId).IsModified = false;
+        await _dbContext.SaveChangesAsync();
+    }
+
     public async Task<List<Category>> GetCategoriesByCategoryType(int categoryTypeId)
     {
         return await _dbContext.CategoryTypeCategories

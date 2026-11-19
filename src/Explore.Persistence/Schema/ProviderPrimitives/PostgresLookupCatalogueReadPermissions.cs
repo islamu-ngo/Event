@@ -33,6 +33,7 @@ public static class PostgresLookupCatalogueReadPermissions
         (typeof(DidCustodyType), ["Id", "MasterCode", "FullName", "Description"]),
         (typeof(FileType), ["Id", "MasterCode", "FullName", "Description"]),
         (typeof(TagType), ["Id", "MasterCode", "FullName", "Description"]),
+        (typeof(CategoryType), ["Id", "MasterCode", "FullName", "Description"]),
         (typeof(OwnerType), ["Id", "MasterCode", "FullName", "Description"])
     ];
 

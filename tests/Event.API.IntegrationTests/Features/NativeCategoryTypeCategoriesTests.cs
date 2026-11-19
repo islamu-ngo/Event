@@ -35,6 +35,7 @@ public sealed class NativeCategoryTypeCategoriesTests
     public async Task NativeMutations_ValidateTargetsAndDuplicatesBeforeChangingTenantBoundRelationships()
     {
         await using var factory = new AuthenticatedWebApplicationFactory();
+        using var client = factory.CreateClient();
         var data = await SeedAsync(factory);
 
         using (var scope = factory.Services.CreateScope())
@@ -175,6 +176,7 @@ public sealed class NativeCategoryTypeCategoriesTests
     public async Task NativeReads_UseTenantFilteredRepositoriesAndReturnNullableMissingDetails()
     {
         await using var factory = new AuthenticatedWebApplicationFactory();
+        using var client = factory.CreateClient();
         var data = await SeedAsync(factory);
         using var scope = factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>()
@@ -236,8 +238,8 @@ public sealed class NativeCategoryTypeCategoriesTests
     public async Task AnonymousGroupedHttp_ReturnsOrderedTenantProjectionWithoutUnlinkedTypes()
     {
         await using var factory = new AuthenticatedWebApplicationFactory();
-        var data = await SeedAsync(factory);
         using var client = factory.CreateClient();
+        var data = await SeedAsync(factory);
         using var response = await client.GetAsync("/api/categorytype/with-categories");
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var groups = await response.Content.ReadFromJsonAsync<List<CategoryTypeWithCategoriesDto>>()
@@ -289,6 +291,7 @@ public sealed class NativeCategoryTypeCategoriesTests
     public async Task AnonymousGroupedHttp_WithOnlyOtherTenantRelationships_ReturnsEmptyArray()
     {
         await using var factory = new AuthenticatedWebApplicationFactory();
+        using var client = factory.CreateClient();
         await SeedAsync(factory);
         await using (var db = factory.CreateMigratorContext())
         {
@@ -299,7 +302,6 @@ public sealed class NativeCategoryTypeCategoriesTests
             await db.SaveChangesAsync();
         }
 
-        using var client = factory.CreateClient();
         using var response = await client.GetAsync("/api/categorytype/with-categories");
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -382,7 +384,7 @@ public sealed class NativeCategoryTypeCategoriesTests
         };
         var otherTenant = new Tenant
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             Slug = "other-category-links",
             FullName = "Other category links",
             TenantStatusId = status.Id,
@@ -426,7 +428,7 @@ public sealed class NativeCategoryTypeCategoriesTests
 
     private static Category NewCategory(Tenant tenant, string code, string name) => new()
     {
-        Id = Guid.NewGuid(),
+        Id = Guid.CreateVersion7(),
         MasterCode = code,
         FullName = name,
         TenantId = tenant.Id,
@@ -435,7 +437,7 @@ public sealed class NativeCategoryTypeCategoriesTests
 
     private static CategoryTypeCategories NewLink(Tenant tenant, Category category, CategoryType type) => new()
     {
-        Id = Guid.NewGuid(),
+        Id = Guid.CreateVersion7(),
         TenantId = tenant.Id,
         Tenant = tenant,
         CategoryId = category.Id,

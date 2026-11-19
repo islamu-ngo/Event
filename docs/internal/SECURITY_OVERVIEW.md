@@ -191,6 +191,18 @@ including administrator writes, ordinary/anonymous refusals and unchanged
 public-content/sibling-path denials. Full native worker recovery is a separate
 qualification requirement.
 
+All forty-seven action methods across the eight `/api/admin/instance/*`
+controllers (`ConfigurationManifestExportsController`, `InstanceAdminController`,
+`InstanceAuthenticationCredentialCutoversController`,
+`InstanceConfigurationImportSessionsController`, `InstanceDeploymentModeController`,
+`InstanceTenantConfigurationController`, `InstanceTenantLifecycleController`, and
+`InstanceTenantPlanController`) carry method-level `[InstanceManagement]` metadata
+(`AttributeTargets.Method`). Keeping the marker per-action prevents accidental
+inheritance on unrelated or future controller methods, preserves `[Authorize]`
+and fresh handler administrator verification, and retains 401/403 refusals for
+anonymous and non-administrator callers in both deployment modes without a public
+tenant.
+
 ## Private PostgreSQL catalogue assertions
 
 The principal-source contract stores its complete catalogue assertion in

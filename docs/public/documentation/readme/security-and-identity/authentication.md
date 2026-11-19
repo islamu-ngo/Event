@@ -144,6 +144,14 @@ cannot change it, and disabling delivery still requires its preview and
 confirmation workflow. This does not make other messaging routes public.
 This needs no new configuration, credential or database grant.
 
+Instance administration endpoints (`/api/admin/instance/*` for instance overview,
+deployment mode, tenant lifecycle, tenant configuration, tenant plans,
+authentication credential cutovers, configuration imports, and manifest exports)
+likewise allow authenticated instance administrators to operate before any
+tenant becomes public across both SingleTenant and MultiTenant deployments, while
+continuing to reject anonymous and non-administrator accounts with no new
+configuration, credential, or database grant.
+
 Native PostgreSQL mixed-settings checks use one private catalogue assertion
 instead of retaining its compiled definition separately in every operation.
 Each protected entry validates that assertion and runs the permission checks

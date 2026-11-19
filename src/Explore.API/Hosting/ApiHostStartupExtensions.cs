@@ -98,7 +98,7 @@ public static class ApiHostStartupExtensions
                                 "Skipping database migrations because provider {ProviderName} is non-relational.",
                                 db.Database.ProviderName ?? "(unknown)");
                             if (agentBrowser)
-                                await LookupTableSeeder.SeedAsync(db, logger, cancellationToken);
+                                await LookupTableSeeder.SeedAsync(db, cancellationToken);
                             else
                                 await DatabaseSeeder.SeedAsync(
                                     db,

@@ -121,6 +121,78 @@ public sealed class GenericRepositorySoftDeleteTests
         await Assert.That(context.ChangeTracker.CascadeDeleteTiming).IsEqualTo(CascadeTiming.Never);
     }
 
+    [Test]
+    public async Task DetachedDelete_WhenOriginalEntityRemainsTrackedInSameContext_DeletesTrackedRowWithoutConflict()
+    {
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(Guid.CreateVersion7().ToString()).Options;
+        await using var context = new ExploreDbContext(options);
+        var tenantId = Guid.CreateVersion7();
+        context.TenantContext = new TenantContext(tenantId);
+        context.CurrentUserService = new CurrentUser(Guid.CreateVersion7());
+        var status = new Explore.Domain.TenantStatus
+        {
+            Id = 1,
+            MasterCode = "active",
+            FullName = "Active",
+            IsActiveState = true
+        };
+        var tenant = new Explore.Domain.Tenant
+        {
+            Id = tenantId,
+            FullName = "Detached delete tenant",
+            Slug = $"detached-delete-{tenantId:N}",
+            TenantStatusId = status.Id,
+            TenantStatus = status
+        };
+        var categoryType = new Explore.Domain.CategoryType
+        {
+            Id = 1,
+            MasterCode = "CAT_TYPE",
+            FullName = "Category Type"
+        };
+        var category = new Explore.Domain.Category
+        {
+            Id = Guid.CreateVersion7(),
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            MasterCode = "CAT",
+            FullName = "Category",
+            TenantId = tenantId,
+            Tenant = tenant
+        };
+        context.TenantStatuses.Add(status);
+        context.Tenants.Add(tenant);
+        context.CategoryTypes.Add(categoryType);
+        context.Categories.Add(category);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var softRepo = new GenericRepository<Group, Guid>(context);
+        var group = await softRepo.Create(new Group { FullName = "Tracked soft" });
+        var detachedGroup = await softRepo.GetById(group.Id)
+            ?? throw new InvalidOperationException("Expected persisted group.");
+        await softRepo.Delete(detachedGroup);
+
+        await Assert.That(await context.Groups.AnyAsync(item => item.Id == group.Id)).IsFalse();
+
+        var hardRepo = new CategoryTypeCategoriesRepository(context);
+        var link = await hardRepo.Create(new CategoryTypeCategories
+        {
+            Id = Guid.CreateVersion7(),
+            CategoryId = category.Id,
+            Category = null!,
+            CategoryTypeId = categoryType.Id,
+            CategoryType = null!,
+            TenantId = tenantId,
+            Tenant = null!
+        });
+        var detachedLink = await hardRepo.GetById(link.Id)
+            ?? throw new InvalidOperationException("Expected persisted category link.");
+        await hardRepo.Delete(detachedLink);
+
+        await Assert.That(await context.CategoryTypeCategories.AnyAsync(item => item.Id == link.Id)).IsFalse();
+    }
+
     private sealed record TenantContext(Guid TenantId) : ITenantContext;
 
     private sealed record CurrentUser(Guid? UserId) : ICurrentUserService

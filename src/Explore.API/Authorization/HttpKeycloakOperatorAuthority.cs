@@ -7,7 +7,7 @@ namespace Explore.API.Authorization;
 public sealed class HttpKeycloakOperatorAuthority(
     IHttpContextAccessor httpContextAccessor,
     IAdminContext adminContext,
-    IInstanceBootstrapStateRepository bootstrapStates)
+    IInstanceBootstrapStateReader bootstrapStates)
     : IKeycloakOperatorAuthority
 {
     public async Task<KeycloakOperatorAuthority> RequireAsync(

@@ -5,6 +5,7 @@ using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.ExternalApiKeys.Handlers.Commands;
 using Explore.Application.Features.ExternalApiKeys.Handlers.Queries;
@@ -179,6 +180,15 @@ public sealed partial class ApiKeyManagementCommitAdmissionTests
     private sealed class AfterBody(ISerializableAttemptOwner inner, Func<CancellationToken, Task> afterBody)
         : ISerializableAttemptOwner
     {
+        public Task<T> ExecuteWithOriginalPrivacyAsync<T>(IOriginalPrivacyIdentityFenceAuthority privacy,
+            Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
+            inner.ExecuteWithOriginalPrivacyAsync(privacy, async token =>
+            {
+                var result = await operation(token);
+                await afterBody(token);
+                return result;
+            }, cancellationToken);
+
         public Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) => inner.ExecuteAsync(async token =>
         {

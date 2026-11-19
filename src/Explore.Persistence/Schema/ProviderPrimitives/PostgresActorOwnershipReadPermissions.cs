@@ -224,7 +224,7 @@ public static class PostgresActorOwnershipReadPermissions
 
     private static string TenantPolicy(ExploreDbContext context, Source source, string login)
     {
-        var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var metadata = context.GetTenantTableInventory()
             .Single(table => table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
         if (metadata.AllowsNullTenant || metadata.ParentJoin is not null) throw new InvalidOperationException(Drift);
         string column = Column(context, source.Type, nameof(TenantUser.TenantId));

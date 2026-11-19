@@ -6,6 +6,9 @@ namespace Explore.Persistence.Security;
 
 public static partial class PostgresEmailDeliveryPolicyContract
 {
+    private static readonly string[] SelectPrivilege = ["SELECT"];
+    private static readonly string[] UpdatePrivilege = ["UPDATE"];
+
     private const string RestrictedCallerSql = """
         IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles role WHERE role.rolname = session_user
             AND role.rolcanlogin AND NOT role.rolsuper AND NOT role.rolbypassrls
@@ -20,6 +23,8 @@ public static partial class PostgresEmailDeliveryPolicyContract
         enrollment.Validate();
         PostgresPrivilegeGuard.Relation Relation<T>(params PostgresPrivilegeGuard.Column[] columns) =>
             new(context.Model.FindEntityType(typeof(T))!.GetTableName()!, OwnerRole, [], columns);
+        PostgresPrivilegeGuard.Relation RecipientRelation<T>(params PostgresPrivilegeGuard.Column[] columns) =>
+            new(context.Model.FindEntityType(typeof(T))!.GetTableName()!, RecipientOwnerRole, [], columns);
         PostgresPrivilegeGuard.Column Column<T>(string property, params string[] privileges)
         {
             var entity = context.Model.FindEntityType(typeof(T))!;
@@ -54,12 +59,12 @@ public static partial class PostgresEmailDeliveryPolicyContract
         ];
         var controlColumns = controlInsert.Select(property => Column<EmailDispatchTenantControl>(property,
             [
-                .. (controlSelect.Contains(property, StringComparer.Ordinal) ? new[] { "SELECT" } : []),
+                .. (controlSelect.Contains(property, StringComparer.Ordinal) ? SelectPrivilege : []),
                 "INSERT",
-                .. (controlUpdate.Contains(property, StringComparer.Ordinal) ? new[] { "UPDATE" } : [])
+                .. (controlUpdate.Contains(property, StringComparer.Ordinal) ? UpdatePrivilege : [])
             ])).ToArray();
         return new(Schema(context),
-            [OwnerRole, MigratorRole, RuntimeRole, GlobalRole, InstanceMutationRole, TenantMutationRole],
+            [OwnerRole, MigratorRole, RuntimeRole, GlobalRole, InstanceMutationRole, TenantMutationRole, RecipientOwnerRole],
             [
                 new("email_delivery_policy_overrides", "", OwnerRole, [RuntimeRole, GlobalRole, InstanceMutationRole]),
                 new("email_delivery_policy_controls_capture", "", OwnerRole, [OwnerRole]),
@@ -69,17 +74,34 @@ public static partial class PostgresEmailDeliveryPolicyContract
                 new("email_delivery_policy_controls", "pg_catalog.uuid[]", OwnerRole,
                     [InstanceMutationRole, TenantMutationRole]),
                 new("email_delivery_policy_controls_apply", "pg_catalog.jsonb, pg_catalog.timestamptz, pg_catalog.uuid",
-                    OwnerRole, [InstanceMutationRole, TenantMutationRole])
+                    OwnerRole, [InstanceMutationRole, TenantMutationRole]),
+                new("email_delivery_recipient", "pg_catalog.uuid", RecipientOwnerRole,
+                    [RuntimeRole, GlobalRole, InstanceMutationRole])
             ],
             [
                 Relation<TenantSetting>(overrideProperties.Select(property => Column<TenantSetting>(property, "SELECT")).ToArray()),
                 Relation<Tenant>(Column<Tenant>(nameof(Tenant.Id), "SELECT")),
                 Relation<EmailDispatchTenantControl>(controlColumns),
                 new("email_delivery_policy_mutation_receipts", OwnerRole, ["SELECT", "INSERT", "UPDATE"], []),
+                RecipientRelation<User>(
+                    Column<User>(nameof(User.Id), "SELECT"),
+                    Column<User>(nameof(User.IsDeleted), "SELECT")),
+                RecipientRelation<UserPii>(
+                    Column<UserPii>(nameof(UserPii.UserId), "SELECT"),
+                    Column<UserPii>(nameof(UserPii.Email), "SELECT")),
+                RecipientRelation<UserIdentityEmailClaim>(
+                    Column<UserIdentityEmailClaim>(nameof(UserIdentityEmailClaim.Id), "SELECT"),
+                    Column<UserIdentityEmailClaim>(nameof(UserIdentityEmailClaim.UserId), "SELECT"),
+                    Column<UserIdentityEmailClaim>(nameof(UserIdentityEmailClaim.NormalizedEmail), "SELECT")),
+                RecipientRelation<UserIdentityEmailEvidence>(
+                    Column<UserIdentityEmailEvidence>(nameof(UserIdentityEmailEvidence.UserId), "SELECT"),
+                    Column<UserIdentityEmailEvidence>(nameof(UserIdentityEmailEvidence.ClaimId), "SELECT"),
+                    Column<UserIdentityEmailEvidence>(nameof(UserIdentityEmailEvidence.IsActive), "SELECT")),
                 .. MutationPrivileges(context)
             ],
             [
                 new(OwnerRole, MigratorRole, false, true, false),
+                new(RecipientOwnerRole, MigratorRole, false, true, false),
                 new(MigratorRole, enrollment.MigratorLogin, false, true, false),
                 new(RuntimeRole, enrollment.RuntimeLogin, true, false, false),
                 new(GlobalRole, enrollment.GlobalLogin, true, false, false),

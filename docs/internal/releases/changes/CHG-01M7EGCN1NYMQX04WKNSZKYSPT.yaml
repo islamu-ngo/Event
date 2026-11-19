@@ -1,0 +1,27 @@
+Change-Id: CHG-01M7EGCN1NYMQX04WKNSZKYSPT
+Title: "Keep instance SMTP writes independent of public tenants"
+Type: fix
+Scope: access
+Summary: "Allow instance administrators to enable SMTP delivery without a public tenant while retaining authentication and current administrator authorization."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "Only the SMTP PATCH action uses instance-management admission. Authentication, current instance-administrator authority, patch validation and delivery-disable confirmation remain mandatory."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Instance administrators can enable SMTP delivery before any tenant is public. No new configuration, credential or database grant is required."

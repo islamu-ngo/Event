@@ -349,7 +349,7 @@ public static class PostgresEmailPointerPublicationPermissions
             if (property.IsShadowProperty()) throw new InvalidOperationException("email_pointer_property_shape_drift");
             return new Column(property.GetColumnName(table)!, property.GetRelationalTypeMapping().StoreType, !property.IsNullable);
         }).ToArray();
-        var tenant = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var tenant = context.GetTenantTableInventory()
             .SingleOrDefault(value => value.TableName == name && (value.Schema ?? schema) == schema);
         if (typeof(T) != typeof(EmailDispatchProcessorState)
             && (tenant is null || tenant.AllowsNullTenant || tenant.ParentJoin is not null)

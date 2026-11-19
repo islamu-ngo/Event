@@ -4,6 +4,21 @@ description: Operate Local Identity, Keycloak, or passwordless AT Protocol authe
 
 # Authentication Architecture
 
+## Event registration-provider operations
+
+When an authenticated operator manages an Event's external registration
+provider, credential-refresh and access-validation timestamps settle with that
+operation's database changes. Expired authority or changed provider inputs
+reject settlement and roll back those timestamps. A successful remote read
+alone does not mean the Event operation committed.
+
+A connection shared by several Events may advance their content revisions
+during an authorized update. This does not permit changing another Event's
+title or other business fields. If a commit acknowledgment is lost, the outcome
+is uncertain: inspect the operation's persisted state before attempting another
+action. The server does not automatically replay provider transport to resolve
+that uncertainty. Background-worker checkpoint behavior remains immediate.
+
 ## AT Protocol OAuth publication
 
 Use the deployment's HTTPS public origin for `/oauth/client-metadata.json` and
@@ -23,6 +38,20 @@ API JWT refresh reads saved public provider metadata through a separate
 configuration reader. It does not need permission to read confidential-client
 bindings. Deployment-managed settings retain precedence, and a new signing-key
 configuration replaces the current one only after metadata retrieval succeeds.
+
+Instance authentication provider discovery likewise resolves saved provider
+secret binding references through that independent database reader without
+granting the ordinary API runtime database role direct table access to
+stored secret bindings. Tenant-scoped and non-provider secret bindings retain
+their existing isolation boundaries.
+
+Native PostgreSQL category and category-type endpoints use least-privilege,
+tenant-isolated Runtime permissions for category writes and category-type lookup
+reads without changing tenant isolation or granting global bypasses. Reprovision
+fresh development-native PostgreSQL profiles with the current migrator so these
+fixed lookup and category mutation grants are installed together; partial or
+modified permission profiles fail closed at startup rather than being repaired
+in place.
 
 The browser host also obtains public tenant-routing configuration through the
 API's independent settings reader. Saved routing values and existing defaults
@@ -53,6 +82,101 @@ against the installed membership and enrollment storage rights. This check
 recognizes the existing tenant parent fence without granting additional access.
 A changed or broadened permission profile still stops the operation; restore
 the reviewed profile rather than adding broad manual grants.
+
+The PostgreSQL API prepares tenant-creation permission-check SQL during startup
+using its configured Global database factory. Each attempt still runs the
+complete checks both before writing and before commit. Preparing the SQL does
+not cache permission decisions: changed permissions or a replaced database owner
+still stop the operation, and a failed transaction does not publish a partial
+tenant graph.
+Commit validation retains the original transaction through awaited authorization
+checks, including when a replacement uses the same database connection.
+The API prepares its own expected SQL even when migrations run in a separate
+process; this preparation neither opens a connection nor establishes readiness.
+
+PostgreSQL principal-source operations share a private catalogue assertion
+to avoid repeating its fixed checks in every table's trigger instance. Each
+operation still verifies the assertion's expected code and permissions, then
+evaluates current database state. Application logins cannot invoke that private
+routine directly; independent admission and installation retain their full
+checks.
+Initialize a fresh development-native profile with the current installer; an
+absent or changed private assertion is rejected instead of silently repaired.
+
+Local credential lifecycle operations use the same private assertion pattern.
+Every stored operation still checks current database state, including the
+identity, privacy and lifecycle storage contracts. The helper receives no
+application-login execution grant; admission and installation continue to verify
+the complete expected contract independently.
+
+Administrative scope discovery uses the application's independently selected
+Global connection and ordinary EF queries. It checks the exact user, matching
+tenant keys, current membership and role facts, and excludes revoked or deleted
+memberships as appropriate. Organization and group discovery can be limited to
+one exact tenant; results contain only distinct scope identifiers. Existing
+tenant lifecycle and participation approval decisions remain separate.
+
+PostgreSQL initialization grants only the declared primitive metadata reads
+needed for these queries. It preserves tenant row-level security and ordinary
+Runtime restrictions, and adds no privileged administrative function or helper
+role. Initialize a fresh development-native profile with the current installer:
+obsolete administrative roles/functions, partial permissions or broadened
+policies stop initialization instead of being silently repaired. This changes
+no operator credentials, configuration keys or API endpoints.
+
+Fresh PostgreSQL initialization installs the complete provisioning-policy
+projection permission contract before visitor settings storage. Both features
+use that single permission owner. Existing partial or altered permission
+catalogues continue to fail admission rather than being silently repaired.
+
+Human tenant creation and managed worker enrollment can coexist without
+invalidating the startup lookup cache. The creator retains its narrow User
+key-update grant. It recognizes the worker's additional declared columns only
+while the complete worker permission catalogue remains valid. Partial or
+altered worker enrollment still prevents admission; no manual grants or
+startup permission bypass are required.
+
+The PostgreSQL email worker now avoids writing unchanged processor state on each
+idle poll. This prevents an empty poll from unnecessarily invalidating a
+concurrent tenant creation transaction. The processor update timestamp changes
+when its deferral state changes; it is not a worker heartbeat. Initial state
+creation and real deferral transitions still persist. Three controlled native
+checks pass; the complete delivery/restart check remains pending before acceptance.
+Do not remove tenant creation's account fence or add database grants to work
+around a concurrency failure.
+
+The BFF can read the instance's non-sensitive resolver configuration before
+selecting a tenant. Private or malformed tenant visitor settings cannot block
+that routing bootstrap. Tenant content still enforces its own visitor policy,
+and changing resolver configuration still requires authenticated administrative
+authority. This correction needs no new configuration, credentials or migration.
+
+Instance administrators can update SMTP delivery settings before a tenant is
+public. The exact SMTP write uses instance management admission while retaining
+sign-in and current instance-administrator authorization. Ordinary accounts
+cannot change it, and disabling delivery still requires its preview and
+confirmation workflow. This does not make other messaging routes public.
+This needs no new configuration, credential or database grant.
+
+Instance administration endpoints (`/api/admin/instance/*` for instance overview,
+deployment mode, tenant lifecycle, tenant configuration, tenant plans,
+authentication credential cutovers, configuration imports, and manifest exports)
+likewise allow authenticated instance administrators to operate before any
+tenant becomes public across both SingleTenant and MultiTenant deployments, while
+continuing to reject anonymous and non-administrator accounts with no new
+configuration, credential, or database grant.
+
+Native PostgreSQL mixed-settings checks use one private catalogue assertion
+instead of retaining its compiled definition separately in every operation.
+Each protected entry validates that assertion and runs the permission checks
+again. Runtime, Global and email-purpose database identities cannot invoke the
+private assertion directly; their existing application operations retain their
+reviewed permissions.
+
+Freshly provision development-native profiles with the current migrator before
+starting this revision. Startup and later operations reject an absent, modified
+or broadened assertion, and reinstallation does not silently repair it. No new
+credential or larger database memory allowance is required by this change.
 
 Each deployment has exactly one **primary authentication provider**:
 
@@ -404,6 +528,12 @@ request a new tenant without selecting an existing tenant first. Authentication
 and the existing server-side creation policy still apply. This exception belongs
 to that exact write action; tenant collection reads, navigation, and ordinary
 tenant resources retain their tenant-resolution requirements.
+
+Creation writes the new tenant, its initial documents, optional administrator
+membership and discovery revision in one transaction. A failed write leaves no
+partial tenant graph. The initial discovery epoch remains one; existing tenants
+retain their normal concurrency protection. This flow requires no additional
+Runtime database privileges for the instance administrator.
 
 Tenant creation through both `/api/tenant` and the multi-tenant instance-admin
 route `/api/admin/instance/tenants` uses the platform user linked to the authenticated

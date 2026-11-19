@@ -19,7 +19,7 @@ namespace Explore.Infrastructure.Services;
 public sealed class ConfiguredAdministratorBootstrapProvider(
     IConfiguration configuration,
     IOptions<InstanceOperatorIdentityOptions> operatorIdentityOptions,
-    IInstanceBootstrapStateRepository bootstrapRepository)
+    IInstanceBootstrapStateReader bootstrapReader)
     : IConfiguredAdministratorBootstrapProvider
 {
     private const int MaximumSubjectLength = 2048;
@@ -48,7 +48,7 @@ public sealed class ConfiguredAdministratorBootstrapProvider(
             return null;
         }
 
-        var current = await bootstrapRepository.GetCurrent(cancellationToken);
+        var current = await bootstrapReader.GetCurrent(cancellationToken);
         if (current is null
             || current.Mode != InstanceBootstrapMode.ConfiguredAdministrator
             || current.Status is not (InstanceBootstrapStatus.Pending or InstanceBootstrapStatus.Completed)

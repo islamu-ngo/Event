@@ -21,6 +21,7 @@ internal static class ActorPublisherCatalogProof
             || sources.Any(type => PostgresTenantCreationPermissions.TryGetGlobalColumns(context, type, out _, out _)
                 || PostgresTenantCreationPermissions.GlobalUpdateColumns(context, type).Count != 0
                 || PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, type, out _, out _, out _)
+                || PostgresAdministrativeAuthorityReadPermissions.TryGetGlobalReadColumns(context, type, out _)
                 || PostgresSetupLiveStoragePermissions.GlobalCompletionColumns(context, type).Length != 0
                 || PostgresTenantMembershipMutationPermissions.TryGetRuntimeColumns(context, type, out _, out _, out _)
                 || PostgresActorOwnershipReadPermissions.TryGetRuntimeReadColumns(context, type, out _)
@@ -78,6 +79,11 @@ internal static class ActorPublisherCatalogProof
         string[] membershipReads = sources.SelectMany(type =>
         {
             PostgresUserTenantMembershipReadPermissions.TryGetGlobalReadColumns(context, type, out var read);
+            return read.Select(column => $"(t.oid={Text(names.Table(type))}::regclass AND a.attname={Text(column)})");
+        }).ToArray();
+        string[] administrativeReads = sources.SelectMany(type =>
+        {
+            PostgresAdministrativeAuthorityReadPermissions.TryGetGlobalReadColumns(context, type, out var read);
             return read.Select(column => $"(t.oid={Text(names.Table(type))}::regclass AND a.attname={Text(column)})");
         }).ToArray();
         string[] runtimeMutations = sources.SelectMany(type =>
@@ -184,6 +190,18 @@ internal static class ActorPublisherCatalogProof
                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
                     WHERE acl.grantee=0 AND acl.privilege_type='SELECT')
                 """ : "false";
+            bool administrativeIntersection = login == enrollment.GlobalLogin && administrativeReads.Length != 0;
+            string administrativeRead = administrativeIntersection ? $"""
+                r.rolname={Text(enrollment.GlobalLogin)} AND a.attnum>0 AND permission.privilege='SELECT'
+                AND ({string.Join(" OR ", administrativeReads)})
+                AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
+                    WHERE acl.grantee=r.oid AND acl.grantor=t.relowner
+                        AND acl.privilege_type='SELECT' AND NOT acl.is_grantable)
+                AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
+                    WHERE acl.grantee=0 AND acl.privilege_type='SELECT')
+                """ : "false";
+            string administrativeProof = administrativeIntersection
+                ? PostgresAdministrativeAuthorityReadPermissions.OptionalGlobalCataloguePredicate(context, enrollment) : "true";
             bool preferenceIntersection = login == enrollment.GlobalLogin && sources.Contains(typeof(User));
             string preferenceGrant = preferenceIntersection ? $"""
                 r.rolname={Text(enrollment.GlobalLogin)} AND a.attnum>0 AND ({preferenceColumns})
@@ -228,12 +246,13 @@ internal static class ActorPublisherCatalogProof
                                     WHERE a.attrelid = t.oid AND a.attnum <> 0 AND NOT a.attisdropped
                                         AND (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege || ' WITH GRANT OPTION')
                                             OR (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege)
-                                                AND NOT ((permission.privilege='SELECT' AND ({referenceRead})) OR ({creatorGrant}) OR ({workerGrant}) OR ({completionGrant}) OR ({membershipRead}) OR ({mutationGrant}) OR ({preferenceGrant}) OR ({settingsGrant}) OR ({enrollmentGrant})))))))
+                                                AND NOT ((permission.privilege='SELECT' AND ({referenceRead})) OR ({creatorGrant}) OR ({workerGrant}) OR ({completionGrant}) OR ({membershipRead}) OR ({administrativeRead}) OR ({mutationGrant}) OR ({preferenceGrant}) OR ({settingsGrant}) OR ({enrollmentGrant})))))))
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                         WHERE pg_catalog.pg_has_role({Text(login)},r.oid,'MEMBER')
                             AND pg_catalog.has_schema_privilege(r.oid,pg_catalog.to_regnamespace({Text(names.Schema)}),'CREATE'))
                     OR NOT ({creatorProof})
                     OR NOT ({workerProof})
+                    OR NOT ({administrativeProof})
                     OR NOT ({mutationProof})
                     OR NOT ({preferenceProof})
                     OR NOT ({enrollmentProof}))
@@ -245,7 +264,7 @@ internal static class ActorPublisherCatalogProof
     internal static string SourceGuard(ExploreDbContext context, HumanPrincipalSourceSql names,
         IReadOnlyCollection<Type> sources, PostgresNativeQueueEnrollment enrollment, string diagnosticPrefix)
     {
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         return $"""
             IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n WHERE n.nspname = {Text(names.Schema)}
                 AND n.nspowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid)

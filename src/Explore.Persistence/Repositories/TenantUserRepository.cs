@@ -34,7 +34,7 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
         _dbContext.ValidateTenantLease();
         if (_dbContext.TenantFilterTenantId != tenantId || _dbContext.IsTenantFilterBypassed)
             throw new UnauthorizedAccessException("Enrollment requires its original selected tenant.");
-        return _dbContext.TenantUsers.IgnoreQueryFilters([QueryFilterNames.SoftDelete]).AsNoTracking()
+        return _dbContext.TenantUsers.IncludeDeleted().AsNoTracking()
             .Where(row => row.TenantId == tenantId && row.UserId == userId)
             .Select(row => new TenantUser
             {

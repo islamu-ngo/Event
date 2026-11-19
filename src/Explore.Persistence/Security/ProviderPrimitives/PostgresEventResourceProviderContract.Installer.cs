@@ -143,7 +143,7 @@ public static partial class PostgresEventResourceProviderContract
                 string tenantPolicy = "";
                 if (type == typeof(TenantSetting))
                 {
-                    var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+                    var metadata = context.GetTenantTableInventory()
                         .Single(value => value.TableName == entity.GetTableName());
                     string fingerprint = PostgresTenantRowLevelSecurityModel.BuildPolicyFingerprintPrefix(metadata, sql.Schema);
                     tenantPolicy = $"""

@@ -96,7 +96,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
         var command = await scenario.InteractiveCommandAsync();
         scenario.HostConfiguration["PUBLIC_BASE_URL"] = "https://changed.example.test";
         var handler = new CompleteInstanceOnboardingCommandHandler(
-            scenario.BootstrapRepository, scenario.UserRepository, scenario.DeploymentModeProvider, scenario.Operation);
+            scenario.BootstrapReader, scenario.UserRepository, scenario.DeploymentModeProvider, scenario.Operation);
         await Assert.ThrowsAsync<ConcurrencyConflictException>(() => handler.ExecuteAsync(command, CancellationToken.None));
         await Assert.That(scenario.CommittedWrites).IsEmpty();
     }
@@ -111,7 +111,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
         var command = await scenario.InteractiveCommandAsync();
         scenario.ChangeSetting(key, "changed");
         var handler = new CompleteInstanceOnboardingCommandHandler(
-            scenario.BootstrapRepository, scenario.UserRepository, scenario.DeploymentModeProvider, scenario.Operation);
+            scenario.BootstrapReader, scenario.UserRepository, scenario.DeploymentModeProvider, scenario.Operation);
         await Assert.ThrowsAsync<ConcurrencyConflictException>(() => handler.ExecuteAsync(command, CancellationToken.None));
         await Assert.That(scenario.CommittedWrites).IsEmpty();
         await Assert.That(scenario.Bootstrap.Status).IsEqualTo(InstanceBootstrapStatus.Pending);
@@ -238,6 +238,8 @@ internal sealed class OnboardingCompletionScenario
         BootstrapRepository.GetCurrentForUpdate(Arg.Any<CancellationToken>()).Returns(_ => Bootstrap);
         BootstrapRepository.Create(Arg.Any<InstanceBootstrapState>()).Returns(_ => RejectWrite<InstanceBootstrapState>("bootstrap"));
         BootstrapRepository.Update(Arg.Any<InstanceBootstrapState>()).Returns(_ => RejectWrite<Task>("bootstrap"));
+        BootstrapReader = Substitute.For<IInstanceBootstrapStateReader>();
+        BootstrapReader.GetCurrent(Arg.Any<CancellationToken>()).Returns(_ => Bootstrap);
         UserRepository = Substitute.For<IUserRepository>();
         UserRepository.Create(Arg.Any<User>()).Returns(call =>
         {
@@ -283,7 +285,7 @@ internal sealed class OnboardingCompletionScenario
             ["Keycloak:Authority"] = "https://identity.example.test",
             ["Keycloak:ClientId"] = "event"
         }).Build();
-        GenerationReader = new InstanceOnboardingGenerationReader(SystemSettings, DeploymentModeProvider, BootstrapRepository, HostConfiguration);
+        GenerationReader = new InstanceOnboardingGenerationReader(SystemSettings, DeploymentModeProvider, BootstrapReader, HostConfiguration);
         var smtp = Substitute.For<ISmtpConfigResolver>();
         smtp.ResolveAsync(Arg.Any<CancellationToken>()).Returns(_ =>
         {
@@ -293,7 +295,7 @@ internal sealed class OnboardingCompletionScenario
         });
         var dispatcher = Substitute.For<IAuthenticationProviderDispatcher>();
         dispatcher.GetActivePrimaryProviderAsync(Arg.Any<CancellationToken>()).Returns(providerKind);
-        Preflight = new GetOnboardingPreflightQueryHandler(BootstrapRepository, DeploymentModeProvider, secret,
+        Preflight = new GetOnboardingPreflightQueryHandler(BootstrapReader, DeploymentModeProvider, secret,
             tenants, SystemSettings, HostConfiguration, dispatcher, smtpConfigResolver: smtp);
         var status = Substitute.For<IQueryHandler<GetInstanceOnboardingStatusQuery, InstanceOnboardingStatusDto>>();
         status.QueryAsync(Arg.Any<GetInstanceOnboardingStatusQuery>(), Arg.Any<CancellationToken>()).Returns(_ => new InstanceOnboardingStatusDto
@@ -337,6 +339,7 @@ internal sealed class OnboardingCompletionScenario
     public ProviderAccountKey Account { get; }
     public InstanceBootstrapState Bootstrap { get; }
     public IInstanceBootstrapStateRepository BootstrapRepository { get; }
+    public IInstanceBootstrapStateReader BootstrapReader { get; }
     public IUserRepository UserRepository { get; }
     public ISystemSettingRepository SystemSettings { get; }
     public IConfiguration HostConfiguration { get; }

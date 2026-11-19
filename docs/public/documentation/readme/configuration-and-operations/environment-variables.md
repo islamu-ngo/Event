@@ -668,12 +668,18 @@ cancelled refresh retains the previous complete cache and reports the failure;
 it does not replace good data with an empty or partial cache. Correct the reported
 database or permission problem before retrying rather than granting broad access.
 
-Administrative scope discovery additionally requires
-`event_admin_authority_global` on the Global login, with inheritance enabled and
-role switching disabled. Do not grant its owner/migrator groups or direct access
-to private role-grant/membership tables. This capability returns only one user's
-eligible administrative scope IDs and platform-administrator status, across
-tenants; it does not grant mutation authority or expose member PII.
+Administrative scope discovery uses application-owned queries over fixed Global
+metadata reads. Fresh development enrollment installs 26 SELECT columns across
+seven relations and the required tenant SELECT policies, reusing existing role
+and tenant-membership reads. No additional administrative helper-role enrollment
+is required. The application selects the exact user's eligible scope IDs and
+platform-administrator status; storage permission does not grant human mutation
+authority or include contact/profile fields. Keep the Global application
+credential private and let the installer declare its fixed permissions.
+
+The former administrative decision routines and helper roles are obsolete.
+Startup rejects their presence rather than converting them automatically; use
+fresh pre-release database enrollment instead of manually extending those roles.
 
 Backends performing verified ATProto actor consolidation additionally require
 `event_actor_consolidation_runtime` on their selected transaction-owning login,

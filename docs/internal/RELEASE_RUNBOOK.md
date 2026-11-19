@@ -9,8 +9,9 @@
 ## Complete release-impact metadata
 
 Before the license audit, CI restores the conditional Standalone container graph
-and the moderation launcher. It then uses ordinary Standalone assets for the
-solution build. When reproducing a missing-metadata failure, verify package and
+and the moderation launcher, browser installer, migration scaffolder and shared
+Keycloak tool owners without running their operations. It finishes with ordinary
+solution assets for the build. For a missing-metadata failure, verify package and
 version coverage for these profiles before changing policy or relying on a warm
 local cache.
 

@@ -32,14 +32,17 @@ internal static class InstanceBootstrapStateQuery
         if (rows.Length == 0)
             return null;
 
-        // Use the mapped materializer for the private constructor/setters, without
-        // attaching evidence to a tracker or borrowing a mutation transaction.
-        var entity = context.Model.FindEntityType(typeof(InstanceBootstrapState))!;
+        return MaterializeJsonRow<InstanceBootstrapState>(context, rows[0]);
+    }
+
+    internal static TEntity MaterializeJsonRow<TEntity>(ExploreDbContext context, JsonElement row) where TEntity : class
+    {
+        var entity = context.Model.FindEntityType(typeof(TEntity))!;
         var properties = entity.GetProperties().ToArray();
         object?[] values = new object?[properties.Max(property => property.GetIndex()) + 1];
         foreach (var property in properties)
-            values[property.GetIndex()] = rows[0].GetProperty(property.Name).Deserialize(property.ClrType);
+            values[property.GetIndex()] = row.GetProperty(property.Name).Deserialize(property.ClrType);
         var materializer = context.GetService<IStructuralTypeMaterializerSource>().GetMaterializer(entity);
-        return (InstanceBootstrapState)materializer(new MaterializationContext(new ValueBuffer(values), context));
+        return (TEntity)materializer(new MaterializationContext(new ValueBuffer(values), context));
     }
 }

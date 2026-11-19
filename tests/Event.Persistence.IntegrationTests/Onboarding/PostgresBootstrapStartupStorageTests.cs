@@ -734,7 +734,8 @@ public sealed class PostgresBootstrapStartupStorageTests(PostgreSqlContainerFixt
         Task PrepareAsync(IConfiguration configuration) =>
             new ConfiguredAdministratorBootstrapStartupRunner(
                 new ConfiguredAdministratorBootstrapProvider(configuration,
-                    Options.Create(new InstanceOperatorIdentityOptions()), repository),
+                    Options.Create(new InstanceOperatorIdentityOptions()),
+                    new Event.Persistence.IntegrationTests.Fixtures.TestInstanceBootstrapStateReader(repository)),
                 repository, transactions, TimeProvider.System, gate).PrepareAsync(token);
 
         var interactive = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>

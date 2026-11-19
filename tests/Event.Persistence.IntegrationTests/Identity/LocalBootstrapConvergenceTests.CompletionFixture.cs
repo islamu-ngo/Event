@@ -4,6 +4,7 @@ using Explore.Application.Authentication;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
@@ -134,6 +135,7 @@ public sealed partial class LocalBootstrapConvergenceTests
             Context = database.Application(scope);
             owner = new EfCoreUnitOfWork(Context);
             BootstrapRepository = new InstanceBootstrapStateRepository(Context);
+            BootstrapReader = new Event.Persistence.IntegrationTests.Fixtures.TestInstanceBootstrapStateReader(BootstrapRepository);
             Users = new UserRepository(Context);
             Settings = SystemSettingRepository.CreateReadOnly(Context, new RelationalSettingMutationLock(Context, owner));
             Configuration["Deployment:Mode"] = mode.ToString();
@@ -156,20 +158,21 @@ public sealed partial class LocalBootstrapConvergenceTests
                     PrivacyUrl = "https://example.test/privacy"
                 }
                 : new InstanceOperatorIdentityOptions());
-            provider = new ConfiguredAdministratorBootstrapProvider(Configuration, operatorOptions, BootstrapRepository);
+            provider = new ConfiguredAdministratorBootstrapProvider(Configuration, operatorOptions, BootstrapReader);
             setup = new ObservedSetupSecret(scope.ServiceProvider.GetRequiredService<ISetupSecretProvider>(), events);
             deployment = new ObservedDeployment(scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>(), events);
             metadata = new ObservedMetadata(events);
             dispatcher = new RuntimeAuthenticationProviderDispatcher(Settings,
                 scope.ServiceProvider.GetRequiredService<IMemoryCache>(),
                 Options.Create(new AuthenticationProviderDeploymentOptions()));
-            Generation = new InstanceOnboardingGenerationReader(Settings, deployment, BootstrapRepository, Configuration);
+            Generation = new InstanceOnboardingGenerationReader(Settings, deployment, BootstrapReader, Configuration);
             observation.Events = events;
         }
 
         internal ExploreDbContext Context { get; }
         internal IServiceProvider RequestServices => human!.Services;
         internal InstanceBootstrapStateRepository BootstrapRepository { get; }
+        internal IInstanceBootstrapStateReader BootstrapReader { get; }
         internal UserRepository Users { get; }
         internal SystemSettingRepository Settings { get; }
         internal IInstanceOnboardingGenerationReader Generation { get; }
@@ -320,7 +323,7 @@ public sealed partial class LocalBootstrapConvergenceTests
             var logins = new UserExternalLoginRepository(Context);
             var emails = new UserIdentityEmailRepository(Context);
             var lifecycle = new TenantLifecycleAccessService(new TenantRepository(Context), human.Admin,
-                BootstrapRepository, new TenantLookupSource(
+                BootstrapReader, new TenantLookupSource(
                     scope.ServiceProvider.GetRequiredService<IGlobalExploreDbContextFactory>()));
             return new SyncUserCommandHandler(Users, logins,
                 new IdentityAccountResolver(Users, logins, emails, new PrivacyErasureStateRepository(Context),
@@ -378,7 +381,7 @@ public sealed partial class LocalBootstrapConvergenceTests
                 else ExternalReadinessCallsInsideTransaction++;
                 return Task.FromResult<SmtpConfiguration?>(null);
             });
-            await new GetOnboardingPreflightQueryHandler(BootstrapRepository, deployment, setup,
+            await new GetOnboardingPreflightQueryHandler(BootstrapReader, deployment, setup,
                 new TenantRepository(Context), Settings, Configuration, dispatcher, smtpConfigResolver: smtp)
                 .QueryAsync(new(), database.Token);
             return new()
@@ -403,7 +406,7 @@ public sealed partial class LocalBootstrapConvergenceTests
         {
             human!.EnterRequest();
             observation.Reset();
-            return new CompleteInstanceOnboardingCommandHandler(BootstrapRepository, Users, deployment, operation)
+            return new CompleteInstanceOnboardingCommandHandler(BootstrapReader, Users, deployment, operation)
                 .ExecuteAsync(command, database.Token);
         }
 

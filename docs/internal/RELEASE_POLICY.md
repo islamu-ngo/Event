@@ -9,7 +9,8 @@
 ## Complete release-impact metadata
 
 License admission covers every tracked product and engineering lock profile,
-including conditional deployment graphs. A pass using a populated developer
+including conditional deployment and file-based engineering-tool graphs.
+A pass using a populated developer
 cache does not establish clean-runner restore coverage. Missing package metadata
 remains a failure; profile servicing must not add audit exemptions.
 

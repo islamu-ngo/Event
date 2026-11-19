@@ -22,13 +22,9 @@ public sealed partial class AuthorizationSurfaceGuardrailTests
     [
         .. ReviewedHandlerAuthorities(),
         new(
-            "Explore.Application.Features.Authentication.Continuation.Commands.JoinVerifiedTenantCommand",
+            "Explore.Application.Features.Authentication.Continuation.Requests.Commands.JoinVerifiedTenantCommand",
             "original-verified-human-enrollment-owner",
             "The retained human security gate and prepared subject must match the canonical account key and selected tenant. Identity and discovery fences, current visitor admission and the original settlement owner govern membership creation and final admission."),
-        new(
-            "Explore.Application.Features.Authentication.Continuation.ResolveVerifiedAccountContinuationQuery",
-            "verified-authentication-adapter-read",
-            "Verified authentication adapters supply the canonical account key. The read-only handler verifies the persisted provider binding ordinally and excludes deleted users and inactive memberships before selecting a destination; it creates no account, membership or credential."),
         new(
             "Explore.Application.Features.Authentication.Local.Requests.Commands.ReserveLocalVisitorEnrollmentCommand",
             "original-browser-enrollment-owner",

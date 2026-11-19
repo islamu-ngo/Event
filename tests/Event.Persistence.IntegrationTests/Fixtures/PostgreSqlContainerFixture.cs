@@ -214,19 +214,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresUserTenantMembershipReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresExternalLoginReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresAdministrativeAuthorityContract.ApplyAsync(migratorContext);
-            foreach (string executor in new[]
-            {
-                PostgresAdministrativeAuthorityContract.GlobalRole
-            })
-            {
-                await migratorContext.Database.ExecuteSqlRawAsync(
-                    $"""
-                    GRANT "{executor}"
-                    TO "{NativeQueueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
-                    WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
-                    """);
-            }
+            await PostgresAdministrativeAuthorityReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresActorConsolidationContract.ApplyAsync(migratorContext);
             await PostgresManagedTenantDomainContract.ApplyAsync(migratorContext);
             await PostgresNotificationFanoutAdmissionContract.ApplyAsync(migratorContext);
@@ -240,6 +228,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresPublicEventResponseClockContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresLookupCatalogueReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresCategoryReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresCategoryMutationPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresAtprotoFederationSettingPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await migratorContext.Database.ExecuteSqlRawAsync(
                 $"""
@@ -347,6 +336,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresProviderConfigurationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresMixedSettingsContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresOrdinarySettingsContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresProvisioningPolicyPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresVisitorSettingsStorage.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresLocalizationSecretStatusReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresTenantPreferencePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);

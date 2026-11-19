@@ -130,13 +130,14 @@ internal sealed partial class AuthenticatedSettingsFixture
             await PostgresModelConstraintApplier.ApplyAsync(seed);
             await PostgresTenantRowLevelSecurityModel.ApplyAsync(seed);
             await PostgresExternalLoginReadPermissions.ApplyAsync(seed, postgres.NativeQueueEnrollment);
-            await PostgresAdministrativeAuthorityContract.ApplyAsync(seed);
+            await PostgresAdministrativeAuthorityReadPermissions.ApplyAsync(seed, postgres.NativeQueueEnrollment);
             await PostgresHumanAdministratorCommitAuthorityContract.ApplyAsync(seed, postgres.NativeQueueEnrollment);
             await PostgresPolicySourceSetContract.ApplyAsync(seed, postgres.NativeQueueEnrollment);
             await PostgresHumanPrincipalSourceContract.ApplyAsync(seed, postgres.NativeQueueEnrollment);
             await PostgresHumanAuthorizationRouteContract.ApplyAsync(seed, postgres.NativeQueueEnrollment);
             await PostgresHumanSupportAccessSourceContract.ApplyAsync(seed, postgres.NativeQueueEnrollment);
             await PostgresOrdinarySettingsContract.ApplyAsync(seed, postgres.NativeQueueEnrollment);
+            await PostgresProvisioningPolicyPermissions.ApplyAsync(seed, postgres.NativeQueueEnrollment);
             await PostgresVisitorSettingsStorage.ApplyAsync(seed, postgres.NativeQueueEnrollment);
             await PostgresMixedSettingsContract.ApplyAsync(seed, postgres.NativeQueueEnrollment);
             await LookupTableSeeder.SeedAsync(seed);

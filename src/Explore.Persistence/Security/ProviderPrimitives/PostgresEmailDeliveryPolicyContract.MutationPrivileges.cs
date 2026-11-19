@@ -144,6 +144,6 @@ public static partial class PostgresEmailDeliveryPolicyContract
                         USING ({tenant} = {selectedTenant}) WITH CHECK ({tenant} = {selectedTenant});
                     """;
         }
-        return grants + "\n" + policies;
+        return grants + "\n" + policies + "\n" + BuildMutationPolicyStampSql(context);
     }
 }

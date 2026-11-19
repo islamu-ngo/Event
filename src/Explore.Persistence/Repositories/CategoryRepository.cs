@@ -16,6 +16,20 @@ public class CategoryRepository : GenericRepository<Category, Guid>, ICategoryRe
         _dbContext = dbContext;
     }
 
+    /// <summary>
+    /// Persists only the columns Runtime may mutate under <c>PostgresCategoryMutationPermissions</c>:
+    /// the identity and tenant columns are immutable and carry no UPDATE grant.
+    /// </summary>
+    public override async Task Update(Category entity)
+    {
+        var entry = TrackForNarrowUpdate(entity);
+        entry.Property(item => item.ConcurrencyStamp).IsModified = true;
+        entry.Property(item => item.MasterCode).IsModified = true;
+        entry.Property(item => item.FullName).IsModified = true;
+        entry.Property(item => item.ParentId).IsModified = true;
+        await _dbContext.SaveChangesAsync();
+    }
+
     public new async Task<Category?> GetById(Guid id)
     {
         return await _dbContext.Categories

@@ -103,7 +103,7 @@ public static partial class PostgresConfigurationImportSnapshotContract
                 ["TenantId", "PolicyScopeKey", "PaidEventPolicyVersionId", "Ordinal", .. riskColumns],
                 ChildPredicate<PaidEventPolicyCurrencyRiskLimitRow>())
         ];
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string Fingerprint(Type type, string predicate) => "event-configuration-import-snapshot:v1:" +
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
                 $"{Schema(context, type)}:{context.Model.FindEntityType(type)!.GetTableName()}:{predicate}"))) + ":";

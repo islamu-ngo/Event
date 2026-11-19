@@ -166,6 +166,7 @@ public static class ExploreDatabaseMigrator
             await PostgresPublicEventResponseClockContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresLookupCatalogueReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresCategoryReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresCategoryMutationPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresAtprotoFederationSettingPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresIdempotencyReceiptContract.ApplyAsync(
                 executionDatabase, queueEnrollment, cancellationToken);
@@ -201,7 +202,8 @@ public static class ExploreDatabaseMigrator
             await PostgresUserTenantMembershipReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
         if (queueEnrollment is not null)
             await PostgresExternalLoginReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
-        await PostgresAdministrativeAuthorityContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresAdministrativeAuthorityReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
         await PostgresActorConsolidationContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresManagedTenantDomainContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresNotificationFanoutAdmissionContract.ApplyAsync(executionDatabase, cancellationToken);
@@ -209,15 +211,7 @@ public static class ExploreDatabaseMigrator
         await PostgresGenericOutboxAdmissionContract.ApplyAsync(executionDatabase, cancellationToken);
         if (queueEnrollment is not null)
         {
-            await executionDatabase.Database.ExecuteSqlRawAsync(
-                $"""
-                GRANT "{PostgresNotificationFanoutAdmissionContract.GlobalRole}",
-                    "{PostgresNotificationOutboxAdmissionContract.GlobalRole}",
-                    "{PostgresGenericOutboxAdmissionContract.GlobalRole}",
-                    "{PostgresEmailDispatchAdmissionContract.GlobalRole}"
-                TO "{queueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
-                WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
-                """, cancellationToken);
+            await ApplyGlobalOutboxAdmissionMembershipsAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresOutboxExecutionContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresPublicationFanoutExecutionContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
         }
@@ -319,6 +313,7 @@ public static class ExploreDatabaseMigrator
             await PostgresProviderConfigurationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresMixedSettingsContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresOrdinarySettingsContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresProvisioningPolicyPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresVisitorSettingsStorage.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresLocalizationSecretStatusReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresTenantPreferencePermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
@@ -353,6 +348,20 @@ public static class ExploreDatabaseMigrator
         }
         await EventDiscoveryRankBackfill.ApplyAsync(executionDatabase, cancellationToken);
     }
+
+    internal static Task ApplyGlobalOutboxAdmissionMembershipsAsync(
+        ExploreDbContext executionDatabase,
+        PostgresNativeQueueEnrollment queueEnrollment,
+        CancellationToken cancellationToken = default) =>
+        executionDatabase.Database.ExecuteSqlRawAsync(
+            $"""
+            GRANT "{PostgresNotificationFanoutAdmissionContract.GlobalRole}",
+                "{PostgresNotificationOutboxAdmissionContract.GlobalRole}",
+                "{PostgresGenericOutboxAdmissionContract.GlobalRole}",
+                "{PostgresEmailDispatchAdmissionContract.GlobalRole}"
+            TO "{queueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+            WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+            """, cancellationToken);
 
     private static PostgresLocalIdentityWriterEnrollment? BindLocalIdentityWriterEnrollment(
         IConfiguration configuration)

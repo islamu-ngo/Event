@@ -304,7 +304,7 @@ public static partial class PostgresPublicEventDiscoveryContract
             var clauses = new List<string>();
             if (entity.FindProperty("TenantId") is not null)
             {
-                var tenant = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+                var tenant = context.GetTenantTableInventory()
                     .SingleOrDefault(table => table.TableName == entity.GetTableName());
                 string column = Column<T>(alias, "TenantId");
                 clauses.Add(tenant?.AllowsNullTenant is true
@@ -320,7 +320,7 @@ public static partial class PostgresPublicEventDiscoveryContract
         internal IReadOnlyDictionary<Type, string> Policies()
         {
             var result = new Dictionary<Type, string>();
-            var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+            var tenantTables = context.GetTenantTableInventory();
             foreach (var type in Sources.Keys.ToArray())
             {
                 var entity = context.Model.FindEntityType(type)!;

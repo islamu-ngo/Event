@@ -52,10 +52,10 @@ public static partial class PostgresHumanPrincipalSourceContract
     }
 
     internal static string AdmissionSql(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
-        $"DO $admission$ BEGIN {Guard(context, enrollment)} {ExactBodies(context, enrollment)} END $admission$;";
+        $"DO $admission$ BEGIN {CatalogueGuard(context, enrollment)} {ExactBodies(context, enrollment)} END $admission$;";
 
     internal static string OriginalSourceAssertionSql(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
-        Guard(context, enrollment) + "\n" + ExactBodies(context, enrollment);
+        CatalogueGuard(context, enrollment) + "\n" + ExactBodies(context, enrollment);
 
     private static string Text(string value) => "E'" + value.Replace("\\", "\\\\", StringComparison.Ordinal)
         .Replace("'", "''", StringComparison.Ordinal).Replace("$", "\\044", StringComparison.Ordinal) + "'";
@@ -186,6 +186,7 @@ public static partial class PostgresHumanPrincipalSourceContract
     private static (string Name, string Signature, string Arguments, string Result, string Body)[] Functions(
         ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
     [
+        (CatalogueGuardName, "", "", "void", CatalogueGuardBody(context, enrollment)),
         (Observe, Signature, Arguments, "jsonb", Body(context, enrollment, false)),
         (Acquire, Signature, Arguments, "jsonb", Body(context, enrollment, true)),
         (Session, SessionSignature, SessionArguments, "jsonb", SessionBody(context, enrollment)),
@@ -196,7 +197,8 @@ public static partial class PostgresHumanPrincipalSourceContract
     private static string ExactBodies(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var sql = new HumanPrincipalSourceSql(context);
-        return string.Join("\n", Functions(context, enrollment).Select(function => $"""
+        return CatalogueGuardWitness(context, enrollment) + "\n"
+            + string.Join("\n", Functions(context, enrollment).Select(function => $"""
             IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc f
                 WHERE f.oid = pg_catalog.to_regprocedure({Text(sql.Name(function.Name) + "(" + function.Signature + ")")})
                     AND pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(f.prosrc,'UTF8')),'hex') = {Text(Hash(function.Body))}
@@ -213,7 +215,8 @@ public static partial class PostgresHumanPrincipalSourceContract
             [new(Observe, Signature, OwnerRole, [RuntimeRole, GlobalRole]),
                 new(Acquire, Signature, OwnerRole, [RuntimeRole, GlobalRole]),
                 new(Session, SessionSignature, OwnerRole, [RuntimeRole]),
-                new(Write, "", OwnerRole, [OwnerRole]), new(SettingWrite, "", OwnerRole, [OwnerRole])],
+                new(Write, "", OwnerRole, [OwnerRole]), new(SettingWrite, "", OwnerRole, [OwnerRole]),
+                new(CatalogueGuardName, "", OwnerRole, [OwnerRole])],
             [.. Sources.Select(source => new PostgresPrivilegeGuard.Relation(
                 context.Model.FindEntityType(source.Type)!.GetTableName()!, OwnerRole, [],
                 source.Columns.Select((property, index) => new PostgresPrivilegeGuard.Column(

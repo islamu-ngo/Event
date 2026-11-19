@@ -12,7 +12,7 @@ namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
 public class GetInstanceOnboardingStatusQueryHandler : IQueryHandler<GetInstanceOnboardingStatusQuery, InstanceOnboardingStatusDto>
 {
-    private readonly IInstanceBootstrapStateRepository _instanceBootstrapStateRepository;
+    private readonly IInstanceBootstrapStateReader _instanceBootstrapStateReader;
     private readonly IAdminContext _adminContext;
     private readonly ICurrentUserService _currentUserService;
     private readonly ISetupSecretProvider _setupSecretProvider;
@@ -20,14 +20,14 @@ public class GetInstanceOnboardingStatusQueryHandler : IQueryHandler<GetInstance
     private readonly IAuthenticationProviderDispatcher _providers;
 
     public GetInstanceOnboardingStatusQueryHandler(
-        IInstanceBootstrapStateRepository instanceBootstrapStateRepository,
+        IInstanceBootstrapStateReader instanceBootstrapStateReader,
         IAdminContext adminContext,
         ICurrentUserService currentUserService,
         ISetupSecretProvider setupSecretProvider,
         IDeploymentModeProvider deploymentModeProvider,
         IAuthenticationProviderDispatcher providers)
     {
-        _instanceBootstrapStateRepository = instanceBootstrapStateRepository;
+        _instanceBootstrapStateReader = instanceBootstrapStateReader;
         _adminContext = adminContext;
         _currentUserService = currentUserService;
         _setupSecretProvider = setupSecretProvider;
@@ -37,7 +37,7 @@ public class GetInstanceOnboardingStatusQueryHandler : IQueryHandler<GetInstance
 
     public async Task<InstanceOnboardingStatusDto> QueryAsync(GetInstanceOnboardingStatusQuery request, CancellationToken cancellationToken)
     {
-        var bootstrap = await _instanceBootstrapStateRepository.GetCurrent(cancellationToken);
+        var bootstrap = await _instanceBootstrapStateReader.GetCurrent(cancellationToken);
         string state = bootstrap switch
         {
             null => "InteractivePending",

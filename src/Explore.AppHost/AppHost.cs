@@ -994,9 +994,12 @@ static LocalPlatformResources AddLocalPlatform(
         .WithHttpHealthCheck("/auth/health/ready", endpointName: "mgmt")
         .WaitFor(crdb);
 
-    var cerbosDb = builder.AddContainer("cerbos-db", "postgres", "18-alpine")
-        .WithEnvironment("POSTGRES_USER", cerbosPostgresUser)
-        .WithEnvironment("POSTGRES_PASSWORD", cerbosPostgresPassword)
+    var cerbosPostgresUserParameter = builder.AddParameter("cerbos-postgres-username",
+        () => cerbosPostgresUser, publishValueAsDefault: false, secret: true);
+    var cerbosPostgresPasswordParameter = builder.AddParameter("cerbos-postgres-password",
+        () => cerbosPostgresPassword, publishValueAsDefault: false, secret: true);
+    var cerbosDb = builder.AddPostgres("cerbos-db", cerbosPostgresUserParameter, cerbosPostgresPasswordParameter)
+        .WithImageTag("18-alpine")
         .WithEnvironment("POSTGRES_DB", cerbosPostgresDatabase)
         .WithVolume("islamu-event-cerbos-data", "/var/lib/postgresql")
         .WithBindMount(cerbosSchemaPath, "/docker-entrypoint-initdb.d/cerbos-schema.sql", isReadOnly: true);

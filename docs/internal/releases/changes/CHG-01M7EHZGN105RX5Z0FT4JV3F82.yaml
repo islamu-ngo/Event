@@ -1,0 +1,27 @@
+Change-Id: CHG-01M7EHZGN105RX5Z0FT4JV3F82
+Title: "Share private principal catalogue assertions"
+Type: fix
+Scope: access
+Summary: "Reuse the complete private principal-source catalogue assertion while preserving fresh checks, exact routine identity and application-login execution denial."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "Same-owner entries authenticate the source-declared private assertion before executing fresh catalogue checks. Application logins retain direct-execution denial; independent admission and installation remain inline."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Initialize fresh development-native profiles with the current installer. Missing, altered or broadened private assertions fail admission; reinstallation does not silently repair drift."

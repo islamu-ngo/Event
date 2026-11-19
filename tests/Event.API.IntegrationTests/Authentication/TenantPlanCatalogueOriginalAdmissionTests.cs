@@ -5,6 +5,7 @@ using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.InstanceAdmin.Handlers.Commands;
@@ -470,6 +471,32 @@ public sealed partial class TenantPlanCatalogueOriginalAdmissionTests
         internal TaskCompletionSource Settled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource ReleaseSettlement { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public async Task<T> ExecuteWithOriginalPrivacyAsync<T>(IOriginalPrivacyIdentityFenceAuthority privacy,
+            Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default)
+        {
+            Entered.TrySetResult();
+            T result = await inner.ExecuteWithOriginalPrivacyAsync(privacy, async token =>
+            {
+                T value = await operation(token);
+                finalizer.Register(async finalToken =>
+                {
+                    gate.RequireCurrent();
+                    if (context.Database.CurrentTransaction is null)
+                        throw new InvalidOperationException("The terminal read must retain the original transaction.");
+                    TerminalReached.TrySetResult();
+                    await ReleaseTerminal.Task.WaitAsync(finalToken);
+                    gate.RequireCurrent();
+                }, _ => { });
+                return value;
+            }, cancellationToken);
+            gate.RequireCurrent();
+            if (context.Database.CurrentTransaction is not null)
+                throw new InvalidOperationException("The real transaction owner must settle before returning.");
+            Settled.TrySetResult();
+            await ReleaseSettlement.Task.WaitAsync(cancellationToken);
+            return result;
+        }
+
         public async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default)
         {
@@ -513,6 +540,16 @@ public sealed partial class TenantPlanCatalogueOriginalAdmissionTests
     private sealed class BodyBoundary(ISerializableAttemptOwner inner,
         Func<CancellationToken, Task>? beforeBody, Func<CancellationToken, Task>? afterBody) : ISerializableAttemptOwner
     {
+        public Task<T> ExecuteWithOriginalPrivacyAsync<T>(IOriginalPrivacyIdentityFenceAuthority privacy,
+            Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
+            inner.ExecuteWithOriginalPrivacyAsync(privacy, async token =>
+            {
+                if (beforeBody is not null) await beforeBody(token);
+                T result = await operation(token);
+                if (afterBody is not null) await afterBody(token);
+                return result;
+            }, cancellationToken);
+
         public Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) => inner.ExecuteAsync(async token =>
         {

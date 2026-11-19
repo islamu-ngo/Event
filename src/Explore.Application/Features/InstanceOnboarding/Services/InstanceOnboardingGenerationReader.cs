@@ -13,15 +13,15 @@ namespace Explore.Application.Features.InstanceOnboarding.Services;
 public sealed class InstanceOnboardingGenerationReader(
     ISystemSettingRepository settings,
     IDeploymentModeProvider deploymentMode,
-    IInstanceBootstrapStateRepository bootstrapRepository,
+    IInstanceBootstrapStateReader bootstrapReader,
     IConfiguration configuration) : IInstanceOnboardingGenerationReader
 {
     public async Task<string> ReadCurrentAsync(CancellationToken cancellationToken) =>
-        await ReadAsync(await bootstrapRepository.GetCurrent(cancellationToken), cancellationToken);
+        await ReadAsync(await bootstrapReader.GetCurrent(cancellationToken), cancellationToken);
 
     public async Task<InstanceOnboardingDurableSnapshot> ReadSnapshotAsync(CancellationToken cancellationToken)
     {
-        var bootstrap = await bootstrapRepository.GetCurrent(cancellationToken);
+        var bootstrap = await bootstrapReader.GetCurrent(cancellationToken);
         var mode = bootstrap?.DeploymentMode
             ?? await deploymentMode.GetConfiguredOnboardingModeAsync(cancellationToken);
         var values = await settings.GetAllSettings(cancellationToken: cancellationToken);

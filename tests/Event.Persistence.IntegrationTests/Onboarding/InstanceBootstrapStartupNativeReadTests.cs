@@ -3,6 +3,7 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Secrets;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -140,6 +141,54 @@ public sealed class InstanceBootstrapStartupNativeReadTests(PostgreSqlContainerF
         }
         var denied = await Assert.ThrowsAsync<PostgresException>(() => reader.GetCurrent());
         await Assert.That(denied!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+    }
+
+    [Test]
+    public async Task ProviderConfigurationSecretBindingReaderReadsKeycloakBindingsWhileRuntimeTableAccessStaysDenied()
+    {
+        await using var migration = fixture.CreateDbContext();
+        await PostgresProviderConfigurationContract.ApplyAsync(migration, fixture.NativeQueueEnrollment);
+        string key = SecretDefinitionRegistry.Keys.Keycloak.Endpoint;
+        await migration.SecretBindings
+            .Where(binding => binding.SettingKey == key && binding.ScopeId == null && binding.Qualifier == string.Empty)
+            .ExecuteDeleteAsync();
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IGlobalExploreDbContextFactory>(
+            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)));
+        services.AddSingleton(fixture.NativeQueueEnrollment);
+        services.AddScoped<IProviderConfigurationSecretBindingReader, ProviderConfigurationSecretBindingReader>();
+        await using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var reader = scope.ServiceProvider.GetRequiredService<IProviderConfigurationSecretBindingReader>();
+
+        // Explicit absence returns null via Global contract without granting Runtime table access.
+        await Assert.That(await reader.GetInstanceBindingAsync(key)).IsNull();
+
+        await using (var runtime = OpenRuntime())
+        {
+            var runtimeDenied = await Assert.ThrowsAsync<PostgresException>(() =>
+                new SecretBindingRepository(runtime).GetByKeyAndScopeAsync(key, SecretScope.Instance, null));
+            await Assert.That(runtimeDenied!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+        }
+
+        var persisted = SecretBinding.CreateEnvironmentVariable(key, SecretScope.Instance, null, "KEYCLOAK_ENDPOINT");
+        migration.SecretBindings.Add(persisted);
+        await migration.SaveChangesAsync();
+        try
+        {
+            var resolved = await reader.GetInstanceBindingAsync(key);
+            await Assert.That(resolved).IsNotNull();
+            await Assert.That(resolved!.Id).IsEqualTo(persisted.Id);
+            await Assert.That(resolved.SettingKey).IsEqualTo(key);
+            await Assert.That(resolved.EnvironmentVariableName).IsEqualTo("KEYCLOAK_ENDPOINT");
+            await Assert.That(resolved.Scope).IsEqualTo(SecretScope.Instance);
+            await Assert.That(resolved.ScopeId).IsNull();
+        }
+        finally
+        {
+            await migration.SecretBindings.Where(binding => binding.Id == persisted.Id).ExecuteDeleteAsync();
+        }
     }
 
     private ExploreDbContext OpenRuntime()

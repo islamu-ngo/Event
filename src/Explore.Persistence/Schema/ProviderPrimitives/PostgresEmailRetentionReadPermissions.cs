@@ -265,7 +265,7 @@ public static class PostgresEmailRetentionReadPermissions
     private static Source[] Sources(ExploreDbContext context)
     {
         var names = context.GetService<ISqlGenerationHelper>();
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         return SourceTypes.Select(type =>
         {
             var entity = context.Model.FindEntityType(type) ?? throw new InvalidOperationException("email_retention_model_missing");

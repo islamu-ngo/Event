@@ -218,7 +218,7 @@ public static class PostgresDiscoveryMetadataPermissions
                 AND a.attnotnull AND a.attgenerated='' AND a.attidentity=''
                 AND a.atttypid={Text(property is "Id" or "TenantId" ? "uuid" : "bigint")}::regtype)
             """));
-        var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model).Single(table =>
+        var metadata = context.GetTenantTableInventory().Single(table =>
             table.TableName == revision.Name && (table.Schema ?? revision.Schema) == revision.Schema);
         string fingerprint = PostgresTenantRowLevelSecurityModel.BuildPolicyFingerprintPrefix(metadata, revision.Schema);
         return $"""
@@ -376,7 +376,7 @@ public static class PostgresDiscoveryMetadataPermissions
             || entity.GetSkipNavigations().Any() || entity.GetNavigations().Any(navigation => navigation.IsEagerLoaded)
             || entity.GetProperties().Any(property => property.ClrType != (property.Name is "Id" or "TenantId" ? typeof(Guid) : typeof(long))))
             throw new InvalidOperationException("discovery_metadata_model_shape_drift");
-        var tenant = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model).SingleOrDefault(table =>
+        var tenant = context.GetTenantTableInventory().SingleOrDefault(table =>
             table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
         if (tenant is not { AllowsNullTenant: false, ParentJoin: null, TenantIdColumn: not null })
             throw new InvalidOperationException("discovery_metadata_model_tenancy_drift");

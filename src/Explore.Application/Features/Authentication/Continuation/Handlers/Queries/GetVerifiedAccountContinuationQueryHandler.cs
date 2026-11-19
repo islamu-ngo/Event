@@ -1,19 +1,20 @@
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.Authentication.Continuation.Requests.Queries;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 
-namespace Explore.Application.Features.Authentication.Continuation;
+namespace Explore.Application.Features.Authentication.Continuation.Handlers.Queries;
 
-public sealed class ResolveVerifiedAccountContinuationQueryHandler(
+public sealed class GetVerifiedAccountContinuationQueryHandler(
     IExternalLoginAuthenticationRepository logins,
     IUserTenantNavigationRepository navigation,
     IUserTenantMembershipRepository memberships)
-    : IQueryHandler<ResolveVerifiedAccountContinuationQuery, VerifiedAccountContinuationResult>
+    : IQueryHandler<GetVerifiedAccountContinuationQuery, VerifiedAccountContinuationResult>
 {
     public async Task<VerifiedAccountContinuationResult> QueryAsync(
-        ResolveVerifiedAccountContinuationQuery request,
+        GetVerifiedAccountContinuationQuery request,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

@@ -269,7 +269,8 @@ public sealed partial class LocalBootstrapConvergenceTests
             TermsUrl = "https://example.test/terms",
             PrivacyUrl = "https://example.test/privacy"
         });
-        var provider = new ConfiguredAdministratorBootstrapProvider(fixture.Configuration, operatorOptions, bootstrap);
+        var provider = new ConfiguredAdministratorBootstrapProvider(fixture.Configuration, operatorOptions,
+            new Event.Persistence.IntegrationTests.Fixtures.TestInstanceBootstrapStateReader(bootstrap));
         context.BindTenantLease();
         var receipts = receiptSource ?? scope.ServiceProvider.GetRequiredService<SetupReceiptCustody>().Source;
         var enrollment = new EventDiscoveryEnrollmentGate(context);

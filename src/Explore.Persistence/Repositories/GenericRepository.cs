@@ -46,15 +46,22 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
     public virtual async Task Delete(T entity)
     {
         RequireTenantMutationScope(entity);
+        var entry = _dbContext.Entry(entity);
+        var target = entry.State == EntityState.Detached ? FindTrackedMatch(entity) ?? entity : entity;
+        if (!ReferenceEquals(target, entity))
+        {
+            _dbContext.Entry(target).CurrentValues.SetValues(entity);
+        }
+
         // Check if entity supports soft delete
-        if (entity is ISoftDeletable)
+        if (target is ISoftDeletable)
         {
             var cascadeTiming = _dbContext.ChangeTracker.CascadeDeleteTiming;
             try
             {
                 // Convert to a soft delete before EF processes required relationships.
                 _dbContext.ChangeTracker.CascadeDeleteTiming = CascadeTiming.OnSaveChanges;
-                _dbContext.Entry(entity).State = EntityState.Deleted;
+                _dbContext.Entry(target).State = EntityState.Deleted;
                 await _dbContext.SaveChangesAsync();
             }
             finally
@@ -65,7 +72,7 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
         else
         {
             // Hard delete: Permanently remove from database
-            _dbContext.Set<T>().Remove(entity);
+            _dbContext.Set<T>().Remove(target);
             await _dbContext.SaveChangesAsync();
         }
     }
@@ -136,12 +143,7 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
             return;
         }
 
-        var entityType = _dbContext.Model.FindEntityType(typeof(T))
-            ?? throw new InvalidOperationException($"Entity type metadata not found for {typeof(T).Name}.");
-        var primaryKey = entityType.FindPrimaryKey()
-            ?? throw new InvalidOperationException($"Primary key metadata not found for {typeof(T).Name}.");
-
-        var trackedEntity = _dbContext.Set<T>().Local.FirstOrDefault(localEntity => HasSamePrimaryKey(localEntity, entity, primaryKey.Properties));
+        var trackedEntity = FindTrackedMatch(entity);
 
         if (trackedEntity is not null)
         {
@@ -154,6 +156,44 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
         }
 
         await _dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Prepares an entity for an UPDATE that writes only the columns the caller marks as modified.
+    /// Detached entities are attached without pending changes so immutable key, tenant and ownership
+    /// columns never enter the generated statement, while a same-key tracked instance keeps its
+    /// original stored values for concurrency checks.
+    /// </summary>
+    protected EntityEntry<T> TrackForNarrowUpdate(T entity)
+    {
+        RequireTenantMutationScope(entity);
+        T? tracked = FindTrackedMatch(entity);
+        EntityEntry<T> entry;
+        if (tracked is null)
+        {
+            entry = _dbContext.Entry(entity);
+        }
+        else
+        {
+            entry = _dbContext.Entry(tracked);
+            if (!ReferenceEquals(tracked, entity))
+            {
+                entry.CurrentValues.SetValues(entity);
+            }
+        }
+
+        entry.State = EntityState.Unchanged;
+        return entry;
+    }
+
+    private T? FindTrackedMatch(T entity)
+    {
+        var entityType = _dbContext.Model.FindEntityType(typeof(T))
+            ?? throw new InvalidOperationException($"Entity type metadata not found for {typeof(T).Name}.");
+        var primaryKey = entityType.FindPrimaryKey()
+            ?? throw new InvalidOperationException($"Primary key metadata not found for {typeof(T).Name}.");
+
+        return _dbContext.Set<T>().Local.FirstOrDefault(localEntity => HasSamePrimaryKey(localEntity, entity, primaryKey.Properties));
     }
 
     private IQueryable<T> VisibleRows()

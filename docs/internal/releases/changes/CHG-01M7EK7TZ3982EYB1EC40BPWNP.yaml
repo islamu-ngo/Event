@@ -1,0 +1,27 @@
+Change-Id: CHG-01M7EK7TZ3982EYB1EC40BPWNP
+Title: "Share private Local Administration catalogue assertions"
+Type: fix
+Scope: access
+Summary: "Reuse the complete private Local Administration catalogue assertion while preserving fresh checks, independent inline admission and application-login execution denial."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "Stored lifecycle entries authenticate the complete private assertion before each fresh invocation. Independent admission and installer checks stay inline; Runtime, Global and Migrator receive no private helper execution grant."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Fresh development initialization includes the private lifecycle assertion. Altered code, metadata or execution grants fail admission; no new application credential or configuration is required."

@@ -85,6 +85,23 @@ public sealed class AppHostCompositionContractTests
     }
 
     [Test]
+    [Arguments("Split")]
+    [Arguments("Standalone")]
+    public async Task CerbosWaitsForUsablePostgresStorageBeforeStarting(string topology)
+    {
+        await InspectAsync(async builder =>
+        {
+            var storage = Resource(builder, "cerbos-db");
+            await Assert.That(storage is PostgresServerResource).IsTrue()
+                .Because("Cerbos needs PostgreSQL connection readiness, not only a running container.");
+            await Assert.That(storage.Annotations.OfType<HealthCheckAnnotation>().Any()).IsTrue();
+            await Assert.That(Resource(builder, "cerbos").Annotations.OfType<WaitAnnotation>()
+                .Any(wait => ReferenceEquals(wait.Resource, storage)
+                    && wait.WaitType == WaitType.WaitUntilHealthy)).IsTrue();
+        }, topology: topology);
+    }
+
+    [Test]
     public async Task PrivacyMigrationStageIsForwardedToItsConsumersWithoutADefault()
     {
         foreach (string topology in new[] { "Split", "Standalone" })

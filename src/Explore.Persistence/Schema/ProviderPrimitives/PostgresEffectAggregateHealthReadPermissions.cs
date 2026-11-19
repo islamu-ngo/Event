@@ -305,7 +305,7 @@ public static class PostgresEffectAggregateHealthReadPermissions
             if (property.IsShadowProperty()) throw new InvalidOperationException("effect_health_model_invalid");
             return new Column(property.GetColumnName(table)!, property.GetRelationalTypeMapping().StoreType, property.IsNullable);
         }).ToArray();
-        var tenant = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var tenant = context.GetTenantTableInventory()
             .Single(candidate => candidate.TableName == name && (candidate.Schema ?? schema) == schema);
         if (tenant.AllowsNullTenant || tenant.ParentJoin is not null)
             throw new InvalidOperationException("effect_health_tenant_model_invalid");

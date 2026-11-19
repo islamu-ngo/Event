@@ -53,6 +53,16 @@ application-user resolution, and the secure `Tenant/create` command. The
 Global owner, credential evidence, policy authorization, admission checks, and
 transaction custody. Routing metadata supplies no creation authority.
 
+During the first graph save, disclosure capture excludes only `Tenant` parents
+that are `Added` in that same save from persisted-parent fencing. Their INSERT
+and foreign keys establish the new graph; there is no committed audience to
+lock yet. Existing tenant parents and the creator's User row retain their fences.
+The original connector-bound creation receipt must complete before finalization,
+which preserves the canonical initial disclosure epoch of one. Failed inserts
+cannot publish a receipt or authorize settlement, including an attempted reuse
+of an existing tenant ID. No Runtime disclosure-routine privilege is granted to
+the Global creator.
+
 ## Visitor read admission
 
 An active directory's visitor mode and its lifecycle are separate authorities.

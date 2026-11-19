@@ -329,7 +329,10 @@ internal static class PostgresLocalIdentityWriterPermissions
     {
         if (!source.RowSecurity || source.Type == typeof(SystemSetting)) return "false";
         var entity = context.Model.FindEntityType(source.Type)!;
-        var tenant = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var tables = context is ExploreDbContext application
+            ? application.GetTenantTableInventory()
+            : PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenant = tables
             .Single(table => table.TableName == entity.GetTableName() && (table.Schema ?? source.Schema) == source.Schema);
         return $"""
             p.polrelid=pg_catalog.to_regclass({Text(source.Table)})
@@ -448,7 +451,7 @@ internal static class PostgresLocalIdentityWriterPermissions
             grants.Add((typeof(SystemSetting), ["SettingKey", "Value", "SettingValueTypeId", "IsLocked", "Description", "Category", "AllowedValues"], [], [], false));
             grants.Add((typeof(TenantSetting), ["TenantId", "SettingKey", "Value", "IsLocked"], [], [], false));
         }
-        var tenantTables = context is ExploreDbContext ? PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model) : [];
+        var tenantTables = context is ExploreDbContext application ? application.GetTenantTableInventory() : [];
         return grants.GroupBy(source => source.EntityType).Select(group =>
         {
             var entity = context.Model.FindEntityType(group.Key) ?? throw new InvalidOperationException("local_identity_writer_model_missing");

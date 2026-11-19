@@ -225,6 +225,43 @@ public sealed class TenantVisitorReadAccessHttpTests
         await AssertDenialAsync(response, HttpStatusCode.Unauthorized, "tenant_authentication_required");
     }
 
+    [Test]
+    [Arguments("AuthenticatedOnly", HttpStatusCode.Unauthorized, "tenant_authentication_required")]
+    [Arguments("invalid-mode", HttpStatusCode.ServiceUnavailable, "tenant_read_policy_unavailable")]
+    public async Task AnonymousResolverBootstrapDoesNotGrantTenantContentAuthority(
+        string mode, HttpStatusCode expectedTenantStatus, string expectedTenantCode)
+    {
+        await using var factory = await CreateReadyAsync();
+        await SetModeAsync(factory, mode);
+        using var client = CreateClient(factory);
+
+        using var bootstrap = await client.GetAsync("/api/instance/settings/resolver-config", Token);
+
+        await Assert.That(bootstrap.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(bootstrap.Content.Headers.ContentType?.MediaType).IsEqualTo("application/json");
+        using var configuration = await JsonDocument.ParseAsync(
+            await bootstrap.Content.ReadAsStreamAsync(Token), cancellationToken: Token);
+        await Assert.That(configuration.RootElement.GetProperty("headerEnabled").ValueKind)
+            .IsEqualTo(JsonValueKind.True);
+        using var tenant = await client.GetAsync("/api/Event", Token);
+        await AssertDenialAsync(tenant, expectedTenantStatus, expectedTenantCode);
+    }
+
+    [Test]
+    public async Task AnonymousResolverBootstrapDoesNotAuthorizeConfigurationWrites()
+    {
+        await using var factory = await CreateReadyAsync();
+        using var client = CreateClient(factory);
+        using var request = new HttpRequestMessage(HttpMethod.Patch, "/api/instance/settings/resolver-config")
+        {
+            Content = JsonContent.Create(new { headerEnabled = false })
+        };
+
+        using var response = await client.SendAsync(request, Token);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+    }
+
     private static async Task<LocalAdmissionWebApplicationFactory> CreateReadyAsync()
     {
         var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();

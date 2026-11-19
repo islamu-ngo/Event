@@ -9,6 +9,7 @@ using Explore.Application.Constants;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Authentication.Continuation;
+using Explore.Application.Features.Authentication.Continuation.Requests.Queries;
 using Explore.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,7 +23,7 @@ namespace Explore.API.Controllers;
 [Authorize]
 [EndpointClassification(EndpointClass.Authenticated)]
 public sealed class VerifiedAccountContinuationController(
-    IQueryHandler<ResolveVerifiedAccountContinuationQuery, VerifiedAccountContinuationResult> continuation,
+    IQueryHandler<GetVerifiedAccountContinuationQuery, VerifiedAccountContinuationResult> continuation,
     ITenantLookupSource tenantLookup) : ControllerBase
 {
     [HttpPost("", Name = RouteNames.ResolveVerifiedAccountContinuation)]
@@ -92,7 +93,7 @@ public sealed class VerifiedAccountContinuationController(
         }
 
         VerifiedAccountContinuationResult result = await continuation.QueryAsync(
-            new ResolveVerifiedAccountContinuationQuery(identity.AccountKey, target), cancellationToken);
+            new GetVerifiedAccountContinuationQuery(identity.AccountKey, target), cancellationToken);
         return result.Outcome == VerifiedAccountContinuationOutcome.Unavailable
             ? Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "account_continuation_unavailable")
             : Ok(result);

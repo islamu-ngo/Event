@@ -270,7 +270,7 @@ public static class PostgresStorageReconciliationContract
     private static string AuthorityReadySql(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var relations = Relations();
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string expectedPolicies = string.Join(", ", relations.Where(relation => tenantTables
             .Any(table => table.TableName == context.Model.FindEntityType(relation.Type)!.GetTableName()))
             .Select(relation =>
@@ -379,7 +379,7 @@ public static class PostgresStorageReconciliationContract
         enrollment.Validate();
         var contract = Privileges(context, enrollment);
         string guard = PostgresPrivilegeGuard.BuildAssertSql(contract);
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string grants = string.Join("\n", Relations().Select(relation =>
         {
             string table = Table(context, relation.Type);

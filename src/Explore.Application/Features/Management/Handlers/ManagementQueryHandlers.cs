@@ -13,7 +13,7 @@ namespace Explore.Application.Features.Management.Handlers.Queries;
 
 public sealed class GetManagementCapabilitiesQueryHandler(
     IOptions<ManagedControlPlaneOptions> options,
-    IInstanceBootstrapStateRepository bootstrapStateRepository,
+    IInstanceBootstrapStateReader bootstrapStateReader,
     IManagedControlPlaneRegistrationRepository registrationRepository,
     ManagedTenantProvisioningCapacityReader tenantProvisioningCapacityReader)
     : IQueryHandler<GetManagementCapabilitiesQuery, ManagementCapabilitiesDto>
@@ -35,7 +35,7 @@ public sealed class GetManagementCapabilitiesQueryHandler(
                 null);
         }
 
-        var bootstrap = await bootstrapStateRepository.GetCurrent(cancellationToken);
+        var bootstrap = await bootstrapStateReader.GetCurrent(cancellationToken);
         var registration = await registrationRepository.GetCurrentAsync(cancellationToken);
         DeploymentMode mode = bootstrap?.Status == InstanceBootstrapStatus.Completed
             ? bootstrap.DeploymentMode
@@ -113,7 +113,7 @@ public sealed class GetManagementHealthQueryHandler(IManagedEventHealthProbe hea
 public sealed class GetManagementUpgradePreflightQueryHandler(
     IOptions<ManagedControlPlaneOptions> options,
     IDeploymentModeProvider deploymentModeProvider,
-    IInstanceBootstrapStateRepository bootstrapStateRepository,
+    IInstanceBootstrapStateReader bootstrapStateReader,
     IManagedControlPlaneRegistrationRepository registrationRepository,
     IManagedEventHealthProbe healthProbe)
     : IQueryHandler<GetManagementUpgradePreflightQuery, ManagementUpgradePreflightDto>
@@ -149,7 +149,7 @@ public sealed class GetManagementUpgradePreflightQueryHandler(
         }
 
         var registration = await registrationRepository.GetCurrentAsync(cancellationToken);
-        var bootstrap = await bootstrapStateRepository.GetCurrent(cancellationToken);
+        var bootstrap = await bootstrapStateReader.GetCurrent(cancellationToken);
         var mode = await deploymentModeProvider.GetCurrentModeAsync(cancellationToken);
         var health = await healthProbe.CheckAsync(cancellationToken);
         ManagementUpgradeAssessment.AddCommonBlockers(
@@ -184,7 +184,7 @@ public sealed class GetManagementUpgradePreflightQueryHandler(
 public sealed class GetManagementUpgradePostflightQueryHandler(
     IOptions<ManagedControlPlaneOptions> options,
     IDeploymentModeProvider deploymentModeProvider,
-    IInstanceBootstrapStateRepository bootstrapStateRepository,
+    IInstanceBootstrapStateReader bootstrapStateReader,
     IManagedControlPlaneRegistrationRepository registrationRepository,
     IManagedEventHealthProbe healthProbe)
     : IQueryHandler<GetManagementUpgradePostflightQuery, ManagementUpgradePostflightDto>
@@ -220,7 +220,7 @@ public sealed class GetManagementUpgradePostflightQueryHandler(
         }
 
         var registration = await registrationRepository.GetCurrentAsync(cancellationToken);
-        var bootstrap = await bootstrapStateRepository.GetCurrent(cancellationToken);
+        var bootstrap = await bootstrapStateReader.GetCurrent(cancellationToken);
         var mode = await deploymentModeProvider.GetCurrentModeAsync(cancellationToken);
         var health = await healthProbe.CheckAsync(cancellationToken);
         ManagementUpgradeAssessment.AddCommonBlockers(

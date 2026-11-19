@@ -334,9 +334,11 @@ public static class PostgresEmailDispatchAdmissionContract
                         RAISE EXCEPTION 'invalid email admission bounds' USING ERRCODE = '22023';
                     END IF;
                     PERFORM pg_advisory_xact_lock({lockKey});
-                    INSERT INTO {states} (id, processor_code, is_paused, optional_reminders_deferred, updated_at)
-                    VALUES (p_lease, 'smtp', FALSE, FALSE, p_claimed_at)
-                    ON CONFLICT (processor_code) DO NOTHING;
+                    IF NOT EXISTS (SELECT 1 FROM {states} AS state WHERE state.processor_code = 'smtp') THEN
+                        INSERT INTO {states} (id, processor_code, is_paused, optional_reminders_deferred, updated_at)
+                        VALUES (p_lease, 'smtp', FALSE, FALSE, p_claimed_at)
+                        ON CONFLICT (processor_code) DO NOTHING;
+                    END IF;
                     IF EXISTS (SELECT 1 FROM {states} AS state WHERE state.processor_code = 'smtp' AND state.is_paused) THEN
                         RETURN;
                     END IF;
@@ -357,13 +359,14 @@ public static class PostgresEmailDispatchAdmissionContract
                       AND (queue.kind <> {reminder} OR COALESCE(delivery.is_required, FALSE))
                       AND NOT EXISTS (SELECT 1 FROM {controls} AS control
                           WHERE control.tenant_id = queue.tenant_id AND control.is_paused);
-                    UPDATE {states} AS state
-                    SET optional_reminders_deferred = CASE
-                            WHEN v_backlog >= p_high THEN TRUE
-                            WHEN v_backlog <= p_low THEN FALSE
-                            ELSE state.optional_reminders_deferred END,
-                        updated_at = p_claimed_at
-                    WHERE state.processor_code = 'smtp';
+                    IF EXISTS (SELECT 1 FROM {states} AS state WHERE state.processor_code = 'smtp'
+                        AND ((v_backlog >= p_high AND NOT state.optional_reminders_deferred)
+                            OR (v_backlog <= p_low AND state.optional_reminders_deferred))) THEN
+                        UPDATE {states} AS state
+                        SET optional_reminders_deferred = (v_backlog >= p_high),
+                            updated_at = p_claimed_at
+                        WHERE state.processor_code = 'smtp';
+                    END IF;
                     RETURN QUERY
                     WITH active_by_tenant AS (
                         SELECT queue.tenant_id, COUNT(*) AS active_count

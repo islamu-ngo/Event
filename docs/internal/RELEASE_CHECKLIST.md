@@ -14,9 +14,10 @@ Use this checklist before tagging or publishing a release. A release is not read
 ## Complete release-impact metadata
 
 Dependency servicing must regenerate and verify both Standalone lock profiles
-and the moderation launcher lock. Confirm that a clean CI cache receives
-deployment-only package metadata before license validation and that ordinary
-Standalone assets are restored before the solution build.
+and the moderation launcher, browser installer, migration scaffolder and shared
+Keycloak tool locks. Confirm that a clean CI cache receives all profile metadata
+before license validation and that ordinary solution assets are restored before
+the build.
 
 Review complete changed-file metadata, including previous names for renames.
 A large PR must not bypass impact classification or lower its declared file count.

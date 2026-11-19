@@ -18,13 +18,18 @@ internal static class PostgresTenantRuntimeReadiness
         var options = context.GetService<IDbContextOptions>();
         string? declaredRuntimeLogin = options.FindExtension<PostgresRuntimeIdentityOptionsExtension>()?.DeclaredLogin;
         string runtimePolicyException = declaredRuntimeLogin is null
-            ? "FALSE" : PostgresDiscoveryMetadataPermissions.RuntimePolicyException(context, declaredRuntimeLogin);
+            ? "FALSE"
+            : $$"""
+                ({{PostgresDiscoveryMetadataPermissions.RuntimePolicyException(context, declaredRuntimeLogin)}})
+                OR ({{PostgresEmailDeliveryPolicyContract.MutationPolicyException(context, declaredRuntimeLogin)}})
+                """;
         string globalPolicyException = enrolledGlobalLogin is null
             ? "FALSE"
             : $"""
                 ({PostgresAtprotoFederationSettingPermissions.GlobalReadPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresDiscoveryMetadataPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresTenantCreationPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
+                OR ({PostgresAdministrativeAuthorityReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresManagedTenantWorkerCreationPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresUserTenantMembershipReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresEmailRetentionReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
@@ -79,7 +84,7 @@ internal static class PostgresTenantRuntimeReadiness
             """;
         string? defaultSchema = context.GetService<Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptions>()
             .FindExtension<Explore.Persistence.Database.RelationalNamespaceOptionsExtension>()?.TargetSchema;
-        var tables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tables = context.GetTenantTableInventory();
         var schemas = command.CreateParameter();
         schemas.ParameterName = "schemas";
         schemas.Value = tables.Select(table => table.Schema ?? defaultSchema ?? "public").ToArray();

@@ -12,6 +12,7 @@ using Explore.Application.Constants;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Features.Authentication.Atproto.Models;
@@ -778,6 +779,15 @@ public sealed class HumanAuthenticationLifetimeTests
     private sealed class ProviderConnectionAfterBodyOwner(
         ISerializableAttemptOwner inner, Func<CancellationToken, Task> afterBody) : ISerializableAttemptOwner
     {
+        public Task<T> ExecuteWithOriginalPrivacyAsync<T>(IOriginalPrivacyIdentityFenceAuthority privacy,
+            Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
+            inner.ExecuteWithOriginalPrivacyAsync(privacy, async token =>
+            {
+                T result = await operation(token);
+                await afterBody(token);
+                return result;
+            }, cancellationToken);
+
         public Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) =>
             inner.ExecuteAsync(async token =>

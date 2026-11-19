@@ -209,7 +209,7 @@ public static partial class PostgresOrdinarySettingsContract
             """));
         string tenantPolicies = string.Join("\n", Sources.Where(type => type != typeof(SystemSetting)).Select(type =>
         {
-            var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+            var metadata = context.GetTenantTableInventory()
                 .Single(table => table.TableName == context.Model.FindEntityType(type)!.GetTableName());
             string fingerprint = PostgresTenantRowLevelSecurityModel.BuildPolicyFingerprintPrefix(metadata, sql.Schema);
             return $"""

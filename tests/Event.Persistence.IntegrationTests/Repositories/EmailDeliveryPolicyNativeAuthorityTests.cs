@@ -1,6 +1,7 @@
 using System.Data;
 using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
+using Explore.Application.Notifications;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -113,6 +114,323 @@ public sealed class EmailDeliveryPolicyNativeAuthorityTests(PostgreSqlContainerF
             context.ChangeTracker.Clear();
         });
         await Assert.That(await seed.EmailDispatchProcessorStates.CountAsync()).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task MutationLoginReadinessAdmitsOnlyStampedContractPolicies()
+    {
+        await fixture.ResetAsync();
+        await using var seed = fixture.CreateDbContext();
+        await PostgresEmailDeliveryPolicyContract.ApplyAsync(seed, fixture.NativeQueueEnrollment);
+        var factories = new EmailPolicyMutationDbContextFactories(
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime),
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global),
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.EmailPolicyInstanceMutation),
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.EmailPolicyTenantMutation));
+        string tenantSettings = Table<TenantSetting>(seed);
+
+        // Contract-installed stamped policies admit the declared email mutation login.
+        await using (var admitted = await factories.CreateAsync(
+            Explore.Application.Contracts.Operations.PolicyMutationScope.EmailInstance, CancellationToken.None))
+        {
+            await Assert.That(admitted.Database.IsNpgsql()).IsTrue();
+        }
+
+        // A tampered stamp comment on a contract policy fails readiness closed.
+        await seed.Database.ExecuteSqlRawAsync(
+            $"COMMENT ON POLICY email_policy_instance_setting_mutation ON {tenantSettings} IS 'rogue'");
+        await RequireMutationReadinessRejectionAsync(factories);
+
+        // Reinstalling the contract restamps the policy and restores admission.
+        await PostgresEmailDeliveryPolicyContract.ApplyAsync(seed, fixture.NativeQueueEnrollment);
+        await using (var restored = await factories.CreateAsync(
+            Explore.Application.Contracts.Operations.PolicyMutationScope.EmailInstance, CancellationToken.None))
+        {
+            await Assert.That(restored.Database.IsNpgsql()).IsTrue();
+        }
+
+        // An unexpected permissive policy granted to a mutation role fails readiness closed.
+        await seed.Database.ExecuteSqlRawAsync($"""
+            CREATE POLICY email_policy_rogue_preview ON {tenantSettings} FOR SELECT
+                TO "{PostgresEmailDeliveryPolicyContract.InstanceMutationRole}" USING (true)
+            """);
+        await RequireMutationReadinessRejectionAsync(factories);
+        await seed.Database.ExecuteSqlRawAsync(
+            $"DROP POLICY email_policy_rogue_preview ON {tenantSettings}");
+        await using (var cleaned = await factories.CreateAsync(
+            Explore.Application.Contracts.Operations.PolicyMutationScope.EmailInstance, CancellationToken.None))
+        {
+            await Assert.That(cleaned.Database.IsNpgsql()).IsTrue();
+        }
+    }
+
+    private async Task RequireMutationReadinessRejectionAsync(EmailPolicyMutationDbContextFactories factories)
+    {
+        var rejected = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await factories.CreateAsync(
+                Explore.Application.Contracts.Operations.PolicyMutationScope.EmailInstance, CancellationToken.None));
+        await Assert.That(rejected!.Message).IsEqualTo("postgres_tenant_runtime_authority_not_ready");
+    }
+
+    [Test]
+    public async Task RecipientFunctionMediatesRecipientReadsForDeliveryLogins()
+    {
+        await fixture.ResetAsync();
+        await using var seed = fixture.CreateDbContext();
+        seed.BindTenantLease();
+        await PostgresEmailDeliveryPolicyContract.ApplyAsync(seed, fixture.NativeQueueEnrollment);
+        DateTime now = new(2026, 11, 17, 12, 0, 0, DateTimeKind.Utc);
+
+        Guid claimlessUserId = Guid.CreateVersion7();
+        Guid multiClaimUserId = Guid.CreateVersion7();
+        Guid deletedUserId = Guid.CreateVersion7();
+        Guid unverifiedOnlyUserId = Guid.CreateVersion7();
+
+        var claimlessUser = CreateRecipientUser(claimlessUserId, "claimless@example.test", isDeleted: false, now);
+        var multiClaimUser = CreateRecipientUser(multiClaimUserId, "  Preferred@Example.Test ", isDeleted: false, now);
+        var deletedUser = CreateRecipientUser(deletedUserId, "deleted@example.test", isDeleted: true, now);
+        var unverifiedOnlyUser = CreateRecipientUser(unverifiedOnlyUserId, "pending@example.test", isDeleted: false, now);
+        seed.Users.AddRange(claimlessUser, multiClaimUser, deletedUser, unverifiedOnlyUser);
+
+        var activeLogin = CreateExternalLogin(multiClaimUser, AuthenticationProviderKind.Keycloak, now);
+        var secondaryLogin = CreateExternalLogin(multiClaimUser, AuthenticationProviderKind.Google, now);
+        var staleLogin = CreateExternalLogin(unverifiedOnlyUser, AuthenticationProviderKind.Keycloak, now);
+        seed.UserExternalLogins.AddRange(activeLogin, secondaryLogin, staleLogin);
+
+        Guid lowerVerifiedClaimId = Guid.Parse("01900000-0000-7000-8000-000000000010");
+        Guid preferredVerifiedClaimId = Guid.Parse("01900000-0000-7000-8000-000000000020");
+        var unverifiedClaim = UserIdentityEmailClaim.Create(multiClaimUserId, "unverified@example.test");
+        var lowerVerifiedClaim = UserIdentityEmailClaim.Create(multiClaimUserId, "alternate@example.test", lowerVerifiedClaimId);
+        var preferredVerifiedClaim = UserIdentityEmailClaim.Create(multiClaimUserId, "preferred@example.test", preferredVerifiedClaimId);
+        var staleClaim = UserIdentityEmailClaim.Create(unverifiedOnlyUserId, "pending@example.test");
+        seed.Set<UserIdentityEmailClaim>().AddRange(unverifiedClaim, lowerVerifiedClaim, preferredVerifiedClaim, staleClaim);
+
+        var staleEvidence = UserIdentityEmailEvidence.Create(unverifiedOnlyUserId, staleClaim.Id, staleLogin.Id, now);
+        staleEvidence.Invalidate();
+        seed.Set<UserIdentityEmailEvidence>().AddRange(
+            UserIdentityEmailEvidence.Create(multiClaimUserId, lowerVerifiedClaim.Id, activeLogin.Id, now),
+            UserIdentityEmailEvidence.Create(multiClaimUserId, preferredVerifiedClaim.Id, secondaryLogin.Id, now),
+            staleEvidence);
+        await seed.SaveChangesAsync();
+
+        string function = PostgresEmailDeliveryPolicyContract.RecipientFunctionSql(seed);
+        string resolveMissing = "SELECT * FROM " + function + "('" + Guid.NewGuid() + "')";
+
+        // Verify the minimal projection surface and dedicated restricted NOLOGIN owner.
+        await using (var inspect = seed.Database.GetDbConnection().CreateCommand())
+        {
+            await seed.Database.OpenConnectionAsync();
+            inspect.CommandText = $"""
+                SELECT pg_catalog.pg_get_userbyid(p.proowner) = '{PostgresEmailDeliveryPolicyContract.RecipientOwnerRole}'
+                    AND p.prosecdef AND p.provolatile = 's'
+                    AND p.proconfig = ARRAY['search_path=pg_catalog']::text[]
+                    AND pg_catalog.pg_get_function_result(p.oid) =
+                        'TABLE(user_id uuid, is_deleted boolean, contact_email character varying, claim_id uuid, normalized_email character varying, claim_verified boolean)'
+                FROM pg_catalog.pg_proc p
+                WHERE p.oid = '{function}(uuid)'::regprocedure
+                """;
+            await Assert.That((bool)(await inspect.ExecuteScalarAsync())!).IsTrue();
+
+            inspect.CommandText = $"""
+                SELECT NOT r.rolcanlogin AND NOT r.rolinherit AND NOT r.rolsuper
+                    AND NOT r.rolbypassrls AND NOT r.rolcreatedb AND NOT r.rolcreaterole AND NOT r.rolreplication
+                    AND NOT pg_catalog.has_column_privilege('{PostgresEmailDeliveryPolicyContract.RecipientOwnerRole}', '{Table<UserPii>(seed)}', 'first_name', 'SELECT')
+                    AND NOT pg_catalog.has_column_privilege('{PostgresEmailDeliveryPolicyContract.RecipientOwnerRole}', '{Table<UserPii>(seed)}', 'last_name', 'SELECT')
+                    AND NOT pg_catalog.has_column_privilege('{PostgresEmailDeliveryPolicyContract.RecipientOwnerRole}', '{Table<User>(seed)}', 'concurrency_stamp', 'SELECT')
+                    AND NOT pg_catalog.has_table_privilege('{PostgresEmailDeliveryPolicyContract.RecipientOwnerRole}', '{Table<Explore.Persistence.Identity.LocalIdentityUser>(seed)}', 'SELECT')
+                FROM pg_catalog.pg_roles r
+                WHERE r.rolname = '{PostgresEmailDeliveryPolicyContract.RecipientOwnerRole}'
+                """;
+            await Assert.That((bool)(await inspect.ExecuteScalarAsync())!).IsTrue();
+        }
+
+        // The runtime login resolves recipients through the shared reader using the SECURITY DEFINER function.
+        var runtimeFactory = new TenantExploreDbContextFactory(
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime), poolSize: 1);
+        await using (var runtimeContext = await runtimeFactory.CreateDbContextAsync(Guid.CreateVersion7()))
+        {
+            // Missing user returns null.
+            await Assert.That(await EmailDeliveryRecipientReader.ReadAsync(
+                runtimeContext, Guid.NewGuid(), CancellationToken.None)).IsNull();
+
+            // Claimless user still resolves existence/deletion state for invitation destinations.
+            EmailRecipient? claimless = await EmailDeliveryRecipientReader.ReadAsync(
+                runtimeContext, claimlessUserId, CancellationToken.None);
+            await Assert.That(claimless).IsNotNull();
+            await Assert.That(claimless!.IsDeleted).IsFalse();
+            await Assert.That(claimless.ContactEmail).IsEqualTo("claimless@example.test");
+            await Assert.That(claimless.VerifiedEmailClaims).IsEmpty();
+
+            // Multi-claim user excludes unverified claims and prefers the contact-matching verified claim.
+            EmailRecipient? multiClaim = await EmailDeliveryRecipientReader.ReadAsync(
+                runtimeContext, multiClaimUserId, CancellationToken.None);
+            await Assert.That(multiClaim).IsNotNull();
+            await Assert.That(multiClaim!.VerifiedEmailClaims.Select(c => c.NormalizedEmail).ToArray())
+                .IsEquivalentTo(["alternate@example.test", "preferred@example.test"]);
+            RecipientEmailAddressResolution resolved = RecipientEmailAddressResolver.Resolve(multiClaim, multiClaimUserId);
+            await Assert.That(resolved.HasVerifiedEmail).IsTrue();
+            await Assert.That(resolved.Email).IsEqualTo("preferred@example.test");
+
+            // Inactive evidence does not validate a claim.
+            EmailRecipient? unverifiedOnly = await EmailDeliveryRecipientReader.ReadAsync(
+                runtimeContext, unverifiedOnlyUserId, CancellationToken.None);
+            await Assert.That(unverifiedOnly).IsNotNull();
+            await Assert.That(unverifiedOnly!.VerifiedEmailClaims).IsEmpty();
+            await Assert.That(RecipientEmailAddressResolver.Resolve(unverifiedOnly, unverifiedOnlyUserId).SkipReason)
+                .IsEqualTo(RecipientEmailAddressResolver.RecipientEmailUnverified);
+
+            // Soft-deleted user reports IsDeleted so eligibility skips with recipient_deleted.
+            EmailRecipient? deleted = await EmailDeliveryRecipientReader.ReadAsync(
+                runtimeContext, deletedUserId, CancellationToken.None);
+            await Assert.That(deleted).IsNotNull();
+            await Assert.That(deleted!.IsDeleted).IsTrue();
+            await Assert.That(RecipientEmailAddressResolver.Resolve(deleted, deletedUserId).SkipReason)
+                .IsEqualTo(RecipientEmailAddressResolver.RecipientDeletedOrMissing);
+        }
+
+        // Global and EmailPolicyInstanceMutation logins are also authorized delivery readers.
+        foreach (PrimaryDatabaseRole allowedRole in new[] { PrimaryDatabaseRole.Global, PrimaryDatabaseRole.EmailPolicyInstanceMutation })
+        {
+            await using var allowed = await OpenRecipientLoginAsync(allowedRole);
+            await using var command = new NpgsqlCommand(
+                "SELECT user_id, is_deleted, contact_email FROM " + function + "(@id)", allowed);
+            command.Parameters.AddWithValue("id", claimlessUserId);
+            await using var rows = await command.ExecuteReaderAsync();
+            await Assert.That(await rows.ReadAsync()).IsTrue();
+            await Assert.That(rows.GetGuid(0)).IsEqualTo(claimlessUserId);
+            await Assert.That(rows.GetBoolean(1)).IsFalse();
+        }
+
+        // The tenant mutation login is not an authorized recipient resolver.
+        await using (var tenantMutation = await OpenRecipientLoginAsync(PrimaryDatabaseRole.EmailPolicyTenantMutation))
+        await using (var rejected = new NpgsqlCommand(resolveMissing, tenantMutation))
+        {
+            var denied = await Assert.ThrowsAsync<PostgresException>(async () => await rejected.ExecuteReaderAsync());
+            await Assert.That(denied!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+        }
+
+        // Direct users/PII entity reads, user_pii.email reads, and SET ROLE stay denied for the runtime login.
+        await using (var boundary = await OpenRecipientLoginAsync(PrimaryDatabaseRole.Runtime))
+        {
+            var sql = seed.GetService<ISqlGenerationHelper>();
+            var piiEntity = seed.Model.FindEntityType(typeof(UserPii))!;
+            string piiEmailCol = sql.DelimitIdentifier(piiEntity.FindProperty(nameof(UserPii.Email))!.GetColumnName(
+                Microsoft.EntityFrameworkCore.Metadata.StoreObjectIdentifier.Table(
+                    piiEntity.GetTableName()!, piiEntity.GetSchema()))!);
+            foreach (string query in new[]
+            {
+                $"SELECT * FROM {Table<User>(seed)} LIMIT 1",
+                $"SELECT * FROM {Table<UserPii>(seed)} LIMIT 1",
+                $"SELECT {piiEmailCol} FROM {Table<UserPii>(seed)} LIMIT 1"
+            })
+            {
+                await using var direct = new NpgsqlCommand(query, boundary);
+                var denied = await Assert.ThrowsAsync<PostgresException>(async () => await direct.ExecuteReaderAsync());
+                await Assert.That(denied!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+            }
+
+            await using var setRole = new NpgsqlCommand(
+                $"SET ROLE {PostgresEmailDeliveryPolicyContract.RecipientOwnerRole}", boundary);
+            var roleDenied = await Assert.ThrowsAsync<PostgresException>(async () => await setRole.ExecuteNonQueryAsync());
+            await Assert.That(roleDenied!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+        }
+    }
+
+    [Test]
+    [Arguments("column")]
+    [Arguments("function")]
+    [Arguments("membership")]
+    public async Task RecipientAuthorityRejectsUnexpectedGrantsAndMembershipDriftWithoutHidingIt(string drift)
+    {
+        await fixture.ResetAsync();
+        await using var seed = fixture.CreateDbContext();
+        await PostgresEmailDeliveryPolicyContract.ApplyAsync(seed, fixture.NativeQueueEnrollment);
+        string function = PostgresEmailDeliveryPolicyContract.RecipientFunctionSql(seed) + "(uuid)";
+        var sql = seed.GetService<ISqlGenerationHelper>();
+        string recipientOwner = sql.DelimitIdentifier(PostgresEmailDeliveryPolicyContract.RecipientOwnerRole);
+        string runtimeRole = sql.DelimitIdentifier(PostgresEmailDeliveryPolicyContract.RuntimeRole);
+        string tenantMutationRole = sql.DelimitIdentifier(PostgresEmailDeliveryPolicyContract.TenantMutationRole);
+        var pii = seed.Model.FindEntityType(typeof(UserPii))!;
+        string firstName = sql.DelimitIdentifier(pii.FindProperty(nameof(UserPii.FirstName))!.GetColumnName(
+            Microsoft.EntityFrameworkCore.Metadata.StoreObjectIdentifier.Table(pii.GetTableName()!, pii.GetSchema()))!);
+        (string Inject, string Restore) statements = drift switch
+        {
+            "column" => ($"GRANT SELECT ({firstName}) ON {Table<UserPii>(seed)} TO {recipientOwner}",
+                $"REVOKE SELECT ({firstName}) ON {Table<UserPii>(seed)} FROM {recipientOwner}"),
+            "function" => ($"GRANT EXECUTE ON FUNCTION {function} TO {tenantMutationRole}",
+                $"REVOKE EXECUTE ON FUNCTION {function} FROM {tenantMutationRole}"),
+            "membership" => ($"GRANT {recipientOwner} TO {runtimeRole} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE",
+                $"REVOKE {recipientOwner} FROM {runtimeRole}"),
+            _ => throw new ArgumentOutOfRangeException(nameof(drift))
+        };
+
+        await seed.Database.ExecuteSqlRawAsync(statements.Inject);
+        try
+        {
+            await using var runtime = await OpenRecipientLoginAsync(PrimaryDatabaseRole.Runtime);
+            await using var read = new NpgsqlCommand(
+                "SELECT * FROM " + PostgresEmailDeliveryPolicyContract.RecipientFunctionSql(seed) + "(@id)", runtime);
+            read.Parameters.AddWithValue("id", Guid.NewGuid());
+            var readRejected = await Assert.ThrowsAsync<PostgresException>(async () => await read.ExecuteReaderAsync());
+            await Assert.That(readRejected!.SqlState).IsEqualTo("55000");
+
+            var reinstallRejected = await Assert.ThrowsAsync<PostgresException>(async () =>
+                await PostgresEmailDeliveryPolicyContract.ApplyAsync(seed, fixture.NativeQueueEnrollment));
+            await Assert.That(reinstallRejected!.SqlState).IsEqualTo("55000");
+        }
+        finally
+        {
+            await seed.Database.ExecuteSqlRawAsync(statements.Restore);
+        }
+
+        await PostgresEmailDeliveryPolicyContract.ApplyAsync(seed, fixture.NativeQueueEnrollment);
+        await using var restored = await OpenRecipientLoginAsync(PrimaryDatabaseRole.Runtime);
+        await using var ok = new NpgsqlCommand(
+            "SELECT * FROM " + PostgresEmailDeliveryPolicyContract.RecipientFunctionSql(seed) + "(@id)", restored);
+        ok.Parameters.AddWithValue("id", Guid.NewGuid());
+        await using var reader = await ok.ExecuteReaderAsync();
+        await Assert.That(await reader.ReadAsync()).IsFalse();
+    }
+
+    private static User CreateRecipientUser(Guid id, string email, bool isDeleted, DateTime now) => new()
+    {
+        Id = id,
+        IsDeleted = isDeleted,
+        DeletedAt = isDeleted ? now : null,
+        CreatedAt = now,
+        Pii = new UserPii
+        {
+            UserId = id,
+            Email = email,
+            FirstName = "Recipient",
+            LastName = "User"
+        }
+    };
+
+    private static UserExternalLogin CreateExternalLogin(User user, AuthenticationProviderKind provider, DateTime now) => new()
+    {
+        Id = Guid.CreateVersion7(),
+        UserId = user.Id,
+        User = user,
+        AuthenticationProviderId = (int)provider,
+        AuthenticationProvider = null!,
+        ProviderKey = $"subject-{Guid.CreateVersion7():N}",
+        CreatedAt = now
+    };
+
+    private async Task<NpgsqlConnection> OpenRecipientLoginAsync(PrimaryDatabaseRole role)
+    {
+        PrimaryDatabaseConnectionOptions login = fixture.GetNativeQueueOptions(role);
+        var connection = new NpgsqlConnection(new NpgsqlConnectionStringBuilder
+        {
+            Host = login.Host,
+            Port = login.Port ?? 5432,
+            Database = login.Database,
+            Username = login.Username,
+            Password = login.Password
+        }.ConnectionString);
+        await connection.OpenAsync();
+        return connection;
     }
 
     [Test]

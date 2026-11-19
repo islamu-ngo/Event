@@ -2,6 +2,7 @@ using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -29,7 +30,10 @@ public static class HumanEventProviderPreparationRegistration
             () => provider.GetRequiredService<IPolicySourceSetFence>(),
             () => provider.GetRequiredService<IHumanActionCommitFinalizer>(),
             () => provider.GetRequiredService<ISerializableAttemptOwner>(),
-            () => provider.GetRequiredService<IHumanEventProviderSourceFactory>()));
+            () => provider.GetRequiredService<IHumanEventProviderSourceFactory>(),
+            () => provider.GetRequiredService<IPrivacyIdentityFenceAuthority>() as IOriginalPrivacyIdentityFenceAuthority
+                ?? throw new NotSupportedException("Event provider settlement requires an original privacy authority."),
+            () => provider.GetRequiredService<IEventDiscoveryEnrollmentGate>()));
         return services;
     }
 }

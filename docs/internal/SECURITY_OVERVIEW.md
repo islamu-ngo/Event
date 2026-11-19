@@ -347,3 +347,18 @@ read, the source-declared admission SQL is also constructed once and executed at
 both existing sides of the native operation. Commands, parameters, transaction
 ownership and live database checks retain their original order. Only immutable
 text is reused within the invocation.
+
+## Provider-configuration secret binding reader
+
+Instance-scoped secret bindings belonging to `ProviderConfigurationState.SecretKeys`
+(`Keycloak.Endpoint`, `Keycloak.Realm`, `Keycloak.ClientId`,
+`Keycloak.BlazorClientSecret`, and `Authentication.GoogleClientSecret`) are read
+through `IProviderConfigurationSecretBindingReader` /
+`ProviderConfigurationSecretBindingReader`, using the independent
+`IGlobalExploreDbContextFactory` pool and `PostgresProviderConfigurationContract`
+on PostgreSQL (`InstanceBootstrapStateQuery.MaterializeJsonRow<TEntity>` without
+tracking). `SecretResolver.ResolveBindingAsync` routes instance-scope lookups
+for those keys through the dedicated reader while retaining `ISecretBindingRepository`
+for tenant-scoped overrides and other keys, so anonymous startup discovery
+(`GET /api/instanceonboarding/auth-provider-configuration`) succeeds without
+granting `Runtime` direct `SELECT` access on `secret_bindings`.

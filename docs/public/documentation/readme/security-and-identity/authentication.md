@@ -39,6 +39,12 @@ configuration reader. It does not need permission to read confidential-client
 bindings. Deployment-managed settings retain precedence, and a new signing-key
 configuration replaces the current one only after metadata retrieval succeeds.
 
+Instance authentication provider discovery likewise resolves saved provider
+secret binding references through that independent database reader without
+granting the ordinary API runtime database role direct table access to
+stored secret bindings. Tenant-scoped and non-provider secret bindings retain
+their existing isolation boundaries.
+
 The browser host also obtains public tenant-routing configuration through the
 API's independent settings reader. Saved routing values and existing defaults
 remain authoritative; this bootstrap read requires no administrator credential

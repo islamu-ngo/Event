@@ -575,6 +575,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<ITenantLookupSource, TenantLookupSource>();
         services.AddScoped<IInstanceBootstrapStateRepository, InstanceBootstrapStateRepository>();
         services.AddScoped<IInstanceBootstrapStateReader, InstanceBootstrapStateReader>();
+        services.AddScoped<IProviderConfigurationSecretBindingReader, ProviderConfigurationSecretBindingReader>();
         services.AddScoped<IIdentitySynchronizationBootstrapReader, IdentitySynchronizationBootstrapReader>();
         services.AddScoped<IPlatformUserRoleRepository, PlatformUserRoleRepository>();
         services.AddScoped<ITenantUserRepository, TenantUserRepository>();

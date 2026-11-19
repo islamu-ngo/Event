@@ -88,6 +88,53 @@ public sealed class SecretResolverBindingTests : IAsyncDisposable
     }
 
     [Test]
+    public async Task ProviderConfigurationInstanceSecretsRouteThroughDedicatedReaderWithoutRuntimeTableLookup()
+    {
+        string settingKey = SecretDefinitionRegistry.Keys.Keycloak.Endpoint;
+        SecretDefinition definition = SecretDefinitionRegistry.GetRequired(settingKey);
+        SecretBinding binding = SecretBinding.CreateEnvironmentVariable(
+            settingKey, SecretScope.Instance, null, definition.DefaultEnvironmentVariableName);
+        binding.Id = Guid.CreateVersion7();
+        string expectedValue = "https://idp.example.test";
+        var authority = LocalAuthority(new Dictionary<string, string?>
+        {
+            [definition.DefaultEnvironmentVariableName] = expectedValue
+        }, SecretConsumerRole.Api);
+        var repository = NSubstitute.Substitute.For<ISecretBindingRepository>();
+        NSubstitute.SubstituteExtensions.Returns(
+            repository.GetByKeyAndScopeAsync(
+                NSubstitute.Arg.Any<string>(),
+                NSubstitute.Arg.Any<SecretScope>(),
+                NSubstitute.Arg.Any<Guid?>(),
+                NSubstitute.Arg.Any<CancellationToken>()),
+            _ => Task.FromException<SecretBinding?>(new InvalidOperationException(
+                "Runtime secret_bindings repository must not be queried for provider-configuration keys.")));
+        var reader = new StubProviderConfigurationSecretBindingReader([binding]);
+        var resolver = new SecretResolver(repository, [authority.Source],
+            _cacheState, _metrics, NullLogger<SecretResolver>.Instance, authority.Owner, reader);
+
+        SecretResolutionResult resolved = await resolver.ResolveAsync(settingKey, null);
+
+        await Assert.That(resolved.IsResolved).IsTrue();
+        await Assert.That(resolved.Value).IsEqualTo(expectedValue);
+        await Assert.That(reader.CallCount).IsEqualTo(1);
+    }
+
+    private sealed class StubProviderConfigurationSecretBindingReader(IReadOnlyList<SecretBinding> bindings)
+        : IProviderConfigurationSecretBindingReader
+    {
+        public int CallCount { get; private set; }
+
+        public Task<SecretBinding?> GetInstanceBindingAsync(
+            string settingKey, CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromResult(bindings.FirstOrDefault(
+                binding => string.Equals(binding.SettingKey, settingKey, StringComparison.Ordinal)));
+        }
+    }
+
+    [Test]
     public async Task ISecretResolver_RequiresExplicitQualifiedResolutionImplementation()
     {
         var method = typeof(ISecretResolver).GetMethod(nameof(ISecretResolver.ResolveQualifiedAsync));

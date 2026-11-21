@@ -16,6 +16,10 @@ public partial class FallbackAuthorizationService
         if (checks.Count == 0)
             return [];
 
+        if (checks.Any(IsInstanceScopedCheck)
+            && !IsInstanceScopedBatch(checks) && _tenantContext.TenantId == Guid.Empty)
+            return checks.Select(_ => AuthorizationDecision.Deny(AuthorizationProviderMetadata.Local)).ToArray();
+
         if (checks.Any(check => RequiresDedicatedResourceAuthority(check.ResourceKind)))
         {
             var boundedResults = checks.Select(_ => AuthorizationDecision.Deny(AuthorizationProviderMetadata.Local)).ToArray();
@@ -31,7 +35,8 @@ public partial class FallbackAuthorizationService
             return boundedResults;
         }
 
-        if (checks.Count <= 2 || _machinePrincipalAccessor.IsMachineCaller
+        if (checks.Count <= 2 || IsInstanceScopedBatch(checks)
+            || _machinePrincipalAccessor.IsMachineCaller
             || checks.Any(check => check.ResourceKind == ResourceKinds.Event
                 && (check.Facts is EventDiscoveryIdentityAuthorizationFacts
                     || EventDiscoveryIdentityAuthorizationFacts.IsDecisionAction(check.Action))))
@@ -72,6 +77,16 @@ public partial class FallbackAuthorizationService
 
         return results;
     }
+
+    /// <summary>
+    /// Instance settings and tenant creation are authorized before a tenant is selected.
+    /// </summary>
+    private static bool IsInstanceScopedBatch(IReadOnlyList<AuthorizationRequest> checks) =>
+        checks.All(IsInstanceScopedCheck);
+
+    private static bool IsInstanceScopedCheck(AuthorizationRequest check) =>
+        check.ResourceKind == ResourceKinds.InstanceSetting
+        || check.ResourceKind == ResourceKinds.Tenant && check.Action == AuthorizationActions.Tenants.Create;
 
     private sealed record AuthorityProfile(
         bool IsInstanceAdmin,

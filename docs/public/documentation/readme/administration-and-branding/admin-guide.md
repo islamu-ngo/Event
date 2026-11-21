@@ -188,6 +188,17 @@ and directory settings. MultiTenant deployments show **Instance Administration**
 tenant-only controls remain under **Tenant Administration** at `/settings/admin`.
 Tenant management and tenant plans remain available from the console navigation.
 Health, provider status, domain guidance and operational warnings are retained.
+
+Instance administration is scoped to the installation, not to one tenant. Opening
+`/settings/instance` or `/admin/instance` does not require a tenant slug, and the
+control plane never substitutes a default tenant when none is selected. Buttons and
+links that change instance settings, tenant lifecycle, plans or instance-wide
+providers are driven by the API's HAL links, so an operator sees exactly the actions
+their current instance authority permits.
+
+Instance onboarding and administration read bootstrap status through the separate
+instance authority; operators do not need to grant the Runtime database identity
+direct access to bootstrap state.
 Delegated tenant-only administrators can manage tenant settings in SingleTenant
 mode; instance infrastructure remains restricted to instance administrators.
 

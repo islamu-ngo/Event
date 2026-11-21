@@ -216,6 +216,29 @@ Each project has a specific role. Run individually — never use solution-level 
 | `ISLAMU.ReleaseEngineering.Tests` | Release engineering | Commit/scope policy, release artifact, Git trust, renderer, tag-anchored attestation, provider adapter plans | No (spawns `git`, `ssh-keygen`, and disposable repositories under the temp directory) |
 | `Event.Benchmarks` | Benchmarks | Advisory BenchmarkDotNet performance scenarios; build-only in PRs and executed by `performance-smoke.yml` | Optional PostgreSQL only for the dedicated provider benchmark |
 
+### Instance-Scoped HAL And Bootstrap-Read Coverage
+
+`Explore.Infrastructure.Tests/Authorization/InstanceScopedBatchAuthorizationTests`
+proves that a three-link instance-setting batch evaluates without reading a tenant,
+while `PrivateInstanceManagementHttpTests`, `TenantVisitorReadAccessHttpTests`,
+`AuthorizationPipelineIntegrationTests` and `LocalRbacAuthorizationTests` form the
+API acceptance slice (75 cases on the 2026-11-20 candidate). The latter proves
+that instance administration reaches its actions without a tenant lease while
+ordinary tenant and visitor admission still fails closed.
+
+`InstanceBootstrapStartupNativeReadTests` is the native boundary witness: Runtime
+cannot select `instance_bootstrap_states` directly, while
+`IInstanceBootstrapStateReader` can observe explicit absence and the current row
+through the Global contract. Mutation and startup owners keep the tracked
+repository; replacing those guards with the tracker-free reader would weaken
+`UPDATE`/generation fencing and is not a valid test simplification.
+
+The distributed cleanup proof treats an absent DCP candidate as retryable until
+native container evidence joins or the proof deadline expires. A concurrent
+`docker rm` that reports "already in progress" is settled by re-inspecting the
+exact owned container, not by accepting an unknown identity. Volume-consumer,
+owner-label, baseline and foreign-resource checks remain mandatory.
+
 ### Run Commands
 
 The [owned distributed assurance guide](testing/DISTRIBUTED_ASSURANCE.md)

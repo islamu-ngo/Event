@@ -171,6 +171,19 @@ For standard authenticated-browser requests, the middleware binds the resolved t
 
 For API-key requests, `ApiTenantResolutionMiddleware` can store a requested tenant hint in `HttpContext.Items["__requested_tenant_id"]` and defer final tenant binding to `ApiTenantPostAuthenticationMiddleware` after authentication succeeds. Tenant-bound API keys bind their persisted tenant when no mismatch exists. `InstanceAdmin` API keys are nullable credentials, but tenant-scoped API and MCP requests still require an execution tenant: an explicit tenant hint binds that tenant, single-tenant mode binds the configured default tenant, and unresolved tenant-scoped API/MCP requests fail closed with `404` and `code=tenant_required`. Only explicit host-administration API routes may continue without tenant context.
 
+## Instance-Management Tenant Exemption
+
+Actions marked with the method-level `[InstanceManagement]` attribute are
+installation-scoped, including the `/api/admin/instance/*` control plane and
+instance onboarding/settings actions. Tenant resolution deliberately does not bind
+a tenant for those exact actions. HAL instance-setting batches evaluate through
+instance authority without building a tenant profile or requesting a default tenant.
+Tenant creation may use that path before a tenant row exists. An instance-setting
+or tenant-creation batch presented to the local provider with other resource checks
+is denied if its resolved tenant is empty. The runtime provider may separately
+evaluate dedicated-resource and discovery checks under their own authority policies.
+See [ADR-021](adr/ADR-021-instance-scoped-hal-authorization.md).
+
 ## Default Tenant Fallback
 
 Fallback default tenant ID in single-tenant runtime is:

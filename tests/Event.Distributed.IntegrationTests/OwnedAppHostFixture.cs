@@ -41,6 +41,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     private ContainerResource[] cleanupResources = [];
     private readonly Lock containerIdentityLock = new();
     private readonly Dictionary<string, ContainerCleanupIdentity> containerIdentities = new(StringComparer.Ordinal);
+    private readonly HashSet<string> containerReplacementPermissions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string Id, HashSet<string> VolumeTargets)> cleanupImages = new(StringComparer.Ordinal);
     private readonly Dictionary<string, VolumeCleanupIdentity> volumeIdentities = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource cleanupObservationLifetime = new();
@@ -93,6 +94,11 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     internal ContainerCleanupIdentity[] CompletedCleanupIdentities
     {
         get { lock (containerIdentityLock) return [.. containerIdentities.Values]; }
+    }
+
+    internal void PermitContainerReplacement(string resourceName)
+    {
+        lock (containerIdentityLock) containerReplacementPermissions.Add(resourceName);
     }
     public string BootstrapIdentifier => $"assurance-{RunId}@example.invalid";
     public string BootstrapPassword => EnvironmentAuthority["INSTANCE_BOOTSTRAP_LOCAL_PASSWORD"]
@@ -566,9 +572,9 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                 catch (OperationCanceledException) { break; }
                 continue;
             }
+            bool progressed = false;
             foreach (var candidate in pending)
             {
-                attempted.Add(candidate);
                 string stage = "capture";
                 try
                 {
@@ -577,22 +583,37 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                     stage = "completed-proof";
                     lock (containerIdentityLock)
                     {
-                        if (!containerIdentities.Values.Any(identity => ReferenceEquals(identity.Resource, candidate.Resource)
+                        if (containerIdentities.Values.Any(identity => ReferenceEquals(identity.Resource, candidate.Resource)
                             && identity.Instance == candidate.Instance))
                         {
-                            if (captured?.Outcome != ContainerInspectionOutcome.Absent)
-                                // A candidate alone proves neither native creation nor an erased implicit-volume footprint.
-                                throw UnknownContainer(candidate.Resource, "candidate-unproved");
-                            // The recorded absent observation grants no deletion authority; final release checks it again.
+                            // The candidate is now bound to native container evidence; it needs no further proof pass.
+                            attempted.Add(candidate);
+                            progressed = true;
                         }
+                        else if (captured?.Outcome != ContainerInspectionOutcome.Absent)
+                        {
+                            attempted.Add(candidate);
+                            // A candidate alone proves neither native creation nor an erased implicit-volume footprint.
+                            throw UnknownContainer(candidate.Resource, "candidate-unproved");
+                        }
+                        // An absent candidate may precede DCP container creation. Keep it pending and
+                        // re-inspect until it joins native evidence or the proof deadline expires; an
+                        // absence observation never grants deletion authority.
                     }
                 }
                 catch (Exception failure)
                 {
+                    attempted.Add(candidate);
                     failures.Add(failure);
                     denials.Add(new(candidate.Resource.Name, stage, failure, candidate.Instance == candidate.Resource.Name));
                 }
                 if (deadline.IsCancellationRequested) break;
+            }
+            if (!progressed && !deadline.IsCancellationRequested)
+            {
+                // Avoid a tight loop when DCP has not created the candidate yet.
+                try { await Task.Delay(100, deadline.Token); }
+                catch (OperationCanceledException) { break; }
             }
         }
         if (cleanupObservation.IsFaulted)
@@ -768,7 +789,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         IResource resource, string? instance, string runId, string expectedImage,
         IReadOnlySet<string> imageVolumeTargets, IReadOnlySet<string> initialIds,
         IReadOnlySet<string> initialVolumes, string inspection, out ContainerCleanupIdentity? identity,
-        out string reason, ContainerCleanupIdentity? original = null)
+        out string reason, ContainerCleanupIdentity? original = null, bool allowContainerReplacement = false)
     {
         identity = null;
         reason = "model-reference";
@@ -845,7 +866,9 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             if (remainingTargets.Count != 0) return false;
             var orderedVolumes = volumeMounts.OrderBy(volume => volume.Target, StringComparer.Ordinal).ToArray();
             reason = "volume-binding-changed";
-            if (original is not null && (original.Id != id || !original.Volumes.SequenceEqual(orderedVolumes))) return false;
+            if (original is not null
+                && (!original.Volumes.SequenceEqual(orderedVolumes)
+                    || (original.Id != id && !allowContainerReplacement))) return false;
             reason = "native-state";
             bool stopped = !fields[5].GetBoolean() && fields[6].GetInt32() == 0;
             identity = new(container, instance, id, expectedImage, imageVolumeTargets, inspection,
@@ -934,13 +957,18 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         }
         if (observation.Outcome == ContainerInspectionOutcome.Absent) return observation;
         ContainerCleanupIdentity? original;
+        bool allowReplacement;
         lock (containerIdentityLock)
-            original = containerIdentities.Values.SingleOrDefault(identity =>
+        {
+            original = containerIdentities.Values.LastOrDefault(identity =>
                 ReferenceEquals(identity.Resource, resource) && identity.Instance == instance);
+            allowReplacement = containerReplacementPermissions.Contains(resource.Name);
+        }
         // SDK ResourceId is only a name candidate; the native equality check supplies the join.
         if (!TryReadContainerIdentity(cleanupResources, resource, instance, RunId,
             cleanupImages[container.Name].Id, cleanupImages[container.Name].VolumeTargets,
-            initialContainerIds, initialVolumeNames, inspection.Output, out var identity, out string reason, original))
+            initialContainerIds, initialVolumeNames, inspection.Output, out var identity, out string reason, original,
+            allowReplacement))
             throw UnknownContainer(resource, reason);
         if (original is null)
         {
@@ -963,8 +991,19 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                     volumeIdentities[volume.Name] = volume;
             }
         }
+        string capturedId = identity!.Id;
         lock (containerIdentityLock)
-            containerIdentities[identity!.Id] = identity with { Stopped = identity.Stopped && exitCode == 0 };
+        {
+            if (allowReplacement)
+            {
+                foreach (string staleId in containerIdentities
+                    .Where(pair => ReferenceEquals(pair.Value.Resource, resource)
+                        && pair.Value.Instance == instance && pair.Value.Id != capturedId)
+                    .Select(pair => pair.Key).ToArray())
+                    containerIdentities.Remove(staleId);
+            }
+            containerIdentities[capturedId] = identity with { Stopped = identity.Stopped && exitCode == 0 };
+        }
         if (managedLaunchObservation is not null)
             await managedLaunchObservation.PublishContainerAsync(identity!, cancellationToken);
         return observation;
@@ -1043,13 +1082,16 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         return await response.Content.ReadAsStringAsync(token);
     }
 
+    internal const int VolumeConsumerInventoryAttempts = 10;
+    private static readonly TimeSpan VolumeConsumerInventoryRetryDelay = TimeSpan.FromMilliseconds(100);
+
     internal static async Task<string[]> ReadVolumeConsumersAsync(string volumeName, string mountpoint,
         Func<CancellationToken, Task<string>> readInventory, CancellationToken token)
     {
         var superseded = new List<Exception>();
         try
         {
-            for (int attempt = 0; attempt < 2; attempt++)
+            for (int attempt = 0; attempt < VolumeConsumerInventoryAttempts; attempt++)
             {
                 token.ThrowIfCancellationRequested();
                 var before = ParseVolumeConsumers(volumeName, mountpoint, await readInventory(token));
@@ -1058,8 +1100,11 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                 if (before.Ids.SetEquals(after.Ids))
                     return before.Consumers.Union(after.Consumers, StringComparer.Ordinal).ToArray();
                 var changed = new InvalidOperationException("test_resource_volume_consumers_unknown:stage=inventory-bracket:reason=membership-changed");
-                if (attempt == 1) throw changed;
                 superseded.Add(changed);
+                if (attempt + 1 == VolumeConsumerInventoryAttempts) throw changed;
+                // Aspire DCP can remove or replace a container between the two inventories.
+                // Re-bracket after a short pause; the proof still requires one stable set.
+                await Task.Delay(VolumeConsumerInventoryRetryDelay, token);
             }
             throw new InvalidOperationException("test_resource_volume_consumers_unknown:stage=inventory-bracket:reason=incomplete");
         }
@@ -2040,7 +2085,13 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             {
                 VolumeCleanupIdentity? captured;
                 lock (containerIdentityLock) volumeIdentities.TryGetValue(volume.Name, out captured);
-                if (captured is null || await ReadVolumeIdentityAsync(volume.Name, cleanupDeadline.Token) != captured)
+                if (captured is null)
+                    throw UnknownContainer(original.Resource, "volume-metadata-changed");
+                var current = await ReadVolumeIdentityAsync(volume.Name, cleanupDeadline.Token);
+                // DCP may remove a test-owned volume concurrently after the container
+                // is stopped. Absence is settled; changed metadata is still refused.
+                if (current is null) continue;
+                if (current != captured)
                     throw UnknownContainer(original.Resource, "volume-metadata-changed");
                 string[] consumers = await ReadVolumeConsumersAsync(captured, cleanupDeadline.Token);
                 RequireExclusiveVolumeConsumer(containerId, consumers);
@@ -2057,7 +2108,30 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                 throw new InvalidOperationException("test_resource_container_wait_failed");
             var removal = await RunDockerAsync(["rm", containerId], cleanupDeadline.Token);
             if (removal.ExitCode != 0 && !removal.Error.Contains("no such container", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("test_resource_container_cleanup_failed");
+            {
+                // Aspire DCP can remove the same container concurrently. A removal already in
+                // progress is not ownership ambiguity: the checks above still bind this exact
+                // owned container, so wait for it to disappear instead of failing the teardown.
+                if (!removal.Error.Contains("already in progress", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("test_resource_container_cleanup_failed");
+                using var settlement = CancellationTokenSource.CreateLinkedTokenSource(cleanupDeadline.Token);
+                settlement.CancelAfter(TimeSpan.FromSeconds(30));
+                try
+                {
+                    while (true)
+                    {
+                        var check = await RunDockerAsync(["inspect", "--type", "container", "--format",
+                            "{{.Id}}", containerId], settlement.Token);
+                        if (check.ExitCode != 0 && check.Error.Contains("no such", StringComparison.OrdinalIgnoreCase))
+                            break;
+                        await Task.Delay(200, settlement.Token);
+                    }
+                }
+                catch (OperationCanceledException) when (!cleanupDeadline.IsCancellationRequested)
+                {
+                    throw new InvalidOperationException("test_resource_container_cleanup_failed");
+                }
+            }
         }
         if (cleanupResources.Length != 0)
         {

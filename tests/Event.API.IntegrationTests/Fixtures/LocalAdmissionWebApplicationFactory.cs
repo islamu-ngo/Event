@@ -244,7 +244,10 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             {
                 settings["Keycloak:Authority"] = null;
                 settings["Keycloak:MetadataAddress"] = null;
-                settings["PublicBaseUrl"] = "https://example.test";
+                // Effective-host admission derives the canonical origin from PublicBaseUrl when
+                // no explicit override exists. It must match the TestServer base address or the
+                // request is rejected with an empty 400 before request logging runs.
+                settings["PublicBaseUrl"] = "https://localhost";
             }
 
             if (_measurementDatabaseSettings is null && _postgreSqlConnectionString is null)

@@ -1,7 +1,7 @@
 # I-VSD — PR 79 Testing Assurance Follow-Up
 
-Last Updated: 2026-10-30
-Report revision: 1
+Last Updated: 2026-11-21
+Report revision: 3
 
 ## Review Metadata
 
@@ -11,10 +11,13 @@ Report revision: 1
 - Report kind: workstream assessment
 - Report status: draft
 - Disposition: changes-required
-- Evidence cutoff: 2026-10-30
+- Evidence cutoff: 2026-11-21
 - Reviewed input:
   - dev/backlog/pr79-testing-assurance-follow-up.md
   - Planning triad revision 1, as supplied in chat and saved locally
+  - Planning triad revision 9, 2026-11-20
+  - Working-tree plan revision 13 and execution context, 2026-11-21
+  - [ADR-021](../../docs/internal/adr/ADR-021-instance-scoped-hal-authorization.md)
 - Supersedes: none
 
 This update persists the supplied assessment and checks its document mappings.
@@ -37,10 +40,16 @@ The proposed plan addresses those responsibilities through exact-candidate
 evidence, positive ownership, private artifact custody, native authority tests
 and explicit incomplete/unavailable outcomes.
 
-The report is not implementation-validated. Current-candidate execution,
-upstream reconciliation and stakeholder/operational evidence remain absent.
-Its draft / changes-required disposition permits planning reconciliation, not
-an implementation-complete, security or merge-readiness claim.
+The report is not independently implementation-validated. The recorded B20
+authorization slice passed 75/75 and the category relationship class passed
+5/5 on earlier sources. The earlier B22 data-protection witness passed 2/2 while
+retaining the developer volumes, but review found that its stop proof was too
+weak; the corrected witness has not run. A later tenant-discovery run was interrupted and is not a
+passing result. These receipts are scoped observations, not proof of the final
+candidate. Worker, browser, K6, provider-matrix, scanner and independent-review
+evidence remain absent. Its draft / changes-required
+disposition permits planning reconciliation, not an implementation-complete,
+security or merge-readiness claim.
 
 ## Scope
 
@@ -365,6 +374,39 @@ authorize execution or waive PR 80 restrictions.
 
 ## Evidence Reviewed
 
+Evidence update (2026-11-21): the worktree execution context records category
+relationship tests 5/5, tenant-creation permission tests 25/25, and the earlier
+B22 data-protection witness 2/2. That B22 result cannot prove the intended restart
+because the previous test accepted a health timeout without a terminal state; its
+corrected witness remains unrun. The subsequent tenant-discovery cohort was
+interrupted without a result. These are ledger-reported receipts; this report
+does not independently certify their logs or the final committed candidate.
+An additional mixed-batch regression demonstrated that an empty tenant profile
+could reach an instance-admin shortcut. The local provider now denies mixed
+instance-scope batches with an empty resolved tenant, while instance settings
+and tenant creation retain their separate authority path. The runtime provider
+may split dedicated-resource and discovery checks before delegation, so this is
+not a blanket claim about every top-level batch. An experimental runtime routing
+change was removed because an unbound tenant accessor can resolve a tenant lazily;
+the existing tenant-specific Cerbos selection is retained. Whole-workstream security review and the
+final candidate's provider parity remain necessary before release. The final local
+authorization regression class passed 9/9, including denied non-administrator
+and missing-tenant cases and selected-tenant behavior; two focused independent
+source reviews found no further proven bypass within that local-provider scope.
+
+Implementation refresh (2026-11-20):
+- B20: `PrivateInstanceManagementHttpTests` 24/24 and the complete four-class
+authorization slice 75/75, with the incomplete-setup host origin and the
+instance-scoped HAL batch root causes repaired. Decision: ADR-021.
+- B21: Runtime bootstrap reads use `IInstanceBootstrapStateReader`; mutation and
+startup owners retain the tracked repository. Category/category-type Runtime DML
+is narrow and attested; the detached read-modify-write guard passed 9/9.
+- B19: the SECURITY DEFINER recipient projection and its native drift/authority
+checks passed 4/4 in the prior recorded run.
+- B22: the cleanup-proof retry and concurrent-removal settlement are implemented
+in `OwnedAppHostFixture`; the native Distributed witness is running and no result
+is claimed yet.
+
 Evidence carried forward from the supplied planner assessment:
 - PR 79 backlog and its explicit evidence limitations.
 - PR 80 overlap/restriction handoff.
@@ -383,9 +425,12 @@ results or the external research sources.
 
 ## Missing Evidence
 
-No current build/test/native result was produced during planning or this update.
-No claim of implemented mitigation, ethical outcome, security certification or
-merge readiness is made.
+No independent whole-workstream security/privacy review has been performed.
+Worker recovery, browser journeys, K6 load, provider matrix and final
+scanner/Sonar evidence are not complete at this evidence cutoff. The corrected
+B22 witness remains unrun and does not certify cleanup or restart behavior.
+No claim of ethical outcome, security certification or merge readiness is made
+from the partial 2026-11-20 evidence.
 
 ## Context Inventory
 
@@ -404,6 +449,8 @@ Unstable inputs:
 | Date | Previous status | New status | Trigger | Evidence/replacement |
 |---|---|---|---|---|
 | 2026-10-30 | Not persisted | draft | Supplied revision 1 saved with metadata normalization | Supplied triad/report; document-only review, not current-candidate validation |
+| 2026-11-20 | draft | draft / implementation evidence refreshed | B20 75/75, category mutation 9/9, B22 repair compiled and native witness started | Planning revision 9, ADR-021, local test logs; independent review and remaining native lanes still open |
+| 2026-11-21 | draft | draft | Reconcile later scoped receipts and interrupted discovery run | Worktree context and plan revision 13; final candidate and independent review remain open |
 
 Current status:
 Draft, with planning mappings supplied.
@@ -422,11 +469,11 @@ A mapping check is not implementation validation.
 ## Planning Handoff
 
 Bound planning revision:
-PR 79 Testing Assurance Follow-Up triad revision 1, dated 2026-10-30.
+PR 79 Testing Assurance Follow-Up triad revision 9, dated 2026-11-20.
 
 - Workstream: pr79-testing-assurance-follow-up.
-- Status: draft.
-- Reviewed input: PR 79 Testing Assurance Follow-Up planning triad revision 1.
+- Status: draft / implementation evidence refreshed.
+- Reviewed input: PR 79 Testing Assurance Follow-Up planning triad revision 9.
 - Escalations required before: implementation for unresolved authority/scope;
   release for missing mandatory acceptance evidence.
 - Refresh triggers: candidate/ownership reconciliation, material scope or trust

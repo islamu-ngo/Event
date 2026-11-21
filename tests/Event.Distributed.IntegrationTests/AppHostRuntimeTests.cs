@@ -12,6 +12,46 @@ namespace Event.Distributed.IntegrationTests;
 public sealed partial class AppHostRuntimeTests
 {
     [Test]
+    public async Task ReplacementContainerInspectionRequiresExplicitPermissionAndMatchingIdentity()
+    {
+        var resource = new ContainerResource("session-authority");
+        const string runId = "replacement-test";
+        string image = new('b', 64);
+        string originalId = new('a', 64);
+        string replacementId = new('c', 64);
+        var targets = new HashSet<string> { "/data" };
+        string Inspection(string id, string owner, string resourceLabel, string volume) =>
+            JsonSerializer.Serialize(new object[]
+            {
+                id, "/session-instance", "sha256:" + image,
+                new Dictionary<string, string>
+                {
+                    ["islamu.assurance.owner"] = owner,
+                    ["islamu.assurance.resource"] = resourceLabel
+                },
+                new[] { new { Type = "volume", Name = volume, Destination = "/data", RW = true } },
+                true, 0
+            });
+        var empty = new HashSet<string>();
+        bool originalValid = OwnedAppHostFixture.TryReadContainerIdentity([resource], resource,
+            "session-instance", runId, image, targets, empty, empty,
+            Inspection(originalId, runId, resource.Name, "session-data"), out var original, out _);
+        await Assert.That(originalValid).IsTrue();
+
+        bool Accept(string owner, string resourceLabel, string volume, bool permit, IReadOnlySet<string> initialIds) =>
+            OwnedAppHostFixture.TryReadContainerIdentity([resource], resource, "session-instance", runId,
+                image, targets, initialIds, empty, Inspection(replacementId, owner, resourceLabel, volume),
+                out _, out _, original, permit);
+
+        await Assert.That(Accept(runId, resource.Name, "session-data", true, empty)).IsTrue();
+        await Assert.That(Accept(runId, resource.Name, "session-data", false, empty)).IsFalse();
+        await Assert.That(Accept("foreign", resource.Name, "session-data", true, empty)).IsFalse();
+        await Assert.That(Accept(runId, "foreign-resource", "session-data", true, empty)).IsFalse();
+        await Assert.That(Accept(runId, resource.Name, "different-volume", true, empty)).IsFalse();
+        await Assert.That(Accept(runId, resource.Name, "session-data", true, new HashSet<string> { replacementId })).IsFalse();
+    }
+
+    [Test]
     [Explicit]
     public async Task NativeVolumeConsumerInventoryUsesSelectedDaemonRuntimePaths()
     {
@@ -475,8 +515,16 @@ public sealed partial class AppHostRuntimeTests
             await ExerciseAsync("same-membership-new-mount", [added], true,
                 Inventory(Row(added, unrelated)), Inventory(Row(added, mount)));
         }
-        await ExerciseAsync("repeated-drift", null, false,
-            Inventory(Row(own)), Inventory(Row(neighbour)), Inventory(Row(neighbour)), Inventory(Row(added)));
+        await ExerciseAsync("transient-then-stable", [own], false,
+            Inventory(Row(own, named)), Inventory(Row(neighbour, named)),
+            Inventory(Row(own, named)), Inventory(Row(own, named)));
+        var driftObservations = Enumerable.Range(0, OwnedAppHostFixture.VolumeConsumerInventoryAttempts)
+            .SelectMany(attempt => new object[]
+            {
+                Inventory(Row(attempt % 2 == 0 ? own : neighbour)),
+                Inventory(Row(attempt % 2 == 0 ? neighbour : added))
+            }).ToArray();
+        await ExerciseAsync("repeated-drift", null, false, driftObservations);
         foreach (string malformed in new[] { "{}", "[", sentinel, Inventory(Row(own), Row(own)),
             Inventory(Row("invalid")), "[{\"Id\":\"" + own + "\",\"Mounts\":[],\"Mounts\":[]}]" })
         {

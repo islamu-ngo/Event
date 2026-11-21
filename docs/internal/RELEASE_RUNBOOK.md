@@ -63,6 +63,39 @@ Generate the existing durable evidence bundle only as the checklist directs:
 dotnet run .ci/scripts/generate-release-evidence-bundle.cs -- artifacts release-evidence
 ```
 
+## PR 79 native authority changes (2026-11-20)
+
+This candidate changes native authorization and read paths. Existing development
+databases must be reprovisioned through the normal migrator/provisioning path;
+do not hand-edit roles, grants, functions or RLS policies to imitate the expected
+state.
+
+- **Category and lookup writes:** Runtime receives a narrow, attested DML contract
+  for `categories` and `category_type_categories`. `category_types` remains a
+  read-only global lookup for Runtime; its controller exposes only GET operations
+  and admin/test seeding uses the migrator context. The grants are installed by
+  `PostgresCategoryMutationPermissions`; a partial or widened grant set fails the
+  catalogue attestation instead of being silently accepted.
+- **Instance bootstrap reads:** HTTP-runtime reads use the Global
+  `IInstanceBootstrapStateReader`. Runtime direct access to
+  `instance_bootstrap_states` remains denied with PostgreSQL `42501`. Do not grant
+  Runtime table access to work around an onboarding-status failure; verify the
+  reader/Global pool configuration instead.
+- **Instance administration:** `/api/admin/instance/*`, instance onboarding and
+  instance settings are installation-scoped and do not require `X-Tenant-Slug`.
+  Do not add a synthetic default-tenant header or a controller-wide tenant
+  exemption. Missing HAL actions should be diagnosed through instance authority
+  and the permission-bound batch path, not by granting tenant authority.
+- **Provider-configuration discovery:** instance-scoped secret binding references
+  are read through the Global provider-configuration contract. Runtime direct
+  `secret_bindings` access stays denied.
+
+Rollback of the application binary does not automatically reverse installed native
+rights. Use the prior supported provisioning/migration path for the selected
+release and re-run its attestations; never widen a runtime role to make an older
+binary start. The B22 cleanup-fixture repair is test infrastructure only and has
+no operator action.
+
 ## Future governed release flow
 
 1. Create public change metadata and its commit footer together:

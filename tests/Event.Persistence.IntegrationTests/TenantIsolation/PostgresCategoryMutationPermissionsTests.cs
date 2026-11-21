@@ -51,11 +51,40 @@ public sealed class PostgresCategoryMutationPermissionsTests(PostgreSqlContainer
             CategoryTypeId = typeId,
             CategoryType = null!
         });
+        var replacementCategory = await categoryRepo.Create(new Category
+        {
+            Id = Guid.CreateVersion7(),
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            MasterCode = $"MUT_{Guid.CreateVersion7():N}",
+            FullName = "Replacement category",
+            TenantId = tenantA,
+            Tenant = null!
+        });
+        createdLink.CategoryId = replacementCategory.Id;
+        runtime.Entry(createdLink).Property(link => link.TenantId).IsModified = true;
         await linkRepo.Update(createdLink);
+        var persistedLink = await runtime.CategoryTypeCategories.AsNoTracking()
+            .SingleAsync(link => link.Id == createdLink.Id);
+        await Assert.That(persistedLink.CategoryId).IsEqualTo(replacementCategory.Id);
+        await Assert.That(persistedLink.TenantId).IsEqualTo(tenantA);
 
         // Cross-tenant reads remain isolated by PostgreSQL RLS.
         await Assert.That(await categoryRepo.GetById(foreignCategoryId)).IsNull();
         await Assert.That(await linkRepo.GetById(foreignLinkId)).IsNull();
+
+        var foreignTracked = new CategoryTypeCategories
+        {
+            Id = foreignLinkId, TenantId = tenantB, CategoryId = foreignCategoryId, CategoryTypeId = typeId,
+            Tenant = null!, Category = null!, CategoryType = null!
+        };
+        runtime.Attach(foreignTracked);
+        var forged = new CategoryTypeCategories
+        {
+            Id = foreignLinkId, TenantId = tenantA, CategoryId = replacementCategory.Id, CategoryTypeId = typeId,
+            Tenant = null!, Category = null!, CategoryType = null!
+        };
+        await Assert.ThrowsAsync<InvalidOperationException>(() => linkRepo.Update(forged));
+        runtime.Entry(foreignTracked).State = EntityState.Detached;
 
         // Cross-tenant INSERT fails closed via RLS WITH CHECK (SQLSTATE 42501).
         var names = new HumanPrincipalSourceSql(runtime);
@@ -96,6 +125,7 @@ public sealed class PostgresCategoryMutationPermissionsTests(PostgreSqlContainer
         }
 
         await linkRepo.Delete(createdLink);
+        await categoryRepo.Delete(replacementCategory);
         await categoryRepo.Delete(createdCategory);
 
         // Global login remains completely denied on both tables.

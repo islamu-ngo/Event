@@ -371,10 +371,58 @@ for fixed Runtime column reads. `PostgresCategoryMutationPermissions` installs
 and attests the optional-complete Runtime DML contract for `Category`
 (column-scoped `INSERT` on six columns, `UPDATE` on `ConcurrencyStamp`,
 `MasterCode`, `FullName`, and `ParentId`, and `DELETE` under mandatory
-`tenant_isolation` RLS) and `CategoryTypeCategories` (column-scoped `SELECT`,
-`INSERT`, `UPDATE` on `CategoryId` and `CategoryTypeId`, and RLS-enforced
-`DELETE`), while `CategoryTypeCategoriesRepository.Update` keeps `TenantId`
-unmodified. Immutable `Id` and `TenantId` remain non-updatable by Runtime,
+`tenant_isolation` RLS) and `CategoryTypeCategories` (column-scoped `SELECT` and
+`INSERT` on `Id`, `CategoryId`, `CategoryTypeId` and `TenantId`, `UPDATE` on the
+two catalogue keys only, and RLS-enforced `DELETE`), while
+`CategoryTypeCategoriesRepository.Update` keeps `Id` and `TenantId` unmodified.
+`CategoryType` itself remains read-only for Runtime; its public controller exposes
+only GET operations and test/admin seeding uses the migrator context, so no Runtime
+`category_types` DML contract is installed. Immutable `Id` and `TenantId` remain non-updatable by Runtime,
 `Global`, `PUBLIC`, and grant options stay denied, and both
 `PostgresCategoryReadPermissions` and `EventReadProjectionSql` compose the
 complete catalogue predicate while rejecting any partial or widened grants.
+
+## Instance bootstrap-state reads and mutation owners
+
+HTTP-runtime query paths read current committed instance-bootstrap evidence through
+`IInstanceBootstrapStateReader`, not through the ordinary tenant-scoped repository.
+The reader uses the independent `IGlobalExploreDbContextFactory` pool and
+`InstanceBootstrapStateQuery`, so it can observe explicit absence and the current
+completed row without granting Runtime direct `SELECT` access to
+`instance_bootstrap_states` (`42501` remains the native proof). Query handlers,
+onboarding status/preflight/generation, management capability and upgrade
+inspections, credential-cutover queries, tenant lifecycle access, webhook ownership
+resolution and tenant activation capacity use this read boundary.
+
+Command and startup owners deliberately retain `IInstanceBootstrapStateRepository`
+when they must mutate the row or establish an `UPDATE`/generation fence:
+`TransitionInstanceDeploymentModeCommandHandler`,
+`SaveInstanceOnboardingProfileCommandHandler`,
+`RepairWebhookProviderBindingCommandHandler`, `InstanceOnboardingCompletionOperation`,
+`LocalAdministratorBootstrapOperation`, `ConfiguredAdministratorBootstrapStartupRunner`
+and `LocalAdministratorBootstrapRunner`. A tracker-free read cannot replace those
+ownership and idempotency checks. The split is therefore by responsibility, not by
+convenience: read paths use the Global contract; mutation owners keep their original
+native transaction and authority.
+
+## Instance-scoped HAL authorization
+
+Instance-management actions marked with the method-level `[InstanceManagement]`
+attribute belong to the installation, not to a tenant. Tenant-resolution middleware
+exempts those exact actions, so an instance-management request may legitimately have
+no selected tenant. The HAL evaluator still batches permission checks for the
+returned links.
+
+A batch containing only `ResourceKinds.InstanceSetting` and tenant-creation
+checks is evaluated per check through instance authority without a tenant profile.
+Runtime provider selection remains unchanged: tenant-specific Cerbos configuration
+is consulted for tenant-creation requests according to the existing routing contract.
+When a batch presented to the local provider also contains other checks and tenant
+resolution returns an empty identifier, that provider denies the entire batch.
+The runtime provider can split dedicated-resource and discovery checks before
+delegation; those decisions retain their own authority policies. Instance-only
+batches do not request a default tenant,
+and the HAL evaluator keeps fail-closed behavior for genuine
+provider failures. `[InstanceManagement]` remains method-scoped; controller-wide
+exemptions are forbidden. See
+[ADR-021](adr/ADR-021-instance-scoped-hal-authorization.md).

@@ -729,7 +729,12 @@ else
 object bffSessionEndpoint = builder.Configuration["BFF_SESSION_REDIS_ENDPOINT"]
     ?? builder.Configuration["Bff:SessionAuthority:Endpoint"] ?? string.Empty;
 if (bffSessionAuthority is not null)
-    bffSessionEndpoint = ReferenceExpression.Create($"redis://{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Host)}:{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Port)}");
+    // Follow Aspire's endpoint transport contract rather than duplicating the scheme:
+    // Redis resources enable TLS by default in Aspire 13, so this resolves to rediss.
+    // The ticket store selects StackExchange.Redis TLS from that scheme and fails closed
+    // if plaintext is projected to a TLS listener.
+    bffSessionEndpoint = ReferenceExpression.Create(
+        $"{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Scheme)}://{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Host)}:{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Port)}");
 
 // Register last, after every explicit resource projection. Parent-process .env
 // inheritance must not reintroduce sibling or infrastructure authority.

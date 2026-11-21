@@ -74,14 +74,24 @@ public sealed class PostgresCategoryMutationPermissionsTests(PostgreSqlContainer
 
         var foreignTracked = new CategoryTypeCategories
         {
-            Id = foreignLinkId, TenantId = tenantB, CategoryId = foreignCategoryId, CategoryTypeId = typeId,
-            Tenant = null!, Category = null!, CategoryType = null!
+            Id = foreignLinkId,
+            TenantId = tenantB,
+            CategoryId = foreignCategoryId,
+            CategoryTypeId = typeId,
+            Tenant = null!,
+            Category = null!,
+            CategoryType = null!
         };
         runtime.Attach(foreignTracked);
         var forged = new CategoryTypeCategories
         {
-            Id = foreignLinkId, TenantId = tenantA, CategoryId = replacementCategory.Id, CategoryTypeId = typeId,
-            Tenant = null!, Category = null!, CategoryType = null!
+            Id = foreignLinkId,
+            TenantId = tenantA,
+            CategoryId = replacementCategory.Id,
+            CategoryTypeId = typeId,
+            Tenant = null!,
+            Category = null!,
+            CategoryType = null!
         };
         await Assert.ThrowsAsync<InvalidOperationException>(() => linkRepo.Update(forged));
         runtime.Entry(foreignTracked).State = EntityState.Detached;

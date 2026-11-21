@@ -382,6 +382,13 @@ only GET operations and test/admin seeding uses the migrator context, so no Runt
 `PostgresCategoryReadPermissions` and `EventReadProjectionSql` compose the
 complete catalogue predicate while rejecting any partial or widened grants.
 
+Narrow category updates preserve the caller's mutable values while retaining
+the caller's concurrency stamp as the database predicate. A same-key tracked
+entity must have the same current and original tenant as the submitted entity.
+For detached deletes that resolve to a tracked entity, the repository preserves
+tracked business values and uses the submitted concurrency tokens as original
+values, so stale snapshots cannot silently replace newer data during a soft delete.
+
 ## Instance bootstrap-state reads and mutation owners
 
 HTTP-runtime query paths read current committed instance-bootstrap evidence through

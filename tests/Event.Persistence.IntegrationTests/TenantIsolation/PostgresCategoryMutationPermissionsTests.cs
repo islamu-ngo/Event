@@ -40,6 +40,9 @@ public sealed class PostgresCategoryMutationPermissionsTests(PostgreSqlContainer
         createdCategory.FullName = "Updated owned category";
         createdCategory.ConcurrencyStamp = Guid.CreateVersion7();
         await categoryRepo.Update(createdCategory);
+        var trackedResult = await categoryRepo.GetById(createdCategory.Id);
+        await Assert.That(trackedResult!.FullName).IsEqualTo("Updated owned category");
+        await Assert.That(trackedResult.ConcurrencyStamp).IsEqualTo(createdCategory.ConcurrencyStamp);
 
         var createdLink = await linkRepo.Create(new CategoryTypeCategories
         {
@@ -60,6 +63,17 @@ public sealed class PostgresCategoryMutationPermissionsTests(PostgreSqlContainer
             TenantId = tenantA,
             Tenant = null!
         });
+        var detachedUpdate = await categoryRepo.GetById(createdCategory.Id);
+        detachedUpdate!.FullName = "Updated from detached category";
+        detachedUpdate.MasterCode = $"DET_{Guid.CreateVersion7():N}";
+        detachedUpdate.ParentId = replacementCategory.Id;
+        await categoryRepo.Update(detachedUpdate);
+        var detachedResult = await categoryRepo.GetById(createdCategory.Id);
+        await Assert.That(detachedResult!.FullName).IsEqualTo(detachedUpdate.FullName);
+        await Assert.That(detachedResult.MasterCode).IsEqualTo(detachedUpdate.MasterCode);
+        await Assert.That(detachedResult.ParentId).IsEqualTo(replacementCategory.Id);
+        await Assert.That(detachedResult.ConcurrencyStamp).IsEqualTo(createdCategory.ConcurrencyStamp);
+        await Assert.That(detachedResult.ConcurrencyStamp).IsNotEqualTo(detachedUpdate.ConcurrencyStamp);
         createdLink.CategoryId = replacementCategory.Id;
         runtime.Entry(createdLink).Property(link => link.TenantId).IsModified = true;
         await linkRepo.Update(createdLink);
@@ -71,6 +85,29 @@ public sealed class PostgresCategoryMutationPermissionsTests(PostgreSqlContainer
         // Cross-tenant reads remain isolated by PostgreSQL RLS.
         await Assert.That(await categoryRepo.GetById(foreignCategoryId)).IsNull();
         await Assert.That(await linkRepo.GetById(foreignLinkId)).IsNull();
+
+        var foreignTrackedCategory = new Category
+        {
+            Id = foreignCategoryId,
+            TenantId = tenantB,
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            MasterCode = "FOREIGN_TRACKED",
+            FullName = "Foreign tracked category",
+            Tenant = null!
+        };
+        runtime.Attach(foreignTrackedCategory);
+        var forgedCategory = new Category
+        {
+            Id = foreignCategoryId,
+            TenantId = tenantA,
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            MasterCode = "FORGED_CATEGORY",
+            FullName = "Forged category",
+            Tenant = null!
+        };
+        var categoryRefusal = await Assert.ThrowsAsync<InvalidOperationException>(() => categoryRepo.Update(forgedCategory));
+        await Assert.That(categoryRefusal!.Message).IsEqualTo("tracked_tenant_authority_mismatch");
+        runtime.Entry(foreignTrackedCategory).State = EntityState.Detached;
 
         var foreignTracked = new CategoryTypeCategories
         {
@@ -93,8 +130,14 @@ public sealed class PostgresCategoryMutationPermissionsTests(PostgreSqlContainer
             Category = null!,
             CategoryType = null!
         };
-        await Assert.ThrowsAsync<InvalidOperationException>(() => linkRepo.Update(forged));
+        var linkRefusal = await Assert.ThrowsAsync<InvalidOperationException>(() => linkRepo.Update(forged));
+        await Assert.That(linkRefusal!.Message).IsEqualTo("tracked_tenant_authority_mismatch");
         runtime.Entry(foreignTracked).State = EntityState.Detached;
+        await using var foreignRuntime = Open(PrimaryDatabaseRole.Runtime, tenantB);
+        var foreignLink = await foreignRuntime.CategoryTypeCategories.AsNoTracking().SingleAsync(link => link.Id == foreignLinkId);
+        await Assert.That(foreignLink.TenantId).IsEqualTo(tenantB);
+        await Assert.That(foreignLink.CategoryId).IsEqualTo(foreignCategoryId);
+        await Assert.That(foreignLink.CategoryTypeId).IsEqualTo(typeId);
 
         // Cross-tenant INSERT fails closed via RLS WITH CHECK (SQLSTATE 42501).
         var names = new HumanPrincipalSourceSql(runtime);
@@ -135,8 +178,8 @@ public sealed class PostgresCategoryMutationPermissionsTests(PostgreSqlContainer
         }
 
         await linkRepo.Delete(createdLink);
-        await categoryRepo.Delete(replacementCategory);
         await categoryRepo.Delete(createdCategory);
+        await categoryRepo.Delete(replacementCategory);
 
         // Global login remains completely denied on both tables.
         await using var global = Open(PrimaryDatabaseRole.Global, tenantA);
@@ -147,6 +190,32 @@ public sealed class PostgresCategoryMutationPermissionsTests(PostgreSqlContainer
                 global.Database.ExecuteSqlRawAsync($"SELECT 1 FROM {table} LIMIT 1"));
             await Assert.That(globalDenied!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
         }
+    }
+
+    [Test]
+    public async Task StaleDetachedCategoryCannotOverwriteNewerTrackedVersion()
+    {
+        var (tenantA, _, _, _, _) = await SeedAsync();
+        await using var runtime = Open(PrimaryDatabaseRole.Runtime, tenantA);
+        await runtime.Database.OpenConnectionAsync();
+        await PostgresCategoryMutationPermissions.RequireReadyAsync(runtime, fixture.NativeQueueEnrollment);
+        var repository = new CategoryRepository(runtime);
+        var tracked = await repository.Create(new Category
+        {
+            Id = Guid.CreateVersion7(),
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            MasterCode = $"STALE_{Guid.CreateVersion7():N}",
+            FullName = "Original",
+            TenantId = tenantA,
+            Tenant = null!
+        });
+        var stale = await repository.GetById(tracked.Id);
+        tracked.FullName = "Current";
+        await repository.Update(tracked);
+        stale!.FullName = "Stale overwrite";
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => repository.Update(stale));
+        var persisted = await repository.GetById(tracked.Id);
+        await Assert.That(persisted!.FullName).IsEqualTo("Current");
     }
 
     [Test]

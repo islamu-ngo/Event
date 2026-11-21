@@ -807,6 +807,10 @@ retrying; a rejected move leaves the original placement intact.
 
 Organizers create Organizations and Groups to co-host events:
 - **Verification Badges**: Instance and tenant admins can mark verified organizations to give attendees trust.
+
+Category edits and deletes use concurrency checks to prevent an older view from
+silently overwriting newer changes. If an edit conflicts, reload the current
+record before trying again.
 - **Membership Management**: Assign Owner, Admin, and Member roles within an organization (see [Admin Hierarchy](admin-hierarchy.md)).
 - **Payment Connections**: Organizers onboard their own [Stripe Connect](../events-and-ticketing/paid-events-and-payouts.md) accounts directly through organization settings to receive ticket payouts.
 

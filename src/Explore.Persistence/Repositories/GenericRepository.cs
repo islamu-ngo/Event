@@ -50,7 +50,16 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
         var target = entry.State == EntityState.Detached ? FindTrackedMatch(entity) ?? entity : entity;
         if (!ReferenceEquals(target, entity))
         {
-            _dbContext.Entry(target).CurrentValues.SetValues(entity);
+            var trackedEntry = _dbContext.Entry(target);
+            var tenant = trackedEntry.Metadata.FindProperty("TenantId");
+            if (tenant is not null && (tenant.ClrType == typeof(Guid) || tenant.ClrType == typeof(Guid?))
+                && (!Equals(trackedEntry.Property(tenant.Name).CurrentValue, entry.Property(tenant.Name).CurrentValue)
+                    || !Equals(trackedEntry.Property(tenant.Name).OriginalValue, entry.Property(tenant.Name).CurrentValue)))
+            {
+                throw new InvalidOperationException("tracked_tenant_authority_mismatch");
+            }
+            foreach (var property in trackedEntry.Metadata.GetProperties().Where(property => property.IsConcurrencyToken))
+                trackedEntry.Property(property.Name).OriginalValue = entry.Property(property.Name).CurrentValue;
         }
 
         // Check if entity supports soft delete
@@ -176,9 +185,12 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
         else
         {
             entry = _dbContext.Entry(tracked);
-            if (!ReferenceEquals(tracked, entity))
+            var tenant = entry.Metadata.FindProperty("TenantId");
+            if (tenant is not null && (tenant.ClrType == typeof(Guid) || tenant.ClrType == typeof(Guid?))
+                && (!Equals(entry.Property(tenant.Name).CurrentValue, _dbContext.Entry(entity).Property(tenant.Name).CurrentValue)
+                    || !Equals(entry.Property(tenant.Name).OriginalValue, _dbContext.Entry(entity).Property(tenant.Name).CurrentValue)))
             {
-                entry.CurrentValues.SetValues(entity);
+                throw new InvalidOperationException("tracked_tenant_authority_mismatch");
             }
         }
 

@@ -137,6 +137,11 @@ requests return `503`; realtime activities remain blocked until a fresh check
 succeeds. Restore service availability and retry rather than disabling admission
 limits. A definitively invalid or revoked identity still requires a new sign-in.
 
+Unavailable public header/footer configuration can remain hidden for the
+existing five-minute public-data cache interval. After correcting operator
+configuration, reload the page or explicitly refresh configuration to obtain
+the current public state; no stale operator identity is displayed meanwhile.
+
 > [!TIP]
 > **Authentication recommendation:** Keep the default embedded Local Identity
 > for the easiest standalone deployment and for localhost/private-network use.

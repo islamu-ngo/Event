@@ -4,6 +4,54 @@ namespace Explore.Blazor.Client.Tests.Services;
 
 public class PublicExperienceServiceTests
 {
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task UnavailableCachedSettingsRecoverOnlyAfterExpiryOrExplicitReset(bool reset)
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero));
+        var service = new PublicExperienceService(_apiClient, Substitute.For<ILogger<PublicExperienceService>>(), clock);
+        var recovered = SettingsWithIdentity("Recovered directory");
+        _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<PublicExperienceSettingsDto>(new ApiException(
+                "Unavailable", 503, string.Empty, new Dictionary<string, IEnumerable<string>>(), null)),
+                Task.FromResult(recovered));
+
+        await Assert.That(await service.GetCachedSettingsAsync()).IsNull();
+        await Assert.That(await service.GetCachedSettingsAsync()).IsNull();
+        await Assert.That(service.SettingsAvailability).IsEqualTo(PublicExperienceAvailability.Unavailable);
+
+        if (reset) service.ResetCache();
+        else clock.Advance(TimeSpan.FromMinutes(6));
+
+        await Assert.That(await service.GetCachedSettingsAsync()).IsSameReferenceAs(recovered);
+        await Assert.That(service.SettingsAvailability).IsEqualTo(PublicExperienceAvailability.Available);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task UnavailableCachedShellRecoversOnlyAfterExpiryOrExplicitReset(bool reset)
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero));
+        var service = new PublicExperienceService(_apiClient, Substitute.For<ILogger<PublicExperienceService>>(), clock);
+        var recovered = ShellWithIdentities("Recovered directory");
+        _apiClient.GetPublicExperienceShellAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<PublicExperienceShellDto>(new ApiException(
+                "Unavailable", 503, string.Empty, new Dictionary<string, IEnumerable<string>>(), null)),
+                Task.FromResult(recovered));
+
+        await Assert.That(await service.GetCachedShellAsync()).IsNull();
+        await Assert.That(await service.GetCachedShellAsync()).IsNull();
+        await Assert.That(service.ShellAvailability).IsEqualTo(PublicExperienceAvailability.Unavailable);
+
+        if (reset) service.ResetCache();
+        else clock.Advance(TimeSpan.FromMinutes(6));
+
+        await Assert.That(await service.GetCachedShellAsync()).IsSameReferenceAs(recovered);
+        await Assert.That(service.ShellAvailability).IsEqualTo(PublicExperienceAvailability.Available);
+    }
+
     private readonly IPublicExperienceClient _apiClient;
     private readonly PublicExperienceService _service;
 

@@ -197,6 +197,13 @@ The internal base URI uses the HTTPS scheme so that API HTTPS-redirection
 middleware does not redirect synthetic requests away from their selected
 handlers. Dispatch remains in process; this does not introduce a network hop.
 
+The public-experience service retains unavailable public settings and shell
+results for its existing five-minute cache interval, returning no stale public
+operator identity. Cached consumers therefore do not repeatedly refetch the
+same fail-closed result during rendering. Explicit reads, `ResetCache`, and
+expiry can obtain fresh public configuration. This cache does not contain
+browser-session validation or private action authority.
+
 Local identity validation distinguishes rejection from unavailability.
 `BffAdminClaimsTransformation.ValidateLocalSessionAsync` preserves definitive
 identity rejection, but translates throttling, server failures, transport errors,

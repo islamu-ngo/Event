@@ -151,6 +151,9 @@ public class PublicExperienceService : IPublicExperienceService
         {
             if (_cachedSettings != null && _clock.GetUtcNow() <= _settingsCacheExpiresAt)
                 return _cachedSettings;
+            if (_settingsAvailability == PublicExperienceAvailability.Unavailable
+                && _clock.GetUtcNow() <= _settingsCacheExpiresAt)
+                return null;
 
             generation = ++_settingsGeneration;
         }
@@ -163,6 +166,9 @@ public class PublicExperienceService : IPublicExperienceService
 
     public async Task<PublicExperienceShellDto?> GetCachedShellAsync()
     {
+        if (ShellAvailability == PublicExperienceAvailability.Unavailable
+            && _clock.GetUtcNow() <= _shellCacheExpiresAt)
+            return null;
         if (_cachedShell != null && _clock.GetUtcNow() <= _shellCacheExpiresAt)
         {
             return _cachedShell;
@@ -238,7 +244,7 @@ public class PublicExperienceService : IPublicExperienceService
         bool changed = _settingsAvailability != PublicExperienceAvailability.Unavailable;
         _cachedSettings = null;
         _announcementSnapshot = null;
-        _settingsCacheExpiresAt = default;
+        _settingsCacheExpiresAt = _clock.GetUtcNow().Add(CacheDuration);
         _settingsAvailability = PublicExperienceAvailability.Unavailable;
         if (changed)
             SettingsChanged?.Invoke();
@@ -247,7 +253,7 @@ public class PublicExperienceService : IPublicExperienceService
     private void InvalidateShell()
     {
         _cachedShell = null;
-        _shellCacheExpiresAt = default;
+        _shellCacheExpiresAt = _clock.GetUtcNow().Add(CacheDuration);
         ShellAvailability = PublicExperienceAvailability.Unavailable;
     }
 

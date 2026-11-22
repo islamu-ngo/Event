@@ -1520,6 +1520,12 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         var apiCreatedInitial = new SecurityExecutionEvidence.InitialNativeResources(
             new HashSet<string>(StringComparer.Ordinal), new HashSet<string>(StringComparer.Ordinal),
             new HashSet<string>(StringComparer.Ordinal) { apiCreatedImageId, "sha256:" + new string('e', 64) });
+        SecurityExecutionEvidence.ApiResourceInputs ApiCreatedInputs(
+            SecurityExecutionEvidence.NativeContainerCreationSnapshot snapshot, SecurityExecutionEvidence.InitialNativeResources initial) =>
+            new(owner, snapshot, apiCreatedImages, initial,
+                new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+                { [apiCreatedImageId] = new HashSet<string>(StringComparer.Ordinal) },
+                new Dictionary<string, string>(StringComparer.Ordinal));
         JsonObject ApiCreatedRow() => new()
         {
             ["Id"] = apiCreatedId,
@@ -1530,16 +1536,16 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             ["Labels"] = new JsonObject { ["islamu.assurance.owner"] = owner, ["islamu.assurance.resource"] = "keycloak" }
         };
         byte[] ApiCreatedBytes(JsonObject row) => JsonSerializer.SerializeToUtf8Bytes(new JsonArray(row.DeepClone()));
-        if (!SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(ApiCreatedRow()), owner,
-            apiCreatedSnapshot, apiCreatedImages, apiCreatedInitial, out var apiCreatedObserved))
+        if (!SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(ApiCreatedRow()),
+            ApiCreatedInputs(apiCreatedSnapshot, apiCreatedInitial), out var apiCreatedObserved))
             throw new InvalidDataException("native_api_creator_resource_join_missing");
-        await Assert.That(apiCreatedObserved!.Single()).IsEqualTo(
+        await Assert.That(apiCreatedObserved!.Single().Container).IsEqualTo(
             new SecurityExecutionEvidence.ObservedOwnedResource(apiCreatedId, apiCreatedImageId, "keycloak", true));
         JsonObject apiUnrelatedRow = ApiCreatedRow();
         apiUnrelatedRow["Id"] = new string('d', 64);
         apiUnrelatedRow["Labels"]!["islamu.assurance.owner"] = new string('d', 32);
-        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(apiUnrelatedRow), owner,
-            apiCreatedSnapshot, apiCreatedImages, apiCreatedInitial, out var apiUnrelatedObserved)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(apiUnrelatedRow),
+            ApiCreatedInputs(apiCreatedSnapshot, apiCreatedInitial), out var apiUnrelatedObserved)).IsTrue();
         await Assert.That(apiUnrelatedObserved!.Count).IsEqualTo(0);
         foreach (string apiConflict in new[] { "same-image-alias", "owner", "resource", "image-id", "container-id",
             "missing-pair", "pending-pair", "pair-image", "pair-id", "initial-container", "uncached-image", "mount" })
@@ -1580,20 +1586,20 @@ public sealed class SecurityExecutionEvidenceParentModelTests
                         ["RW"] = true
                     }); break;
             }
-            if (SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(apiConflictingRow), owner,
-                apiConflictingSnapshot, apiCreatedImages, apiConflictingInitial, out _))
+            if (SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(apiConflictingRow),
+                ApiCreatedInputs(apiConflictingSnapshot, apiConflictingInitial), out _))
                 throw new InvalidDataException("native_api_creator_resource_conflict_accepted_" + apiConflict);
         }
-        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(Encoding.UTF8.GetBytes("[]"), owner,
-            apiCreatedSnapshot, apiCreatedImages, apiCreatedInitial, out var apiCreatedGone)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(Encoding.UTF8.GetBytes("[]"),
+            ApiCreatedInputs(apiCreatedSnapshot, apiCreatedInitial), out var apiCreatedGone)).IsTrue();
         await Assert.That(apiCreatedGone!.Count).IsEqualTo(0);
-        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(Encoding.UTF8.GetBytes("[]"), owner,
-            apiCreatedSnapshot with
+        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(Encoding.UTF8.GetBytes("[]"),
+            ApiCreatedInputs(apiCreatedSnapshot with
             {
                 Created = [],
                 PendingCreationIds = new HashSet<string>(StringComparer.Ordinal)
                 { apiCreatedPair.CreationId }
-            }, apiCreatedImages, apiCreatedInitial, out var apiCreationNotYetVisible)).IsTrue();
+            }, apiCreatedInitial), out var apiCreationNotYetVisible)).IsTrue();
         await Assert.That(apiCreationNotYetVisible!.Count).IsEqualTo(0);
 
         var directPair = apiCreatedPair with { Resource = "docker-wait" };
@@ -3434,6 +3440,12 @@ public sealed class SecurityExecutionEvidenceProcessTests
         string root = Environment.GetEnvironmentVariable("ISLAMU_RELEASE_NATIVE_CHILD_ROOT")!;
         string canary = Environment.GetEnvironmentVariable("ISLAMU_RELEASE_NATIVE_CHILD_CANARY")!;
         RecordOwnedPid(root, Environment.ProcessId);
+        if (mode == "api-mounted")
+        {
+            if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException();
+            await SecurityExecutionEvidenceApiResourceTests.RunMountedNativeChildAsync();
+            return;
+        }
         if (mode == "clean")
         {
             using Stream standardOutput = Console.OpenStandardOutput();

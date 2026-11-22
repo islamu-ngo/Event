@@ -2621,12 +2621,17 @@ public static partial class SecurityExecutionEvidence
             if (requireRunningPrerequisites && cachedImageIds.Count == 0)
                 throw new OwnedExecutionFailure("cached_image_inputs_missing");
             HashSet<string> initial = await InitialContainersAsync(owner, CancellationToken.None).ConfigureAwait(false);
-            var initialResources = new InitialNativeResources(initial, new HashSet<string>(StringComparer.Ordinal), cachedImageIds);
+            Dictionary<string, string> initialVolumes = await VolumeMountpointsAsync(CancellationToken.None).ConfigureAwait(false);
+            var initialResources = new InitialNativeResources(initial, initialVolumes.Keys.ToHashSet(StringComparer.Ordinal), cachedImageIds);
             var qualified = new Dictionary<string, ApiCreationProof>(StringComparer.Ordinal);
             var seenCreations = new HashSet<string>(StringComparer.Ordinal);
             var seenOwnedIds = new HashSet<string>(StringComparer.Ordinal);
             var images = new Dictionary<string, string>(StringComparer.Ordinal);
+            var imageTargets = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
             var known = new Dictionary<string, ObservedOwnedResource>(StringComparer.Ordinal);
+            var knownMounts = new Dictionary<string, IReadOnlyList<ObservedContainerMount>>(StringComparer.Ordinal);
+            var volumes = new Dictionary<string, string>(StringComparer.Ordinal);
+            var witnessedVolumes = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
             var running = new HashSet<string>(StringComparer.Ordinal);
             bool cleanup = false;
             byte[] after = [];
@@ -2646,13 +2651,25 @@ public static partial class SecurityExecutionEvidence
             NativeContainerCreationSnapshot QualifiedSnapshot() => new(
                 qualified.Values.Select(proof => proof.Creation).ToArray(), new HashSet<string>(StringComparer.Ordinal), []);
 
-            void RetainResources(IReadOnlyList<ObservedOwnedResource> observed)
+            void RetainResources(IReadOnlyList<ConfiguredOwnedResource> observed, IReadOnlyDictionary<string, JsonElement> currentVolumes)
             {
-                foreach (ObservedOwnedResource item in observed)
+                foreach (ConfiguredOwnedResource resource in observed)
                 {
+                    ObservedOwnedResource item = resource.Container;
                     if (known.TryGetValue(item.ContainerId, out ObservedOwnedResource? previous)
-                        && (previous.ImageId != item.ImageId || previous.Resource != item.Resource))
+                        && (previous.ImageId != item.ImageId || previous.Resource != item.Resource
+                            || !knownMounts[item.ContainerId].ToHashSet().SetEquals(resource.Mounts)))
                         throw new OwnedExecutionFailure("owned_resource_identity_changed");
+                    foreach (ObservedContainerMount mount in resource.Mounts)
+                    {
+                        if (!currentVolumes.TryGetValue(mount.Name, out JsonElement volume)
+                            || volumes.TryGetValue(mount.Name, out string? source) && source != mount.Source
+                            || witnessedVolumes.TryGetValue(mount.Name, out JsonElement original) && !SameVolumeIncarnation(original, volume))
+                            throw new OwnedExecutionFailure("owned_resource_identity_changed");
+                        volumes[mount.Name] = mount.Source;
+                        witnessedVolumes[mount.Name] = volume;
+                    }
+                    knownMounts[item.ContainerId] = resource.Mounts;
                     known[item.ContainerId] = item with { Running = item.Running || (previous?.Running ?? false) };
                     if (item.Running) running.Add(item.Resource);
                 }
@@ -2673,6 +2690,33 @@ public static partial class SecurityExecutionEvidence
                     if (!selected || pairedIds.Contains(id)) eligible.Add(item);
                 }
                 return JsonSerializer.SerializeToUtf8Bytes(eligible);
+            }
+
+            async Task<IReadOnlyList<ConfiguredOwnedResource>> ReadResourcesAsync(JsonElement inventory, bool eligibleOnly, CancellationToken token)
+            {
+                byte[] bytes = eligibleOnly ? EligibleInventory(inventory) : JsonSerializer.SerializeToUtf8Bytes(inventory);
+                using JsonDocument selected = JsonDocument.Parse(bytes, DocumentOptions);
+                var rows = new List<JsonElement>();
+                var pairedIds = qualified.Values.Select(proof => proof.Creation.ContainerId).ToHashSet(StringComparer.Ordinal);
+                foreach (JsonElement row in selected.RootElement.EnumerateArray())
+                {
+                    JsonElement joined = row;
+                    if (pairedIds.Contains(Text(row, "Id"))
+                        && TryReadRuntimeMounts(row, out var mounts, allowEmptyForeignVolumeSource: true)
+                        && mounts.Any(mount => mount.Type == "volume" && mount.Source.Length == 0))
+                    {
+                        using JsonDocument inspection = await GetAsync("/v1.40/containers/" + Text(row, "Id") + "/json", token).ConfigureAwait(false);
+                        if (!TryJoinContainerMountInspection(row, inspection.RootElement, out joined))
+                            throw new OwnedExecutionFailure("api_created_resource_observation_invalid");
+                    }
+                    rows.Add(joined);
+                }
+                var current = await VolumeInventoriesAsync(token).ConfigureAwait(false);
+                var inputs = new ApiResourceInputs(owner, QualifiedSnapshot(), images, initialResources, imageTargets, current.Mountpoints);
+                if (!TryReadApiCreatedResources(JsonSerializer.SerializeToUtf8Bytes(rows), inputs, out var observed))
+                    throw new OwnedExecutionFailure("api_created_resource_observation_invalid");
+                RetainResources(observed!, current.Volumes);
+                return observed!;
             }
 
             async Task ObserveAsync(OwnedNativeProcessContext context, CancellationToken stop)
@@ -2702,13 +2746,13 @@ public static partial class SecurityExecutionEvidence
                         || initialImage != image || images.TryGetValue(proof.Creation.ImageReference, out string? previousImage)
                         && previousImage != image) throw new OwnedExecutionFailure("api_image_reference_changed");
                     images[proof.Creation.ImageReference] = image;
+                    if (!imageTargets.ContainsKey(image))
+                        imageTargets[image] = await ImageVolumeTargetsAsync(image, CancellationToken.None).ConfigureAwait(false);
                     qualified.Add(id, proof);
                 }
                 if (stop.IsCancellationRequested) return;
                 using JsonDocument document = await GetAsync("/v1.40/containers/json?all=true", CancellationToken.None).ConfigureAwait(false);
-                if (!TryReadApiCreatedResources(EligibleInventory(document.RootElement), owner, QualifiedSnapshot(), images,
-                        initialResources, out var observed)) throw new OwnedExecutionFailure("api_created_resource_observation_invalid");
-                RetainResources(observed!);
+                _ = await ReadResourcesAsync(document.RootElement, true, CancellationToken.None).ConfigureAwait(false);
             }
 
             OwnedNativeProcessResult process = await RunOwnedNativeProcessAsync(command, timeout, cancellationToken, async (context, stop) =>
@@ -2745,13 +2789,7 @@ public static partial class SecurityExecutionEvidence
                     await ValidateApiCreationAsync(proof, finalCandidates[proof.Creation.CreationId], cleanupDeadline.Token).ConfigureAwait(false);
                 using (JsonDocument terminal = await GetAsync("/v1.40/containers/json?all=true", cleanupDeadline.Token).ConfigureAwait(false))
                 {
-                    if (!TryReadApiCreatedResources(EligibleInventory(terminal.RootElement), owner, QualifiedSnapshot(), images,
-                            initialResources, out var terminalQualified))
-                        throw new OwnedExecutionFailure("api_resource_terminal_unqualified");
-                    RetainResources(terminalQualified!);
-                    if (!TryReadApiCreatedResources(JsonSerializer.SerializeToUtf8Bytes(terminal.RootElement), owner,
-                            QualifiedSnapshot(), images, initialResources, out _))
-                        throw new OwnedExecutionFailure("api_resource_terminal_unqualified");
+                    _ = await ReadResourcesAsync(terminal.RootElement, false, cleanupDeadline.Token).ConfigureAwait(false);
                 }
                 var qualifiedIds = qualified.Values.Select(proof => proof.Creation.ContainerId).ToHashSet(StringComparer.Ordinal);
                 if (!seenCreations.SetEquals(qualified.Keys) || !qualifiedIds.SetEquals(known.Keys)
@@ -2771,10 +2809,11 @@ public static partial class SecurityExecutionEvidence
                     JsonElement inventory = current.RootElement;
                     if (inventory.ValueKind != JsonValueKind.Array) throw new OwnedExecutionFailure("owned_container_cleanup_failed");
                     if (inventory.GetArrayLength() == 0) continue;
-                    if (inventory.GetArrayLength() != 1 || Text(inventory[0], "Id") != item.ContainerId
-                        || !TryReadApiCreatedResources(JsonSerializer.SerializeToUtf8Bytes(inventory), owner, QualifiedSnapshot(), images,
-                            initialResources, out var currentResources) || currentResources!.Count != 1
-                        || currentResources[0].ImageId != item.ImageId || currentResources[0].Resource != item.Resource)
+                    if (inventory.GetArrayLength() != 1 || Text(inventory[0], "Id") != item.ContainerId)
+                        throw new OwnedExecutionFailure("owned_container_cleanup_failed");
+                    IReadOnlyList<ConfiguredOwnedResource> currentResources = await ReadResourcesAsync(inventory, false, cleanupDeadline.Token).ConfigureAwait(false);
+                    if (currentResources.Count != 1 || currentResources[0].Container.ImageId != item.ImageId
+                        || currentResources[0].Container.Resource != item.Resource)
                         throw new OwnedExecutionFailure("owned_container_cleanup_failed");
                     await DeleteAsync(item.ContainerId, cleanupDeadline.Token).ConfigureAwait(false);
                 }
@@ -2784,7 +2823,12 @@ public static partial class SecurityExecutionEvidence
             {
                 using JsonDocument final = await GetAsync("/v1.40/containers/json?all=true", cleanupDeadline.Token).ConfigureAwait(false);
                 HashSet<string> finalIds = ReadAllContainerIds(final.RootElement, owner, requireOwnerAbsent: true);
-                cleanup = failures.Count == 0 && !finalIds.Overlaps(known.Keys) && !finalIds.Overlaps(seenOwnedIds);
+                // Mount observation does not prove volume ownership; only the creating fixture may remove it.
+                Dictionary<string, string> finalVolumes = await VolumeMountpointsAsync(cleanupDeadline.Token).ConfigureAwait(false);
+                cleanup = failures.Count == 0 && !finalIds.Overlaps(known.Keys) && !finalIds.Overlaps(seenOwnedIds)
+                    && !finalVolumes.Keys.Intersect(volumes.Keys, StringComparer.Ordinal).Any()
+                    && VolumeConsumersAbsent(final.RootElement, volumes)
+                    && initialVolumes.All(volume => finalVolumes.TryGetValue(volume.Key, out string? path) && path == volume.Value);
                 after = await IdentityAsync(cleanupDeadline.Token).ConfigureAwait(false);
                 RequireSameApiDaemonIdentity(before, after);
                 HashSet<string> finalImages = await CachedImageIdsAsync(cleanupDeadline.Token).ConfigureAwait(false);
@@ -2806,6 +2850,8 @@ public static partial class SecurityExecutionEvidence
                 creatorAuthentication = "not-attested",
                 initialContainerCount = initial.Count,
                 initialContainerInventorySha256 = DigestBytes(JsonSerializer.SerializeToUtf8Bytes(initial.Order(StringComparer.Ordinal))),
+                initialVolumeCount = initialVolumes.Count,
+                observedVolumeCount = volumes.Count,
                 resources = known.Values.OrderBy(item => item.ContainerId, StringComparer.Ordinal)
                     .Select(item => new { item.ContainerId, item.ImageId, item.Resource, runningObserved = item.Running }),
                 creatorObservations = qualified.Values.OrderBy(proof => proof.Creation.CreationId, StringComparer.Ordinal)

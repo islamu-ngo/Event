@@ -13,6 +13,23 @@ intentionally absent from the serving output. Adding EF design packages to the
 runtime is not the correction. JSON/HAL configuration and explicit test
 application parts registered after API composition retain their normal roles.
 
+## SQLite Startup Rebuild Integrity
+
+Normal Standalone startup applies the historical migrations before accepting
+traffic. `ConfigurableSqliteMigrationsSqlGenerator` keeps deferred temporary-table
+copies and both merged-resource batches in one connection-local foreign-key-off
+window. It recognizes native rebuild pragmas even when the migration contains no
+explicit table drop; nested pragma pairs must not reopen enforcement before a
+principal's alternate key has been rebuilt.
+
+The resource schema preflight remains before that window. After all copies, a
+temporary integer-only CHECK guard rejects any `pragma_foreign_key_check` result
+before the transaction-suppressed foreign-key-on command commits the batch.
+Restoring enforcement alone does not validate existing rows. Failure blocks
+startup; it is not permission to serve with broken relationships, forge migration
+history or replace normal migration with `EnsureCreated`. Generated migration
+files and their constraint definitions remain untouched.
+
 ## Private Learning Rollout And Recovery
 
 Learning adds four tenant-filtered entity tables through the generated

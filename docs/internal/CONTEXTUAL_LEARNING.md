@@ -1,8 +1,16 @@
 # Private Learning State And Authored Practice
 
 > **Audience:** Developers and operators
-> **Status:** Private backend, authored practice and scoped Help/settings integration; full programme/host assurance remains open
-> **Contract Updated:** 2026-10-30; historical verification receipts retained below
+> **Status:** Private backend, authored practice and scoped Help/settings integration; SQLite verified, server-provider assurance deferred; renderer admission and hosted/assistive/audience assurance remain open
+> **Contract Updated:** 2026-11-22; historical verification receipts retained below
+
+Current verification is SQLite only on freshly created development stores:
+learning acceptance passes 22/22 (provider contract 9, semantic persistence 7,
+erasure 4, migrations 2). PostgreSQL, SQL Server, MySQL and MariaDB runs are
+deferred to `dev/backlog/contextual-tenant-onboarding-server-provider-assurance.md`;
+no server-provider or deployment certification is claimed. Retained development
+store upgrades are not current acceptance. Provider receipts below that predate
+this decision are historical.
 > **Source Anchors:** `src/Explore.Domain/Learning/`, `ILearningRepository`, `ILearningPrivacyErasureStore`, `PrivacyErasureApplier`
 
 ## Delivery Boundary
@@ -342,8 +350,9 @@ read-only learning retention lease nor borrows branding provisioning authority.
 PostgreSQL guidance storage rights are limited to the selected tenant's
 `tenant.learning_guidance`: SELECT/INSERT and UPDATE of payload, stamp and update
 audit columns only. No DELETE or immutable identity/key update is granted.
-The actual Runtime positive read reached the intended42501 denial before these
-rights were authored. Private policy HTTP checks passed48/48 on their selected
+Historical PostgreSQL receipts, not current assurance (server-provider
+acceptance is deferred to the backlog above): the actual Runtime positive read
+reached the intended42501 denial before these rights were authored. Private policy HTTP checks passed48/48 on their selected
 fixture. The post-change actual PostgreSQL Runtime permission/isolation witness
 passed, including three privilege-drift rejection/restoration cases.
 Credential-only access remains a storage boundary, not proof of original
@@ -484,7 +493,9 @@ three cohorts were regenerated after merging develop so their target models
 retain upstream mutation-evidence metadata. Complete Up/Down inspection found
 only learning changes, and all four catalogs have model-agreement receipts.
 These are model-only checks, not physical deployment or full-history migration
-acceptance. No database upgrade or reset is claimed.
+acceptance. SQLite migration execution is covered by the current 22/22 SQLite
+acceptance; physical server-engine migration is deferred. No database upgrade or
+reset is claimed.
 
 ## Common Erasure Boundary
 
@@ -731,6 +742,15 @@ start. Current-scope, target, policy, expiry and disposal fences prevent old
 continuations from opening or writing in a replacement context. Renderer
 persistence is disabled and navigation cannot substitute for server progress.
 
+Native package locks and the [dependency decision](legal/dependencies/guideflow.md)
+record exact 1.0.1. Selected local host verification uses Standalone SQLite with
+Environment authority. The selected testing authority now passes native startup;
+normal setup, mandatory password replacement and persistent authenticated
+administration are verified. The host serves the selected renderer CSS and
+JavaScript module, but those metadata checks do not certify overlay execution,
+keyboard/focus behavior or accessibility. Missing authority still fails closed;
+the local testing receipt is not production restore-custody evidence.
+
 ### Historical Backend Receipts (Before C04 Semantic Changes)
 
 The following receipts are preserved as historical evidence, not current C04
@@ -796,6 +816,29 @@ affected by a subsequent change or a corrected setup; do not hide cold-start
 costs or label a generated-cohort pass as a full migration-chain pass.
 
 ### Quarantined Baseline Gates
+
+On November 1, 2026 the explicitly requested functional Standalone testing host
+made the SQLite source-owner rebuild defect a direct startup prerequisite.
+The native generator repair now passes all four focused real-engine cases
+(including rejection of existing invalid ownership) and the genuine
+`GeneratedLearningMigrationAppliesTwiceDownAndUpWithRealSchemaObjects` case.
+Historical generated migrations remain unchanged. The earlier failure below is
+preserved as its baseline receipt, not the current SQLite result. The separate
+repeated-generation SQL-equality check still fails on the unchanged pre-repair
+binary and remains quarantined; its assertion was not weakened. This does not
+certify the unrun server engines or hosted audience/accessibility behavior.
+
+The final source assurance rerun on October 31, 2026 passed SQLite provider
+contracts (9/9), semantic persistence (7/7), erasure (4/4) and the generated
+three-migration learning cohort (1/1). The separate full-chain case again failed
+before learning setup with the foreign-key mismatch recorded below: 21/22 total,
+not full SQLite migration acceptance. Each class ran separately through
+`dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll`
+with `--treenode-filter "/*/*/*<Class>/*"`, its exact minimum count (9, 7, 4 or 2)
+and `--maximum-parallel-tests 1`, selecting `Database__Provider=Sqlite` and the
+Environment authority. The final four server-engine runs remain unexecuted
+because approved Migrator inputs are absent; earlier receipts do not certify
+the final source on those engines.
 
 Each failure below was physically reproduced on untouched `develop` at
 `20737e450db0df748b3e5737bcb3405f54c37cd8`. Repair belongs in a separate

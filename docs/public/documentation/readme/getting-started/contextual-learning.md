@@ -360,9 +360,12 @@ provider account or compatibility route. All four semantic migration cohorts
 were regenerated and checked against the current model. The original SQL Server
 metadata defect was corrected separately; the semantic cohort no longer carries
 that unrelated foreign-key change. These checks are not proof of deployment.
-No database has been upgraded or reset as evidence for this increment. Require
-the normal deployment migration procedure and selected-provider acceptance before
-rollout; never hand-edit generated migrations or reset a shared database.
+Current development acceptance uses freshly created development stores with no
+retained data; upgrading an older retained development store is not an accepted
+rollout path and is not evidence for this increment. No shared or production
+database has been upgraded or reset. Require the normal deployment migration
+procedure and selected-provider acceptance before rollout; never hand-edit
+generated migrations or reset a shared database.
 For PostgreSQL, run the existing declared-purpose migration composition as well:
 it installs Runtime tenant-scoped learning rights and the existing protected
 Global purpose's limited learner-root erasure rights. Do not grant broad child
@@ -375,19 +378,24 @@ rollout also requires actual keyboard, focus, screen-reader, RTL and
 representative-comprehension evidence. Do not describe backend tests as proof
 that the complete onboarding experience is ready.
 
-This increment is not yet release-certified across the provider matrix.
-No hosted or final migration/provider assurance is complete, and no learning UI
-has shipped. Earlier isolated checks do not certify the current semantic contract
-or renderer. Targeted actual-role checks now cover original-user source
-retention, rejection after a concurrent guidance insertion, and live routine
-drift detection after a warmed read. API/client regeneration and compilation also
-passed. These results do not certify every authority topology or deployment.
-Existing schema failures block MySQL/MariaDB learning assurance, and existing
-historical migration failures block the complete SQLite/SQL Server gates.
-Native PostgreSQL tenant retirement is also blocked by an existing discovery
-permission-contract conflict before learning deletion.
-Passing isolated learning checks do not make those deployments ready. Require
-the complete migration and privacy gates for the selected provider before rollout.
+Current verification is SQLite only. The SQLite learning acceptance passes
+22 of 22 checks: 9 provider-contract, 7 semantic-persistence, 4 erasure and both
+learning migrations. PostgreSQL, SQL Server, MySQL and MariaDB verification is
+deferred to the project's server-provider assurance backlog; this increment
+makes no certification for any server provider or deployment. Earlier PostgreSQL
+receipts and earlier server-provider schema or permission failures are historical
+records kept in that backlog, not current results or current SQLite blockers.
+
+The learning hub, authored practice, permanent Help, tenant guidance settings and
+announcement dismissal described above are part of this workstream. Final tour
+renderer admission, hosted acceptance, real assistive-technology use, actual
+browser zoom and representative-user comprehension remain open release gates;
+component tests and browser accessibility snapshots don't close them.
+Targeted checks cover original-user source retention, rejection after a
+concurrent guidance insertion, and live routine drift detection after a warmed
+read. API/client regeneration and compilation also passed. These results do not
+certify every authority topology or deployment. Require the complete migration
+and privacy gates for the selected provider before rollout.
 
 See [Privacy Erasure](../security-and-identity/privacy-erasure.md) and
 [Authorization](../security-and-identity/authorization.md) for the existing

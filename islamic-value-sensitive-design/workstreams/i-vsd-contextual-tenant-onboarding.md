@@ -393,7 +393,7 @@ internal-user ownership must be adopted before the API can persist it.
 - Claim / principles / domains: implementation risk/invariant; Rights of People, Amanah, Avoiding Spying; privacy, technical.
 - Stakeholders / control: account owners and operators; fenced writes and complete cleanup.
 - Evidence / validation: P04/P14, current-source traceability, no new-table assurance.
-- Mitigation / owner / binding: IVSD-M017; privacy/persistence; S30/S31; protected-storage retained fencing and common purge/absence before coverage/native exits; final admission and five-engine erasure/replay/rollback assurance at backend exit.
+- Mitigation / owner / binding: IVSD-M017; privacy/persistence; S30/S31; protected-storage retained fencing and common purge/absence before coverage/native exits; final admission and erasure/replay/rollback assurance at backend exit. Evidence scope amendment (2026-11-22): under the developer's explicit SQLite-only override, current exit evidence is SQLite on fresh development stores (learning acceptance 22/22, including erasure 4 and migrations 2). Server-engine erasure, replay and rollback assurance is deferred to `dev/backlog/contextual-tenant-onboarding-server-provider-assurance.md`, not waived; no server-provider certification is claimed. The invariants are unchanged: tenant-scoped storage, child-before-parent deletion, covered replay through the common applier and anti-resurrection fencing still bind every provider before its release.
 - Escalation: incomplete authority/cleanup blocks storage adoption and release.
 
 ### IVSD-F018: Dependency Claims Are Not Hosted Assurance

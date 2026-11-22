@@ -57,7 +57,7 @@ Cancelled transports are not assumed to stop: generation and scope checks fence
 late reads, writes and post-write refreshes. Disposal clears private state.
 Static rendering contains no practice data or private transfer state.
 
-The hub consumes the five current server-authored recipes. The practice surface
+The hub consumes the six current server-authored recipes. The practice surface
 renders their choices, confirmation, result and reset/clear states without
 mounting Studio or initializing live AI. Received HAL relations alone expose
 actions; capability booleans are not grants. A mutation advances the display

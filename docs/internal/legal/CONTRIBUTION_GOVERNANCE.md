@@ -6,7 +6,7 @@ ABOUTME: Summarizes CLA research, owner decisions, and unsafe workflow patterns 
 > **Audience:** Maintainers | Legal reviewers | Contributors | AI agents
 > **Status:** CLA-only decision implemented; operational draft pending legal review and repository settings verification
 > **Owner:** Platform/Ops | Contributor Experience | Legal reviewer
-> **Last Verified:** 2026-05-31
+> **Last Verified:** 2026-11-17
 > **Source Anchors:** `docs/CI_CD_GOVERNANCE.md`, `docs/CONTRIBUTING.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `dev/active/enterprise-ci-cd-hardening/enterprise-ci-cd-hardening-tasks.md`
 
 This document records the legal contribution gate decision and automation threat model. The active agreement is [legal/CLA.md](../../../legal/CLA.md).
@@ -15,11 +15,11 @@ This document records the legal contribution gate decision and automation threat
 
 | Question | Current Answer |
 |---|---|
-| Legal posture | CLA only. Every non-bot contributor must sign the ISLAMU Event CLA. |
-| Inbound scope | Broad copyright and patent license grant to the ISLAMU project steward so ISLAMU Event can be maintained, provided, and relicensed under alternative terms for enterprise internal-use on-premises compliance, nonprofit, humanitarian, public-sector, or procurement-restricted needs—subject to the Project Steward's binding covenant against closed-source proprietary SaaS commercialization (all SaaS providers must use AGPL-3.0). |
+| Legal posture | CLA only. Every non-bot contributor must sign the ISLAMU CLA (`legal/CLA.md`). |
+| Inbound scope | Defined solely by [`legal/CLA.md`](../../../legal/CLA.md) (single authoritative source covering past, concurrent, and future Contributions, Anti-SaaS organizational/humanitarian licensing for copyleft platforms, and cross-project open-source reuse under OSI-approved licenses with an MIT notice/disclaimer floor). |
 | Enforcing workflow | `.github/workflows/cla.yml` validates pull request and issue-comment metadata with `contributor-assistant/github-action`, pinned to a full commit SHA. A pre-flight `actions/github-script` step (also SHA-pinned) short-circuits the full action when all commit authors are already signed or allowlisted. |
-| Approved legal document | `legal/CLA.md` is the active CLA v1.0 operational draft, incorporating a self-executing lifecycle bridge (Belgian CSA Art. 2:2 retroactive ratification, Civil Code Arts. 5.109–5.111 third-party beneficiary, and advance assignment) ensuring perpetual validity across ASBL en formation and registered ASBL milestones with zero re-signatures. |
-| Signature storage | Same-repository signature JSON at `signatures/v1.0/cla.json` on the dedicated `cla-signatures` branch, plus GitHub PR/comment audit trail (authoritative electronic evidence under Belgian Civil Code Arts. 8.1 & 8.9). |
+| Approved legal document | `legal/CLA.md` is the active CLA v1.0 operational draft, incorporating a self-executing lifecycle bridge (Belgian CSA Art. 2:2 retroactive ratification, Civil Code Arts. 5.109–5.111 third-party beneficiary, and advance assignment) ensuring perpetual validity across the pre-incorporation and formally incorporated non-profit entity milestones with zero re-signatures. |
+| Signature storage | Same-repository signature JSON at `signatures/v1.0/cla.json` on the dedicated `cla-signatures` branch, plus GitHub PR/comment audit trail (or signed written/email confirmations accepted by the Project Steward for offline/historical contributors), serving as authoritative electronic/written evidence under Belgian Civil Code Arts. 8.1 & 8.9. |
 | Token model | Default `GITHUB_TOKEN` with explicit write scopes for same-repository signature storage, pull-request comments, issue comments, and statuses. |
 | Bot allowlist | `dependabot[bot]`, `github-actions[bot]`, `renovate[bot]`, `codecov[bot]`, `*[bot]` (GitHub App bot suffix convention — safe because all GitHub App accounts use `[bot]` suffix), and `web-flow` (GitHub Web UI commit identity). The prefix pattern `bot*` remains not approved. |
 
@@ -111,10 +111,10 @@ Repository rule:
 
 ## Current Contributor Instructions
 
-Every non-bot contributor must sign the ISLAMU Event CLA in [legal/CLA.md](../../../legal/CLA.md) by posting the exact CLA v1.0 signature comment on the pull request.
+Every non-bot contributor must sign the CLA in [legal/CLA.md](../../../legal/CLA.md) by posting the exact CLA v1.0 signature comment on the pull request (or providing written/signed email confirmation accepted by the Project Steward).
 
 Required pull request comment:
 
 ```text
-I have read and agree to the ISLAMU Event Contributor License Agreement v1.0, and I confirm that I have the right to submit my contribution under it.
+I have read and agree to the ISLAMU Contributor License Agreement v1.0, and I confirm that I have the right to submit my contribution under it.
 ```

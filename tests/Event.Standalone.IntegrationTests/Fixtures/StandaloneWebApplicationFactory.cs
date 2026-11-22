@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
 using System.Net;
 using Event.Web.BffHosting.Abstractions;
+using Event.Testing;
+using Event.Testing.DataProtection;
+using Explore.Blazor.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Blazor.Client.Clients;
@@ -8,6 +11,10 @@ using Explore.Blazor.Services;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Seed;
+using Explore.ServiceDefaults.DataProtection;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Event.Standalone.Hosting;
 using Microsoft.AspNetCore.Hosting;
@@ -18,7 +25,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Data.Sqlite;
 
 namespace Event.Standalone.IntegrationTests.Fixtures;
 
@@ -29,6 +36,7 @@ public sealed class StandaloneWebApplicationFactory : WebApplicationFactory<Stan
     private readonly IReadOnlyDictionary<string, string?>? _configurationOverrides;
     private readonly IConfigurationManifestStartupRunner? _startupRunner;
     private readonly string _databaseName = $"StandaloneGraphTests-{Guid.CreateVersion7():N}";
+    private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority = new("combined");
 
     public StandaloneWebApplicationFactory(
         IReadOnlyDictionary<string, string?>? configurationOverrides = null,
@@ -101,7 +109,10 @@ public sealed class StandaloneWebApplicationFactory : WebApplicationFactory<Stan
 
         builder.ConfigureServices(services =>
         {
-            AddInMemoryExploreDbContext(services);
+            AddSqliteExploreDbContext(services);
+            services.AddTestBffSessionAuthority();
+            services.RemoveAll<IExternalDataProtectionSource>();
+            services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
             services.RemoveAll<IDistributedCache>();
             services.AddDistributedMemoryCache();
             services.RemoveAll<ISetupSecretProvider>();
@@ -147,23 +158,43 @@ public sealed class StandaloneWebApplicationFactory : WebApplicationFactory<Stan
         await database.SaveChangesAsync();
     }
 
-    private void AddInMemoryExploreDbContext(IServiceCollection services)
+    private void AddSqliteExploreDbContext(IServiceCollection services)
     {
-        services.AddDbContextFactory<ExploreDbContext>(options =>
+        services.AddSingleton(_ =>
         {
-            options.UseInMemoryDatabase(_databaseName);
-            options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+            var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+            {
+                DataSource = _databaseName,
+                Mode = SqliteOpenMode.Memory,
+                Cache = SqliteCacheMode.Shared,
+                Pooling = false
+            }.ToString());
+            try
+            {
+                connection.Open();
+                var options = new DbContextOptionsBuilder<ExploreDbContext>();
+                ConfigureDatabase(options, connection.ConnectionString);
+                using var context = new ExploreDbContext(options.Options);
+                context.BindTenantLease();
+                context.Database.EnsureCreated();
+                SqliteDatabaseInitializer.InitializeAsync(context, CancellationToken.None).GetAwaiter().GetResult();
+                LookupTableSeeder.SeedAsync(context).GetAwaiter().GetResult();
+                return connection;
+            }
+            catch
+            {
+                connection.Dispose();
+                throw;
+            }
         });
-        services.AddScoped(serviceProvider =>
-        {
-            var factory = serviceProvider.GetRequiredService<IDbContextFactory<ExploreDbContext>>();
-            var context = factory.CreateDbContext();
-            context.ClearTenantFilterBypass();
-            context.TenantContext = serviceProvider.GetService<ITenantContext>();
-            context.CurrentUserService = serviceProvider.GetService<ICurrentUserService>();
-            return context;
-        });
+        services.AddDbContextFactory<ExploreDbContext>((provider, options) =>
+            ConfigureDatabase(options, provider.GetRequiredService<SqliteConnection>().ConnectionString));
+        services.AddTestContextOwners();
     }
+
+    private static void ConfigureDatabase(DbContextOptionsBuilder options, string connectionString) => options
+        .UseSqlite(connectionString).UseSnakeCaseNamingConvention()
+        .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance, SqliteProjectionLockTransactionInterceptor.Instance);
 
     private sealed class TestSetupSecretProvider : ISetupSecretProvider
     {
@@ -226,7 +257,8 @@ public sealed class ForwardedRequestProbe : IEventBffTenantHintProvider
         _observations.Enqueue(new ForwardedRequestObservation(
             httpContext.Request.Scheme,
             httpContext.Request.Host.Value ?? string.Empty,
-            httpContext.Connection.RemoteIpAddress));
+            httpContext.Connection.RemoteIpAddress,
+            httpContext.User.Identity?.IsAuthenticated == true));
         return null;
     }
 }
@@ -234,4 +266,5 @@ public sealed class ForwardedRequestProbe : IEventBffTenantHintProvider
 public sealed record ForwardedRequestObservation(
     string Scheme,
     string Host,
-    IPAddress? RemoteIpAddress);
+    IPAddress? RemoteIpAddress,
+    bool IsAuthenticated);

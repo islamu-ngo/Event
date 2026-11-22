@@ -9,6 +9,7 @@ using Explore.Domain.Constants;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Identity;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -219,5 +220,65 @@ public sealed class HumanAuthorizationRouteSourceTests(PostgreSqlContainerFixtur
     {
         var entity = context.Model.FindEntityType(type)!;
         return context.GetService<ISqlGenerationHelper>().DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+    }
+}
+
+[NotInParallel]
+[ClassDataSource<HumanAuthorizationRouteUnusualLoginTests.UnusualLoginFixture>(Shared = SharedType.PerClass)]
+public sealed class HumanAuthorizationRouteUnusualLoginTests(HumanAuthorizationRouteUnusualLoginTests.UnusualLoginFixture fixture)
+{
+    [Test]
+    public async Task UnusualEnrolledLoginCanObserveOnlyTheAuthorizedRoute()
+    {
+        CancellationToken token = TestContext.Current!.Execution.CancellationToken;
+        var enrollment = fixture.NativeQueueEnrollment;
+        await using var migrator = fixture.CreateDbContext();
+        migrator.BindTenantLease();
+        string key = GovernanceSettingKeys.Security.AuthorizationProvider;
+        var setting = await migrator.SystemSettings.SingleOrDefaultAsync(row => row.SettingKey == key, token);
+        if (setting is null)
+        {
+            setting = new SystemSetting
+            {
+                Id = Guid.CreateVersion7(),
+                SettingKey = key,
+                Value = "\"local\"",
+                ValueType = SettingValueType.String,
+                CreatedAt = DateTime.UtcNow
+            };
+            migrator.SystemSettings.Add(setting);
+        }
+        setting.Value = "\"local\"";
+        await migrator.SaveChangesAsync(token);
+        await PostgresPolicySourceSetContract.ApplyAsync(migrator, enrollment, token);
+        await PostgresHumanAuthorizationRouteContract.ApplyAsync(migrator, enrollment, token);
+
+        var factory = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+        await using var owner = await factory.CreateDbContextAsync(token);
+        await owner.Database.OpenConnectionAsync(token);
+        string login = await owner.Database.SqlQueryRaw<string>(
+            "SELECT current_user::text AS \"Value\" WHERE current_user = session_user").SingleAsync(token);
+        await Assert.That(login).IsEqualTo(enrollment.GlobalLogin);
+
+        var subject = await HumanCommitSubject.ResolveAsync(new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim("sub", "route-source-regression"), new Claim("iss", "https://route.invalid"),
+                new Claim("auth_provider", "keycloak")], "fixture")), new ResolvedIdentity(), token)
+            ?? throw new InvalidOperationException("Resolved account required.");
+        var source = new HumanAuthorizationRouteSource(owner, subject, PolicySourceSetPurpose.Global, enrollment);
+        var facts = await source.ObserveAsync(token);
+        await Assert.That(facts.Settings.Select(row => row.Key).SequenceEqual(HumanAuthorizationRouteFacts.Keys)).IsTrue();
+        await Assert.That(facts.Settings.Single(row => row.Key == key).System?.Value).IsEqualTo("\"local\"");
+        var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await owner.SystemSettings.AsNoTracking().ToListAsync(token));
+        await Assert.That(denied!.SqlState).IsEqualTo("42501");
+    }
+
+    public sealed class UnusualLoginFixture() : PostgreSqlContainerFixture(
+        IdentityDatabaseTopology.Colocated, globalLoginSuffix: @"\'$admission$");
+
+    private sealed class ResolvedIdentity : IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>
+    {
+        public Task<Guid?> QueryAsync(ResolveCurrentUserIdByIdentityRequest query, CancellationToken cancellationToken = default) =>
+            Task.FromResult<Guid?>(Guid.Parse("018e4e5c-7f00-7000-8000-000000000001"));
     }
 }

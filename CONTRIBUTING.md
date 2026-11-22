@@ -41,7 +41,6 @@ This guide explains **what kind of contributions are likely to be accepted** and
 - [Maintainer Bandwidth & Expectations](#maintainer-bandwidth--expectations)
 - [AI Contribution Policy](#ai-contribution-policy)
 - [Contributor Legal Status & CLA](#contributor-legal-status--cla)
-  - [Anti-SaaS Community Protection](#anti-saas-community-protection)
   - [Clean-Room & IP Protection](#clean-room--ip-protection)
 - [Ways to Contribute](#ways-to-contribute)
   - [1. Support Contributions](#1-support-contributions)
@@ -188,23 +187,18 @@ AI-assisted contributions (using GitHub Copilot, ChatGPT, Claude, Gemini, Cursor
 
 ## Contributor Legal Status & CLA
 
-Inbound contributions are governed by the **ISLAMU Event Contributor License Agreement (CLA) v1.0**.
+Inbound contributions are governed by the **[ISLAMU Contributor License Agreement (CLA) v1.0](legal/CLA.md)**, which is the single authoritative source of contributor licensing terms, Anti-SaaS protections, and cross-project open-source reuse boundaries.
 
-Every non-bot contributor must sign the CLA before a pull request can be merged.
+Every non-bot contributor must sign [`legal/CLA.md`](legal/CLA.md) before a pull request can be merged.
 
 ### How to Sign the CLA:
-When you open a pull request, the CLA Assistant bot will post a comment. Simply reply with the following comment:
+When you open a pull request, the CLA check posts instructions. Reply with the exact comment:
 
 ```text
-I have read and agree to the ISLAMU Event Contributor License Agreement v1.0, and I confirm that I have the right to submit my contribution under it.
+I have read and agree to the ISLAMU Contributor License Agreement v1.0, and I confirm that I have the right to submit my contribution under it.
 ```
 
 To re-run the CLA check after signing, post a comment with `recheck`.
-
-### Why a CLA Alongside AGPL-3.0-or-later?
-ISLAMU Event is distributed publicly under the **GNU AGPL-3.0-or-later** license. The CLA does not take ownership away from you; you retain copyright in your contributions. It provides the ISLAMU project steward (currently Amir Akrari as interim trustee, transferring to ISLAMU ASBL upon incorporation and ratification) with the inbound licensing rights needed to offer ISLAMU Event under alternative terms for enterprise internal-use on-premises/VPC compliance (where corporate compliance policies ban AGPL copyleft on internal systems), public-sector procurement, or humanitarian missions.
-
-**Anti-SaaS Community Protection:** The Project Steward is bound by a strict governance commitment **never to grant an alternative license permitting a third party to operate a closed-source, proprietary SaaS or cloud service**. Any entity offering ISLAMU Event as a SaaS must use `AGPL-3.0-or-later`, guaranteeing that all SaaS improvements remain open source. Your contributions will never be enclosed behind a proprietary vendor wall. See [`legal/CLA.md`](legal/CLA.md) and [`islamic-value-sensitive-design/governance/i-vsd-licensing-and-commercial-strategy.md`](islamic-value-sensitive-design/governance/i-vsd-licensing-and-commercial-strategy.md).
 
 ### Clean-Room & IP Protection
 To protect the codebase and its outbound licensing options, you must **never** copy third-party proprietary, copyleft-incompatible, or unverified source code, snippets, ASTs, SQL, migrations, tests, comments, or assets into this repository. See [`docs/internal/legal/IP_GOVERNANCE.md`](docs/internal/legal/IP_GOVERNANCE.md) for details.

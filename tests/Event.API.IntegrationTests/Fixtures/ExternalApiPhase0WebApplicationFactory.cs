@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Threading.Channels;
 using System.Threading.RateLimiting;
 using Event.Testing.DataProtection;
+using Event.Testing;
 using Explore.API.Authentication;
 using Explore.API.Configuration;
 using Explore.Application.Authentication;

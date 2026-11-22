@@ -16,7 +16,7 @@
 | `plane push` | Push schema, then cycles/modules/milestones/pages, then work items. Creates/updates, not work-item deletes. |
 | `plane push --work-only` | Skip schema step; still updates relevant work files. |
 | `plane pull` | **Overwrites `work/workitems.yaml`** (`sync/writer.py#L259`) and schema/operational YAML from Plane, resetting work-item `source` in `.plane/state.json`. |
-| `plane pull --merge` | Flag accepted by CLI in v0.5.2, **but currently unused inside `_pull()`** — still overwrites `work/workitems.yaml`. |
+| `plane pull --merge` | Flag accepted by CLI in v0.5.2, **but currently unused inside `_pull()`** — still overwrites `work/workitems.yaml`. Not a reconciliation tool; see [conflict resolution](conflict-resolution.md#default-targeted-cloud-read-then-a-local-field-merge). |
 | `plane schema import` | Connect local schema names to remote IDs in state; default doesn't change YAML. |
 
 ## Before every remote write
@@ -62,13 +62,13 @@ When one change set mixes YAML pushes with Plane MCP mutations (module membershi
 3. `plane push --work-only` for new parents (Epics), then read their minted IDs and UUIDs back.
 4. `plane push --work-only` for children and edited items (`parent:` takes the parent's **UUID**).
 5. Plane MCP mutations (Version Module membership, comments, links, approved deletions).
-6. No pull for routine work: MCP should only touch what YAML cannot hold (modules, comments, links, approved deletions). Fold consumed `active-*.yaml` files into `work/workitems.yaml`. Run a full pull only when Plane-side edits to YAML fields must come back, and repair its output before pushing.
+6. No pull for routine work: MCP should only touch what YAML cannot hold (modules, comments, links, approved deletions). Fold consumed `active-*.yaml` files into `work/workitems.yaml`. When Plane-side edits to YAML fields must come back, read those items and mirror them into YAML ([conflict resolution](conflict-resolution.md#default-targeted-cloud-read-then-a-local-field-merge)). A full pull is separately scheduled maintenance, not a step in this batch.
 
 **Disjoint `work/*.yaml` rule:** an `EVENT-XXX` ID lives in exactly one `work/*.yaml` file at a time. Edit existing items in place in `work/workitems.yaml`. Put only **new** items (with `id:` omitted) in staging files such as `work/active-<task>.yaml`. Copying an existing ID into a staging file fails validation with `Duplicate ID`.
 
 **Never mint through MCP:** an item created with MCP `workitem create` (or in the Plane UI) is unknown to `.plane/state.json`. Hand-writing its `id:` into YAML without a state entry makes the next `plane push` create a duplicate. Mint IDs through `plane push`. To bring an existing Plane-only item under YAML, add its `work_items["id:EVENT-N"]` state entry with the real `remote_id` and an empty `content_hash` first ([plan-tracking](plan-tracking.md) stage 1, step 5).
 
-**Conflict tables on push:** the push conflict check fetches only the items being updated and compares remote and state hashes, so it is cheap for task-sized pushes; keep it on. Before overriding a reported conflict, confirm with MCP `workitem retrieve_by_identifier` (`fields=id,state,updated_at`) that the remote item has not changed since the last sync. Never override blind.
+**Conflict tables on push:** the push conflict check fetches only the items being updated and compares remote and state hashes, so it is cheap for task-sized pushes; keep it on. An unchanged local hash isn't an update, so the check never sees remote-only edits on it; reconcile those first ([conflict resolution](conflict-resolution.md#default-targeted-cloud-read-then-a-local-field-merge)). Don't override a reported conflict. Read the item with MCP `workitem retrieve_by_identifier` (`fields=id,state,updated_at`), reconcile it in YAML, and get the owner's decision when both sides changed the same field. Then push again with normal checking.
 
 ## Version traps
 

@@ -137,7 +137,7 @@ jobs:
         if: >-
           (github.event_name == 'issue_comment' &&
             (github.event.comment.body == 'recheck' ||
-              github.event.comment.body == 'I have read and agree to the ISLAMU Event Contributor License Agreement v1.0, and I confirm that I have the right to submit my contribution under it.')) ||
+              github.event.comment.body == 'I have read and agree to the ISLAMU Contributor License Agreement v1.0, and I confirm that I have the right to submit my contribution under it.')) ||
           steps.cla_state.outputs.needs_cla_action == 'true'
         uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # zizmor: ignore[archived-uses] Pinned metadata-only CLA action; no PR-head code execution. # v2.6.1
         env:
@@ -151,17 +151,17 @@ jobs:
           branch: "cla-signatures"
           allowlist: "dependabot[bot],github-actions[bot],renovate[bot],codecov[bot],*[bot],web-flow"
           custom-notsigned-prcomment: |
-            Thank you for your contribution to ISLAMU Event! Before we can review or merge this pull request, every non-bot contributor must sign the [ISLAMU Event Contributor License Agreement v1.0](https://github.com/islamu-ngo/Event/blob/develop/legal/CLA.md).
+            Thank you for your contribution! Before we can review or merge this pull request, every non-bot contributor must sign the [ISLAMU Contributor License Agreement v1.0](https://github.com/islamu-ngo/Event/blob/develop/legal/CLA.md).
 
             **To sign the CLA**, post a new comment on this pull request with the exact text:
             ```text
-            I have read and agree to the ISLAMU Event Contributor License Agreement v1.0, and I confirm that I have the right to submit my contribution under it.
+            I have read and agree to the ISLAMU Contributor License Agreement v1.0, and I confirm that I have the right to submit my contribution under it.
             ```
 
             To re-run the check after signing, post a comment with `recheck`.
           custom-allsigned-prcomment: |
             All contributors have signed the ISLAMU Contributor License Agreement. Thank you! ✅
-          custom-pr-sign-comment: "I have read and agree to the ISLAMU Event Contributor License Agreement v1.0, and I confirm that I have the right to submit my contribution under it."
+          custom-pr-sign-comment: "I have read and agree to the ISLAMU Contributor License Agreement v1.0, and I confirm that I have the right to submit my contribution under it."
           create-file-commit-message: "chore(cla): create signatures file v1.0"
           signed-commit-message: "chore(cla): $contributorName signed the CLA in PR #$pullRequestNo"
           signed-empty-commit-message: "chore(cla): $contributorName re-signed the CLA in PR #$pullRequestNo"
@@ -181,7 +181,7 @@ jobs:
             echo "| **Pre-flight Result** | \`${{ steps.cla_state.outputs.needs_cla_action || 'N/A (comment event)' }}\` |"
             echo
             echo "### Legal Document"
-            echo "- [ISLAMU Event CLA v1.0](https://github.com/islamu-ngo/Event/blob/develop/legal/CLA.md)"
+            echo "- [ISLAMU CLA v1.0](https://github.com/islamu-ngo/Event/blob/develop/legal/CLA.md)"
             echo
             echo "### What this job checks"
             echo "- Pre-flight: checks stored CLA signatures to skip the full action when all commit authors are already signed or allowlisted."

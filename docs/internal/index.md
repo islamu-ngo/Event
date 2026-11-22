@@ -84,7 +84,7 @@ Start with [Repository README](../../README.md) or the [Documentation Hub](../RE
 - [RELEASE_POLICY.md](RELEASE_POLICY.md) - normative provider-neutral release invariants; prospective until the release engine is activated.
 - [RELEASE_RUNBOOK.md](RELEASE_RUNBOOK.md) - current manual and future governed-release operator procedure.
 - [adr/ADR-025-provider-neutral-release-governance.md](adr/ADR-025-provider-neutral-release-governance.md) - trusted-bundle, exact-commit, and renderer-only release architecture.
-- [legal/CLA.md](../../legal/CLA.md) - active ISLAMU Event contributor license agreement.
+- [legal/CLA.md](../../legal/CLA.md) - active ISLAMU contributor license agreement (single source of truth).
 - [legal/CONTRIBUTION_GOVERNANCE.md](legal/CONTRIBUTION_GOVERNANCE.md) - CLA legal contribution decision record and automation threat model.
 - [legal/IP_GOVERNANCE.md](legal/IP_GOVERNANCE.md) - clean-room research, source isolation, dependency-license compatibility, and audit evidence policy.
 - [NAMING_CONVENTIONS.md](NAMING_CONVENTIONS.md) - naming rules for entities, CQRS, services, tests.

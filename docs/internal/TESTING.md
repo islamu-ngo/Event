@@ -312,6 +312,17 @@ cleanup. `ReleaseCandidateVerificationTests` exercise the actual admission
 decision and deterministic manifest digest. Their synthetic report inputs prove
 protocol invariants, not execution of API security lanes.
 
+API security-container observation joins each native creator receipt to the
+exact cached image and its declared volume destinations. It accepts only fresh,
+writable volume mounts with matching daemon mountpoints; unexpected bind mounts,
+missing destinations and pre-existing volumes fail closed. Mounted identities
+are observations, not authority to delete volumes. Parent cleanup removes only
+proven container IDs with volume removal disabled. If the creating fixture did
+not remove its volumes, cleanup admission fails and those volumes are retained.
+The explicit `SecurityExecutionEvidenceApiResourceTests` interruption probe
+checks that both anonymous volumes and a newly created foreign named volume
+survive parent cleanup. Its ordinary parser cases cover mount substitution.
+
 The explicit `SecurityExecutionEvidenceManagedCleanupTests` run a genuine
 compiled child and terminate its native owner only after all declared containers
 and managed project hosts have qualified. The child uses the same fifteen-minute

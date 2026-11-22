@@ -91,10 +91,10 @@ complete container-image or distribution SBOM.
 
 ## Contributor License Agreement (CLA)
 
-Every non-bot contributor must sign the **ISLAMU Event Contributor License Agreement (CLA) v1.0**. When you open a pull request, the CLA Assistant bot will guide you to sign directly in a comment:
+Every non-bot contributor must sign the **[ISLAMU Contributor License Agreement (CLA) v1.0](https://github.com/islamu-ngo/Event/blob/develop/legal/CLA.md)** (single source of truth for inbound terms, Anti-SaaS protections, and cross-project open-source reuse). When you open a pull request, the CLA check guides you to sign directly in a comment:
 
 ```text
-I have read and agree to the ISLAMU Event Contributor License Agreement v1.0, and I confirm that I have the right to submit my contribution under it.
+I have read and agree to the ISLAMU Contributor License Agreement v1.0, and I confirm that I have the right to submit my contribution under it.
 ```
 
-* **Anti-SaaS Protection:** The CLA protects the community: the Project Steward is legally bound never to grant closed-source commercial SaaS licenses. Any entity offering ISLAMU Event as a hosted service must remain open source under `AGPL-3.0-or-later`. Your contributions will never be locked behind a proprietary vendor wall. See [Clean-Room IP & Licensing](clean-room-ip-and-licensing.md).
+See [`legal/CLA.md`](https://github.com/islamu-ngo/Event/blob/develop/legal/CLA.md) for the full agreement and [Clean-Room IP & Licensing](clean-room-ip-and-licensing.md) for clean-room and dependency rules.

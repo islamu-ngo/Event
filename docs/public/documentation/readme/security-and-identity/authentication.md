@@ -178,6 +178,10 @@ starting this revision. Startup and later operations reject an absent, modified
 or broadened assertion, and reinstallation does not silently repair it. No new
 credential or larger database memory allowance is required by this change.
 
+This development revision provides no in-place database downgrade path. To return
+to an earlier candidate, provision fresh databases using that candidate's migrator
+and start its matching application binary after its native checks succeed.
+
 Each deployment has exactly one **primary authentication provider**:
 
 * **Local Identity** uses ASP.NET Core Identity inside ISLAMU Event. It is the

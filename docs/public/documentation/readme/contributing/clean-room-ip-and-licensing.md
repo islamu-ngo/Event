@@ -4,7 +4,7 @@ description: Contribute under the AGPL, CLA, provenance, and dependency-review b
 
 # Clean-Room IP & Licensing
 
-ISLAMU Event is publicly licensed under **GNU AGPL-3.0-or-later**. Non-bot contributors sign the project Contributor License Agreement (CLA), which grants the project steward rights to distribute and preserve the platform.
+ISLAMU Event is publicly licensed as a complete product under **GNU AGPL-3.0-or-later**. Non-bot contributors sign the [ISLAMU Contributor License Agreement](https://github.com/islamu-ngo/Event/blob/develop/legal/CLA.md), which is the single authoritative source governing inbound contributor rights, Anti-SaaS organizational-use boundaries, and cross-project open-source reuse.
 
 > [!NOTE]
 > This page summarizes engineering policy, not formal legal advice.

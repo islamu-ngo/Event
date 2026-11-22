@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <Compile Include="../Explore.Blazor.IntegrationTests/Fixtures/TestBffSessionAuthority.cs" Link="Fixtures/TestBffSessionAuthority.cs" />
+    <Compile Include="../Shared/ProviderContextOwners.cs" Link="Fixtures/ProviderContextOwners.cs" />
     <Compile Include="../Shared/OperationalEndpointTestTransport.cs" Link="Fixtures/OperationalEndpointTestTransport.cs" />
     <Compile Include="../Shared/ExternalDataProtectionTestAuthority.cs" Link="Fixtures/ExternalDataProtectionTestAuthority.cs" />
     <Compile Include="../Shared/Execution/TestExecutionProfile.cs" Link="Execution/TestExecutionProfile.cs" />
@@ -23,7 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Event.Standalone\Event.Standalone.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="TUnit" />
   </ItemGroup>
 </Project>

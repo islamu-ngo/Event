@@ -100,8 +100,8 @@ internal static class PostgresContractAttestationSql
             ? $"""
                 NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n WHERE n.nspname = {Text(schema)}
                     AND n.nspowner = pg_catalog.to_regrole({Text(migratorLoginForNamespaceOwner)})::oid)
-                OR 
-            """
+                OR
+            """ + " "
             : string.Empty;
         return $"""
             {prefix}EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname IN ({rolesSql})

@@ -580,7 +580,7 @@ Confirm these GitHub security features at repository or organization level:
 
 ### Contributor Legal Governance
 
-The repository uses a CLA-only contribution posture. Every non-bot contributor must sign the [ISLAMU Event Contributor License Agreement](../../legal/CLA.md), which grants the ISLAMU project steward broad inbound rights to maintain, provide, and relicense ISLAMU Event under alternative terms for enterprise internal-use on-premises compliance, nonprofit, humanitarian, public-sector, or procurement-restricted needs—subject to the Project Steward's binding covenant against closed-source proprietary SaaS commercialization (all SaaS providers must use AGPL-3.0).
+The repository uses a CLA-only contribution posture. Every non-bot contributor must sign the [ISLAMU Contributor License Agreement](../../legal/CLA.md) (the single authoritative source for inbound licensing bounds, Anti-SaaS Covenant, and cross-project OSI reuse rules with an MIT notice/disclaimer floor).
 
 The decision record in [CONTRIBUTION_GOVERNANCE.md](legal/CONTRIBUTION_GOVERNANCE.md) captures the legal posture, inbound copyright/patent scope, signature storage model, bot allowlist, archived CLA Assistant risk decision, and `pull_request_target` threat model.
 

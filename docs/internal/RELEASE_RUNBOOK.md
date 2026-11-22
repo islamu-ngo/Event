@@ -90,11 +90,12 @@ state.
   are read through the Global provider-configuration contract. Runtime direct
   `secret_bindings` access stays denied.
 
-Rollback of the application binary does not automatically reverse installed native
-rights. Use the prior supported provisioning/migration path for the selected
-release and re-run its attestations; never widen a runtime role to make an older
-binary start. The B22 cleanup-fixture repair is test infrastructure only and has
-no operator action.
+This pre-release development scope uses freshly provisioned databases; it does
+not provide an in-place database downgrade or old-data compatibility path.
+To return to an earlier candidate, provision fresh databases with that candidate's
+migrator and re-run its native attestations before starting the matching binary.
+Never widen a runtime role to make an older binary start. The B22 cleanup-fixture
+repair is test infrastructure only and has no operator action.
 
 ## Future governed release flow
 

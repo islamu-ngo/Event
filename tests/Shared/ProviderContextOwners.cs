@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace Event.Api.IntegrationTests.Fixtures;
+namespace Event.Testing;
 
-internal static partial class TestDbContextServiceCollectionExtensions
+internal static class TestContextOwnerRegistration
 {
     public static IServiceCollection AddTestContextOwners(this IServiceCollection services)
     {
@@ -85,12 +85,12 @@ internal static partial class TestDbContextServiceCollectionExtensions
         {
             var context = await factory.CreateDbContextAsync(cancellationToken);
             context.ClearTenantFilterBypass();
-            context.TenantContext = tenantId is { } tenant ? new TenantIdentity(tenant) : null;
+            context.TenantContext = tenantId is { } tenant ? new TestTenantContext(tenant) : null;
             context.CurrentUserService = null;
             context.BindTenantLease();
             return context;
         }
     }
-
-    private sealed record TenantIdentity(Guid TenantId) : ITenantContext;
 }
+
+internal sealed record TestTenantContext(Guid TenantId) : ITenantContext;

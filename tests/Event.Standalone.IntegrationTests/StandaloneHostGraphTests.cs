@@ -13,6 +13,7 @@ using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Extensions;
 using Explore.Blazor.Services;
 using Explore.Blazor.Services.Auth;
+using Explore.Blazor.IntegrationTests.Fixtures;
 using Event.Standalone.IntegrationTests.Fixtures;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -179,15 +180,12 @@ public sealed class StandaloneHostGraphTests
         });
         await factory.SeedDefaultTenantAsync(TenantStatusEnum.Active);
         var bffOptions = factory.Services.GetRequiredService<IOptions<EventBffHostingOptions>>().Value;
-        var cookieOptions = factory.Services
-            .GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
-            .Get(CookieAuthenticationDefaults.AuthenticationScheme);
         var ticket = new AuthenticationTicket(
             new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", Guid.NewGuid().ToString())],
                 CookieAuthenticationDefaults.AuthenticationScheme)),
             CreateTokenProperties(),
             CookieAuthenticationDefaults.AuthenticationScheme);
-        var cookie = cookieOptions.TicketDataFormat.Protect(ticket);
+        var cookie = await TestBffSessionAuthorityRegistration.IssueFreshCookieAsync(factory.Services, ticket);
 
         using var uiRequest = new HttpRequestMessage(HttpMethod.Get, "/auth/status");
         uiRequest.Headers.Add("X-Forwarded-Host", bffOptions.AdminHosts.Single());
@@ -196,16 +194,16 @@ public sealed class StandaloneHostGraphTests
         using var uiResponse = await client.SendAsync(uiRequest);
 
         using var apiRequest = new HttpRequestMessage(HttpMethod.Get, "/api/EventType");
-        apiRequest.Headers.Add("Cookie", $"{cookieOptions.Cookie.Name}={Uri.EscapeDataString(cookie)}");
+        apiRequest.Headers.Add("Cookie", cookie);
         apiRequest.Headers.Add("X-Forwarded-Host", "tenant.proxy.test");
         apiRequest.Headers.Add("X-Forwarded-Proto", "https");
         apiRequest.Headers.Add("X-Forwarded-For", "203.0.113.42");
         using var apiResponse = await client.SendAsync(apiRequest);
-        var bridgeObservation = factory.Services.GetRequiredService<ForwardedRequestProbe>()
-            .Observations.Single();
-
         await Assert.That(uiResponse.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         await Assert.That(apiResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var bridgeObservation = factory.Services.GetRequiredService<ForwardedRequestProbe>()
+            .Observations.Single(observation => observation.Host == "tenant.proxy.test");
+        await Assert.That(bridgeObservation.IsAuthenticated).IsTrue();
         await Assert.That(bridgeObservation.Scheme).IsEqualTo("https");
         await Assert.That(bridgeObservation.Host).IsEqualTo("tenant.proxy.test");
         await Assert.That(bridgeObservation.RemoteIpAddress).IsEqualTo(IPAddress.Parse("203.0.113.42"));
@@ -317,8 +315,9 @@ public sealed class StandaloneHostGraphTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(response.Headers.GetValues("X-Content-Type-Options").Single()).IsEqualTo("nosniff");
-        await Assert.That(response.Headers.GetValues("X-Correlation-ID").Single())
-            .IsEqualTo("standalone-transport-probe");
+        var correlationId = response.Headers.GetValues("X-Correlation-ID").Single();
+        await Assert.That(Guid.TryParseExact(correlationId, "N", out var parsedCorrelationId)).IsTrue();
+        await Assert.That(parsedCorrelationId).IsNotEqualTo(Guid.Empty);
         await Assert.That(response.Headers.GetValues("Preference-Applied").Single()).IsEqualTo("return=minimal");
     }
 
@@ -379,7 +378,7 @@ public sealed class StandaloneHostGraphTests
 
     private static AuthenticationProperties CreateTokenProperties()
     {
-        var properties = new AuthenticationProperties();
+        var properties = new AuthenticationProperties { ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(10) };
         string token = new JwtSecurityTokenHandler().WriteToken(
             new JwtSecurityToken(
                 expires: new DateTime(

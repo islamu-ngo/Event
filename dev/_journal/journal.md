@@ -3844,3 +3844,43 @@ authorize a new connector or replay a possibly committed operation.
 
 **Promotion Consideration**:
 - [x] Stays in journal; the durable runtime-witness contract is also documented in the distributed assurance guide.
+
+[2026-11-22 Europe/Brussels] — Image-declared mounts do not grant volume deletion authority
+
+**Context**: While completing PR86's native security-execution assurance, the live
+observer failed before the test process finished. The bounded rejection code
+identified the API container/resource join rather than an unexplained exit 137.
+
+**Symptom / Observation**: `api_created_resource_observation_invalid` rejected
+Cerbos containers. The pinned image declares three volume targets and a real
+new-container probe confirmed all three; the parser incorrectly required none.
+
+**Root Cause**: A proven creator/container/image relationship establishes which
+container was created, but an attached volume can still be a foreign volume
+created after the initial inventory. Image target equality and a fresh volume
+name do not establish ownership or safe delete-by-name authority.
+
+**Resolution**: Commit `26e34c1991` validates exact cached-image targets, source
+mountpoints and stable mount/incarnation metadata. API parent cleanup removes
+only proven container IDs with `v=false`; it never deletes volumes. Remaining
+observed volumes prevent cleanup admission and remain untouched. The native
+`InterruptedApiOwnerPreservesNewForeignAndAnonymousVolumes` control passed 1/1;
+ten substitution cases, the existing creator/resource contract and sixteen
+consumer-boundary cases also passed using Release `dotnet test --no-build`
+slices. The ordinary fixture remains responsible for its own volume disposal.
+
+**Why This Matters for Future Work**: Distinguish observation from destructive
+authority. Failed cleanup is preferable to deleting storage whose creator or
+incarnation cannot be established. A focused custody control is not evidence
+that the entire registered security lane or product runtime passed.
+
+**References**:
+- `eng/release/src/ISLAMU.ReleaseEngineering/SecurityExecutionEvidence.Execution.cs`
+- `eng/release/src/ISLAMU.ReleaseEngineering/SecurityExecutionEvidence.Production.cs`
+- `eng/release/tests/ISLAMU.ReleaseEngineering.Tests/SecurityExecutionEvidenceApiResourceTests.cs`
+- `docs/internal/TESTING.md`
+- Docker volume lifetime facts: https://docs.docker.com/engine/storage/volumes/
+- PR86 / commit `26e34c1991`; repository-native implementation, no external source imported.
+
+**Promotion Consideration**:
+- [x] Stays in journal; the delivered API cleanup boundary is documented in TESTING.md.

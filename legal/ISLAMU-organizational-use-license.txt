@@ -1,0 +1,288 @@
+================================================================================
+            ISLAMU ORGANIZATIONAL-USE (ANTI-SAAS) LICENSE AGREEMENT
+================================================================================
+
+Version: 1.0
+Status: Operational draft pending formal legal review under Belgian law
+Licensor / Steward: ISLAMU (non-profit in formation, and upon incorporation its
+                    registered non-profit legal entity)
+Interim Representative: Amir Akrari
+Authoritative CLA Anchor: legal/CLA.md
+
+IMPORTANT NOTICE — BILATERAL LICENSE REQUIRING WRITTEN EXECUTION:
+Mere possession or download of this file or the repository does NOT grant a
+license under these terms. Absent an executed Order Form signed in writing by
+the Licensor, the Covered Software is licensed solely under the public GNU
+Affero General Public License v3.0 or later ("AGPL-3.0-or-later", see LICENSE).
+This Agreement takes effect only when expressly executed in writing between the
+Licensor and a named Licensee via the Execution Schedule at the end of this
+document (or a separate written Order Form referencing this Agreement).
+
+--------------------------------------------------------------------------------
+1. PURPOSE AND ANTI-SAAS COVENANT
+--------------------------------------------------------------------------------
+
+ISLAMU's self-hostable software platforms are publicly distributed as free and
+open-source software under AGPL-3.0-or-later. For any organization or recipient
+seeking to use the Covered Software under terms other than AGPL-3.0-or-later,
+the Licensor offers this bilateral Organizational-Use (Anti-SaaS) License
+(whether for a fee or gratis, as specified in an executed Order Form) pursuant
+to the inbound rights granted by contributors under the ISLAMU Contributor
+License Agreement (legal/CLA.md).
+
+This Agreement is strictly governed by the ISLAMU Anti-SaaS Covenant:
+  (a) It waives AGPL-3.0 network-copyleft contagion for a Licensee operating the
+      Covered Software solely for the Licensee's own organizational operations
+      and the Licensee's own end-user services.
+  (b) It strictly PROHIBITS offering, reselling, sublicensing, or operating the
+      Covered Software as a commercial hosting service, managed platform, or
+      multi-tenant Software-as-a-Service (SaaS) for third-party organizations.
+      Any party wishing to offer the Covered Software as a SaaS to third parties
+      must do so under the public AGPL-3.0-or-later license so all improvements
+      are shared back with the open-source community.
+
+--------------------------------------------------------------------------------
+2. DEFINITIONS
+--------------------------------------------------------------------------------
+
+"Covered Software" means the ISLAMU software platform or repository identified
+in the executed Order Form (or, if accompanying a specific ISLAMU distribution
+covered by such Order Form, the ISLAMU-owned and CLA-licensed source code and
+object code of that distribution), including any updates or modifications
+provided by the Licensor under this Agreement.
+
+"Licensor" (or "Project Steward") means:
+  (a) prior to formal incorporation of the Organization with legal personality,
+      the ISLAMU non-profit association in formation, acting through its Interim
+      Representative (Amir Akrari, or any successor interim representative or
+      co-custodian designated in writing on behalf of the Organization in
+      formation) solely in a representative and custodial capacity; and
+  (b) upon and after formal incorporation and ratification of this Agreement,
+      the incorporated non-profit legal entity established to steward ISLAMU
+      (anticipated as an ASBL/VZW or AISBL under Belgian law, or such other
+      non-profit legal form or registered name established by the founders to
+      succeed ISLAMU in formation), together with its lawful corporate
+      successors and permitted assigns.
+
+"Licensee" means the specific legal entity or organization identified as the
+Licensee in an executed Order Form referencing this Agreement.
+
+"Authorized Infrastructure" means on-premises servers, private virtual private
+clouds (VPCs), or single-tenant dedicated cloud/infrastructure environments
+owned, leased, or controlled by the Licensee (or operated exclusively on the
+Licensee's behalf by a contracted IT administrator bound in writing to this
+Agreement).
+
+"Permitted Organizational Use" means running, configuring, integrating, and
+internally modifying the Covered Software on Authorized Infrastructure solely
+for the Licensee's own internal operations and the Licensee's own institutional,
+community, or business activities (including allowing the Licensee's own
+external visitors, attendees, members, students, donors, or customers to
+interact with the Licensee's self-hosted instance over a network).
+
+"Prohibited SaaS / Third-Party Hosting" means offering, reselling, white-
+labeling for third parties, time-sharing, or operating the Covered Software as a
+multi-tenant platform, managed service, application service provider (ASP),
+API-as-a-service, or commercial/hosted Software-as-a-Service (SaaS) where
+third-party organizations or unaffiliated external tenants use the instance to
+conduct their own operations or host their own offerings.
+
+"Third-Party Materials" means third-party open-source libraries, packages,
+runtimes, container images, fonts, or assets distributed with or referenced by
+the Covered Software that are owned by third parties and licensed under their
+own separate terms (such as MIT, BSD, Apache-2.0, or LGPL).
+
+"Order Form" means a written document (including an executed Schedule attached
+hereto) signed by both the Licensor and the Licensee that specifies the Covered
+Software, scope/deployment parameters, Term, and applicable fee (whether a
+commercial fee or EUR 0 / gratis).
+
+--------------------------------------------------------------------------------
+3. LICENSE GRANT AND AGPL SECTION 13 WAIVER
+--------------------------------------------------------------------------------
+
+3.1 Copyright License Grant. Subject to the terms and conditions of this
+Agreement and full compliance with an active Order Form, the Licensor hereby
+grants to the Licensee, during the specified Term, a worldwide, non-exclusive,
+non-transferable, non-sublicensable copyright license to install, reproduce,
+configure, modify for internal use, and execute the Covered Software on
+Authorized Infrastructure solely for Permitted Organizational Use.
+
+3.2 Waiver of AGPL-3.0 Copyleft on Internal Systems. So long as the Licensee's
+use remains strictly within Permitted Organizational Use and complies with this
+Agreement, the Licensee is not required under AGPL-3.0 (including Section 13
+thereof) to disclose or publish the source code of:
+  (a) the Licensee's internal modifications or extensions to the Covered
+      Software used solely on Authorized Infrastructure for Permitted
+      Organizational Use; or
+  (b) the Licensee's separate proprietary internal systems, single sign-on (SSO)
+      providers, directories, databases, or internal APIs that interoperate with
+      the Covered Software.
+
+3.3 Patent License Grant. Subject to this Agreement, the Licensor grants to the
+Licensee, during the Term and solely for Permitted Organizational Use of the
+Covered Software, a non-exclusive, non-transferable, royalty-free patent license
+under patent claims licensable by the Licensor (including those licensed to the
+Project Steward under legal/CLA.md) that are necessarily infringed by the
+Covered Software as provided by the Licensor. If the Licensee institutes patent
+litigation alleging that the Covered Software or any ISLAMU Open-Source Project
+infringes a patent, all patent licenses granted to the Licensee under this
+Agreement terminate automatically as of the date such litigation is filed.
+
+--------------------------------------------------------------------------------
+4. STRICT RESTRICTIONS AND ANTI-SAAS COVENANT
+--------------------------------------------------------------------------------
+
+4.1 No SaaS or Third-Party Hosting. The Licensee shall NOT engage in Prohibited
+SaaS / Third-Party Hosting under this Agreement. Any operation of the Covered
+Software as a hosted service or SaaS for third-party organizations requires full
+compliance with the public AGPL-3.0-or-later license.
+
+4.2 No Redistribution or Sublicensing. Except for making the Covered Software
+accessible to contracted IT personnel operating Authorized Infrastructure
+exclusively on the Licensee's behalf (for whose compliance the Licensee remains
+fully liable), the Licensee may not distribute, publish, sublicense, sell, rent,
+lease, or transfer the Covered Software or internal modifications thereof to any
+third party under this Agreement. (The Licensee always retains the separate
+right to distribute unmodified or modified copies under the full terms of
+AGPL-3.0-or-later.)
+
+4.3 Mandatory Retention of Copyright, License, and Disclaimer Notices (MIT &
+Third-Party Compatibility Floor). The Licensee must retain intact, and must
+never remove, alter, or obscure, all copyright notices, permission and license
+notices, attribution notices, and warranty/liability disclaimers appearing in
+the Covered Software and in all included Third-Party Materials (including
+LICENSE, this file, and THIRD-PARTY-NOTICES). In no event may the Covered
+Software or any portion thereof be dedicated to the public domain or stripped of
+required notices.
+
+4.4 No Trademark Grant. This Agreement grants no right to use the trade names,
+trademarks, service marks, or logos of ISLAMU, the Licensor, or any contributor,
+except as necessary for unmodified copyright/attribution notices or as separately
+authorized in writing (such as under an Official Partner agreement).
+
+--------------------------------------------------------------------------------
+5. THIRD-PARTY MATERIALS
+--------------------------------------------------------------------------------
+
+The Covered Software incorporates or interoperates with Third-Party Materials
+licensed under permissive or compatible open-source licenses (such as MIT,
+BSD-2-Clause, BSD-3-Clause, Apache-2.0, and MPL-2.0). This Agreement applies
+only to code owned by the Licensor or licensed to the Project Steward under
+legal/CLA.md. Each Third-Party Material retains its own applicable license and
+notices; nothing in this Agreement restricts, limits, or supersedes any rights
+the Licensee receives directly from the respective third-party rightsholders
+under those open-source licenses.
+
+--------------------------------------------------------------------------------
+6. FEES (PAID OR GRATIS)
+--------------------------------------------------------------------------------
+
+The Licensee shall pay the license fees, if any, specified in the executed Order
+Form (which may specify either a commercial license fee or EUR 0 / gratis). All
+net proceeds received by the Licensor support the non-profit stewardship,
+security auditing, maintenance, and public-good development of ISLAMU's
+open-source ecosystem.
+
+--------------------------------------------------------------------------------
+7. OWNERSHIP AND UPSTREAM CONTRIBUTIONS
+--------------------------------------------------------------------------------
+
+The Licensor and its contributors retain all right, title, and interest
+(including all copyright and other intellectual property rights) in and to the
+Covered Software. The Licensee retains ownership of its own independent
+configurations and internal modifications, subject to the Licensor's underlying
+rights in the Covered Software. Any modifications or patches that the Licensee
+voluntarily submits upstream to an official ISLAMU repository are governed by
+the ISLAMU Contributor License Agreement (legal/CLA.md).
+
+--------------------------------------------------------------------------------
+8. MULTI-PHASE STEWARDSHIP AND AUTOMATIC ASSUMPTION (BELGIAN LAW)
+--------------------------------------------------------------------------------
+
+Until the ISLAMU non-profit legal entity is formally incorporated with legal
+personality, the Interim Representative executes this Agreement solely in a
+representative and custodial capacity on behalf of ISLAMU in formation. Upon
+incorporation, the Organization shall ratify and assume this Agreement pursuant
+to Article 2:2 of the Belgian Companies and Associations Code (Code des societes
+et des associations / Wetboek van vennootschappen en verenigingen), and enjoys
+all rights hereunder as an intended third-party beneficiary (Articles 5.109 to
+5.111 of the Belgian Civil Code) and assignee by automatic novation. Upon such
+assumption, all rights and obligations of the Licensor are deemed contracted
+directly by the incorporated Organization from the effective date, and the
+Interim Representative is retroactively released from personal liability to the
+fullest extent permitted by law.
+
+--------------------------------------------------------------------------------
+9. TERM, TERMINATION, AND AUTOMATIC AGPL FALLBACK
+--------------------------------------------------------------------------------
+
+9.1 Term. This Agreement is effective for the Term stated in the executed Order
+Form (or perpetually for the covered version if specified as perpetual therein),
+unless terminated earlier under Section 9.2.
+
+9.2 Termination for Breach. If the Licensee breaches any material provision of
+this Agreement—including, without limitation, any violation of the Anti-SaaS
+Covenant in Section 4.1 or non-payment of applicable fees—and fails to cure such
+breach within thirty (30) days after written notice (or immediately in the case
+of a willful breach of Section 4.1), the rights granted under this Agreement
+terminate automatically. Upon termination, any continued use or network
+operation of the Covered Software by the Licensee is governed strictly by the
+public AGPL-3.0-or-later license (including all source-code disclosure
+obligations thereof) unless the Licensee ceases all use of the Covered Software.
+
+--------------------------------------------------------------------------------
+10. DISCLAIMER OF WARRANTIES AND LIMITATION OF LIABILITY
+--------------------------------------------------------------------------------
+
+10.1 AS-IS Disclaimer. EXCEPT AS EXPRESSLY AGREED IN A SEPARATE WRITTEN SUPPORT
+OR SERVICE AGREEMENT SIGNED BY THE LICENSOR, THE COVERED SOFTWARE IS PROVIDED
+"AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
+
+10.2 Limitation of Liability. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE
+MANDATORY LAW, IN NO EVENT SHALL THE LICENSOR, THE INTERIM REPRESENTATIVE, THE
+ORGANIZATION, OR ANY CONTRIBUTOR BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, CONSEQUENTIAL, OR PUNITIVE DAMAGES (INCLUDING LOSS OF
+PROFITS, DATA, OR BUSINESS INTERRUPTION), OR FOR AGGREGATE DIRECT DAMAGES
+EXCEEDING THE TOTAL FEES ACTUALLY PAID BY THE LICENSEE TO THE LICENSOR UNDER
+THE APPLICABLE ORDER FORM IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM (OR
+FIFTY EUROS [EUR 50] WHERE THE FEE IS EUR 0 / GRATIS), EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+
+--------------------------------------------------------------------------------
+11. GOVERNING LAW, VENUE, AND GENERAL PROVISIONS
+--------------------------------------------------------------------------------
+
+11.1 Governing Law and Venue. This Agreement is governed by the laws of Belgium,
+excluding its conflict-of-laws rules, unless mandatory law requires otherwise.
+The courts of Brussels, Belgium shall have exclusive jurisdiction over any
+dispute arising out of or relating to this Agreement.
+
+11.2 Severability and Entire Agreement. If any provision of this Agreement is
+held unenforceable, the remaining provisions remain in full force and effect.
+This Agreement, together with the executed Order Form, constitutes the entire
+agreement between the parties regarding its subject matter. Sections 1, 2, 4, 5,
+7, 8, 9.2, 10, and 11 survive any expiration or termination of this Agreement.
+
+================================================================================
+                        EXECUTION SCHEDULE — ORDER FORM
+================================================================================
+
+  Order Reference ID         : ________________________________________________
+  Effective Date             : ________________________________________________
+  Covered Software / Repo    : ________________________________________________
+  Licensee Legal Name        : ________________________________________________
+  Licensee Registration / ID : ________________________________________________
+  Licensee Address           : ________________________________________________
+  Fee (or EUR 0 / Gratis)    : ________________________________________________
+  Authorized Scope & Term    : ________________________________________________
+
+  FOR LICENSOR (ISLAMU Project Steward)       FOR LICENSEE
+
+  Signature : _________________________       Signature : _____________________
+  Name      : _________________________       Name      : _____________________
+  Title     : _________________________       Title     : _____________________
+  Date      : _________________________       Date      : _____________________
+================================================================================

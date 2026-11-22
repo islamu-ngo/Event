@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using Event.Api.IntegrationTests.Builders;
+using Event.Testing;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
@@ -105,7 +106,7 @@ internal static partial class TestDbContextServiceCollectionExtensions
                 database.SaveChanges();
                 using var tenantDatabase = new ExploreDbContext(options.Options)
                 {
-                    TenantContext = new TenantIdentity(tenantId)
+                    TenantContext = new TestTenantContext(tenantId)
                 };
                 tenantDatabase.BindTenantLease();
                 Guid membershipId = Guid.CreateVersion7();

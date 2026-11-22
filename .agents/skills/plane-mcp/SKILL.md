@@ -62,7 +62,7 @@ Read [ISLAMU Event project IDs](resources/islamu-event-project.md) before the fi
 1. Build the exact ID set with paginated PQL and dedupe it. Record it in the task ledger before mutating.
 2. Remove protected (Git/ADR/docs-cited) IDs from any delete set and confirm the remainder with the maintainer.
 3. Execute in bounded batches, logging completed and remaining IDs after each batch.
-4. Verify with `count` or `list_workitems` read-back. If the batch changed YAML-held fields, mirror them in `event/work/*.yaml` or schedule a full pull (and its repairs) before the next push.
+4. Verify with `count` or `list_workitems` read-back. If the batch changed YAML-held fields, mirror them in `event/work/*.yaml` before the next push that touches those items ([conflict resolution](../plane-compose/resources/conflict-resolution.md#default-targeted-cloud-read-then-a-local-field-merge)). A full pull is a separately scheduled maintenance resync, not the fix.
 
 ## Verification
 

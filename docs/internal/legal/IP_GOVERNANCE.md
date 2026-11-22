@@ -6,16 +6,14 @@
 > **Audience:** Maintainers | Contributors | AI agents | Legal reviewers
 > **Status:** Operational policy; legal conclusions and exceptions require qualified legal review
 > **Owner:** Project Steward | Contributor Experience
-> **Last Verified:** 2026-08-12
+> **Last Verified:** 2026-11-17
 > **Source Anchors:** `legal/CLA.md`, `LICENSE`, `Directory.Packages.props`, `Directory.Build.props`, `.ci/scripts/validate-dependency-license-policy.cs`, `.github/workflows/_build-test.yml`, `docs/internal/legal/dependencies/mapperly.md`
 
 This is the repository's source of truth for externally informed implementation, third-party material, dependency-license compatibility, and provenance evidence. It is an engineering control, not legal advice or a guarantee that a court, regulator, or licensor will agree with a project classification.
 
 ## Legal Posture And Authority Boundary
 
-ISLAMU Event is publicly distributed under `AGPL-3.0-or-later`. The CLA grants the Project Steward broad inbound rights in contributor-owned Contributions so ISLAMU-owned material can also be offered under alternative terms selected by the Project Steward.
-
-**Anti-SaaS Governance Invariant:** The Project Steward's alternative licensing authority is strictly constrained by a community covenant: alternative terms are limited to **Enterprise Internal-Use On-Premises/VPC deployments** (waiving AGPL Section 13 copyleft contagion over internal corporate infrastructure) and $0 non-profit/humanitarian grants. The Project Steward commits never to grant an alternative license permitting a third party to operate a closed-source, proprietary SaaS or cloud service. All SaaS offerings must operate under `AGPL-3.0-or-later`. See [I-VSD Strategy Review](../../../islamic-value-sensitive-design/governance/i-vsd-licensing-and-commercial-strategy.md).
+ISLAMU Event is publicly distributed as a complete product under `AGPL-3.0-or-later`. Contributor inbound rights, Anti-SaaS boundaries for bilateral alternative licensing, and cross-project open-source reuse rules are governed solely by [`legal/CLA.md`](../../../legal/CLA.md) (see also [I-VSD Strategy Review](../../../islamic-value-sensitive-design/governance/i-vsd-licensing-and-commercial-strategy.md)).
 
 The CLA grants no rights in third-party material. A contributor signature cannot cure copied code, missing authority, or an incompatible dependency. Every assembled distribution must comply with each third-party component's own terms even when ISLAMU-owned material is offered under another license.
 

@@ -15,6 +15,7 @@ using Explore.ServiceDefaults.Secrets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 
 const string DefaultInstanceAdminHost = "admin.localhost";
 const int DefaultInstanceAdminPort = 7002;
@@ -922,7 +923,9 @@ var testingExecution = testingIsolation is null
     ? null : application.Services.GetService<TestingApplicationExecution>();
 if (testingIsolation is not null && testingExecution is null)
     throw new InvalidOperationException("test_application_execution_missing");
-Task execution = application.RunAsync(testingExecution?.HostCancellationToken ?? CancellationToken.None);
+Task execution = testingExecution is null
+    ? application.RunAsync()
+    : RunWithoutDisposalAsync(testingExecution.HostCancellationToken);
 Exception? hostFailure = null;
 try
 {
@@ -963,6 +966,12 @@ if (testingExecution is not null)
     }
 }
 if (hostFailure is not null) ExceptionDispatchInfo.Capture(hostFailure).Throw();
+
+async Task RunWithoutDisposalAsync(CancellationToken cancellationToken)
+{
+    await application.StartAsync(cancellationToken);
+    await application.Services.GetRequiredService<IHost>().WaitForShutdownAsync(cancellationToken);
+}
 
 static LocalPlatformResources AddLocalPlatform(
     IDistributedApplicationBuilder builder,

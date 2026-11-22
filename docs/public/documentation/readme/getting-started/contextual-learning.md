@@ -62,6 +62,9 @@ guidance is hidden or disabled. It explains browsing, participation, personal
 work and organization/group collaboration. Administration links reflect the
 settings scopes currently offered by the server; Help does not grant them.
 
+Help text follows its own language, so English fallback punctuation remains
+readable when the surrounding page uses a right-to-left language.
+
 In deployments with native preference support, signed-in language and direction
 changes save only your preferences in the current tenant. Selecting an inherited
 value removes your override so future default changes can apply. These changes

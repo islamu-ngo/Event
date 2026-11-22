@@ -93,6 +93,32 @@ public sealed class LearningContextHelpTests : IDisposable
     }
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task HelpIsolatesEachTranslatedOrFallbackTextBlockFromThePageDirection(bool authenticated)
+    {
+        if (authenticated)
+            _ctx.SetAuthenticatedUser(_userId, "Learner");
+        else
+            _ctx.SetAnonymousUser();
+
+        var translation = _ctx.Services.GetRequiredService<ITranslationService>();
+        translation.CurrentLanguage.Returns("ar");
+        translation.T("ui.learning.help.find.body", Arg.Any<string?>())
+            .Returns("\u0627\u0628\u062D\u062B \u0639\u0646 \u0627\u0644\u0641\u0639\u0627\u0644\u064A\u0627\u062A.");
+        var help = _ctx.Render<LearningContextHelp>(parameters => parameters
+            .Add(component => component.ReplayGuidanceAvailable, true)
+            .Add(component => component.ReplayGuidance, () => Task.CompletedTask));
+
+        var textBlocks = help.FindAll("summary, p, dt, dd, a, button");
+        await Assert.That(textBlocks.Count).IsGreaterThan(0);
+        foreach (var element in textBlocks)
+            await Assert.That(element.GetAttribute("dir")).IsEqualTo("auto");
+        await Assert.That(help.Find(".learning-help").HasAttribute("dir")).IsFalse();
+        await Assert.That(help.Find(".learning-help__content").HasAttribute("dir")).IsFalse();
+    }
+
+    [Test]
     [Arguments(false, "anonymous")]
     [Arguments(true, "anonymous")]
     [Arguments(false, "authenticated")]

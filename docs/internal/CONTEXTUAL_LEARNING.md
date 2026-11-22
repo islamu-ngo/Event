@@ -95,6 +95,11 @@ administration destinations come from the existing shell's advertised settings
 scopes and are not rendered into static public HTML. A missing tenant does not
 create an instance-owned learner row.
 
+Each Help text block uses native `dir="auto"` independently of the disclosure
+and its positioned container. Translated Arabic and retained English fallback
+copy therefore choose their own paragraph direction without changing the shell's
+RTL layout. Dynamic scope names retain their existing `bdi` isolation.
+
 `PrivateLearningPanel` remains separate from the actor's public representation.
 Initial rendering exposes a public-safe placeholder only. Interactive admission
 reads the current user's resource to identify the personal actor, or checks the

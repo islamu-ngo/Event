@@ -96,18 +96,18 @@ public sealed class LearningGeneratedContractTests
         var update = schemas.GetProperty("UpdateLearningGuidancePolicyRequest");
         await Assert.That(update.GetProperty("additionalProperties").ValueKind).IsEqualTo(JsonValueKind.False);
         await Assert.That(update.GetProperty("required").EnumerateArray().Select(value => value.GetString())
-                .Where(value => value is not null))
+                .Select(value => value ?? throw new JsonException("A schema member must be a string.")))
             .IsEquivalentTo(new[] { "expectedConcurrencyStamp", "policy" });
         var updateStamp = update.GetProperty("properties").GetProperty("expectedConcurrencyStamp");
         await Assert.That(updateStamp.GetProperty("type").EnumerateArray().Select(value => value.GetString())
-                .Where(value => value is not null))
+                .Select(value => value ?? throw new JsonException("A schema member must be a string.")))
             .IsEquivalentTo(new[] { "null", "string" });
         await Assert.That(updateStamp.GetProperty("format").GetString()).IsEqualTo("uuid");
 
         var policy = schemas.GetProperty("LearningGuidancePolicyDto");
         var policyProperties = policy.GetProperty("properties");
         await Assert.That(policy.GetProperty("required").EnumerateArray().Select(value => value.GetString())
-                .Where(value => value is not null))
+                .Select(value => value ?? throw new JsonException("A schema member must be a string.")))
             .IsEquivalentTo(new[] { "schemaVersion", "defaultsVersion", "concurrencyStamp", "policy" });
         foreach (string name in new[] { "schemaVersion", "defaultsVersion", "concurrencyStamp", "policy" })
             await Assert.That(policyProperties.TryGetProperty(name, out _)).IsTrue();
@@ -115,14 +115,14 @@ public sealed class LearningGeneratedContractTests
         await Assert.That(policyProperties.TryGetProperty("CanEdit", out _)).IsFalse();
         var policyStamp = policyProperties.GetProperty("concurrencyStamp");
         await Assert.That(policyStamp.GetProperty("type").EnumerateArray().Select(value => value.GetString())
-                .Where(value => value is not null))
+                .Select(value => value ?? throw new JsonException("A schema member must be a string.")))
             .IsEquivalentTo(new[] { "null", "string" });
         await Assert.That(policyStamp.GetProperty("format").GetString()).IsEqualTo("uuid");
 
         var payload = schemas.GetProperty("LearningGuidancePolicyPayload");
         await Assert.That(payload.GetProperty("additionalProperties").ValueKind).IsEqualTo(JsonValueKind.False);
         await Assert.That(payload.GetProperty("required").EnumerateArray().Select(value => value.GetString())
-                .Where(value => value is not null))
+                .Select(value => value ?? throw new JsonException("A schema member must be a string.")))
             .IsEquivalentTo(new[]
             {
                 "enabled", "automaticInvitations", "invitationAudience", "manualAccessAudience",
@@ -139,7 +139,7 @@ public sealed class LearningGeneratedContractTests
         var familyOverride = schemas.GetProperty("LearningGuidanceFamilyOverrideDto");
         await Assert.That(familyOverride.GetProperty("additionalProperties").ValueKind).IsEqualTo(JsonValueKind.False);
         await Assert.That(familyOverride.GetProperty("required").EnumerateArray().Select(value => value.GetString())
-                .Where(value => value is not null))
+                .Select(value => value ?? throw new JsonException("A schema member must be a string.")))
             .IsEquivalentTo(new[] { "family", "enabled", "automaticInvitations" });
         await Assert.That(familyOverride.GetProperty("properties").EnumerateObject().Select(property => property.Name))
             .IsEquivalentTo(new[]
@@ -165,7 +165,7 @@ public sealed class LearningGeneratedContractTests
         var request = schemas.GetProperty("LearningAcknowledgeRequirementRequest");
         await Assert.That(request.GetProperty("additionalProperties").ValueKind).IsEqualTo(JsonValueKind.False);
         await Assert.That(request.GetProperty("required").EnumerateArray().Select(value => value.GetString())
-                .Where(value => value is not null))
+                .Select(value => value ?? throw new JsonException("A schema member must be a string.")))
             .IsEquivalentTo(new[]
             {
                 "intentId", "expectedScopeStamp", "expectedRevision", "expectedPolicySourceStamp", "materialVersion"
@@ -187,7 +187,7 @@ public sealed class LearningGeneratedContractTests
         var requirement = schemas.GetProperty("LearningRequirementDto");
         var requirementProperties = requirement.GetProperty("properties");
         await Assert.That(requirement.GetProperty("required").EnumerateArray().Select(value => value.GetString())
-                .Where(value => value is not null))
+                .Select(value => value ?? throw new JsonException("A schema member must be a string.")))
             .IsEquivalentTo(new[] { "requirementKey", "materialVersion", "status", "policySourceStamp" });
         foreach (string name in new[]
         {
@@ -195,7 +195,8 @@ public sealed class LearningGeneratedContractTests
         })
             await Assert.That(requirementProperties.TryGetProperty(name, out _)).IsTrue();
         await Assert.That(requirementProperties.GetProperty("acknowledgedAtUtc").GetProperty("type")
-                .EnumerateArray().Select(value => value.GetString()).Where(value => value is not null))
+                .EnumerateArray().Select(value => value.GetString()
+                    ?? throw new JsonException("A schema member must be a string.")))
             .IsEquivalentTo(new[] { "null", "string" });
         await Assert.That(requirementProperties.GetProperty("acknowledgedAtUtc").GetProperty("format").GetString())
             .IsEqualTo("date-time");
@@ -211,7 +212,7 @@ public sealed class LearningGeneratedContractTests
             var schema = schemas.GetProperty(enumeration.Key);
             await Assert.That(schema.GetProperty("type").GetString()).IsEqualTo("string");
             await Assert.That(schema.GetProperty("enum").EnumerateArray().Select(value => value.GetString())
-                    .Where(value => value is not null))
+                    .Select(value => value ?? throw new JsonException("A schema member must be a string.")))
                 .IsEquivalentTo(enumeration.Value);
         }
 

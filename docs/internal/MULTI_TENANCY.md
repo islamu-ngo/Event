@@ -39,6 +39,73 @@ evaluation. Provider metadata reads only the instance portion of the fixed
 authority-key snapshot, so tenant settings cannot replace instance authentication
 provider configuration. Neither path grants private event management authority.
 
+## Root Tenant Creation
+
+`TenantController.Create` carries method-level `[InstanceManagement]` metadata.
+`ApiTenantResolutionMiddleware` therefore allows the exact `POST /api/tenant`
+action to reach authentication without binding an existing tenant. Public tenant
+lifecycle gating uses the same instance-owned classification. This does not
+exempt the controller's collection reads or navigation actions.
+
+The action retains `[Authorize]`, authenticated endpoint classification, linked
+application-user resolution, and the secure `Tenant/create` command. The
+`TenantCreation` policy-mutation scope and human creator retain the original
+Global owner, credential evidence, policy authorization, admission checks, and
+transaction custody. Routing metadata supplies no creation authority.
+
+During the first graph save, disclosure capture excludes only `Tenant` parents
+that are `Added` in that same save from persisted-parent fencing. Their INSERT
+and foreign keys establish the new graph; there is no committed audience to
+lock yet. Existing tenant parents and the creator's User row retain their fences.
+The original connector-bound creation receipt must complete before finalization,
+which preserves the canonical initial disclosure epoch of one. Failed inserts
+cannot publish a receipt or authorize settlement, including an attempted reuse
+of an existing tenant ID. No Runtime disclosure-routine privilege is granted to
+the Global creator.
+
+## Visitor read admission
+
+An active directory's visitor mode and its lifecycle are separate authorities.
+`AuthenticatedOnly` requires an authenticated API principal before tenant content
+is read; it does not attest tenant membership or replace resource ACLs.
+`FullRegistrationAndAuth`, `AnonymousOnly` and `DirectoryListingOnly` retain
+anonymous browsing. A successfully absent visitor setting defaults to public;
+malformed or unavailable authoritative settings never do.
+
+`VisitorTenantReadAccessPolicy` reads the current selected-tenant hierarchy,
+including instance locks. `TenantVisitorReadAccessMiddleware` runs after trusted
+tenant/authentication binding and before idempotency, output caching and ETag
+evaluation. Tenant binding, lifecycle and read admission share the same surface
+classifier: matched API controller actions are included even outside `/api`,
+alongside the API and configured MCP paths. Denials are no-store Problem Details: 401 with a Bearer challenge for
+missing authentication, 503 for unavailable policy and 404 for missing tenancy.
+Only exact bootstrap or independently authorized capability actions carry
+`TenantReadBootstrap`; an anonymous endpoint classification alone grants no
+exception. Existing setup, credential, signed-callback and narrow order-recovery
+authority remains responsible for those actions.
+Exact `TenantLifecycleManagement` actions retain the lifecycle middleware's
+validated `CanManageAsync` decision. Authenticated self-session and administrator
+synchronization bootstrap retains its existing lifecycle/owner checks, rather
+than requiring publication merely to finish configuring a directory.
+
+Native discovery, event details, calendars, public images and source projections
+call the same Application policy. Stored discovery membership is admitted again
+before reuse, preventing old counts or cursors from becoming read authority.
+Sitemap projections and machine-public AT Protocol snapshots evaluate anonymous eligibility,
+including when an authenticated publisher or worker requests the projection.
+The existing publication planner converts an ineligible update to withdrawal
+when it has an owned remote record; delivery rebuilds that projection.
+An unavailable read policy instead propagates typed denial. It is not evidence
+of a privacy closure and cannot authorize withdrawal of an existing remote record.
+`TenantMachinePublicRead` additionally requires that anonymous decision before
+HTTP sitemap caching or conditional replay, regardless of caller authentication.
+
+Privacy linearizes at read admission. A policy change committed before admission
+denies the new anonymous read even when output invalidation is delayed. Work
+already admitted may finish, and previously public downloads cannot be recalled.
+Setting changes also evict the common `tenant-public-reads` response tag through
+the existing discovery invalidator; eviction is hygiene, not authorization.
+
 ## Tenant Directory-Operator Identity
 
  Every tenant has an authoritative typed directory-operator identity document,
@@ -103,6 +170,19 @@ Admin-host classification is deployment-static BFF configuration, not tenant rou
 For standard authenticated-browser requests, the middleware binds the resolved tenant into the request-scoped tenant context accessor immediately.
 
 For API-key requests, `ApiTenantResolutionMiddleware` can store a requested tenant hint in `HttpContext.Items["__requested_tenant_id"]` and defer final tenant binding to `ApiTenantPostAuthenticationMiddleware` after authentication succeeds. Tenant-bound API keys bind their persisted tenant when no mismatch exists. `InstanceAdmin` API keys are nullable credentials, but tenant-scoped API and MCP requests still require an execution tenant: an explicit tenant hint binds that tenant, single-tenant mode binds the configured default tenant, and unresolved tenant-scoped API/MCP requests fail closed with `404` and `code=tenant_required`. Only explicit host-administration API routes may continue without tenant context.
+
+## Instance-Management Tenant Exemption
+
+Actions marked with the method-level `[InstanceManagement]` attribute are
+installation-scoped, including the `/api/admin/instance/*` control plane and
+instance onboarding/settings actions. Tenant resolution deliberately does not bind
+a tenant for those exact actions. HAL instance-setting batches evaluate through
+instance authority without building a tenant profile or requesting a default tenant.
+Tenant creation may use that path before a tenant row exists. An instance-setting
+or tenant-creation batch presented to the local provider with other resource checks
+is denied if its resolved tenant is empty. The runtime provider may separately
+evaluate dedicated-resource and discovery checks under their own authority policies.
+See [ADR-021](adr/ADR-021-instance-scoped-hal-authorization.md).
 
 ## Default Tenant Fallback
 

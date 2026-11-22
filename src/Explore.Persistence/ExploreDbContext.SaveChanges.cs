@@ -174,7 +174,10 @@ public partial class ExploreDbContext
                 (entry.State == EntityState.Added || entry.State == EntityState.Modified) &&
                 (entry.State == EntityState.Modified || concurrencyAware.ConcurrencyStamp == Guid.Empty))
             {
-                concurrencyAware.ConcurrencyStamp = Guid.CreateVersion7();
+                Guid stamp = Guid.CreateVersion7();
+                if (entry.Entity is Explore.Domain.Event stampedEvent)
+                    HumanEventProviderWrites?.RecordPreparedStamp(stampedEvent, stamp);
+                concurrencyAware.ConcurrencyStamp = stamp;
             }
 
             if (entry.Entity is IAuditableEntity auditable)
@@ -218,7 +221,7 @@ public partial class ExploreDbContext
                 }
             }
         }
-
+        HumanEventProviderWrites?.StagePreparedEvents();
     }
 
     private void ValidateRegistrationProviderConnectionSecrets()

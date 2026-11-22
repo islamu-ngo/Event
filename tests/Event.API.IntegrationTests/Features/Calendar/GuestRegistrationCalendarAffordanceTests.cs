@@ -28,7 +28,8 @@ public sealed class GuestRegistrationCalendarAffordanceTests
         var tenant = Substitute.For<ITenantContext>();
         tenant.TenantId.Returns(Guid.NewGuid());
         var projection = await new GetEventCalendarExportRequestHandler(new Owner(outcome), tenant,
-            Substitute.For<IEventLocationDisclosureService>(), TimeProvider.System)
+            Substitute.For<IEventLocationDisclosureService>(), TimeProvider.System,
+            new Event.Testing.Settings.VisitorReadPolicyTestAuthority(tenant.TenantId).Policy)
             .QueryAsync(new(eventId), CancellationToken.None);
         var query = Substitute.For<IQueryHandler<GetEventCalendarExportRequest, PublicEventCalendarProjection?>>();
         query.QueryAsync(Arg.Any<GetEventCalendarExportRequest>(), Arg.Any<CancellationToken>()).Returns(projection);

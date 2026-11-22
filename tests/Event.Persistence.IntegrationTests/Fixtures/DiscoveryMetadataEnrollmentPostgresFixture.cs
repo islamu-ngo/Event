@@ -29,6 +29,7 @@ internal sealed class DiscoveryMetadataEnrollmentPostgresFixture : IAsyncDisposa
             .WithDatabase("discovery_metadata_enrollment")
             .WithUsername("postgres")
             .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
+            .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
             .Build();
         string suffix = Guid.CreateVersion7().ToString("N")[..12];
         _logins = new[] { PrimaryDatabaseRole.Runtime, PrimaryDatabaseRole.Global,

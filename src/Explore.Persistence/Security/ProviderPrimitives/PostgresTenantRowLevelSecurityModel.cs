@@ -168,7 +168,7 @@ public static class PostgresTenantRowLevelSecurityModel
         var defaultSchema = context.GetService<IDbContextOptions>()
             .FindExtension<RelationalNamespaceOptionsExtension>()?.TargetSchema;
 
-        var tables = GetTenantTables(context.Model);
+        var tables = context.GetTenantTableInventory();
         if (tables.Count == 0)
         {
             return;
@@ -206,7 +206,7 @@ public static class PostgresTenantRowLevelSecurityModel
         var defaultSchema = context.GetService<IDbContextOptions>()
             .FindExtension<RelationalNamespaceOptionsExtension>()?.TargetSchema;
 
-        var tables = GetTenantTables(context.Model);
+        var tables = context.GetTenantTableInventory();
         if (tables.Count == 0)
         {
             return;

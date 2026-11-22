@@ -46,7 +46,7 @@ public static class PostgresAtprotoFederationSettingPermissions
                     _ => typeof(string)
                 })))
                 throw new InvalidOperationException("federation_settings_model_shape_drift");
-            var tenantTable = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+            var tenantTable = context.GetTenantTableInventory()
                 .SingleOrDefault(table => table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
             if (source.Tenant
                 ? tenantTable is not { AllowsNullTenant: false, ParentJoin: null, TenantIdColumn: not null }
@@ -353,7 +353,7 @@ public static class PostgresAtprotoFederationSettingPermissions
 
     private static string TenantPolicyPredicate(ExploreDbContext context, Source tenant)
     {
-        var table = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var table = context.GetTenantTableInventory()
             .Single(value => value.TableName == tenant.Name && (value.Schema ?? tenant.Schema) == tenant.Schema);
         string prefix = PostgresTenantRowLevelSecurityModel.BuildPolicyFingerprintPrefix(table, tenant.Schema);
         return $"""

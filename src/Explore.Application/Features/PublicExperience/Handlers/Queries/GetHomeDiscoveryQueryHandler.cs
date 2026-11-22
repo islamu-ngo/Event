@@ -2,6 +2,7 @@ using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.Events.Requests.Queries;
@@ -24,7 +25,8 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
     IHierarchicalSettingsResolver settingsResolver,
     ILocationRepository locationRepository,
     TimeProvider timeProvider,
-    ILogger<GetHomeDiscoveryQueryHandler> logger)
+    ILogger<GetHomeDiscoveryQueryHandler> logger,
+    IVisitorTenantReadAccessPolicy visitorRead)
     : IQueryHandler<GetHomeDiscoveryQuery, HomeDiscoveryDto>
 {
     private const int HeroLimit = 10;
@@ -42,6 +44,7 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
         GetHomeDiscoveryQuery request,
         CancellationToken cancellationToken)
     {
+        await visitorRead.RequireAsync(tenantContext.TenantId, cancellationToken);
         var generatedAt = timeProvider.GetUtcNow();
         var allocator = new HomeDiscoveryAllocator(generatedAt);
         var context = new HomeDiscoveryContextDto();

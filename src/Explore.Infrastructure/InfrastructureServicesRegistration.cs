@@ -87,6 +87,12 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<IConfigurationTransferDestinationResolver,
             ConfigurationTransferDestinationResolver>();
         services.AddOptions<PhotonGeocodingOptions>()
+            .Configure(options =>
+            {
+                // An explicit schedule replaces defaults rather than extending them during binding.
+                if (configuration.GetSection($"{PhotonGeocodingOptions.SectionName}:RetryDelaysMilliseconds").Exists())
+                    options.RetryDelaysMilliseconds = [];
+            })
             .Bind(configuration.GetSection(PhotonGeocodingOptions.SectionName))
             .ValidateOnStart();
         services.AddSingleton<
@@ -344,7 +350,9 @@ public static class InfrastructureServicesRegistration
             sp.GetRequiredService<TimeProvider>()));
 
         // Legacy S3-compatible object storage service. New local-first flows use IFileStorageProvider.
-        services.AddScoped<IS3ConfigResolver, S3ConfigResolver>();
+        services.AddScoped<S3ConfigResolver>();
+        services.AddScoped<IS3ConfigResolver>(sp => sp.GetRequiredService<S3ConfigResolver>());
+        services.AddScoped<IInstanceS3ConfigResolver>(sp => sp.GetRequiredService<S3ConfigResolver>());
         services.AddHierarchicalSettingsReader();
         services.AddSingleton<S3ConfigCacheRegistry>();
         services.AddSingleton<IS3ClientFactory, S3ClientFactory>();
@@ -365,6 +373,7 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<ISupportAccessSessionService, SupportAccessSessionService>();
         services.AddScoped<IPublicUrlBuilder, PublicUrlBuilder>();
         services.AddScoped<IEventReportEvidenceProtector, EventReportEvidenceProtector>();
+        services.AddScoped<ILocalVisitorEnrollmentIntentProtector, LocalVisitorEnrollmentIntentProtector>();
         services.AddScoped<ModerationRecognitionKeyRingProvider>();
         services.AddScoped<IModerationRecognitionKeyRingProvider>(provider =>
             provider.GetRequiredService<ModerationRecognitionKeyRingProvider>());
@@ -564,6 +573,7 @@ public static class InfrastructureServicesRegistration
         // Configuration audit logging
         services.AddScoped<IConfigurationChangeLogService, ConfigurationChangeLogService>();
         services.AddScoped<IAuthorizationProviderConfigurationService, AuthorizationProviderConfigurationService>();
+        services.AddSingleton<ICerbosEndpointHealthProbe, CerbosEndpointHealthProbe>();
         services.AddHttpClient<IKeycloakAdminClient, KeycloakAdminClient>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);

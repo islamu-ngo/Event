@@ -20,6 +20,17 @@
 - Current-state strengths and pain points both cite concrete evidence.
 - Related active or paused work was checked for overlap and conflicts.
 
+## PR Scope Gate
+
+- Every phase and task in plan, tasks and context sits under a stable PR scope ID; reordering scopes did not rename them.
+- Each scope states the [required definition](pr-scope-contract.md#required-scope-definition): independently usable outcome, requirements/scenarios, predecessors and consumed contracts, owned paths and exclusions, I-VSD IDs, acceptance, PR acceptance gate, release/docs impact, rollback, and downstream obligations.
+- Each scope is independently mergeable. A large PR renamed as a scope fails when smaller independently mergeable outcomes exist; a split that leaves contradictory merged instructions or unusable intermediate states also fails.
+- Readiness conditions are explicit; an approved programme does not make every future scope Ready.
+- The next candidate is executable in detail; later scopes may carry rolling detail but retain every required outcome, dependency and acceptance criterion. No required work moved to backlog.
+- The `tasks.md` registry lists every scope with delivery, reconciliation, cleanup and delegation fields; `plan.md` carries none of that mutable state.
+- Re-baselines left delegated snapshots untouched and recorded amendments for their live owner.
+- Each PR scope maps to exactly one item row in the Plane Tracking Plan; M/L grouping parents have no PR branch. Never create rows per phase.
+
 ## Contract Gate
 
 - Every relevant implementation intent was captured.
@@ -41,31 +52,41 @@
 - Every task names exact files or a bounded investigation that will discover them.
 - Every task includes observable acceptance criteria, dependencies, effort, and required guidance.
 - Phases are reviewable slices with rollback or failure-diagnosis guidance.
-- **Clean Architecture Slicing & 3-Ring Progressive Verification**:
-  - **Ring 1 (Inner Loop, < 2s)**: Subtasks specify fast in-memory TUnit slicing (`--treenode-filter "/*/*/*<TestClass>/*"`) targeting `Event.Domain.UnitTests` or `Event.Application.UnitTests`. Zero Docker containers or network I/O in the inner loop. Pure domain invariants (normalization, validation, state machines) belong in Domain unit tests (< 50ms).
-  - **Ring 2 (Phase Exit Gate, < 15s)**: Every intermediate phase ends with exactly one Release build (`dotnet build -c Release -v q`) and at most one fastest relevant project test against ONE selected provider (e.g. SQLite in-memory or single PostgreSQL container). **Planning multi-database provider matrix runs or container sweeps during intermediate phases is strictly forbidden.**
-  - **Ring 3 (Plan Exit Gate)**: The full 5-database provider matrix (PostgreSQL, SQLite, SQL Server, MySQL), EF Core migrations, and `Event.Architecture.Tests` are planned strictly at the final plan exit before PR creation.
+- **Clean Architecture Slicing & Proportional Verification**: verification follows the [Verification Gates](#verification-gates) below.
 - **Yak-Shaving Quarantine Rule**: The plan must forbid agents from absorbing, debugging, or fixing pre-existing test rot or broken fixtures outside the task scope. When unrelated tests fail, agents must reproduce on clean base, log under `*-context.md` / `dev/backlog/`, quarantine the failure, and proceed with the assigned deliverable.
 - Tests are specified against public contracts (native CQS requests, HTTP routes, ProblemDetails RFC 7807, database states) rather than private implementation details.
-- Every phase then ends with a self-sufficient declarative commit contract. If a phase touches dozens or hundreds of files or multiple separable layers, it sequences multiple atomic commit contracts following `conventional-commit`. The commit stages and commits strictly phase-owned files on the task branch (`feat/<task-name>`), verifying clean status before completing the phase. Normal execution does not reload `conventional-commit`.
+- Every phase then ends with a self-sufficient declarative commit contract. If a phase touches dozens or hundreds of files or multiple separable layers, it sequences multiple atomic commit contracts following `conventional-commit`. The commit stages and commits strictly phase-owned files on the selected PR's task branch, accounting for remaining working-tree changes before completing the phase. Normal execution does not reload `conventional-commit`.
 - Message overrides are limited to explicit user-driven outcome changes, atomic phase splits, material implementation divergence, changed breaking/change-fragment classification, or a planned message that became factually false. Stylistic preference is never sufficient.
 - Only an allowed override loads `conventional-commit`; every resulting actual contract repeats the declarative schema before any commit executes.
 - Phase-attributable failures block the commit and must be resolved before phase completion.
-- The plan contains no app startup, Playwright, browser automation, Chrome DevTools MCP, visual QA, E2E, Docker/Aspire startup, live-service smoke, or manual runtime walkthrough.
+- Runtime, browser, container, or provider-matrix checks appear only where a matched intent, path rule, or the PR's changed surface requires them, and then in that PR's acceptance gate rather than as phase-level ritual.
+
+## Verification Gates
+
+These gates apply the authoritative [verification policy](../../../../docs/internal/OPERATIONS.md#verification-policy), [testing rings](../../../../docs/internal/TESTING.md) and [AGENTS.md §8](../../../../AGENTS.md#8-verification-baseline) to PR-scoped programmes; they do not weaken any product check.
+
+- **Ring 1 (inner loop, < 2s)**: subtasks use in-memory TUnit slicing (`--treenode-filter "/*/*/*<TestClass>/*"`) in Domain or Application unit tests; no containers or network I/O. Required security invariant-breaker Red tests run once before their implementation.
+- **Phase gate (Ring 2, < 15s)**: one targeted Release build and at most one fastest relevant project test against one selected provider. Never plan provider matrices or container sweeps at intermediate phases.
+- **PR acceptance gate**: before review handoff and merge, every check the PR's changed surface and matched intents require — the applicable provider matrix and migrations for persistence changes, architecture tests, security invariant-breakers, integration or UI verification mandated by a path rule such as the [Blazor workflow](../../../../docs/internal/BLAZOR_DEV_WORKFLOW.md). Checks cannot be deferred merely because more programme PRs remain; a later PR never owns the first validation of merged changes.
+- **Programme acceptance**: cross-capability scenarios are planned once, after their prerequisite scopes merge, and must be resolved before the programme retires.
+- **Tier 4**: documentation and agent-context scopes use metadata, link, schema and diff checks; never .NET builds or tests.
+- **Execution profile**: builds and tests run sequentially one project at a time under the selected resource profile (AGENTS rule 21).
+- **User overrides**: an explicit programme-specific verification override is recorded in plan Section 7 and context, never generalized to other programmes, and each PR handoff discloses the checks it left unrun.
 
 ## Continuity Gate
 
 - The stable task name and `Last Updated: YYYY-MM-DD Europe/Brussels` appear in all three files.
-- Plan, context, and tasks agree on status, current priority, next action, blockers, task ids, decisions, risks, and verification.
+- Plan, context, and tasks agree on status, PR scope IDs, registry state, current priority, next action, blockers, task ids, decisions, risks, and verification.
 - Plan, context, and tasks agree on I-VSD path, status/disposition, CTO-review status, and user-approval status.
 - **Dev-Doc Triad Single Responsibility**: `plan.md` defines architectural phase exit criteria without embedding granular task execution checklists, checkboxes (`- [ ]`), or session handoffs; `tasks.md` is the sole hot execution ledger; `context.md` is the ephemeral session memory and handoff log.
 - Context puts resume state and blockers near the top.
 - Tasks are checkable and mirror the plan's phases.
 - The implementation-agent contract makes `tasks.md` the hot ledger, batches task updates at phase milestones, and separates implementation completion, verification disposition, and the phase commit.
-- Every phase records exact phase-owned paths, a concrete planned declarative commit contract, and post-verification commit checkboxes; completed phases confirm clean status on the feature branch.
+- Every phase records exact phase-owned paths, a concrete planned declarative commit contract, and post-verification commit checkboxes; completed phases account for remaining working-tree changes.
 - Executive summaries, planned commit messages, and decision briefs pass the [shared readability check](../../conventional-commit/resources/reader-first-writing.md#readability-check): concrete meaning first, sufficient technical detail next.
 - Context and plan update triggers are narrow enough to prevent documentation churn, while a dated handoff remains mandatory before pause or transfer.
-- Resume guidance reads tasks first and only relevant plan sections, avoiding repeated full-workstream rereads.
+- Resume guidance is context-first: it selects the active PR scope from the registry (active or in-review scope first, then the earliest Planned candidate passing readiness), never the first phase or first unchecked historical task, and reads only that scope's ledger and named plan sections.
+- No instruction moves the whole triad into a worktree, keeps two editable full copies, or retires the programme when one PR merges.
 
 ## Scope Gate
 
@@ -105,10 +126,10 @@ Created/updated implementation plan for `<task-name>`:
 <Concrete problem and what will change for users/operators or engineering work.
 Then explain the core technical approach and its important constraint.>
 
-### Phase Roadmap
-- **Phase 1: <Descriptive Name>** — <Concrete result, then components and behavior to verify>
-- **Phase 2: <Descriptive Name>** — <Concrete result, then components and behavior to verify>
-- ...
+### PR Roadmap
+- **PR-<OUTCOME> (<descriptive name>)** — <independently mergeable result, its phases, prerequisites, and the acceptance gate it must pass>
+- **PR-<NEXT> (<descriptive name>)** — <result, dependency on the earlier scope, rolling-detail status>
+- **Programme acceptance** — <cross-capability scenarios that run after the prerequisite scopes merge>
 
 ### Key Decisions & Trade-offs
 - <Choice and practical consequence, followed by the technical rationale>
@@ -116,8 +137,10 @@ Then explain the core technical approach and its important constraint.>
 ### Potential Risks & Hardest Unknowns
 <Short evidence-grounded paragraph naming the hardest unresolved area or edge case.>
 
-### Recommended Next Step & Approval Request
-<Explicit call for approval or specific direction to proceed with Phase 1, with options if applicable.>
+### Recommended Next Action
+
+Run /senior-cto-feedback in a fresh session if you want an adversarial Senior CTO architectural audit of the plan triad first, or
+Run /implement-tasks to start the first Ready PR scope after its readiness check.
 ```
 
 Do not say implementation started. If re-baselining, summarize what materially changed in the planning artifacts.

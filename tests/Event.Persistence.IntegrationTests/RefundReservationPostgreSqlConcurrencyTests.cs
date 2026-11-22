@@ -365,6 +365,7 @@ public sealed class RefundPostgreSqlContainerFixture : IAsyncInitializer, IAsync
         .WithDatabase("refund_test")
         .WithUsername("postgres")
         .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
+        .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
         .Build();
 
     public string ConnectionString

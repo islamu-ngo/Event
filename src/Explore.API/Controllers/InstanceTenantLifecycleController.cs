@@ -66,6 +66,7 @@ public sealed class InstanceTenantLifecycleController : EventControllerBase
     }
 
     [HttpGet("tenants/{tenantId:guid}", Name = RouteNames.GetInstanceAdminTenantById)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Get Instance Administration Tenant")]
@@ -99,6 +100,7 @@ public sealed class InstanceTenantLifecycleController : EventControllerBase
     }
 
     [HttpPost("tenants", Name = RouteNames.CreateInstanceAdminTenant)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -126,6 +128,7 @@ public sealed class InstanceTenantLifecycleController : EventControllerBase
     }
 
     [HttpPost("tenants/{tenantId:guid}/activate", Name = RouteNames.ActivateInstanceAdminTenant)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Activate Instance Administration Tenant")]
@@ -142,6 +145,7 @@ public sealed class InstanceTenantLifecycleController : EventControllerBase
         TransitionTenant(tenantId, TenantStatusEnum.Active, dto, cancellationToken);
 
     [HttpPost("tenants/{tenantId:guid}/suspend", Name = RouteNames.SuspendInstanceAdminTenant)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -159,6 +163,7 @@ public sealed class InstanceTenantLifecycleController : EventControllerBase
         TransitionTenant(tenantId, TenantStatusEnum.Suspended, dto, cancellationToken);
 
     [HttpPost("tenants/{tenantId:guid}/archive", Name = RouteNames.ArchiveInstanceAdminTenant)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -176,6 +181,7 @@ public sealed class InstanceTenantLifecycleController : EventControllerBase
         TransitionTenant(tenantId, TenantStatusEnum.Archived, dto, cancellationToken);
 
     [HttpPost("tenants/{tenantId:guid}/reactivate", Name = RouteNames.ReactivateInstanceAdminTenant)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -193,6 +199,7 @@ public sealed class InstanceTenantLifecycleController : EventControllerBase
         TransitionTenant(tenantId, TenantStatusEnum.Active, dto, cancellationToken);
 
     [HttpPost("tenants/{tenantId:guid}/schedule-purge", Name = RouteNames.ScheduleInstanceAdminTenantPurge)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]

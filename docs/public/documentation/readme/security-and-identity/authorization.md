@@ -8,6 +8,51 @@ Authorization in ISLAMU Event determines *what* an authenticated identity is per
 
 ---
 
+## PostgreSQL Metadata Readers
+
+Managed-domain collision checks and report synchronization health use the
+configured Global database login. Provision only the capability groups required
+by the running consumers: `event_managed_domain_global` exposes the two domain
+settings, while `event_report_operations_global` exposes synchronization and
+parent-deletion metadata. Neither permits administrative writes or report-body
+reads. Request Runtime credentials retain their tenant boundaries.
+
+For this storage-contract upgrade, stop the participating consumers, run the
+selected Migrator, then restart the matching application. The migrator replaces
+the former privileged reader functions with fixed read grants and row policies.
+Do not run mixed application versions. Missing rights or changed policies leave
+the consumer unavailable; repair them through the migrator rather than granting
+superuser, BYPASSRLS or owner access to Runtime or Global logins.
+
+## PostgreSQL Bootstrap Storage
+
+Bootstrap convergence uses the deployment's Global login to read and lock
+bootstrap state, create a configured pending generation, and supersede an older
+generation. The selected Migrator installs fixed column permissions for that
+workflow; it does not grant deletion, table-wide access, ownership or RLS bypass.
+Keep Runtime, Global and Migrator credentials separate.
+
+Apply the matching Migrator before restarting upgraded application hosts.
+A missing bootstrap storage grant blocks startup; the application does not
+repair database permissions or skip convergence to become healthy.
+
+## PostgreSQL Privacy Replay Storage
+
+Startup privacy replay uses the configured Global login for recognition receipt
+retention and recovery. Run the matching application Migrator before restarting
+the application: it installs the fixed recognition-state storage permissions
+needed by those C# workflows. Global owns checkpoint reads and appends. The
+separate Runtime login can read checkpoints and the metadata needed by readiness
+counters, but cannot append checkpoints. Neither can update or delete checkpoint
+history through these grants.
+Runtime credentials remain separate, and this
+installation does not grant superuser, BYPASSRLS or schema-owner privileges.
+
+A permission denial during replay leaves startup blocked. Repair the deployment
+through its selected Migrator rather than disabling replay or granting broad
+rights manually. Retained erasure facts, identity fences and replay checkpoints
+continue to determine whether startup may complete.
+
 ## Authorization Pipeline Flow
 
 Every mutation and sensitive query passes through a multi-stage, fail-closed authorization pipeline before reaching business logic:
@@ -327,6 +372,15 @@ inside the same transaction as projection rows, dirty markers and status
 changes. A posted tenant ID cannot select another tenant. These source changes
 and native regression cases are authored; execution remains pending.
 
+## Local lifecycle callback authority
+
+Local account lifecycle delivery reads the instance callback address through
+the ordinary settings purpose before selecting its identity writer. An invalid
+deployment override or a non-HTTPS address prevents sending; it cannot fall back
+to another host. Identity mirror repair still runs independently of delivery
+availability. No additional settings-table privileges are required for the
+identity writer.
+
 ## Current authority for API-key management
 
 Tenant-bound key details, policy changes and revocation use the current execution
@@ -344,10 +398,56 @@ for the selected-authority configuration.
 
 On PostgreSQL, migration-owned functions expose only those operations. Startup
 rejects missing or mismatched capability grants instead of promoting Runtime or
-Global privileges. Each operation rechecks the canonical actor and current
+Global privileges. Canonical migration enrolls the four declared purpose logins,
+including issuance, with inherited executor rights and no role-switching or
+membership-administration rights. Each operation rechecks the canonical actor and current
 administrator grant within its transaction, after the selected authorization
 provider allows the operation. Listing remains self-owned; an exact-key
 administrative read or mutation may target another administrator's key.
+
+Background queue admission uses the separately configured Global database login.
+Canonical PostgreSQL migration enrolls it for generic outbox, notification outbox
+and notification fanout admission. Those memberships allow the bounded admission
+operations without role switching, membership administration or arbitrary private
+table reads; they do not promote the ordinary Runtime login.
+Canonical migration likewise enrolls Global for bounded queue-drain and
+location-review health counts; those checks do not gain private record access.
+
+Webhook-effect and fair-return readiness use separate Global aggregate readers.
+Their database rights cover only the status and timing fields needed for counts,
+not retained messages, effect ownership, or writes. Readiness rejects altered
+permissions or tenant-bound sessions rather than treating an unauthorized query
+as an empty queue.
+
+Authorization-provider readiness reads saved instance configuration through a
+separate read owner. Ordinary application connections retain their existing
+restrictions. Missing saved settings remain distinguishable from defaults, and
+readiness does not acquire permission to change the configuration.
+
+PostgreSQL startup also enrolls the Global connection in the fixed public
+tenant-directory read capability. This supplies active tenant IDs, slugs and
+public domain coordinates without granting private tenant-table access or
+migration authority to serving hosts.
+
+The Global connection also receives the existing bounded email admission,
+stale-recovery and aggregate-health capability during canonical migration.
+Readiness must use that application purpose rather than granting email-function
+execution to the ordinary Runtime connection.
+
+RabbitMQ publication reads pointer metadata without loading email content or
+claiming SMTP delivery. Its database writes cover only publication markers.
+Global and tenant pauses, retry timing, redaction and soft deletion still govern
+selection. Repeated pointers remain possible after uncertain marker persistence;
+the SMTP worker's claim determines whether delivery work can proceed.
+
+Jetstream readiness uses independent instance-policy reads to determine which
+active tenants enable ingestion. Tenant overrides and instance locks remain
+authoritative; reading readiness does not promote the background caller's
+database permissions.
+
+Readiness continues to check current database privileges on every observation.
+Reusing generated validation text reduces repeated construction work without
+reusing earlier authorization decisions.
 
 Creation reveals a secret only in its initial successful response. Recovery
 returns digest-bound metadata, never a stored secret or credential hash.

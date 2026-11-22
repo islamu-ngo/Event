@@ -383,7 +383,9 @@ public sealed class PostgresStorageProbeSourceContractTests(PostgreSqlContainerF
             // mutate the shared fixture cluster or impersonate Runtime with SET ROLE.
             var container = new PostgreSqlBuilder("postgres:18-alpine")
                 .WithDatabase("storage_source_" + Guid.CreateVersion7().ToString("N"))
-                .WithUsername(original.Username!).WithPassword(original.Password!).Build();
+                .WithUsername(original.Username!).WithPassword(original.Password!)
+                .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
+                .Build();
             try
             {
                 await container.StartAsync();

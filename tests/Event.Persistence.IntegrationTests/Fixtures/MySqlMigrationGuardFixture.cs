@@ -36,6 +36,8 @@ public sealed class MySqlMigrationGuardFixture : IAsyncDisposable
                     .WithEnvironment(prefix + "_ROOT_PASSWORD", _password)
                     .WithWaitStrategy(Wait.ForUnixContainer()
                         .UntilInternalTcpPortIsAvailable(DatabasePort))
+                    .ApplyBoundedResourcePolicy(
+                        mariaDb ? Event.Testing.ContainerServiceRole.MariaDb : Event.Testing.ContainerServiceRole.MySql)
                     .Build();
                 _containers.Add(provider, container);
                 using var startup = new CancellationTokenSource(TimeSpan.FromMinutes(3));

@@ -102,14 +102,17 @@ public partial class ExploreDbContext
                 RequireCustody();
                 await DisclosureMutations.CaptureAsync(cancellationToken);
                 RequireCustody();
+                var userCreations = DisclosureMutations.PrepareUserCreations();
                 int saved = await PersistStorageReferencesAsync(
                     carriers, () => persist(acceptAllChangesOnSuccess), cancellationToken);
                 RequireCustody();
                 CompleteDiscoveryEnrollmentSave(enrollment, saved);
+                DisclosureMutations.CompleteUserCreations(userCreations);
                 return saved;
             }
             catch
             {
+                DisclosureMutations.InvalidateUserCreations();
                 FailDiscoveryEnrollmentSave();
                 if (changesHumanSources)
                     PoisonStorageReferenceTransaction();
@@ -148,9 +151,11 @@ public partial class ExploreDbContext
                     RequireCustody();
                     await DisclosureMutations.CaptureAsync(token);
                     RequireCustody();
+                    var userCreations = DisclosureMutations.PrepareUserCreations();
                     int saved = await PersistStorageReferencesAsync(carriers, () => persist(false), token);
                     RequireCustody();
                     CompleteDiscoveryEnrollmentSave(enrollment, saved);
+                    DisclosureMutations.CompleteUserCreations(userCreations);
                     await FlushDisclosureAsync(token);
                     RequireCustody();
                     commitStamps = CaptureStorageCommitStamps();

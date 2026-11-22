@@ -70,7 +70,7 @@ public sealed class GetInstanceOverviewQueryHandlerTests
         else
             profileReader.ReadCurrent().Returns(_ =>
                 throw new InvalidOperationException("authentication_credential_profile_unavailable"));
-        var bootstrapStates = Substitute.For<IInstanceBootstrapStateRepository>();
+        var bootstrapStates = Substitute.For<IInstanceBootstrapStateReader>();
         DateTime now = new(2026, 10, 7, 12, 0, 0, DateTimeKind.Utc);
         var bootstrap = InstanceBootstrapState.CreateInteractivePending(Guid.CreateVersion7(), DeploymentMode.MultiTenant, now);
         if (bootstrapCompleted)

@@ -1,0 +1,28 @@
+Change-Id: CHG-01M7ZW4A6ZWCN9X5515SQ0882E
+Title: "Restore instance bootstrap reads under restricted runtime"
+Type: fix
+Scope: onboarding
+Summary: "Read instance bootstrap state through the Global authority while retaining Runtime table denial."
+Group: instance-bootstrap-reader
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "Read-only runtime paths use the independent Global reader; Runtime direct table access remains denied and mutation owners retain their transaction fences."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: "Instance onboarding and administration can read bootstrap status under the restricted Runtime identity without expanding its database privileges."

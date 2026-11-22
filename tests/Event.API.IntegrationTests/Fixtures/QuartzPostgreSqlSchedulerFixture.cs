@@ -28,6 +28,7 @@ public sealed class QuartzPostgreSqlSchedulerFixture : IAsyncInitializer, IAsync
         .WithDatabase("quartz_scheduler_test")
         .WithUsername("postgres")
         .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
+        .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
         .Build();
 
     /// <summary>

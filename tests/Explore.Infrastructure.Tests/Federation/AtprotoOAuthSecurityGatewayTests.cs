@@ -130,7 +130,7 @@ public sealed class AtprotoOAuthSecurityGatewayTests
             tokenIssuer,
             claimAdministratorHandler,
             externalLogins,
-            Substitute.For<IInstanceBootstrapStateRepository>(),
+            Substitute.For<IInstanceBootstrapStateReader>(),
             Substitute.For<IAuthenticationProviderDispatcher>(),
             Substitute.For<IAuthProviderConfigurationService>(),
             new AtprotoJitAccountProvisioningOperation(
@@ -158,17 +158,7 @@ public sealed class AtprotoOAuthSecurityGatewayTests
             new VisitorAccessCapabilityResolver(
                 settingsReader,
                 new VisitorAccessProviderReader(configuration),
-                new TenantLifecycleAccessService(new TenantRepository(visitorSettings.Context),
-                    Substitute.For<Explore.Application.Contracts.Identity.IAdminContext>(),
-                    new InstanceBootstrapStateRepository(visitorSettings.Context),
-                    new Explore.Persistence.Services.TenantLookupSource(
-                        new Explore.Persistence.Database.GlobalExploreDbContextFactory(
-                            new Explore.Persistence.Database.PrimaryDatabaseConnectionOptions
-                            {
-                                Role = Explore.Persistence.Database.PrimaryDatabaseRole.Global,
-                                Provider = Explore.Persistence.Database.PrimaryDatabaseProvider.Sqlite,
-                                Database = visitorSettings.Context.Database.GetDbConnection().DataSource
-                            })))),
+                CreateTenantLifecycleAccessService(visitorSettings.Context)),
             tenantContext,
             configuration,
             TimeProvider.System,
@@ -177,7 +167,7 @@ public sealed class AtprotoOAuthSecurityGatewayTests
                 Substitute.For<Explore.Application.Contracts.Moderation.IModerationRecognitionContinuity>(),
                 TimeProvider.System, externalLogins,
                 () => throw new InvalidOperationException("A rejected DID cannot settle human enrollment.")),
-            null!); // DID mismatch fails before a native membership participant can be acquired.
+            null!, Substitute.For<ITenantUserRepository>()); // DID mismatch fails before a native membership participant can be acquired.
         var payload = JsonSerializer.SerializeToUtf8Bytes(CreateSession());
 
         var result = await handler.ExecuteAsync(new BootstrapAtprotoSessionCommand(
@@ -916,5 +906,21 @@ public sealed class AtprotoOAuthSecurityGatewayTests
                 return ValueTask.CompletedTask;
             }
         }
+    }
+
+    private static TenantLifecycleAccessService CreateTenantLifecycleAccessService(Explore.Persistence.ExploreDbContext context)
+    {
+        var globalFactory = new Explore.Persistence.Database.GlobalExploreDbContextFactory(
+            new Explore.Persistence.Database.PrimaryDatabaseConnectionOptions
+            {
+                Role = Explore.Persistence.Database.PrimaryDatabaseRole.Global,
+                Provider = Explore.Persistence.Database.PrimaryDatabaseProvider.Sqlite,
+                Database = context.Database.GetDbConnection().DataSource
+            });
+        return new TenantLifecycleAccessService(
+            new TenantRepository(context),
+            Substitute.For<Explore.Application.Contracts.Identity.IAdminContext>(),
+            new Explore.Persistence.Services.InstanceBootstrapStateReader(globalFactory, Substitute.For<IServiceProvider>()),
+            new Explore.Persistence.Services.TenantLookupSource(globalFactory));
     }
 }

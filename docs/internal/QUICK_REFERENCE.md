@@ -45,13 +45,14 @@ ABOUTME: Focuses on non-inferable constraints and project-specific behavior.
 33. **The 3-Ring Progressive Verification Model & Yak-Shaving Quarantine**:
     - **Ring 1 (Inner Loop / Sliced)**: In-progress subtasks run in-memory TUnit sliced tests (`--treenode-filter "/*/*/*<TestClass>/*"`) targeting `Event.Domain.UnitTests` or `Event.Application.UnitTests` (< 2s, 0 Docker containers, 0 network I/O). 90%+ of domain/normalization/validation invariants belong in Domain unit tests.
     - **Ring 2 (Phase Exit Gate)**: Verify the modified project against a single designated provider in < 15s.
-    - **Ring 3 (Plan Exit Gate)**: The full 5-database matrix, migrations, and architecture tests run strictly at plan exit before PR creation.
+    - **Ring 3 (PR Acceptance / Programme Exit)**: Each PR runs its applicable affected-provider, migration, architecture and other acceptance checks before merge. Final programme acceptance covers cross-capability promises when ready; later PRs cannot own the first validation of already merged behavior. Retain explicit user verification overrides with their boundaries and unrun-check limits.
     - **Yak-Shaving Quarantine**: Agents are strictly forbidden from fixing unrelated pre-existing test suite rot or fixture failures encountered during feature tasks. Prove if it reproduces on untouched base, log it in `*-context.md` / `dev/backlog/`, quarantine it, and proceed with the assigned scope.
 34. **Self-Documenting Code & Retirement of ABOUTME on Code**: Source code (`.cs`, `.razor`, `.css`) relies on Clean Architecture naming, directory structure, and standard C# XML doc comments (`/// <summary>`) for discovery. The legacy `ABOUTME:` comment prefix is officially retired for source code; agents must not generate it in new code. Internal documentation in `docs/internal/` and `.agents/` uses natural Markdown metadata blocks (`> **Audience:** ...`) or frontmatter. See [`docs/internal/GOVERNANCE.md`](GOVERNANCE.md#header--file-metadata-policy-natural-metadata--code-retirement).
 35. **No Warning Suppressions to Force Build/Tests**: Never suppress compiler warnings or analyzer diagnostics via `#pragma warning disable` or `[SuppressMessage]` to force a build through. Fix the underlying root cause. If an intentional compiler ratchet is needed, obtain maintainer approval for `Directory.Build.props`.
 36. **Execution Continuity Directive for Approved Tasks**: For tasks within an approved plan, continue implementation and proportional verification end-to-end without routine stage pauses. Pause only at material boundaries: requirement ambiguity, unexpected scope creep, irreversible actions, or explicit user direction.
 37. **Targeted Verification Default & Verification Evidence**: Always target verification against the specific affected project(s) by default using [`PROJECTS.md`](../../PROJECTS.md). Every task completion report must record exact commands executed and their outcomes, plus checks omitted with reasons. Never state or imply a build or test suite passed when it was not physically executed.
 38. **C# application authority; database storage**: Domain/Application own authorization, business rules, workflows, concurrency coordination and completion. EF Core/LINQ and supported provider APIs are the default; transactions, foreign keys, uniqueness, constraints and tenant RLS support that authority. Do not move business authority into stored procedures or privileged routines to deny legitimate application operations. Fixed permissions for an approved workflow are normal implementation; record credential-only compromise risk once rather than repeatedly reopening accepted decisions. See [the accepted decision and transition rules](adr/ADR-application-owned-persistence.md).
+39. **Project tracking with Plane (`EVENT`)**: Substantive work carries right-sized Plane tracking as code in gitignored `event/work/active-<task-slug>.yaml`: one tracked item per separately merged pull request (a single-PR plan owns 1 Work Item; a 2–5-PR plan owns 1 parent plus 1 Sub-item per PR; never an item per phase, test, review, or commit; more than 6 new items needs approval). `id:` stays omitted until the execution-start `plane push --work-only` mints uppercase `EVENT-XXX`; each PR is traced as `feat/EVENT-XXX-<slug>`, `Refs: EVENT-XXX`, and PR `- Plane: [EVENT-XXX]`. Items are completable vertical deliverables: Epics group programs, Surface Labels mark codebase surfaces, Version Modules (`v0.1.0`, `v1.0.0`) carry release urgency, and `priority` encodes functional criticality only. Tests, migrations, and docs caused by a feature are Definition of Done, not tickets. Hierarchy is `Epic → Work Item → Sub-item`, with chain depth ≤ 2. `plane-compose` owns YAML truth and Plane MCP owns remote-only operations; never add a custom Plane REST client. `--force`, `schema sync`, and `--prune` are forbidden without approval. See [the taxonomy standard §4.1](project-management/work-item-taxonomy-and-granularity-report.md#41-tracking-budget-per-implementation-plan-plan--plane-mapping) and [the Plane project management ADR](adr/ADR-plane-project-management-standardization.md) (mirrors `AGENTS.md` Critical Rule 20).
 
 ## Multi-Tenancy Reminder
 Browser tenant routing defaults to `/{slug}`. The BFF extracts the first path
@@ -98,11 +99,21 @@ Database defense-in-depth (PostgreSQL):
 
 ## Build And Test Baseline
 
+Programmes retain one canonical triad in the main checkout: programme → PR scope →
+phase → task. Execute one ready scope with merged/reconciled prerequisites and one
+live detailed owner; explicit user-selected in-tree execution uses the canonical
+selected section. Reconcile before review and after verified merge, preserve future
+sections and unmet required scope, and stop at that PR's review handoff. Worktree
+cleanup is separately authorized after preserving ignored/local work; the canonical
+programme survives intermediate merges. See the
+[scope contract](../../.agents/skills/implementation-plan/resources/pr-scope-contract.md)
+and [execution lifecycle](../../.agents/skills/implement-tasks/resources/pr-execution-lifecycle.md).
+
 1. Build: `dotnet build --configuration Release --verbosity quiet`
 2. Follow the **3-Ring Progressive Verification Model** (`AGENTS.md` §8):
    - **Ring 1 (< 2s)**: In-memory TUnit slicing (`--treenode-filter`) for subtasks.
    - **Ring 2 (< 15s)**: Single-project, single designated provider run for phase exits.
-   - **Ring 3 (Plan Exit)**: Multi-provider matrix and full suites run once at workstream exit.
+   - **Ring 3 (PR / Programme Exit)**: Run checks applicable to each PR before merge, then final cross-capability programme acceptance when its prerequisites exist. Documentation-only Tier 4 work uses metadata, links, scenario review and diff checks, with no .NET build/test.
 3. Use [`PROJECTS.md`](../../PROJECTS.md) for solution project roles and targeted verification commands.
 4. Enforce the **Yak-Shaving Quarantine Rule**: quarantine pre-existing test rot outside task scope.
 5. Provide a **Verification Evidence Report** on task completion (commands executed, outcomes, omitted checks with technical rationale).

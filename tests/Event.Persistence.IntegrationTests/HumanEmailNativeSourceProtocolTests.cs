@@ -330,7 +330,7 @@ public sealed class HumanEmailNativeSourceProtocolTests(PostgreSqlContainerFixtu
             Value = JsonSerializer.Serialize(new LocalCredentialStateMetadata(1, LocalCredentialState.Ready, operation, user.Id))
         }, new LocalIdentityCredentialOperation(new LocalCredentialOperationReceipt(operation,
             LocalCredentialOperationKind.Create, LocalCredentialOperationStage.ProvisioningPending,
-            user.Id, user.Id, actor.Id, login, DateTime.UtcNow), Guid.CreateVersion7()));
+            user.Id, user.Id, actor.Id, login, DateTime.UtcNow, null), Guid.CreateVersion7()));
         await context.SaveChangesAsync();
         await context.Set<LocalIdentityCredentialOperation>().Where(row => row.Id == operation)
             .ExecuteUpdateAsync(update => update.SetProperty(row => row.Stage, LocalCredentialOperationStage.Replaced));

@@ -52,7 +52,9 @@ public sealed class ModerationRecognitionKeyLifecycleReplicaOwner : IDisposable
                 {
                     using var competing = OpenOwnershipHandle(path);
                 }
-                catch (IOException exception) when ((exception.HResult & 0xffff) == (OperatingSystem.IsWindows() ? 33 : 32))
+                catch (IOException exception) when (
+                    (exception.HResult & 0xffff) == (OperatingSystem.IsWindows() ? 33 : 32)
+                    || OperatingSystem.IsLinux() && (exception.HResult & 0xffff) == 11)
                 {
                     excludesAnotherHandle = true;
                 }

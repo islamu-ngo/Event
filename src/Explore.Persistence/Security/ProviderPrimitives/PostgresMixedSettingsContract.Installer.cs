@@ -14,7 +14,7 @@ public static partial class PostgresMixedSettingsContract
         var contract = Privileges(context, enrollment);
         string roles = string.Join(",", Roles.Select(Text));
         string migrator = sql.Quote(enrollment.MigratorLogin);
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         var policySources = Sources(context).Where(source => tenantTables.Any(table =>
             table.TableName == context.Model.FindEntityType(source.Type)!.GetTableName())).ToArray();
         string memberships = string.Join("\n", contract.Memberships.Select(edge => $"""
@@ -32,16 +32,22 @@ public static partial class PostgresMixedSettingsContract
             return relation.Privileges.Count == 0 ? columns
                 : columns + $"\nGRANT {string.Join(",", relation.Privileges)} ON {sql.Name(relation.Name)} TO {OwnerRole};";
         }));
-        string definitions = string.Join("\n", Functions(context, enrollment).Select(function => $"""
-            CREATE OR REPLACE FUNCTION {FunctionSql(context, function.Name)}({function.Arguments}) RETURNS {function.Result}
-                LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $body${function.Body}$body$;
-            REVOKE ALL ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature}) FROM PUBLIC;
-            GRANT EXECUTE ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature})
-                TO {(function.Name is "learning_retain" or "learning_document" ? LearningReaderRole
-                    : function.Name == "email_consume" ? PostgresEmailDeliveryPolicyContract.OwnerRole
-                    : function.Result == "trigger" ? migrator : GlobalRole)};
-            COMMENT ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature}) IS {Text(Stamp + Hash(function.Body))};
-            """));
+        string definitions = string.Join("\n", Functions(context, enrollment).Select(function =>
+        {
+            var routine = contract.Routines.Single(candidate =>
+                candidate.Name == Prefix + function.Name && candidate.IdentityArguments == function.Signature);
+            string executeGrants = string.Join("\n", routine.Executors.Where(executor => executor != OwnerRole)
+                .Select(executor => $"GRANT EXECUTE ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature}) TO {sql.Quote(executor)};"));
+            return $"""
+                CREATE OR REPLACE FUNCTION {FunctionSql(context, function.Name)}({function.Arguments}) RETURNS {function.Result}
+                    LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $body${function.Body}$body$;
+                REVOKE ALL ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature}) FROM PUBLIC;
+                {executeGrants}
+                {(function.Result == "trigger"
+                    ? $"GRANT EXECUTE ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature}) TO {migrator};" : "")}
+                COMMENT ON FUNCTION {FunctionSql(context, function.Name)}({function.Signature}) IS {Text(Stamp + Hash(function.Body))};
+                """;
+        }));
         string triggers = string.Join("\n", Sources(context).Select(source => $"""
             CREATE TRIGGER {Prefix}changed BEFORE INSERT OR UPDATE OR DELETE OR TRUNCATE ON {sql.Table(source.Type)}
                 FOR EACH STATEMENT EXECUTE FUNCTION {FunctionSql(context, "changed")}();
@@ -58,7 +64,7 @@ public static partial class PostgresMixedSettingsContract
                 SELECT count(*) INTO existing FROM pg_catalog.pg_roles WHERE rolname IN ({roles});
                 IF existing <> 0 THEN
                     IF existing <> {Roles.Length} THEN RAISE EXCEPTION 'mixed_settings_partial_roles' USING ERRCODE = '55000'; END IF;
-                    {Guard(context, enrollment)}
+                    {CatalogueGuard(context, enrollment)}
                     {ExactBodies(context, enrollment)}
                     RETURN;
                 END IF;
@@ -106,7 +112,7 @@ public static partial class PostgresMixedSettingsContract
                 REVOKE EXECUTE ON FUNCTION {FunctionSql(context, "changed")}() FROM {migrator};
                 REVOKE EXECUTE ON FUNCTION {FunctionSql(context, "settlement")}() FROM {migrator};
                 PERFORM pg_catalog.set_config('role','none',true);
-                {Guard(context, enrollment)}
+                {CatalogueGuard(context, enrollment)}
                 {ExactBodies(context, enrollment)}
             END $bootstrap$;
             """;

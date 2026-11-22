@@ -27,7 +27,7 @@ public sealed class HumanPrincipalPortableSourceFenceTests(AdmissionAuthorityPro
     [Arguments(PrimaryDatabaseProvider.MariaDb)]
     public async Task EmptyPrincipalSourceRangesExcludeInsertionUntilOriginalOwnerEnds(PrimaryDatabaseProvider provider)
     {
-        await using var setup = Open(provider);
+        await using var setup = await OpenAsync(provider);
         bool sqlServer = provider == PrimaryDatabaseProvider.SqlServer;
         if (sqlServer)
             await setup.Database.ExecuteSqlRawAsync(
@@ -56,14 +56,14 @@ public sealed class HumanPrincipalPortableSourceFenceTests(AdmissionAuthorityPro
             new ClaimsPrincipal(new ClaimsIdentity(
                 [new Claim(ClaimTypes.NameIdentifier, Guid.CreateVersion7().ToString())], "fixture")),
             new ResolveCurrentUserIdByIdentityRequestHandler(new ExternalLoginAuthenticationRepository(
-                new GlobalExploreDbContextFactory(fixture.CreateOptions(provider, PrimaryDatabaseRole.Global)), null)),
+                new GlobalExploreDbContextFactory(await fixture.CreateOptionsAsync(provider, PrimaryDatabaseRole.Global)), null)),
             CancellationToken.None) ?? throw new InvalidOperationException("A human subject is required.");
-        await using var context = Open(provider);
+        await using var context = await OpenAsync(provider);
         var source = new HumanPrincipalSourceFence(context, subject, PolicySourceSetPurpose.Global);
         var sets = new PolicySourceSetFence(context, PolicySourceSetPurpose.Global);
         await using var owner = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var held = await source.AcquireAsync(await sets.AcquireAsync());
-        await using var writer = Open(provider);
+        await using var writer = await OpenAsync(provider);
         await writer.Database.OpenConnectionAsync();
         await writer.Database.ExecuteSqlRawAsync(sqlServer
             ? "SET LOCK_TIMEOUT 0" : "SET SESSION innodb_lock_wait_timeout = 1");
@@ -82,10 +82,10 @@ public sealed class HumanPrincipalPortableSourceFenceTests(AdmissionAuthorityPro
         await Assert.ThrowsAsync<InvalidOperationException>(() => held.ValidateAsync());
     }
 
-    private ExploreDbContext Open(PrimaryDatabaseProvider provider)
+    private async Task<ExploreDbContext> OpenAsync(PrimaryDatabaseProvider provider)
     {
         var options = TestDbContextOptions.Create<ExploreDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.CreateOptions(provider));
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, await fixture.CreateOptionsAsync(provider));
         return new ExploreDbContext(options.Options);
     }
 

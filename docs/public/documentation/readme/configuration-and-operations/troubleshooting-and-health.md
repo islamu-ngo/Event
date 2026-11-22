@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 If startup fails and cleanup also reports an error, both failures are retained. Diagnose the startup error as well as the cleanup error; a cleanup failure does not replace the original startup failure. No configuration change or data reset is required for this behavior.
 
+If PostgreSQL migration in the default schema reports `tenant_lease_not_bound`
+during policy installation, use the corrected migration process with the existing
+migrator credentials and schema. The migrator owns the required execution lease;
+no tenant identifier or new configuration key is needed. Do not switch the API
+to the migrator account, change schemas as a workaround, or bypass lease guards.
+
 Setup Live enrollment and write receipts require the Runtime storage permissions
 installed by the current database migration process. If an enrollment request
 fails with PostgreSQL permission error `42501`, apply the updated migration
@@ -1786,6 +1792,29 @@ The platform exposes standardized, sanitized health endpoints:
 | `/health` | `GET` | **Readiness Probe**: Checks required infrastructure and reports optional-service health. | `200 OK` with sanitized JSON status |
 
 Both `Healthy` and `Degraded` readiness return HTTP 200. `Unhealthy` returns HTTP 503. Inspect the individual checks to distinguish an optional email incident from a core dependency failure.
+
+The `mcp-adapter` entry reports the process's startup ceiling and instance MCP
+governance. It reads instance settings through the existing Global read
+capability without requiring a selected tenant or expanding Runtime access.
+Startup-disabled or instance-disabled MCP is `Degraded`; enabled MCP is
+`Healthy`. This does not certify each tenant's overrides. Legacy SSE remains
+unavailable even when requested. No new credential or configuration is needed.
+
+The `listmonk-integration` entry observes instance configuration independently
+of tenant overrides. Disabled instance integration is `Healthy`; enabled
+integration with missing configuration is `Degraded`. The check uses the
+existing instance read capability and secret authority, with no new credential
+or expanded Runtime permission. Its output contains configuration flags and
+secret-resolution states, not provider URLs or credentials. Tenant-specific
+connection tests remain available through the authorized integration API.
+
+The `storage` entry resolves the instance storage policy without a selected
+request tenant. Instance locks, upload ceilings and provider selection remain
+effective. When the default provider uses S3 autodetection, only instance S3
+settings and instance-owned credentials determine that result; a tenant's S3
+configuration cannot change instance readiness. No new credential or Runtime
+database permission is required. Tenant storage operations continue to apply
+their permitted overrides.
 
 ### Optional Email Readiness
 

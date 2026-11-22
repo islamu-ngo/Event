@@ -309,8 +309,8 @@ public class UserExternalLoginIntegrationTests
                 return new AtprotoIssuedSessionToken("platform-token", DateTimeOffset.UtcNow.AddMinutes(5));
             });
 
-        var bootstrapRepository = Substitute.For<IInstanceBootstrapStateRepository>();
-        bootstrapRepository.GetCurrent(Arg.Any<CancellationToken>()).Returns(
+        var bootstrapReader = Substitute.For<IInstanceBootstrapStateReader>();
+        bootstrapReader.GetCurrent(Arg.Any<CancellationToken>()).Returns(
             InstanceBootstrapState.CreateConfiguredAdministratorPending(
                 Guid.CreateVersion7(),
                 AuthenticationProviderKind.Atproto,
@@ -329,7 +329,7 @@ public class UserExternalLoginIntegrationTests
             claimAdministratorHandler,
             logins,
             out _,
-            bootstrapRepository);
+            bootstrapReader);
         BootstrapAtprotoSessionCommandHandler second = CreateAtprotoHandler(
             secondScope.ServiceProvider,
             gateway,
@@ -337,7 +337,7 @@ public class UserExternalLoginIntegrationTests
             claimAdministratorHandler,
             logins,
             out _,
-            bootstrapRepository);
+            bootstrapReader);
 
         async Task<AtprotoSessionBootstrapResult> RunAttemptAsync(
             string name, BootstrapAtprotoSessionCommandHandler handler)
@@ -428,8 +428,8 @@ public class UserExternalLoginIntegrationTests
                     ? throw new InvalidOperationException("Injected post-commit effect failure.")
                     : BaseCommandResponse.Success(Guid.CreateVersion7(), "reconciled");
             });
-        var bootstrapRepository = Substitute.For<IInstanceBootstrapStateRepository>();
-        bootstrapRepository.GetCurrent(Arg.Any<CancellationToken>()).Returns(
+        var bootstrapReader = Substitute.For<IInstanceBootstrapStateReader>();
+        bootstrapReader.GetCurrent(Arg.Any<CancellationToken>()).Returns(
             InstanceBootstrapState.CreateConfiguredAdministratorPending(
                 Guid.CreateVersion7(),
                 AuthenticationProviderKind.Atproto,
@@ -449,7 +449,7 @@ public class UserExternalLoginIntegrationTests
             claimAdministratorHandler,
             logins,
             out _,
-            bootstrapRepository);
+            bootstrapReader);
 
         _ = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.ExecuteAsync(CreateBootstrapCommand(did), CancellationToken.None));
@@ -605,7 +605,7 @@ public class UserExternalLoginIntegrationTests
         ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>> claimAdministratorHandler,
         IUserExternalLoginRepository logins,
         out IUnitOfWork unitOfWork,
-        IInstanceBootstrapStateRepository? bootstrapRepository = null,
+        IInstanceBootstrapStateReader? bootstrapReader = null,
         IAuthenticationProviderDispatcher?
             authenticationProviderDispatcher = null,
         IAuthProviderConfigurationService?
@@ -640,7 +640,7 @@ public class UserExternalLoginIntegrationTests
         var tenantUsers = Substitute.For<ITenantUserRepository>();
         tenantUsers.GetByTenantAndUserAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns((TenantUser?)null);
-        tenantUsers.Create(Arg.Any<TenantUser>()).Returns(call =>
+        tenantUsers.CreateForExistingAccountAsync(Arg.Any<TenantUser>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
             TenantUser value = call.Arg<TenantUser>();
             value.Id = Guid.CreateVersion7();
@@ -716,7 +716,7 @@ public class UserExternalLoginIntegrationTests
             tokenIssuer,
             claimAdministratorHandler,
             logins,
-            bootstrapRepository ?? Substitute.For<IInstanceBootstrapStateRepository>(),
+            bootstrapReader ?? Substitute.For<IInstanceBootstrapStateReader>(),
             authenticationProviderDispatcher
             ?? Substitute.For<IAuthenticationProviderDispatcher>(),
             authProviderConfiguration,
@@ -727,13 +727,13 @@ public class UserExternalLoginIntegrationTests
             onboarding,
             unitOfWork,
             new ImmediateSettingMutationLock(),
-            Substitute.For<IVisitorAccessCapabilityResolver>(),
+            services.GetRequiredService<IVisitorAccessCapabilityResolver>(),
             tenantContext,
             configuration,
             TimeProvider.System,
             new Explore.Application.Services.PrivacyIdentityFenceOperation(fenceAuthority, recognition,
                 TimeProvider.System, logins, services.GetRequiredService<IHumanActionCommitFinalizer>),
-            null!); // These legacy scenarios exercise Person login; membership participants have native-store coverage.
+            null!, tenantUsers); // These scenarios exercise Person login; membership participants have native-store coverage.
     }
 
     private async Task EnsureUserExistsAsync(Guid userId, string? email = null)

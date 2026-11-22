@@ -4,6 +4,7 @@ using System.Collections.Frozen;
 using System.Diagnostics;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
+using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.ServiceDefaults.Secrets;
@@ -32,6 +33,7 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
     public static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
     private readonly ISecretBindingRepository _bindings;
+    private readonly IProviderConfigurationSecretBindingReader? _providerConfigurationBindings;
     private readonly FrozenDictionary<SecretSourceType, ISecretSource> _sources;
     private readonly SecretResolverCacheState _cacheState;
     private readonly SecretResolverMetrics _metrics;
@@ -48,7 +50,8 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
         SecretResolverCacheState cacheState,
         SecretResolverMetrics metrics,
         ILogger<SecretResolver> logger,
-        SecretAuthorityAcquisition authority)
+        SecretAuthorityAcquisition authority,
+        IProviderConfigurationSecretBindingReader? providerConfigurationBindings = null)
     {
         ArgumentNullException.ThrowIfNull(bindings);
         ArgumentNullException.ThrowIfNull(sources);
@@ -58,6 +61,7 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
         ArgumentNullException.ThrowIfNull(authority);
 
         _bindings = bindings;
+        _providerConfigurationBindings = providerConfigurationBindings;
         _cacheState = cacheState;
         _metrics = metrics;
         _logger = logger;
@@ -79,6 +83,45 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
             || !SecretBindingAdmission.AllowsBinding(binding, SecretAcquisitionPolicy.Roots(_consumer), _infisicalEnvironment))
             throw new InvalidOperationException("storage_secret_unavailable");
         return RetainedSecretReference.Capture(binding, _provider.ToString(), _authorityEndpoint, _authorityProject);
+    }
+
+    public async Task<RetainedSecretReference?> CaptureInstanceAsync(
+        string settingKey, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingKey);
+        cancellationToken.ThrowIfCancellationRequested();
+        var binding = await ResolveBindingAsync(settingKey, null, cancellationToken).ConfigureAwait(false);
+        if (binding is null)
+            return null;
+        if (binding.Scope != SecretScope.Instance || binding.ScopeId is not null
+            || SelectedSourceType() != binding.SourceType
+            || !SecretBindingAdmission.AllowsBinding(binding, SecretAcquisitionPolicy.Roots(_consumer), _infisicalEnvironment))
+            throw new InvalidOperationException("storage_secret_unavailable");
+
+        return RetainedSecretReference.Capture(binding, _provider.ToString(), _authorityEndpoint, _authorityProject);
+    }
+
+    public Task<RetainedSecretReference?> CaptureAsync(
+        string settingKey, Guid? tenantId, SecretBinding? selectedBinding, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingKey);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (tenantId == Guid.Empty)
+            throw new InvalidOperationException("storage_secret_unavailable");
+        var definition = SecretDefinitionRegistry.TryGet(settingKey);
+        var binding = selectedBinding ?? CreateDefaultInstanceBinding(settingKey);
+        if (binding is null)
+            return Task.FromResult<RetainedSecretReference?>(null);
+        if (definition is null || binding.SettingKey != settingKey || binding.Qualifier != string.Empty
+            || !definition.AllowedScopes.Contains(binding.Scope)
+            || (binding.Scope == SecretScope.Instance
+                ? binding.ScopeId is not null
+                : binding.Scope != SecretScope.Tenant || !tenantId.HasValue || binding.ScopeId != tenantId)
+            || SelectedSourceType() != binding.SourceType
+            || !SecretBindingAdmission.AllowsBinding(binding, SecretAcquisitionPolicy.Roots(_consumer), _infisicalEnvironment))
+            throw new InvalidOperationException("storage_secret_unavailable");
+        return Task.FromResult<RetainedSecretReference?>(
+            RetainedSecretReference.Capture(binding, _provider.ToString(), _authorityEndpoint, _authorityProject));
     }
 
     public async Task<SecretResolutionResult> ResolveAsync(
@@ -215,7 +258,8 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
     }
 
     /// <summary>
-    /// Walks Tenant -> Instance -> authoritative registry default. A null return means
+    /// Resolves bootstrap keys directly from the registry; otherwise walks
+    /// Tenant -> Instance -> authoritative registry default. A null return means
     /// the key is unknown or unavailable for instance scope.
     /// </summary>
     private async Task<SecretBinding?> ResolveBindingAsync(
@@ -223,6 +267,11 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
         Guid? tenantId,
         CancellationToken cancellationToken)
     {
+        if (SecretDefinitionRegistry.TryGet(settingKey)?.IsBootstrapSecret == true)
+        {
+            return CreateDefaultInstanceBinding(settingKey);
+        }
+
         if (tenantId.HasValue && tenantId.Value != Guid.Empty)
         {
             var tenantBinding = await _bindings.GetByKeyAndScopeAsync(
@@ -235,9 +284,13 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
             }
         }
 
-        var instanceBinding = await _bindings.GetByKeyAndScopeAsync(
-            settingKey, SecretScope.Instance, scopeId: null, cancellationToken)
-            .ConfigureAwait(false);
+        SecretBinding? instanceBinding = _providerConfigurationBindings is not null
+            && ProviderConfigurationState.SecretKeys.Contains(settingKey, StringComparer.Ordinal)
+            ? await _providerConfigurationBindings.GetInstanceBindingAsync(settingKey, cancellationToken)
+                .ConfigureAwait(false)
+            : await _bindings.GetByKeyAndScopeAsync(
+                settingKey, SecretScope.Instance, scopeId: null, cancellationToken)
+                .ConfigureAwait(false);
         if (instanceBinding is not null)
         {
             return instanceBinding;

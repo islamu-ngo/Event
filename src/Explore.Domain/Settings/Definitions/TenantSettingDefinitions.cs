@@ -2,6 +2,16 @@ namespace Explore.Domain.Settings.Definitions;
 
 public static class TenantSettingDefinitions
 {
+    public static readonly SettingDefinition UserRegistrationEnabled = new(
+        Key: Constants.GovernanceSettingKeys.Tenants.UserRegistrationEnabled,
+        ValueType: SettingValueType.Boolean,
+        DefaultValue: "true",
+        Category: "Tenant",
+        Description: "Whether new users may enroll in this tenant; existing accounts retain access",
+        MinScope: SettingScope.Instance,
+        MaxScope: SettingScope.Tenant,
+        IsLockable: true);
+
     public static readonly SettingDefinition SelfServiceRegistration = new(
         Key: "tenants.self_service_registration",
         ValueType: SettingValueType.Boolean,
@@ -33,5 +43,5 @@ public static class TenantSettingDefinitions
         MaxScope: SettingScope.Tenant);
 
     public static IReadOnlyList<SettingDefinition> All =>
-        [SelfServiceRegistration, WhiteLabelingEnabled, DefaultOrganizationId, DefaultGroupId];
+        [SelfServiceRegistration, UserRegistrationEnabled, WhiteLabelingEnabled, DefaultOrganizationId, DefaultGroupId];
 }

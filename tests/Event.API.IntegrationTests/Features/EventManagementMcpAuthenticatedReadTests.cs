@@ -21,7 +21,7 @@ using TUnit.Core;
 namespace ApiIntegrationTests.Features;
 
 [NotInParallel]
-[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerClass)]
+[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
 public sealed class EventManagementMcpAuthenticatedReadTests(PostgreSqlContainerFixture postgres)
 {
     private static readonly string[] ManagementActionRelations =

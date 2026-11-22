@@ -21,7 +21,7 @@ namespace Explore.Application.Features.Management.Handlers.Commands;
 public sealed class TriggerManagedControlPlaneRegistrationCommandHandler(
     IOptions<ManagedControlPlaneOptions> options,
     IManagedControlPlaneRegistrationRepository registrationRepository,
-    IInstanceBootstrapStateRepository bootstrapStateRepository,
+    IInstanceBootstrapStateReader bootstrapStateReader,
     ISecretBindingRepository secretBindingRepository,
     ISecretResolver secretResolver,
     IDeploymentModeProvider deploymentModeProvider,
@@ -119,7 +119,7 @@ public sealed class TriggerManagedControlPlaneRegistrationCommandHandler(
         RegistrationSecrets secrets,
         CancellationToken cancellationToken)
     {
-        var bootstrap = await bootstrapStateRepository.GetCurrent(cancellationToken);
+        var bootstrap = await bootstrapStateReader.GetCurrent(cancellationToken);
         if (bootstrap is not { Status: InstanceBootstrapStatus.Completed })
         {
             throw new InvalidOperationException(

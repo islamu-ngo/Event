@@ -1,4 +1,6 @@
 using Explore.Domain;
+using System.Security.Cryptography;
+using System.Text;
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -7,16 +9,27 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Security;
 
-/// <summary>Migration-owned scalar report synchronization counts with parent soft-delete filtering.</summary>
+/// <summary>Migration-owned metadata reads for application-owned report synchronization counts.</summary>
 public static class PostgresEventReportOperationsContract
 {
-    public const string OwnerRole = "event_report_operations_owner";
-    public const string MigratorRole = "event_report_operations_migrator";
+    private const string RetiredOwnerRole = "event_report_operations_owner";
+    private const string RetiredMigratorRole = "event_report_operations_migrator";
     public const string GlobalRole = "event_report_operations_global";
     private const string PolicyName = "report_operations_authority";
 
-    public static string FunctionSql(ExploreDbContext context) =>
-        context.GetService<ISqlGenerationHelper>().DelimitIdentifier("event_report_operations_count", Schema(context));
+    internal static string GlobalPolicyException(ExploreDbContext context, string login) =>
+        "(" + string.Join(" OR ", new[] { typeof(EventReportExternalLink), typeof(EventReport) }.Select(type =>
+        {
+            string table = context.Model.FindEntityType(type)!.GetTableName()!;
+            return $"""
+                (session_user={Text(login)} AND current_user=session_user
+                AND n.nspname={Text(Schema(context))} AND c.relname={Text(table)}
+                AND p.polname={Text(PolicyName)} AND p.polcmd='r' AND p.polpermissive
+                AND p.polroles=ARRAY[(SELECT oid FROM pg_catalog.pg_roles WHERE rolname={Text(GlobalRole)})]
+                AND p.polwithcheck IS NULL AND p.polqual IS NOT NULL
+                AND pg_catalog.obj_description(p.oid,'pg_policy')={Text(PolicyStamp(context, table))} || pg_catalog.md5(p.polqual::text))
+                """;
+        })) + ")";
 
     public static async Task ApplyAsync(ExploreDbContext context, CancellationToken cancellationToken = default)
     {
@@ -47,12 +60,12 @@ public static class PostgresEventReportOperationsContract
         string id = Column<EventReport>(nameof(EventReport.Id));
         string tenant = Column<EventReport>(nameof(EventReport.TenantId));
         string deleted = Column<EventReport>(nameof(EventReport.IsDeleted));
-        string function = FunctionSql(context);
+        string function = sql.DelimitIdentifier("event_report_operations_count", Schema(context));
         return $$"""
             DO $roles$
             DECLARE role_name text;
             BEGIN
-                FOREACH role_name IN ARRAY ARRAY['{{OwnerRole}}','{{MigratorRole}}','{{GlobalRole}}'] LOOP
+                FOREACH role_name IN ARRAY ARRAY['{{GlobalRole}}'] LOOP
                     IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = role_name) THEN
                         EXECUTE format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS', role_name);
                     END IF;
@@ -72,41 +85,41 @@ public static class PostgresEventReportOperationsContract
                     RAISE EXCEPTION 'report_operations_migration_authority_invalid';
                 END IF;
             END; $roles$;
-            GRANT {{OwnerRole}} TO {{MigratorRole}};
-            GRANT {{MigratorRole}} TO CURRENT_USER;
-            GRANT USAGE, CREATE ON SCHEMA {{schema}} TO {{OwnerRole}};
             GRANT USAGE ON SCHEMA {{schema}} TO {{GlobalRole}};
-            REVOKE ALL ON {{links}}, {{reports}} FROM {{OwnerRole}};
-            GRANT SELECT ({{linkTenant}}, {{reportId}}, {{state}}, {{created}}) ON {{links}} TO {{OwnerRole}};
-            GRANT SELECT ({{id}}, {{tenant}}, {{deleted}}) ON {{reports}} TO {{OwnerRole}};
+            DROP FUNCTION IF EXISTS {{function}}(integer, timestamp with time zone);
+            REVOKE ALL ON {{links}}, {{reports}} FROM {{GlobalRole}};
+            GRANT SELECT ({{linkTenant}}, {{reportId}}, {{state}}, {{created}}) ON {{links}} TO {{GlobalRole}};
+            GRANT SELECT ({{id}}, {{tenant}}, {{deleted}}) ON {{reports}} TO {{GlobalRole}};
             DROP POLICY IF EXISTS "{{PolicyName}}" ON {{links}};
-            CREATE POLICY "{{PolicyName}}" ON {{links}} FOR SELECT TO {{OwnerRole}} USING (true);
+            CREATE POLICY "{{PolicyName}}" ON {{links}} FOR SELECT TO {{GlobalRole}} USING (true);
             DROP POLICY IF EXISTS "{{PolicyName}}" ON {{reports}};
-            CREATE POLICY "{{PolicyName}}" ON {{reports}} FOR SELECT TO {{OwnerRole}} USING (true);
-            DO $install$
-            DECLARE previous_role text := current_setting('role');
+            CREATE POLICY "{{PolicyName}}" ON {{reports}} FOR SELECT TO {{GlobalRole}} USING (true);
+            DO $stamp$
             BEGIN
-                PERFORM set_config('role', '{{OwnerRole}}', true);
-                EXECUTE $ddl$
-                CREATE OR REPLACE FUNCTION {{function}}(p_state integer, p_before timestamp with time zone)
-                RETURNS integer LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog
-                AS $body$
-                    SELECT count(*)::integer FROM {{links}} link
-                    JOIN {{reports}} report ON report.{{id}} = link.{{reportId}}
-                        AND report.{{tenant}} = link.{{linkTenant}}
-                    WHERE NOT report.{{deleted}} AND link.{{state}} = p_state
-                        AND (p_before IS NULL OR link.{{created}} < p_before)
-                $body$;
-                $ddl$;
-                EXECUTE $acl$
-                    REVOKE ALL ON FUNCTION {{function}}(integer, timestamp with time zone) FROM PUBLIC, {{GlobalRole}};
-                    GRANT EXECUTE ON FUNCTION {{function}}(integer, timestamp with time zone) TO {{GlobalRole}};
-                $acl$;
-                PERFORM set_config('role', previous_role, true);
-            END; $install$;
-            REVOKE CREATE ON SCHEMA {{schema}} FROM {{OwnerRole}};
+                EXECUTE (SELECT format('COMMENT ON POLICY %I ON %s IS %L', p.polname,
+                    {{Text(links)}}, {{Text(PolicyStamp(context, context.Model.FindEntityType(typeof(EventReportExternalLink))!.GetTableName()!))}} || md5(p.polqual::text))
+                    FROM pg_policy p WHERE p.polrelid={{Text(links)}}::regclass AND p.polname='{{PolicyName}}');
+                EXECUTE (SELECT format('COMMENT ON POLICY %I ON %s IS %L', p.polname,
+                    {{Text(reports)}}, {{Text(PolicyStamp(context, context.Model.FindEntityType(typeof(EventReport))!.GetTableName()!))}} || md5(p.polqual::text))
+                    FROM pg_policy p WHERE p.polrelid={{Text(reports)}}::regclass AND p.polname='{{PolicyName}}');
+            END; $stamp$;
+            DO $retire$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='{{RetiredOwnerRole}}') THEN
+                    REVOKE ALL ON {{links}}, {{reports}} FROM {{RetiredOwnerRole}};
+                    REVOKE CREATE ON SCHEMA {{schema}} FROM {{RetiredOwnerRole}};
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='{{RetiredMigratorRole}}') THEN
+                        REVOKE {{RetiredOwnerRole}} FROM {{RetiredMigratorRole}};
+                    END IF;
+                END IF;
+            END; $retire$;
             """;
     }
+
+    private static string PolicyStamp(ExploreDbContext context, string table) => "event-report-operations-read:v1:"
+        + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Schema(context) + ":" + table + ":metadata:true"))) + ":";
+
+    private static string Text(string value) => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
 
     private static string Schema(ExploreDbContext context) =>
         context.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>()?.TargetSchema

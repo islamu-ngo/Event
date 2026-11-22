@@ -1,0 +1,37 @@
+Change-Id: CHG-01M69F0433GZQ57AN5E8DYMVES
+Title: Keep ambient tracing context out of daemon control requests
+Type: fix
+Scope: testing
+Summary: >-
+  Stop assurance-controller activity headers and baggage from crossing the
+  privileged Unix daemon API without disabling application tracing or changing
+  endpoint selection, credentials or request deadlines.
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/testing/DISTRIBUTED_ASSURANCE.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      The dedicated daemon handler suppresses ambient context propagation.
+      Real Unix-peer tests verify forbidden header names, preserve the caller
+      activity and decode the actual response. Native acquisition remains
+      separate from resource custody, cleanup and registered-lane admission.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/contributing/distributed-testing.md
+    Disposition: documented
+    Detail: >-
+      The change requires no credential, endpoint or global tracing adjustment.
+      Successful daemon reads do not prove workload completion or owned cleanup.

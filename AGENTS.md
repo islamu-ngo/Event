@@ -1,7 +1,7 @@
 # AGENTS.md — Agent Contribution Contract
 
 > **This is the required entrypoint for every AI tool contributing to this repository.**
-> Last Updated: 2026-10-04
+> Last Updated: 2026-11-14
 
 ---
 
@@ -34,6 +34,7 @@ Every change must answer these eight questions **before editing any file**:
 | Intent registry | `.agents/contract/intents.yaml` | Machine-readable task mapping |
 | Operations | `docs/internal/OPERATIONS.md` | Build/Test details, AI operational rules |
 | Durable findings | `dev/_journal/journal.md` | Decisions, non-obvious patterns |
+| Project tracking as code | `event/plane.yaml` | Plane Compose project configuration, schemas, and work items |
 
 ---
 
@@ -84,12 +85,14 @@ Every change must answer these eight questions **before editing any file**:
 15. **The 3-Ring Progressive Verification Model & Yak-Shaving Quarantine**:
     - **Ring 1 (Inner Loop / Sliced)**: Subtask changes MUST be verified via fast in-memory TUnit sliced tests (`--treenode-filter "/*/*/*<TestClass>/*"`) targeting Domain or Application unit tests in **< 2 seconds**. Zero Docker containers or network I/O in the inner loop. 90%+ of algorithmic/normalization/business invariants belong in `Event.Domain.UnitTests`.
     - **Ring 2 (Phase Exit Gate)**: Verify the single touched project against ONE selected provider (e.g., SQLite in-memory or single PostgreSQL container) in **< 15 seconds**.
-    - **Ring 3 (Plan Exit / Workstream Gate)**: The full multi-database provider matrix (PostgreSQL, SQLite, SQL Server, MySQL), migration checks, and full suites are run ONCE at the end of the entire implementation plan before PR creation.
+    - **Ring 3 (PR Acceptance / Programme Exit)**: Every independently merged PR runs its applicable affected-provider matrix, migration, architecture and other required acceptance checks before merge. Later programme PRs cannot own the first validation of already merged behavior. Final programme acceptance verifies cross-capability promises when their prerequisites exist. Preserve explicit user verification overrides with their scope and unrun-check limits; Tier 4 documentation still uses document checks only.
     - **Yak-Shaving Quarantine**: Agents are strictly FORBIDDEN from absorbing or repairing pre-existing unrelated test suite rot encountered during feature work. If an existing test fails outside the task's path, verify if it reproduces on an untouched base worktree, log it under `*-context.md` (or `dev/backlog/`), and quarantine it. Never derail feature implementation to fix unrelated persistence suite failures.
 16. **No Warning Suppressions to Force Build/Tests**: Never suppress compiler warnings or analyzer diagnostics via `#pragma warning disable` or `[SuppressMessage]` to force a build through. Fix the underlying root cause. If an intentional compiler ratchet is needed, obtain explicit maintainer approval to adjust `Directory.Build.props`.
-17. **Execution Continuity Directive for Approved Tasks**: For tasks within an approved plan, agents must continue implementation and proportional verification end-to-end without routine stage pauses. Pause only at material boundaries: requirement ambiguity, unexpected scope creep, irreversible actions, or explicit user direction.
+17. **Execution Continuity Directive for Approved Tasks**: Within the selected approved PR scope, continue implementation and proportional verification end-to-end without routine stage pauses. Stop at its review handoff; retain future required scope in the same canonical programme. Pause earlier only at material boundaries: requirement ambiguity, unexpected scope creep, irreversible actions, or explicit user direction.
 18. **Targeted Verification Default & Verification Evidence**: Always target verification against the specific affected project(s) by default using the verified commands in [`PROJECTS.md`](PROJECTS.md). Every task completion, milestone report, or PR description must record exact commands executed and their outcomes, plus any checks not run and why. Never state or imply a build or test suite passed when it was not physically executed.
 19. **Application-Owned Authority, EF-First Persistence**: C# owns authorization, business rules, workflows, concurrency coordination and completion. Keep that logic in Domain/Application services and handlers, not controllers or a second database application. Use EF Core/LINQ and supported provider libraries for ordinary persistence. The database supplies transactions, foreign keys, uniqueness, constraints and useful tenant isolation; narrow permissions support legitimate application operations. Do not introduce or retain stored procedures, privileged business routines or database-enforced workflow authority to prevent an application from performing operations it is authorized to manage. Remaining handwritten SQL needs a demonstrated EF/provider capability gap and a small documented storage primitive. Granting an approved application purpose the fixed permissions its workflow needs is normal implementation, not automatically a defect or a new approval request. Document credential-only compromise risk once; do not repeatedly reopen an accepted trade-off. Escalate genuinely new trust boundaries, secret exposure or destructive actions. Existing SQL contracts are transitional, not a reason to preserve business logic in SQL or silently remove controls before a verified C# replacement. See [the accepted persistence decision](docs/internal/adr/ADR-application-owned-persistence.md).
+20. **Project Tracking with Plane Compose**: Every implementation plan carries a right-sized **Plane Tracking Plan**: one tracked item per separately merged pull request. A single-PR plan owns 1 Work Item; a 2–5-PR plan owns 1 parent Work Item plus 1 Sub-item per PR; phases, tests, docs, reviews, and commits never become items. Larger programmes retain the same canonical triad and an explicit tracking budget; more than 6 new items or a new Epic needs approval ([taxonomy §4.1](docs/internal/project-management/work-item-taxonomy-and-granularity-report.md#41-tracking-budget-per-implementation-plan-plan--plane-mapping), [plan-tracking protocol](.agents/skills/plane-compose/resources/plan-tracking.md)). Reuse an existing item when one fits. Planning authors `event/work/active-<task-slug>.yaml` from `event/templates/active-workitem.yaml` locally with `id:` omitted and `parent:` set to the capability Epic UUID (never place template `.yaml` files inside `event/work/`). Execution start pushes it (`plane push --work-only`) to mint canonical uppercase `EVENT-XXX` for native Git Development linking (`feat/EVENT-XXX-<task>`, `Refs: EVENT-XXX`, PR `[EVENT-XXX]`); Plane state changes per pull request (`In Progress` → `Review Needed` → `Done`), never per phase. Intermediate merges retain active YAML and the canonical triad. Only after the final scope's verified merge, reconciled acceptance and resolution of every retained obligation, fold the owned active blocks into `event/work/workitems.yaml` and retire the active file; no `plane pull` is needed. Worktree/branch cleanup is separate and requires current user authorization and preservation. Isolated worktrees must link `event/` via `ln -s ../../event event`. Validate locally (`plane schema validate`, `plane validate --offline`) and dry-run (`plane push --work-only --dry-run`) before additive pushes. Destructive operations (`--force`, `schema sync`, `--prune`), tracking trivial edits, and editing items the plan does not own are strictly forbidden. Work items follow the [work-item taxonomy standard](docs/internal/project-management/work-item-taxonomy-and-granularity-report.md) and the [Plane project management ADR](docs/internal/adr/ADR-plane-project-management-standardization.md): one `EVENT` project, completable vertical items, `Epic → Work Item → Sub-item`, Surface Labels, Version Modules, and `priority` as functional criticality. `plane-compose` owns YAML truth and ID minting; the Plane MCP server (`plane-mcp` skill) owns module membership, comments, links, and approved deletions. Never mint IDs through MCP, and never add a custom Plane REST client.
+21. **Serial Execution & Resource Execution Profiles (`constrained` / `balanced` / `performance`)**: Always build and run `.NET` test projects **sequentially one project at a time** (never launch parallel `dotnet build`/`dotnet test` background jobs or bare solution-wide `dotnet test`), separating compilation (`dotnet build <Project.csproj> --configuration Release -m:1 -nr:false --verbosity quiet`) from execution (`dotnet test --project <TestProject.csproj> --configuration Release --no-build --verbosity quiet`). All 16 TUnit assemblies inherit memory-aware concurrency via `BoundedTestDiscoveryHook` + `TestExecutionProfile`, and Testcontainers builders bind RAM/JVM ceilings via `ContainerResourceBounds`. When `ISLAMU_EXECUTION_PROFILE=constrained` (recommended for low-RAM laptops, multi-tasking workstations, and AI agent sessions), pair it with `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1`, `MSBUILDDISABLENODEREUSE=1`, `DOTNET_GCConserveMemory=5`, and a disk-backed `0700` `TMPDIR` (e.g. `$HOME/.cache/agent-tmp`) so `Directory.Build.props` disables `UseSharedCompilation`/`BuildInParallel`, `.agents/hooks/BuildCheck.cs` scopes to changed Release projects, and Linux `/tmp` `tmpfs` is not exhausted. Remote/high-RAM hosts remain unthrottled in `balanced` or `performance` mode or via `--maximum-parallel-tests` / `TUNIT_MAX_PARALLEL_TESTS` / `ISLAMU_CONTAINER_MEMORY_MB`.
 
 **Full list:** [`docs/internal/QUICK_REFERENCE.md`](docs/internal/QUICK_REFERENCE.md)
 
@@ -108,10 +111,45 @@ Every change must answer these eight questions **before editing any file**:
 | Agent Ops | [`.agents/CONTEXT_ENGINEERING.md`](.agents/CONTEXT_ENGINEERING.md) |
 | PR Review | [`.agents/skills/review-pr/SKILL.md`](.agents/skills/review-pr/SKILL.md) |
 | Log Finding | [`.agents/skills/finding/SKILL.md`](.agents/skills/finding/SKILL.md) |
+| Project Tracking / Plane | [`.agents/skills/plane-compose/SKILL.md`](.agents/skills/plane-compose/SKILL.md) (YAML) · [`.agents/skills/plane-mcp/SKILL.md`](.agents/skills/plane-mcp/SKILL.md) (remote) |
+| Work-item sizing & taxonomy | [`docs/internal/project-management/work-item-taxonomy-and-granularity-report.md`](docs/internal/project-management/work-item-taxonomy-and-granularity-report.md) · [ADR](docs/internal/adr/ADR-plane-project-management-standardization.md) |
 
 ---
 
 ## 7. Targeted Fetch And Reuse Rule
+
+### Persistent Programmes And Bounded PR Execution
+
+The hierarchy is programme → PR scope → phase → task. Keep the complete canonical
+`dev/active/<programme>/` triad in the main checkout across all PRs. Planning owns
+the full requested scope; the tasks registry owns explicit delegation, delivery,
+reconciliation and cleanup facts. One delegated PR has one live detailed execution
+ledger; its canonical selected section is a labelled snapshot. Explicit user-selected
+in-tree execution uses that canonical section directly.
+
+Resume existing ownership before selecting an eligible Planned candidate. Mark it
+Ready only after its merged/reconciled prerequisites, shared contracts, acceptance,
+paths and verification are complete. Checked historical tasks never choose topology.
+Extract only the selected scope and required shared invariants, I-VSD constraints,
+dependency contracts and commit packets; never move the whole canonical directory.
+Hub/spoke workers may serve only that PR, not accumulate future PRs.
+
+Reconcile actual delivery against original intent before review handoff and after
+verified merge. Patch only selected canonical sections and justified shared decisions;
+preserve future edits and every unmet requested obligation. Approval is not merge,
+and squash/rebase merge evidence must not depend solely on original-tip ancestry.
+Cleanup requires current user authorization and preservation/accounting of local
+and ignored work. Intermediate PR merges retain the canonical triad and active
+Plane file; programme retirement follows final reconciled acceptance and durable
+knowledge graduation.
+
+The [shared scope contract](.agents/skills/implementation-plan/resources/pr-scope-contract.md)
+defines ownership/readiness; the
+[execution lifecycle](.agents/skills/implement-tasks/resources/pr-execution-lifecycle.md)
+defines native setup, handoff and recovery. Normalize legacy plans only on explicit
+resume by inventorying actual delivery and remaining scope. For this documentation
+rollout, preserve its root triad and apply selected-scope execution from the first
+task; the user's explicit in-tree request takes precedence over default isolation.
 
 When a task touches a topic covered by docs, skills, or rules, retrieve the **smallest relevant heading, symbol, or bounded range once**. Follow [`.agents/CONTEXT_ENGINEERING.md`](.agents/CONTEXT_ENGINEERING.md).
 
@@ -128,7 +166,7 @@ When a task touches a topic covered by docs, skills, or rules, retrieve the **sm
 
 ## 8. Verification Baseline
 
-Before the first product edit, ensure local tracking is fresh against upstream. In the root workspace on `develop`, fast-forward cleanly: `git fetch origin develop && git pull --ff-only origin develop`. To prevent index contamination, never switch branches via `git checkout` inside the main repository root when task worktrees or uncommitted edits exist; feature execution belongs in isolated worktrees (`.worktrees/<task>`), keeping the root checkout clean on `develop`. Then establish the green baseline once for code changes. Do not rerun an unchanged baseline; every PR touching product code must still leave the build and minimum tests green.
+Before the first product edit, ensure local tracking is fresh against upstream. In a clean root workspace on `develop`, fast-forward cleanly: `git fetch origin develop && git pull --ff-only origin develop`. Never pull into a dirty shared checkout or switch its branch. Fresh feature execution defaults to a selected-PR worktree (`.worktrees/<programme>--<scope>`) from updated merged target reality; an explicit user in-tree request keeps the current branch and canonical selected ledger in place. Establish the green baseline once for code changes. Do not rerun an unchanged baseline; every PR touching product code must still leave the build and minimum tests green.
 
 **The 3-Ring Progressive Verification Hierarchy:**
 1. **Ring 1 (Inner Loop — Subtask Level, < 2s)**:
@@ -138,18 +176,21 @@ Before the first product edit, ensure local tracking is fresh against upstream. 
 2. **Ring 2 (Phase Exit Gate — Phase Level, < 15s)**:
    - Run a single Release build and at most ONE selected project test against a single selected provider.
    - Forbid running the multi-database provider matrix during intermediate phase exits.
-3. **Ring 3 (Plan Exit Gate — Workstream Level)**:
-   - Full multi-database matrix, migration round-trips, and architecture guardrails run ONCE at the end of the workstream before PR creation.
+3. **Ring 3 (PR Acceptance And Programme Exit)**:
+   - Each PR runs the matrix, migration round-trips, architecture guardrails and other checks applicable to its changed scope before merge. Do not run unrelated layer suites.
+   - Final programme acceptance verifies cross-capability outcomes after their prerequisites exist. Preserve explicit programme-specific user overrides and their limitations; do not generalize them silently or repeat unchanged passing checks.
 
 **Scope & Layer Discipline:**
 - **Tier 4 (Docs / Agent Context):** For documentation, agent context, markdown-only, or comment changes, DO NOT run `dotnet build` or .NET test suites. Verification is strictly scoped to markdown formatting, link integrity, and schema checks.
 - **Layer-Bounded Execution:** Never run test suites belonging to unrelated architectural layers (e.g., no database integration tests for UI changes; no Blazor tests for CQRS handlers).
 - **Yak-Shaving Quarantine Rule:** Never derail feature implementation to fix pre-existing test rot or broken fixtures outside the task path. Verify reproduction on clean base, log under `*-context.md`, quarantine the failure, and proceed with the assigned deliverable.
 
-**Build Command (Code Changes Only):**
+**Build & Sequential Test Commands (Code Changes Only):**
 ```bash
-dotnet build --configuration Release --verbosity quiet
+dotnet build <TargetProject.csproj> --configuration Release -m:1 -nr:false --verbosity quiet
+dotnet test --project <TestProject.csproj> --configuration Release --no-build --verbosity quiet
 ```
+Set `ISLAMU_EXECUTION_PROFILE=constrained` (alongside `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1`, `MSBUILDDISABLENODEREUSE=1`, `DOTNET_GCConserveMemory=5`, and disk-backed `TMPDIR="$HOME/.cache/agent-tmp"`) on memory-constrained or multi-tasking machines; use `balanced` (default) or `performance` on dedicated high-memory hosts. Never re-introduce static `[assembly: ParallelLimiter<T>]` attributes (`Event.Architecture.Tests` enforces adaptive `BoundedTestDiscoveryHook` parity).
 
 **Full Test List:** [`docs/internal/OPERATIONS.md#full-project-test-list`](docs/internal/OPERATIONS.md#full-project-test-list)
 

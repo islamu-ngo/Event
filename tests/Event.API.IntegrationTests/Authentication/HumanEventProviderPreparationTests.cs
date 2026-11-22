@@ -6,6 +6,7 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationProviders;
 using Explore.Application.Exceptions;
@@ -48,7 +49,7 @@ public sealed class HumanEventProviderPreparationTests
         var (eventId, assignmentId, _) = await SeedAsync(fixture);
         if (revoke)
         {
-            await using var writer = fixture.Native.CreateDatabase();
+            await using var writer = CreateTenantDatabase(fixture);
             await writer.EventRoleAssignments.Where(row => row.Id == assignmentId)
                 .ExecuteUpdateAsync(update => update.SetProperty(row => row.Status, EventRoleAssignmentStatus.Revoked));
         }
@@ -102,6 +103,25 @@ public sealed class HumanEventProviderPreparationTests
         var services = request.Services;
         var context = services.GetRequiredService<ExploreDbContext>();
         var (eventId, assignmentId, expires) = await SeedAsync(fixture);
+        if (change == "own_route_change")
+        {
+            await using var global = fixture.Native.CreateDatabase();
+            global.BindTenantLease();
+            foreach (var (settingKey, value) in new[]
+            {
+                (GovernanceSettingKeys.Cerbos.TenantCustomizationEnabled, "false"),
+                (GovernanceSettingKeys.Cerbos.Mode, "\"inherit_global\""),
+                (GovernanceSettingKeys.Cerbos.CustomEndpoint, "\"\"")
+            })
+            {
+                var row = await global.SystemSettings.SingleOrDefaultAsync(item => item.SettingKey == settingKey);
+                if (row is null)
+                    global.SystemSettings.Add(new SystemSetting { SettingKey = settingKey, Value = value });
+                else
+                    row.Value = value;
+            }
+            await global.SaveChangesAsync();
+        }
         var originalLifetime = (await services.GetRequiredService<IHumanAuthenticationLifetimeObserver>()
             .ObserveAsync(request.Context.User, CancellationToken.None))!;
         if (change is "expire_after_last_read" or "credential_expiry_after_last_read" or "own_expiry_extension_after_last_read")
@@ -110,7 +130,7 @@ public sealed class HumanEventProviderPreparationTests
             expires = change == "credential_expiry_after_last_read"
                 ? credentialEnd.AddHours(1)
                 : fixture.Clock.GetUtcNow().Add((credentialEnd - fixture.Clock.GetUtcNow()) / 2);
-            await using var seed = fixture.Native.CreateDatabase();
+            await using var seed = CreateTenantDatabase(fixture);
             await seed.EventRoleAssignments.Where(row => row.Id == assignmentId)
                 .ExecuteUpdateAsync(update => update.SetProperty(row => row.ExpiresAtUtc, expires.UtcDateTime));
             if (change != "credential_expiry_after_last_read")
@@ -120,10 +140,12 @@ public sealed class HumanEventProviderPreparationTests
             PlatformDefaults.DefaultTenantId, eventId, Guid.CreateVersion7());
         var transport = new Transport(context);
         var preparation = CreatePreparation(services, fixture.Clock, provider, transport);
+        await using var securitySources = change is "own_route_change" or "irrelevant_route_write"
+            ? await services.GetRequiredService<IHumanSecuritySourceGate>().AcquireAsync() : null;
         var prepared = await preparation.PrepareAsync(command);
         if (change == "revoke_before_acquire")
         {
-            await using var revoke = fixture.Native.CreateDatabase();
+            await using var revoke = CreateTenantDatabase(fixture);
             await revoke.EventRoleAssignments.Where(row => row.Id == assignmentId)
                 .ExecuteUpdateAsync(update => update.SetProperty(row => row.Status, EventRoleAssignmentStatus.Revoked));
         }
@@ -162,6 +184,15 @@ public sealed class HumanEventProviderPreparationTests
                     : [(GovernanceSettingKeys.Cerbos.GrpcEndpoint, "\"http://unused.prepared.test:3593\"")];
                 foreach (var setting in settings)
                 {
+                    if (change == "own_route_change")
+                    {
+                        // Deliberate raw source tampering, like the stamp and assignment cases.
+                        // A tenant command cannot use the normal instance-policy producer.
+                        int changed = await context.SystemSettings.Where(item => item.SettingKey == setting.Key)
+                            .ExecuteUpdateAsync(update => update.SetProperty(item => item.Value, setting.Value), token);
+                        await Assert.That(changed).IsEqualTo(1);
+                        continue;
+                    }
                     var row = await context.SystemSettings.SingleOrDefaultAsync(item => item.SettingKey == setting.Key, token);
                     if (row is null)
                         context.SystemSettings.Add(new SystemSetting { SettingKey = setting.Key, Value = setting.Value });
@@ -189,7 +220,7 @@ public sealed class HumanEventProviderPreparationTests
             await Assert.That(await execution).IsTrue();
         else
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() => execution);
-        await using var observer = fixture.Native.CreateDatabase();
+        await using var observer = CreateTenantDatabase(fixture);
         await Assert.That(await observer.SystemSettings.AnyAsync(row => row.SettingKey == key)).IsEqualTo(commits);
         await Assert.That(transport.Requests.Count).IsEqualTo(provider == "cerbos" ? 1 : 0);
         await Assert.ThrowsAsync<InvalidOperationException>(() => prepared.AcquireAsync(command));
@@ -208,7 +239,7 @@ public sealed class HumanEventProviderPreparationTests
         await using var request = new Request(fixture.Host.Services);
         await request.AuthenticateAsync(await fixture.SignInAsync());
         var (eventId, assignmentId, _) = await SeedAsync(fixture);
-        await using (var seed = fixture.Native.CreateDatabase())
+        await using (var seed = CreateTenantDatabase(fixture))
         {
             if (instanceAdmin)
             {
@@ -276,7 +307,7 @@ public sealed class HumanEventProviderPreparationTests
             await Assert.ThrowsAsync<AuthorizationException>(() => preparation.PrepareAsync(command));
         if (!organizer)
         {
-            await using var revoke = fixture.Native.CreateDatabase();
+            await using var revoke = CreateTenantDatabase(fixture);
             await revoke.EventRoleAssignments.Where(row => row.Id == assignmentId).ExecuteDeleteAsync();
             await Assert.ThrowsAsync<AuthorizationException>(() => preparation.PrepareAsync(command));
         }
@@ -371,7 +402,7 @@ public sealed class HumanEventProviderPreparationTests
             throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
                 "A business conflict is not an acknowledged owner rollback receipt.");
         }));
-        await using var observer = fixture.Native.CreateDatabase();
+        await using var observer = CreateTenantDatabase(fixture);
         await Assert.That(await observer.SystemSettings.AnyAsync(row => row.SettingKey == key)).IsFalse();
         await Assert.That(invocations).IsEqualTo(1);
         await Assert.That(transport.Requests.Count).IsEqualTo(1);
@@ -398,7 +429,7 @@ public sealed class HumanEventProviderPreparationTests
             return rejected;
         });
         await Assert.That(result).IsSameReferenceAs(rejected);
-        await using var observer = fixture.Native.CreateDatabase();
+        await using var observer = CreateTenantDatabase(fixture);
         await Assert.That(await observer.SystemSettings.AnyAsync(row => row.SettingKey == key)).IsFalse();
         await Assert.That(context.ChangeTracker.HasChanges()).IsFalse();
         await Assert.That(transport.Requests.Count).IsEqualTo(1);
@@ -450,7 +481,7 @@ public sealed class HumanEventProviderPreparationTests
             if (nested) throw new AggregateException(new InvalidOperationException("Nested callback receipt", receipt));
             throw receipt;
         }));
-        await using var observer = fixture.Native.CreateDatabase();
+        await using var observer = CreateTenantDatabase(fixture);
         await Assert.That(await observer.SystemSettings.AnyAsync(row => row.SettingKey == key)).IsFalse();
         await Assert.That(invocations).IsEqualTo(1);
         await Assert.That(transport.Requests.Count).IsEqualTo(1);
@@ -474,14 +505,12 @@ public sealed class HumanEventProviderPreparationTests
         var principal = await originalBuilder.BuildSdkPrincipalAsync(fixture.Binding.LocalSubjectId);
         await originalBuilder.EnrichWithEventAssignmentsAsync(principal, fixture.Binding.LocalSubjectId,
             command.TenantId, [eventId], CancellationToken.None);
-        // The original builder samples DateTime.UtcNow, not this fixture's trusted clock.
-        // Normalize only that independently sampled scalar; compare its actual unsorted lists.
-        principal.WithAttribute("nowUtc",
-            Cerbos.Sdk.Builder.AttributeValue.StringValue(sent.Principal.Attr["nowUtc"].StringValue));
         var assignments = await services.GetRequiredService<IHumanEventAssignmentSourceFactory>()
             .Create(command.TenantId, [eventId]).ObserveAsync();
-        var expected = Cerbos.Sdk.Builder.CheckResourcesRequest.NewInstance().WithPrincipal(principal)
-            .ToCheckResourcesRequest().Principal;
+        var expected = principal.ToPrincipal().Clone();
+        // The original builder samples DateTime.UtcNow, not this fixture's trusted clock.
+        // Normalize only that independently sampled scalar; compare its actual unsorted lists.
+        expected.Attr["nowUtc"].StringValue = sent.Principal.Attr["nowUtc"].StringValue;
         await Assert.That(sent.Principal.Equals(expected)).IsTrue();
         await Assert.That(sent.Resources.Single().Actions.Single()).IsEqualTo(AuthorizationActions.Events.ManageRegistrationChannels);
         await Assert.That(sent.Resources.Single().Resource.Id).IsEqualTo(eventId.ToString("D"));
@@ -513,13 +542,26 @@ public sealed class HumanEventProviderPreparationTests
             () => services.GetRequiredService<IPolicySourceSetFence>(),
             () => services.GetRequiredService<IHumanActionCommitFinalizer>(),
             () => services.GetRequiredService<ISerializableAttemptOwner>(),
-            () => services.GetRequiredService<IHumanEventProviderSourceFactory>());
+            () => services.GetRequiredService<IHumanEventProviderSourceFactory>(),
+            () => services.GetRequiredService<IPrivacyIdentityFenceAuthority>() as IOriginalPrivacyIdentityFenceAuthority
+                ?? throw new NotSupportedException("Event provider settlement requires an original privacy authority."),
+            () => services.GetRequiredService<IEventDiscoveryEnrollmentGate>());
+    }
+
+    private sealed record SelectedTenant(Guid TenantId) : ITenantContext;
+
+    private static ExploreDbContext CreateTenantDatabase(LocalIdentityLifecycleHttpFixture fixture)
+    {
+        var context = fixture.Native.CreateDatabase();
+        context.TenantContext = new SelectedTenant(PlatformDefaults.DefaultTenantId);
+        context.BindTenantLease();
+        return context;
     }
 
     private static async Task<(Guid EventId, Guid AssignmentId, DateTimeOffset Expires)> SeedAsync(
         LocalIdentityLifecycleHttpFixture fixture)
     {
-        await using var seed = fixture.Native.CreateDatabase();
+        await using var seed = CreateTenantDatabase(fixture);
         Guid actor = await seed.Actors.Where(row => row.UserId == fixture.Binding.LocalSubjectId)
             .Select(row => row.Id).SingleAsync();
         var parent = new Explore.Domain.Event(EventStatusEnum.Draft)

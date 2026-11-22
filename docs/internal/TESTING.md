@@ -102,6 +102,58 @@ comparisons after rejected/replayed operations prevent later valid transitions
 from hiding a partial mutation. These pure in-memory tests prove no real-provider
 race, distributed exactly-once effect or production authentication boundary.
 
+## Execution Profiles & Resource Governance
+
+All 16 TUnit assemblies in `tests/` and `eng/` share `tests/Shared/Execution/TestExecutionProfile.cs` and `tests/Shared/Execution/BoundedTestDiscoveryHook.cs` to replace TUnit's unconstrained `4 * CPU cores` concurrency default with memory-aware parallelism:
+
+| Profile (`ISLAMU_EXECUTION_PROFILE`) | `UnitPure` | `IntegrationContainer` | `Distributed` | MSBuild / Roslyn (`Directory.Build.props`) |
+|---|---|---|---|---|
+| `constrained` | `2` (or `1` < 12 GiB) | `1` | `1` | `UseSharedCompilation=false`, `BuildInParallel=false`, `-m:1 -nr:false` |
+| `balanced` *(default)* | `2`–`6` by free RAM | `1` (< 24 GiB) to `3` (>= 48 GiB) | `1` | Standard SDK defaults |
+| `performance` | Up to `Environment.ProcessorCount` | Up to `4` | `2` | Standard SDK defaults |
+
+Precedence order for `MaximumParallelTests` is strictly: `--maximum-parallel-tests` CLI flag > `TUNIT_MAX_PARALLEL_TESTS` > `ISLAMU_TEST_PARALLEL_LIMIT` > `ISLAMU_EXECUTION_PROFILE` / adaptive memory ceiling (reading Linux `/proc/meminfo` `MemAvailable`, cgroup v2 `memory.max`, or cross-platform `GC.GetGCMemoryInfo()`). Static `[assembly: ParallelLimiter<T>]` attributes are forbidden (`Event.Architecture.Tests` `TestExecutionGovernanceArchitectureTests` enforces this across all TUnit assemblies).
+
+### Container Memory Ceilings, Lazy Boot & Reuse Safety
+
+- Every Testcontainers builder chains `.ApplyBoundedResourcePolicy(...)` from `tests/Shared/Containers/TestcontainersBuilderExtensions.cs` + `tests/Shared/Containers/ContainerResourceBounds.cs`, capping `HostConfig.Memory`: `Redis`/`Mailpit` (`128 MiB`), `Cerbos`/`Svix` (`256 MiB`), `RabbitMq`/`Generic` (`512 MiB`), `MySql`/`MariaDb` (`768 MiB`), `PostgreSql`/`PostGis`/`Keycloak` (`1024 MiB`, with Keycloak JVM heap capped via `JAVA_OPTS_APPEND`), and `SqlServer` (`2048 MiB`). Override defaults with `ISLAMU_CONTAINER_MEMORY_MB` and `ISLAMU_KEYCLOAK_HEAP_MB`.
+- Opt-in container reuse (`ISLAMU_TEST_CONTAINER_REUSE=true`) is automatically suppressed (`disableReuse` / `hasAssuranceOwner` / explicit container name) whenever `AssuranceOwnershipContext` or custom container naming is active.
+- Multi-provider fixtures (`AdmissionAuthorityProviderFixture`, `SemanticValueNonTransactionalProviderFixture`, `MySqlMigrationGuardFixture`) start containers lazily on first `CreateOptionsAsync(...)` call under `SemaphoreSlim(1, 1)` instead of spawning 3 engines eagerly in `InitializeAsync()`.
+- `PostgreSqlContainerFixture.CreateIsolatedDatabaseAsync()` creates and disposes per-test logical databases (`test_<guid>`) on one shared `PerAssembly` container instead of booting redundant Postgres instances.
+
+### Portable Workstation Setup & `AGENTS.local.md` Templates
+
+Always build one project cleanly before passing `--no-build` sequentially one test project at a time.
+
+- **Linux (Arch, Fedora, Ubuntu, etc.)**: Relocate `TMPDIR` off RAM-backed `/tmp` `tmpfs` (`mkdir -m 700 -p "$HOME/.cache/agent-tmp" && export TMPDIR="$HOME/.cache/agent-tmp"`). Rootless Podman uses `DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock`, `TESTCONTAINERS_RYUK_DISABLED=true`, and `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`. Nested systemd/container cgroup v2 parent slices are walked automatically by `TestExecutionProfile`.
+- **macOS & Windows**: `/var/folders` (APFS) and `%TEMP%` (NTFS) are already disk-backed (no `TMPDIR` relocation needed). On 24+ GiB machines running Docker Desktop / WSL2 / Colima / OrbStack, set `ISLAMU_CONTAINER_BUDGET_GIB` to your Linux VM memory limit (since `GC.GetGCMemoryInfo().TotalAvailableMemoryBytes` reports host physical RAM on non-Linux OSes).
+
+Copy the matching template into gitignored `AGENTS.local.md`:
+
+```bash
+# Constrained workstation / remote SSH — Linux & macOS (bash/zsh)
+export ISLAMU_EXECUTION_PROFILE=constrained
+export DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1 MSBUILDDISABLENODEREUSE=1 DOTNET_GCConserveMemory=5
+# Linux distros with tmpfs /tmp (Arch, Fedora, etc.): mkdir -m 700 -p "$HOME/.cache/agent-tmp" && export TMPDIR="$HOME/.cache/agent-tmp"
+# macOS Docker Desktop/VM hosts: export ISLAMU_CONTAINER_BUDGET_GIB=8
+```
+
+```powershell
+# Constrained workstation — Windows (PowerShell)
+$env:ISLAMU_EXECUTION_PROFILE = "constrained"
+$env:DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER = "1"
+$env:MSBUILDDISABLENODEREUSE = "1"
+$env:DOTNET_GCConserveMemory = "5"
+$env:ISLAMU_CONTAINER_BUDGET_GIB = "8"
+```
+
+```bash
+# Dedicated high-RAM workstation (48 GiB+)
+export ISLAMU_EXECUTION_PROFILE=performance
+export ISLAMU_CONTAINER_MEMORY_MB=2048
+export ISLAMU_TEST_CONTAINER_REUSE=true
+```
+
 ## The 3-Ring Progressive Verification Model
 
 To eliminate the 50% test diagnosis and 15% container troubleshooting bottleneck during agentic and contributor workflows, the repository strictly enforces a **3-Ring Progressive Verification** hierarchy:
@@ -110,7 +162,23 @@ To eliminate the 50% test diagnosis and 15% container troubleshooting bottleneck
 |---|---|---|---|---|
 | **Ring 1: Inner Loop** | Subtask level (during active coding) | **< 2s** | In-memory TUnit slicing (`--treenode-filter`) in `Event.Domain.UnitTests` or `Event.Application.UnitTests`. **0 containers, 0 network, 0 DB lag**. | Instant Red/Green validation of business logic, state machines, and invariants. |
 | **Ring 2: Phase Exit Gate** | Phase boundary (before phase commit) | **< 15s** | Release build (`dotnet build -c Release -v q`) + at most **one** selected project test against **one designated provider** (e.g. SQLite in-memory or single PostgreSQL container). | Ensure project-level integrity without matrix delays. |
-| **Ring 3: Plan Exit Gate** | Workstream boundary (before PR) | Minutes | Full 5-database matrix (PostgreSQL, SQLite, SQL Server, MySQL), EF Core migrations, and `Event.Architecture.Tests`. | Catch multi-dialect edge cases and architecture drift once before PR submission. |
+| **Ring 3: PR Acceptance / Programme Exit** | Each PR before merge; final cross-capability gate when ready | Minutes | Affected provider matrix, EF migrations, architecture and other scope-required checks. | Verify every independently merged outcome and then the combined programme promises. |
+
+Each programme retains one canonical plan/tasks/context triad, grouped into PR
+scopes, phases and tasks. Each PR has its own acceptance boundary: run all checks
+required by its actual changed contracts before merge, including applicable
+provider/migration, security, public-contract and UI/runtime checks. Do not defer
+the first validation of already merged changes to a later PR or run unrelated
+architectural-layer suites. Final programme acceptance covers cross-capability
+behavior after its prerequisites exist.
+
+Record explicit programme-specific user verification overrides, including their
+scope, unrun checks and resulting limits; they are not general permission to omit
+another PR's checks. Preserve unchanged passing evidence and rerun only invalidated
+checks after code/integration changes. Tier 4 documentation and agent-context-only
+changes use metadata, relative links, scenario review and diff checks, with no .NET
+build/test, provider matrix, browser, app or containers. This does not waive product
+checks when executable behavior changes.
 
 ### Fast-Loop In-Memory Slicing vs Containerized Persistence Testing
 
@@ -148,6 +216,29 @@ Each project has a specific role. Run individually — never use solution-level 
 | `ISLAMU.ReleaseEngineering.Tests` | Release engineering | Commit/scope policy, release artifact, Git trust, renderer, tag-anchored attestation, provider adapter plans | No (spawns `git`, `ssh-keygen`, and disposable repositories under the temp directory) |
 | `Event.Benchmarks` | Benchmarks | Advisory BenchmarkDotNet performance scenarios; build-only in PRs and executed by `performance-smoke.yml` | Optional PostgreSQL only for the dedicated provider benchmark |
 
+### Instance-Scoped HAL And Bootstrap-Read Coverage
+
+`Explore.Infrastructure.Tests/Authorization/InstanceScopedBatchAuthorizationTests`
+proves that a three-link instance-setting batch evaluates without reading a tenant,
+while `PrivateInstanceManagementHttpTests`, `TenantVisitorReadAccessHttpTests`,
+`AuthorizationPipelineIntegrationTests` and `LocalRbacAuthorizationTests` form the
+API acceptance slice (75 cases on the 2026-11-20 candidate). The latter proves
+that instance administration reaches its actions without a tenant lease while
+ordinary tenant and visitor admission still fails closed.
+
+`InstanceBootstrapStartupNativeReadTests` is the native boundary witness: Runtime
+cannot select `instance_bootstrap_states` directly, while
+`IInstanceBootstrapStateReader` can observe explicit absence and the current row
+through the Global contract. Mutation and startup owners keep the tracked
+repository; replacing those guards with the tracker-free reader would weaken
+`UPDATE`/generation fencing and is not a valid test simplification.
+
+The distributed cleanup proof treats an absent DCP candidate as retryable until
+native container evidence joins or the proof deadline expires. A concurrent
+`docker rm` that reports "already in progress" is settled by re-inspecting the
+exact owned container, not by accepting an unknown identity. Volume-consumer,
+owner-label, baseline and foreign-resource checks remain mandatory.
+
 ### Run Commands
 
 The [owned distributed assurance guide](testing/DISTRIBUTED_ASSURANCE.md)
@@ -164,6 +255,16 @@ The [browser](testing/BROWSER_ASSURANCE.md) and
 from actual host execution and measurement. The integrated project owns all
 four categories; neither discovery nor a passing host-free selection admits
 an unexecuted browser, enabled worker, load or recovery profile.
+
+Native test projects declare the operations endpoint target host as `127.0.0.1`,
+matching `OperationalEndpoints:Address`. Leaving the target host as `localhost`
+can send probes through `::1`; the exact private-listener guard then correctly
+returns 404 despite a matching port. Keep the explicit binding rather than
+broadening the address guard or increasing readiness budgets.
+The owned test topology also explicitly declares that IPv4 target in
+`EffectiveHostAuthority:InstanceHosts`: the earlier host-authority guard otherwise
+rejects it before the private-listener check. Neither guard accepts an undeclared
+host or a mismatched local listener.
 
 `AppHostCompositionContractTests` uses
 `OwnedAppHostFixture.InspectCompositionAsync` to inspect the real AppHost resource
@@ -210,6 +311,16 @@ invocation identity, honest no-ops, traversal/entity/size rejection and producer
 cleanup. `ReleaseCandidateVerificationTests` exercise the actual admission
 decision and deterministic manifest digest. Their synthetic report inputs prove
 protocol invariants, not execution of API security lanes.
+
+The explicit `SecurityExecutionEvidenceManagedCleanupTests` run a genuine
+compiled child and terminate its native owner only after all declared containers
+and managed project hosts have qualified. The child uses the same fifteen-minute
+cold-start allowance as `RealTopologyCompletesMigrationAndBecomesHealthy`; its
+native test command and process watchdog use the same 900-second limit. The
+parent has a twenty-minute deadline for setup and owner-death checks, with
+separately bounded teardown operations. These fixture lifetimes do not change
+product readiness deadlines or capacity thresholds. Model-only tests do not
+replace the real foreign-consumer and replaced-volume probes.
 
 `SecurityControlRegisterTests` consume the shipped machine catalogue and reject
 missing/duplicate identities, invalid ownership, missing mitigation pairs,
@@ -353,7 +464,7 @@ dotnet build src/Explore.Blazor.Client/Explore.Blazor.Client.csproj --configurat
 
 The determinism pass repeats the API build, inventory command, and Blazor client build, then requires zero diff in `schemas/openapi_islamu-event.json`, `docs/API_CONTRACT_INVENTORY.md`, and `src/Explore.Blazor.Client/Clients/EventApiClient.g.cs`.
 
-The solution-level build can be blocked by unrelated Blazor WebAssembly task-host issues on local SDK/tooling states where the WebAssembly workload is not installed. For the pinned .NET SDK `10.0.302`, verify the workload with `dotnet workload list` and install the official ASP.NET Core Blazor WebAssembly prerequisite with `dotnet workload install wasm-tools` when Release builds fail in `ComputeWasmBuildAssets`, `Microsoft.NETCore.App.Runtime.Mono.browser-wasm`, or `Microsoft.NET.Sdk.WebAssembly.Pack` resolution. When the change is API/Application/HAL-only, prefer the API project build plus focused tests above and report any broader build blocker separately instead of weakening lifecycle tests.
+The solution-level build can be blocked by unrelated Blazor WebAssembly task-host issues on local SDK/tooling states where the WebAssembly workload is not installed. For the pinned .NET SDK `10.0.403`, verify the workload with `dotnet workload list` and install the official ASP.NET Core Blazor WebAssembly prerequisite with `dotnet workload install wasm-tools` when Release builds fail in `ComputeWasmBuildAssets`, `Microsoft.NETCore.App.Runtime.Mono.browser-wasm`, or `Microsoft.NET.Sdk.WebAssembly.Pack` resolution. When the change is API/Application/HAL-only, prefer the API project build plus focused tests above and report any broader build blocker separately instead of weakening lifecycle tests.
 
 ### Support Access Focused Verification
 
@@ -457,6 +568,14 @@ dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTest
 ```
 
 ### Multi-provider database verification
+
+`PostgresMigrationAuthorityIsolationTests.CanonicalMigrationOwnsItsExecutionLeaseWithoutBindingTheCaller`
+uses a fresh PostgreSQL cluster with the fixture's declared accounts and selected
+credentials to exercise native installation with an unbound caller. This avoids
+the general fixture's extra grants. It requires migration completion, unchanged
+selected migrator identity and an empty, still-unbound caller context. A second
+database in the fixture's cluster is not equivalent: native roles have an exact
+database ownership contract, so that probes a different refusal.
 
 The CI database matrix uses real engines for migration/runtime evidence; the
 provider-model tests alone are not portability proof.
@@ -882,6 +1001,36 @@ that bypasses a compile-time contract, and token assurance over product source
 or documentation. Compiled endpoint/type/EF metadata and parsed JSON, YAML,
 schema, and project artifacts remain valid assurance seams.
 
+The persistence mode resolves EF and ADO operations from evaluated compilations,
+including aliases, provider overrides, delegates and wrapper calls. Export each
+owning project with `PersistenceAuditInputs.targets` and the explicit
+`ExportPersistenceAuditInputs` target. That target rebuilds the project before
+marking its source-generator manifest ready; ordinary incremental builds cannot
+certify a missing generator export. Store the resulting JSON outside tracked
+source. For example, from the worktree root:
+
+```bash
+dotnet msbuild eng/tools/Explore.AssuranceAudit/Explore.AssuranceAudit.csproj \
+  -target:ExportPersistenceAuditInputs -property:Configuration=Release \
+  -property:EmitCompilerGeneratedFiles=true \
+  -property:CompilerGeneratedFilesOutputPath=obj/persistence-audit-generated \
+  -property:CustomAfterMicrosoftCommonTargets="$PWD/eng/tools/Explore.AssuranceAudit/PersistenceAuditInputs.targets" \
+  -getProperty:MSBuildProjectFullPath,AssemblyName,DefineConstants,LangVersion,AllowUnsafeBlocks,OutputType,EmitCompilerGeneratedFiles,CompilerGeneratedFilesOutputPath,PersistenceAuditExportReady \
+  -getItem:Compile,ReferencePath,PersistenceAuditGeneratedCompile -verbosity:quiet -nologo \
+  > "$TMPDIR/persistence-audit-inputs.json"
+dotnet eng/tools/Explore.AssuranceAudit/bin/Release/net10.0/Explore.AssuranceAudit.dll \
+  . --persistence eng/tools/Explore.AssuranceAudit/persistence-capabilities.json \
+  "$TMPDIR/persistence-audit-inputs.json"
+```
+
+Supply all relevant runtime and native-test compilations together. An allowed
+capability names its exact assembly and method, approved API declaration IDs,
+provider gap, identifier/parameter handling, and an actual TUnit test owner.
+Missing symbols, incomplete exports, stale grants and dynamic dispatch fail the
+audit. The initial policy grants no exceptions; this mode exposes inherited SQL
+workflows as violations while their replacement proceeds. Passing the tool's own
+compilation is an input-path check, not repository-wide persistence qualification.
+
 
 `Event.Architecture.Tests` enforces project-wide conventions through reflection-based tests. These are not optional — they are CI gates.
 
@@ -961,6 +1110,20 @@ TDD is the default unless explicitly allowed to skip.
 - Add backward-compatibility tests for obsolete behavior while the project is in development mode
 
 ## Test Data And Fixtures
+
+The registration finalization/consent, PostgreSQL model-constraint, and location
+privacy/token-visibility fixtures bind container bootstrap passwords through
+`PostgresTestRoleBootstrap.ReadBootstrapPassword`. Inject the documented
+`DATABASE_MIGRATOR_PASSWORD` authority before running these native cases; missing
+or blank input fails before container creation. There is no default password or
+sibling-role fallback. Purpose-specific runtime logins remain separate from this
+bootstrap authority, and their ephemeral credentials must never appear in logs.
+
+`TypedPersistenceFixtureTests` exercises finalization arrangements with relational
+constraints enabled: missing submission evidence and cross-tenant lineage must
+fail, while complete participant/applicability graphs and both callback arrival
+orders persist correctly. These SQLite cases reuse the native test scenarios;
+they do not qualify PostgreSQL role admission, lease contention or lock behavior.
 
 - **Domain unit tests**: construct entities directly with valid state
 - **Application unit tests**: use in-memory fakes or builder patterns for repositories

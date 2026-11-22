@@ -435,7 +435,9 @@ public sealed class PostgresHumanWebhookResourceSourceContractTests(PostgreSqlCo
             // Contract roles have cluster-wide custody; never alter the fixture cluster.
             var container = new PostgreSqlBuilder("postgres:18-alpine")
                 .WithDatabase("webhook_source_" + Guid.CreateVersion7().ToString("N"))
-                .WithUsername(original.Username!).WithPassword(original.Password!).Build();
+                .WithUsername(original.Username!).WithPassword(original.Password!)
+                .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
+                .Build();
             try
             {
                 await container.StartAsync();

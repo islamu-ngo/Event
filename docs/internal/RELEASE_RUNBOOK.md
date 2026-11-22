@@ -8,6 +8,13 @@
 
 ## Complete release-impact metadata
 
+Before the license audit, CI restores the conditional Standalone container graph
+and the moderation launcher, browser installer, migration scaffolder and shared
+Keycloak tool owners without running their operations. It finishes with ordinary
+solution assets for the build. For a missing-metadata failure, verify package and
+version coverage for these profiles before changing policy or relying on a warm
+local cache.
+
 Review complete changed-file metadata, including previous names for renames.
 A large PR must not bypass impact classification or lower its declared file count.
 See [the trusted metadata contract](CI_CD_GOVERNANCE.md#complete-pr-file-metadata).
@@ -16,6 +23,12 @@ used by `pull_request_target`; arrange an independently reviewed base update
 before relying on its rerun.
 
 ## Current procedure
+
+If CodeQL is cancelled, inspect the actual workflow conclusion and phase
+timestamps before interpreting the result. Follow
+[the operational procedure](OPERATIONS.md#codeql-analysis-cancellation)
+and retain a completed analysis for the candidate before satisfying its
+scanner gate. A successful traced build alone does not satisfy that gate.
 
 Until a trusted release bundle, release-engine verification, signer policy, provider
 protection evidence, and advisory dry run are implemented, operators MUST use
@@ -30,11 +43,58 @@ different commits or label missing runtime lanes as complete. If publication fai
 follow [coverage publication operations](OPERATIONS.md#codecov-coverage-publication);
 do not substitute coverage percentages for the checklist's required tests.
 
+Prepare the owned browser through the existing native installer and its
+dedicated committed lock, preserving other tools' locks. Follow
+[security fixture prerequisites](CI_CD_GOVERNANCE.md#security-integration-fixture-execution)
+when restore or download fails. Only actual case execution, not installation,
+can satisfy the browser portion of the candidate's assurance.
+
+For SDK/runtime servicing, verify the official release's CVE mapping and image
+digests, regenerate owned dependency locks with the selected SDK, and retain
+the affected build and deployment evidence. Follow
+[the servicing baseline](OPERATIONS.md#sdk-and-runtime-servicing) and
+[operator rebuild instructions](../public/documentation/readme/self-hosting/docker-standalone.md).
+Do not treat framework pruning or a Dockerfile static check as a completed
+application image rebuild or a deployed-runtime verification.
+
 Generate the existing durable evidence bundle only as the checklist directs:
 
 ```sh
 dotnet run .ci/scripts/generate-release-evidence-bundle.cs -- artifacts release-evidence
 ```
+
+## PR 79 native authority changes (2026-11-20)
+
+This candidate changes native authorization and read paths. Existing development
+databases must be reprovisioned through the normal migrator/provisioning path;
+do not hand-edit roles, grants, functions or RLS policies to imitate the expected
+state.
+
+- **Category and lookup writes:** Runtime receives a narrow, attested DML contract
+  for `categories` and `category_type_categories`. `category_types` remains a
+  read-only global lookup for Runtime; its controller exposes only GET operations
+  and admin/test seeding uses the migrator context. The grants are installed by
+  `PostgresCategoryMutationPermissions`; a partial or widened grant set fails the
+  catalogue attestation instead of being silently accepted.
+- **Instance bootstrap reads:** HTTP-runtime reads use the Global
+  `IInstanceBootstrapStateReader`. Runtime direct access to
+  `instance_bootstrap_states` remains denied with PostgreSQL `42501`. Do not grant
+  Runtime table access to work around an onboarding-status failure; verify the
+  reader/Global pool configuration instead.
+- **Instance administration:** `/api/admin/instance/*`, instance onboarding and
+  instance settings are installation-scoped and do not require `X-Tenant-Slug`.
+  Do not add a synthetic default-tenant header or a controller-wide tenant
+  exemption. Missing HAL actions should be diagnosed through instance authority
+  and the permission-bound batch path, not by granting tenant authority.
+- **Provider-configuration discovery:** instance-scoped secret binding references
+  are read through the Global provider-configuration contract. Runtime direct
+  `secret_bindings` access stays denied.
+
+Rollback of the application binary does not automatically reverse installed native
+rights. Use the prior supported provisioning/migration path for the selected
+release and re-run its attestations; never widen a runtime role to make an older
+binary start. The B22 cleanup-fixture repair is test infrastructure only and has
+no operator action.
 
 ## Future governed release flow
 
@@ -252,6 +312,39 @@ execution sidecar and referenced reports have also been supplied:
 3. Keep these exact bytes for replay and tag-only clones. Missing, stale,
    duplicated, skipped, zero-test or digest-inconsistent evidence rejects
    candidate verification before a manifest is written.
+
+When acquisition fails before child launch, distinguish the selected daemon's
+read-only transport result from workload and cleanup evidence. Do not use
+diagnostic socket-completion or global tracing overrides to qualify the final
+candidate; the dedicated handler's context isolation must work normally.
+
+For a stat-role link rejection, retain the security workflow's system-stat
+observation before choosing a repair. Confirm the actual link chain, executable
+and invocation semantics; a resolved multicall target may not accept stat's
+arguments directly. Preserve non-link candidate admission and bind any future
+utility selection to both measured and executed inputs. Do not retry with a link
+exception or assume that changing runner images proves compatibility.
+
+The native stat repair resolves only the fixed system entry and retains its
+same-basename executable for capture and both metadata operations. Unsupported
+dispatchers and linked entry/target ancestors fail closed. Verify real alias
+execution and unchanged managed/policy linked-input refusals before publication;
+the hosted workflow must still complete all registered profiles on the final head.
+Capture the fixed `stat_tool_*` rejection code when selection fails.
+`stat_tool_selection_unavailable` identifies an inaccessible or missing
+filesystem target without exposing its path or underlying exception text.
+
+For a discovery identity mismatch, retain native JSON and a real TRX from the
+required witness. The supported constructor display form maps to the undecorated
+CLR class through one shared parser used by admission and proof generation.
+Do not rewrite authority inventories to display text or relax exact/subset joins.
+
+Establish actual engine readiness with a separate bounded read-only uncached
+inventory request on the selected socket. Desktop proxy cache responses can
+precede VM startup; retain startup/readiness evidence separately. Preserve the
+asynchronous client's five-second request and three-second connection allowances.
+A lost mutation response is an unknown outcome: inspect the qualified resource
+and preserve the error instead of adding retries or declaring cleanup complete.
 
 ```sh
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \

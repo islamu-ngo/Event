@@ -13,6 +13,12 @@ public class UserRepository : GenericRepository<User, Guid>, IUserRepository
         _dbContext = dbContext;
     }
 
+    public Task<User?> GetForIdentityEnrollmentAsync(Guid id, CancellationToken cancellationToken) =>
+        _dbContext.Users.IgnoreAutoIncludes().AsNoTracking()
+            .Where(user => user.Id == id)
+            .Select(user => new User { Id = user.Id, IsDeleted = user.IsDeleted, Pii = null! })
+            .FirstOrDefaultAsync(cancellationToken);
+
     public new async Task<User?> GetById(Guid id)
     {
         return await _dbContext.Users

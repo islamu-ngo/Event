@@ -24,6 +24,12 @@ keeps those decisions separate.
 | **Minimum Hardware** | 1 vCPU, 2 GB RAM | 4 vCPUs, 8 GB RAM | 8+ vCPUs, 16+ GB RAM (per node) |
 | **Supported Architectures** | `linux/amd64`, `linux/arm64` | `linux/amd64`, `linux/arm64` | `linux/amd64`, `linux/arm64` |
 
+> [!NOTE]
+> **🔄 Bidirectional Elasticity (Scaling Up & Downscaling):**  
+> Don't let the fear of future scaling force you into a high-tier deployment prematurely. **Start with Tier 1 (Standalone + SQLite).** It takes seconds to deploy and runs on a $4/month VPS.  
+> When ticket sales surge or you need multi-container clustering, you can promote to Tier 2 (Split + PostgreSQL) in ~15 minutes with **zero data loss**. Conversely, if your high-traffic season concludes and you wish to reduce infrastructure overhead, you can downscale from Tier 2 back to Tier 1 without losing historical records.  
+> See the complete **[Scaling & Migration Guide (Standalone ↔ Split)](topology-and-database-migration.md)** for step-by-step Coolify, Dokploy, and Compose runbooks.
+
 > [!TIP]
 > **⚙️ Reference Architecture Blueprint (Target Topology):**
 > Our recommended multi-service split deployment blueprint is designed for a **Hetzner CPX32** (x86_64) or **CAX31/CAX41** (ARM64 Ampere Altra) cloud server managed via **Coolify** (see our [Coolify Deployment Guide](coolify-cerbos-traefik.md)). Because all ISLAMU Event images ship with native multi-architecture support, operators can choose ARM64 cloud instances (e.g., Hetzner CAX, AWS Graviton) for improved price-to-performance without emulation overhead:

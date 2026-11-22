@@ -22,6 +22,7 @@ using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Seed;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.TestHost;
@@ -67,10 +68,12 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     private bool _poolContexts;
     internal event Action<ExploreDbContext, DbContextId>? ContextReturned;
     private ILoggerProvider? _logCapture;
+    private IExceptionHandler? _exceptionObserver;
     private IdentityDatabaseTopology _identityTopology = IdentityDatabaseTopology.Colocated;
     private string? _identityConnectionString;
     private bool _incompleteSetup;
     private bool _enableRateLimiting;
+    private DeploymentMode _deploymentMode = DeploymentMode.SingleTenant;
     private string? _postgreSqlConnectionString;
     private readonly PrimaryDatabaseConnectionOptions? _measurementDatabase;
     private readonly Dictionary<string, string?>? _measurementDatabaseSettings;
@@ -137,17 +140,21 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         bool enableAtproto = false,
         string? postgreSqlConnectionString = null,
         TimeProvider? timeProvider = null,
-        bool poolContexts = false)
+        bool poolContexts = false,
+        IExceptionHandler? exceptionObserver = null,
+        DeploymentMode deploymentMode = DeploymentMode.SingleTenant)
     {
         var factory = new LocalAdmissionWebApplicationFactory(primaryProvider, enableAtproto, timeProvider)
         {
             _persistenceInterceptor = persistenceInterceptor,
             _poolContexts = poolContexts,
             _logCapture = logCapture,
+            _exceptionObserver = exceptionObserver,
             _identityTopology = identityTopology,
             _incompleteSetup = incompleteSetup,
             _enableRateLimiting = enableRateLimiting,
-            _postgreSqlConnectionString = postgreSqlConnectionString
+            _postgreSqlConnectionString = postgreSqlConnectionString,
+            _deploymentMode = deploymentMode
         };
         try
         {
@@ -241,9 +248,30 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             {
                 settings["Keycloak:Authority"] = null;
                 settings["Keycloak:MetadataAddress"] = null;
-                settings["PublicBaseUrl"] = "https://example.test";
+                // Effective-host admission derives the canonical origin from PublicBaseUrl when
+                // no explicit override exists. It must match the TestServer base address or the
+                // request is rejected with an empty 400 before request logging runs.
+                settings["PublicBaseUrl"] = "https://localhost";
             }
 
+            if (_measurementDatabaseSettings is null && _postgreSqlConnectionString is null)
+            {
+                foreach (var role in Enum.GetValues<PrimaryDatabaseRole>())
+                {
+                    string prefix = $"Database:{role}:";
+                    settings[prefix + "Provider"] = "Sqlite";
+                    settings[prefix + "Name"] = _databasePath;
+                    settings[prefix + "Database"] = _databasePath;
+                    settings[prefix + "Host"] = null;
+                    settings[prefix + "Port"] = null;
+                    settings[prefix + "TlsMode"] = "Prefer";
+                    settings[prefix + "TrustServerCertificate"] = "false";
+                    settings[$"DATABASE_{role.ToString().ToUpperInvariant()}_HOST"] = null;
+                    settings[$"DATABASE_{role.ToString().ToUpperInvariant()}_PORT"] = null;
+                }
+                settings["DATABASE_HOST"] = null;
+                settings["DATABASE_PORT"] = null;
+            }
             if (_measurementDatabaseSettings is not null)
                 foreach (var setting in _measurementDatabaseSettings)
                     settings[setting.Key] = setting.Value;
@@ -253,6 +281,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         });
         builder.ConfigureTestServices(services =>
         {
+            if (_exceptionObserver is not null)
+                services.Insert(0, ServiceDescriptor.Singleton(_exceptionObserver));
             if (_timeProvider is not null)
             {
                 services.RemoveAll<TimeProvider>();
@@ -728,7 +758,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         });
         var bootstrap = InstanceBootstrapState.CreateInteractivePending(
             id: Guid.CreateVersion7(),
-            deploymentMode: DeploymentMode.SingleTenant,
+            deploymentMode: _deploymentMode,
             createdAt: now);
         if (!_incompleteSetup)
         {

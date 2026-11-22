@@ -75,6 +75,7 @@ public sealed class InstanceTenantConfigurationController : EventControllerBase
     }
 
     [HttpGet("tenants/{tenantId:guid}/plan-assignment", Name = RouteNames.GetInstanceAdminTenantPlanAssignment)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -94,6 +95,7 @@ public sealed class InstanceTenantConfigurationController : EventControllerBase
     }
 
     [HttpGet("tenants/{tenantId:guid}/effective-configuration", Name = RouteNames.GetInstanceAdminTenantEffectiveConfiguration)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -115,6 +117,7 @@ public sealed class InstanceTenantConfigurationController : EventControllerBase
     }
 
     [HttpPut("tenants/{tenantId:guid}/settings/{key}", Name = RouteNames.SetInstanceAdminTenantSetting)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -140,6 +143,7 @@ public sealed class InstanceTenantConfigurationController : EventControllerBase
     }
 
     [HttpPost("tenants/{tenantId:guid}/settings/{key}/lock", Name = RouteNames.LockInstanceAdminTenantSetting)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -163,6 +167,7 @@ public sealed class InstanceTenantConfigurationController : EventControllerBase
     }
 
     [HttpDelete("tenants/{tenantId:guid}/settings/{key}/lock", Name = RouteNames.UnlockInstanceAdminTenantSetting)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -186,6 +191,7 @@ public sealed class InstanceTenantConfigurationController : EventControllerBase
     }
 
     [HttpPost("tenants/{tenantId:guid}/plan-assignment", Name = RouteNames.SwitchInstanceAdminTenantPlanAssignment)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -214,6 +220,7 @@ public sealed class InstanceTenantConfigurationController : EventControllerBase
     }
 
     [HttpPost("tenants/{tenantId:guid}/plan-assignments/{assignmentId:guid}/apply", Name = RouteNames.ApplyInstanceAdminTenantPlanAssignment)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -243,6 +250,7 @@ public sealed class InstanceTenantConfigurationController : EventControllerBase
     }
 
     [HttpPost("tenants/{tenantId:guid}/plan-assignments/{assignmentId:guid}/rollback", Name = RouteNames.RollbackInstanceAdminTenantPlanAssignment)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]

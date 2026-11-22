@@ -166,15 +166,6 @@ public sealed class InMemoryEmailDispatchOutboxRepository(EmailDispatchOutbox di
         }
     }
 
-    public Task<IReadOnlyList<EmailDispatchOutbox>> GetRabbitMqPublishBatch(
-        int batchSize,
-        DateTime now,
-        DateTime retryAttemptsBefore,
-        CancellationToken cancellationToken)
-    {
-        throw new NotSupportedException();
-    }
-
     public Task<IReadOnlyList<EmailDispatchOutbox>> GetStatusRows(
         Guid tenantId,
         int limit,
@@ -712,20 +703,6 @@ public sealed class InMemoryEmailDispatchOutboxRepository(EmailDispatchOutbox di
                 ? EmailDispatchPreHandoffReleaseOutcome.ProviderHandoffFenced
                 : EmailDispatchPreHandoffReleaseOutcome.LostClaim);
         }
-    }
-
-    public Task MarkRabbitMqPublishSucceeded(Guid id, DateTime publishedAt, CancellationToken cancellationToken)
-    {
-        throw new NotSupportedException();
-    }
-
-    public Task MarkRabbitMqPublishFailed(
-        Guid id,
-        string failureCategory,
-        DateTime attemptedAt,
-        CancellationToken cancellationToken)
-    {
-        throw new NotSupportedException();
     }
 
     public Task SettleProviderAccepted(

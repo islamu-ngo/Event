@@ -1,5 +1,13 @@
 ## Key Decisions
 
+- [2026-11-20 Europe/Brussels] **Instance-management HAL batches must not resolve a tenant** — Instance-management actions are installation-scoped and are deliberately exempt from tenant-resolution middleware. The local authorization provider's three-or-more-check batch path used to build a tenant authority profile, which read `ITenantContext.TenantId`; on a MultiTenant instance-management request no tenant is bound, so the read could prevent instance links. Batches containing only instance settings and tenant creation evaluate per check through instance authority. An instance-setting batch containing other resource checks returns denied decisions when tenant resolution is empty, before size-specific or special-resource dispatch. An empty-tenant profile was rejected because the instance-admin shortcut could authorize mixed resource checks without a tenant. `[InstanceManagement]` stays method-scoped. The regression is `InstanceScopedBatchAuthorizationTests` plus the API authorization slice; the decision is `docs/internal/adr/ADR-021-instance-scoped-hal-authorization.md`.
+
+- [2026-11-20 Europe/Brussels] **Bootstrap reads use the Global reader; mutation owners keep the tracked repository** — HTTP-runtime query paths must not select `instance_bootstrap_states` through the ordinary Runtime repository: `InstanceBootstrapStartupNativeReadTests` proves that direct read returns PostgreSQL `42501`, while `IInstanceBootstrapStateReader` observes explicit absence and the current row through the independent `IGlobalExploreDbContextFactory` pool and `InstanceBootstrapStateQuery`. Query handlers, onboarding status/preflight/generation, management capability/upgrade inspections, credential-cutover queries, tenant lifecycle access, webhook ownership resolution and activation capacity use the reader. Commands and startup runners that mutate the row or need `UPDATE`/generation fencing retain `IInstanceBootstrapStateRepository`; replacing those guards with a tracker-free read would weaken idempotency and ownership checks. This split is documented in `docs/internal/SECURITY_OVERVIEW.md` and `docs/internal/CONFIGURATION.md`.
+
+- [2026-11-20 Europe/Brussels] **BFF session Redis must be projected with its TLS scheme** — The dedicated `bff-session-authority` AppHost resource is an Aspire Redis instance with a TLS listener, while the BFF ticket store selects StackExchange.Redis transport security from the endpoint URI. Projecting `redis://` made the first distributed BFF sign-in fail closed with HTTP 503: the API login returned 200, but the browser-session write sent plaintext to the TLS listener, which logged `SSL routines::wrong version number`. The repair derives the URI scheme from Aspire's `PrimaryEndpoint` (`EndpointProperty.Scheme`), which resolves to `rediss` while the resource's `TlsEnabled` contract is active; it does not duplicate the transport string or use `UriExpression`, whose password userinfo the BFF endpoint contract rejects. The store still rejects a missing namespace, password, or malformed URI rather than degrading to plaintext. `AppHostBffSessionAuthorityTests` mirrors the resolved post-certificate endpoint and passed 4/4 after the change; the real runtime witness remains the proof of TLS. Key files: `src/Explore.AppHost/AppHost.cs`, `src/Explore.Blazor/Services/Auth/RedisBffTicketStore.cs`, `tests/Event.Distributed.IntegrationTests/AppHostBffSessionAuthorityTests.cs`. A later method-scoped B22 witness reached the post-stop health probe without a sign-in failure, but both cases exhausted HttpClient's implicit 100-second timeout; the test now uses a bounded 10-second linked probe, and the stopped project wait accepts Aspire's `Finished` or `Exited` state. A subsequent witness reached cleanup and exposed a volume-consumer inventory race while Aspire DCP removed containers. The fixture now re-brackets up to ten times with a 100 ms pause; it still requires two identical inventories and still rejects foreign consumers, so the ownership proof is not weakened. Another witness reached the BFF stop command, where DCP's shorter local stop budget timed out while the BFF was still inside its intentional 25-second graceful-shutdown budget. The runtime test now treats the terminal `Finished`/`Exited` resource state as authoritative and allows a bounded 45-second settlement; production orchestration retains the 25-second grace period. This is a local Aspire limit, not a production AppHost dependency. A later witness deliberately stopped and restarted the BFF session authority; DCP replaced the container with a new native ID, and strict ID equality rejected the legitimate replacement. The fixture now permits an explicit same-resource replacement only when owner/resource labels, image, volume names and targets, and the sole volume consumer are unchanged; a changed volume binding still fails. A second capture must replace the stale identity for that resource instance rather than retain both IDs, otherwise the ledger's single-identity lookup throws `Sequence contains more than one matching element`. DCP's 12-second local stop budget can also expire before the BFF's 30-second host shutdown; a single stop does not reconcile the exited process. DCP's local stop command and resource state are not the product contract; the witness uses the bounded 503 health probe, then requires start and a healthy restart. The witness uses the approved 20-minute parent allowance; a 15-minute budget expired during post-authority session recovery even after both restart commands succeeded. DCP can also remove a test-owned volume before the fixture's container cleanup reads it; absence is now settled, while changed metadata or a foreign consumer still fails. AppHost remains local-development composition only: production API, Blazor, and standalone images receive the session endpoint from deployment configuration and have no AppHost project reference. Ordinary Redis caching is optional and independent; the BFF session authority is a separate optional input and is never inferred from cache availability. Key test files: `tests/Event.Distributed.IntegrationTests/ExternalDataProtectionRuntimeTests.cs`, `tests/Event.Distributed.IntegrationTests/OwnedAppHostFixture.cs`.
+
+- [2026-11-20 Europe/Brussels] **Category Runtime DML must be narrow, tenant-isolated and attested** — `PostgresCategoryMutationPermissions` grants only the columns the category write paths actually change: six-column `INSERT` on `categories`, `UPDATE` limited to `ConcurrencyStamp`, `MasterCode`, `FullName` and `ParentId`, RLS-enforced `DELETE`, and the corresponding narrow `category_type_categories` contract. `Id`, `TenantId` updates, grant options and `PUBLIC` stay outside the contract. `CategoryType` itself is read-only for Runtime: its controller exposes only GET operations and test/admin seeding uses the migrator context, so no Runtime `category_types` DML contract is installed. The read-permission attestation accepts exactly the authorized grant set and rejects partial or widened grants; the detached read-modify-write guard passed 9/9.
+
 - [2026-10-14 Europe/Brussels] **Native Configurator adoption supersedes the exporter model** — The Steward rejected `eng/configurator/` as contrary to the intended maintainer UX and requested its removal. Contributors use the portable `configurator-integrate` Agentic Skill with an AI agent that researches Event's public configuration declarations, schemas, validators and synthetic examples, then authors the integration file. The standalone Configurator CLI checks, revises, builds and exercises that file; Event retains target validation and apply authority. No bespoke exporter, downloader, compiler wrapper or target runtime dependency is required. The earlier generated-source decision below is historical and superseded. See `docs/internal/CONFIGURATOR_DEFINITION_EXPORT.md` and Configurator's `docs/public/integrate-your-tool.md`.
 
 - **Configurator source and fixture ownership:** Event generates one `configurator.yaml` from its contracts and reviewed host shapes; canonical `definition.json` and its public `release.json` remain the delivery boundary. Synthetic inputs, answers, expected artifacts and catalogue/template snapshots live under `tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/islamu-event/`. The baseline manifest is the two-tenant vector, so only one- and three-tenant variations need separate files. YAML round-trip validation and semantic revision guards preserve scalar meaning and canonical identity while raw source SHA-256 tracks serialization changes. `--write-local` retains compiled bytes and cannot establish compiler freshness; explicit pinned compilation remains a separate gate.
@@ -3697,3 +3705,92 @@ authorize a new connector or replay a possibly committed operation.
 
 **Promotion Consideration**:
 - [x] Stays in journal only; reusable fault-injection lesson, no new authority policy.
+---
+
+[2026-11-06 Europe/Brussels] — Tenant scalar commands need explicit native owner selection
+
+**Context**: While implementing recoverable Local visitor signup, actual HTTP tests closed tenant enrollment through the existing authenticated administrator setting endpoint.
+
+**Symptom / Observation**: The setting PUT returned 401 despite a valid Local bearer and `AdminContext: IsTenantAdmin=true`. A test-only exception observer captured `System.UnauthorizedAccessException` at `VisitorSettingsOriginalStore.RequireOriginal`; sanitized `route-unresolved` logging did not mean routing had failed.
+
+**Root Cause**: `PolicyMutationCommandScope.Handles` included the scalar setting command types, but `Select` covered their Instance cases without their Tenant cases. Update, batch, reset, lock and unlock therefore fell through to an unselected owner. The original visitor store correctly requires the retained Standard policy execution owner, exact tenant, subject, credential lifetime and original command. Successful administrator authorization cannot replace that custody.
+
+**Resolution**: Commit `9d747dde5bfab26cf81db8288632d54c9a966ba1` selects the authenticated nonempty tenant's Standard owner before constructing those five handler graphs. Missing or empty tenant fails immediately; dedicated Email/Mixed selections and user preferences keep their existing paths. The original-store checks remain unchanged. `dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release -- --treenode-filter '/*/*/TenantScalarSettingsOwnerSelectionTests/*' --minimum-expected-tests 8` produced seven intended failures before repair and passed all eight afterward. Following the API Release build, `dotnet run --no-build --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release -- --treenode-filter '/*/*/VisitorAccessDiscoveryHttpTests/ClosingEnrollmentPreservesLocalParticipationAndUsesAdministratorHal' --minimum-expected-tests 2` passed both existing-account/HAL cases. Actual Local enrollment closure also passed both cases after its separate pending-receipt cancellation repair.
+
+**Why This Matters for Future Work**: A type being listed in `Handles` does not prove every scope variant selects a native owner. Trace the actual request through `Select` when an authenticated write fails an original-source guard. Fix missing selection rather than treating a null policy purpose as Standard or relaxing principal/connection checks.
+
+**References**:
+- `src/Explore.Application/Operations/PolicyMutationCommandScope.cs:123`
+- `src/Explore.Persistence/Services/VisitorSettingsOriginalStore.cs:201`
+- `tests/Event.Application.UnitTests/Operations/TenantScalarSettingsOwnerSelectionTests.cs`
+- `docs/internal/AUTHORIZATION.md` — Original resource and visitor Settings ownership.
+- Commit: `9d747dde5bfab26cf81db8288632d54c9a966ba1`.
+
+**Promotion Consideration**:
+- [x] Stays in journal only; a regression-specific lesson about existing native selection requirements.
+
+---
+
+[2026-11-13 Europe/Brussels] — Open SQLite connections can hide transaction-lock leaks
+
+**Context**: PR79 persistence assurance examined named-lock cleanup after implicit rollback. Existing tests either closed the original connection or acquired another lock on it after disposing the transaction.
+
+**Symptom / Observation**: A contender already waiting on another connection remained blocked after the owning EF transaction was disposed while its externally owned SQLite connection stayed open. The new witness failed with `OperationCanceledException` at the final semaphore wait, rather than entering after rollback.
+
+**Root Cause**: EF transaction interception covers commit, rollback and failure but has no disposal callback. Connection cleanup and later acquisition scavenging hid the missing release event. Disposing an EF wrapper around a borrowed physical transaction is a different boundary: that external transaction can remain active and must retain exclusion.
+
+**Resolution**: Published commit `57d529542cc3c2cbfb517e9accf28b3e39da2e08` on draft PR #86 makes the existing SQLite tracker observe EF transaction-disposed diagnostics. It releases only an already tracked physical transaction whose connection is null. Existing dictionary removal keeps repeated cleanup idempotent and preserves reverse release order. The original witness failed before repair; Release compilation and all 18 relational named-lock cases passed after it, including synchronous and asynchronous borrowed-wrapper negatives. Commands: `dotnet build tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-restore -m:1 -nr:false --verbosity quiet`; `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/RelationalNamedLockTests/*" --minimum-expected-tests 3 --maximum-parallel-tests 1 --output Detailed --show-stdout All`.
+
+**Why This Matters for Future Work**: A disposal regression must start the contender before ending its owner and leave the original connection open. Reacquiring afterward can trigger scavenging and falsely suggest that existing waiters were released. Wrapper disposal alone does not prove that a borrowed database transaction ended.
+
+**References**:
+- `src/Explore.Persistence/Database/ProviderPrimitives/SqliteNamedLockTransactionInterceptor.cs:30`
+- `tests/Event.Persistence.IntegrationTests/Database/RelationalNamedLockTests.cs:188`
+- `docs/internal/BACKUP_RESTORE_UPGRADE.md` — SQLite transaction lock disposal.
+- Commit: `57d529542cc3c2cbfb517e9accf28b3e39da2e08`.
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the operational behavior is already documented, and the reusable lesson is how to distinguish disposal from scavenging.
+
+---
+
+[2026-11-13 Europe/Brussels] — Role identity and policy literal rendering are distinct
+
+**Context**: PR79 native assurance exercised setup admission for a declared PostgreSQL login containing uppercase letters, a backslash, an apostrophe and a dollar sign under both standard-string modes.
+
+**Symptom / Observation**: Fixture installation first failed with `global_setup_completion_storage_not_ready` before either test body ran. After correcting role lookup, disabled standard strings produced SQLSTATE `42704` for a name missing its backslash. Explicit escape literals removed that failure, but both modes still rejected the installed trusted-settings policy with `trusted_setup_settings_storage_not_ready`.
+
+**Root Cause**: Three representations were conflated. `to_regrole` parses identifier text, so an exact declared role name must be quoted before conversion. Ordinary SQL value literals can consume backslashes when standard strings are disabled. Finally, `quote_literal` adds an escape prefix for backslashes while `pg_get_expr` emits an ordinary literal with mode-dependent backslash doubling; comparing those rendered strings rejected a valid policy despite preserving its value.
+
+**Resolution**: Commit `fb3f97939829fbb52cfe648d2cb3c2d21b5cbf89` quotes role identifiers, uses explicit escape literals for values, and renders only the expected identity literal to match the native policy deparser. Exact expression equality, fingerprints, closed privileges and original-owner checks remain required. Both real-owner mode cases passed, followed by the existing private-row, forbidden mutation, drift rejection and original-transaction control. Release compilation also passed. Commands: `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/TrustedSettingsLiteralModeNativeTests/*" --minimum-expected-tests 2 --maximum-parallel-tests 1 --output Detailed --show-stdout All`; `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/PostgresBootstrapStartupStorageTests/GlobalSetupSettingsRetainPrivateRowIsolationAndOriginalTransaction" --minimum-expected-tests 1 --maximum-parallel-tests 1 --output Detailed --show-stdout All`.
+
+**Why This Matters for Future Work**: Identifier parsing, SQL value encoding and deparser output each have separate contracts. A fixture-initialization failure is not evidence that the intended test body failed. Diagnose the failing representation on the original owner rather than loosening policy matching or broadening grants.
+
+**References**:
+- `src/Explore.Persistence/Schema/ProviderPrimitives/PostgresSetupLiveStoragePermissions.GlobalCompletion.cs:70`
+- `src/Explore.Persistence/Schema/ProviderPrimitives/PostgresSetupLiveStoragePermissions.TrustedSettings.cs:238`
+- `tests/Event.Persistence.IntegrationTests/Onboarding/TrustedSettingsLiteralModeNativeTests.cs:19`
+- `docs/internal/BACKUP_RESTORE_UPGRADE.md` — Exact PostgreSQL setup role names.
+- Commit: `fb3f97939829fbb52cfe648d2cb3c2d21b5cbf89`.
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the operational contract is documented, and this entry retains the separate failure mechanisms and native diagnostic evidence.
+
+[2026-11-21 Europe/Brussels] — A failed health probe does not prove a BFF stopped
+
+**Context**: Independent review of the PR79 distributed BFF session-recovery witness examined whether it actually proved a restart.
+
+**Symptom / Observation**: The witness accepted a health timeout or HTTP 503 after the stop command even when the resource's terminal state was not observed.
+
+**Root Cause**: A running but unhealthy or slow process can produce the same health observation as a stopped process; a later running notification can therefore describe the original process.
+
+**Resolution**: The witness now requires the terminal `Finished` or `Exited` resource state before issuing start. Health unavailability is supplementary evidence. The earlier 2/2 run predates this correction and does not qualify the revised witness; the revised native test remains unrun.
+
+**Why This Matters for Future Work**: Recovery tests must establish the state transition they claim to exercise. Endpoint unavailability alone does not establish process termination or restart.
+
+**References**:
+- `tests/Event.Distributed.IntegrationTests/ExternalDataProtectionRuntimeTests.cs`
+- `docs/internal/testing/DISTRIBUTED_ASSURANCE.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal; the durable runtime-witness contract is also documented in the distributed assurance guide.

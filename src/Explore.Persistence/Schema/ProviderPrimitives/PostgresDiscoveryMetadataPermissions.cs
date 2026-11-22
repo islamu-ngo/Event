@@ -218,7 +218,7 @@ public static class PostgresDiscoveryMetadataPermissions
                 AND a.attnotnull AND a.attgenerated='' AND a.attidentity=''
                 AND a.atttypid={Text(property is "Id" or "TenantId" ? "uuid" : "bigint")}::regtype)
             """));
-        var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model).Single(table =>
+        var metadata = context.GetTenantTableInventory().Single(table =>
             table.TableName == revision.Name && (table.Schema ?? revision.Schema) == revision.Schema);
         string fingerprint = PostgresTenantRowLevelSecurityModel.BuildPolicyFingerprintPrefix(metadata, revision.Schema);
         return $"""
@@ -271,10 +271,18 @@ public static class PostgresDiscoveryMetadataPermissions
                     .Select(column => (column, Privilege: "UPDATE")))
                 .Select(grant => $"({Text(source.Table)},{Text(grant.column)},{Text(creatorEnrollment.GlobalLogin)},{Text(grant.Privilege)})");
         }).ToArray();
-        string[] declaredRuntimeParents = context is null || creatorEnrollment is null ? [] : sources.SelectMany(source =>
-            PostgresTenantApiKeyStoragePermissions.RuntimeParentReadColumns(context, source.Type)
-                .Select(column => $"({Text(source.Table)},{Text(column)},{Text(creatorEnrollment.RuntimeLogin)},'SELECT')")).ToArray();
-        string[] declaredGrants = [.. declaredGlobalGrants, .. declaredRuntimeParents];
+        string[] declaredRuntimeGrants = context is null || creatorEnrollment is null ? [] : sources.SelectMany(source =>
+        {
+            PostgresTenantMembershipMutationPermissions.TryGetRuntimeColumns(context, source.Type,
+                out var read, out var update, out _);
+            return PostgresTenantApiKeyStoragePermissions.RuntimeParentReadColumns(context, source.Type)
+                .Concat(read).Select(column => (Column: column, Privilege: "SELECT"))
+                .Concat(update.Select(column => (Column: column, Privilege: "UPDATE")))
+                .Concat(PostgresExternalTenantEnrollmentPermissions.RuntimeColumns(context, source.Type))
+                .Distinct().Select(grant =>
+                    $"({Text(source.Table)},{Text(grant.Column)},{Text(creatorEnrollment.RuntimeLogin)},{Text(grant.Privilege)})");
+        }).ToArray();
+        string[] declaredGrants = [.. declaredGlobalGrants, .. declaredRuntimeGrants];
         string permitted = "SELECT * FROM expected" + (declaredGrants.Length == 0 ? "" : " UNION VALUES " + string.Join(',', declaredGrants));
         string tables = "ARRAY[" + string.Join(',', sources.Select(source => Text(source.Table))) + "]::text[]";
         string required = complete ? """
@@ -368,7 +376,7 @@ public static class PostgresDiscoveryMetadataPermissions
             || entity.GetSkipNavigations().Any() || entity.GetNavigations().Any(navigation => navigation.IsEagerLoaded)
             || entity.GetProperties().Any(property => property.ClrType != (property.Name is "Id" or "TenantId" ? typeof(Guid) : typeof(long))))
             throw new InvalidOperationException("discovery_metadata_model_shape_drift");
-        var tenant = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model).SingleOrDefault(table =>
+        var tenant = context.GetTenantTableInventory().SingleOrDefault(table =>
             table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
         if (tenant is not { AllowsNullTenant: false, ParentJoin: null, TenantIdColumn: not null })
             throw new InvalidOperationException("discovery_metadata_model_tenancy_drift");

@@ -7,7 +7,7 @@ public static class ReservedTenantSlugs
     public static readonly FrozenSet<string> All = new[]
     {
         "about", "admin", "ai", "auth", "community-guidelines", "contact", "error", "errors",
-        "actors", "events", "event-created", "forbidden", "group", "home", "login", "logout",
+        "actors", "events", "event-created", "forbidden", "group", "home", "join", "login", "logout",
         "moderation", "my", "notifications", "onboarding", "organization", "organizations", "payments", "privacy",
         "registration", "settings", "setup", "startup", "status", "studio", "terms", "tickets",
         "users", "oauth", "test-endpoint",

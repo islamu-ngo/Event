@@ -2,6 +2,7 @@ using Explore.Application.Configuration;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Services;
@@ -268,7 +269,8 @@ public sealed partial class LocalBootstrapConvergenceTests
             TermsUrl = "https://example.test/terms",
             PrivacyUrl = "https://example.test/privacy"
         });
-        var provider = new ConfiguredAdministratorBootstrapProvider(fixture.Configuration, operatorOptions, bootstrap);
+        var provider = new ConfiguredAdministratorBootstrapProvider(fixture.Configuration, operatorOptions,
+            new Event.Persistence.IntegrationTests.Fixtures.TestInstanceBootstrapStateReader(bootstrap));
         context.BindTenantLease();
         var receipts = receiptSource ?? scope.ServiceProvider.GetRequiredService<SetupReceiptCustody>().Source;
         var enrollment = new EventDiscoveryEnrollmentGate(context);
@@ -293,7 +295,7 @@ public sealed partial class LocalBootstrapConvergenceTests
             new ActorRepository(context), logins, emails, privacy,
             new IdentityAccountResolver(users, logins, emails, privacy, Options.Create(new IdentityCorrelationOptions())),
             new IdentityEmailSynchronizationOperation(emails),
-            settings, [provider], setup,
+            [provider], setup,
             new InstanceBootstrapAuditLogger(NullLogger<InstanceBootstrapAuditLogger>.Instance),
             deployment, new RuntimeMetadataRefresh(), NullLogger<InstanceOnboardingCompletionOperation>.Instance,
             unitOfWork, fixture.GenerationReader(scope), fixture.Configuration,
@@ -312,6 +314,9 @@ public sealed partial class LocalBootstrapConvergenceTests
         private Func<Task>? replay;
 
         internal Task ReplayAsync() => replay!();
+
+        public Task<bool> HasOperatorIdentityAsync(IUnitOfWork originalOwner, CancellationToken cancellationToken) =>
+            inner.HasOperatorIdentityAsync(originalOwner, cancellationToken);
 
         public async Task<T> ExecuteAsync<T>(TrustedSetupSettingsApply<T> apply, CancellationToken cancellationToken)
         {

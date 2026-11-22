@@ -9,5 +9,17 @@ namespace Explore.Application.Contracts.Secrets;
 public interface IRetainedSecretResolver
 {
     Task<RetainedSecretReference> CaptureAsync(string settingKey, Guid tenantId, CancellationToken cancellationToken);
+    /// <summary>
+    /// Captures only the selected instance reference without reading external material.
+    /// Returns null when no instance reference exists. Resolve after releasing source
+    /// locks to establish availability, including an unconfigured external value.
+    /// </summary>
+    Task<RetainedSecretReference?> CaptureInstanceAsync(string settingKey, CancellationToken cancellationToken);
+    /// <summary>
+    /// Admits an already selected detached binding without another repository read.
+    /// Null selects only the registry's instance default, never another stored row.
+    /// </summary>
+    Task<RetainedSecretReference?> CaptureAsync(string settingKey, Guid? tenantId,
+        SecretBinding? selectedBinding, CancellationToken cancellationToken);
     Task<SecretResolutionResult> ResolveAsync(RetainedSecretReference reference, CancellationToken cancellationToken);
 }

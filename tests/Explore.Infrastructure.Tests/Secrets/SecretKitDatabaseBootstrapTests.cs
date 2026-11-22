@@ -2,6 +2,7 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
@@ -126,6 +127,52 @@ public sealed class SecretKitDatabaseBootstrapTests
             await using var acquisition = await MigrationDatabaseAcquisition.OpenAsync(
                 bootstrap, "Testing", ["/database"], testingAuthority: selected);
         }).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    [Arguments("DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD")]
+    [Arguments("Database__LocalIdentityWriter__Password")]
+    [Arguments("IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD")]
+    [Arguments("IdentityDatabase__LocalIdentityWriter__Password")]
+    public async Task MigrationAcquisitionDoesNotAcquireMaskedServingWriterPassword(string inheritedName)
+    {
+        IConfiguration selected = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["DATABASE_PROVIDER"] = "Sqlite",
+                ["DATABASE_NAME"] = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".db")
+            }).Build();
+        var projected = new Dictionary<string, object>();
+        RuntimeSecretEnvironment.Apply(projected, selected, [inheritedName],
+            SecretConsumerRole.Migration, SecretAuthorityKind.Environment,
+            [
+                new("/database", "DATABASE_PROVIDER", "DATABASE_PROVIDER"),
+                new("/database", "DATABASE_NAME", "DATABASE_NAME")
+            ]);
+        await Assert.That(projected[inheritedName]).IsEqualTo(string.Empty);
+        IConfiguration authority = new ConfigurationBuilder().AddInMemoryCollection(
+            projected.Select(pair => new KeyValuePair<string, string?>(
+                pair.Key.Replace("__", ":", StringComparison.Ordinal), (string?)pair.Value))).Build();
+
+        await using var acquisition = await MigrationDatabaseAcquisition.OpenAsync(
+            authority, "Testing", ["/database", "/database/identity"], testingAuthority: authority);
+
+        await Assert.That(PrimaryDatabaseConfiguration.BindMigrator(acquisition.Configuration).Provider)
+            .IsEqualTo(PrimaryDatabaseProvider.Sqlite);
+        await Assert.That(acquisition.Configuration["Database:LocalIdentityWriter:Password"]).IsNull();
+        await Assert.That(acquisition.Configuration["IdentityDatabase:LocalIdentityWriter:Password"]).IsNull();
+        var lowerValues = new Dictionary<string, string?>
+        {
+            ["Database:LocalIdentityWriter:Password"] = Guid.NewGuid().ToString("N"),
+            ["IdentityDatabase:LocalIdentityWriter:Password"] = Guid.NewGuid().ToString("N")
+        };
+        string inheritedKey = inheritedName.Replace("__", ":", StringComparison.Ordinal);
+        lowerValues[inheritedKey] = Guid.NewGuid().ToString("N");
+        IConfiguration overlaid = acquisition.ApplyTo(
+            new ConfigurationBuilder().AddInMemoryCollection(lowerValues)).Build();
+        await Assert.That(overlaid["Database:LocalIdentityWriter:Password"] is null).IsTrue();
+        await Assert.That(overlaid["IdentityDatabase:LocalIdentityWriter:Password"] is null).IsTrue();
+        await Assert.That(overlaid[inheritedKey] is null).IsTrue();
     }
 
     [Test]

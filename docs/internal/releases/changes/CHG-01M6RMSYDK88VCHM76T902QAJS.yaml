@@ -1,0 +1,26 @@
+Change-Id: CHG-01M6RMSYDK88VCHM76T902QAJS
+Title: "Keep visitor writes consistent with provisioning policy"
+Type: fix
+Scope: access
+Summary: "Visitor setting changes preserve the provisioning policy state used to validate later administrative edits."
+Group: visitor-provisioning-policy
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented

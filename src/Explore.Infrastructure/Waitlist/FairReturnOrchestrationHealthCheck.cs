@@ -18,13 +18,13 @@ public sealed class FairReturnOrchestrationHealthCheck(
         ArgumentNullException.ThrowIfNull(context);
         await using AsyncServiceScope scope =
             scopeFactory.CreateAsyncScope();
-        IFairReturnOrchestrationRepository repository =
+        IFairReturnOrchestrationHealthReader reader =
             scope.ServiceProvider.GetRequiredService<
-                IFairReturnOrchestrationRepository>();
+                IFairReturnOrchestrationHealthReader>();
         DateTime now =
             timeProvider.GetUtcNow().UtcDateTime;
         FairReturnOrchestrationHealth health =
-            await repository.GetHealthAsync(
+            await reader.ReadAsync(
                 now,
                 cancellationToken);
         var data = new Dictionary<

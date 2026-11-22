@@ -49,6 +49,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
     private Task? _localIdentityWriterPreparation;
     private int _disposed;
     private readonly ConcurrentBag<string> _isolatedSchemas = new();
+    private readonly ConcurrentBag<string> _isolatedDatabases = new();
     private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
     private string? _runtimeConnectionString;
     private PostgreSqlDatabaseReset? _reset;
@@ -145,6 +146,10 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
                 .WithName(_intendedContainerName!)
                 .WithLabel(OwnerLabel, owner.Owner).WithLabel(ResourceLabel, "postgres")
                 .WithLabel(FixtureLabel, _fixtureNonce).WithImagePullPolicy(PullPolicy.Never);
+        builder = builder.ApplyBoundedResourcePolicy(
+            ContainerServiceRole.PostgreSql,
+            hasAssuranceOwner: _assurance is not null,
+            hasExplicitContainerName: !string.IsNullOrWhiteSpace(_intendedContainerName));
         _container = builder.Build();
         await _container.StartAsync();
         RecordStage(AssuranceStage.ContainerStartReturned);
@@ -211,19 +216,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresUserTenantMembershipReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresExternalLoginReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresAdministrativeAuthorityContract.ApplyAsync(migratorContext);
-            foreach (string executor in new[]
-            {
-                PostgresAdministrativeAuthorityContract.GlobalRole
-            })
-            {
-                await migratorContext.Database.ExecuteSqlRawAsync(
-                    $"""
-                    GRANT "{executor}"
-                    TO "{NativeQueueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
-                    WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
-                    """);
-            }
+            await PostgresAdministrativeAuthorityReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresActorConsolidationContract.ApplyAsync(migratorContext);
             await PostgresManagedTenantDomainContract.ApplyAsync(migratorContext);
             await PostgresNotificationFanoutAdmissionContract.ApplyAsync(migratorContext);
@@ -237,6 +230,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresPublicEventResponseClockContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresLookupCatalogueReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresCategoryReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresCategoryMutationPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresAtprotoFederationSettingPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await migratorContext.Database.ExecuteSqlRawAsync(
                 $"""
@@ -299,7 +293,11 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresIncomingWebhookQueueContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresEventReportOperationsContract.ApplyAsync(migratorContext);
             await PostgresEmailRetentionReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresVisitorEnrollmentRecoveryReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresEmailPointerPublicationPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresWebhookCataloguePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresEventResourceAuditReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresEffectAggregateHealthReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresWebhookLocalDeliveryAdmissionContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresWebhookClaimEndpointStateContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresWebhookLocalDeliveryHealthContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
@@ -340,6 +338,8 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresProviderConfigurationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresMixedSettingsContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresOrdinarySettingsContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresProvisioningPolicyPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresVisitorSettingsStorage.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresLocalizationSecretStatusReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresTenantPreferencePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresUserTenantNavigationReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
@@ -352,6 +352,9 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresTenantMembershipMutationPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresActorOwnershipReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresSetupLiveStoragePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresPrivacyReplayStoragePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresExternalTenantEnrollmentPermissions.ApplyAsync(
+                migratorContext, NativeQueueEnrollment, _identityTopology);
         }
 
         RecordStage(AssuranceStage.ContractsReturned);
@@ -461,6 +464,26 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
                     }
                 }
             }
+
+            if (!_isolatedDatabases.IsEmpty && _container is not null)
+            {
+                NpgsqlConnection.ClearAllPools();
+                await using var adminConnection = new NpgsqlConnection(_container.GetConnectionString());
+                await adminConnection.OpenAsync();
+                foreach (var database in _isolatedDatabases)
+                {
+                    try
+                    {
+                        await using var cmd = adminConnection.CreateCommand();
+                        cmd.CommandText = $"DROP DATABASE IF EXISTS \"{database}\" WITH (FORCE);";
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                    catch (DbException)
+                    {
+                        // Best-effort logical database cleanup before container disposal
+                    }
+                }
+            }
         }
         catch (DbException)
         {
@@ -537,6 +560,36 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = $"DROP SCHEMA IF EXISTS \"{schemaName}\" CASCADE;";
         await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// Creates an empty, isolated logical database inside the shared PostgreSQL container and returns its admin connection string.
+    /// Useful for tests that execute EnsureCreatedAsync or schema-specific MigrateAsync without spawning a dedicated container.
+    /// </summary>
+    public async Task<string> CreateIsolatedDatabaseAsync(string databasePrefix = "test_")
+    {
+        string sanitizedPrefix = string.Concat(
+            (databasePrefix ?? "test_").Select(ch => char.IsAsciiLetterOrDigit(ch) || ch == '_' ? char.ToLowerInvariant(ch) : '_'));
+        string databaseName = $"{sanitizedPrefix}{Guid.NewGuid():N}";
+        if (databaseName.Length > 63)
+        {
+            databaseName = databaseName[..63];
+        }
+
+        await using var adminConnection = new NpgsqlConnection(Container.GetConnectionString());
+        await adminConnection.OpenAsync();
+        await using (var command = adminConnection.CreateCommand())
+        {
+            command.CommandText = $"CREATE DATABASE \"{databaseName}\";";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        _isolatedDatabases.Add(databaseName);
+        var builder = new NpgsqlConnectionStringBuilder(Container.GetConnectionString())
+        {
+            Database = databaseName,
+        };
+        return builder.ConnectionString;
     }
 
     /// <summary>

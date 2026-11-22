@@ -8,7 +8,7 @@ public sealed class AuthenticationCredentialAcquisitionReceiptTests
     public async Task SchemeInstallationCannotManufactureAcquisition()
     {
         var receipts = new AuthenticationCredentialAcquisitionReceipts();
-        receipts.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc, true);
+        receipts.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc, true);
         await Assert.That(receipts.Snapshot()).IsEmpty();
     }
 
@@ -16,20 +16,20 @@ public sealed class AuthenticationCredentialAcquisitionReceiptTests
     public async Task RemovalAndMetadataRefreshPreserveAcquisitionIdentityAndSnapshots()
     {
         var receipts = new AuthenticationCredentialAcquisitionReceipts();
-        receipts.RecordAcquired(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc,
+        receipts.RecordAcquired(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc,
             AuthenticationCredentialAcquisitionReceipts.Authority.Environment);
         var initial = receipts.Snapshot();
-        receipts.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc, true);
+        receipts.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc, true);
         var installed = receipts.Snapshot();
-        receipts.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc, false);
+        receipts.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc, false);
         var removed = receipts.Snapshot();
-        receipts.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc, true);
+        receipts.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc, true);
         await Assert.That(initial.Single().Installed).IsFalse();
         await Assert.That(installed.Single().Installed).IsTrue();
         await Assert.That(removed.Single()).IsEqualTo(initial.Single());
         await Assert.That(receipts.Snapshot().Single()).IsEqualTo(installed.Single());
         await Assert.That(() => receipts.RecordAcquired(
-            AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc,
+            AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc,
             AuthenticationCredentialAcquisitionReceipts.Authority.Environment))
             .Throws<InvalidOperationException>();
     }

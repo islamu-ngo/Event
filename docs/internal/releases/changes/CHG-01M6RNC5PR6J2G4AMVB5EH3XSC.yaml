@@ -1,0 +1,26 @@
+Change-Id: CHG-01M6RNC5PR6J2G4AMVB5EH3XSC
+Title: "Separate tenant enrollment from existing-account access"
+Type: feat
+Scope: access
+Summary: "Tenant administrators can close new enrollment while existing accounts retain usable login and account-required participation."
+Group: tenant-enrollment-policy
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: documented
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented

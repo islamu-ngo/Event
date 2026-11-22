@@ -1,0 +1,38 @@
+Change-Id: CHG-01M6BJF74X5KK57NG7XTPSM3ZS
+Title: "Own migration policy installation contexts"
+Type: fix
+Scope: database
+Summary: "Install application policies through a migration-owned execution context in both default and remapped namespaces without binding the caller's tenant lease."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Policy installation retains the selected migration authority and target
+      namespace. Its owned context binds an absent tenant lease; it does not
+      rebind a caller, promote Runtime credentials or bypass lease guards.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: >-
+      The default namespace now uses the same separately owned policy execution
+      context as remapped namespaces. This correction adds no migration catalog
+      or schema operation and preserves existing authority history separation.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: >-
+      Use the corrected migration process with existing migrator credentials
+      and schema when policy installation reports tenant_lease_not_bound.
+      No new tenant identifier, configuration key or data reset is required.

@@ -141,9 +141,12 @@ public sealed class HateoasAuthorizationEvaluator : IHateoasAuthorizationEvaluat
             activity?.SetTag("outcome", "success");
             return results;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            _logger.LogWarning("HATEOAS batch authorization failed; denying all {Count} permission-bound links (fail-closed).", pendingChecks.Count);
+            _logger.LogWarning(
+                "HATEOAS batch authorization failed; denying all {Count} permission-bound links (fail-closed). FailureType={FailureType}",
+                pendingChecks.Count,
+                exception.GetType().Name);
             activity?.SetTag("outcome", "fail_closed");
 
             foreach (var pending in pendingChecks)

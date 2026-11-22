@@ -134,6 +134,8 @@ internal static partial class MixedSettingsDataImage
                             value = value is Guid guid ? guid : Guid.Parse(Convert.ToString(value, CultureInfo.InvariantCulture)!);
                         else if (propertyType == typeof(bool))
                             value = Convert.ToBoolean(value, CultureInfo.InvariantCulture);
+                        else if (propertyType == typeof(decimal))
+                            value = Convert.ToDecimal(value, CultureInfo.InvariantCulture);
                         else if (propertyType == typeof(DateTime))
                             value = DateTime.SpecifyKind(value is DateTime date ? date
                                 : DateTime.Parse((string)value, CultureInfo.InvariantCulture), DateTimeKind.Utc)

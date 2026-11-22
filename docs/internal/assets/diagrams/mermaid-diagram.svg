@@ -1,0 +1,202 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1775.4364999999996 985.45" width="1775.4364999999996" height="985.45" style="--bg:#18181B;--fg:#F4F4F5;--line:#71717A;--muted:#A1A1AA;--surface:#27272A;--border:#3F3F46;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="seq-arrow" markerWidth="8" markerHeight="5" refX="8" refY="2.5" orient="auto-start-reverse">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" />
+  </marker>
+  <marker id="seq-arrow-open" markerWidth="8" markerHeight="5" refX="8" refY="2.5" orient="auto-start-reverse">
+    <polyline points="0 0, 8 2.5, 0 5" fill="none" stroke="var(--_arrow)" stroke-width="1" />
+  </marker>
+</defs>
+<line class="lifeline" data-actor="Dev" x1="78.09700000000001" y1="92.45" x2="78.09700000000001" y2="955.45" stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />
+<line class="lifeline" data-actor="Stage2" x1="362.53499999999997" y1="70" x2="362.53499999999997" y2="955.45" stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />
+<line class="lifeline" data-actor="Stage3" x1="702.5149999999999" y1="70" x2="702.5149999999999" y2="955.45" stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />
+<line class="lifeline" data-actor="Stage4" x1="995.8009999999998" y1="70" x2="995.8009999999998" y2="955.45" stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />
+<line class="lifeline" data-actor="Stage5" x1="1359.5409999999997" y1="70" x2="1359.5409999999997" y2="955.45" stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />
+<line class="lifeline" data-actor="Plane" x1="1649.9189999999996" y1="70" x2="1649.9189999999996" y2="955.45" stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />
+<g class="block" data-type="loop" data-label="For each Phase">
+  <rect x="833.2229999999998" y="535.45" width="912.2134999999997" height="200" rx="0" ry="0" fill="none" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="833.2229999999998" y="535.45" width="154" height="20" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="841.2229999999998" y="545.45" font-size="11" font-weight="600" fill="var(--_text-sec)" dy="3.8499999999999996">loop [For each Phase]</text>
+</g>
+<g class="message" data-from="Dev" data-to="Stage2" data-label="Create implementation plan for &lt;feature&gt;" data-line-style="solid" data-arrow-head="filled" data-self="false" data-step="1">
+  <line x1="78.09700000000001" y1="112.45" x2="362.53499999999997" y2="112.45" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="114.31599999999997" y="94.3" width="212" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="220.31599999999997" y="102.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Create implementation plan for &lt;feature&gt;</text>
+  <circle class="sequence-number" cx="78.09700000000001" cy="112.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="78.09700000000001" y="112.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">1</text>
+</g>
+<g class="message" data-from="Stage2" data-to="Plane" data-label="Match/create work item in event/work/ (Stable ID / EVENT-XXX)" data-line-style="solid" data-arrow-head="filled" data-self="false" data-step="2">
+  <line x1="362.53499999999997" y1="167.45" x2="1649.9189999999996" y2="167.45" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="842.2269999999999" y="149.29999999999998" width="328" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="1006.2269999999999" y="157.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Match/create work item in event/work/ (Stable ID / EVENT-XXX)</text>
+  <circle class="sequence-number" cx="362.53499999999997" cy="167.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="362.53499999999997" y="167.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">2</text>
+</g>
+<g class="message" data-from="Stage2" data-to="Stage2" data-label="Author dev/active/&lt;task&gt;/ (plan.md, tasks.md, context.md)" data-line-style="solid" data-arrow-head="filled" data-self="true" data-step="3">
+  <polyline points="362.53499999999997,207.45 392.53499999999997,207.45 392.53499999999997,227.45 362.53499999999997,227.45" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="397.53499999999997" y="209.29999999999998" width="299" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="400.53499999999997" y="217.45" font-size="11" text-anchor="start" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Author dev/active/&lt;task&gt;/ (plan.md, tasks.md, context.md)</text>
+  <circle class="sequence-number" cx="362.53499999999997" cy="207.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="362.53499999999997" y="207.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">3</text>
+</g>
+<g class="message" data-from="Stage2" data-to="Dev" data-label="Executive Plan Brief (with Plane Ticket References)" data-line-style="dashed" data-arrow-head="filled" data-self="false" data-step="4">
+  <line x1="362.53499999999997" y1="277.45" x2="78.09700000000001" y2="277.45" stroke="var(--_line)" stroke-width="1" stroke-dasharray="6 4" marker-end="url(#seq-arrow)" />
+  <rect x="84.81599999999997" y="259.3" width="271" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="220.31599999999997" y="267.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Executive Plan Brief (with Plane Ticket References)</text>
+  <circle class="sequence-number" cx="362.53499999999997" cy="277.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="362.53499999999997" y="277.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">4</text>
+</g>
+<g class="message" data-from="Dev" data-to="Stage3" data-label="Run senior-cto-feedback" data-line-style="solid" data-arrow-head="filled" data-self="false" data-step="5">
+  <line x1="78.09700000000001" y1="317.45" x2="702.5149999999999" y2="317.45" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="322.3059999999999" y="299.3" width="136" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="390.3059999999999" y="307.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Run senior-cto-feedback</text>
+  <circle class="sequence-number" cx="78.09700000000001" cy="317.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="78.09700000000001" y="317.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">5</text>
+</g>
+<g class="message" data-from="Stage3" data-to="Plane" data-label="Update dependencies (blocked_by) &amp; priority in event/work/" data-line-style="solid" data-arrow-head="filled" data-self="false" data-step="6">
+  <line x1="702.5149999999999" y1="372.45" x2="1649.9189999999996" y2="372.45" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="1019.2169999999996" y="354.3" width="314" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="1176.2169999999996" y="362.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Update dependencies (blocked_by) &amp; priority in event/work/</text>
+  <circle class="sequence-number" cx="702.5149999999999" cy="372.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="702.5149999999999" y="372.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">6</text>
+</g>
+<g class="message" data-from="Stage3" data-to="Dev" data-label="Decision Brief &amp; Approved Triad" data-line-style="dashed" data-arrow-head="filled" data-self="false" data-step="7">
+  <line x1="702.5149999999999" y1="412.45" x2="78.09700000000001" y2="412.45" stroke="var(--_line)" stroke-width="1" stroke-dasharray="6 4" marker-end="url(#seq-arrow)" />
+  <rect x="303.3059999999999" y="394.3" width="174" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="390.3059999999999" y="402.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Decision Brief &amp; Approved Triad</text>
+  <circle class="sequence-number" cx="702.5149999999999" cy="412.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="702.5149999999999" y="412.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">7</text>
+</g>
+<g class="message" data-from="Dev" data-to="Stage4" data-label="Execute /goal + implement-tasks" data-line-style="solid" data-arrow-head="filled" data-self="false" data-step="8">
+  <line x1="78.09700000000001" y1="452.45" x2="995.8009999999998" y2="452.45" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="451.44899999999996" y="434.3" width="171" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="536.949" y="442.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Execute /goal + implement-tasks</text>
+  <circle class="sequence-number" cx="78.09700000000001" cy="452.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="78.09700000000001" y="452.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">8</text>
+</g>
+<g class="message" data-from="Stage4" data-to="Plane" data-label="Set Work Item state: 'In Progress'" data-line-style="solid" data-arrow-head="filled" data-self="false" data-step="9">
+  <line x1="995.8009999999998" y1="507.45" x2="1649.9189999999996" y2="507.45" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="1234.8599999999997" y="489.3" width="176" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="1322.8599999999997" y="497.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Set Work Item state: &#39;In Progress&#39;</text>
+  <circle class="sequence-number" cx="995.8009999999998" cy="507.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="995.8009999999998" y="507.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">9</text>
+</g>
+<g class="message" data-from="Stage4" data-to="Stage4" data-label="Red -&gt; Green -&gt; Progressive Verification (Ring 1/2)" data-line-style="solid" data-arrow-head="filled" data-self="true" data-step="10">
+  <polyline points="995.8009999999998,575.45 1025.801,575.45 1025.801,595.45 995.8009999999998,595.45" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="1030.801" y="577.3000000000001" width="263" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="1033.801" y="585.45" font-size="11" text-anchor="start" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Red -&gt; Green -&gt; Progressive Verification (Ring 1/2)</text>
+  <circle class="sequence-number" cx="995.8009999999998" cy="575.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="995.8009999999998" y="575.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">10</text>
+</g>
+<g class="message" data-from="Stage4" data-to="Stage4" data-label="Execute planned Conventional Commit with 'Refs: EVENT-XXX'" data-line-style="solid" data-arrow-head="filled" data-self="true" data-step="11">
+  <polyline points="995.8009999999998,645.45 1025.801,645.45 1025.801,665.45 995.8009999999998,665.45" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="1030.801" y="647.3000000000001" width="325" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="1033.801" y="655.45" font-size="11" text-anchor="start" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Execute planned Conventional Commit with &#39;Refs: EVENT-XXX&#39;</text>
+  <circle class="sequence-number" cx="995.8009999999998" cy="645.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="995.8009999999998" y="645.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">11</text>
+</g>
+<g class="message" data-from="Stage4" data-to="Plane" data-label="Record phase verification evidence &amp; acceptance status" data-line-style="solid" data-arrow-head="filled" data-self="false" data-step="12">
+  <line x1="995.8009999999998" y1="715.45" x2="1649.9189999999996" y2="715.45" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="1174.3599999999997" y="697.3000000000001" width="297" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="1322.8599999999997" y="705.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Record phase verification evidence &amp; acceptance status</text>
+  <circle class="sequence-number" cx="995.8009999999998" cy="715.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="995.8009999999998" y="715.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">12</text>
+</g>
+<g class="message" data-from="Stage4" data-to="Stage5" data-label="All phases green -&gt; Ring 3 Gate &amp; Knowledge Graduation" data-line-style="solid" data-arrow-head="filled" data-self="false" data-step="13">
+  <line x1="995.8009999999998" y1="755.45" x2="1359.5409999999997" y2="755.45" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="1030.1709999999998" y="737.3000000000001" width="295" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="1177.6709999999998" y="745.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">All phases green -&gt; Ring 3 Gate &amp; Knowledge Graduation</text>
+  <circle class="sequence-number" cx="995.8009999999998" cy="755.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="995.8009999999998" y="755.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">13</text>
+</g>
+<g class="message" data-from="Stage5" data-to="Plane" data-label="Set state: 'In Review' / 'Done'" data-line-style="solid" data-arrow-head="filled" data-self="false" data-step="14">
+  <line x1="1359.5409999999997" y1="795.45" x2="1649.9189999999996" y2="795.45" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="1429.2299999999996" y="777.3000000000001" width="151" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="1504.7299999999996" y="785.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Set state: &#39;In Review&#39; / &#39;Done&#39;</text>
+  <circle class="sequence-number" cx="1359.5409999999997" cy="795.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="1359.5409999999997" y="795.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">14</text>
+</g>
+<g class="message" data-from="Stage5" data-to="Plane" data-label="Preflight check: plane validate &amp; plane push --dry-run" data-line-style="solid" data-arrow-head="filled" data-self="false" data-step="15">
+  <line x1="1359.5409999999997" y1="835.45" x2="1649.9189999999996" y2="835.45" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="1365.7299999999996" y="817.3000000000001" width="278" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="1504.7299999999996" y="825.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Preflight check: plane validate &amp; plane push --dry-run</text>
+  <circle class="sequence-number" cx="1359.5409999999997" cy="835.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="1359.5409999999997" y="835.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">15</text>
+</g>
+<g class="message" data-from="Stage5" data-to="Plane" data-label="Synchronize: plane push --work-only" data-line-style="solid" data-arrow-head="filled" data-self="false" data-step="16">
+  <line x1="1359.5409999999997" y1="875.45" x2="1649.9189999999996" y2="875.45" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="1405.7299999999996" y="857.3000000000001" width="198" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="1504.7299999999996" y="865.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Synchronize: plane push --work-only</text>
+  <circle class="sequence-number" cx="1359.5409999999997" cy="875.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="1359.5409999999997" y="875.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">16</text>
+</g>
+<g class="message" data-from="Stage5" data-to="Dev" data-label="Submit PR (with EVENT-XXX link &amp; Release Impact checklist)" data-line-style="solid" data-arrow-head="filled" data-self="false" data-step="17">
+  <line x1="1359.5409999999997" y1="915.45" x2="78.09700000000001" y2="915.45" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <rect x="562.3189999999998" y="897.3000000000001" width="313" height="16.3" rx="2" ry="2" fill="var(--bg)" />
+  <text x="718.8189999999998" y="905.45" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Submit PR (with EVENT-XXX link &amp; Release Impact checklist)</text>
+  <circle class="sequence-number" cx="1359.5409999999997" cy="915.45" r="9" fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />
+  <text x="1359.5409999999997" y="915.45" class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="600" fill="var(--bg)" dy="3.5">17</text>
+</g>
+<g class="note" data-position="over" data-actors="Stage2">
+  <polygon points="240.71099999999996,120.45 478.3589999999999,120.45 484.3589999999999,126.45 484.3589999999999,143.45 240.71099999999996,143.45" fill="var(--bg)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <polygon points="478.3589999999999,120.45 484.3589999999999,126.45 478.3589999999999,126.45" fill="var(--_inner-stroke)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="362.53499999999997" y="131.95" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Ingest i-vsd boundaries &amp; check Plane backlog</text>
+</g>
+<g class="note" data-position="over" data-actors="Stage3">
+  <polygon points="544.1599999999999,325.45 854.8699999999998,325.45 860.8699999999998,331.45 860.8699999999998,348.45 544.1599999999999,348.45" fill="var(--bg)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <polygon points="854.8699999999998,325.45 860.8699999999998,331.45 854.8699999999998,331.45" fill="var(--_inner-stroke)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="702.5149999999999" y="336.95" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Socratic stress-test, scope validation, dependency verification</text>
+</g>
+<g class="note" data-position="over" data-actors="Stage4">
+  <polygon points="896.5489999999998,460.45 1089.0529999999999,460.45 1095.0529999999999,466.45 1095.0529999999999,483.45 896.5489999999998,483.45" fill="var(--bg)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <polygon points="1089.0529999999999,460.45 1095.0529999999999,466.45 1089.0529999999999,466.45" fill="var(--_inner-stroke)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="995.8009999999997" y="471.95" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Worktree setup &amp; topology discovery</text>
+</g>
+<g class="actor" data-id="Dev" data-label="Developer" data-type="actor">
+  <g transform="translate(60.09700000000001,32) scale(1.5)">
+    <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" fill="none" stroke="var(--_line)" stroke-width="0.6666666666666666" />
+    <path d="M15 10C15 11.6569 13.6569 13 12 13C10.3431 13 9 11.6569 9 10C9 8.34315 10.3431 7 12 7C13.6569 7 15 8.34315 15 10Z" fill="none" stroke="var(--_line)" stroke-width="0.6666666666666666" />
+    <path d="M5.62842 18.3563C7.08963 17.0398 9.39997 16 12 16C14.6 16 16.9104 17.0398 18.3716 18.3563" fill="none" stroke="var(--_line)" stroke-width="0.6666666666666666" />
+  </g>
+  <text x="78.09700000000001" y="84" font-size="13" text-anchor="middle" font-weight="500" fill="var(--_text)" dy="4.55">Developer</text>
+</g>
+<g class="actor" data-id="Stage2" data-label="Stage 2: implementation-plan" data-type="participant">
+  <rect x="264.4205" y="30" width="196.22899999999996" height="40" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="362.53499999999997" y="50" font-size="13" text-anchor="middle" font-weight="500" fill="var(--_text)" dy="4.55">Stage 2: implementation-plan</text>
+</g>
+<g class="actor" data-id="Stage3" data-label="Stage 3: senior-cto-feedback" data-type="participant">
+  <rect x="601.8069999999999" y="30" width="201.41599999999997" height="40" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="702.5149999999999" y="50" font-size="13" text-anchor="middle" font-weight="500" fill="var(--_text)" dy="4.55">Stage 3: senior-cto-feedback</text>
+</g>
+<g class="actor" data-id="Stage4" data-label="Stage 4: implement-tasks &amp; conventional-commit" data-type="participant">
+  <rect x="843.2229999999998" y="30" width="305.15599999999995" height="40" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="995.8009999999998" y="50" font-size="13" text-anchor="middle" font-weight="500" fill="var(--_text)" dy="4.55">Stage 4: implement-tasks &amp; conventional-commit</text>
+</g>
+<g class="actor" data-id="Stage5" data-label="Stage 5: Graduation &amp; PR" data-type="participant">
+  <rect x="1270.6889999999996" y="30" width="177.70399999999998" height="40" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="1359.5409999999997" y="50" font-size="13" text-anchor="middle" font-weight="500" fill="var(--_text)" dy="4.55">Stage 5: Graduation &amp; PR</text>
+</g>
+<g class="actor" data-id="Plane" data-label="Plane Compose (event/)" data-type="participant">
+  <rect x="1564.4014999999997" y="30" width="171.03499999999997" height="40" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="1649.9189999999996" y="50" font-size="13" text-anchor="middle" font-weight="500" fill="var(--_text)" dy="4.55">Plane Compose (event/)</text>
+</g>
+</svg>

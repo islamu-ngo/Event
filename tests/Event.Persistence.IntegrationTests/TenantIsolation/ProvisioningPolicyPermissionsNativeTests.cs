@@ -24,6 +24,28 @@ namespace Event.Persistence.IntegrationTests.TenantIsolation;
 public sealed class ProvisioningPolicyPermissionsNativeTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
+    public async Task VisitorStorageAndProvisioningPolicyRetainOneCompleteProjectionCatalogue()
+    {
+        await using var owner = fixture.CreateDbContext();
+        await owner.Database.OpenConnectionAsync();
+        await PostgresVisitorSettingsStorage.ApplyAsync(owner, fixture.NativeQueueEnrollment);
+        await PostgresProvisioningPolicyPermissions.ApplyAsync(owner, fixture.NativeQueueEnrollment);
+
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options,
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+        options.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
+        await using var global = new ExploreDbContext(options.Options) { TenantContext = null };
+        global.BindTenantLease();
+        await global.Database.OpenConnectionAsync();
+        await PostgresProvisioningPolicyPermissions.RequireCurrentAsync(global, fixture.NativeQueueEnrollment);
+
+        await PostgresVisitorSettingsStorage.ApplyAsync(owner, fixture.NativeQueueEnrollment);
+        await PostgresProvisioningPolicyPermissions.ApplyAsync(owner, fixture.NativeQueueEnrollment);
+        await PostgresProvisioningPolicyPermissions.RequireCurrentAsync(global, fixture.NativeQueueEnrollment);
+    }
+
+    [Test]
     public async Task GlobalReadsTheCompleteImageAndUpdatesOnlyItsFourMutableColumns()
     {
         await using var scope = await CreateScopeAsync();

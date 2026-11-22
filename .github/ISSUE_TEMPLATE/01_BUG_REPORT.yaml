@@ -11,6 +11,8 @@ body:
         >
         > If you plan to submit a fix, branch from `develop` and target `develop` with your pull request.
 
+        **How triage works:** report one bug per issue, with reproduction evidence. Maintainers reproduce it, and once it is confirmed they promote it into the project's Plane tracker (Intake) as a single fix item and share its `EVENT-XXX` ID here. You do not need a Plane account or ID, and you do not need to split the report into API, UI, test, or docs parts.
+
   - type: textarea
     id: description
     attributes:
@@ -81,7 +83,7 @@ body:
     attributes:
       label: Affected Component or Code Path (if known)
       description: List files, routes, endpoints, UI pages, or docs if known.
-      placeholder: "Explore.API/Controllers/..., Explore.Blazor.Client/Pages/..., docs/SELF_HOSTING.md"
+      placeholder: "src/Explore.API/Controllers/..., src/Explore.Blazor.Client/Pages/..., docs/internal/SELF_HOSTING.md"
 
   - type: textarea
     id: visuals

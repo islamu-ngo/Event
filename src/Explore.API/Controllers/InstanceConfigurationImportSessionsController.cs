@@ -45,6 +45,7 @@ public sealed class InstanceConfigurationImportSessionsController(
     : ConfigurationImportSessionsControllerBase
 {
     [HttpPost("", Name = RouteNames.CreateInstanceConfigurationImportSession)]
+    [InstanceManagement]
     [Consumes(ConfigurationManifestContractMetadata.MediaType)]
     [PrivateNoStore]
     [EnableRateLimiting(
@@ -85,6 +86,7 @@ public sealed class InstanceConfigurationImportSessionsController(
     [HttpPost(
         "{sessionId:guid}/preview",
         Name = RouteNames.PreviewInstanceConfigurationImportSession)]
+    [InstanceManagement]
     [PrivateNoStore]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -111,6 +113,7 @@ public sealed class InstanceConfigurationImportSessionsController(
     [HttpPost(
         "{sessionId:guid}/refresh",
         Name = RouteNames.RefreshInstanceConfigurationImportSession)]
+    [InstanceManagement]
     [PrivateNoStore]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -137,6 +140,7 @@ public sealed class InstanceConfigurationImportSessionsController(
     [HttpPost(
         "{sessionId:guid}/apply",
         Name = RouteNames.ApplyInstanceConfigurationImportSession)]
+    [InstanceManagement]
     [PrivateNoStore]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -172,6 +176,7 @@ public sealed class InstanceConfigurationImportSessionsController(
     [HttpGet(
         "operations",
         Name = RouteNames.ListInstanceConfigurationImportHistory)]
+    [InstanceManagement]
     [PrivateNoStore]
     [ProducesResponseType(
         typeof(HalResource<ConfigurationImportHistoryResult>),
@@ -193,6 +198,7 @@ public sealed class InstanceConfigurationImportSessionsController(
     [HttpGet(
         "operations/{operationId:guid}",
         Name = RouteNames.GetInstanceConfigurationImportReceipt)]
+    [InstanceManagement]
     [PrivateNoStore]
     [ProducesResponseType(
         typeof(HalResource<ConfigurationImportOperationResult>),
@@ -220,6 +226,7 @@ public sealed class InstanceConfigurationImportSessionsController(
     [HttpPost(
         "operations/{operationId:guid}/rollback",
         Name = RouteNames.CreateInstanceConfigurationRollbackSession)]
+    [InstanceManagement]
     [PrivateNoStore]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -247,6 +254,7 @@ public sealed class InstanceConfigurationImportSessionsController(
     [HttpDelete(
         "{sessionId:guid}",
         Name = RouteNames.CancelInstanceConfigurationImportSession)]
+    [InstanceManagement]
     [PrivateNoStore]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]

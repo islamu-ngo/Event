@@ -28,6 +28,7 @@ public class ProjectionTestContainerFixture : IAsyncInitializer, IAsyncDisposabl
             .WithDatabase("explore_db_projection")
             .WithUsername("postgres")
             .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
+            .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
             .Build();
     }
 
@@ -38,6 +39,7 @@ public class ProjectionTestContainerFixture : IAsyncInitializer, IAsyncDisposabl
         await _container.StartAsync();
 
         await using var context = CreateDbContextInternal(PrimaryDatabaseRole.Migrator);
+        context.BindTenantLease();
         await context.Database.EnsureCreatedAsync();
         await PostgresDiscoveryDisclosureContract.ApplyAsync(context);
         await LookupTableSeeder.SeedAsync(context);
@@ -54,6 +56,7 @@ public class ProjectionTestContainerFixture : IAsyncInitializer, IAsyncDisposabl
     {
         var context = CreateDbContextInternal();
         context.EnableTenantFilterBypass("Projection integration test system context.");
+        context.BindTenantLease();
         return context;
     }
 
@@ -61,6 +64,7 @@ public class ProjectionTestContainerFixture : IAsyncInitializer, IAsyncDisposabl
     {
         var context = CreateDbContextInternal();
         context.TenantContext = tenantContext;
+        context.BindTenantLease();
         return context;
     }
 

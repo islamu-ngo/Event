@@ -1,0 +1,27 @@
+Change-Id: CHG-01M7E63GJV9G0EPHSR7GX07FAK
+Title: "Install provisioning projection through its owner"
+Type: fix
+Scope: access
+Summary: "Install the complete provisioning-policy permission contract before Visitor Settings storage instead of granting a partial duplicate profile."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "Provisioning Policy remains the sole installer of its complete nineteen Global/Email projection privileges, forced RLS and policy manifest. Visitor Settings no longer installs a partial duplicate grant; drift rejection is unchanged."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Fresh initialization installs the canonical projection contract before Visitor Settings. Partial or altered profiles remain rejected; no manual grant, credential or configuration change is required."

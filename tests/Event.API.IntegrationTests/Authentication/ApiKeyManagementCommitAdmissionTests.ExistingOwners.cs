@@ -2,6 +2,7 @@ using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Features.ExternalApiKeys.Handlers.Commands;
 using Explore.Application.Features.ExternalApiKeys.Handlers.Queries;
 using Explore.Application.Features.ExternalApiKeys.Requests.Commands;
@@ -211,6 +212,13 @@ public sealed partial class ApiKeyManagementCommitAdmissionTests
     private sealed class BeforeOwner(ISerializableAttemptOwner inner, Func<CancellationToken, Task> before)
         : ISerializableAttemptOwner
     {
+        public async Task<T> ExecuteWithOriginalPrivacyAsync<T>(IOriginalPrivacyIdentityFenceAuthority privacy,
+            Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default)
+        {
+            await before(cancellationToken);
+            return await inner.ExecuteWithOriginalPrivacyAsync(privacy, operation, cancellationToken);
+        }
+
         public async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default)
         {

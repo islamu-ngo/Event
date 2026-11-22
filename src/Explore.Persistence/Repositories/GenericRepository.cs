@@ -12,6 +12,7 @@ namespace Explore.Persistence.Repositories;
 
 public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : class
 {
+    private const string TenantAuthorityMismatch = "tracked_tenant_authority_mismatch";
     private readonly ExploreDbContext _dbContext;
 
     public GenericRepository(ExploreDbContext dbContext)
@@ -46,15 +47,25 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
     public virtual async Task Delete(T entity)
     {
         RequireTenantMutationScope(entity);
+        var entry = _dbContext.Entry(entity);
+        var target = entry.State == EntityState.Detached ? FindTrackedMatch(entity) ?? entity : entity;
+        if (!ReferenceEquals(target, entity))
+        {
+            var trackedEntry = _dbContext.Entry(target);
+            RequireMatchingTrackedTenant(trackedEntry, entry);
+            foreach (var property in trackedEntry.Metadata.GetProperties().Where(property => property.IsConcurrencyToken))
+                trackedEntry.Property(property.Name).OriginalValue = entry.Property(property.Name).CurrentValue;
+        }
+
         // Check if entity supports soft delete
-        if (entity is ISoftDeletable)
+        if (target is ISoftDeletable)
         {
             var cascadeTiming = _dbContext.ChangeTracker.CascadeDeleteTiming;
             try
             {
                 // Convert to a soft delete before EF processes required relationships.
                 _dbContext.ChangeTracker.CascadeDeleteTiming = CascadeTiming.OnSaveChanges;
-                _dbContext.Entry(entity).State = EntityState.Deleted;
+                _dbContext.Entry(target).State = EntityState.Deleted;
                 await _dbContext.SaveChangesAsync();
             }
             finally
@@ -65,7 +76,7 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
         else
         {
             // Hard delete: Permanently remove from database
-            _dbContext.Set<T>().Remove(entity);
+            _dbContext.Set<T>().Remove(target);
             await _dbContext.SaveChangesAsync();
         }
     }
@@ -136,12 +147,7 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
             return;
         }
 
-        var entityType = _dbContext.Model.FindEntityType(typeof(T))
-            ?? throw new InvalidOperationException($"Entity type metadata not found for {typeof(T).Name}.");
-        var primaryKey = entityType.FindPrimaryKey()
-            ?? throw new InvalidOperationException($"Primary key metadata not found for {typeof(T).Name}.");
-
-        var trackedEntity = _dbContext.Set<T>().Local.FirstOrDefault(localEntity => HasSamePrimaryKey(localEntity, entity, primaryKey.Properties));
+        var trackedEntity = FindTrackedMatch(entity);
 
         if (trackedEntity is not null)
         {
@@ -156,10 +162,45 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
         await _dbContext.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// Prepares an entity for an UPDATE that writes only the columns the caller marks as modified.
+    /// Detached entities are attached without pending changes so immutable key, tenant and ownership
+    /// columns never enter the generated statement, while a same-key tracked instance keeps its
+    /// original stored values for concurrency checks.
+    /// </summary>
+    protected EntityEntry<T> TrackForNarrowUpdate(T entity)
+    {
+        RequireTenantMutationScope(entity);
+        T? tracked = FindTrackedMatch(entity);
+        EntityEntry<T> entry;
+        if (tracked is null)
+        {
+            entry = _dbContext.Entry(entity);
+        }
+        else
+        {
+            entry = _dbContext.Entry(tracked);
+            RequireMatchingTrackedTenant(entry, _dbContext.Entry(entity));
+        }
+
+        entry.State = EntityState.Unchanged;
+        return entry;
+    }
+
+    private T? FindTrackedMatch(T entity)
+    {
+        var entityType = _dbContext.Model.FindEntityType(typeof(T))
+            ?? throw new InvalidOperationException($"Entity type metadata not found for {typeof(T).Name}.");
+        var primaryKey = entityType.FindPrimaryKey()
+            ?? throw new InvalidOperationException($"Primary key metadata not found for {typeof(T).Name}.");
+
+        return _dbContext.Set<T>().Local.FirstOrDefault(localEntity => HasSamePrimaryKey(localEntity, entity, primaryKey.Properties));
+    }
+
     private IQueryable<T> VisibleRows()
     {
         var query = _dbContext.Set<T>().AsNoTracking();
-        var tenant = _dbContext.Model.FindEntityType(typeof(T))?.FindProperty("TenantId");
+        var tenant = _dbContext.Model.FindEntityType(typeof(T))?.FindProperty(nameof(ITenantEntity.TenantId));
         if (tenant is null || tenant.ClrType != typeof(Guid) && tenant.ClrType != typeof(Guid?))
             return query;
 
@@ -179,12 +220,24 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
     private void RequireTenantMutationScope(T entity)
     {
         var entry = _dbContext.Entry(entity);
-        var tenant = entry.Metadata.FindProperty("TenantId");
+        var tenant = entry.Metadata.FindProperty(nameof(ITenantEntity.TenantId));
         if (tenant is not null && (tenant.ClrType == typeof(Guid) || tenant.ClrType == typeof(Guid?))
             && entry.Property(tenant.Name).CurrentValue is Guid targetTenant
             && (targetTenant == Guid.Empty || _dbContext.TenantFilterTenantId != targetTenant
                 || _dbContext.IsTenantFilterBypassed))
-            throw new InvalidOperationException("tracked_tenant_authority_mismatch");
+            throw new InvalidOperationException(TenantAuthorityMismatch);
+    }
+
+    private static void RequireMatchingTrackedTenant(EntityEntry<T> tracked, EntityEntry<T> candidate)
+    {
+        var tenant = tracked.Metadata.FindProperty(nameof(ITenantEntity.TenantId));
+        if (tenant is null || (tenant.ClrType != typeof(Guid) && tenant.ClrType != typeof(Guid?)))
+            return;
+
+        object? requestedTenant = candidate.Property(tenant.Name).CurrentValue;
+        var trackedTenant = tracked.Property(tenant.Name);
+        if (!Equals(trackedTenant.CurrentValue, requestedTenant) || !Equals(trackedTenant.OriginalValue, requestedTenant))
+            throw new InvalidOperationException(TenantAuthorityMismatch);
     }
 
     private bool HasSamePrimaryKey(T trackedEntity, T candidateEntity, IReadOnlyList<Microsoft.EntityFrameworkCore.Metadata.IProperty> keyProperties)

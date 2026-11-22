@@ -25,47 +25,51 @@ public sealed partial class SupportAdministrationNativeContractTests
         CancellationToken token = timeout.Token;
         await using var migrator = MembershipMigrator();
         await migrator.Database.OpenConnectionAsync(token);
-        await Native.RequireReadyAsync(migrator, fixture.NativeQueueEnrollment, token);
-        await Native.ApplyAsync(migrator, fixture.NativeQueueEnrollment, token);
-        var names = new HumanPrincipalSourceSql(migrator);
-        string tenants = names.Table(typeof(Tenant));
-        string periods = names.Table(typeof(ExternalApiKeyCreditPeriod));
-        string runtime = fixture.NativeQueueEnrollment.RuntimeLogin;
-        string tenantId = names.ColumnName(typeof(Tenant), nameof(Tenant.Id));
-        string fullName = names.ColumnName(typeof(Tenant), nameof(Tenant.FullName));
-        string periodId = names.ColumnName(typeof(ExternalApiKeyCreditPeriod), nameof(ExternalApiKeyCreditPeriod.Id));
-        await Assert.That(await migrator.Database.SqlQuery<bool>($"""
-            SELECT pg_catalog.has_column_privilege({runtime},{tenants},{tenantId},'SELECT')
-                AND NOT pg_catalog.has_column_privilege({runtime},{tenants},{fullName},'SELECT')
-                AND pg_catalog.has_column_privilege({runtime},{periods},{periodId},'SELECT') AS "Value"
-            """).SingleAsync(token)).IsTrue();
-
-        string attack = partial
-            ? $"REVOKE SELECT ({names.Quote(periodId)}) ON {periods} FROM {names.Quote(runtime)}"
-            : $"GRANT SELECT ({names.Quote(fullName)}) ON {tenants} TO {names.Quote(runtime)}";
-        string restore = partial
-            ? $"GRANT SELECT ({names.Quote(periodId)}) ON {periods} TO {names.Quote(runtime)}"
-            : $"REVOKE SELECT ({names.Quote(fullName)}) ON {tenants} FROM {names.Quote(runtime)}";
-        await migrator.Database.ExecuteSqlRawAsync(attack, token);
-        try
+        await migrator.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
+            await using var owner = await migrator.Database.BeginTransactionAsync(token);
+            await RevokeExternalEnrollmentAdditionsAsync(migrator, fixture.NativeQueueEnrollment.RuntimeLogin, token);
+            await Native.RequireReadyAsync(migrator, fixture.NativeQueueEnrollment, token);
+            await Native.ApplyAsync(migrator, fixture.NativeQueueEnrollment, token);
+            var names = new HumanPrincipalSourceSql(migrator);
+            string tenants = names.Table(typeof(Tenant));
+            string periods = names.Table(typeof(ExternalApiKeyCreditPeriod));
+            string runtime = fixture.NativeQueueEnrollment.RuntimeLogin;
+            string tenantId = names.ColumnName(typeof(Tenant), nameof(Tenant.Id));
+            string fullName = names.ColumnName(typeof(Tenant), nameof(Tenant.FullName));
+            string periodId = names.ColumnName(typeof(ExternalApiKeyCreditPeriod), nameof(ExternalApiKeyCreditPeriod.Id));
+            await Assert.That(await migrator.Database.SqlQuery<bool>($"""
+                SELECT pg_catalog.has_column_privilege({runtime},{tenants},{tenantId},'SELECT')
+                    AND NOT pg_catalog.has_column_privilege({runtime},{tenants},{fullName},'SELECT')
+                    AND pg_catalog.has_column_privilege({runtime},{periods},{periodId},'SELECT') AS "Value"
+                """).SingleAsync(token)).IsTrue();
+
+            await owner.CreateSavepointAsync("healthy_parent_support", token);
+            string attack = partial
+                ? $"REVOKE SELECT ({names.Quote(periodId)}) ON {periods} FROM {names.Quote(runtime)}"
+                : $"GRANT SELECT ({names.Quote(fullName)}) ON {tenants} TO {names.Quote(runtime)}";
+            await migrator.Database.ExecuteSqlRawAsync(attack, token);
             string tenantBefore = await MembershipAclImageAsync(migrator, tenants);
             string periodBefore = await MembershipAclImageAsync(migrator, periods);
+            await owner.CreateSavepointAsync("before_parent_support_check", token);
             var readiness = await Assert.ThrowsAsync<PostgresException>(() =>
                 Native.RequireReadyAsync(migrator, fixture.NativeQueueEnrollment, token));
             await Assert.That(readiness.SqlState).IsEqualTo("55000");
             await Assert.That(readiness.MessageText).IsEqualTo("support_administration_ambient_scalar_authority");
+            await owner.RollbackToSavepointAsync("before_parent_support_check", token);
             var installation = await Assert.ThrowsAsync<PostgresException>(() =>
                 Native.ApplyAsync(migrator, fixture.NativeQueueEnrollment, token));
             await Assert.That(installation.SqlState).IsEqualTo("55000");
             await Assert.That(installation.MessageText).IsEqualTo("support_administration_ambient_scalar_authority");
+            await owner.RollbackToSavepointAsync("before_parent_support_check", token);
             await Assert.That(await MembershipAclImageAsync(migrator, tenants)).IsEqualTo(tenantBefore);
             await Assert.That(await MembershipAclImageAsync(migrator, periods)).IsEqualTo(periodBefore);
-        }
-        finally
-        {
-            await migrator.Database.ExecuteSqlRawAsync(restore, CancellationToken.None);
-        }
+            await owner.RollbackToSavepointAsync("healthy_parent_support", token);
+            await Native.RequireReadyAsync(migrator, fixture.NativeQueueEnrollment, token);
+            await Native.ApplyAsync(migrator, fixture.NativeQueueEnrollment, token);
+            await Assert.That(migrator.Database.CurrentTransaction).IsSameReferenceAs(owner);
+            await owner.RollbackAsync(CancellationToken.None);
+        });
         await Native.RequireReadyAsync(migrator, fixture.NativeQueueEnrollment, token);
         await Native.ApplyAsync(migrator, fixture.NativeQueueEnrollment, token);
     }

@@ -49,7 +49,7 @@ public static partial class PostgresLocalAdministrationContract
             ["Id", "ConcurrencyStamp", "CreatedAt", "ExternalLoginId", "InitiatingApplicationUserId",
                 "Kind", "LocalSubjectId", "PersonalActorId", "PreviousOperationConcurrencyStamp",
                 "PreviousOperationId", "ResetReason", "Stage", "UpdatedAt", "VerifiedAt",
-                "VerifiedByApplicationUserId"]),
+                 "VerifiedByApplicationUserId", "VisitorEnrollmentOperationId"]),
         new(typeof(IdentityUserToken<Guid>), "UserId", ["UserId", "LoginProvider", "Name", "Value"]),
         new(typeof(User), "Id",
             ["Id", "ConcurrencyStamp", "CreatedAt", "CreatedBy", "DeletedAt", "DeletedBy",
@@ -154,7 +154,7 @@ public static partial class PostgresLocalAdministrationContract
         await using var command = context.Database.GetDbConnection().CreateCommand();
         command.Transaction = context.Database.CurrentTransaction?.GetDbTransaction();
         // No private-table reads here: the caller has EXECUTE, not scalar authority.
-        command.CommandText = $"DO $ready$ BEGIN {Guard(context, enrollment)} {ExactBodies(context, enrollment)} END $ready$;";
+        command.CommandText = $"DO $ready$ BEGIN {CatalogueGuard(context, enrollment)} {ExactBodies(context, enrollment)} END $ready$;";
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

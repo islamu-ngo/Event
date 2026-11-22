@@ -31,6 +31,7 @@ See [`_schema.md`](_schema.md) before adding or editing any rule file.
 | `efcore-migrations.md` | `src/Explore.Persistence/Migrations/**/*.cs` | migration discipline and seed sync |
 | `tests.md` | `**/*Tests/*.cs`, `**/*UnitTests/*.cs`, `**/*IntegrationTests/*.cs`, `**/*.Tests/*.cs` | test execution and suite hygiene |
 | `ip-clean-room.md` | `src/**/*`, `docs/internal/**/*`, `dev/active/**/*` | clean-room source isolation, SSO differentiation, provenance, and dependency-license compatibility |
+| `plane-tracking.md` | `docs/internal/project-management/**/*.md`, `.agents/skills/plane-compose/**/*.md`, `.agents/skills/plane-mcp/**/*.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/ISSUE_TEMPLATE/*` | Single-Project `EVENT` taxonomy, hierarchy, plane-compose vs Plane MCP split, Intake gate |
 
 ## Layout Notes
 

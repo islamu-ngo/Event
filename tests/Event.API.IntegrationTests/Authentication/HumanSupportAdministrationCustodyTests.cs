@@ -3,6 +3,7 @@ using Explore.Application.Authentication;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.SupportAccess.Handlers.Commands;
 using Explore.Application.Features.SupportAccess.Handlers.Queries;
@@ -194,6 +195,15 @@ public sealed partial class HumanSupportAdministrationCustodyTests
     private sealed class AfterBody(ISerializableAttemptOwner inner, Func<CancellationToken, Task> after)
         : ISerializableAttemptOwner
     {
+        public Task<T> ExecuteWithOriginalPrivacyAsync<T>(IOriginalPrivacyIdentityFenceAuthority privacy,
+            Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
+            inner.ExecuteWithOriginalPrivacyAsync(privacy, async token =>
+            {
+                T result = await operation(token);
+                await after(token);
+                return result;
+            }, cancellationToken);
+
         public Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) => inner.ExecuteAsync(async token =>
         {

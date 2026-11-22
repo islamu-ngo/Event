@@ -30,7 +30,7 @@ public sealed class HumanEventAssignmentPortableSourceFenceTests(AdmissionAuthor
     {
         Guid tenant = Guid.CreateVersion7(), user = Guid.CreateVersion7(), eventId = Guid.CreateVersion7();
         bool sqlServer = provider == PrimaryDatabaseProvider.SqlServer;
-        await using var setup = Open(provider, tenant);
+        await using var setup = await OpenAsync(provider, tenant);
         if (sqlServer)
             await setup.Database.ExecuteSqlRawAsync(
                 "IF SCHEMA_ID(N'islamu_event') IS NULL EXEC(N'CREATE SCHEMA [islamu_event]')");
@@ -56,15 +56,15 @@ public sealed class HumanEventAssignmentPortableSourceFenceTests(AdmissionAuthor
         var subject = await HumanCommitSubject.ResolveAsync(
             new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, user.ToString())], "fixture")),
             new ResolveCurrentUserIdByIdentityRequestHandler(new ExternalLoginAuthenticationRepository(
-                new GlobalExploreDbContextFactory(fixture.CreateOptions(provider, PrimaryDatabaseRole.Global)), null)), default)
+                new GlobalExploreDbContextFactory(await fixture.CreateOptionsAsync(provider, PrimaryDatabaseRole.Global)), null)), default)
             ?? throw new InvalidOperationException("A human subject is required.");
-        await using var context = Open(provider, tenant);
+        await using var context = await OpenAsync(provider, tenant);
         var source = new HumanEventAssignmentSourceFence(context, subject,
             PolicySourceSetPurpose.RuntimeTenant, tenant, [eventId]);
         var sets = new PolicySourceSetFence(context, PolicySourceSetPurpose.RuntimeTenant);
         await using var owner = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var held = await source.AcquireAsync(await sets.AcquireAsync());
-        await using var writer = Open(provider, tenant);
+        await using var writer = await OpenAsync(provider, tenant);
         await writer.Database.OpenConnectionAsync();
         await writer.Database.ExecuteSqlRawAsync(sqlServer ? "SET LOCK_TIMEOUT 0" : "SET SESSION innodb_lock_wait_timeout = 1");
         string insert = $"INSERT INTO {Table(writer, typeof(EventRoleAssignment))} "
@@ -85,10 +85,10 @@ public sealed class HumanEventAssignmentPortableSourceFenceTests(AdmissionAuthor
         await owner.RollbackAsync();
     }
 
-    private ExploreDbContext Open(PrimaryDatabaseProvider provider, Guid tenant)
+    private async Task<ExploreDbContext> OpenAsync(PrimaryDatabaseProvider provider, Guid tenant)
     {
         var options = TestDbContextOptions.Create<ExploreDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.CreateOptions(provider));
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, await fixture.CreateOptionsAsync(provider));
         return new ExploreDbContext(options.Options) { TenantContext = new TenantIdentity(tenant) };
     }
 

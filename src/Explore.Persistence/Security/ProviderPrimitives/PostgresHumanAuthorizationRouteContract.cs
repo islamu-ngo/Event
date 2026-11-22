@@ -20,7 +20,7 @@ public static class PostgresHumanAuthorizationRouteContract
     private const string Observe = "human_authorization_route_observe";
     private const string Acquire = "human_authorization_route_acquire";
     private const string Signature = "integer,uuid";
-    private const string ReadPolicy = "human_authorization_route_read";
+    internal const string ReadPolicy = "human_authorization_route_read";
     private const string Stamp = "human-authorization-route:v1:";
     private static readonly string[] Roles = [OwnerRole, MigratorRole, RuntimeRole, GlobalRole];
 
@@ -115,7 +115,7 @@ public static class PostgresHumanAuthorizationRouteContract
                     AND f.prolang = (SELECT oid FROM pg_catalog.pg_language WHERE lanname = 'plpgsql'))
             THEN RAISE EXCEPTION 'human_route_routine_drift' USING ERRCODE = '55000'; END IF;
             """));
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string policies = string.Join("\n", HumanAuthorizationRouteSql.Sources.Select(source =>
         {
             string table = sql.Table(source.Type);

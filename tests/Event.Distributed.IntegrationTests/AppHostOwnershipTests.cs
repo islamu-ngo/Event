@@ -297,9 +297,47 @@ public sealed class AppHostOwnershipTests
     }
 
     [Test]
+    public async Task ExecutionStartRequiresPermissionAndUnstartedDisposalCancelsWait()
+    {
+        using var permitted = new TestingApplicationExecution();
+        Task starting = permitted.StartingAsync(CancellationToken.None);
+        await Assert.That(starting.IsCompleted).IsFalse();
+        await Assert.That(permitted.PermitStart()).IsTrue();
+        await starting;
+        permitted.CancelUnstarted();
+        await Assert.That(permitted.StartingAsync(CancellationToken.None).IsCompletedSuccessfully).IsTrue();
+
+        using var cancelled = new TestingApplicationExecution();
+        cancelled.Observe(cancelled.StartingAsync(CancellationToken.None));
+        cancelled.CancelUnstarted();
+        await Assert.That(cancelled.PermitStart()).IsFalse();
+        await Assert.That(async () => await cancelled.StartingAsync(CancellationToken.None)).Throws<OperationCanceledException>();
+        await cancelled.WaitForCompletionAsync(TimeSpan.FromSeconds(1));
+        await Assert.That(cancelled.IsSettled).IsTrue();
+    }
+
+    [Test]
+    public async Task ExecutionDisposalWaitsForPermissionAndPreservesFailure()
+    {
+        using var execution = new TestingApplicationExecution();
+        Task permission = execution.WaitForDisposalPermissionAsync();
+        await Assert.That(permission.IsCompleted).IsFalse();
+        execution.PermitDisposal();
+        await permission;
+        await Assert.That(execution.IsDisposalSettled).IsFalse();
+
+        var expected = new InvalidOperationException("assurance_disposal_fault");
+        execution.FailDisposal(expected);
+        await Assert.That(execution.IsDisposalSettled).IsTrue();
+        var actual = await Assert.That(async () => await execution.WaitForDisposalAsync(TimeSpan.FromSeconds(1)))
+            .Throws<InvalidOperationException>();
+        await Assert.That(ReferenceEquals(actual, expected)).IsTrue();
+    }
+
+    [Test]
     public async Task DuplicateExecutionObservationCannotCertifyCompletion()
     {
-        var observer = new TestingApplicationExecution();
+        using var observer = new TestingApplicationExecution();
         observer.Observe(Task.CompletedTask);
         var running = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await Assert.That(() => observer.Observe(running.Task)).Throws<InvalidOperationException>();
@@ -312,7 +350,7 @@ public sealed class AppHostOwnershipTests
     [Test]
     public async Task CancelledObservationWaitCannotCertifyUnobservedExecution()
     {
-        var observer = new TestingApplicationExecution();
+        using var observer = new TestingApplicationExecution();
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
         await Assert.That(async () => await observer.Completion.WaitAsync(cancelled.Token))
@@ -330,7 +368,7 @@ public sealed class AppHostOwnershipTests
     [Test]
     public async Task FaultedCancellationObservationRetainsItsFailure()
     {
-        var observer = new TestingApplicationExecution();
+        using var observer = new TestingApplicationExecution();
         var failure = new OperationCanceledException("assurance_faulted_cancellation");
         observer.Observe(Task.FromException(failure));
         var observed = await Assert.That(async () => await observer.WaitForCompletionAsync(TimeSpan.FromSeconds(1)))
@@ -342,7 +380,7 @@ public sealed class AppHostOwnershipTests
     [Test]
     public async Task CancelledExecutionObservationCompletesCleanupWait()
     {
-        var observer = new TestingApplicationExecution();
+        using var observer = new TestingApplicationExecution();
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
         observer.Observe(Task.FromCanceled(cancelled.Token));
@@ -426,9 +464,16 @@ public sealed class AppHostOwnershipTests
                 var resources = builder.Resources.OfType<ProjectResource>().ToArray();
                 _ = resources.Single(resource => resource.Name == "explore-blazor-peer");
                 string root = builder.Configuration["ISLAMU_TEST_ROOT"]!;
+                string[] forbiddenBffInputs =
+                [
+                    "EVENT_DP_API_RING", "EVENT_DP_COMBINED_RING", "IDENTITY_DATABASE_RUNTIME_PASSWORD"
+                ];
                 foreach (var resource in resources)
                 {
                     var context = new EnvironmentCallbackContext(builder.ExecutionContext, resource);
+                    if (resource.Name is "explore-blazor" or "explore-blazor-peer")
+                        foreach (string key in forbiddenBffInputs)
+                            context.EnvironmentVariables[key] = Guid.NewGuid().ToString("N");
                     foreach (var callback in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
                         await callback.Callback(context);
                     if (resource.Name is "explore-api" or "event-migrationservice")
@@ -440,13 +485,17 @@ public sealed class AppHostOwnershipTests
                     }
                     if (resource.Name is "explore-blazor" or "explore-blazor-peer")
                     {
-                        await Assert.That(context.EnvironmentVariables.Keys.Any(key =>
-                            key.StartsWith("EVENT_DP_API_", StringComparison.Ordinal)
-                            || key.StartsWith("EVENT_DP_COMBINED_", StringComparison.Ordinal))).IsFalse();
-                        await Assert.That(context.EnvironmentVariables.Keys.Any(key =>
-                            key.StartsWith("IDENTITY_DATABASE_", StringComparison.OrdinalIgnoreCase)
-                            || key.Replace("__", ":", StringComparison.Ordinal)
-                                .StartsWith("IdentityDatabase:", StringComparison.OrdinalIgnoreCase))).IsFalse();
+                        foreach (string key in forbiddenBffInputs)
+                            await Assert.That(context.EnvironmentVariables[key]).IsEqualTo(string.Empty);
+                        await Assert.That(context.EnvironmentVariables.Where(entry =>
+                            entry.Key.StartsWith("EVENT_DP_API_", StringComparison.Ordinal)
+                            || entry.Key.StartsWith("EVENT_DP_COMBINED_", StringComparison.Ordinal))
+                            .All(entry => entry.Value is string { Length: 0 })).IsTrue();
+                        await Assert.That(context.EnvironmentVariables.Where(entry =>
+                            entry.Key.StartsWith("IDENTITY_DATABASE_", StringComparison.OrdinalIgnoreCase)
+                            || entry.Key.Replace("__", ":", StringComparison.Ordinal)
+                                .StartsWith("IdentityDatabase:", StringComparison.OrdinalIgnoreCase))
+                            .All(entry => entry.Value is string { Length: 0 })).IsTrue();
                         await Assert.That(resource.Annotations.OfType<EndpointAnnotation>().Any(endpoint => endpoint.Name == "https")).IsTrue();
                     }
                 }

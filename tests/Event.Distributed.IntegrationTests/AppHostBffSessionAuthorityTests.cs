@@ -27,7 +27,13 @@ public sealed class AppHostBffSessionAuthorityTests
                 await Assert.That(cache.TryGetContainerImageName(out var cacheImage)).IsTrue();
                 await Assert.That(cacheImage).IsEqualTo(image)
                     .Because("Both Redis backends must use the admitted supported server image.");
+                // Aspire applies its HTTPS certificate during the later lifecycle event. Mirror
+                // the resolved run-mode endpoint before inspecting environment callbacks so this
+                // test exercises the contract the BFF actually receives, not the pre-certificate
+                // builder stage where the endpoint is still plaintext.
                 var endpoint = authority.Annotations.OfType<EndpointAnnotation>().Single();
+                endpoint.UriScheme = "rediss";
+                endpoint.TlsEnabled = true;
                 endpoint.AllocatedEndpoint = new AllocatedEndpoint(endpoint, "127.0.0.1", 16379, "6379");
                 string runId = builder.Configuration["ISLAMU_TEST_RUN_ID"]!;
                 string selected = builder.Configuration["TestingEnvironment:BFF_SESSION_REDIS_PASSWORD"]!;
@@ -56,7 +62,7 @@ public sealed class AppHostBffSessionAuthorityTests
                         .Because("Only a selected Environment BFF consumer may receive the session credential.");
                     string? projectedEndpoint = await ResolveAsync(
                         context.EnvironmentVariables["BFF_SESSION_REDIS_ENDPOINT"], deadline.Token);
-                    await Assert.That(projectedEndpoint).IsEqualTo(isBff ? "redis://127.0.0.1:16379" : string.Empty);
+                    await Assert.That(projectedEndpoint).IsEqualTo(isBff ? "rediss://127.0.0.1:16379" : string.Empty);
                     await Assert.That(context.EnvironmentVariables["BFF_SESSION_NAMESPACE"] as string)
                         .IsEqualTo(isBff ? runId : string.Empty);
                     if (isBff)

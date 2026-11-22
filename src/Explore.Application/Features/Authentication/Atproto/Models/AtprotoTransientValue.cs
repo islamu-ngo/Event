@@ -1,10 +1,12 @@
 using Explore.Domain;
+using Explore.Domain.ValueObjects;
 using Explore.Application.Responses;
 
 namespace Explore.Application.Features.Authentication.Atproto.Models;
 
 public sealed record AtprotoTransientValue(Guid Id, AtprotoTransientPurpose Purpose, string TokenDigest,
-    Guid TenantId, string ProtectedPayload, long ExpiresAtUnixMilliseconds)
+    Guid? TenantId, string ProtectedPayload, long ExpiresAtUnixMilliseconds,
+    AtprotoAuthenticationFlowKind FlowKind)
 {
     public override string ToString() => nameof(AtprotoTransientValue);
 }

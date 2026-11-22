@@ -74,6 +74,8 @@ Own `Explore.API` presentation contracts, HAL policies, `Explore.Blazor`, `Explo
 
 Handoffs include route/operation IDs, DTO and HAL rels, generated-client status, BFF assumptions, component states, screenshots or interaction evidence, and remaining failures. Never concurrently edit a shared API contract or generated client with another mutating agent.
 
+**Plane:** a feature crossing API and UI is one item labeled `API` + `Web App`, not separate tickets; a new client surface (KMP, Avalonia, TUI, CLI) gets its own item that `implements` the shipped one instead of reopening it ([taxonomy standard](../../docs/internal/project-management/work-item-taxonomy-and-granularity-report.md)).
+
 ## Forbidden Moves
 
 - Never gate resource actions by browser roles or claims when HAL affordances exist.

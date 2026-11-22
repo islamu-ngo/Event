@@ -19,6 +19,7 @@ public sealed class SystemController(
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
     [HttpGet("onboarding-status", Name = RouteNames.GetSystemOnboardingStatus)]
+    [TenantReadBootstrap]
     [OutputCache(PolicyName = "SystemConfig")]
     [EndpointSummary("Get System Onboarding Status")]
     [EndpointDescription("Returns non-sensitive startup state: whether onboarding is required and the effective deployment mode.")]

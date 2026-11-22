@@ -25,7 +25,7 @@ public sealed class ActorMediaCutoverProviderTests(AdmissionAuthorityProviderFix
     {
         var options = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(
-            options, fixture.CreateOptions(provider, PrimaryDatabaseRole.Migrator));
+            options, await fixture.CreateOptionsAsync(provider, PrimaryDatabaseRole.Migrator));
         await using var context = new ExploreDbContext(options.Options);
         await context.Database.OpenConnectionAsync();
         string name = $"cutover_{Guid.NewGuid():N}_actor_pii";

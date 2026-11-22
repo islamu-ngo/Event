@@ -89,7 +89,7 @@ public static partial class PostgresPrivateEventManagementContract
     private static IReadOnlyDictionary<Type, string> Policies(ExploreDbContext context, GraphSql sql)
     {
         var result = new Dictionary<Type, string>();
-        var tables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tables = context.GetTenantTableInventory();
         while (sql.Sources.Keys.FirstOrDefault(type => !result.ContainsKey(type)) is { } type)
         {
             var entity = context.Model.FindEntityType(type)!;
@@ -109,7 +109,7 @@ public static partial class PostgresPrivateEventManagementContract
 
     private static string SourceGuard(ExploreDbContext context, GraphSql sql, PostgresNativeQueueEnrollment enrollment)
     {
-        var tables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tables = context.GetTenantTableInventory();
         return $"""
             IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n WHERE n.nspname = {Text(sql.Names.Schema)}
                 AND n.nspowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid)

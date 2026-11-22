@@ -28,8 +28,11 @@ public static partial class PostgresTenantMembershipMutationPermissions
                 WHERE relation.oid={relationOid} AND acl.grantee=0 AND acl.privilege_type='DELETE'))
         """;
 
-    internal static string OptionalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
-        $"(({Catalogue(context, enrollment, false)}) AND (({Absent(context, enrollment)}) OR ({Catalogue(context, enrollment, true)})))";
+    internal static string OptionalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        string? externalCataloguePredicate = null) =>
+        PostgresExternalTenantEnrollmentPermissions.ComposeCataloguePredicate(context, enrollment,
+            externalCataloguePredicate, reference =>
+                $"(({Catalogue(context, enrollment, false, reference)}) AND (({Absent(context, enrollment)}) OR ({Catalogue(context, enrollment, true, reference)})))");
 
     public static async Task ApplyAsync(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
         CancellationToken cancellationToken = default)
@@ -172,12 +175,16 @@ public static partial class PostgresTenantMembershipMutationPermissions
             {(source.Delete ? $"AND NOT pg_catalog.has_table_privilege({Role(source.Login)},pg_catalog.to_regclass({Text(source.Table)}),'DELETE')" : "")}
             """));
 
-    private static string Catalogue(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment, bool complete) => $"""
+    private static string Catalogue(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment, bool complete,
+        string? externalCataloguePredicate = null) =>
+        PostgresExternalTenantEnrollmentPermissions.ComposeCataloguePredicate(context, enrollment,
+            externalCataloguePredicate, reference => $"""
         EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE oid={Role(enrollment.MigratorLogin)} AND rolcanlogin)
         AND NOT pg_catalog.pg_has_role({Role(enrollment.RuntimeLogin)},{Role(enrollment.GlobalLogin)},'MEMBER')
         AND NOT pg_catalog.pg_has_role({Role(enrollment.GlobalLogin)},{Role(enrollment.RuntimeLogin)},'MEMBER')
+        AND ({reference})
         AND {string.Join(" AND ", Sources(context, enrollment).Select(source => SourcePredicate(context, source, enrollment, complete)))}
-        """;
+        """);
 
     private static string SourcePredicate(ExploreDbContext context, Source source, PostgresNativeQueueEnrollment enrollment, bool complete)
     {
@@ -236,7 +243,7 @@ public static partial class PostgresTenantMembershipMutationPermissions
 
     private static string TenantPolicy(ExploreDbContext context, Source source)
     {
-        var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var metadata = context.GetTenantTableInventory()
             .Single(table => table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
         if (metadata.AllowsNullTenant || metadata.ParentJoin is not null)
             throw new InvalidOperationException("tenant_membership_mutation_model_drift");
@@ -269,7 +276,9 @@ public static partial class PostgresTenantMembershipMutationPermissions
             TryGetRuntimeColumns(context, item.Type, out var read, out var update, out bool delete);
             Grant[] own = [.. read.Select(column => new Grant(column, "SELECT")), .. update.Select(column => new Grant(column, "UPDATE"))];
             PostgresActorOwnershipReadPermissions.TryGetRuntimeReadColumns(context, item.Type, out var ownershipRead);
-            Grant[] allowed = [.. own.Concat(ownershipRead.Select(column => new Grant(column, "SELECT"))).Distinct()];
+            Grant[] allowed = [.. own.Concat(ownershipRead.Select(column => new Grant(column, "SELECT")))
+                .Concat(PostgresExternalTenantEnrollmentPermissions.RuntimeColumns(context, item.Type)
+                    .Select(grant => new Grant(grant.Column, grant.Privilege))).Distinct()];
             return Map(context, item.Type, enrollment.RuntimeLogin, own, allowed, delete);
         }).ToList();
         PostgresUserTenantMembershipReadPermissions.TryGetGlobalReadColumns(context, typeof(Tenant), out var membership);

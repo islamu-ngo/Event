@@ -1,10 +1,10 @@
-using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -43,21 +43,47 @@ public sealed class PostgresAdministrativeAuthorityTests(PostgreSqlContainerFixt
             .IsEquivalentTo([rows.OrganizationA]);
         await Assert.That(await reader.GetAdminGroupIdsAsync(rows.Authentication.UserId, rows.Authentication.A))
             .IsEquivalentTo([rows.GroupA]);
+        await Assert.That(await reader.GetAdminOrganizationIdsAsync(rows.Authentication.UserId, rows.Authentication.B))
+            .IsEquivalentTo([rows.OrganizationB]);
+        await Assert.That(await reader.GetAdminGroupIdsAsync(rows.Authentication.UserId, rows.Authentication.B))
+            .IsEquivalentTo([rows.GroupB]);
+        await Assert.That(await reader.IsInstanceAdminAsync(Guid.Empty)).IsFalse();
+        await Assert.That(await reader.GetAdminTenantIdsAsync(Guid.Empty)).IsEmpty();
+        await Assert.That(await reader.GetAdminOrganizationIdsAsync(Guid.Empty)).IsEmpty();
+        await Assert.That(await reader.GetAdminGroupIdsAsync(Guid.Empty)).IsEmpty();
         await Assert.That(request.TenantFilterTenantId).IsEqualTo(foreignTenant ? rows.Authentication.B : (Guid?)null);
     }
 
     [Test]
-    [Arguments("revoked")]
-    [Arguments("suspended")]
-    [Arguments("banned")]
-    [Arguments("removed")]
-    [Arguments("deleted")]
-    [Arguments("member-role")]
+    [Category("AdministrativeScopeIntegrity")]
+    public async Task SharedOrganizationAndGroupAcrossTenantsAreReturnedOnce()
+    {
+        await using var rows = await AuthorityRows.CreateAsync(fixture, sharedScopes: true);
+        var reader = new AdministrativeAuthorityRepository(rows.Factory);
+        await Assert.That(await reader.GetAdminOrganizationIdsAsync(rows.Authentication.UserId))
+            .IsEquivalentTo([rows.OrganizationA, rows.OrganizationB]);
+        await Assert.That(await reader.GetAdminGroupIdsAsync(rows.Authentication.UserId))
+            .IsEquivalentTo([rows.GroupA, rows.GroupB]);
+        await Assert.That(await reader.GetAdminOrganizationIdsAsync(rows.Authentication.UserId, rows.Authentication.B))
+            .IsEquivalentTo([rows.OrganizationA, rows.OrganizationB]);
+        await Assert.That(await reader.GetAdminGroupIdsAsync(rows.Authentication.UserId, rows.Authentication.B))
+            .IsEquivalentTo([rows.GroupA, rows.GroupB]);
+    }
+
+    [Test]
+    [Arguments("revoked", Categories = new[] { "AdministrativeGrantEligibility" })]
+    [Arguments("suspended", Categories = new[] { "AdministrativeMembershipState" })]
+    [Arguments("banned", Categories = new[] { "AdministrativeMembershipState" })]
+    [Arguments("removed", Categories = new[] { "AdministrativeMembershipState" })]
+    [Arguments("deleted", Categories = new[] { "AdministrativeMembershipDeletion", "AdministrativeScopeIntegrity" })]
+    [Arguments("member-role", Categories = new[] { "AdministrativeGrantEligibility" })]
+    [Arguments("foreign-tenant", Categories = new[] { "AdministrativeTenantGrantFence", "AdministrativeIdentityIntegrity" })]
     public async Task TenantEnumerationRetainsMembershipAndGrantEligibility(string exclusion)
     {
         await using var rows = await AuthorityRows.CreateAsync(fixture);
         await using (var seed = fixture.CreateDbContext())
         {
+            seed.BindTenantLease();
             var membership = await seed.TenantUsers.SingleAsync(row =>
                 row.UserId == rows.Authentication.UserId && row.TenantId == rows.Authentication.A);
             var grant = await seed.TenantUserRoleGrants.SingleAsync(row => row.TenantUserId == membership.Id);
@@ -66,28 +92,43 @@ public sealed class PostgresAdministrativeAuthorityTests(PostgreSqlContainerFixt
                 case "revoked": grant.RevokedAt = PostgresAuthenticationLookupAuthorityTests.AuthenticationRows.Now; break;
                 case "deleted": membership.IsDeleted = true; break;
                 case "member-role": grant.RoleId = (int)RoleEnum.TenantMember; break;
+                case "foreign-tenant": grant.TenantId = rows.Authentication.B; break;
                 case "suspended": membership.StatusId = (int)TenantUserStatusEnum.Suspended; break;
                 case "banned": membership.StatusId = (int)TenantUserStatusEnum.Banned; break;
                 case "removed": membership.StatusId = (int)TenantUserStatusEnum.Removed; break;
                 default: throw new ArgumentOutOfRangeException(nameof(exclusion));
             }
-            await seed.SaveChangesAsync();
+            if (exclusion == "foreign-tenant")
+            {
+                var rejected = await Assert.ThrowsAsync<DbUpdateException>(() => seed.SaveChangesAsync());
+                var constraint = rejected?.InnerException as PostgresException;
+                await Assert.That(constraint?.SqlState).IsEqualTo("23503");
+                await Assert.That(constraint?.TableName).IsEqualTo("tenant_user_role_grants");
+            }
+            else
+            {
+                await seed.SaveChangesAsync();
+            }
         }
         var reader = new AdministrativeAuthorityRepository(rows.Factory);
+        Guid[] expected = exclusion == "foreign-tenant"
+            ? [rows.Authentication.A, rows.Authentication.B, rows.Authentication.Inactive]
+            : [rows.Authentication.B, rows.Authentication.Inactive];
         await Assert.That(await reader.GetAdminTenantIdsAsync(rows.Authentication.UserId))
-            .IsEquivalentTo([rows.Authentication.B, rows.Authentication.Inactive]);
+            .IsEquivalentTo(expected);
     }
 
     [Test]
-    [Arguments(TenantStatusEnum.Provisioning)]
-    [Arguments(TenantStatusEnum.Suspended)]
-    [Arguments(TenantStatusEnum.Archived)]
-    [Arguments(TenantStatusEnum.Purged)]
+    [Arguments(TenantStatusEnum.Provisioning, Categories = new[] { "AdministrativePendingLifecycle" })]
+    [Arguments(TenantStatusEnum.Suspended, Categories = new[] { "AdministrativePendingLifecycle" })]
+    [Arguments(TenantStatusEnum.Archived, Categories = new[] { "AdministrativeTerminalLifecycle" })]
+    [Arguments(TenantStatusEnum.Purged, Categories = new[] { "AdministrativeTerminalLifecycle" })]
     public async Task TenantEnumerationDoesNotAddLifecycleFiltering(TenantStatusEnum status)
     {
         await using var rows = await AuthorityRows.CreateAsync(fixture);
         await using (var seed = fixture.CreateDbContext())
         {
+            seed.BindTenantLease();
             var tenant = await seed.Tenants.SingleAsync(row => row.Id == rows.Authentication.A);
             tenant.TenantStatusId = (int)status;
             await seed.SaveChangesAsync();
@@ -98,16 +139,19 @@ public sealed class PostgresAdministrativeAuthorityTests(PostgreSqlContainerFixt
     }
 
     [Test]
-    [Arguments("membership")]
-    [Arguments("participation")]
-    [Arguments("root")]
-    [Arguments("member-role")]
-    [Arguments("unapproved")]
+    [Arguments("membership", Categories = new[] { "AdministrativeDeletion" })]
+    [Arguments("participation", Categories = new[] { "AdministrativeDeletion" })]
+    [Arguments("root", Categories = new[] { "AdministrativeDeletion" })]
+    [Arguments("member-role", Categories = new[] { "AdministrativeParticipation" })]
+    [Arguments("unapproved", Categories = new[] { "AdministrativeParticipation" })]
+    [Arguments("foreign-subject", Categories = new[] { "AdministrativeJoinIsolation", "AdministrativeIdentityIntegrity" })]
+    [Arguments("foreign-tenant", Categories = new[] { "AdministrativeParticipationTenantFence", "AdministrativeIdentityIntegrity" })]
     public async Task OrganizationAndGroupEnumerationRetainOriginalJoinsWithoutApprovalFiltering(string state)
     {
         await using var rows = await AuthorityRows.CreateAsync(fixture);
         await using (var seed = fixture.CreateDbContext())
         {
+            seed.BindTenantLease();
             var organization = await seed.OrganizationMembers.Include(row => row.OrganizationTenant)
                 .ThenInclude(row => row.Organization).SingleAsync(row =>
                     row.OrganizationTenant.OrganizationId == rows.OrganizationA);
@@ -119,6 +163,14 @@ public sealed class PostgresAdministrativeAuthorityTests(PostgreSqlContainerFixt
                 case "participation": organization.OrganizationTenant.IsDeleted = true; group.GroupTenant.IsDeleted = true; break;
                 case "root": organization.OrganizationTenant.Organization.IsDeleted = true; group.GroupTenant.Group.IsDeleted = true; break;
                 case "member-role": organization.RoleId = (int)RoleEnum.OrgMember; group.RoleId = (int)RoleEnum.GroupMember; break;
+                case "foreign-subject":
+                    organization.UserId = rows.Authentication.OtherUserId;
+                    group.UserId = rows.Authentication.OtherUserId;
+                    break;
+                case "foreign-tenant":
+                    organization.TenantId = rows.Authentication.B;
+                    group.TenantId = rows.Authentication.B;
+                    break;
                 case "unapproved":
                     organization.OrganizationTenant.ApprovalStatusId = (int)ApprovalStatusEnum.Rejected;
                     group.GroupTenant.ApprovalStatusId = (int)ApprovalStatusEnum.Revoked;
@@ -127,11 +179,25 @@ public sealed class PostgresAdministrativeAuthorityTests(PostgreSqlContainerFixt
                     break;
                 default: throw new ArgumentOutOfRangeException(nameof(state));
             }
-            await seed.SaveChangesAsync();
+            if (state == "foreign-tenant")
+            {
+                var rejected = await Assert.ThrowsAsync<DbUpdateException>(() => seed.SaveChangesAsync());
+                var constraint = rejected?.InnerException as PostgresException;
+                await Assert.That(constraint?.SqlState).IsEqualTo("23503");
+                await Assert.That(constraint?.TableName is "organization_members" or "group_members").IsTrue();
+            }
+            else
+            {
+                await seed.SaveChangesAsync();
+            }
         }
         var reader = new AdministrativeAuthorityRepository(rows.Factory);
-        Guid[] expectedOrganizations = state == "unapproved" ? [rows.OrganizationA, rows.OrganizationB] : [rows.OrganizationB];
-        Guid[] expectedGroups = state == "unapproved" ? [rows.GroupA, rows.GroupB] : [rows.GroupB];
+        Guid[] expectedOrganizations = state is "unapproved" or "foreign-tenant"
+            ? [rows.OrganizationA, rows.OrganizationB]
+            : [rows.OrganizationB];
+        Guid[] expectedGroups = state is "unapproved" or "foreign-tenant"
+            ? [rows.GroupA, rows.GroupB]
+            : [rows.GroupB];
         await Assert.That(await reader.GetAdminOrganizationIdsAsync(rows.Authentication.UserId))
             .IsEquivalentTo(expectedOrganizations);
         await Assert.That(await reader.GetAdminGroupIdsAsync(rows.Authentication.UserId))
@@ -139,69 +205,69 @@ public sealed class PostgresAdministrativeAuthorityTests(PostgreSqlContainerFixt
     }
 
     [Test]
-    [Arguments("instance")]
     [Arguments("tenant")]
-    [Arguments("organization")]
-    [Arguments("group")]
-    public async Task RuntimeCannotExecuteAdministrativeDiscovery(string scope)
+    [Arguments("organization", Categories = new[] { "AdministrativeRuntimePermission" })]
+    [Arguments("group", Categories = new[] { "AdministrativeRuntimePermission" })]
+    public async Task RuntimeCannotReadAdministrativeRowsAcrossTenants(string scope)
     {
         await using var rows = await AuthorityRows.CreateAsync(fixture);
-        await using var request = rows.Authentication.Context(rows.Authentication.A);
+        await using var request = rows.Authentication.Context(rows.Authentication.B);
         await rows.Authentication.AssertOrdinaryRoleAsync(request);
-        await using var command = request.Database.GetDbConnection().CreateCommand();
-        command.CommandText = scope switch
+        if (scope == "tenant")
         {
-            "instance" => $"SELECT {PostgresAdministrativeAuthorityContract.InstanceFunctionSql(request)}(@user)",
-            "tenant" => $"SELECT * FROM {PostgresAdministrativeAuthorityContract.TenantFunctionSql(request)}(@user)",
-            "organization" => $"SELECT * FROM {PostgresAdministrativeAuthorityContract.OrganizationFunctionSql(request)}(@user, NULL)",
-            "group" => $"SELECT * FROM {PostgresAdministrativeAuthorityContract.GroupFunctionSql(request)}(@user, NULL)",
-            _ => throw new ArgumentOutOfRangeException(nameof(scope))
-        };
-        var parameter = command.CreateParameter();
-        parameter.ParameterName = "user";
-        parameter.Value = rows.Authentication.UserId;
-        command.Parameters.Add(parameter);
-        var denied = await Assert.ThrowsAsync<PostgresException>(async () => { await command.ExecuteScalarAsync(); });
+            await Assert.That(await request.TenantUserRoleGrants.IgnoreQueryFilters()
+                .AnyAsync(row => row.TenantId == rows.Authentication.A)).IsFalse();
+            return;
+        }
+
+        var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
+        {
+            _ = scope switch
+            {
+                "organization" => await request.OrganizationMembers.IgnoreQueryFilters()
+                    .AnyAsync(row => row.TenantId == rows.Authentication.A),
+                "group" => await request.GroupMembers.IgnoreQueryFilters()
+                    .AnyAsync(row => row.TenantId == rows.Authentication.A),
+                _ => throw new ArgumentOutOfRangeException(nameof(scope))
+            };
+        });
         await Assert.That(denied?.SqlState).IsEqualTo("42501");
     }
 
     [Test]
-    public async Task GlobalExecutorCannotReadPrivateTablesAndOwnerCannotLogin()
+    [Category("AdministrativeScopeIntegrity")]
+    public async Task GlobalAdministrativeReadsDoNotGrantPrivateColumnsOrWrites()
     {
         await using var rows = await AuthorityRows.CreateAsync(fixture);
         await using var context = await rows.Factory.CreateDbContextAsync();
         await context.Database.OpenConnectionAsync();
         await using var command = context.Database.GetDbConnection().CreateCommand();
-        foreach (Type type in new[] { typeof(PlatformUserRole), typeof(TenantUserRoleGrant), typeof(TenantUser),
-            typeof(OrganizationMember), typeof(OrganizationTenant), typeof(Organization),
-            typeof(GroupMember), typeof(GroupTenant), typeof(Group), typeof(UserPii), typeof(ActorPii) })
+        var names = new HumanPrincipalSourceSql(context);
+        // Existing setup/worker purposes already read selected PII and membership
+        // columns. Protect columns outside that declared union, not those old rights.
+        (Type Type, string Property)[] protectedColumns =
+        [
+            (typeof(UserPii), "_dateOfBirth"),
+            (typeof(OrganizationMember), nameof(OrganizationMember.Id)),
+            (typeof(GroupMember), nameof(GroupMember.Id))
+        ];
+        foreach (var (type, property) in protectedColumns)
         {
             var entity = context.Model.FindEntityType(type)!;
-            command.CommandText = $"SELECT 1 FROM \"{entity.GetSchema()}\".\"{entity.GetTableName()}\" LIMIT 1";
+            var store = Microsoft.EntityFrameworkCore.Metadata.StoreObjectIdentifier.Table(
+                entity.GetTableName()!, entity.GetSchema());
+            string column = entity.FindProperty(property)!.GetColumnName(store)!;
+            command.CommandText = $"SELECT {names.Quote(column)} FROM {names.Quote(entity.GetSchema()!)}.{names.Quote(entity.GetTableName()!)} LIMIT 1";
             var denied = await Assert.ThrowsAsync<PostgresException>(async () => { await command.ExecuteScalarAsync(); });
             await Assert.That(denied?.SqlState).IsEqualTo("42501");
         }
-        command.CommandText = $"""
-            SELECT rolcanlogin OR rolsuper OR rolbypassrls FROM pg_catalog.pg_roles
-            WHERE rolname = '{PostgresAdministrativeAuthorityContract.OwnerRole}'
-            """;
-        await Assert.That((bool)(await command.ExecuteScalarAsync())!).IsFalse();
-        command.CommandText = $"""
-            SELECT count(*) FROM pg_catalog.pg_proc p
-            JOIN pg_catalog.pg_roles r ON r.oid = p.proowner
-            JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
-            WHERE r.rolname = '{PostgresAdministrativeAuthorityContract.OwnerRole}'
-              AND n.nspname = @schema
-              AND p.prosecdef AND 'search_path=pg_catalog' = ANY(p.proconfig)
-            """;
-        var schema = command.CreateParameter();
-        schema.ParameterName = "schema";
-        schema.Value = rows.Authentication.Schema;
-        command.Parameters.Add(schema);
-        await Assert.That((long)(await command.ExecuteScalarAsync())!).IsEqualTo(4);
+        var write = await Assert.ThrowsAsync<PostgresException>(() =>
+            context.OrganizationMembers.IgnoreQueryFilters().Where(row => row.UserId == rows.Authentication.UserId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.RoleId, (int)RoleEnum.OrgMember)));
+        await Assert.That(write?.SqlState).IsEqualTo("42501");
     }
 
-    private sealed class AuthorityRows(PostgreSqlContainerFixture fixture) : IAsyncDisposable
+    private sealed class AuthorityRows : IAsyncDisposable
     {
         internal PostgresAuthenticationLookupAuthorityTests.AuthenticationRows Authentication { get; private set; } = null!;
         internal GlobalExploreDbContextFactory Factory { get; private set; } = null!;
@@ -209,15 +275,14 @@ public sealed class PostgresAdministrativeAuthorityTests(PostgreSqlContainerFixt
         internal Guid OrganizationB { get; } = Guid.CreateVersion7();
         internal Guid GroupA { get; } = Guid.CreateVersion7();
         internal Guid GroupB { get; } = Guid.CreateVersion7();
-        private readonly string _role = $"administrative_global_{Guid.CreateVersion7():N}";
-        private string _connectionString = null!;
 
-        internal static async Task<AuthorityRows> CreateAsync(PostgreSqlContainerFixture fixture)
+        internal static async Task<AuthorityRows> CreateAsync(PostgreSqlContainerFixture fixture, bool sharedScopes = false)
         {
-            var rows = new AuthorityRows(fixture);
+            var rows = new AuthorityRows();
             rows.Authentication = await PostgresAuthenticationLookupAuthorityTests.AuthenticationRows.CreateAsync(fixture);
             await using var seed = fixture.CreateDbContext();
-            await PostgresAdministrativeAuthorityContract.ApplyAsync(seed);
+            seed.BindTenantLease();
+            await PostgresAdministrativeAuthorityReadPermissions.ApplyAsync(seed, fixture.NativeQueueEnrollment);
             seed.PlatformUserRoles.Add(new PlatformUserRole
             {
                 Id = Guid.CreateVersion7(),
@@ -226,7 +291,8 @@ public sealed class PostgresAdministrativeAuthorityTests(PostgreSqlContainerFixt
                 RoleId = (int)RoleEnum.Admin,
                 Role = null!
             });
-            foreach (var membership in await seed.TenantUsers.ToListAsync())
+            foreach (var membership in await seed.TenantUsers.Where(row =>
+                row.UserId == rows.Authentication.UserId || row.UserId == rows.Authentication.OtherUserId).ToListAsync())
                 seed.TenantUserRoleGrants.Add(new TenantUserRoleGrant
                 {
                     Id = Guid.CreateVersion7(),
@@ -240,49 +306,26 @@ public sealed class PostgresAdministrativeAuthorityTests(PostgreSqlContainerFixt
                 });
             AddScopes(rows.Authentication.A, rows.OrganizationA, rows.GroupA);
             AddScopes(rows.Authentication.B, rows.OrganizationB, rows.GroupB);
+            if (sharedScopes)
+                AddScopes(rows.Authentication.B, rows.OrganizationA, rows.GroupA);
             await seed.SaveChangesAsync();
 
-            string password = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-            await using var administration = new NpgsqlConnection(fixture.ConnectionString);
-            await administration.OpenAsync();
-            await using var grant = administration.CreateCommand();
-            grant.CommandText = $"""
-                CREATE ROLE "{rows._role}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '{password}';
-                GRANT {PostgresAdministrativeAuthorityContract.GlobalRole} TO "{rows._role}";
-                """;
-            await grant.ExecuteNonQueryAsync();
-            var connection = new NpgsqlConnectionStringBuilder(fixture.ConnectionString)
-            {
-                Username = rows._role,
-                Password = password
-            };
-            rows._connectionString = connection.ConnectionString;
-            rows.Factory = new GlobalExploreDbContextFactory(new PrimaryDatabaseConnectionOptions
-            {
-                Role = PrimaryDatabaseRole.Global,
-                Provider = PrimaryDatabaseProvider.PostgreSql,
-                Host = connection.Host,
-                Port = connection.Port,
-                Database = connection.Database,
-                Username = rows._role,
-                Password = password,
-                Schema = rows.Authentication.Schema,
-                TlsMode = PrimaryDatabaseTlsMode.Disabled
-            }, poolSize: 1);
+            rows.Factory = new GlobalExploreDbContextFactory(
+                fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1);
             await using var verify = await rows.Factory.CreateDbContextAsync();
             await verify.Database.OpenConnectionAsync();
             await using var probe = verify.Database.GetDbConnection().CreateCommand();
             probe.CommandText = "SELECT current_user, rolsuper, rolbypassrls FROM pg_catalog.pg_roles WHERE rolname = current_user";
             await using var result = await probe.ExecuteReaderAsync();
             await Assert.That(await result.ReadAsync()).IsTrue();
-            await Assert.That(result.GetString(0)).IsEqualTo(rows._role);
+            await Assert.That(result.GetString(0)).IsEqualTo(fixture.NativeQueueEnrollment.GlobalLogin);
             await Assert.That(result.GetBoolean(1)).IsFalse();
             await Assert.That(result.GetBoolean(2)).IsFalse();
             return rows;
 
             void AddScopes(Guid tenantId, Guid organizationId, Guid groupId)
             {
-                var organization = new Organization
+                var organization = seed.Organizations.Local.SingleOrDefault(row => row.Id == organizationId) ?? new Organization
                 {
                     Id = organizationId,
                     Pii = new OrganizationPii { FullName = "Authority organization" },
@@ -311,7 +354,7 @@ public sealed class PostgresAdministrativeAuthorityTests(PostgreSqlContainerFixt
                     RoleId = (int)RoleEnum.OrgAdmin,
                     Role = null!
                 });
-                var group = new Group
+                var group = seed.Groups.Local.SingleOrDefault(row => row.Id == groupId) ?? new Group
                 {
                     Id = groupId,
                     FullName = "Authority group",
@@ -345,16 +388,6 @@ public sealed class PostgresAdministrativeAuthorityTests(PostgreSqlContainerFixt
 
         public async ValueTask DisposeAsync()
         {
-            using var pool = new NpgsqlConnection(_connectionString);
-            NpgsqlConnection.ClearPool(pool);
-            await using var administration = new NpgsqlConnection(fixture.ConnectionString);
-            await administration.OpenAsync();
-            await using var revoke = administration.CreateCommand();
-            revoke.CommandText = $"""
-                REVOKE {PostgresAdministrativeAuthorityContract.GlobalRole} FROM "{_role}";
-                DROP ROLE "{_role}";
-                """;
-            await revoke.ExecuteNonQueryAsync();
             await Authentication.DisposeAsync();
         }
     }

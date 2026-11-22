@@ -1,15 +1,44 @@
 using System.Collections.Concurrent;
 using System.Data.Common;
+using System.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Explore.Persistence.Database;
 
 internal sealed class SqliteNamedLockTransactionInterceptor
-    : DbTransactionInterceptor, IDbConnectionInterceptor
+    : DbTransactionInterceptor, IDbConnectionInterceptor,
+        IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>
 {
     private readonly ConcurrentDictionary<DbTransaction, TransactionLocks> _locks = new();
 
     public static SqliteNamedLockTransactionInterceptor Instance { get; } = new();
+
+    private SqliteNamedLockTransactionInterceptor()
+    {
+        // EF transaction disposal has no interceptor callback. This singleton observes
+        // disposal for its process lifetime and releases only its tracked owners.
+        _ = DiagnosticListener.AllListeners.Subscribe(this);
+    }
+
+    public void OnNext(DiagnosticListener listener)
+    {
+        if (listener.Name == DbLoggerCategory.Name)
+            _ = listener.Subscribe(this, name => name == RelationalEventId.TransactionDisposed.Name);
+    }
+
+    public void OnNext(KeyValuePair<string, object?> notification)
+    {
+        if (notification.Key == RelationalEventId.TransactionDisposed.Name
+            && notification.Value is TransactionEventData disposed
+            && _locks.ContainsKey(disposed.Transaction)
+            && disposed.Transaction.Connection is null)
+            Release(disposed.Transaction);
+    }
+
+    public void OnCompleted() { }
+
+    public void OnError(Exception error) { }
 
     public bool IsTracked(DbTransaction transaction, string resource) =>
         _locks.TryGetValue(transaction, out TransactionLocks? locks)

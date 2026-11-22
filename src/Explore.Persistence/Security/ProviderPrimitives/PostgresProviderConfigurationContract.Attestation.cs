@@ -32,7 +32,7 @@ public static partial class PostgresProviderConfigurationContract
     private static string SourceGuard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var sql = new HumanPrincipalSourceSql(context);
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string sources = string.Join("\n", Sources.Select(type =>
         {
             var entity = context.Model.FindEntityType(type)!;
@@ -113,7 +113,7 @@ public static partial class PostgresProviderConfigurationContract
                     AND NOT t.tgdeferrable AND NOT t.tginitdeferred AND t.tgoldtable IS NULL AND t.tgnewtable IS NULL)
             THEN RAISE EXCEPTION 'provider_configuration_exclusion_drift' USING ERRCODE = '55000'; END IF;
             """));
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string policies = string.Join("\n", Sources.Where(type => tenantTables.Any(table =>
             table.TableName == context.Model.FindEntityType(type)!.GetTableName())).Select(type => $"""
             IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid = {Text(sql.Table(type))}::regclass
@@ -187,7 +187,8 @@ public static partial class PostgresProviderConfigurationContract
             THEN RAISE EXCEPTION 'provider_configuration_authority_drift' USING ERRCODE = '55000'; END IF;
             IF pg_catalog.has_schema_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Schema)},'CREATE')
                 OR pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(typeof(SystemSetting)))}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(typeof(SystemSetting)))}::regclass,'INSERT,UPDATE,REFERENCES')
+                OR (pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(typeof(SystemSetting)))}::regclass,'INSERT,UPDATE,REFERENCES')
+                    AND ({PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(context, enrollment)}) IS NOT TRUE)
                 OR pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{anchor}::regclass,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                 OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{anchor}::regclass,'SELECT,INSERT,UPDATE,REFERENCES')
             THEN RAISE EXCEPTION 'provider_configuration_ambient_authority' USING ERRCODE = '55000'; END IF;

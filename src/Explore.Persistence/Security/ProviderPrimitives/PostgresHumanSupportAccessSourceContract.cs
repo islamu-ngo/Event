@@ -17,8 +17,8 @@ public static partial class PostgresHumanSupportAccessSourceContract
     private const string Write = "human_support_access_source_write";
     private const string WriterTrigger = "zz_human_support_access_source_write";
     private const string Anchor = "human_support_access_source_epoch";
-    private const string ReadPolicy = "human_support_access_source_read";
-    private const string UpdatePolicy = "human_support_access_source_update";
+    internal const string ReadPolicy = "human_support_access_source_read";
+    internal const string UpdatePolicy = "human_support_access_source_update";
     private const string Signature = "uuid,integer,uuid,uuid,uuid";
     private const string Arguments = "p_actor uuid,p_purpose integer,p_tenant uuid,p_session uuid,p_resolved uuid";
     private const string Stamp = "human-support-access-source:v1:";

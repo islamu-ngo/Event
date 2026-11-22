@@ -309,13 +309,9 @@ public sealed class EmailDispatchEligibilityEvaluator(
             return await SkipAsync(dispatch, delivery, request, "recipient_membership_inactive", cancellationToken);
         }
 
-        var user = await dbContext.Users
-            .AsNoTracking()
-            .Include(value => value.Pii)
-            .Include(value => value.IdentityEmailClaims)
-                .ThenInclude(claim => claim.Evidence)
-            .SingleOrDefaultAsync(value => value.Id == dispatch.RecipientUserId, cancellationToken);
-        if (user is null || user.IsDeleted)
+        var recipient = await EmailDeliveryRecipientReader.ReadAsync(
+            dbContext, dispatch.RecipientUserId, cancellationToken);
+        if (recipient is null || recipient.IsDeleted)
         {
             return await SkipAsync(dispatch, delivery, request, "recipient_deleted", cancellationToken);
         }
@@ -399,7 +395,7 @@ public sealed class EmailDispatchEligibilityEvaluator(
             }
 
             RecipientEmailAddressResolution emailAddress = RecipientEmailAddressResolver.Resolve(
-                user,
+                recipient,
                 dispatch.RecipientUserId);
             if (!emailAddress.HasVerifiedEmail)
             {

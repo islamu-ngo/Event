@@ -16,7 +16,15 @@ public static class Program
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromSeconds(5);
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public static int Main(string[] args) => Run(args, Console.Out);
+    public static int Main(string[] args)
+    {
+        if (args.Length > 0 && string.Equals(args[0], LoadProcessOwner.CommandName, StringComparison.Ordinal))
+        {
+            return LoadProcessOwner.Run(args);
+        }
+
+        return Run(args, Console.Out);
+    }
 
     public static int Run(string[] args, TextWriter output)
     {

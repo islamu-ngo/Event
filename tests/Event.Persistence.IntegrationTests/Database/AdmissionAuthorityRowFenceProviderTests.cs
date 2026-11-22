@@ -21,10 +21,10 @@ public sealed class AdmissionAuthorityRowFenceProviderTests(
     {
         Guid tenantId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
-        await using ExploreDbContext setup = CreateContext(provider);
+        await using ExploreDbContext setup = await CreateContextAsync(provider);
         await PrepareMinimalOrderTableAsync(setup, provider, tenantId, orderId);
 
-        await using ExploreDbContext first = CreateContext(provider);
+        await using ExploreDbContext first = await CreateContextAsync(provider);
         await using var firstTransaction = await first.Database.BeginTransactionAsync();
         await RelationalEntityRowFence.AcquireAsync<RegistrationOrder>(
             first,
@@ -33,7 +33,7 @@ public sealed class AdmissionAuthorityRowFenceProviderTests(
             orderId,
             CancellationToken.None);
 
-        await using ExploreDbContext contender = CreateContext(provider);
+        await using ExploreDbContext contender = await CreateContextAsync(provider);
         await using var contenderTransaction =
             await contender.Database.BeginTransactionAsync();
         Exception? contention = await CaptureAsync(() =>
@@ -47,7 +47,7 @@ public sealed class AdmissionAuthorityRowFenceProviderTests(
         await contenderTransaction.RollbackAsync();
         await firstTransaction.CommitAsync();
 
-        await using ExploreDbContext released = CreateContext(provider);
+        await using ExploreDbContext released = await CreateContextAsync(provider);
         await using var releasedTransaction = await released.Database.BeginTransactionAsync();
         await RelationalEntityRowFence.AcquireAsync<RegistrationOrder>(
             released,
@@ -66,7 +66,7 @@ public sealed class AdmissionAuthorityRowFenceProviderTests(
         PrimaryDatabaseProvider provider)
     {
         string resource = $"named-lock-lifecycle:{provider}:{Guid.CreateVersion7():N}";
-        await using ExploreDbContext owner = CreateContext(provider);
+        await using ExploreDbContext owner = await CreateContextAsync(provider);
         await using var ownerTransaction = await owner.Database.BeginTransactionAsync();
         await using IAsyncDisposable transactionLease =
             await RelationalNamedLock.AcquireTransactionAsync(
@@ -74,7 +74,7 @@ public sealed class AdmissionAuthorityRowFenceProviderTests(
                 resource,
                 CancellationToken.None);
 
-        await using (ExploreDbContext contender = CreateContext(provider))
+        await using (ExploreDbContext contender = await CreateContextAsync(provider))
         await using (var contenderTransaction = await contender.Database.BeginTransactionAsync())
         {
             using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(750));
@@ -92,7 +92,7 @@ public sealed class AdmissionAuthorityRowFenceProviderTests(
 
         await ownerTransaction.CommitAsync();
 
-        await using (ExploreDbContext rollbackOwner = CreateContext(provider))
+        await using (ExploreDbContext rollbackOwner = await CreateContextAsync(provider))
         await using (var rollbackTransaction = await rollbackOwner.Database.BeginTransactionAsync())
         {
             await using IAsyncDisposable lease =
@@ -103,14 +103,14 @@ public sealed class AdmissionAuthorityRowFenceProviderTests(
             await rollbackTransaction.RollbackAsync();
         }
 
-        await using ExploreDbContext sessionOwner = CreateContext(provider);
+        await using ExploreDbContext sessionOwner = await CreateContextAsync(provider);
         IAsyncDisposable sessionLease = await RelationalNamedLock.AcquireSessionAsync(
             sessionOwner,
             resource,
             CancellationToken.None);
         await sessionLease.DisposeAsync();
 
-        await using ExploreDbContext verifier = CreateContext(provider);
+        await using ExploreDbContext verifier = await CreateContextAsync(provider);
         await using var verificationTransaction = await verifier.Database.BeginTransactionAsync();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await using IAsyncDisposable verificationLease =
@@ -121,12 +121,12 @@ public sealed class AdmissionAuthorityRowFenceProviderTests(
         await verificationTransaction.CommitAsync(timeout.Token);
     }
 
-    private ExploreDbContext CreateContext(PrimaryDatabaseProvider provider)
+    private async Task<ExploreDbContext> CreateContextAsync(PrimaryDatabaseProvider provider)
     {
         var options = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(
             options,
-            fixture.CreateOptions(provider));
+            await fixture.CreateOptionsAsync(provider));
         return new ExploreDbContext(options.Options);
     }
 

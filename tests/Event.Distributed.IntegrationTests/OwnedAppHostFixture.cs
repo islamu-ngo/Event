@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Collections.Frozen;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Runtime.ExceptionServices;
@@ -40,6 +41,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     private ContainerResource[] cleanupResources = [];
     private readonly Lock containerIdentityLock = new();
     private readonly Dictionary<string, ContainerCleanupIdentity> containerIdentities = new(StringComparer.Ordinal);
+    private readonly HashSet<string> containerReplacementPermissions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string Id, HashSet<string> VolumeTargets)> cleanupImages = new(StringComparer.Ordinal);
     private readonly Dictionary<string, VolumeCleanupIdentity> volumeIdentities = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource cleanupObservationLifetime = new();
@@ -48,10 +50,12 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     private readonly CleanupProofFailures cleanupProofFailures = new();
     private Task cleanupObservation = Task.CompletedTask;
     private Task cleanupObservationCancellation = Task.CompletedTask;
+    private Task? cleanupObservationSettlement;
     private bool cleanupPrepared;
     private HashSet<string> initialContainerIds = new(StringComparer.Ordinal);
     private HashSet<string> initialVolumeNames = new(StringComparer.Ordinal);
     private Exception? startupFailure;
+    private CancellationToken startupToken;
     private ManagedResourceLaunchObservation? managedLaunchObservation;
     private readonly CancellationTokenSource managedObservationLifetime = new();
     private Task managedObservation = Task.CompletedTask;
@@ -91,6 +95,11 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     internal ContainerCleanupIdentity[] CompletedCleanupIdentities
     {
         get { lock (containerIdentityLock) return [.. containerIdentities.Values]; }
+    }
+
+    internal void PermitContainerReplacement(string resourceName)
+    {
+        lock (containerIdentityLock) containerReplacementPermissions.Add(resourceName);
     }
     public string BootstrapIdentifier => $"assurance-{RunId}@example.invalid";
     public string BootstrapPassword => EnvironmentAuthority["INSTANCE_BOOTSTRAP_LOCAL_PASSWORD"]
@@ -169,6 +178,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                     "SECRET_PROVIDER=Environment", "SecretProvider:Provider=Environment",
                     "DATABASE_PROVIDER=PostgreSql", "DATABASE_NAME=islamu_assurance",
                     "DATABASE_SCHEMA=assurance", "DATABASE_HOST=localhost",
+                    "Scheduler:Quartz:Enabled=false", "Scheduler:Quartz:ApplySchemaOnStartup=false",
                     $"IDENTITY_DATABASE_TOPOLOGY={(profile == OwnedAppHostProfile.ExternalIdentitySharedBff ? "External" : "CoLocated")}",
                     .. (profile == OwnedAppHostProfile.ExternalIdentitySharedBff
                         ? new[] { "IDENTITY_DATABASE_PROVIDER=Sqlite", $"IDENTITY_DATABASE_NAME={Path.Combine(owner.Root, "identity.sqlite")}" }
@@ -226,7 +236,9 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             {
                 builder.CreateResourceBuilder(project)
                     .WithEnvironment("AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH", blocklist)
-                    .WithEnvironment("AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256", Convert.ToHexString(SHA256.HashData(blocklistBytes)));
+                    .WithEnvironment("AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256", Convert.ToHexString(SHA256.HashData(blocklistBytes)))
+                    .WithEnvironment("Scheduler__Quartz__ApplySchemaOnStartup", "false")
+                    .WithEnvironment("Scheduler__Quartz__Enabled", "false");
                 if (configuredAdministrator)
                     builder.CreateResourceBuilder(project).WithEnvironment("Authentication__Local__AccessTokenLifetimeMinutes", "5");
             }
@@ -243,6 +255,12 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                 postgresBuilder.WithEnvironment($"DATABASE_{purpose}_PASSWORD", owner.EnvironmentAuthority[$"DATABASE_{purpose}_PASSWORD"]);
             if (configureBuilder is not null)
                 await configureBuilder(builder);
+            var executionRegistrations = builder.Services
+                .Where(descriptor => descriptor.ServiceType == typeof(TestingApplicationExecution)).ToArray();
+            if (executionRegistrations.Length != 1 || !ReferenceEquals(executionRegistrations[0].ImplementationInstance, owner.execution))
+                throw new InvalidOperationException("test_application_execution_missing");
+            builder.Services.Configure<HostOptions>(options => options.ServicesStartConcurrently = false);
+            builder.Services.Insert(0, ServiceDescriptor.Singleton<IHostedService>(owner.execution));
             await new TestingResourceIsolation(owner.RunId, owner.Root, profile)
                 .PublishConfiguredContainerModelAsync(builder, cancellationToken);
             owner.volumes = builder.Resources.OfType<ContainerResource>()
@@ -264,6 +282,8 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         }
         catch (Exception creationFailure)
         {
+            owner.execution.CancelUnstarted();
+            owner.execution.PermitDisposal();
             await DisposeFailedCreationAsync(creationFailure, builder, owner);
             throw;
         }
@@ -328,22 +348,44 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     private async Task StartCoreAsync(CancellationToken cancellationToken)
     {
         using var startup = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
+        startupToken = startup.Token;
         try
         {
             // StartAsync holds disposalLock until this first task assignment precedes any asynchronous preparation.
             managedObservation = RejectFailedResourcesAsync(managedObservationLifetime.Token);
+            await execution.WaitForEntryPointAsync(startup.Token);
             await PrepareContainerCleanupAsync(startup.Token);
             cleanupPrepared = true;
             cleanupObservation = ObserveContainerCleanupCandidatesAsync(cleanupObservationLifetime.Token);
-            await RunObservedStartupAsync(token => managedObservation.WaitAsync(token), Application.StartAsync,
-                WaitForReadyAsync, applicationLifetime!.StopApplication,
+            async Task StartHostAsync(CancellationToken token)
+            {
+                if (!execution.PermitStart())
+                    throw new OperationCanceledException(token);
+                var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                using var registration = applicationLifetime!.ApplicationStarted.Register(() => started.TrySetResult());
+                Task completed = await Task.WhenAny(started.Task, execution.Completion).WaitAsync(token);
+                await completed;
+                if (!started.Task.IsCompletedSuccessfully)
+                    throw new InvalidOperationException("test_application_stopped_before_start");
+            }
+            void StopHost()
+            {
+                applicationLifetime!.StopApplication();
+                execution.CancelHost();
+            }
+            await RunObservedStartupAsync(token => managedObservation.WaitAsync(token), StartHostAsync,
+                WaitForReadyAsync, StopHost,
                 (phase, reason, requested) => managedLaunchObservation?.RecordStartupFailure(phase, reason, requested,
                     cancellationToken.IsCancellationRequested, lifetime.IsCancellationRequested), startup,
                 () => CompleteCleanupProofBeforeStopAsync());
+            await CompleteCleanupProofBeforeStopAsync(cancellationToken);
         }
         catch (Exception exception) { startupFailure = exception; }
         if (startupFailure is not null)
         {
+            execution.CancelUnstarted();
+            try { execution.CancelHost(); }
+            catch (Exception exception) { startupFailure = new AggregateException(startupFailure, exception); }
             try { await execution.WaitForCompletionAsync(TimeSpan.FromSeconds(30)); }
             catch (Exception exception) { startupFailure = new AggregateException(startupFailure, exception); }
         }
@@ -462,9 +504,15 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     {
         await foreach (var update in Application.ResourceNotifications.WatchAsync(cancellationToken))
         {
+            if (startupToken.IsCancellationRequested || cancellationToken.IsCancellationRequested)
+                break;
             if (update.Snapshot.State?.Text == KnownResourceStates.FailedToStart
                 || update.Snapshot.ExitCode is not (null or 0))
+            {
+                if (startupToken.IsCancellationRequested || cancellationToken.IsCancellationRequested)
+                    break;
                 throw new InvalidOperationException($"test_resource_start_failed:{update.Resource.Name}");
+            }
             if (managedLaunchObservation is not null)
                 await managedLaunchObservation.CaptureAsync(update.Resource, update.ResourceId,
                     update.Snapshot.Properties, cancellationToken);
@@ -490,6 +538,15 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     private static bool CanonicalNativePath(string? path) => !string.IsNullOrEmpty(path)
         && path.Length <= 4096 && path.StartsWith('/') && !path.Any(char.IsControl)
         && path == Path.GetFullPath(path) && (path == "/" || !path.EndsWith('/'));
+
+    private static string CanonicalBindSource(string? source)
+    {
+        if (source is null) return string.Empty;
+        const string hostMntPrefix = "/host_mnt";
+        return source.StartsWith(hostMntPrefix + "/", StringComparison.Ordinal)
+            ? source[hostMntPrefix.Length..]
+            : source;
+    }
 
     private static InvalidOperationException UnknownContainer(IResource resource, string reason) =>
         new($"test_resource_container_identity_unknown:{resource.Name}:{reason}");
@@ -533,10 +590,20 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             lock (containerIdentityLock)
                 pending = cleanupCandidates.Where(candidate => !attempted.Any(previous =>
                     ReferenceEquals(previous.Resource, candidate.Resource) && previous.Instance == candidate.Instance)).ToArray();
-            if (pending.Length == 0) break;
+            if (pending.Length == 0)
+            {
+                lock (containerIdentityLock)
+                {
+                    if (cleanupResources.All(resource => containerIdentities.Values.Any(identity => ReferenceEquals(identity.Resource, resource))))
+                        break;
+                }
+                try { await Task.Delay(50, deadline.Token); }
+                catch (OperationCanceledException) { break; }
+                continue;
+            }
+            bool progressed = false;
             foreach (var candidate in pending)
             {
-                attempted.Add(candidate);
                 string stage = "capture";
                 try
                 {
@@ -545,22 +612,37 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                     stage = "completed-proof";
                     lock (containerIdentityLock)
                     {
-                        if (!containerIdentities.Values.Any(identity => ReferenceEquals(identity.Resource, candidate.Resource)
+                        if (containerIdentities.Values.Any(identity => ReferenceEquals(identity.Resource, candidate.Resource)
                             && identity.Instance == candidate.Instance))
                         {
-                            if (captured?.Outcome != ContainerInspectionOutcome.Absent)
-                                // A candidate alone proves neither native creation nor an erased implicit-volume footprint.
-                                throw UnknownContainer(candidate.Resource, "candidate-unproved");
-                            // The recorded absent observation grants no deletion authority; final release checks it again.
+                            // The candidate is now bound to native container evidence; it needs no further proof pass.
+                            attempted.Add(candidate);
+                            progressed = true;
                         }
+                        else if (captured?.Outcome != ContainerInspectionOutcome.Absent)
+                        {
+                            attempted.Add(candidate);
+                            // A candidate alone proves neither native creation nor an erased implicit-volume footprint.
+                            throw UnknownContainer(candidate.Resource, "candidate-unproved");
+                        }
+                        // An absent candidate may precede DCP container creation. Keep it pending and
+                        // re-inspect until it joins native evidence or the proof deadline expires; an
+                        // absence observation never grants deletion authority.
                     }
                 }
                 catch (Exception failure)
                 {
+                    attempted.Add(candidate);
                     failures.Add(failure);
                     denials.Add(new(candidate.Resource.Name, stage, failure, candidate.Instance == candidate.Resource.Name));
                 }
                 if (deadline.IsCancellationRequested) break;
+            }
+            if (!progressed && !deadline.IsCancellationRequested)
+            {
+                // Avoid a tight loop when DCP has not created the candidate yet.
+                try { await Task.Delay(100, deadline.Token); }
+                catch (OperationCanceledException) { break; }
             }
         }
         if (cleanupObservation.IsFaulted)
@@ -648,7 +730,13 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         return new InvalidOperationException(message, original);
     }
 
-    private async Task JoinCleanupObservationAsync()
+    private Task JoinCleanupObservationAsync()
+    {
+        lock (disposalLock)
+            return cleanupObservationSettlement ??= JoinCleanupObservationCoreAsync();
+    }
+
+    private async Task JoinCleanupObservationCoreAsync()
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var failures = new List<Exception>();
@@ -668,8 +756,10 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             try { await CompleteCleanupProofBeforeStopAsync(deadline.Token); }
             catch (Exception failure) { failures.Add(failure); }
         }
-        if (failures.Count != 0)
+        if (!cleanupObservation.IsCompleted || !cleanupObservationCancellation.IsCompleted)
             throw new InvalidOperationException("test_resource_cleanup_observer_unsettled", new AggregateException(failures));
+        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException(failures);
     }
 
     private static string? DockerIdentity(string? value)
@@ -736,7 +826,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         IResource resource, string? instance, string runId, string expectedImage,
         IReadOnlySet<string> imageVolumeTargets, IReadOnlySet<string> initialIds,
         IReadOnlySet<string> initialVolumes, string inspection, out ContainerCleanupIdentity? identity,
-        out string reason, ContainerCleanupIdentity? original = null)
+        out string reason, ContainerCleanupIdentity? original = null, bool allowContainerReplacement = false)
     {
         identity = null;
         reason = "model-reference";
@@ -785,7 +875,10 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                 var selected = remaining.SingleOrDefault(expected =>
                     (expected.Type == ContainerMountType.Volume && type == "volume"
                         || expected.Type == ContainerMountType.BindMount && type == "bind")
-                    && expected.Source == source && expected.Target == target && expected.IsReadOnly != writable);
+                    && (expected.Type == ContainerMountType.BindMount
+                        ? CanonicalBindSource(expected.Source) == CanonicalBindSource(source)
+                        : expected.Source == source)
+                    && expected.Target == target && expected.IsReadOnly != writable);
                 bool implicitVolume = selected is null;
                 if (selected is not null) remaining.Remove(selected);
                 else
@@ -810,7 +903,9 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             if (remainingTargets.Count != 0) return false;
             var orderedVolumes = volumeMounts.OrderBy(volume => volume.Target, StringComparer.Ordinal).ToArray();
             reason = "volume-binding-changed";
-            if (original is not null && (original.Id != id || !original.Volumes.SequenceEqual(orderedVolumes))) return false;
+            if (original is not null
+                && (!original.Volumes.SequenceEqual(orderedVolumes)
+                    || (original.Id != id && !allowContainerReplacement))) return false;
             reason = "native-state";
             bool stopped = !fields[5].GetBoolean() && fields[6].GetInt32() == 0;
             identity = new(container, instance, id, expectedImage, imageVolumeTargets, inspection,
@@ -899,13 +994,18 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         }
         if (observation.Outcome == ContainerInspectionOutcome.Absent) return observation;
         ContainerCleanupIdentity? original;
+        bool allowReplacement;
         lock (containerIdentityLock)
-            original = containerIdentities.Values.SingleOrDefault(identity =>
+        {
+            original = containerIdentities.Values.LastOrDefault(identity =>
                 ReferenceEquals(identity.Resource, resource) && identity.Instance == instance);
+            allowReplacement = containerReplacementPermissions.Contains(resource.Name);
+        }
         // SDK ResourceId is only a name candidate; the native equality check supplies the join.
         if (!TryReadContainerIdentity(cleanupResources, resource, instance, RunId,
             cleanupImages[container.Name].Id, cleanupImages[container.Name].VolumeTargets,
-            initialContainerIds, initialVolumeNames, inspection.Output, out var identity, out string reason, original))
+            initialContainerIds, initialVolumeNames, inspection.Output, out var identity, out string reason, original,
+            allowReplacement))
             throw UnknownContainer(resource, reason);
         if (original is null)
         {
@@ -928,8 +1028,19 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                     volumeIdentities[volume.Name] = volume;
             }
         }
+        string capturedId = identity!.Id;
         lock (containerIdentityLock)
-            containerIdentities[identity!.Id] = identity with { Stopped = identity.Stopped && exitCode == 0 };
+        {
+            if (allowReplacement)
+            {
+                foreach (string staleId in containerIdentities
+                    .Where(pair => ReferenceEquals(pair.Value.Resource, resource)
+                        && pair.Value.Instance == instance && pair.Value.Id != capturedId)
+                    .Select(pair => pair.Key).ToArray())
+                    containerIdentities.Remove(staleId);
+            }
+            containerIdentities[capturedId] = identity with { Stopped = identity.Stopped && exitCode == 0 };
+        }
         if (managedLaunchObservation is not null)
             await managedLaunchObservation.PublishContainerAsync(identity!, cancellationToken);
         return observation;
@@ -964,81 +1075,73 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         || first.StartsWith(second == "/" ? "/" : second + "/", StringComparison.Ordinal)
         || second.StartsWith(first == "/" ? "/" : first + "/", StringComparison.Ordinal);
 
-    internal static void RequireVolumeConsumerInspectionSucceeded(int exitCode, string error)
-    {
-        if (exitCode == 0) return;
-        throw VolumeConsumerInspectionFailure(exitCode, error);
-    }
-
-    private static string VolumeConsumerInspectionCategory(string error)
-    {
-        if (error.Length > 8192) return "oversize";
-        if (string.IsNullOrWhiteSpace(error)) return "empty";
-        // Marker observations cannot diagnose absence or authorize deletion.
-        bool missing = error.Contains("no such", StringComparison.OrdinalIgnoreCase);
-        bool permission = error.Contains("permission denied", StringComparison.OrdinalIgnoreCase)
-            || error.Contains("access denied", StringComparison.OrdinalIgnoreCase);
-        bool connection = error.Contains("cannot connect", StringComparison.OrdinalIgnoreCase)
-            || error.Contains("connection refused", StringComparison.OrdinalIgnoreCase)
-            || error.Contains("connection reset", StringComparison.OrdinalIgnoreCase);
-        int classes = (missing ? 1 : 0) + (permission ? 1 : 0) + (connection ? 1 : 0);
-        return classes > 1 ? "multiple-markers" : missing ? "no-such-marker"
-            : permission ? "permission-marker" : connection ? "connection-marker" : "other";
-    }
-
-    private static InvalidOperationException VolumeConsumerInspectionFailure(int exitCode, string error) => new(FormattableString.Invariant(
-        $"test_resource_volume_consumers_unknown:stage=bulk-inspect:exit={exitCode}:stderr={VolumeConsumerInspectionCategory(error)}"));
-
     private static Task<string[]> ReadVolumeConsumersAsync(VolumeCleanupIdentity volume, CancellationToken token) =>
-        ReadVolumeConsumersAsync(volume.Name, volume.Mountpoint, (arguments, cancellation) => RunDockerAsync(arguments, cancellation), token);
+        ReadVolumeConsumersAsync(volume.Name, volume.Mountpoint, ReadRuntimeContainerInventoryAsync, token);
+
+    internal static async Task<string> ReadRuntimeContainerInventoryAsync(CancellationToken token)
+    {
+        string? host = Environment.GetEnvironmentVariable("DOCKER_HOST");
+        if (!Uri.TryCreate(host, UriKind.Absolute, out var endpoint) || endpoint.Scheme != "unix"
+            || endpoint.Host.Length != 0 || endpoint.Query.Length != 0 || endpoint.Fragment.Length != 0
+            || endpoint.UserInfo.Length != 0 || !CanonicalNativePath(endpoint.LocalPath)
+            || host != "unix://" + endpoint.LocalPath
+            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DOCKER_CONTEXT"))
+            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DOCKER_TLS_VERIFY"))
+            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DOCKER_CERT_PATH")))
+            throw new InvalidOperationException("test_resource_docker_endpoint_unknown");
+        using var handler = new SocketsHttpHandler
+        {
+            UseProxy = false,
+            AllowAutoRedirect = false,
+            UseCookies = false,
+            ActivityHeadersPropagator = null,
+            ConnectCallback = async (_, cancellation) =>
+            {
+                var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+                try
+                {
+                    await socket.ConnectAsync(new UnixDomainSocketEndPoint(endpoint.LocalPath), cancellation);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch { socket.Dispose(); throw; }
+            }
+        };
+        using var client = new HttpClient(handler, disposeHandler: false) { MaxResponseContentBufferSize = 4 * 1024 * 1024 };
+        return await ReadRuntimeContainerInventoryAsync(client, token);
+    }
+
+    internal static async Task<string> ReadRuntimeContainerInventoryAsync(HttpClient client, CancellationToken token)
+    {
+        using var response = await client.GetAsync("http://localhost/v1.40/containers/json?all=true", HttpCompletionOption.ResponseHeadersRead, token);
+        if (response.StatusCode != System.Net.HttpStatusCode.OK || response.Content.Headers.ContentRange is not null)
+            throw new InvalidOperationException("test_resource_volume_consumers_unknown:runtime-inventory-http");
+        await response.Content.LoadIntoBufferAsync(4 * 1024 * 1024, token);
+        return await response.Content.ReadAsStringAsync(token);
+    }
+
+    internal const int VolumeConsumerInventoryAttempts = 10;
+    private static readonly TimeSpan VolumeConsumerInventoryRetryDelay = TimeSpan.FromMilliseconds(100);
 
     internal static async Task<string[]> ReadVolumeConsumersAsync(string volumeName, string mountpoint,
-        Func<string[], CancellationToken, Task<(int ExitCode, string Output, string Error)>> execute, CancellationToken token)
+        Func<CancellationToken, Task<string>> readInventory, CancellationToken token)
     {
         var superseded = new List<Exception>();
-        async Task<string[]> InventoryAsync()
-        {
-            token.ThrowIfCancellationRequested();
-            var inventory = await execute(["ps", "--no-trunc", "-aq"], token);
-            if (inventory.ExitCode != 0) throw new InvalidOperationException("test_resource_container_inventory_failed");
-            string[] ids = inventory.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            var unique = new HashSet<string>(StringComparer.Ordinal);
-            if (ids.Any(id => DockerIdentity(id) != id || !unique.Add(id)))
-                throw new InvalidOperationException("test_resource_container_identity_invalid");
-            return ids;
-        }
         try
         {
-            for (int attempt = 0; attempt < 2; attempt++)
+            for (int attempt = 0; attempt < VolumeConsumerInventoryAttempts; attempt++)
             {
-                string[] ids = await InventoryAsync();
-                string[] consumers = [];
-                if (ids.Length != 0)
-                {
-                    var inspected = await execute(["inspect", "--type", "container", "--format",
-                        "[{{json .ID}},{{json .Mounts}}]", .. ids], token);
-                    if (inspected.ExitCode != 0)
-                    {
-                        var failure = VolumeConsumerInspectionFailure(inspected.ExitCode, inspected.Error);
-                        if (attempt == 0 && inspected.ExitCode == 1
-                            && VolumeConsumerInspectionCategory(inspected.Error) == "no-such-marker")
-                        {
-                            // Discard all failed stdout. Only an independently complete fresh proof can supersede it.
-                            superseded.Add(failure);
-                            string[] afterFailure = await InventoryAsync();
-                            if (!ids.ToHashSet(StringComparer.Ordinal).SetEquals(afterFailure))
-                                continue;
-                        }
-                        throw failure;
-                    }
-                    consumers = ParseVolumeConsumers(volumeName, mountpoint, ids, inspected.Output);
-                }
-                string[] after = await InventoryAsync();
                 token.ThrowIfCancellationRequested();
-                if (ids.ToHashSet(StringComparer.Ordinal).SetEquals(after)) return consumers;
+                var before = ParseVolumeConsumers(volumeName, mountpoint, await readInventory(token));
+                var after = ParseVolumeConsumers(volumeName, mountpoint, await readInventory(token));
+                token.ThrowIfCancellationRequested();
+                if (before.Ids.SetEquals(after.Ids))
+                    return before.Consumers.Union(after.Consumers, StringComparer.Ordinal).ToArray();
                 var changed = new InvalidOperationException("test_resource_volume_consumers_unknown:stage=inventory-bracket:reason=membership-changed");
-                if (attempt == 1) throw changed;
                 superseded.Add(changed);
+                if (attempt + 1 == VolumeConsumerInventoryAttempts) throw changed;
+                // Aspire DCP can remove or replace a container between the two inventories.
+                // Re-bracket after a short pause; the proof still requires one stable set.
+                await Task.Delay(VolumeConsumerInventoryRetryDelay, token);
             }
             throw new InvalidOperationException("test_resource_volume_consumers_unknown:stage=inventory-bracket:reason=incomplete");
         }
@@ -1050,23 +1153,26 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         }
     }
 
-    private static string[] ParseVolumeConsumers(string volumeName, string mountpoint, string[] ids, string output)
+    private static (HashSet<string> Ids, HashSet<string> Consumers) ParseVolumeConsumers(string volumeName, string mountpoint, string output)
     {
         var consumers = new HashSet<string>(StringComparer.Ordinal);
         var seen = new HashSet<string>(StringComparer.Ordinal);
         try
         {
-            foreach (string line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            using var document = JsonDocument.Parse(output);
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+                throw new InvalidOperationException("test_resource_volume_consumers_unknown");
+            foreach (var row in document.RootElement.EnumerateArray())
             {
-                using var document = JsonDocument.Parse(line);
-                var fields = document.RootElement;
-                if (fields.ValueKind != JsonValueKind.Array || fields.GetArrayLength() != 2
-                    || fields[0].GetString() is not { } id || !ids.Contains(id, StringComparer.Ordinal) || !seen.Add(id)
-                    || fields[1].ValueKind != JsonValueKind.Array)
+                if (row.ValueKind != JsonValueKind.Object
+                    || row.EnumerateObject().Select(property => property.Name).Distinct(StringComparer.Ordinal).Count() != row.EnumerateObject().Count()
+                    || row.GetProperty("Id").GetString() is not { } id || DockerIdentity(id) != id || !seen.Add(id)
+                    || row.GetProperty("Mounts").ValueKind != JsonValueKind.Array)
                     throw new InvalidOperationException("test_resource_volume_consumers_unknown");
-                foreach (var mount in fields[1].EnumerateArray())
+                foreach (var mount in row.GetProperty("Mounts").EnumerateArray())
                 {
-                    if (mount.ValueKind != JsonValueKind.Object)
+                    if (mount.ValueKind != JsonValueKind.Object
+                        || mount.EnumerateObject().Select(property => property.Name).Distinct(StringComparer.Ordinal).Count() != mount.EnumerateObject().Count())
                         throw new InvalidOperationException("test_resource_volume_consumers_unknown");
                     string? type = mount.GetProperty("Type").GetString();
                     if (type == "volume")
@@ -1091,8 +1197,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                     else throw new InvalidOperationException("test_resource_volume_consumers_unknown");
                 }
             }
-            if (seen.Count != ids.Length) throw new InvalidOperationException("test_resource_volume_consumers_unknown");
-            return consumers.ToArray();
+            return (seen, consumers);
         }
         catch (Exception failure) when (failure is JsonException or ArgumentException or KeyNotFoundException or InvalidOperationException)
         { throw new InvalidOperationException("test_resource_volume_consumers_unknown"); }
@@ -1252,6 +1357,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             observations = new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<ContainerResource, Dictionary<(string Instance, string Id), ManagedContainerAssociation>>
             containers = new(ReferenceEqualityComparer.Instance);
+        private readonly List<FileStream> heldStreams = [];
         private int records;
         internal IReadOnlyList<ManagedLaunchHint> Rows
         {
@@ -1413,8 +1519,9 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             static bool LowerHex(string value) => value.Length == 64
                 && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
             if (string.IsNullOrEmpty(identity.Instance) || identity.Instance.Length > 256 || !LowerHex(identity.Id)
-                || !identity.Image.StartsWith("sha256:", StringComparison.Ordinal) || !LowerHex(identity.Image[7..]))
+                || !LowerHex(identity.Image))
                 throw new InvalidOperationException("test_managed_container_identity_invalid");
+            string imageId = "sha256:" + identity.Image;
             string digest = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(identity.Instance))).ToLowerInvariant();
             await Publication.WaitAsync(token);
             try
@@ -1424,14 +1531,14 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                     if (containers.TryGetValue(identity.Resource, out var prior)
                         && prior.TryGetValue((digest, identity.Id), out var previous))
                     {
-                        if (previous.ImageId != identity.Image)
+                        if (previous.ImageId != imageId)
                             throw new InvalidOperationException("test_managed_container_identity_changed");
                         return;
                     }
                 }
                 if (snapshotClosed) throw new InvalidOperationException("test_managed_launch_observation_closed");
                 if (records >= 64) throw new InvalidOperationException("test_managed_launch_observation_limit");
-                var association = new ManagedContainerAssociation(identity.Resource.Name, digest, identity.Id, identity.Image, true);
+                var association = new ManagedContainerAssociation(identity.Resource.Name, digest, identity.Id, imageId, true);
                 VerifyPrivateRoot(root, runId);
                 string name = $"managed-launch-container-{digest}-{identity.Id}-{records}.json";
                 await WritePrivateJsonAsync(Path.Combine(root, name), new { Schema = 1, RunId = runId, Container = association }, token);
@@ -1793,26 +1900,53 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             { throw new InvalidOperationException("test_managed_launch_write_failed"); }
         }
 
-        private static async Task WritePrivateJsonAsync<T>(string path, T value, CancellationToken token)
+        private async Task WritePrivateJsonAsync<T>(string path, T value, CancellationToken token)
         {
             if (!OperatingSystem.IsLinux()) throw new InvalidOperationException("test_managed_launch_platform_unsupported");
             byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(value);
             if (bytes.Length > 1_048_576) throw new InvalidOperationException("test_managed_launch_record_limit");
+            FileStream? output = null;
             try
             {
-                await using var output = new FileStream(path, new FileStreamOptions
+                output = new FileStream(path, new FileStreamOptions
                 {
                     Mode = FileMode.CreateNew,
-                    Access = FileAccess.Write,
-                    Share = FileShare.None,
-                    Options = FileOptions.Asynchronous,
+                    Access = FileAccess.ReadWrite,
+                    Share = FileShare.Read,
+                    Options = FileOptions.Asynchronous | FileOptions.WriteThrough,
                     UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
                 });
                 await output.WriteAsync(bytes, token);
+                await output.FlushAsync(token);
+                output.Flush(flushToDisk: true);
+                lock (observationLock)
+                    heldStreams.Add(output);
             }
-            catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                if (output is not null) await output.DisposeAsync();
+                throw;
+            }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
-            { throw new InvalidOperationException("test_managed_launch_write_failed"); }
+            {
+                if (output is not null) await output.DisposeAsync();
+                throw new InvalidOperationException("test_managed_launch_write_failed");
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            List<FileStream> streams;
+            lock (observationLock)
+            {
+                streams = [.. heldStreams];
+                heldStreams.Clear();
+            }
+            foreach (var stream in streams)
+            {
+                try { await stream.DisposeAsync(); }
+                catch { }
+            }
         }
     }
 
@@ -1820,7 +1954,11 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     private async Task WaitForReadyAsync(CancellationToken cancellationToken)
     {
         await Application.ResourceNotifications.WaitForResourceAsync(
-            "event-migrationservice", KnownResourceStates.Exited, cancellationToken);
+            "event-migrationservice",
+            update => update.Snapshot.ExitCode == 0
+                && (update.Snapshot.State?.Text == KnownResourceStates.Finished
+                    || update.Snapshot.State?.Text == KnownResourceStates.Exited),
+            cancellationToken);
         List<string> services = topology == "Split" ? ["explore-api", "explore-blazor"] : ["event-standalone"];
         if (profile == OwnedAppHostProfile.ExternalIdentitySharedBff)
             services.Add("explore-blazor-peer");
@@ -1869,6 +2007,8 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             // Nonterminal owned readers retain their dependencies for the finite outer process boundary.
             if (ManagedLaunchWritersSettled)
             {
+                if (execution.IsSettled && execution.IsDisposalSettled)
+                    execution.Dispose();
                 managedObservationLifetime.Dispose();
                 cleanupObservationLifetime.Dispose();
                 lifetime.Dispose();
@@ -1879,10 +2019,12 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     private bool ManagedLaunchWritersSettled => cleanupObservation.IsCompleted
         && cleanupObservationCancellation.IsCompleted && runningStartup?.IsCompleted != false
         && managedObservation.IsCompleted && managedObservationCancellation.IsCompleted
+        && cleanupObservationSettlement?.IsCompleted != false
         && managedObservationSettlement?.IsCompleted != false;
 
     private async Task DisposeOwnedResourcesAsync()
     {
+        execution.CancelUnstarted();
         var failures = new List<Exception>();
         bool applicationSettled = true;
         try { await CompleteCleanupProofBeforeStopAsync(); }
@@ -1893,54 +2035,54 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         catch (Exception exception) { failures.Add(exception); }
         try { await lifetime.CancelAsync(); }
         catch (Exception exception) { failures.Add(exception); }
+        try { execution.CancelHost(); }
+        catch (Exception exception) { failures.Add(exception); }
         if (Application is not null)
         {
             try { applicationLifetime!.StopApplication(); }
             catch (Exception exception) { failures.Add(exception); }
-            try { await Application.StopAsync(stopDeadline.Token); }
+            try { await execution.WaitForCompletionAsync(TimeSpan.FromSeconds(60)); }
             catch (Exception exception) { failures.Add(exception); }
-            finally
+            if (!execution.IsSettled)
             {
-                try { await JoinCleanupObservationAsync(); }
+                applicationSettled = false;
+                failures.Add(new InvalidOperationException("test_application_execution_unsettled"));
+            }
+            try { await JoinCleanupObservationAsync(); }
+            catch (Exception exception) { failures.Add(exception); }
+            if (runningStartup is not null)
+            {
+                try { await runningStartup.WaitAsync(TimeSpan.FromSeconds(30)); }
+                catch (Exception exception) when (runningStartup.IsCompleted)
+                {
+                    if (startupFailure is null) failures.Add(exception);
+                }
+                catch (TimeoutException exception)
+                {
+                    failures.Add(new InvalidOperationException("test_resource_cleanup_startup_unsettled", exception));
+                }
+            }
+            if (runningStartup?.IsCompleted != false)
+            {
+                try { await CompleteManagedObservationAsync(); }
                 catch (Exception exception) { failures.Add(exception); }
-                if (runningStartup is not null)
-                {
-                    try { await runningStartup.WaitAsync(TimeSpan.FromSeconds(30)); }
-                    catch (Exception exception) when (runningStartup.IsCompleted)
-                    {
-                        if (startupFailure is null) failures.Add(exception);
-                    }
-                    catch (TimeoutException exception)
-                    {
-                        failures.Add(new InvalidOperationException("test_resource_cleanup_startup_unsettled", exception));
-                    }
-                }
-                if (runningStartup?.IsCompleted != false)
-                {
-                    try { await CompleteManagedObservationAsync(); }
-                    catch (Exception exception) { failures.Add(exception); }
-                }
-                if (!cleanupObservation.IsCompleted || !cleanupObservationCancellation.IsCompleted
-                    || runningStartup?.IsCompleted == false || !managedObservation.IsCompleted
-                    || !managedObservationCancellation.IsCompleted)
+            }
+            if (!cleanupObservation.IsCompleted || !cleanupObservationCancellation.IsCompleted
+                || runningStartup?.IsCompleted == false || !managedObservation.IsCompleted
+                || !managedObservationCancellation.IsCompleted)
+            {
+                applicationSettled = false;
+                failures.Add(new InvalidOperationException("test_resource_cleanup_dependencies_unsettled"));
+            }
+            if (applicationSettled)
+            {
+                execution.PermitDisposal();
+                try { await execution.WaitForDisposalAsync(TimeSpan.FromSeconds(60)); }
+                catch (Exception exception)
                 {
                     applicationSettled = false;
-                    failures.Add(new InvalidOperationException("test_resource_cleanup_dependencies_unsettled"));
+                    failures.Add(exception);
                 }
-                else
-                {
-                    // Terminal proof/stop faults do not suppress this independent disposal attempt.
-                    try { await Application.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(60)); }
-                    catch (Exception exception)
-                    {
-                        applicationSettled = false;
-                        failures.Add(exception);
-                    }
-                }
-                try { await execution.WaitForCompletionAsync(TimeSpan.FromSeconds(60)); }
-                catch (Exception exception) { failures.Add(exception); }
-                if (!execution.IsSettled)
-                    applicationSettled = false;
             }
         }
         if (applicationSettled && managedLaunchObservation is not null && ManagedLaunchWritersSettled)
@@ -1984,7 +2126,13 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             {
                 VolumeCleanupIdentity? captured;
                 lock (containerIdentityLock) volumeIdentities.TryGetValue(volume.Name, out captured);
-                if (captured is null || await ReadVolumeIdentityAsync(volume.Name, cleanupDeadline.Token) != captured)
+                if (captured is null)
+                    throw UnknownContainer(original.Resource, "volume-metadata-changed");
+                var current = await ReadVolumeIdentityAsync(volume.Name, cleanupDeadline.Token);
+                // DCP may remove a test-owned volume concurrently after the container
+                // is stopped. Absence is settled; changed metadata is still refused.
+                if (current is null) continue;
+                if (current != captured)
                     throw UnknownContainer(original.Resource, "volume-metadata-changed");
                 string[] consumers = await ReadVolumeConsumersAsync(captured, cleanupDeadline.Token);
                 RequireExclusiveVolumeConsumer(containerId, consumers);
@@ -2001,7 +2149,30 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                 throw new InvalidOperationException("test_resource_container_wait_failed");
             var removal = await RunDockerAsync(["rm", containerId], cleanupDeadline.Token);
             if (removal.ExitCode != 0 && !removal.Error.Contains("no such container", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("test_resource_container_cleanup_failed");
+            {
+                // Aspire DCP can remove the same container concurrently. A removal already in
+                // progress is not ownership ambiguity: the checks above still bind this exact
+                // owned container, so wait for it to disappear instead of failing the teardown.
+                if (!removal.Error.Contains("already in progress", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("test_resource_container_cleanup_failed");
+                using var settlement = CancellationTokenSource.CreateLinkedTokenSource(cleanupDeadline.Token);
+                settlement.CancelAfter(TimeSpan.FromSeconds(30));
+                try
+                {
+                    while (true)
+                    {
+                        var check = await RunDockerAsync(["inspect", "--type", "container", "--format",
+                            "{{.Id}}", containerId], settlement.Token);
+                        if (check.ExitCode != 0 && check.Error.Contains("no such", StringComparison.OrdinalIgnoreCase))
+                            break;
+                        await Task.Delay(200, settlement.Token);
+                    }
+                }
+                catch (OperationCanceledException) when (!cleanupDeadline.IsCancellationRequested)
+                {
+                    throw new InvalidOperationException("test_resource_container_cleanup_failed");
+                }
+            }
         }
         if (cleanupResources.Length != 0)
         {
@@ -2058,6 +2229,11 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             var containers = await RunDockerAsync(["ps", "--no-trunc", "-aq"], token);
             var currentVolumes = await RunDockerAsync(["volume", "ls", "--format", "{{.Name}}"], token);
             return new(containers.ExitCode, containers.Output, currentVolumes.ExitCode, currentVolumes.Output);
+        }
+        if (managedLaunchObservation is not null)
+        {
+            try { await managedLaunchObservation.DisposeAsync(); }
+            catch (Exception exception) { failures.Add(exception); }
         }
         try
         {

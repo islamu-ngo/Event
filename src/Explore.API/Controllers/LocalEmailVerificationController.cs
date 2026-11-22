@@ -24,6 +24,7 @@ public sealed class LocalEmailVerificationController(
     ICommandHandler<ConfirmLocalEmailCommand, BaseCommandResponse<Guid>> confirmHandler) : ControllerBase
 {
     [HttpPost(Name = RouteNames.RequestLocalEmailVerification)]
+    [TenantReadBootstrap]
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
     [PrivateNoStore]
@@ -45,6 +46,7 @@ public sealed class LocalEmailVerificationController(
             onSuccess: Accepted);
 
     [HttpPost("consume", Name = RouteNames.ConfirmLocalEmail)]
+    [TenantReadBootstrap]
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
     [PrivateNoStore]

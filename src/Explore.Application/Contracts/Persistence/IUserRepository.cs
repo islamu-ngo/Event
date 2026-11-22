@@ -7,6 +7,9 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IUserRepository : IGenericRepository<User, Guid>
 {
+    /// <summary>Reads only the filtered identity enrollment subject's ID and deletion state, without tracking or profile data.</summary>
+    Task<User?> GetForIdentityEnrollmentAsync(Guid id, CancellationToken cancellationToken);
+
     /// <summary>Reads the filtered User and personal Actor binding without profile or storage navigation data.</summary>
     Task<User?> GetLocalIdentityBindingAsync(Guid id, CancellationToken cancellationToken);
 

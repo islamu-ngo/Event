@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Appearance.Requests.Commands;
+using Explore.Application.Features.Authentication.Continuation.Requests.Commands;
 using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Features.Localization.Requests.Commands;
 using Explore.Application.Contracts.Identity;
@@ -26,6 +27,7 @@ internal static class PolicyMutationCommandScope
         FooterOperationScope.Handles(request)
         || HandlesLearning(request)
         || request == typeof(UpdateCurrentUserAppearancePreferencesCommand)
+        || request == typeof(JoinVerifiedTenantCommand)
         || request == typeof(UpdateLocalizationGovernanceCommand)
         || request == typeof(UpdateUserLastActiveTenantCommand)
         || request == typeof(UpdateSettingCommand) || request == typeof(UpdateSettingBatchCommand)
@@ -104,6 +106,8 @@ internal static class PolicyMutationCommandScope
             && tenant != Guid.Empty => new(tenant),
         UpdateCurrentUserAppearancePreferencesCommand =>
             throw new UnauthorizedAccessException("Appearance preferences require the authenticated tenant."),
+        JoinVerifiedTenantCommand command when command.TenantId != Guid.Empty => new(command.TenantId),
+        JoinVerifiedTenantCommand => throw new UnauthorizedAccessException("Tenant joining requires an explicit target."),
         UpdateLocalizationGovernanceCommand => PolicyMutationScope.Instance,
         UpdateUserLastActiveTenantCommand => PolicyMutationScope.Instance,
         SaveInstanceOnboardingProfileCommand => PolicyMutationScope.Instance,
@@ -152,6 +156,14 @@ internal static class PolicyMutationCommandScope
         ResetSettingCommand { Scope: SettingScope.Instance } => PolicyMutationScope.Instance,
         LockSettingCommand { Scope: SettingScope.Instance } => PolicyMutationScope.Instance,
         UnlockSettingCommand { Scope: SettingScope.Instance } => PolicyMutationScope.Instance,
+        UpdateSettingCommand { Scope: SettingScope.Tenant }
+            or UpdateSettingBatchCommand { Scope: SettingScope.Tenant }
+            or ResetSettingCommand { Scope: SettingScope.Tenant }
+            or LockSettingCommand { Scope: SettingScope.Tenant }
+            or UnlockSettingCommand { Scope: SettingScope.Tenant } =>
+            tenantContext?.TenantId is { } tenant && tenant != Guid.Empty
+                ? new(tenant)
+                : throw new InvalidOperationException("Tenant settings require the authenticated tenant."),
         SetInstanceTenantSettingCommand { TenantId: var tenant } when tenant != Guid.Empty => new(tenant),
         LockInstanceTenantSettingCommand { TenantId: var tenant } when tenant != Guid.Empty => new(tenant),
         UnlockInstanceTenantSettingCommand { TenantId: var tenant } when tenant != Guid.Empty => new(tenant),

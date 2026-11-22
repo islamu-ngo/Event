@@ -246,7 +246,7 @@ internal sealed class PostgresAuthenticationSourceProfile(Type type, string role
     private string SourcePredicate(ExploreDbContext context, Source source, string migrator)
     {
         var entity = context.Model.FindEntityType(type)!;
-        var tenant = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model).Single(table => table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
+        var tenant = context.GetTenantTableInventory().Single(table => table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
         string shape = string.Join(" AND ", source.Columns.Values.Select(column => $"""
             EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)}) AND a.attnum>0
                 AND NOT a.attisdropped AND a.attname={Text(column.Name)} AND pg_catalog.format_type(a.atttypid,a.atttypmod)={Text(column.StoreType)}

@@ -40,10 +40,12 @@ public static partial class PostgresEmailDeliveryPolicyContract
             if (await command.ExecuteScalarAsync(cancellationToken) is true)
                 await PostgresMixedSettingsContract.RequireReadyAsync(context, enrollment, cancellationToken);
         }
+        await context.Database.ExecuteSqlRawAsync(BuildRecipientRolesSql(enrollment), cancellationToken);
         await context.Database.ExecuteSqlRawAsync(BuildSql(context, enrollment), cancellationToken);
         await context.Database.ExecuteSqlRawAsync(BuildControlsSql(context, enrollment), cancellationToken);
         await context.Database.ExecuteSqlRawAsync(BuildMutationGrantsSql(context), cancellationToken);
         await context.Database.ExecuteSqlRawAsync(BuildProcessorMutationSql(context, enrollment), cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(BuildRecipientSql(context, enrollment), cancellationToken);
         await context.Database.ExecuteSqlRawAsync(
             $"DO $ready$ BEGIN {PrivilegeAssertion(context, enrollment)} END $ready$;",
             cancellationToken);
@@ -78,13 +80,26 @@ public static partial class PostgresEmailDeliveryPolicyContract
         string key = Column<TenantSetting>(nameof(TenantSetting.SettingKey));
         string owner = Column<TenantSetting>(nameof(TenantSetting.TenantId));
         string keys = string.Join(", ", EmailDeliverySettingKeys.All.Select(value => $"'{value.Replace("'", "''")}'"));
+        // Store types must mirror the migrated columns exactly: PL/pgSQL RETURN QUERY rejects
+        // binary-incompatible drift such as a varchar(256) column declared as text (42804).
+        string StoreType(string property)
+        {
+            var entity = context.Model.FindEntityType(typeof(TenantSetting))!;
+            var table = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+            return entity.FindProperty(property)!.GetColumnType(table)
+                ?? throw new InvalidOperationException($"email_policy_store_type_missing:{property}");
+        }
         (string Name, string Type)[] columns =
         [
-            (nameof(TenantSetting.Id), "uuid"), (nameof(TenantSetting.TenantId), "uuid"),
-            (nameof(TenantSetting.SettingKey), "text"), (nameof(TenantSetting.Value), "text"),
-            (nameof(TenantSetting.IsLocked), "boolean"), (nameof(TenantSetting.CreatedAt), "timestamp with time zone"),
-            (nameof(TenantSetting.CreatedBy), "uuid"), (nameof(TenantSetting.UpdatedAt), "timestamp with time zone"),
-            (nameof(TenantSetting.UpdatedBy), "uuid")
+            (nameof(TenantSetting.Id), StoreType(nameof(TenantSetting.Id))),
+            (nameof(TenantSetting.TenantId), StoreType(nameof(TenantSetting.TenantId))),
+            (nameof(TenantSetting.SettingKey), StoreType(nameof(TenantSetting.SettingKey))),
+            (nameof(TenantSetting.Value), StoreType(nameof(TenantSetting.Value))),
+            (nameof(TenantSetting.IsLocked), StoreType(nameof(TenantSetting.IsLocked))),
+            (nameof(TenantSetting.CreatedAt), StoreType(nameof(TenantSetting.CreatedAt))),
+            (nameof(TenantSetting.CreatedBy), StoreType(nameof(TenantSetting.CreatedBy))),
+            (nameof(TenantSetting.UpdatedAt), StoreType(nameof(TenantSetting.UpdatedAt))),
+            (nameof(TenantSetting.UpdatedBy), StoreType(nameof(TenantSetting.UpdatedBy)))
         ];
         string projection = string.Join(", ", columns.Select(column => $"setting.{Column<TenantSetting>(column.Name)}"));
         string grants = string.Join(", ", columns.Select(column => Column<TenantSetting>(column.Name)));
@@ -106,7 +121,7 @@ public static partial class PostgresEmailDeliveryPolicyContract
                     IF EXISTS (SELECT 1 FROM pg_catalog.pg_proc p
                         JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
                         WHERE n.nspname = {{LoginLiteral(Schema(context))}}
-                            AND p.proname LIKE 'email_delivery_policy_%')
+                            AND (p.proname LIKE 'email_delivery_policy_%' OR p.proname = 'email_delivery_recipient'))
                         OR pg_catalog.to_regclass({{LoginLiteral($"{Schema(context)}.email_delivery_policy_mutation_receipts")}}) IS NOT NULL THEN
                         RAISE EXCEPTION 'email_policy_bootstrap_artifacts_present' USING ERRCODE = '55000';
                     END IF;

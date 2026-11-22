@@ -88,7 +88,7 @@ public sealed class TenantIdentityActivationConcurrencyTests
             currentUser,
             mutationLock,
             new TenantActivationCapacityPolicy(
-                Substitute.For<IInstanceBootstrapStateRepository>(),
+                Substitute.For<IInstanceBootstrapStateReader>(),
                 tenantRepository,
                 Substitute.For<IManagedTenantProvisioningOperationRepository>(),
                 Microsoft.Extensions.Options.Options.Create(new ManagedControlPlaneOptions())),

@@ -15,6 +15,7 @@ using Explore.Persistence.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.API.IntegrationTests.Features;
@@ -87,7 +88,7 @@ public sealed class LocalIdentityPublicFailureHttpTests
         await using DbContext read = fixture.Native.CreateIdentityDatabase();
         await Assert.That(await read.Set<LocalIdentityLifecycleOperation>().CountAsync(CancellationToken)).IsEqualTo(0);
         await using (var scope = fixture.Host.Services.CreateAsyncScope())
-            await scope.ServiceProvider.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(new Uri("https://lifecycle.test"), CancellationToken);
         await Assert.That(fixture.Smtp.Handoffs.Count).IsEqualTo(0);
         await fixture.SignInAsync();
     }
@@ -122,6 +123,7 @@ public sealed class LocalIdentityPublicFailureHttpTests
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
         await using (var configure = fixture.Native.CreateDatabase())
         {
+            configure.BindTenantLease();
             var host = await configure.SystemSettings.SingleAsync(row => row.SettingKey == GovernanceSettingKeys.Email.SmtpHost, CancellationToken);
             host.Value = "\"\"";
             await configure.SaveChangesAsync(CancellationToken);
@@ -130,7 +132,7 @@ public sealed class LocalIdentityPublicFailureHttpTests
             await AssertAcceptedAsync(accepted);
         await fixture.SignInAsync();
         await using (var scope = fixture.Host.Services.CreateAsyncScope())
-            await scope.ServiceProvider.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(new Uri("https://lifecycle.test"), CancellationToken);
         await Assert.That(fixture.Smtp.Handoffs.Count).IsEqualTo(0);
         await using DbContext read = fixture.Native.CreateIdentityDatabase();
         var pending = await read.Set<LocalIdentityLifecycleOperation>().AsNoTracking().SingleAsync(CancellationToken);
@@ -185,7 +187,8 @@ public sealed class LocalIdentityPublicFailureHttpTests
     public async Task CommitAcknowledgementFailureRetainsOriginalOperationAndWorkerHandoff()
     {
         var failure = new CommitAcknowledgementFailure();
-        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(interceptor: failure);
+        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(
+            interceptor: failure, selectedInterceptors: [failure.IntakeWitness]);
         failure.Armed = true;
         await using (var scope = fixture.Host.Services.CreateAsyncScope())
         {
@@ -217,7 +220,8 @@ public sealed class LocalIdentityPublicFailureHttpTests
             cancellation.Cancel();
             return new OperationCanceledException(cancellation.Token);
         });
-        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(interceptor: failure);
+        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(
+            interceptor: failure, selectedInterceptors: [failure.IntakeWitness]);
         failure.Armed = true;
         await using (var scope = fixture.Host.Services.CreateAsyncScope())
         {
@@ -232,7 +236,7 @@ public sealed class LocalIdentityPublicFailureHttpTests
         using (HttpResponseMessage repeated = await RequestAsync(fixture, fixture.Login.Identifier))
             await AssertAcceptedAsync(repeated);
         await using var scopeAfter = fixture.Host.Services.CreateAsyncScope();
-        await scopeAfter.ServiceProvider.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(CancellationToken);
+        await scopeAfter.ServiceProvider.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(new Uri("https://lifecycle.test"), CancellationToken);
         await Assert.That(fixture.Smtp.Handoffs.Count).IsEqualTo(1);
         await Assert.That(fixture.Smtp.Handoffs.Single().Operation).IsEqualTo(handoff.Operation);
     }
@@ -283,20 +287,47 @@ public sealed class LocalIdentityPublicFailureHttpTests
         }
     }
 
-    private sealed class CommitAcknowledgementFailure(Func<Exception>? failure = null) : DbTransactionInterceptor
+    private sealed class CommitAcknowledgementFailure : DbTransactionInterceptor
     {
+        private readonly Func<Exception>? _failure;
+        private DbTransaction? _intakeTransaction;
+        internal IInterceptor IntakeWitness { get; }
         internal bool Armed { get; set; }
         internal bool Triggered { get; private set; }
+
+        internal CommitAcknowledgementFailure(Func<Exception>? failure = null)
+        {
+            _failure = failure;
+            IntakeWitness = new IntakeCommitWitness(this);
+        }
+
         public override Task TransactionCommittedAsync(DbTransaction transaction, TransactionEndEventData eventData,
             CancellationToken cancellationToken = default)
         {
-            if (Armed && eventData.Context!.ChangeTracker.Entries<LocalIdentityLifecycleOperation>().Any())
+            if (Armed && ReferenceEquals(transaction, _intakeTransaction))
             {
                 Armed = false;
                 Triggered = true;
-                throw failure?.Invoke() ?? new TransientStoreFailure();
+                throw _failure?.Invoke() ?? new TransientStoreFailure();
             }
             return Task.CompletedTask;
+        }
+
+        private sealed class IntakeCommitWitness(CommitAcknowledgementFailure owner) : SaveChangesInterceptor
+        {
+            public override ValueTask<int> SavedChangesAsync(SaveChangesCompletedEventData eventData, int result,
+                CancellationToken cancellationToken = default)
+            {
+                if (owner.Armed && eventData.Context is { } context
+                    && context.ChangeTracker.Entries<LocalIdentityLifecycleOperation>().Any())
+                {
+                    // Colocated intake releases a savepoint and detaches the operation before
+                    // the retained owner commits. Match its actual transaction, not later tracking state.
+                    owner._intakeTransaction = context.Database.CurrentTransaction?.GetDbTransaction()
+                        ?? throw new InvalidOperationException("Lifecycle intake saved without its original transaction.");
+                }
+                return ValueTask.FromResult(result);
+            }
         }
     }
 

@@ -8,6 +8,12 @@
 
 ## Complete release-impact metadata
 
+License admission covers every tracked product and engineering lock profile,
+including conditional deployment and file-based engineering-tool graphs.
+A pass using a populated developer
+cache does not establish clean-runner restore coverage. Missing package metadata
+remains a failure; profile servicing must not add audit exemptions.
+
 Review complete changed-file metadata, including previous names for renames.
 A large PR must not bypass impact classification or lower its declared file count.
 See [the trusted metadata contract](CI_CD_GOVERNANCE.md#complete-pr-file-metadata).
@@ -16,6 +22,18 @@ used by `pull_request_target`; arrange an independently reviewed base update
 before relying on its rerun.
 
 ## Scope and precedence
+
+Scanner admission requires completed analysis for the selected candidate.
+A job budget correction does not waive cancelled or missing query results;
+the [CI execution budget](CI_CD_GOVERNANCE.md#required-repository-settings)
+preserves the full configured suite.
+
+SDK/runtime servicing evidence must cover the component actually delivered:
+package resolution, framework-provided assemblies and self-contained/container
+runtime bytes have distinct ownership. Pruning an obsolete package reference
+does not establish that a deployed runtime is patched. The selected source and
+image baseline is maintained in
+[Operations](OPERATIONS.md#sdk-and-runtime-servicing).
 
 This policy governs the future release engine. It does not replace the current manual
 [Release Checklist](RELEASE_CHECKLIST.md) before activation. In a conflict, this
@@ -54,6 +72,20 @@ runtime lanes must not be presented as complete platform coverage. Its scope and
   MUST NOT self-promote or influence authoritative attestation.
 
 ## Release sources and exact identity
+
+- System utility link-chain and invocation observations MUST NOT replace native
+  executable binding or relax candidate input admission. Infrastructure selection
+  repair requires measured identity and compatible invocation; a successful
+  diagnostic command alone is not release execution evidence.
+  Only the fixed infrastructure stat leaf may resolve to a same-basename,
+  nonlinked target selected once per process. Candidate input link rejection
+  and the existing before/after executable fingerprints MUST remain unchanged.
+  Selector refusal MUST retain a closed owned stat code; inaccessible filesystem
+  selection MUST omit raw paths and exception text.
+  Recognized fixture constructor decoration in native discovery MUST map through
+  the shared complete grammar; register/report equality, opaque UID uniqueness
+  and canonical tuple uniqueness MUST remain unchanged. Constructor display
+  arguments do not replace or expand required authority witness identities.
 
 - Candidate B MUST retain a `security-execution.v1.json` sidecar from actual
   selected execution at exactly B, together with its contained report/log
@@ -129,6 +161,19 @@ runtime lanes must not be presented as complete platform coverage. Its scope and
   verifiable, because every release is closed by its tag.
 
 ## Trust, determinism, and privacy
+
+Assurance prerequisite installers retain separately owned, committed dependency
+locks. A restored or installed prerequisite does not attest execution of a
+registered profile; the exact-candidate requirements in the
+[release checklist](RELEASE_CHECKLIST.md#code-and-test-gates) remain separate.
+
+Ambient tracing context is not daemon authority and is not forwarded by the
+dedicated daemon handler. A successful read-only probe is not execution evidence.
+
+Actual selected-engine readiness precedes bounded asynchronous daemon requests.
+Cached proxy metadata does not prove a running VM. Readiness evidence is separate
+from runtime admission and does not extend request deadlines or authorize replay
+after an uncertain mutation.
 
 - The renderer MUST run from the trusted bundle with explicit configuration,
   `--offline`, and `--no-exec`; it MUST NOT use provider APIs, network configuration,

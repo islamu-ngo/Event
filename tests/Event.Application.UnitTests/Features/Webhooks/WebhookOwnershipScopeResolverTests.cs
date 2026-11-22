@@ -64,7 +64,7 @@ public sealed class WebhookOwnershipScopeResolverTests
         new(
             tenantContext,
             currentUserService,
-            Substitute.For<IInstanceBootstrapStateRepository>(),
+            Substitute.For<IInstanceBootstrapStateReader>(),
             Substitute.For<IOrganizationRepository>(),
             Substitute.For<IGroupRepository>(),
             tenantUserRepository,

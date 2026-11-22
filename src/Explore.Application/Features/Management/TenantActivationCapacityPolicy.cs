@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace Explore.Application.Features.Management;
 
 public sealed class TenantActivationCapacityPolicy(
-    IInstanceBootstrapStateRepository bootstrapStateRepository,
+    IInstanceBootstrapStateReader bootstrapStateReader,
     ITenantRepository tenantRepository,
     IManagedTenantProvisioningOperationRepository operationRepository,
     IOptions<ManagedControlPlaneOptions> options)
@@ -26,7 +26,7 @@ public sealed class TenantActivationCapacityPolicy(
         }
 
         DeploymentMode? mode = knownPersistedMode
-            ?? ResolvePersistedMode(await bootstrapStateRepository.GetCurrent(cancellationToken));
+            ?? ResolvePersistedMode(await bootstrapStateReader.GetCurrent(cancellationToken));
         int maximumTenantCount = options.Value.MaximumTenantCount;
         var configuration = Assess(true, requireMultiTenant, mode, maximumTenantCount, 0, 0);
         if (configuration.FailureCode is "tenant_provisioning_requires_multi_tenant"

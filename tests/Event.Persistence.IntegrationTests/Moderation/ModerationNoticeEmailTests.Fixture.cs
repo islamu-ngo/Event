@@ -2,6 +2,7 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Notifications;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Models;
 using Explore.Application.Notifications;
 using Explore.Application.Services.Moderation;
@@ -25,12 +26,20 @@ namespace Event.Persistence.IntegrationTests.Moderation;
 public sealed partial class ModerationNoticeEmailTests
 {
     private sealed class EmailFixture(NoticeDatabase notice, SqliteConnection connection,
-        AuthorityFactory authorityFactory) : IAsyncDisposable
+        AuthorityFactory authorityFactory) : IAsyncDisposable, IInstanceSystemSettingsReader
     {
         public NoticeDatabase Notice { get; } = notice;
         public string CurrentAddress { get; private set; } = "original-notice@example.invalid";
         public Guid OutboxId { get; private set; }
         private Guid RecipientId { get; set; }
+
+        public async Task<IReadOnlyList<SystemSetting>> ReadAsync(
+            IReadOnlyCollection<string> keys, CancellationToken cancellationToken = default)
+        {
+            await using var context = Notice.Database.Context();
+            return await context.SystemSettings.AsNoTracking()
+                .Where(row => keys.Contains(row.SettingKey)).ToArrayAsync(cancellationToken);
+        }
 
         public static async Task<EmailFixture> CreateAsync(bool reviewer = false, bool muted = false, bool content = false)
         {

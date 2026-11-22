@@ -52,11 +52,24 @@ Use the GitHub templates to keep requests and reviews actionable:
 
 ### How to Contribute
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/foobar`)
-3. Commit your changes (`git commit -m "Add feature"`)
-4. Push to the branch (`git push origin feature/foobar`)
-5. Create a new Pull Request
+1. **Start from tracked intent.** External contributors begin with a GitHub Issue (reproducible bug or documentation defect) or a Discussion (idea). Maintainers triage it and, once it is accepted, promote it into the Plane `EVENT` project through Intake as one vertical work item with an `EVENT-XXX` ID. Contributors never create Plane IDs themselves. Maintainers and agents doing substantive work track it as code under `AGENTS.md` Critical Rule 20. Size and shape follow the [work-item taxonomy standard](project-management/work-item-taxonomy-and-granularity-report.md).
+2. **Fork and branch from `develop`.** Name the branch after the work item when one exists: `git checkout -b feat/EVENT-XXX-<short-slug> origin/develop` (`fix/EVENT-XXX-<slug>` for defects). The ID must be uppercase; Plane's Development panel only links uppercase `EVENT-XXX`. Without a Plane item, use `feat/<short-slug>` and reference the GitHub issue in the PR.
+3. **Commit in Conventional Commits form**, one coherent change per commit, staging only the paths you own (`git add -- <paths>`). The subject is `type(scope): description` (see [Commit Messages](#commit-messages)). Put trailers at the end of the body, in this order: `Refs: EVENT-XXX` (or `Fixes: EVENT-XXX`), then the changelog declarations:
+
+   ```text
+   docs(documentation): explain organizer invitation expiry
+
+   Organizers could not tell why old invitation links failed. Document the
+   seven-day expiry and the resend path in the organizer guide.
+
+   Refs: EVENT-1234
+   Changelog: skip
+   Changelog-Reason: Internal documentation clarification.
+   ```
+
+   Never put `[EVENT-XXX]` before `type(scope):`; it breaks release tooling. The `.githooks/commit-msg` hook validates every message (`git config core.hooksPath .githooks`).
+4. **Push** with `git push -u origin feat/EVENT-XXX-<short-slug>`.
+5. **Open the Pull Request against `develop`** using the [pull request template](../../.github/PULL_REQUEST_TEMPLATE.md). Keep the title in Conventional Commits form (no ID prefix), and list `- Plane: [EVENT-XXX]` under `## Issues` alongside `Closes #<github-issue>` when one exists.
 
 Before opening a PR:
 - build the solution in Release mode
@@ -84,6 +97,8 @@ The `Contributor License Agreement` workflow records v1.0 signatures in `signatu
 | `docs/` | Documentation only |
 | `test/` | Test additions or fixes |
 | `chore/` | Build, CI, dependency updates |
+
+When the work has a Plane item, put its uppercase ID right after the prefix: `feat/EVENT-1234-organizer-invite-expiry`. Plane's GitHub integration links the branch, commits (`Refs: EVENT-1234`), and PR (`- Plane: [EVENT-1234]`) to the work item automatically.
 
 ### Commit Messages
 

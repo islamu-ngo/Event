@@ -75,6 +75,7 @@ public sealed class BffKeycloakFixture : IAsyncInitializer, IAsyncDisposable
                         .ForPort(8080)
                         .ForStatusCode(System.Net.HttpStatusCode.OK),
                     wait => wait.WithTimeout(StartupTimeout)))
+            .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.Keycloak)
             .Build();
 
         using var startupCts = new CancellationTokenSource(StartupTimeout);

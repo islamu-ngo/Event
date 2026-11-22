@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6P4YRPV485GY599663AE0Q5
+Title: "Replace default geocoding delays when an explicit schedule is configured"
+Type: fix
+Scope: self-hosting
+Summary: "Bind explicit geocoding retry schedules as replacements while retaining defaults for absent schedules and preserving startup budget validation."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/SECURITY_OVERVIEW.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: "Explicit retry delays replace initialized defaults; absent configuration retains 200,500. Retry-count and total-timeout validation remains unchanged."
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: "Configure a schedule matching the retry count and strictly below the total budget; invalid values block startup even with geocoding disabled."

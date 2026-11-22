@@ -13,7 +13,7 @@ using Microsoft.Extensions.Configuration;
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
 public sealed class GetOnboardingPreflightQueryHandler(
-    IInstanceBootstrapStateRepository instanceBootstrapStateRepository,
+    IInstanceBootstrapStateReader instanceBootstrapStateReader,
     IDeploymentModeProvider deploymentModeProvider,
     ISetupSecretProvider setupSecretProvider,
     ITenantRepository tenantRepository,
@@ -30,7 +30,7 @@ public sealed class GetOnboardingPreflightQueryHandler(
     public async Task<OnboardingPreflightDto> QueryAsync(GetOnboardingPreflightQuery request, CancellationToken cancellationToken)
     {
         var result = new OnboardingPreflightDto();
-        var bootstrap = await instanceBootstrapStateRepository.GetCurrent(cancellationToken);
+        var bootstrap = await instanceBootstrapStateReader.GetCurrent(cancellationToken);
         var onboardingCompleted = bootstrap?.Status == InstanceBootstrapStatus.Completed;
         var deploymentMode = onboardingCompleted
             ? bootstrap!.DeploymentMode
@@ -124,22 +124,20 @@ public sealed class GetOnboardingPreflightQueryHandler(
             && await HasSettingValueAsync(GovernanceSettingKeys.Authentication.KeycloakClientId);
         var atprotoReady = await HasEnabledSettingAsync(GovernanceSettingKeys.Authentication.AtprotoLoginEnabled)
             && await HasSettingValueAsync(GovernanceSettingKeys.Authentication.AtprotoPublicUrl);
-        var googleReady = await HasEnabledSettingAsync(GovernanceSettingKeys.Authentication.GoogleSsoEnabled)
-            && await HasSettingValueAsync(GovernanceSettingKeys.Authentication.GoogleClientId);
 
         AddBlocking(
             result,
             "auth_config",
             "Authentication configuration",
-            localReady || keycloakReady || storedKeycloak || atprotoReady || googleReady
+            localReady || keycloakReady || storedKeycloak || atprotoReady
                 ? OnboardingPreflightCheckStatus.Pass
                 : OnboardingPreflightCheckStatus.Fail,
-            localReady || keycloakReady || storedKeycloak || atprotoReady || googleReady
+            localReady || keycloakReady || storedKeycloak || atprotoReady
                 ? "At least one authentication provider has enough configuration to continue."
                 : "No authentication provider appears ready for admin sign-in.",
-            localReady || keycloakReady || storedKeycloak || atprotoReady || googleReady
+            localReady || keycloakReady || storedKeycloak || atprotoReady
                 ? null
-                : "Configure Keycloak, AT Protocol, or Google SSO before completing onboarding.");
+                : "Configure Local Identity, Keycloak, or AT Protocol before completing onboarding.");
     }
 
     private async Task AddDnsChecklistWarningsAsync(OnboardingPreflightDto result, DeploymentMode deploymentMode)

@@ -1,5 +1,7 @@
+using Explore.Application.Exceptions;
 using Explore.Domain;
 using Explore.Persistence;
+using Explore.Persistence.Security;
 using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -143,6 +145,44 @@ public sealed partial class EventDiscoveryEnrollmentProducerTests
         await using var reader = store.Open(tenant.Id);
         await Assert.That(await reader.Tenants.AnyAsync(row => row.Id == tenant.Id)).IsFalse();
         await Assert.That(await reader.Set<EventDiscoveryRevision>().AnyAsync()).IsFalse();
+    }
+
+    [Test]
+    public async Task ForgedExistingTenantCannotReplaceMetadataOrSettleAfterSaveFailure()
+    {
+        await using var store = await Store.CreateAsync();
+        var tenant = NewTenant();
+        tenant.Id = store.TenantId;
+        await using var writer = store.Open(store.TenantId);
+        await using var human = await new HumanSecuritySourceGate(writer).AcquireAsync();
+        await using var gate = await new EventDiscoveryEnrollmentGate(writer).AcquireAsync();
+        bool saveRefused = false;
+
+        await Assert.ThrowsAsync<ConcurrencyConflictException>(() =>
+            new EfCoreUnitOfWork(writer).ExecuteSerializableAsync(async token =>
+            {
+                writer.Tenants.Add(tenant);
+                try
+                {
+                    await writer.SaveChangesAsync(token);
+                }
+                catch (DbUpdateException)
+                {
+                    saveRefused = true;
+                }
+                // Catching the duplicate INSERT cannot authorize settlement of
+                // the failed parent and its synthesized creation revision.
+                return true;
+            }, CancellationToken.None));
+
+        await Assert.That(saveRefused).IsTrue();
+        await using var reader = store.Open(store.TenantId);
+        await Assert.That(await reader.Tenants.CountAsync()).IsEqualTo(1);
+        await Assert.That((await reader.Tenants.SingleAsync()).Slug).IsNotEqualTo(tenant.Slug);
+        var revision = await reader.Set<EventDiscoveryRevision>().SingleAsync();
+        await Assert.That(revision.Id).IsEqualTo(store.RevisionId);
+        await Assert.That(revision.IdentityEpoch).IsEqualTo(7);
+        await Assert.That(revision.DisclosureEpoch).IsEqualTo(11);
     }
 
     [Test]

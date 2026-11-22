@@ -45,8 +45,8 @@ public sealed partial class ModerationRecognitionErasureRepository
             .Append(request.SubjectId).Distinct().Order().ToArray();
         foreach (var human in humans)
             await RelationalEntityRowFence.AcquireGlobalAsync<User>(context, human, token);
-        var subject = await Rows<User>().SingleOrDefaultAsync(row => row.Id == request.SubjectId, token);
-        if (subject is null) throw new InvalidOperationException("moderation_recognition_subject_unavailable");
+        if (!await Rows<User>().AnyAsync(row => row.Id == request.SubjectId, token))
+            throw new InvalidOperationException("moderation_recognition_subject_unavailable");
         var logins = await Rows<UserExternalLogin>().Where(row => humans.Contains(row.UserId))
             .OrderBy(row => row.Id).Select(row => row.Id).ToArrayAsync(token);
         foreach (var id in logins)

@@ -12,13 +12,31 @@ This guide helps developers set up a local development workstation to contribute
 
 To build and run the complete solution from source, install:
 
-- **.NET 10 SDK** (v10.0.302 or compatible)
+- **.NET 10 SDK** (v10.0.404 selected by `global.json`)
 - **Docker Engine / Docker Desktop** (v24+ with Compose v2)
 - **.NET Aspire CLI**:
   ```bash
   dotnet tool install -g Aspire.Cli
   ```
 - **Git**
+
+SDK and runtime servicing do not update independently versioned packages.
+For `CVE-2026-118747`, inspect `System.Formats.Cbor` references separately and
+update affected packages to a fixed version listed in the advisory (`10.0.15`
+or later for the 10.0 line), then regenerate and inspect their dependency locks.
+SDK roll-forward is disabled, so install the exact selected SDK. Use it when
+generating dependency locks: another SDK can select different
+implicit framework assets and make CI's locked restore fail. This repository pin
+does not update the SDK/runtime installed on your workstation.
+
+Aspire has a separate servicing lifecycle. AppHost and its Hosting/Testing
+packages select `13.6.5` for `GHSA-4g86-54fm-h9h8` and `GHSA-f7vh-h5g3-7jrh`.
+Restore the matching locks, rebuild and restart AppHost. Service a globally
+installed Aspire CLI separately; repository pins do not modify it.
+
+The package-owned orchestration path may emit `ASPIRE010`. Keep the warning
+visible rather than suppressing it or changing orchestration ownership solely
+to remove the message.
 
 ---
 
@@ -44,19 +62,56 @@ Open the **Aspire Dashboard** URL displayed in your terminal (typically `http://
 
 ## 3. Building and Testing
 
-Build the solution in Release configuration:
+Compile a target project (or the solution) once in Release configuration before executing tests sequentially one project at a time:
 
 ```bash
-dotnet build --configuration Release --verbosity quiet
+dotnet build tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj \
+  --configuration Release \
+  -m:1 -nr:false \
+  --verbosity quiet
 ```
 
-Run tests using [TUnit](tunit.md):
+Run tests using [TUnit](tunit.md) with `--no-build` so TUnit reuses the compiled binaries without triggering redundant MSBuild graphs:
 
 ```bash
-# Run unit tests for Application layer
-dotnet test tests/Explore.Application.Tests/Explore.Application.Tests.csproj \
+# Run unit tests for the Application layer
+dotnet test --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj \
   --configuration Release \
-  --treenode-filter "/*/*/*<TestClass>/*"
+  --no-build \
+  --verbosity quiet \
+  -- --treenode-filter "/*/*/*<TestClass>/*"
+```
+
+### Execution Profiles & Cross-Platform Workstation Controls (Linux, macOS, Windows)
+
+All test suites automatically adapt TUnit parallelism and Testcontainers Docker memory limits across **Linux** (Ubuntu, Debian, Arch, Fedora, NixOS), **macOS** (Apple Silicon & Intel), and **Windows**:
+
+* **`ISLAMU_EXECUTION_PROFILE`**: `constrained` (strictly serial builds/containers for laptops, SSH hosts, or concurrent workloads), `balanced` (default adaptive scaling), or `performance` (higher unit-test concurrency on dedicated multi-core hosts; explicit `--maximum-parallel-tests`, `TUNIT_MAX_PARALLEL_TESTS`, or `ISLAMU_TEST_PARALLEL_LIMIT` always win).
+* **Low-RAM MSBuild & Roslyn caps** (when `ISLAMU_EXECUTION_PROFILE=constrained`): `Directory.Build.props` sets `UseSharedCompilation=false` and `BuildInParallel=false`; pair with `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1`, `MSBUILDDISABLENODEREUSE=1`, and `DOTNET_GCConserveMemory=5`.
+* **Container memory & VM budget controls**: Testcontainers default ceilings (`PostgreSql`/`PostGis`/`Keycloak` 1024 MiB, `SqlServer` 2048 MiB, `MySql`/`MariaDb` 768 MiB, `RabbitMq` 512 MiB, `Cerbos`/`Svix` 256 MiB, `Redis`/`Mailpit` 128 MiB) can be overridden via `ISLAMU_CONTAINER_MEMORY_MB` and `ISLAMU_KEYCLOAK_HEAP_MB`. On **Windows** (Docker Desktop WSL2) and **macOS** (Docker Desktop / OrbStack / Colima), set `ISLAMU_CONTAINER_BUDGET_GIB` to your Linux VM's allocated RAM (for example `8`) when host physical RAM is >= 24 GiB so container concurrency scales to the VM budget rather than total host memory. Opt-in reuse (`ISLAMU_TEST_CONTAINER_REUSE=true`) is automatically suppressed on security-isolated fixtures.
+* **OS temporary directory & container runtime notes**:
+  * **Linux (Arch, Fedora, Ubuntu, etc.)**: `/tmp` is often RAM-backed (`tmpfs`), so point `TMPDIR` at a disk-backed `0700` directory (`mkdir -m 700 -p "$HOME/.cache/agent-tmp" && export TMPDIR="$HOME/.cache/agent-tmp"`). Under rootless **Podman**, export `DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock`, `TESTCONTAINERS_RYUK_DISABLED=true`, and `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`.
+  * **macOS & Windows**: `/var/folders` (APFS) and `%TEMP%` (NTFS) are already disk-backed — no `TMPDIR` relocation is needed.
+
+**Linux / macOS (`bash` / `zsh`) constrained setup:**
+
+```bash
+export ISLAMU_EXECUTION_PROFILE=constrained
+export DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1 MSBUILDDISABLENODEREUSE=1 DOTNET_GCConserveMemory=5
+# Linux distros with tmpfs /tmp (Arch, Fedora, etc.):
+mkdir -m 700 -p "$HOME/.cache/agent-tmp" && export TMPDIR="$HOME/.cache/agent-tmp"
+# Optional on macOS Docker Desktop/OrbStack/Colima if VM RAM < host RAM:
+export ISLAMU_CONTAINER_BUDGET_GIB=8
+```
+
+**Windows (`PowerShell`) constrained setup:**
+
+```powershell
+$env:ISLAMU_EXECUTION_PROFILE = "constrained"
+$env:DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER = "1"
+$env:MSBUILDDISABLENODEREUSE = "1"
+$env:DOTNET_GCConserveMemory = "5"
+$env:ISLAMU_CONTAINER_BUDGET_GIB = "8" # Match your WSL2 / Docker Desktop VM RAM limit
 ```
 
 ---

@@ -1,0 +1,31 @@
+Change-Id: CHG-01M7FF1QN51CFT8D44G1EPVPNW
+Title: "Read administrative scopes through EF"
+Type: fix
+Scope: access
+Summary: "Administrative scope enumeration uses application-owned EF queries and fixed Global metadata reads instead of privileged database decision routines."
+Group: administrative-ef-reads
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: "Pre-release PostgreSQL enrollment replaces the former administrative helper routines and roles. Existing obsolete installations fail startup and require fresh development enrollment; no automatic conversion is performed."
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "C# selects exact administrative subjects through EF. Global receives only the declared metadata SELECT columns and tenant policies; no helper execution, write privilege, role switch or RLS bypass is added. Partial, excessive and obsolete catalogues fail closed."
+  Migration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: "Use fresh pre-release enrollment for the new permission profile. EF entity schema is unchanged; this change does not drop or convert an existing catalogue."
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: "The existing selected Global credential is retained. Remove the obsolete administrative helper-role enrollment instruction; the migrator installs the fixed read profile without new environment variables."
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: "Keep Global credentials private because their declared metadata reads span tenants. Human authorization remains in C#. Fresh initialization rejects broadened or obsolete permission objects instead of repairing them."

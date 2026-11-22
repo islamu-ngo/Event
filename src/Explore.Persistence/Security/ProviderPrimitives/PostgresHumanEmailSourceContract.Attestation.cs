@@ -50,7 +50,7 @@ public static partial class PostgresHumanEmailSourceContract
                         '{Stamp}' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(f.prosrc,'UTF8')),'hex'))
             THEN RAISE EXCEPTION 'human_email_routine_drift' USING ERRCODE = '55000'; END IF;
             """));
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string policies = string.Join("\n", Sources().Select(source =>
         {
             string table = sql.Table(source.Type);

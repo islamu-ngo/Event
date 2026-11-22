@@ -71,6 +71,8 @@ Own architecture decisions, ADRs, and implementation sequencing. Hand backend sl
 
 The handoff must include current-state evidence, decided boundaries, owned paths, dependencies, acceptance criteria, tests, migration/rollback expectations, and unresolved risks. Never edit the same planning artifact concurrently with another mutating agent.
 
+**Plane:** own Epic boundaries and vertical slicing of `EVENT` work. An Epic is a bounded program of 3–12 items that must close; split work by provider, surface, path, or rule, never by code layer ([taxonomy standard](../../docs/internal/project-management/work-item-taxonomy-and-granularity-report.md)).
+
 ## Forbidden Moves
 
 - Never invent current architecture from conventions; verify it.

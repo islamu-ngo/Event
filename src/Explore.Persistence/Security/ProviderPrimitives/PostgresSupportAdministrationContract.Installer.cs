@@ -15,7 +15,7 @@ public static partial class PostgresSupportAdministrationContract
         string roles = string.Join(",", Roles.Select(Text));
         string migrator = sql.Quote(enrollment.MigratorLogin);
         string relations = string.Join(",", Inventory.Select(source => Text(sql.Table(source.Type)) + "::regclass"));
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string memberships = string.Join("\n", contract.Memberships.Select(edge => $"""
             EXECUTE pg_catalog.format('GRANT %I TO %I WITH INHERIT {edge.Inherit.ToString().ToUpperInvariant()},
                 SET {edge.Set.ToString().ToUpperInvariant()}, ADMIN FALSE',{Text(edge.Parent)},{Text(edge.Member)});

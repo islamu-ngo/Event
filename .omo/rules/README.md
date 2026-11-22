@@ -36,7 +36,7 @@ Rules are ranked by:
 
 ## Files
 
-All 15 path-scoped rules plus `_schema.md` are twins of `.agents/rules/`:
+All 16 path-scoped rules plus `_schema.md` are twins of `.agents/rules/`:
 
 | File | Matches |
 |---|---|
@@ -52,6 +52,7 @@ All 15 path-scoped rules plus `_schema.md` are twins of `.agents/rules/`:
 | `efcore-persistence.md` | `src/Explore.Persistence/**/*.cs` |
 | `ip-clean-room.md` | IP/licensing paths |
 | `payments-commerce.md` | Payment/commerce paths |
+| `plane-tracking.md` | Plane taxonomy docs, Plane skills, GitHub issue/PR templates |
 | `privacy-and-pii.md` | Privacy/PII paths |
 | `tests.md` | `tests/**/*.cs` |
 | `work-criticality-matrix.md` | `**/*.cs`, `**/*.razor` |

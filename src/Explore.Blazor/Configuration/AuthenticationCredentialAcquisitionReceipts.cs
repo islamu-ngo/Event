@@ -8,7 +8,7 @@ namespace Explore.Blazor.Configuration;
 /// </summary>
 public sealed class AuthenticationCredentialAcquisitionReceipts(Guid? authorityProfileRevision = null)
 {
-    public enum Consumer { GoogleOidc, KeycloakOidc }
+    public enum Consumer { KeycloakOidc }
     public enum Authority { Environment, Infisical, UserSecrets }
 
     public sealed record Receipt(Guid ProcessBootId, Consumer Consumer, Authority Authority,

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Net.Sockets;
+using System.Runtime.ExceptionServices;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DotNetEnv;
@@ -92,7 +93,10 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 {
     ["SecretProvider:Provider"] = configuredSecretProvider.ToString()
 });
-var runtimeSecretEntries = SecretDefinitionRegistry.All.Values.Select(definition =>
+var runtimeSecretEntries = SecretDefinitionRegistry.All.Values
+    .Where(definition => definition.DefaultInfisicalPath != "/runtime/bff/oidc/google"
+        || definition.DefaultInfisicalKey != "GOOGLE_CLIENT_SECRET")
+    .Select(definition =>
     new SecretAcquisitionEntry(definition.DefaultInfisicalPath,
         definition.DefaultInfisicalKey, definition.DefaultEnvironmentVariableName)).ToArray();
 IResourceBuilder<ParameterResource>? agentPostgresUsername = null;
@@ -726,7 +730,12 @@ else
 object bffSessionEndpoint = builder.Configuration["BFF_SESSION_REDIS_ENDPOINT"]
     ?? builder.Configuration["Bff:SessionAuthority:Endpoint"] ?? string.Empty;
 if (bffSessionAuthority is not null)
-    bffSessionEndpoint = ReferenceExpression.Create($"redis://{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Host)}:{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Port)}");
+    // Follow Aspire's endpoint transport contract rather than duplicating the scheme:
+    // Redis resources enable TLS by default in Aspire 13, so this resolves to rediss.
+    // The ticket store selects StackExchange.Redis TLS from that scheme and fails closed
+    // if plaintext is projected to a TLS listener.
+    bffSessionEndpoint = ReferenceExpression.Create(
+        $"{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Scheme)}://{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Host)}:{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Port)}");
 
 // Register last, after every explicit resource projection. Parent-process .env
 // inheritance must not reintroduce sibling or infrastructure authority.
@@ -755,7 +764,7 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
                 "DATABASE_INSTANCE_KEY_WRITE_USERNAME", "DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME",
                 "DATABASE_PLATFORM_KEY_REPORT_USERNAME", "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME",
                 "DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME", "DATABASE_MIGRATOR_USERNAME", "DATABASE_TLS_MODE",
-                "AUTHENTICATION_PROVIDER", "AUTHENTICATION_CREDENTIAL_PROFILE_REVISION", "GOOGLE_CLIENT_ID",
+                "AUTHENTICATION_PROVIDER", "AUTHENTICATION_CREDENTIAL_PROFILE_REVISION",
                 "IDENTITYCORRELATION__TRUSTEDISSUERS__0", "ATPROTO_LOGIN_ENABLED",
                 "INSTANCE_BOOTSTRAP_ADMIN_PROVIDER", "INSTANCE_BOOTSTRAP_BINDING_GENERATION",
                 "INSTANCE_BOOTSTRAP_ADMIN_SUBJECT", "INSTANCE_BOOTSTRAP_ADMIN_EMAIL",
@@ -911,15 +920,49 @@ if (testingIsolation is not null)
     await testingIsolation.DenyInspectionRunAsync(application);
 var testingExecution = testingIsolation is null
     ? null : application.Services.GetService<TestingApplicationExecution>();
-Task execution = application.RunAsync();
-try { testingExecution?.Observe(execution); }
-catch (Exception observationFailure)
+if (testingIsolation is not null && testingExecution is null)
+    throw new InvalidOperationException("test_application_execution_missing");
+Task execution = application.RunAsync(testingExecution?.HostCancellationToken ?? CancellationToken.None);
+Exception? hostFailure = null;
+try
 {
-    try { await execution; }
-    catch (Exception executionFailure) { throw new AggregateException(observationFailure, executionFailure); }
-    throw;
+    try
+    {
+        testingExecution?.Observe(execution);
+        testingExecution?.ConfirmEntryPoint();
+    }
+    catch (Exception observationFailure)
+    {
+        testingExecution?.FailEntryPoint(observationFailure);
+        testingExecution?.CancelUnstarted();
+        testingExecution?.PermitDisposal();
+        try { await execution; }
+        catch (OperationCanceledException) when (execution.IsCanceled)
+        {
+            // Cancelling an unopened gate settles the unstarted execution.
+        }
+        catch (Exception executionFailure) { throw new AggregateException(observationFailure, executionFailure); }
+        throw;
+    }
+    await execution;
 }
-await execution;
+catch (Exception failure) { hostFailure = failure; }
+if (testingExecution is not null)
+{
+    await testingExecution.WaitForDisposalPermissionAsync();
+    try
+    {
+        await application.DisposeAsync();
+        testingExecution.CompleteDisposal();
+    }
+    catch (Exception disposalFailure)
+    {
+        testingExecution.FailDisposal(disposalFailure);
+        if (hostFailure is not null) throw new AggregateException(hostFailure, disposalFailure);
+        throw;
+    }
+}
+if (hostFailure is not null) ExceptionDispatchInfo.Capture(hostFailure).Throw();
 
 static LocalPlatformResources AddLocalPlatform(
     IDistributedApplicationBuilder builder,
@@ -991,9 +1034,12 @@ static LocalPlatformResources AddLocalPlatform(
         .WithHttpHealthCheck("/auth/health/ready", endpointName: "mgmt")
         .WaitFor(crdb);
 
-    var cerbosDb = builder.AddContainer("cerbos-db", "postgres", "18-alpine")
-        .WithEnvironment("POSTGRES_USER", cerbosPostgresUser)
-        .WithEnvironment("POSTGRES_PASSWORD", cerbosPostgresPassword)
+    var cerbosPostgresUserParameter = builder.AddParameter("cerbos-postgres-username",
+        () => cerbosPostgresUser, publishValueAsDefault: false, secret: true);
+    var cerbosPostgresPasswordParameter = builder.AddParameter("cerbos-postgres-password",
+        () => cerbosPostgresPassword, publishValueAsDefault: false, secret: true);
+    var cerbosDb = builder.AddPostgres("cerbos-db", cerbosPostgresUserParameter, cerbosPostgresPasswordParameter)
+        .WithImageTag("18-alpine")
         .WithEnvironment("POSTGRES_DB", cerbosPostgresDatabase)
         .WithVolume("islamu-event-cerbos-data", "/var/lib/postgresql")
         .WithBindMount(cerbosSchemaPath, "/docker-entrypoint-initdb.d/cerbos-schema.sql", isReadOnly: true);
@@ -1972,6 +2018,16 @@ static IResourceBuilder<ProjectResource> WithProfileSecretMode(
         .WithEnvironment("ISLAMU_ASPIRE_MODE", runMode.ToString())
         .WithEnvironment("DOTNET_ENVIRONMENT", "Development")
         .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development");
+
+    if (Environment.GetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER") is { Length: > 0 } polling)
+    {
+        project = project.WithEnvironment("DOTNET_USE_POLLING_FILE_WATCHER", polling);
+    }
+
+    if (Environment.GetEnvironmentVariable("DOTNET_SYSTEM_IO_DISABLEFILEWATCHING") is { Length: > 0 } disableWatching)
+    {
+        project = project.WithEnvironment("DOTNET_SYSTEM_IO_DISABLEFILEWATCHING", disableWatching);
+    }
 
     if (runMode == AspireRunMode.AgentBrowser)
     {

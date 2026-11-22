@@ -15,6 +15,9 @@ public static class FailureCodes
     /// <summary>Operation requires an authenticated user context.</summary>
     public const string AuthenticationRequired = "authentication_required";
 
+    public const string LocalEnrollmentProofInvalid = "local_enrollment_proof_invalid";
+    public const string LocalEnrollmentClosed = "local_enrollment_closed";
+
     /// <summary>Operation conflicts with a concurrent update.</summary>
     public const string ConcurrencyConflict = "concurrency_conflict";
 

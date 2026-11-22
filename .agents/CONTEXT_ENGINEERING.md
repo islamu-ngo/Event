@@ -109,13 +109,13 @@ To eliminate the 50% test diagnosis and 15% container troubleshooting bottleneck
 |---|---|---|---|---|
 | **Ring 1: Inner Loop** | Subtask level (every code edit) | **< 2 seconds** | Sliced in-memory TUnit (`--treenode-filter`) in `Event.Domain.UnitTests` or `Event.Application.UnitTests`. **0 Docker containers, 0 network I/O, 0 database lag**. | Instant Red/Green validation of business logic, state machines, and invariants. |
 | **Ring 2: Phase Exit Gate** | Phase boundary (before phase commit) | **< 15 seconds** | Single Release build (`dotnet build -c Release -v q`) + at most **one** selected test project against **one selected provider** (e.g. SQLite in-memory or single PostgreSQL container). | Verify project compilability and single-layer integration without matrix delays. |
-| **Ring 3: Plan Exit Gate** | Workstream boundary (before PR creation) | Minutes | Full 5-database matrix (PostgreSQL, SQLite, SQL Server, MySQL), EF Core migrations, and `Event.Architecture.Tests`. | Catch multi-dialect edge cases and architecture drift once before PR submission. |
+| **Ring 3: PR Acceptance / Programme Exit** | Each selected PR before merge; final cross-capability acceptance when ready | Minutes | Affected provider matrix, migrations, architecture and other scope-required checks; final programme checks after prerequisites exist. | Verify each merged outcome without deferring its first validation to a later PR. |
 
 ### 2. The Yak-Shaving Quarantine Rule
 
 Agents are **strictly forbidden** from absorbing, investigating, or repairing pre-existing test suite rot or broken fixtures outside the phase-owned scope:
 1. **Detect**: If an existing test fails outside the task's path during a run.
-2. **Isolate & Verify**: Prove whether the failure reproduces on a clean worktree of the base branch (`git checkout develop`).
+2. **Isolate & Verify**: Prove whether the failure reproduces in a clean authorized comparison location at the base revision; never switch or reset the shared main checkout for attribution.
 3. **Log & Quarantine**: If pre-existing/unrelated, log the exact failing command, error snippet, and path under `*-context.md` (`Validation Baseline / Pre-Existing Technical Debt`) or `dev/backlog/<slug>.md`.
 4. **Halt Yak-Shaving**: Under no circumstances modify unrelated tests or production code to "fix" the suite.
 5. **Proceed**: Continue executing the assigned scope once the phase-owned slice is green.
@@ -179,7 +179,33 @@ Active task artifacts (`plan.md`, `tasks.md`, `context.md` in `dev/active/<task>
 
 ## Workstream And Handoff State
 
-For a substantial active workstream, resume from its task-owned `*-context.md`. Read the current state and current task first, then zoom only the referenced plan heading. Do not automatically load plan, context, and task files together.
+For a substantial active programme, resume from canonical `*-context.md`, then its
+PR registry/current task and only the referenced design headings. Resolve existing
+delegation, review or finalization before selecting a new Planned candidate; mark it
+Ready only after merged/reconciled prerequisites and complete contracts are verified.
+Do not automatically load the whole triad or choose topology from historical checkboxes.
+
+The hierarchy is programme → PR scope → phase → task. The complete canonical triad
+stays in the main checkout across PRs. One delegated execution copy owns only the
+selected PR's live detailed ledger; the canonical selected checklist is a labelled
+snapshot. Explicit in-tree execution keeps that selected canonical section live.
+Extraction must include relevant shared invariants, scenarios, I-VSD constraints,
+predecessor/downstream contracts, verification and exact commit packets.
+
+Use the [scope contract](skills/implementation-plan/resources/pr-scope-contract.md)
+and [execution lifecycle](skills/implement-tasks/resources/pr-execution-lifecycle.md).
+Before review and after merge, reconcile original intent with actual delivery,
+changed decisions, exact evidence and unmet obligations. Patch selected sections
+and justified shared decisions only; preserve independent canonical future edits.
+Required scope remains in the programme unless the user removes it.
+
+Each merged PR has mandatory applicable acceptance checks; programme acceptance
+verifies later cross-capability promises. Retain explicit user overrides and their
+boundaries and limitations. Tier 4 document-only work never starts .NET, app,
+browser or containers. Cleanup is separate from delivery and reconciliation:
+require current user authorization, native merge/target evidence and preservation
+of ignored/local work. A clean status does not account for ignored planning files.
+Intermediate merges and interrupted cleanup cannot retire the canonical programme.
 
 A handoff is written directly into the task-owned context and contains only:
 

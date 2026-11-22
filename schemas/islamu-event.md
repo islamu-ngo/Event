@@ -6,13 +6,43 @@ Project islamu_event {
   Note: 'ISLAMU Event multi-tenant platform with ATProto federation and modular event composition. This is the logical unprefixed model: PostgreSQL and SQL Server place these names in the configured schema; SQLite, MariaDB, and MySQL materialize them with the fixed ie_ prefix.'
 }
 
-// Generated application source heads (2026-10-22; not applied or runtime-certified):
-// PostgreSQL 20261022194142, SQLite 20261022194303,
-// SQL Server 20261022194317 (after 20261020181307), MySQL 20261022194338.
+// Generated application source heads (2026-11-06; not applied or runtime-certified):
+// PostgreSQL 20261106214421, SQLite 20261106214657,
+// SQL Server 20261106214726, MySQL 20261106214802.
+// External Identity source heads: PostgreSQL 20261106191656,
+// SQLite 20261106191658, SQL Server 20261106191700, MySQL 20261106191702.
 // MariaDB shares the MySQL migration assembly. The SQL Server corrective Down has
 // an unresolved case-evidence FK predecessor discrepancy; it is not an approved rollback.
 // Physical identifier shortening is provider-owned; this logical unprefixed reference
 // does not assert complete generated-model parity.
+
+// Local visitor enrollment: primary-store admission and recovery evidence.
+// The selected native identity store may be physically separate. Its operation
+// gains nullable visitor_enrollment_operation_id provenance, while administrator
+// initiator/verifier/timestamp fields permit absent administrator provenance
+// for visitor-owned origins.
+// No cross-store foreign key or administrator identity is fabricated.
+Table "visitor_enrollment_operations" {
+  "id" uuid [pk, not null]
+  "tenant_id" uuid [not null, ref: > tenants.id]
+  "local_subject_id" uuid [not null, unique]
+  "personal_actor_id" uuid [not null]
+  "external_login_id" uuid [not null]
+  "credential_operation_id" uuid [not null, unique]
+  "credential_generation" bigint
+  "tenant_user_id" uuid
+  "intent_digest" char(64) [not null]
+  "stage" int [not null, note: '1 Reserved, 2 IdentityPrepared, 3 PrimaryAdmitted, 4 Active, 5 Canceled']
+  "generation" bigint [not null, note: 'Positive concurrency token']
+  "created_at" timestamptz [not null]
+  "expires_at" timestamptz [not null, note: 'Original fifteen-minute deadline; never renewed']
+  "updated_at" timestamptz
+  "cleanup_completed_at" timestamptz [note: 'Canceled only; acknowledged after confirmed native deletion and fresh absence verification']
+  indexes {
+    (stage, expires_at, id)
+  }
+  Note: 'Stores no password or raw browser proof. Primary admission and ordinary membership commit together. Pending cancellation precedes separate native purge. Completed cleanup remains retained but is excluded from bounded recovery discovery.'
+}
 
 // ============================================================
 // Lookup / Reference Tables (int PK, ValueGeneratedNever)
@@ -3814,8 +3844,11 @@ Table "privacy_erasure_authority"."authority_counter" {
   "singleton" boolean [pk, not null]
   "last_sequence" bigint [not null]
   "retained_floor_sequence" bigint [not null, default: 0]
+  "recovery_generation" bigint [not null, default: 1]
+  "revision" bigint [not null, default: 1]
+  "store_id" uuid [not null, default: `uuidv7()`]
 
-  Note: 'Singleton sequence allocator and durable compaction floor for typed platform privacy-erasure facts. Checks require 0 <= retained_floor_sequence <= last_sequence. The selected topology migration owns this table.'
+  Note: 'Singleton sequence allocator and durable compaction floor for typed platform privacy-erasure facts. Checks require 0 <= retained_floor_sequence <= last_sequence, positive recovery_generation/revision and UUIDv7 store identity. Revision is an application concurrency token. The selected topology migration owns this table; PostgreSQL CoLocated recovery coordinates are restored by generated migration 20261031102545. Embedded SQLite RestoreEmbeddedAuthorityRecoveryCoordinates initializes missing revision/generation to 1 and store identity through native UUIDv7 defaults, preserving explicit domain values. Downgrade drops those coordinates and is not data-preserving.'
 }
 
 Table "privacy_erasure_authority"."erasure_intents" {
@@ -4090,7 +4123,7 @@ Table "user_pii" {
   "last_name" varchar(500) [not null]
   "date_of_birth" date [note: 'Private optional declaration, never verified age evidence or an ordinary user DTO field']
   "birth_date_collection_receipt_id" uuid [note: 'Current provenance pointer, intentionally not a retention-preserving FK']
-  "birth_date_revision" bigint [not null, note: 'Application-managed correction/clear concurrency token']
+  "birth_date_revision" bigint [not null, default: 0, note: 'Application-managed correction/clear concurrency token; zero is the initial revision, not a birth-date or age declaration']
 
   indexes {
     email [unique]
@@ -8004,7 +8037,8 @@ Table "atproto_transient_records" {
   "id" uuid [pk, not null, note: 'Application-assigned UUIDv7; immutable candidate identity']
   "purpose" int [not null, note: '1 OAuthState, 2 TenantHandoff, 3 internal HealthProbe']
   "token_digest" char(64) [not null, note: 'Lowercase SHA-256 locator digest; never the raw state or handoff code']
-  "tenant_id" uuid [note: 'Mandatory nonempty binding for authentication purposes; null only for internal health probes']
+  "tenant_id" uuid [note: 'Mandatory nonempty binding for Targeted flows; null only for explicit unscoped OAuth verification or internal health probes']
+  "flow_kind" int [note: '1 Targeted, 2 UnscopedVerification for OAuthState only; null for HealthProbe']
   "protected_payload" varchar(65536) [not null, note: 'BFF-protected ciphertext; application boundary also enforces 64 KiB UTF-8']
   "expires_at_unix_milliseconds" bigint [not null]
 
@@ -8013,7 +8047,7 @@ Table "atproto_transient_records" {
     expires_at_unix_milliseconds
   }
 
-  Note: 'Instance-owned authentication infrastructure, not a tenant-filtered business aggregate. Rows are insert-only and conditionally deleted using candidate identity, purpose, digest, expected tenant and fresh expiry. Exactly one committed delete may return ciphertext. Tenant-purpose shape is database constrained; live eligibility does not depend on cleanup.'
+  Note: 'Instance-owned authentication infrastructure, not a tenant-filtered business aggregate. Rows are insert-only. Ordinary session consumption conditionally deletes by candidate identity, purpose, digest, exact tenant, Targeted kind and fresh expiry. Exactly one committed delete may return ciphertext. Explicit unscoped OAuth verification never grants an ordinary tenant session. Purpose/tenant/kind shape is database constrained; live eligibility does not depend on cleanup.'
 }
 
 Table "atproto_transient_assertion_replays" {

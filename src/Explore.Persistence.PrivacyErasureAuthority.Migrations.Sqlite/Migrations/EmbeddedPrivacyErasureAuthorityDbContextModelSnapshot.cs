@@ -37,11 +37,30 @@ namespace Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite.Migratio
                         .HasColumnType("INTEGER")
                         .HasColumnName("last_sequence");
 
+                    b.Property<long>("RecoveryGeneration")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("recovery_generation");
+
                     b.Property<long>("RetainedFloorSequence")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(0L)
                         .HasColumnName("retained_floor_sequence");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("StoreId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("store_id")
+                        .HasDefaultValueSql("(lower(printf('%08x-%04x-7%s-%s%s-%s',\n    cast(unixepoch('subsec') * 1000 as integer) >> 16,\n    cast(unixepoch('subsec') * 1000 as integer) & 65535,\n    substr(hex(randomblob(2)), 2),\n    substr('89ab', (random() & 3) + 1, 1),\n    substr(hex(randomblob(2)), 2), hex(randomblob(6)))))");
 
                     b.HasKey("Singleton")
                         .HasName("pk_ie_authority_counter");
@@ -49,6 +68,8 @@ namespace Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite.Migratio
                     b.ToTable("ie_authority_counter", null, t =>
                         {
                             t.HasCheckConstraint("ck_authority_counter_nonnegative", "last_sequence >= 0");
+
+                            t.HasCheckConstraint("ck_authority_counter_recovery", "revision > 0 AND recovery_generation > 0 AND length(store_id) = 36 AND substr(store_id, 15, 1) = '7' AND lower(substr(store_id, 20, 1)) IN ('8', '9', 'a', 'b')");
 
                             t.HasCheckConstraint("ck_authority_counter_retained_floor", "retained_floor_sequence >= 0 AND retained_floor_sequence <= last_sequence");
 

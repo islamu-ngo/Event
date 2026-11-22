@@ -277,7 +277,7 @@ public static class PostgresEventResourceAuditReadPermissions
     private static Source Audit(ExploreDbContext context)
     {
         var source = Map<EventResourceAuditEntry>(context, nameof(EventResourceAuditEntry.TenantId));
-        var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var metadata = context.GetTenantTableInventory()
             .Single(table => table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
         if (metadata.AllowsNullTenant || metadata.ParentJoin is not null)
             throw new InvalidOperationException("event_resource_audit_tenant_model_invalid");

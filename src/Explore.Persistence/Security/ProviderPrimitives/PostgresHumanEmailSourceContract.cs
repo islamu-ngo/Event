@@ -22,8 +22,8 @@ public static partial class PostgresHumanEmailSourceContract
     private const string Signature = "uuid,integer,text,integer,uuid,text,uuid,uuid,boolean";
     private const string Arguments = "p_actor uuid,p_provider integer,p_account text,p_purpose integer,"
         + "p_tenant uuid,p_stamp text,p_session uuid,p_resolved uuid,p_route boolean";
-    private const string ReadPolicy = "human_email_source_read";
-    private const string LockPolicy = "human_email_source_lock";
+    internal const string ReadPolicy = "human_email_source_read";
+    internal const string LockPolicy = "human_email_source_lock";
     private const string Stamp = "human-email-source:v1:";
     private static readonly string[] Roles = [OwnerRole, MigratorRole, InstanceRole, TenantRole];
     private static readonly string[] Anchors =
@@ -109,10 +109,11 @@ public static partial class PostgresHumanEmailSourceContract
         string[] principal = sql.Queries;
         string principalRows = string.Join("\n", principal.Take(10).Select((query, index) =>
             $"p := p || pg_catalog.jsonb_build_object('q{index}',{Aggregate(query)});"));
+        // v_permission_rows avoids the unqualified "value" column in the shared local source vocabulary.
         string permissions = string.Join("\n", principal.Skip(11).Select((query, index) => $"""
-            value := {Aggregate(query)};
-            IF value = '[]'::jsonb AND NOT mappings_exist THEN value := {Aggregate(sql.FallbackQueries[index % 2])}; END IF;
-            p := p || pg_catalog.jsonb_build_object('q{index + 11}',value);
+            v_permission_rows := {Aggregate(query)};
+            IF v_permission_rows = '[]'::jsonb AND NOT mappings_exist THEN v_permission_rows := {Aggregate(sql.FallbackQueries[index % 2])}; END IF;
+            p := p || pg_catalog.jsonb_build_object('q{index + 11}',v_permission_rows);
             """));
         string local = string.Join("\n", sql.LocalQueries.Select((query, index) =>
             $"p := p || pg_catalog.jsonb_build_object('l{index}',{Aggregate(query)});"));
@@ -129,7 +130,7 @@ public static partial class PostgresHumanEmailSourceContract
         }
         return $"""
             DECLARE p jsonb := pg_catalog.jsonb_build_object(); h jsonb := pg_catalog.jsonb_build_object(); route jsonb := NULL;
-                value jsonb; mappings_exist boolean;
+                v_permission_rows jsonb; mappings_exist boolean;
             BEGIN
                 {Guard(context, enrollment)}
                 {Caller(enrollment, acquire)}

@@ -141,17 +141,12 @@ public sealed class ProviderConfigurationMutation : IAsyncDisposable
             KeycloakClientId = patch.KeycloakClientId,
             KeycloakDetectedFromEnvironment = original.KeycloakDetectedFromEnvironment,
             KeycloakClientSecretOwnership = original.KeycloakClientSecretOwnership,
+            UnsupportedProviderMessage = original.UnsupportedProviderMessage,
             AtprotoLoginEnabled = patch.AtprotoLoginEnabled,
             AtprotoPublicUrl = patch.AtprotoPublicUrl,
-            GoogleSsoEnabled = patch.GoogleSsoEnabled,
-            GoogleClientId = patch.GoogleClientId,
-            GoogleClientSecretOwnership = original.GoogleClientSecretOwnership,
             LockAtprotoLoginEnabled = patch.LockAtprotoLoginEnabled,
-            LockGoogleSsoEnabled = patch.LockGoogleSsoEnabled,
             KeycloakPublicOnboardingPolicy = patch.KeycloakPublicOnboardingPolicy,
-            KeycloakPublicSignupUrl = patch.KeycloakPublicSignupUrl,
-            GooglePublicOnboardingPolicy = patch.GooglePublicOnboardingPolicy,
-            GooglePublicSignupUrl = patch.GooglePublicSignupUrl
+            KeycloakPublicSignupUrl = patch.KeycloakPublicSignupUrl
         });
         Freeze(rows);
     }

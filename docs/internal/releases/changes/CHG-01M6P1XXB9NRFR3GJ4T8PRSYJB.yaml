@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6P1XXB9NRFR3GJ4T8PRSYJB
+Title: "Enroll Global queue admission during canonical migration"
+Type: fix
+Scope: notifications
+Summary: "Supply existing bounded outbox, notification and email admission capabilities to the declared Global login while preserving Runtime isolation."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Global inherits existing bounded queue admission capabilities without SET or ADMIN authority; Runtime receives no new rights."
+  Migration:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Canonical migration enrolls generic outbox, notification outbox/fanout and email purposes; fresh-cluster checks invoke actual admission consumers."
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: "Email's existing purpose includes bounded admission, stale recovery and aggregate health; ordinary Runtime credentials remain separate."

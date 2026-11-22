@@ -1,0 +1,32 @@
+Change-Id: CHG-01M6E4FZ4D465KPT4DEVZ68QKX
+Title: "Recognize Linux exclusion of a competing recognition owner"
+Type: fix
+Scope: privacy
+Summary: "Accept the demonstrated Linux contention result from the competing SQLite file open while retaining lifetime-exclusive recognition ownership."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Recognize Linux error 11 only after the candidate acquired its original
+      exclusive handle. Competing owners and other I/O failures remain rejected.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/privacy-erasure.md
+    Disposition: documented
+    Detail: >-
+      Standalone SQLite recognition still requires one writer and a physical
+      database. Stop writers before restoring or replacing its file.

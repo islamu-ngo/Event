@@ -1,4 +1,4 @@
-# ABOUTME: Thirteen cold-start benchmark scenarios validating the ISLAMU Event AI-native contribution system.
+# ABOUTME: Fifteen cold-start benchmark scenarios validating the ISLAMU Event AI-native contribution system.
 # ABOUTME: Each scenario is a self-contained task a fresh AI agent should be able to complete using only AGENTS.md + the context system.
 # Version: 1 (synthetic). Target: replace each with real issue-based scenario within 4–6 weeks.
 
@@ -512,14 +512,16 @@ scenarios:
       - "src/**/Migrations/**"
       - "schemas/openapi_islamu-event.json"
     expected_verification_commands:
-      - "dotnet build --configuration Release --verbosity quiet"
-      - "dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet"
+      - "dotnet build tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release -m:1 -nr:false --verbosity quiet"
+      - "dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --no-build --verbosity quiet"
+      - "dotnet build tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj --configuration Release -m:1 -nr:false --verbosity quiet"
+      - "dotnet test --project tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj --configuration Release --no-build --verbosity quiet"
     acceptance_criteria:
       - "The request classifies as `test-suite-rationalization`, not separate layer feature intents."
       - "Every deleted cohort maps to stronger retained behavior, a passing semantic replacement, or intentionally removed behavior."
       - "Critical invariant coverage fails closed until stronger replacement evidence passes."
       - "Tests assert domain, HTTP, persistence, HAL, rendered semantics, generated contracts, or provider behavior rather than internal calls or source text."
-      - "Each surviving executable project has an explicit lane and nonzero execution evidence."
+      - "Each surviving executable project has an explicit lane, BoundedTestDiscoveryHook governance (no static ParallelLimiter), and sequential --no-build verification honoring ISLAMU_EXECUTION_PROFILE."
       - "Fast lanes do not start Docker, browsers, Aspire, brokers, or live providers."
       - "The internal-only change uses `Changelog: skip` and does not add a public change fragment."
 
@@ -712,3 +714,37 @@ scenarios:
       - "Generated OpenAPI schemas, client classes, and EF model snapshots show expected zero drift."
     notes: |
       This scenario exercises cross-layer typed refactoring with strict backward-compatibility rejection and invariant-first testing.
+
+  - id: plane-work-item-taxonomy
+    intent_id: agent-workflow-guard
+    summary: |
+      Shape a multi-provider capability into compliant Plane work items without backlog bloat.
+    prompt: |
+      Maintainers want to track "add PayPal checkout alongside the existing Stripe Connect
+      checkout, plus a manual bank-transfer option, with tests and docs" in Plane. Propose
+      the Plane structure for the single EVENT project (types, Epic or not, labels, priority,
+      Version Module, sub-items if any) and explain which parts belong to the Definition of
+      Done instead of separate tickets. Do not push anything to Plane.
+    expected_must_reads:
+      - "AGENTS.md"
+      - "docs/internal/QUICK_REFERENCE.md"
+      - "docs/internal/project-management/work-item-taxonomy-and-granularity-report.md"
+      - "docs/internal/adr/ADR-plane-project-management-standardization.md"
+      - ".agents/rules/plane-tracking.md"
+      - ".agents/skills/plane-compose/SKILL.md"
+    expected_paths_in_scope:
+      - "docs/internal/project-management/**"
+      - ".agents/skills/plane-compose/**"
+      - ".agents/skills/plane-mcp/**"
+    expected_verification_commands:
+      - "git diff --check"
+    acceptance_criteria:
+      - "One work item per payment provider (PayPal, manual bank transfer); never a combined `PayPal/Bank Transfer` item."
+      - "Items carry Surface/Domain labels such as `API`, `Web App`, `Finance`, `Payments`, not separate API, UI, test, or docs tickets."
+      - "An Epic is proposed only if the group is a bounded program that will close; an Epic never has a parent."
+      - "`priority` reflects functional criticality; release timing is expressed by Version Module (`v0.1.0` or `v1.0.0`) and `due_date`."
+      - "Provider tests, sandbox coverage, and public/internal docs parity are listed as acceptance criteria (Definition of Done), not tickets."
+      - "No `EVENT-XXX` ID is invented; new items omit `id:` until `plane push` mints it."
+    notes: |
+      This scenario exercises the Single-Project EVENT taxonomy: vertical slicing by provider,
+      labels over horizontal tickets, and the importance-versus-urgency split.

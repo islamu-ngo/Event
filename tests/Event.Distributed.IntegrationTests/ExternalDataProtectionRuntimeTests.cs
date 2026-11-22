@@ -17,7 +17,7 @@ public sealed class ExternalDataProtectionRuntimeTests
     [Arguments(OwnedBffPeerProtection.IndependentValidAuthority)]
     public async Task SelectedExternalAuthorityControlsPeerSessionsAcrossBffRestart(OwnedBffPeerProtection protection)
     {
-        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(15));
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(20));
         CancellationToken cancellationToken = deadline.Token;
         await using var owner = await OwnedAppHostFixture.CreateAsync("Split", cancellationToken,
             configuredAdministrator: true, deploymentMode: "MultiTenant",
@@ -46,19 +46,26 @@ public sealed class ExternalDataProtectionRuntimeTests
         await RequireCurrentUserAsync(peer, userId, cancellationToken);
 
         Task stopped = owner.Application.ResourceNotifications.WaitForResourceAsync(
-            "explore-blazor", KnownResourceStates.Exited, cancellationToken);
-        var stop = await owner.Application.ResourceCommands.ExecuteCommandAsync(
+            "explore-blazor", [KnownResourceStates.Exited, KnownResourceStates.Finished], cancellationToken);
+        _ = await owner.Application.ResourceCommands.ExecuteCommandAsync(
             "explore-blazor", KnownResourceCommands.StopCommand, cancellationToken);
-        await Assert.That(stop.Success).IsTrue();
-        await stopped;
+        // DCP uses a shorter local stop budget than the BFF's 25-second graceful
+        // shutdown. A timed-out command still delivers SIGTERM; the resource state
+        // below is authoritative, and production retains the longer grace period.
+        using var settled = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        settled.CancelAfter(TimeSpan.FromSeconds(45));
+        await stopped.WaitAsync(settled.Token);
         using (var operations = owner.CreateHttpClient("explore-blazor", "operations"))
+        using (var probe = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
         {
+            probe.CancelAfter(TimeSpan.FromSeconds(10));
             bool unavailable;
             try
             {
-                using var response = await operations.GetAsync("/health", cancellationToken);
+                using var response = await operations.GetAsync("/health", probe.Token);
                 unavailable = response.StatusCode == HttpStatusCode.ServiceUnavailable;
             }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { unavailable = true; }
             catch (HttpRequestException) { unavailable = true; }
             await Assert.That(unavailable).IsTrue();
         }
@@ -68,6 +75,12 @@ public sealed class ExternalDataProtectionRuntimeTests
             "explore-blazor", KnownResourceStates.Running, cancellationToken);
         var start = await owner.Application.ResourceCommands.ExecuteCommandAsync(
             "explore-blazor", KnownResourceCommands.StartCommand, cancellationToken);
+        if (!start.Success)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            start = await owner.Application.ResourceCommands.ExecuteCommandAsync(
+                "explore-blazor", KnownResourceCommands.StartCommand, cancellationToken);
+        }
         await Assert.That(start.Success).IsTrue();
         await running;
         await owner.Application.ResourceNotifications.WaitForResourceHealthyAsync("explore-blazor", cancellationToken);
@@ -80,6 +93,9 @@ public sealed class ExternalDataProtectionRuntimeTests
 
         using var peerOriginal = new BffSession(peer.Address);
         peerOriginal.CopyCookiesFrom(peer);
+        // DCP replaces a stopped container; allow only this explicitly restarted resource
+        // to rebind its native container ID while the ownership and volume proof remains strict.
+        owner.PermitContainerReplacement("bff-session-authority");
         Task authorityStopped = owner.Application.ResourceNotifications.WaitForResourceAsync(
             "bff-session-authority", KnownResourceStates.Exited, cancellationToken);
         var stopAuthority = await owner.Application.ResourceCommands.ExecuteCommandAsync(

@@ -93,7 +93,22 @@ public sealed class HumanEventProviderSourceFence : IHumanEventProviderSourceFen
         HumanEventProviderSourceTransitions.RequireTarget(facts);
         await sourceSet.ValidateAsync(cancellationToken);
         RequireSameOwner(transaction);
-        _writeGuard = new HumanEventProviderSourceWriteGuard(_context, transaction, facts);
+        var connectionIds = facts.Of(HumanEventProviderSource.Connection).Select(row => row.Id).ToArray();
+        var formIds = _context.Set<Explore.Domain.RegistrationProviderBinding>()
+            .Where(row => connectionIds.Contains(row.RegistrationProviderConnectionId))
+            .Select(row => row.RegistrationFormId);
+        var formEvents = _context.Set<Explore.Domain.RegistrationForm>()
+            .Where(row => formIds.Contains(row.Id)).Select(row => row.EventId);
+        var versionEvents = _context.Set<Explore.Domain.RegistrationFormVersion>()
+            .Where(row => row.ExternalRegistrationProviderConnectionId.HasValue
+                && connectionIds.Contains(row.ExternalRegistrationProviderConnectionId.Value))
+            .Select(row => row.EventId);
+        var roots = await _context.Events.AsNoTracking().Where(row => row.Id == _target.EventId
+            || formEvents.Contains(row.Id) || versionEvents.Contains(row.Id)).ToArrayAsync(cancellationToken);
+        var root = roots.Single(row => row.Id == _target.EventId);
+        if (root.ConcurrencyStamp != assignments.Facts.Events.Single(row => row.Id == _target.EventId).ConcurrencyStamp)
+            throw new UnauthorizedAccessException("human_event_provider_original_event_changed");
+        _writeGuard = new HumanEventProviderSourceWriteGuard(_context, transaction, facts, roots);
         _writeGuard.Attach();
         return new Lease(this, transaction, facts, sourceSet, principal, route, assignments, support);
     }
@@ -170,6 +185,13 @@ public sealed class HumanEventProviderSourceFence : IHumanEventProviderSourceFen
         IHumanSupportAccessSourceLease support) : IHumanEventProviderSourceLease
     {
         public HumanEventProviderSourceFacts Facts { get; } = facts;
+        public async Task<Guid> ValidateEventCommitAsync(CancellationToken cancellationToken = default)
+        {
+            await ValidateAsync(cancellationToken);
+            return await (source._writeGuard ?? throw new InvalidOperationException(
+                "human_event_provider_write_guard_missing")).ValidateEventsAsync(cancellationToken);
+        }
+
         public async Task<HumanEventProviderSourceFacts> ValidateAsync(CancellationToken cancellationToken = default)
         {
             source.RequireSameOwner(transaction);

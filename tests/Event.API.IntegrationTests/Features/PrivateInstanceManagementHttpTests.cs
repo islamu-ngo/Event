@@ -20,6 +20,72 @@ namespace Event.API.IntegrationTests.Features;
 public sealed class PrivateInstanceManagementHttpTests
 {
     [Test]
+    [Arguments(false, "administrator", HttpStatusCode.OK)]
+    [Arguments(true, "administrator", HttpStatusCode.OK)]
+    [Arguments(false, "ordinary", HttpStatusCode.Forbidden)]
+    [Arguments(true, "ordinary", HttpStatusCode.Forbidden)]
+    [Arguments(false, "anonymous", HttpStatusCode.Unauthorized)]
+    [Arguments(true, "anonymous", HttpStatusCode.Unauthorized)]
+    public async Task InstanceSmtpWriteRetainsAdministratorAuthorityWithoutPublicTenant(
+        bool multiTenant, string authority, HttpStatusCode expected)
+    {
+        var token = TestContext.Current!.Execution.CancellationToken;
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            { ["Deployment:Mode"] = multiTenant ? "MultiTenant" : "SingleTenant" })));
+        using var client = configured.CreateClient(new WebApplicationFactoryClientOptions
+        { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
+        if (authority != "anonymous")
+        {
+            var credential = await factory.SeedLocalUserAsync(emailConfirmed: true);
+            if (authority == "administrator")
+            {
+                await using var database = factory.CreateDatabase();
+                database.BindTenantLease();
+                var user = await database.Users.SingleAsync(user => user.Pii!.Email == credential.Identifier, token);
+                database.PlatformUserRoles.Add(new PlatformUserRole
+                {
+                    Id = Guid.CreateVersion7(),
+                    UserId = user.Id,
+                    User = user,
+                    RoleId = (int)RoleEnum.Admin,
+                    Role = null!,
+                    GrantedAt = DateTime.UtcNow,
+                    GrantedBy = user.Id
+                });
+                await database.SaveChangesAsync(token);
+            }
+            using var login = await client.PostAsJsonAsync("/api/auth/local/login", credential, token);
+            login.EnsureSuccessStatusCode();
+            using var body = JsonDocument.Parse(await login.Content.ReadAsStringAsync(token));
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+                "Bearer", body.RootElement.GetProperty("token").GetString());
+        }
+        await using (var database = factory.CreateDatabase())
+        {
+            database.BindTenantLease();
+            if (multiTenant)
+            {
+                var bootstrap = await database.InstanceBootstrapStates.SingleOrDefaultAsync(token);
+                bootstrap?.TransitionDeploymentMode(DeploymentMode.MultiTenant);
+            }
+            (await database.Tenants.SingleAsync(tenant => tenant.Id == PlatformDefaults.DefaultTenantId, token))
+                .TenantStatusId = (int)TenantStatusEnum.Provisioning;
+            await database.SaveChangesAsync(token);
+        }
+
+        using var write = await client.PatchAsJsonAsync("/api/instance/settings/smtp",
+            new PatchInstanceSmtpSettingsDto { DeliveryEnabled = OptionalUpdate<bool>.Set(true) }, token);
+        await Assert.That(write.StatusCode).IsEqualTo(expected);
+        using var publicRead = await client.GetAsync("/api/PublicExperience/settings", token);
+        await Assert.That(publicRead.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        using var unrelated = await client.PatchAsJsonAsync("/api/instance/settings/smtp/details",
+            new PatchInstanceSmtpSettingsDto { DeliveryEnabled = OptionalUpdate<bool>.Set(true) }, token);
+        await Assert.That(unrelated.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+    }
+
+    [Test]
     [Arguments(false, "setup", HttpStatusCode.OK)]
     [Arguments(true, "setup", HttpStatusCode.OK)]
     [Arguments(false, "administrator", HttpStatusCode.OK)]
@@ -36,7 +102,8 @@ public sealed class PrivateInstanceManagementHttpTests
         bool multiTenant, string authority, HttpStatusCode expected)
     {
         var token = TestContext.Current!.Execution.CancellationToken;
-        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(incompleteSetup: authority == "setup");
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(
+            incompleteSetup: authority == "setup");
         await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             { ["Deployment:Mode"] = multiTenant ? "MultiTenant" : "SingleTenant" })));
@@ -47,6 +114,7 @@ public sealed class PrivateInstanceManagementHttpTests
             var credential = await factory.SeedLocalUserAsync(emailConfirmed: true);
             await using (var database = factory.CreateDatabase())
             {
+                database.BindTenantLease();
                 var user = await database.Users.SingleAsync(user => user.Pii!.Email == credential.Identifier, token);
                 if (authority == "administrator")
                     database.PlatformUserRoles.Add(new PlatformUserRole
@@ -106,14 +174,15 @@ public sealed class PrivateInstanceManagementHttpTests
             client.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
         await using (var database = factory.CreateDatabase())
         {
+            database.BindTenantLease();
+            var bootstrap = await database.InstanceBootstrapStates.SingleOrDefaultAsync(token);
             if (multiTenant)
-            {
-                var bootstrap = await database.InstanceBootstrapStates.SingleOrDefaultAsync(token);
                 bootstrap?.TransitionDeploymentMode(DeploymentMode.MultiTenant);
-                await database.Tenants.Where(tenant => tenant.Id == PlatformDefaults.DefaultTenantId).ExecuteDeleteAsync(token);
-            }
-            else
-                (await database.Tenants.SingleAsync(tenant => tenant.Id == PlatformDefaults.DefaultTenantId, token)).TenantStatusId = (int)TenantStatusEnum.Provisioning;
+            // A Provisioning default tenant is not publicly resolvable, which is the
+            // "no public tenant" state this authorization case needs. Deleting the
+            // seeded row would instead exercise unrelated tenant-owned foreign keys.
+            (await database.Tenants.SingleAsync(tenant => tenant.Id == PlatformDefaults.DefaultTenantId, token))
+                .TenantStatusId = (int)TenantStatusEnum.Provisioning;
             await database.SaveChangesAsync(token);
         }
         if (authority == "administrator")
@@ -132,7 +201,8 @@ public sealed class PrivateInstanceManagementHttpTests
         foreach (var path in paths)
         {
             using var read = await client.GetAsync(path, token);
-            await Assert.That(read.StatusCode).IsEqualTo(expected).Because(path);
+            await Assert.That(read.StatusCode).IsEqualTo(expected)
+                .Because($"{path}: {await read.Content.ReadAsStringAsync(token)}");
         }
         using var authWrite = await client.PatchAsJsonAsync(paths[0], new PatchAuthProviderConfigurationDto
         { Configuration = OptionalUpdate<AuthProviderConfigurationWriteDto>.Set(new()) }, token);
@@ -150,10 +220,77 @@ public sealed class PrivateInstanceManagementHttpTests
             await Assert.That(unrelated.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
         }
         await using var persisted = factory.CreateDatabase();
-        if (!multiTenant)
-            await Assert.That((await persisted.Tenants.SingleAsync(tenant => tenant.Id == PlatformDefaults.DefaultTenantId, token)).TenantStatusId)
-                .IsEqualTo((int)TenantStatusEnum.Provisioning);
-        else
-            await Assert.That(await persisted.Tenants.AnyAsync(tenant => tenant.Id == PlatformDefaults.DefaultTenantId, token)).IsFalse();
+        persisted.BindTenantLease();
+        await Assert.That((await persisted.Tenants.SingleAsync(tenant => tenant.Id == PlatformDefaults.DefaultTenantId, token)).TenantStatusId)
+            .IsEqualTo((int)TenantStatusEnum.Provisioning);
+    }
+
+    [Test]
+    [Arguments(false, "administrator", HttpStatusCode.OK)]
+    [Arguments(true, "administrator", HttpStatusCode.OK)]
+    [Arguments(false, "ordinary", HttpStatusCode.Forbidden)]
+    [Arguments(true, "ordinary", HttpStatusCode.Forbidden)]
+    [Arguments(false, "anonymous", HttpStatusCode.Unauthorized)]
+    [Arguments(true, "anonymous", HttpStatusCode.Unauthorized)]
+    public async Task InstanceAdminRoutesRetainAdministratorAuthorityWithoutPublicTenant(
+        bool multiTenant, string authority, HttpStatusCode expected)
+    {
+        var token = TestContext.Current!.Execution.CancellationToken;
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            { ["Deployment:Mode"] = multiTenant ? "MultiTenant" : "SingleTenant" })));
+        using var client = configured.CreateClient(new WebApplicationFactoryClientOptions
+        { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
+        if (authority != "anonymous")
+        {
+            var credential = await factory.SeedLocalUserAsync(emailConfirmed: true);
+            if (authority == "administrator")
+            {
+                await using var database = factory.CreateDatabase();
+                database.BindTenantLease();
+                var user = await database.Users.SingleAsync(user => user.Pii!.Email == credential.Identifier, token);
+                database.PlatformUserRoles.Add(new PlatformUserRole
+                {
+                    Id = Guid.CreateVersion7(),
+                    UserId = user.Id,
+                    User = user,
+                    RoleId = (int)RoleEnum.Admin,
+                    Role = null!,
+                    GrantedAt = DateTime.UtcNow,
+                    GrantedBy = user.Id
+                });
+                await database.SaveChangesAsync(token);
+            }
+            using var login = await client.PostAsJsonAsync("/api/auth/local/login", credential, token);
+            login.EnsureSuccessStatusCode();
+            using var body = JsonDocument.Parse(await login.Content.ReadAsStringAsync(token));
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+                "Bearer", body.RootElement.GetProperty("token").GetString());
+        }
+        await using (var database = factory.CreateDatabase())
+        {
+            database.BindTenantLease();
+            if (multiTenant)
+            {
+                var bootstrap = await database.InstanceBootstrapStates.SingleOrDefaultAsync(token);
+                bootstrap?.TransitionDeploymentMode(DeploymentMode.MultiTenant);
+            }
+            (await database.Tenants.SingleAsync(tenant => tenant.Id == PlatformDefaults.DefaultTenantId, token))
+                .TenantStatusId = (int)TenantStatusEnum.Provisioning;
+            await database.SaveChangesAsync(token);
+        }
+
+        using var overview = await client.GetAsync("/api/admin/instance/overview", token);
+        await Assert.That(overview.StatusCode).IsEqualTo(expected);
+        if (multiTenant)
+        {
+            using var tenants = await client.GetAsync("/api/admin/instance/tenants", token);
+            await Assert.That(tenants.StatusCode).IsEqualTo(expected);
+        }
+        using var publicRead = await client.GetAsync("/api/PublicExperience/settings", token);
+        await Assert.That(publicRead.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        using var unrelated = await client.GetAsync("/api/admin/instance/nonexistent-route", token);
+        await Assert.That(unrelated.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }
 }

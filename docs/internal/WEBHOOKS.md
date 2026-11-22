@@ -110,6 +110,23 @@ uses capability metadata solely for safe operator explanations.
 
 `GET /api/webhooks/event-types` exposes the primary event catalog with names, groups, schema versions, JSON Schema, and example envelopes. Initial public event types include event lifecycle, registration, report, moderation, and organization verification events.
 
+`WebhookEventTypeRepository` owns an independent Global context for each catalog
+operation. PostgreSQL migration installs `PostgresWebhookCataloguePermissions`:
+SELECT and INSERT on the thirteen mapped metadata columns, and UPDATE on the
+nine mutable descriptor and update-audit columns. ID, name and creation audit
+remain unchanged on update; neither Global DELETE nor direct Runtime catalog
+access is granted. The leaf manifest participates in the closed Global
+application catalogue and performs fresh identity, model and ACL admission.
+The installer accepts only fresh or complete permissions under the original
+Migrator connection and rejects partial or unexpected grants.
+
+C# `WebhookEventTypeCatalogSyncService` continues to choose descriptors, generate
+schemas and decide whether to create or update; the database supplies fixed
+storage permissions and constraints. Repository calls retain the original
+tenantless physical connection through EF work and recheck admission before
+returning. These rights let a compromised Global credential alter catalog
+metadata; they grant no webhook payload or endpoint-secret access.
+
 Payloads use a stable envelope:
 
 ```json

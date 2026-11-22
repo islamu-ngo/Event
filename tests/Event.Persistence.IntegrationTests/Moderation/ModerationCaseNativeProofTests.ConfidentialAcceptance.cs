@@ -173,4 +173,72 @@ public sealed partial class ModerationCaseNativeProofTests
         await Assert.That(allegation.Evidence.Count).IsEqualTo(1);
         await Assert.That(await verify.ModerationCaseIntakeAcknowledgements.CountAsync()).IsEqualTo(2);
     }
+
+    [Test]
+    [Arguments(false, true)]
+    [Arguments(false, false)]
+    [Arguments(true, true)]
+    [Arguments(true, false)]
+    public async Task ReissuedCopyRechecksEarliestAcceptanceWithIdentityTieBreak(
+        bool equalTimes, bool changeSelected)
+    {
+        await using var database = await NativeDatabase.CreateAsync(ModerationCaseTargetKind.LocalIncident);
+        var original = await database.IssueAsync();
+        await using var context = database.Context();
+        var handler = new SubmitModerationAllegationCommandHandler(Committer(context, database));
+        var first = await handler.ExecuteAsync(Submission(original.Receipt.Id, original.Token, database.Request().Material));
+        await Assert.That(first.IsSuccess).IsTrue();
+        var copy = await database.IssueAsync();
+        var second = await handler.ExecuteAsync(Submission(copy.Receipt.Id, copy.Token, database.Request().Material));
+        await Assert.That(second.IsSuccess).IsTrue();
+        bool firstIsLower = first.Id.CompareTo(second.Id) < 0;
+        var lowerId = firstIsLower ? first.Id : second.Id;
+        var higherId = firstIsLower ? second.Id : first.Id;
+        var lowerReceiptId = firstIsLower ? original.Receipt.Id : copy.Receipt.Id;
+        var higherReceiptId = firstIsLower ? copy.Receipt.Id : original.Receipt.Id;
+
+        var wholeSecond = database.Clock.Now;
+        var fractionalSecond = wholeSecond.AddMilliseconds(500);
+        await using (var arrange = database.Context())
+        {
+            // Keep consumed-receipt coordinates consistent while making chronology oppose ID order.
+            await arrange.ModerationCaseIntakeAcknowledgements.Where(row => row.Id == lowerId)
+                .ExecuteUpdateAsync(update => update.SetProperty(row => row.AcceptedAt, fractionalSecond));
+            await arrange.ModerationCaseTargetReceipts.Where(row => row.Id == lowerReceiptId)
+                .ExecuteUpdateAsync(update => update.SetProperty(row => row.ConsumedAt, fractionalSecond));
+            var secondAt = equalTimes ? fractionalSecond : wholeSecond;
+            await arrange.ModerationCaseIntakeAcknowledgements.Where(row => row.Id == higherId)
+                .ExecuteUpdateAsync(update => update.SetProperty(row => row.AcceptedAt, secondAt));
+            await arrange.ModerationCaseTargetReceipts.Where(row => row.Id == higherReceiptId)
+                .ExecuteUpdateAsync(update => update.SetProperty(row => row.ConsumedAt, secondAt));
+            await arrange.ModerationCaseNarratives.ExecuteDeleteAsync();
+        }
+        database.Clock.Now = wholeSecond.AddSeconds(1);
+        var third = await database.IssueAsync();
+        var selectedId = equalTimes ? lowerId : higherId;
+        var otherId = equalTimes ? higherId : lowerId;
+        var changedId = changeSelected ? selectedId : otherId;
+        var changedReceiptId = changedId == lowerId ? lowerReceiptId : higherReceiptId;
+        var checkpoint = new ReceiptSavedCheckpoint(async saved =>
+        {
+            await saved.ModerationCaseIntakeAcknowledgements.Where(row => row.Id == changedId)
+                .ExecuteUpdateAsync(update => update.SetProperty(row => row.AcceptedAt, wholeSecond.AddMilliseconds(750)));
+            await saved.ModerationCaseTargetReceipts.Where(row => row.Id == changedReceiptId)
+                .ExecuteUpdateAsync(update => update.SetProperty(row => row.ConsumedAt, wholeSecond.AddMilliseconds(750)));
+        });
+        await using (var submit = database.Context(checkpoint))
+        {
+            var result = await new SubmitModerationAllegationCommandHandler(Committer(submit, database))
+                .ExecuteAsync(Submission(third.Receipt.Id, third.Token, database.Request().Material));
+            await Assert.That(result.IsSuccess).IsEqualTo(!changeSelected);
+        }
+        await Assert.That(checkpoint.ObservedReceiptSave).IsTrue();
+        await using var verify = database.Context();
+        await Assert.That(await verify.ModerationCaseNarratives.AnyAsync()).IsFalse();
+        await Assert.That(await verify.ModerationCaseIntakeAcknowledgements.CountAsync()).IsEqualTo(changeSelected ? 2 : 3);
+        var thirdReceipt = await verify.ModerationCaseTargetReceipts.SingleAsync(row => row.Id == third.Receipt.Id);
+        await Assert.That(thirdReceipt.ConsumedAt.HasValue).IsEqualTo(!changeSelected);
+        var retained = await verify.ModerationCaseIntakeAcknowledgements.SingleAsync(row => row.Id == selectedId);
+        await Assert.That(retained.AcceptedAt).IsEqualTo(equalTimes ? fractionalSecond : wholeSecond);
+    }
 }

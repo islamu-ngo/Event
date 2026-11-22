@@ -33,6 +33,8 @@ public sealed class SettingCacheInvalidationHandler : INotificationHandler<Setti
         if (string.Equals(
                 notification.Key,
                 GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
+                StringComparison.Ordinal)
+            || string.Equals(notification.Key, GovernanceSettingKeys.PublicExperience.VisitorAccessMode,
                 StringComparison.Ordinal))
         {
             foreach (IAtprotoDiscoveryCacheInvalidator invalidator in _atprotoDiscoveryCacheInvalidators)

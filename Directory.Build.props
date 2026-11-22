@@ -33,7 +33,7 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <!-- WASM pack selection must not depend on installed workloads or the runner's latest runtime. -->
-    <RuntimeFrameworkVersion Condition="'$(UsingMicrosoftNETSdkBlazorWebAssembly)' == 'true'">10.0.10</RuntimeFrameworkVersion>
+    <RuntimeFrameworkVersion Condition="'$(UsingMicrosoftNETSdkBlazorWebAssembly)' == 'true'">10.0.14</RuntimeFrameworkVersion>
     <Authors>Amir Akrari, ISLAMU Team, and Contributors</Authors>
     <Company>ISLAMU (ASBL en formation)</Company>
     <Copyright>Copyright (c) 2026 ISLAMU (ASBL en formation). Licensed under AGPL-3.0-or-later.</Copyright>
@@ -49,8 +49,14 @@
     <RestoreLockedMode>true</RestoreLockedMode>
   </PropertyGroup>
 
+  <!-- Opt-in resource-bounded MSBuild/Roslyn settings for constrained local or remote sessions -->
+  <PropertyGroup Condition="'$(ISLAMU_EXECUTION_PROFILE)' == 'constrained'">
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <BuildInParallel>false</BuildInParallel>
+  </PropertyGroup>
+
   <!-- Test Projects: standard BDD test method naming (Method_When_Should) and assertion ergonomics -->
-  <PropertyGroup Condition="$(MSBuildProjectFullPath.Contains('/tests/')) or '$(IsTestProject)' == 'true'">
+  <PropertyGroup Condition="$([System.String]::Copy('$(MSBuildProjectFullPath)').Replace('\', '/').Contains('/tests/')) or '$(IsTestProject)' == 'true'">
     <EnableMicrosoftTestingPlatformExtensions>true</EnableMicrosoftTestingPlatformExtensions>
     <!--
       Test-Specific Policy Suppressions:

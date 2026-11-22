@@ -1,6 +1,8 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Settings;
+using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
@@ -14,6 +16,7 @@ namespace Explore.Infrastructure.Tests.Infrastructure;
 public sealed class S3ConfigResolverTests : IDisposable
 {
     private readonly IHierarchicalSettingsResolver _settings = Substitute.For<IHierarchicalSettingsResolver>();
+    private readonly IInstanceSystemSettingsReader _instanceSettings = Substitute.For<IInstanceSystemSettingsReader>();
     private readonly ITenantContext _tenant = Substitute.For<ITenantContext>();
     private readonly ISecretResolver _secrets = Substitute.For<ISecretResolver>();
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
@@ -140,8 +143,113 @@ public sealed class S3ConfigResolverTests : IDisposable
         }
     }
 
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task InstancePurposeUsesIndependentSettingsAndInstanceCredentials(bool tenantSelected)
+    {
+        var endpoint = new SystemSetting
+        {
+            SettingKey = GovernanceSettingKeys.Storage.Endpoint,
+            Value = SettingValueSerializer.Serialize("https://instance.example.test")
+        };
+        _instanceSettings.ReadAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns([endpoint, new SystemSetting
+            {
+                SettingKey = GovernanceSettingKeys.Storage.BucketName,
+                Value = SettingValueSerializer.Serialize("instance-bucket")
+            }]);
+        _tenant.TenantId.Returns(tenantSelected ? _tenantId : Guid.Empty);
+        _settings.ResolveAsync<string>(Arg.Any<string>(), Arg.Any<SettingContext>(), Arg.Any<CancellationToken>())
+            .Returns<string?>(_ => throw new InvalidOperationException("Tenant hierarchy must not serve instance purpose."));
+        using var cancellation = new CancellationTokenSource();
+        foreach (string key in new[]
+        {
+            SecretDefinitionRegistry.Keys.Storage.AccessKeyId,
+            SecretDefinitionRegistry.Keys.Storage.SecretAccessKey
+        })
+            _secrets.ResolveAsync(key, null, cancellation.Token)
+                .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
+                    key, Guid.NewGuid().ToString("N"), SecretSourceType.EnvironmentVariable,
+                    SecretScope.Instance, null, DateTimeOffset.UtcNow)));
+        var resolver = CreateResolver();
+
+        await Assert.That(await resolver.IsInstanceConfiguredAsync(cancellation.Token)).IsTrue();
+        endpoint.Value = SettingValueSerializer.Serialize("");
+        resolver.InvalidateCache(_tenantId);
+        await Assert.That(await resolver.IsInstanceConfiguredAsync(cancellation.Token)).IsTrue();
+        resolver.InvalidateCache();
+        await Assert.That(await resolver.IsInstanceConfiguredAsync(cancellation.Token)).IsFalse();
+    }
+
+    [Test]
+    public async Task InstancePurposeDoesNotAdoptSelectedTenantConfigurationOrCache()
+    {
+        _instanceSettings.ReadAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        ConfigureGovernance();
+        ConfigureResolvedCredentials(Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"));
+        var resolver = CreateResolver();
+
+        await Assert.That((await resolver.ResolveAsync())!.Endpoint).IsEqualTo("https://storage.example.test");
+        await Assert.That(await resolver.IsInstanceConfiguredAsync()).IsFalse();
+        await Assert.That((await resolver.ResolveAsync())!.Endpoint).IsEqualTo("https://storage.example.test");
+    }
+
+    [Test]
+    public async Task InFlightInstanceResolutionCannotRepublishAfterInstanceInvalidation()
+    {
+        foreach (string key in new[]
+        {
+            SecretDefinitionRegistry.Keys.Storage.AccessKeyId,
+            SecretDefinitionRegistry.Keys.Storage.SecretAccessKey
+        })
+            _secrets.ResolveAsync(key, null, Arg.Any<CancellationToken>())
+                .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
+                    key, Guid.NewGuid().ToString("N"), SecretSourceType.EnvironmentVariable,
+                    SecretScope.Instance, null, DateTimeOffset.UtcNow)));
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var settings = new TaskCompletionSource<IReadOnlyList<SystemSetting>>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _instanceSettings.ReadAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                entered.TrySetResult();
+                return settings.Task;
+            });
+        var resolution = CreateResolver().IsInstanceConfiguredAsync();
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            _instanceSettings.ReadAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+                .Returns(Array.Empty<SystemSetting>());
+            CreateResolver().InvalidateCache();
+            settings.SetResult(
+            [
+                new SystemSetting
+                {
+                    SettingKey = GovernanceSettingKeys.Storage.Endpoint,
+                    Value = SettingValueSerializer.Serialize("https://instance.example.test")
+                },
+                new SystemSetting
+                {
+                    SettingKey = GovernanceSettingKeys.Storage.BucketName,
+                    Value = SettingValueSerializer.Serialize("instance-bucket")
+                }
+            ]);
+
+            await Assert.That(await resolution).IsTrue();
+            await Assert.That(await CreateResolver().IsInstanceConfiguredAsync()).IsFalse();
+        }
+        finally
+        {
+            settings.TrySetResult(Array.Empty<SystemSetting>());
+        }
+    }
+
     private S3ConfigResolver CreateResolver() => new(
         _settings,
+        _instanceSettings,
         _tenant,
         _cache,
         _cacheRegistry,

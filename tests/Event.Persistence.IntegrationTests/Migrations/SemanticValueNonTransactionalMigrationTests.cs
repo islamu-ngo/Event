@@ -33,8 +33,9 @@ public sealed class SemanticValueNonTransactionalMigrationTests(
     public async Task InitialMigration_AppliesSemanticConstraintsExactlyOnce(
         PrimaryDatabaseProvider provider)
     {
-        await using ExploreDbContext context = CreateContext(
-            fixture.CreateOptions(provider));
+        PrimaryDatabaseConnectionOptions connectionOptions =
+            await fixture.CreateOptionsAsync(provider);
+        await using ExploreDbContext context = CreateContext(connectionOptions);
 
         await ExploreDatabaseMigrator.MigrateAsync(
             context,
@@ -71,7 +72,7 @@ public sealed class SemanticValueNonTransactionalMigrationTests(
             .IsEquivalentTo(available, CollectionOrdering.Matching);
 
         await SqliteApplicationInitialLifecycleTests.AssertDataProtectionLifecycleAsync(
-            fixture.CreateOptions(provider));
+            connectionOptions);
     }
 
     private static ExploreDbContext CreateContext(

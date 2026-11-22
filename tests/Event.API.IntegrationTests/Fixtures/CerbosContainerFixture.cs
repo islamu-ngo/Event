@@ -65,6 +65,10 @@ public sealed class CerbosContainerFixture : IAsyncInitializer, IAsyncDisposable
                         .ForPort(3592)
                         .ForStatusCode(System.Net.HttpStatusCode.OK),
                     wait => wait.WithTimeout(StartupTimeout)))
+            .ApplyBoundedResourcePolicy(
+                Event.Testing.ContainerServiceRole.Cerbos,
+                hasAssuranceOwner: ownership.Ownership is not null,
+                hasExplicitContainerName: ownership.Ownership is not null)
             .Build();
         _container = container;
         using var startupCts = new CancellationTokenSource(StartupTimeout);

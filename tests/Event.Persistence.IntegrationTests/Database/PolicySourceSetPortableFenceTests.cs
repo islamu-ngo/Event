@@ -31,7 +31,7 @@ public sealed class PolicySourceSetPortableFenceTests(AdmissionAuthorityProvider
     public async Task EmptyPermissionAndAbsentRouteInsertionsAreExcludedByNativeLocks(
         PrimaryDatabaseProvider provider, string source)
     {
-        await using var setup = Open(provider);
+        await using var setup = await OpenAsync(provider);
         bool sqlServer = provider == PrimaryDatabaseProvider.SqlServer;
         if (sqlServer)
             await setup.Database.ExecuteSqlRawAsync(
@@ -47,11 +47,11 @@ public sealed class PolicySourceSetPortableFenceTests(AdmissionAuthorityProvider
                 : $"CREATE TABLE IF NOT EXISTS {table} ({columns}) ENGINE=InnoDB");
             await setup.Database.ExecuteSqlRawAsync($"DELETE FROM {table}");
         }
-        await using var owner = Open(provider);
+        await using var owner = await OpenAsync(provider);
         var fence = new PolicySourceSetFence(owner, PolicySourceSetPurpose.Global);
         await using var transaction = await owner.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var lease = await fence.AcquireAsync();
-        await using var writer = Open(provider);
+        await using var writer = await OpenAsync(provider);
         await writer.Database.OpenConnectionAsync();
         await writer.Database.ExecuteSqlRawAsync(sqlServer
             ? "SET LOCK_TIMEOUT 0" : "SET SESSION innodb_lock_wait_timeout = 1");
@@ -76,10 +76,10 @@ public sealed class PolicySourceSetPortableFenceTests(AdmissionAuthorityProvider
         await Assert.ThrowsAsync<InvalidOperationException>(() => lease.ValidateAsync());
     }
 
-    private ExploreDbContext Open(PrimaryDatabaseProvider provider)
+    private async Task<ExploreDbContext> OpenAsync(PrimaryDatabaseProvider provider)
     {
         var options = TestDbContextOptions.Create<ExploreDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.CreateOptions(provider));
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, await fixture.CreateOptionsAsync(provider));
         return new ExploreDbContext(options.Options);
     }
 

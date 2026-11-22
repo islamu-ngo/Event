@@ -11,7 +11,7 @@ namespace Explore.Application.Services.Webhooks;
 public sealed class WebhookOwnershipScopeResolver(
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
-    IInstanceBootstrapStateRepository instanceBootstrapStateRepository,
+    IInstanceBootstrapStateReader instanceBootstrapStateReader,
     IOrganizationRepository organizationRepository,
     IGroupRepository groupRepository,
     ITenantUserRepository tenantUserRepository,
@@ -132,7 +132,7 @@ public sealed class WebhookOwnershipScopeResolver(
         Guid? requestedOwnerId,
         CancellationToken cancellationToken)
     {
-        var state = await instanceBootstrapStateRepository.GetCurrent(cancellationToken);
+        var state = await instanceBootstrapStateReader.GetCurrent(cancellationToken);
         if (state is null || state.Status != InstanceBootstrapStatus.Completed || state.Id == Guid.Empty)
         {
             return Failed(

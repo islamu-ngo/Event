@@ -25,6 +25,7 @@ public static partial class PostgresMixedSettingsContract
     public const string SourceTable = "mixed_settings_source";
     private const string AttemptTable = "mixed_settings_attempt";
     private const string Prefix = "mixed_settings_";
+    private const string CatalogueGuardName = "assert_catalogue";
     private const string Stamp = "mixed-settings:v1:";
     private const string Policy = "mixed_settings_source_read";
     private const string HumanSignature = "uuid,integer,text,uuid,text,uuid,uuid,jsonb";
@@ -33,6 +34,7 @@ public static partial class PostgresMixedSettingsContract
     private static readonly string[] Roles = [OwnerRole, MigratorRole, GlobalRole, LearningReaderRole];
     private static readonly (string Name, string Signature, string Result)[] Routines =
     [
+        (CatalogueGuardName, "", "void"),
         ("ready", "uuid", "void"),
         ("learning_retain", "uuid", "void"),
         ("learning_document", "uuid", "jsonb"),
@@ -86,7 +88,7 @@ public static partial class PostgresMixedSettingsContract
                 WHERE session_user <> {Text(enrollment.MigratorLogin)};
             DO $ready$ BEGIN
                 IF session_user = {Text(enrollment.MigratorLogin)} THEN
-                    {Guard(context, enrollment)}
+                    {CatalogueGuard(context, enrollment)}
                 END IF;
                 {ExactBodies(context, enrollment)}
             END $ready$;

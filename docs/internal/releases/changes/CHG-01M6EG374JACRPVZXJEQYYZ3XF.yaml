@@ -1,0 +1,37 @@
+Change-Id: CHG-01M6EG374JACRPVZXJEQYYZ3XF
+Title: "Avoid repeated fixed routine resolution during PostgreSQL erasure checks"
+Type: fix
+Scope: privacy
+Summary: "Resolve the fixed mixed-settings routine inventory through an uncorrelated query while retaining the original ownership and privilege drift checks."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Both catalog exclusion predicates retain their fixed signatures, null
+      behavior and original ownership and privilege requirements. Admission
+      still validates current authority within each statement; no authority
+      result is cached across statements and no command timeout is increased.
+  Migration:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Detail: >-
+      The existing native-contract installation path refreshes the generated
+      routine body. No table shape, retained erasure fact or checkpoint changes.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/privacy-erasure.md
+    Disposition: documented
+    Detail: >-
+      Use the normal migration and startup sequence to install the current
+      native contracts. Preserve existing credentials, permissions and timeouts.

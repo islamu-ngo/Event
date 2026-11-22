@@ -146,7 +146,7 @@ public static class PostgresAtprotoMaterializationContract
         string reads = string.Join(", ", ownerTypes.Select(Table).Distinct());
         string privateWrites = string.Join(", ", PrivateRelations.Select(relation => Table(relation.Type))
             .Append(counters).Distinct());
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var tenantTables = context.GetTenantTableInventory()
             .Select(table => table.TableName).ToHashSet(StringComparer.Ordinal);
         string policies = string.Join(Environment.NewLine, ownerTypes
             .Where(type => tenantTables.Contains(context.Model.FindEntityType(type)!.GetTableName()!))

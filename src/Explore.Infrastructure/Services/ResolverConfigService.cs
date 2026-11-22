@@ -17,16 +17,16 @@ public class ResolverConfigService : IResolverConfigService
     private const string CacheKey = "ResolverConfigService.Configuration";
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
-    private readonly ISystemSettingRepository _systemSettingRepository;
+    private readonly IInstanceSystemSettingsReader _settingsReader;
     private readonly IMemoryCache _cache;
     private readonly IServiceProvider _services;
 
     public ResolverConfigService(
-        ISystemSettingRepository systemSettingRepository,
+        IInstanceSystemSettingsReader settingsReader,
         IMemoryCache cache,
         IServiceProvider services)
     {
-        _systemSettingRepository = systemSettingRepository;
+        _settingsReader = settingsReader;
         _cache = cache;
         _services = services;
     }
@@ -39,9 +39,11 @@ public class ResolverConfigService : IResolverConfigService
         }
 
         var rows = ImmutableDictionary.CreateBuilder<string, ResolverConfigurationSettingSnapshot?>(StringComparer.Ordinal);
+        var stored = (await _settingsReader.ReadAsync(ResolverConfigurationMutation.Keys, cancellationToken))
+            .ToDictionary(row => row.SettingKey, StringComparer.Ordinal);
         foreach (string key in ResolverConfigurationMutation.Keys)
         {
-            var row = await _systemSettingRepository.GetByKey(key, cancellationToken);
+            var row = stored.GetValueOrDefault(key);
             rows.Add(key, row is null ? null : ResolverConfigurationSettingSnapshot.From(row));
         }
         var configuration = ResolverConfigurationMutation.Project(rows.ToImmutable());

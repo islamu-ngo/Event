@@ -6,10 +6,10 @@ namespace Event.Architecture.Tests;
 
 public sealed class SecretAuthorityLeastPrivilegeArchitectureTests
 {
+    private const string RetiredGoogleRoot = "/runtime/bff/oidc/google";
     private static readonly string[] FrontendRoots =
     [
         "/runtime/bff/oidc/keycloak",
-        "/runtime/bff/oidc/google",
         "/runtime/bff/atproto/oauth",
         "/runtime/bff/session"
     ];
@@ -26,11 +26,12 @@ public sealed class SecretAuthorityLeastPrivilegeArchitectureTests
     ];
 
     [Test]
-    public async Task BffAdmissionAcceptsOnlyItsFourRuntimePurposes()
+    public async Task BffAdmissionAcceptsOnlyItsRuntimePurposes()
     {
         await Assert.That(SecretAcquisitionPolicy.Roots(SecretConsumerRole.Bff)).IsEquivalentTo(FrontendRoots);
         var selection = new SecretAuthoritySelection(SecretAuthorityKind.Infisical, "Testing", SecretConsumerRole.Bff);
-        foreach (string root in SecretAcquisitionPolicy.Roots(SecretConsumerRole.Api).Concat(new[] { "/keycloak", "/blazor", "/cerbos" }))
+        foreach (string root in SecretAcquisitionPolicy.Roots(SecretConsumerRole.Api)
+            .Concat(new[] { RetiredGoogleRoot, "/keycloak", "/blazor", "/cerbos" }))
             await Assert.That(() => SecretAcquisitionPolicy.AdmitRoots(selection, [root])).Throws<InvalidOperationException>();
         foreach (string root in FrontendRoots)
             await Assert.That(() => SecretAcquisitionPolicy.AdmitRoots(selection, [root])).ThrowsNothing();
@@ -40,7 +41,7 @@ public sealed class SecretAuthorityLeastPrivilegeArchitectureTests
     public async Task ApiAdmissionCannotAcquireFrontendCredentials()
     {
         var selection = new SecretAuthoritySelection(SecretAuthorityKind.Infisical, "Testing", SecretConsumerRole.Api);
-        foreach (string root in FrontendRoots.Concat(new[] { "/blazor" }))
+        foreach (string root in FrontendRoots.Concat(new[] { RetiredGoogleRoot, "/blazor" }))
             await Assert.That(() => SecretAcquisitionPolicy.AdmitRoots(selection, [root])).Throws<InvalidOperationException>();
     }
 
@@ -59,6 +60,9 @@ public sealed class SecretAuthorityLeastPrivilegeArchitectureTests
     {
         await Assert.That(SecretAcquisitionPolicy.Roots(SecretConsumerRole.Combined)).IsEquivalentTo(
             SecretAcquisitionPolicy.Roots(SecretConsumerRole.Api).Concat(FrontendRoots).Distinct(StringComparer.Ordinal));
+        var selection = new SecretAuthoritySelection(SecretAuthorityKind.Infisical, "Testing", SecretConsumerRole.Combined);
+        await Assert.That(() => SecretAcquisitionPolicy.AdmitRoots(selection, [RetiredGoogleRoot]))
+            .Throws<InvalidOperationException>();
     }
 
     [Test]

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Text.Json;
 using Explore.Blazor.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
@@ -43,9 +44,11 @@ public sealed class BffAuthLoggingBoundaryTests
         CompletedRequest request = await completed.WaitAsync(CompletionTimeout, Token);
 
         await Assert.That(request.DecodedInput).IsEqualTo(provider);
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Redirect);
-        await Assert.That(response.Headers.Location?.OriginalString)
-            .IsEqualTo("/login?returnUrl=%2Fdashboard");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(response.Headers.Location).IsNull();
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Token));
+        await Assert.That(problem.RootElement.GetProperty("code").GetString())
+            .IsEqualTo("unsupported_provider");
         await AssertPrivateLogsAsync(request.Logs);
     }
 

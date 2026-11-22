@@ -66,6 +66,10 @@ public sealed class MailpitContainerFixture : IAsyncInitializer, IAsyncDisposabl
                     .WithName(_intendedContainerName!)
                     .WithLabel(OwnerLabel, selected.Owner).WithLabel(ResourceLabel, "mailpit")
                     .WithLabel(FixtureLabel, _fixtureNonce).WithImagePullPolicy(PullPolicy.Never);
+            builder = builder.ApplyBoundedResourcePolicy(
+                Event.Testing.ContainerServiceRole.Mailpit,
+                hasAssuranceOwner: _assurance is not null,
+                hasExplicitContainerName: !string.IsNullOrWhiteSpace(_intendedContainerName));
             _container = builder.Build();
             using var startupCts = new CancellationTokenSource(StartupTimeout);
             await _container.StartAsync(startupCts.Token);

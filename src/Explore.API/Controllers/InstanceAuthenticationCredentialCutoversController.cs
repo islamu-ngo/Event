@@ -38,6 +38,7 @@ public sealed class InstanceAuthenticationCredentialCutoversController(
         "The authentication credential cutover was not found.");
 
     [HttpGet("{operationId:guid}/cleanup-targets", Name = RouteNames.InspectAuthenticationCredentialCleanup)]
+    [InstanceManagement]
     [AllowAnonymous]
     [PrivateNoStore]
     [EndpointSummary("Inspect Exact Authentication Credential Cleanup Targets")]
@@ -52,6 +53,7 @@ public sealed class InstanceAuthenticationCredentialCutoversController(
         Ok(await inspection.QueryAsync(new InspectAuthenticationCredentialCleanupQuery(operationId), cancellationToken));
 
     [HttpPost("cleanup", Name = RouteNames.CleanupAuthenticationCredentials)]
+    [InstanceManagement]
     [PrivateNoStore]
     [SuppressIdempotencyResponseStorage]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
@@ -70,6 +72,7 @@ public sealed class InstanceAuthenticationCredentialCutoversController(
     }
 
     [HttpGet("current", Name = RouteNames.GetCurrentAuthenticationCredentialCutover)]
+    [InstanceManagement]
     [AllowAnonymous]
     [PrivateNoStore]
     [EndpointSummary("Get Current Authentication Credential Cutover")]
@@ -85,6 +88,7 @@ public sealed class InstanceAuthenticationCredentialCutoversController(
     }
 
     [HttpGet("{operationId:guid}", Name = RouteNames.GetAuthenticationCredentialCutover)]
+    [InstanceManagement]
     [AllowAnonymous]
     [PrivateNoStore]
     [EndpointSummary("Get Authentication Credential Cutover Receipt")]
@@ -103,6 +107,7 @@ public sealed class InstanceAuthenticationCredentialCutoversController(
     }
 
     [HttpPost(Name = RouteNames.PrepareAuthenticationCredentialCutover)]
+    [InstanceManagement]
     [PrivateNoStore]
     [SuppressIdempotencyResponseStorage]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
@@ -121,6 +126,7 @@ public sealed class InstanceAuthenticationCredentialCutoversController(
     }
 
     [HttpPost("activations", Name = RouteNames.ReportAuthenticationCredentialActivation)]
+    [InstanceManagement]
     [PrivateNoStore]
     [SuppressIdempotencyResponseStorage]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
@@ -139,6 +145,7 @@ public sealed class InstanceAuthenticationCredentialCutoversController(
     }
 
     [HttpPost("fence", Name = RouteNames.AttestAuthenticationCredentialFence)]
+    [InstanceManagement]
     [PrivateNoStore]
     [SuppressIdempotencyResponseStorage]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]

@@ -8,6 +8,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="../Shared/Execution/TestExecutionProfile.cs" Link="Execution/TestExecutionProfile.cs" />
+    <Compile Include="../Shared/Execution/BoundedTestDiscoveryHook.cs" Link="Execution/BoundedTestDiscoveryHook.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="Event.Testing.TestSuiteKindAttribute">
+      <_Parameter1>UnitPure</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Event.Wire.Contracts\Event.Wire.Contracts.csproj" />
   </ItemGroup>
 

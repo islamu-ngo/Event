@@ -31,6 +31,7 @@ public sealed class InstanceDeploymentModeController(
     : EventControllerBase
 {
     [HttpGet("", Name = RouteNames.GetInstanceAdminDeploymentModeRunbook)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Get Deployment Mode Runbook")]
@@ -48,6 +49,7 @@ public sealed class InstanceDeploymentModeController(
     }
 
     [HttpPost("transition", Name = RouteNames.TransitionInstanceAdminDeploymentMode)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Transition Deployment Mode")]

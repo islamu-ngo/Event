@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6T44XDDY0YK7M4EHJ9ZW935
+Title: "Retain original probe owners across provider handoffs"
+Type: fix
+Scope: storage
+Summary: "Resolve storage probe metadata through the original purpose-selected readers and retain request, tenant and credential custody through provider execution and cleanup."
+Group: storage-probe-original-owners
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: "Read tenant transport settings through the captured tenant's Runtime owner and secret binding metadata through the existing bounded storage capability. Retain original request support headers, physical connection, tenant and credential snapshots across remote handoffs. Replacement bindings or reopened connections cannot renew authority. No generic binding-table grant or new database routine is introduced."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented
+    Detail: "Storage probes distinguish independent instance readiness from tenant transport configuration. Source changes during credential resolution, provider work, cleanup or final return refuse completion; source transactions return idle before external reads. No new setting or migration is required."

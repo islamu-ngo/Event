@@ -297,7 +297,7 @@ public static class PostgresAtprotoModerationCompensationContract
             return string.Join(", ", properties.Select(property =>
                 sql.DelimitIdentifier(entity.FindProperty(property)!.GetColumnName(mapping)!)).Distinct());
         }
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var tenantTables = context.GetTenantTableInventory()
             .Select(table => table.TableName).ToHashSet(StringComparer.Ordinal);
         string grants = string.Join(Environment.NewLine, reads.Select(relation =>
         {

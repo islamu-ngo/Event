@@ -67,6 +67,26 @@ public sealed class LocalIdentityLifecycleOwnerSelectionTests
         await Assert.That(delivery.DeliveryRead && !delivery.SynchronizationRead).IsTrue();
         await Assert.That(scan.Disposed && delivery.Disposed).IsTrue();
         await Assert.That(delivery.OverlappedEarlierOwner).IsFalse();
+        await Assert.That(composition.State.AddressObservedAfterScan).IsTrue();
+        await Assert.That(composition.State.AddressDisposedBeforeDelivery).IsTrue();
+    }
+
+    [Test]
+    [Arguments("invalid")]
+    [Arguments("http://lifecycle.example.test")]
+    public async Task InvalidOrInsecureOverrideCannotOpenDeliveryOwner(string publicBaseUrl)
+    {
+        await using var composition = new Composition(publicBaseUrl);
+        composition.Factory.Release.TrySetResult();
+        using var worker = composition.Worker();
+
+        await worker.RunOnceAsync(CancellationToken.None);
+
+        await Assert.That(composition.State.Owners.Count).IsEqualTo(1);
+        await Assert.That(composition.State.Owners.Single().SynchronizationRead).IsTrue();
+        await Assert.That(composition.State.Owners.Single().Disposed).IsTrue();
+        await Assert.That(composition.State.Owners.Single().DeliveryRead).IsFalse();
+        await Assert.That(composition.State.AddressActive).IsFalse();
     }
 
     [Test]
@@ -176,8 +196,9 @@ public sealed class LocalIdentityLifecycleOwnerSelectionTests
         internal SelectedFactory Factory { get; }
         private readonly ServiceProvider selected;
 
-        internal Composition()
+        internal Composition(string publicBaseUrl = "https://lifecycle.example.test")
         {
+            PublicBaseUrl = publicBaseUrl;
             selected = Services(isSelected: true).BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
             Factory = new SelectedFactory(selected, State);
             var ambient = Services(isSelected: false);
@@ -185,12 +206,17 @@ public sealed class LocalIdentityLifecycleOwnerSelectionTests
             Ambient = ambient.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         }
 
+        private string PublicBaseUrl { get; }
+
         internal LocalIdentityLifecycleDeliveryWorker Worker() => new(
             Ambient.GetRequiredService<IServiceScopeFactory>(), NullLogger<LocalIdentityLifecycleDeliveryWorker>.Instance);
 
         private ServiceCollection Services(bool isSelected)
         {
             var services = new ServiceCollection();
+            services.AddScoped<IConfiguration>(_ => new AddressConfiguration(
+                new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+                { ["PublicBaseUrl"] = PublicBaseUrl }).Build(), State, isSelected));
             services.AddScoped(_ => new Owner(State, isSelected));
             services.AddScoped<ILocalIdentityLifecycleStore, LifecycleProbe>();
             services.AddScoped<ILocalIdentityLifecycleDeliveryStore, DeliveryProbe>();
@@ -201,9 +227,7 @@ public sealed class LocalIdentityLifecycleOwnerSelectionTests
                 // Empty delivery inventory makes SMTP/settings/secret dependencies unreachable.
                 // An unexpected delivery must fail, not invoke a replacement/no-op transport.
                 null!, null!, null!, null!,
-                new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-                { ["PublicBaseUrl"] = "https://lifecycle.example.test" }).Build(),
-                null!, Options.Create(new EmailDispatchProcessorSettings())));
+                Options.Create(new EmailDispatchProcessorSettings())));
             return services;
         }
 
@@ -214,6 +238,32 @@ public sealed class LocalIdentityLifecycleOwnerSelectionTests
         }
     }
 
+    private sealed class AddressConfiguration(IConfigurationRoot configuration, State state, bool selected)
+        : IConfiguration, IDisposable
+    {
+        public string? this[string key]
+        {
+            get
+            {
+                if (selected) throw new InvalidOperationException("Address resolution used the selected writer.");
+                state.AddressActive = true;
+                state.AddressObservedAfterScan = state.Owners.Count > 0
+                    && state.Owners.All(owner => owner.Disposed);
+                return configuration[key];
+            }
+            set => configuration[key] = value;
+        }
+
+        public IEnumerable<IConfigurationSection> GetChildren() => configuration.GetChildren();
+        public Microsoft.Extensions.Primitives.IChangeToken GetReloadToken() => configuration.GetReloadToken();
+        public IConfigurationSection GetSection(string key) => configuration.GetSection(key);
+        public void Dispose()
+        {
+            state.AddressActive = false;
+            ((IDisposable)configuration).Dispose();
+        }
+    }
+
     private sealed class State
     {
         internal List<Owner> Owners { get; } = [];
@@ -221,6 +271,9 @@ public sealed class LocalIdentityLifecycleOwnerSelectionTests
         internal bool PauseSynchronization { get; set; }
         internal bool FailDeliveryRead { get; set; }
         internal bool FailIntake { get; set; }
+        internal bool AddressActive { get; set; }
+        internal bool AddressObservedAfterScan { get; set; }
+        internal bool AddressDisposedBeforeDelivery { get; set; }
         internal TaskCompletionSource SynchronizationStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource ReleaseSynchronization { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal LocalIdentityLifecycleRequest NativeRequest { get; } = new(Guid.CreateVersion7(), Guid.CreateVersion7(),
@@ -272,6 +325,8 @@ public sealed class LocalIdentityLifecycleOwnerSelectionTests
         {
             Requested.TrySetResult();
             await Release.Task.WaitAsync(cancellationToken);
+            if (state.Owners.Count > 0)
+                state.AddressDisposedBeforeDelivery = state.AddressObservedAfterScan && !state.AddressActive;
             var scope = selected.CreateAsyncScope();
             state.Owners.Add(scope.ServiceProvider.GetRequiredService<Owner>());
             return new SelectedScope(scope);

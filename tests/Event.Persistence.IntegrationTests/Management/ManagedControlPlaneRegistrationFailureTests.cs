@@ -57,7 +57,7 @@ public sealed class ManagedControlPlaneRegistrationFailureTests
         var handler = new TriggerManagedControlPlaneRegistrationCommandHandler(
             Options.Create(new ManagedControlPlaneOptions { Enabled = true }),
             registrations,
-            new InstanceBootstrapStateRepository(context),
+            new Event.Persistence.IntegrationTests.Fixtures.TestInstanceBootstrapStateReader(context),
             new SecretBindingRepository(context),
             secrets,
             provider.GetRequiredService<DeploymentModeProvider>(),

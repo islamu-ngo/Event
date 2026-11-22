@@ -116,6 +116,15 @@ the original selected SQLite or PostgreSQL owner before each remote handoff and 
 Database transactions and source leases are released before remote calls.
 Observation/configuration preflight no longer performs write probes.
 
+`StorageProbeBinding` observes instance credential references and material only
+when the real `StoragePolicyResolver` requests instance S3 autodetection. An
+explicit provider selection retains its tenant transport credentials without
+consulting an unused instance pair. The first instance observation records both
+the retained reference image and the credential status/material/revision witness;
+every later handoff revalidates that same evidence. Unavailable credentials still
+fail closed when autodetection requires them. Deferred observation happens after
+the original source transaction and leases have returned.
+
 The dedicated probe client disables retry and redirects. S3 writes use
 conditional creation; cleanup names only the acknowledged version ID. Collisions,
 ambiguous creation or a missing version do not confer deletion ownership. Source

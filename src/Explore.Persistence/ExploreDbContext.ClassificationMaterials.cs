@@ -12,6 +12,7 @@ namespace Explore.Persistence;
 
 public partial class ExploreDbContext
 {
+    internal Security.HumanEventProviderSourceWriteGuard? HumanEventProviderWrites { get; set; }
     // This is the closed set of native material carriers, shared by inventory and stamping.
     // Registration answers, participants, UserPii and moderation decisions are not content
     // classification inputs. ActorPii carries only displayed actor text and profile media.
@@ -215,6 +216,7 @@ public partial class ExploreDbContext
     private void PrepareClassificationMaterialStamps()
     {
         var changed = ChangeTracker.Entries().Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted).ToArray();
+        HumanEventProviderWrites?.BeginSave(changed, ClassificationCarriers.Keys);
         if (changed.Any(entry => entry.State is EntityState.Modified or EntityState.Deleted
             && entry.Entity is ModerationClassificationControlSelection or ModerationClassificationControlBinding
                 or ModerationClassificationMaterialSource or ModerationClassificationMaterialEntry
@@ -255,7 +257,12 @@ public partial class ExploreDbContext
                 bindingIds.UnionWith(Keys(entry, "RegistrationProviderBindingId"));
             else if (entry.Entity is Actor or Explore.Domain.ActorPii)
             {
-                var ids = Keys(entry, entry.Entity is Actor ? nameof(Actor.Id) : nameof(Explore.Domain.ActorPii.ActorId));
+                // Persisted descendants cannot reference an actor being inserted for the first time.
+                // Tracked event/session changes already contribute their own ancestry above.
+                var ids = Keys(entry, entry.Entity is Actor ? nameof(Actor.Id) : nameof(Explore.Domain.ActorPii.ActorId))
+                    .Where(id => !changed.Any(candidate => candidate.State == EntityState.Added
+                        && candidate.Entity is Actor actor && actor.Id == id)).ToArray();
+                if (ids.Length == 0) continue;
                 eventIds.UnionWith(Events.Where(row => ids.Contains(row.ActorId) || row.OrganizerActorId != null
                     && ids.Contains(row.OrganizerActorId.Value)).Select(row => row.Id));
                 sessionIds.UnionWith(Set<EventSessionSpeaker>().Where(row => ids.Contains(row.ActorId)).Select(row => row.EventSessionId));
@@ -295,7 +302,9 @@ public partial class ExploreDbContext
             var tracked = ChangeTracker.Entries<Event>().SingleOrDefault(entry => entry.Entity.Id == id);
             var entity = tracked?.Entity ?? Events.SingleOrDefault(row => row.Id == id);
             if (entity is null || tracked?.State is EntityState.Added or EntityState.Deleted) continue;
-            entity.ConcurrencyStamp = Guid.CreateVersion7();
+            Guid stamp = Guid.CreateVersion7();
+            HumanEventProviderWrites?.RecordClassificationStamp(entity, stamp);
+            entity.ConcurrencyStamp = stamp;
         }
 
         static Guid[] Keys(EntityEntry entry, string name) =>

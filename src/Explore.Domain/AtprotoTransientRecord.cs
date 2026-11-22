@@ -1,4 +1,5 @@
 using System.Text;
+using Explore.Domain.ValueObjects;
 
 namespace Explore.Domain;
 
@@ -20,26 +21,31 @@ public sealed class AtprotoTransientRecord
     public AtprotoTransientPurpose Purpose { get; private set; }
     public string TokenDigest { get; private set; } = string.Empty;
     public Guid? TenantId { get; private set; }
+    public AtprotoAuthenticationFlowKind? FlowKind { get; private set; }
     public string ProtectedPayload { get; private set; } = string.Empty;
     public long ExpiresAtUnixMilliseconds { get; private set; }
 
-    public static AtprotoTransientRecord Create(AtprotoTransientPurpose purpose, string tokenDigest, Guid tenantId, string protectedPayload, long expiresAtUnixMilliseconds)
+    public static AtprotoTransientRecord Create(AtprotoTransientPurpose purpose, string tokenDigest,
+        AtprotoAuthenticationFlowTarget target, string protectedPayload, long expiresAtUnixMilliseconds)
     {
         if (purpose is not (AtprotoTransientPurpose.OAuthState or AtprotoTransientPurpose.TenantHandoff)) throw new ArgumentOutOfRangeException(nameof(purpose));
-        if (tenantId == Guid.Empty) throw new ArgumentException("Authentication transient records require a tenant.", nameof(tenantId));
-        return CreateCore(purpose, tokenDigest, tenantId, protectedPayload, expiresAtUnixMilliseconds);
+        ArgumentNullException.ThrowIfNull(target);
+        if (purpose == AtprotoTransientPurpose.TenantHandoff && target.Kind != AtprotoAuthenticationFlowKind.Targeted)
+            throw new ArgumentException("A tenant handoff requires an exact tenant target.", nameof(target));
+        return CreateCore(purpose, tokenDigest, target.TenantId, target.Kind, protectedPayload, expiresAtUnixMilliseconds);
     }
 
     public static AtprotoTransientRecord CreateHealthProbe(string tokenDigest, string protectedPayload, long expiresAtUnixMilliseconds) =>
-        CreateCore(AtprotoTransientPurpose.HealthProbe, tokenDigest, null, protectedPayload, expiresAtUnixMilliseconds);
+        CreateCore(AtprotoTransientPurpose.HealthProbe, tokenDigest, null, null, protectedPayload, expiresAtUnixMilliseconds);
 
-    private static AtprotoTransientRecord CreateCore(AtprotoTransientPurpose purpose, string tokenDigest, Guid? tenantId, string protectedPayload, long expiresAtUnixMilliseconds)
+    private static AtprotoTransientRecord CreateCore(AtprotoTransientPurpose purpose, string tokenDigest, Guid? tenantId,
+        AtprotoAuthenticationFlowKind? flowKind, string protectedPayload, long expiresAtUnixMilliseconds)
     {
         ValidateDigest(tokenDigest);
         ArgumentNullException.ThrowIfNull(protectedPayload);
         if (Encoding.UTF8.GetByteCount(protectedPayload) > MaximumProtectedPayloadBytes) throw new ArgumentException("The protected payload exceeds 64 KiB.", nameof(protectedPayload));
         if (expiresAtUnixMilliseconds <= 0) throw new ArgumentOutOfRangeException(nameof(expiresAtUnixMilliseconds));
-        return new() { Id = Guid.CreateVersion7(), Purpose = purpose, TokenDigest = tokenDigest, TenantId = tenantId, ProtectedPayload = protectedPayload, ExpiresAtUnixMilliseconds = expiresAtUnixMilliseconds };
+        return new() { Id = Guid.CreateVersion7(), Purpose = purpose, TokenDigest = tokenDigest, TenantId = tenantId, FlowKind = flowKind, ProtectedPayload = protectedPayload, ExpiresAtUnixMilliseconds = expiresAtUnixMilliseconds };
     }
 
     internal static void ValidateDigest(string digest)

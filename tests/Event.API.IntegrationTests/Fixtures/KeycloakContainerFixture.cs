@@ -119,6 +119,10 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
                         .ForPort(8080)
                         .ForStatusCode(System.Net.HttpStatusCode.OK),
                     wait => wait.WithTimeout(StartupTimeout)))
+            .ApplyBoundedResourcePolicy(
+                Event.Testing.ContainerServiceRole.Keycloak,
+                hasAssuranceOwner: ownership.Ownership is not null,
+                hasExplicitContainerName: ownership.Ownership is not null)
             .Build();
         _container = container;
         using var startupCts = new CancellationTokenSource(StartupTimeout);

@@ -1,13 +1,12 @@
 using System.Security.Cryptography;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
+using Event.Testing;
 using Explore.Persistence.Database;
-using TUnit.Core.Interfaces;
 
 namespace Event.Persistence.IntegrationTests.Fixtures;
 
-public sealed class SemanticValueNonTransactionalProviderFixture
-    : IAsyncInitializer, IAsyncDisposable
+public sealed class SemanticValueNonTransactionalProviderFixture : IAsyncDisposable
 {
     private const ushort DatabasePort = 3306;
     private const string DatabaseName = "semantic_value_migration";
@@ -16,31 +15,36 @@ public sealed class SemanticValueNonTransactionalProviderFixture
 
     private readonly string _password =
         Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-    private IContainer? _mariaDb;
-    private IContainer? _mySql;
+    private readonly SemaphoreSlim _startup = new(1, 1);
+    private readonly Dictionary<PrimaryDatabaseProvider, IContainer> _containers = new();
 
-    public async Task InitializeAsync()
+    public async Task<PrimaryDatabaseConnectionOptions> CreateOptionsAsync(
+        PrimaryDatabaseProvider provider,
+        CancellationToken cancellationToken = default)
     {
-        _mariaDb = BuildContainer(PrimaryDatabaseProvider.MariaDb);
-        _mySql = BuildContainer(PrimaryDatabaseProvider.MySql);
-
-        using var startupCts = new CancellationTokenSource(StartupTimeout);
-        await Task.WhenAll(
-            _mariaDb.StartAsync(startupCts.Token),
-            _mySql.StartAsync(startupCts.Token));
-    }
-
-    public PrimaryDatabaseConnectionOptions CreateOptions(
-        PrimaryDatabaseProvider provider)
-    {
-        IContainer container = provider switch
+        if (provider is not (PrimaryDatabaseProvider.MariaDb or PrimaryDatabaseProvider.MySql))
         {
-            PrimaryDatabaseProvider.MariaDb => _mariaDb
-                ?? throw new InvalidOperationException("MariaDB is not started."),
-            PrimaryDatabaseProvider.MySql => _mySql
-                ?? throw new InvalidOperationException("MySQL is not started."),
-            _ => throw new ArgumentOutOfRangeException(nameof(provider))
-        };
+            throw new ArgumentOutOfRangeException(nameof(provider));
+        }
+
+        IContainer container;
+        await _startup.WaitAsync(cancellationToken);
+        try
+        {
+            if (!_containers.TryGetValue(provider, out container!))
+            {
+                container = BuildContainer(provider);
+                _containers.Add(provider, container);
+
+                using var startupCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                startupCts.CancelAfter(StartupTimeout);
+                await container.StartAsync(startupCts.Token);
+            }
+        }
+        finally
+        {
+            _startup.Release();
+        }
 
         return new PrimaryDatabaseConnectionOptions
         {
@@ -57,21 +61,18 @@ public sealed class SemanticValueNonTransactionalProviderFixture
                 : PrimaryDatabaseServerFlavor.MySql,
             ServerVersion = provider == PrimaryDatabaseProvider.MariaDb
                 ? new Version(11, 4)
-                : new Version(8, 4)
+                : new Version(8, 4),
         };
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_mariaDb is not null)
+        foreach (IContainer container in _containers.Values)
         {
-            await _mariaDb.DisposeAsync();
+            await container.DisposeAsync();
         }
 
-        if (_mySql is not null)
-        {
-            await _mySql.DisposeAsync();
-        }
+        _startup.Dispose();
     }
 
     private IContainer BuildContainer(PrimaryDatabaseProvider provider)
@@ -82,7 +83,11 @@ public sealed class SemanticValueNonTransactionalProviderFixture
             .WithPortBinding(DatabasePort, assignRandomHostPort: true)
             .WithWaitStrategy(
                 Wait.ForUnixContainer()
-                    .UntilInternalTcpPortIsAvailable(DatabasePort));
+                    .UntilInternalTcpPortIsAvailable(DatabasePort))
+            .ApplyBoundedResourcePolicy(
+                provider == PrimaryDatabaseProvider.MariaDb
+                    ? ContainerServiceRole.MariaDb
+                    : ContainerServiceRole.MySql);
 
         return provider == PrimaryDatabaseProvider.MariaDb
             ? builder

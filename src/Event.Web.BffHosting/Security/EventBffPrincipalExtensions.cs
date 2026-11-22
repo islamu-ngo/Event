@@ -240,7 +240,6 @@ public static class EventBffPrincipalExtensions
     private static bool IsTrustedBffScheme(string? scheme) =>
         scheme is CookieAuthenticationDefaults.AuthenticationScheme
             or Event.Web.BffHosting.Authentication.EventBffAuthenticationSchemes.Keycloak
-            or Event.Web.BffHosting.Authentication.EventBffAuthenticationSchemes.Google
             or Event.Web.BffHosting.Authentication.EventBffAuthenticationSchemes.Atproto;
 
     private static bool IsValidOpaqueValue(string value) =>

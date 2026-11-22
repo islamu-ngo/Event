@@ -1,13 +1,12 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
-using Explore.Domain;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Messaging;
 
 public sealed class EmailDispatchRabbitMqPointerPublisher(
-    IEmailDispatchOutboxRepository repository,
+    IEmailDispatchPointerPublicationStore store,
     IEmailDispatchTransport transport,
     IOptionsMonitor<EmailDispatchRabbitMqSettings> settings,
     ILogger<EmailDispatchRabbitMqPointerPublisher> logger)
@@ -26,7 +25,7 @@ public sealed class EmailDispatchRabbitMqPointerPublisher(
 
         var now = DateTime.UtcNow;
         var retryAttemptsBefore = now.AddSeconds(-options.PublisherRetryDelaySeconds);
-        IReadOnlyList<EmailDispatchOutbox> rows = await repository.GetRabbitMqPublishBatch(
+        IReadOnlyList<EmailDispatchPointerCandidate> rows = await store.GetPublishBatchAsync(
             options.PublisherBatchSize,
             now,
             retryAttemptsBefore,
@@ -40,14 +39,14 @@ public sealed class EmailDispatchRabbitMqPointerPublisher(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var pointer = EmailDispatchPointer.FromOutbox(row);
+            var pointer = row.Pointer;
             var attemptedAt = DateTime.UtcNow;
             try
             {
                 EmailDispatchPublishResult result = await transport.PublishDispatchPointerAsync(pointer, cancellationToken);
                 if (result.Outcome == EmailDispatchPublishOutcome.Confirmed)
                 {
-                    await repository.MarkRabbitMqPublishSucceeded(row.Id, attemptedAt, cancellationToken);
+                    await store.MarkPublishSucceededAsync(row, attemptedAt, cancellationToken);
                     confirmed++;
                     continue;
                 }
@@ -58,8 +57,8 @@ public sealed class EmailDispatchRabbitMqPointerPublisher(
                     continue;
                 }
 
-                await repository.MarkRabbitMqPublishFailed(
-                    row.Id,
+                await store.MarkPublishFailedAsync(
+                    row,
                     GetFailureCode(result),
                     attemptedAt,
                     cancellationToken);
@@ -71,8 +70,8 @@ public sealed class EmailDispatchRabbitMqPointerPublisher(
             }
             catch (Exception)
             {
-                await repository.MarkRabbitMqPublishFailed(
-                    row.Id,
+                await store.MarkPublishFailedAsync(
+                    row,
                     EmailDispatchPublishFailure.PointerPublishException.ToCode(),
                     attemptedAt,
                     CancellationToken.None);

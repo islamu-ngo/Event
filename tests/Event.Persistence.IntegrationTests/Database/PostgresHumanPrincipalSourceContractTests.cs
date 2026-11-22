@@ -21,7 +21,7 @@ namespace Event.Persistence.IntegrationTests.Database;
 
 [NotInParallel]
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
-public sealed class PostgresHumanPrincipalSourceContractTests(PostgreSqlContainerFixture fixture)
+public sealed partial class PostgresHumanPrincipalSourceContractTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
     [Arguments(PrimaryDatabaseRole.Runtime, 1)]
@@ -249,6 +249,7 @@ public sealed class PostgresHumanPrincipalSourceContractTests(PostgreSqlContaine
                 .WithDatabase("principal_source_" + Guid.CreateVersion7().ToString("N"))
                 .WithUsername(migrator.Username!)
                 .WithPassword(migrator.Password!)
+                .ApplyBoundedResourcePolicy(Event.Testing.ContainerServiceRole.PostgreSql)
                 .Build();
             try
             {

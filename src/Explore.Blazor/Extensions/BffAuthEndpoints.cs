@@ -107,6 +107,14 @@ public static class BffAuthEndpoints
             return;
         }
 
+        var providerReadiness = ctx.RequestServices.GetRequiredService<IBffProviderReadinessService>();
+        var schemeName = providerReadiness.ResolveProviderScheme(provider);
+        if (!string.IsNullOrWhiteSpace(provider) && schemeName is null)
+        {
+            await UnsupportedProvider().ExecuteAsync(ctx);
+            return;
+        }
+
         // Resolve which auth scheme to challenge
         var schemeManager = ctx.RequestServices.GetRequiredService<IDynamicAuthSchemeManager>();
         string activePrimaryProvider = schemeManager.GetActivePrimaryProvider();
@@ -134,8 +142,6 @@ public static class BffAuthEndpoints
             return;
         }
 
-        var providerReadiness = ctx.RequestServices.GetRequiredService<IBffProviderReadinessService>();
-        var schemeName = providerReadiness.ResolveProviderScheme(provider);
         if (string.Equals(schemeName, AuthSchemeNames.Atproto, StringComparison.Ordinal))
         {
             ctx.Response.Redirect(returnUrlService.BuildLoginRedirectUrl(returnUrl, "atproto"));
@@ -157,6 +163,11 @@ public static class BffAuthEndpoints
 
             foreach (var registeredScheme in registered)
             {
+                if (!AuthSchemeNames.AllProviders.Contains(registeredScheme))
+                {
+                    continue;
+                }
+
                 if (activePrimaryProvider == "atproto"
                     && registeredScheme != AuthSchemeNames.Atproto)
                 {
@@ -535,9 +546,16 @@ public static class BffAuthEndpoints
             return;
         }
 
+        var providerReadiness = ctx.RequestServices.GetRequiredService<IBffProviderReadinessService>();
+        if (!string.IsNullOrWhiteSpace(provider)
+            && providerReadiness.ResolveProviderScheme(provider) is null)
+        {
+            await UnsupportedProvider().ExecuteAsync(ctx);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(provider))
         {
-            var providerReadiness = ctx.RequestServices.GetRequiredService<IBffProviderReadinessService>();
             provider = await providerReadiness.ResolvePreferredProviderForDirectLoginAsync(ctx.RequestAborted);
         }
 
@@ -545,6 +563,11 @@ public static class BffAuthEndpoints
 
         ctx.Response.Redirect(redirectUrl);
     }
+
+    private static IResult UnsupportedProvider() => Results.Problem(
+        title: "Authentication provider is unsupported.",
+        statusCode: StatusCodes.Status400BadRequest,
+        extensions: new Dictionary<string, object?> { ["code"] = "unsupported_provider" });
 
     private static async Task<AuthOnboardingAdmission> ResolveOnboardingAdmissionAsync(
         HttpContext ctx,
@@ -683,7 +706,7 @@ public static class BffAuthEndpoints
 
             foreach (var scheme in registered)
             {
-                if (scheme is AuthSchemeNames.Keycloak or AuthSchemeNames.Google)
+                if (scheme == AuthSchemeNames.Keycloak)
                 {
                     try
                     {
@@ -1020,6 +1043,11 @@ public static class BffAuthEndpoints
 
             foreach (var scheme in registered)
             {
+                if (!AuthSchemeNames.AllProviders.Contains(scheme))
+                {
+                    continue;
+                }
+
                 if (primaryProvider == "atproto"
                     && scheme != AuthSchemeNames.Atproto)
                 {
@@ -1058,7 +1086,6 @@ public static class BffAuthEndpoints
                     displayName = scheme switch
                     {
                         AuthSchemeNames.Keycloak => "Keycloak",
-                        AuthSchemeNames.Google => "Google",
                         AuthSchemeNames.Atproto => "AT Protocol",
                         _ => scheme
                     },

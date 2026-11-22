@@ -57,7 +57,7 @@ public static partial class PostgresMixedSettingsContract
             Routines.Select(routine => new PostgresPrivilegeGuard.Routine(Prefix + routine.Name, routine.Signature,
                 OwnerRole, routine.Name is "learning_retain" or "learning_document" ? [LearningReaderRole]
                     : routine.Name == "email_consume" ? [PostgresEmailDeliveryPolicyContract.OwnerRole]
-                    : routine.Result == "trigger" ? [OwnerRole] : [GlobalRole])).ToArray(),
+                    : routine.Result == "trigger" || routine.Name == CatalogueGuardName ? [OwnerRole] : [GlobalRole])).ToArray(),
             [
                 .. Sources(context).Select(source => new PostgresPrivilegeGuard.Relation(
                     context.Model.FindEntityType(source.Type)!.GetTableName()!, OwnerRole,
@@ -91,7 +91,7 @@ public static partial class PostgresMixedSettingsContract
     private static string SourceGuard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var sql = new HumanPrincipalSourceSql(context);
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         return string.Join("\n", Sources(context).Select(source =>
         {
             var entity = context.Model.FindEntityType(source.Type)!;
@@ -99,7 +99,7 @@ public static partial class PostgresMixedSettingsContract
             var properties = entity.GetProperties().ToArray();
             string table = Text(sql.Table(source.Type));
             bool tenant = tenantTables.Any(candidate => candidate.TableName == entity.GetTableName());
-            string columns = string.Join(" OR ", properties.Select(property =>
+            string columns = string.Join(",", properties.Select(property =>
             {
                 string collation = property.FindAnnotation(PortableOrdinalAsciiPropertyExtensions.AnnotationName)?.Value is true
                     || property.FindAnnotation(LocationUnicodePropertyExtensions.AnnotationName)?.Value is true ? "C" : "default";
@@ -110,11 +110,10 @@ public static partial class PostgresMixedSettingsContract
                     _ => ""
                 };
                 return $"""
-                    NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid = pg_catalog.to_regclass({table})
-                        AND a.attname = {Text(sql.ColumnName(source.Type, property.Name))} AND a.attnum > 0 AND NOT a.attisdropped
-                        AND pg_catalog.format_type(a.atttypid,a.atttypmod) = {Text(property.GetRelationalTypeMapping().StoreType)}
-                        AND a.attnotnull = {(property.IsNullable ? "false" : "true")} AND a.attgenerated = '' AND a.attidentity = {Text(identity)}
-                        AND (a.attcollation = 0 OR a.attcollation = pg_catalog.to_regcollation({Text("pg_catalog." + sql.Quote(collation))})))
+                    ({Text(sql.ColumnName(source.Type, property.Name))}::pg_catalog.name,
+                        {Text(property.GetRelationalTypeMapping().StoreType)},
+                        {(property.IsNullable ? "false" : "true")},{Text(identity)}::pg_catalog."char",
+                        {Text("pg_catalog." + sql.Quote(collation))})
                     """;
             }));
             string keys = string.Join("\n", entity.GetKeys().Select(key =>
@@ -169,29 +168,51 @@ public static partial class PostgresMixedSettingsContract
                         WHERE i.inhrelid = pg_catalog.to_regclass({table}) OR i.inhparent = pg_catalog.to_regclass({table}))
                     OR (SELECT count(*) FROM pg_catalog.pg_attribute a WHERE a.attrelid = pg_catalog.to_regclass({table})
                         AND a.attnum > 0 AND NOT a.attisdropped) <> {properties.Length}
-                    OR {columns}
+                    OR EXISTS (
+                        WITH actual AS MATERIALIZED (
+                            SELECT a.attname,pg_catalog.format_type(a.atttypid,a.atttypmod) AS store_type,
+                                a.attnotnull,a.attgenerated,a.attidentity,a.attcollation
+                            FROM pg_catalog.pg_attribute a
+                            WHERE a.attrelid = pg_catalog.to_regclass({table})
+                                AND a.attnum > 0 AND NOT a.attisdropped)
+                        SELECT 1 FROM (VALUES {columns})
+                            expected(column_name,store_type,is_not_null,identity_mode,collation_name)
+                        WHERE NOT EXISTS (SELECT 1 FROM actual a
+                            WHERE a.attname = expected.column_name AND a.store_type = expected.store_type
+                                AND a.attnotnull = expected.is_not_null AND a.attgenerated = ''
+                                AND a.attidentity = expected.identity_mode
+                                AND (a.attcollation = 0
+                                    OR a.attcollation = pg_catalog.to_regcollation(expected.collation_name))))
                 THEN RAISE EXCEPTION 'mixed_settings_source_catalog_drift' USING ERRCODE = '55000'; END IF;
                 {keys}
                 """;
         }));
     }
 
-    private static string Guard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    private static string Guard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        PostgresContractAttestationSql.BuildGuardInvocationSql(
+            CatalogueGuardWitness(context, enrollment),
+            FunctionSql(context, CatalogueGuardName));
+
+    private static string CatalogueGuardWitness(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        PostgresContractAttestationSql.BuildCatalogueGuardWitnessSql(
+            FunctionSql(context, CatalogueGuardName),
+            OwnerRole,
+            Hash(CatalogueGuardBody(context, enrollment)),
+            Stamp,
+            "mixed_settings_catalogue_guard_drift");
+
+    private static string CatalogueGuardBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        PostgresContractAttestationSql.BuildCatalogueGuardBodySql(CatalogueGuard(context, enrollment));
+
+    private static string CatalogueGuard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var sql = new HumanPrincipalSourceSql(context);
         string roles = string.Join(",", Roles.Select(Text));
-        string routineIds = string.Join(",", Routines.Select(routine =>
-            $"pg_catalog.to_regprocedure({Text(FunctionSql(context, routine.Name) + "(" + routine.Signature + ")")})"));
-        string routines = string.Join("\n", Routines.Select(routine => $"""
-            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc f
-                WHERE f.oid = pg_catalog.to_regprocedure({Text(FunctionSql(context, routine.Name) + "(" + routine.Signature + ")")})
-                    AND f.provolatile = 'v' AND f.proparallel = 'u' AND NOT f.proleakproof AND NOT f.proisstrict
-                    AND NOT f.proretset AND f.proargdefaults IS NULL AND f.prorettype = 'pg_catalog.{routine.Result}'::regtype
-                    AND f.prolang = (SELECT oid FROM pg_catalog.pg_language WHERE lanname = 'plpgsql')
-                    AND pg_catalog.obj_description(f.oid,'pg_proc') =
-                        '{Stamp}' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(f.prosrc,'UTF8')),'hex'))
-            THEN RAISE EXCEPTION 'mixed_settings_routine_drift' USING ERRCODE = '55000'; END IF;
-            """));
+        string routineIds = PostgresContractAttestationSql.RoutineSignatureIdsSql(
+            context, Routines, routine => (routine.Name, routine.Signature), FunctionSql);
+        string routines = PostgresContractAttestationSql.BuildRoutineMetadataChecksSql(
+            context, Routines, routine => routine, FunctionSql, Stamp, "mixed_settings_routine_drift");
         string triggers = string.Join("\n", Sources(context).Select(source => $"""
             IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger t
                 WHERE t.tgrelid = pg_catalog.to_regclass({Text(sql.Table(source.Type))}) AND t.tgname = '{Prefix}changed'
@@ -201,7 +222,7 @@ public static partial class PostgresMixedSettingsContract
                     AND NOT t.tgdeferrable AND NOT t.tginitdeferred AND t.tgoldtable IS NULL AND t.tgnewtable IS NULL)
             THEN RAISE EXCEPTION 'mixed_settings_source_exclusion_drift' USING ERRCODE = '55000'; END IF;
             """));
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string policies = string.Join("\n", Sources(context).Where(source =>
             tenantTables.Any(candidate => candidate.TableName == context.Model.FindEntityType(source.Type)!.GetTableName()))
             .Select(source => $"""
@@ -259,8 +280,12 @@ public static partial class PostgresMixedSettingsContract
             mixed_write_authority AS MATERIALIZED (
                 SELECT target.*,
                     pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},target.relation,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') AS table_write,
-                    pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},target.relation,'UPDATE,REFERENCES') AS column_write,
-                    pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},target.relation,'INSERT') AS insert_write
+                    (pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},target.relation,'UPDATE,REFERENCES')
+                        AND NOT (target.relation={Text(sql.Table(typeof(Explore.Domain.SystemSetting)))}::regclass
+                            AND ({PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(context, enrollment)}) IS TRUE)) AS column_write,
+                    (pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},target.relation,'INSERT')
+                        AND NOT (target.relation={Text(sql.Table(typeof(Explore.Domain.SystemSetting)))}::regclass
+                            AND ({PostgresSetupLiveStoragePermissions.GlobalSettingsCataloguePredicate(context, enrollment)}) IS TRUE)) AS insert_write
                 FROM mixed_write_targets target),
             mixed_catalogues AS MATERIALIZED (
                 SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM mixed_write_authority WHERE table_write OR column_write)
@@ -312,31 +337,8 @@ public static partial class PostgresMixedSettingsContract
                     AND t.tgconstraint <> 0 AND t.tgdeferrable AND t.tginitdeferred
                     AND t.tgoldtable IS NULL AND t.tgnewtable IS NULL)
             THEN RAISE EXCEPTION 'mixed_settings_receipt_key_drift' USING ERRCODE = '55000'; END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n WHERE n.nspname = {Text(sql.Schema)}
-                    AND n.nspowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid)
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname IN ({roles})
-                    AND pg_catalog.shobj_description(r.oid,'pg_authid') IS DISTINCT FROM '{Stamp}role:' || r.rolname)
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n CROSS JOIN pg_catalog.pg_roles r
-                    WHERE r.rolname IN ({roles}) AND pg_catalog.has_schema_privilege(r.oid,n.oid,'CREATE'))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname IN ({roles})
-                    AND NOT pg_catalog.has_schema_privilege(r.oid,{Text(sql.Schema)},'USAGE'))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_class t CROSS JOIN pg_catalog.pg_roles r
-                    WHERE r.rolname IN ({roles}) AND t.relkind = 'S' AND pg_catalog.has_sequence_privilege(r.oid,t.oid,'USAGE,SELECT,UPDATE'))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_database d CROSS JOIN pg_catalog.pg_roles r
-                    WHERE r.rolname IN ({roles}) AND pg_catalog.has_database_privilege(r.oid,d.oid,'CREATE'))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_class t JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
-                    CROSS JOIN pg_catalog.pg_roles r WHERE r.rolname IN ({roles}) AND n.nspname <> {Text(sql.Schema)}
-                        AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%'
-                        AND t.relkind IN ('r','p','v','m','f')
-                        AND (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                            OR pg_catalog.has_any_column_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,REFERENCES')))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_shdepend d WHERE d.refclassid = 'pg_catalog.pg_authid'::regclass
-                    AND d.refobjid IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles})) AND d.deptype = 'o'
-                    AND (d.classid <> 'pg_catalog.pg_proc'::regclass OR d.dbid <> (SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database())
-                        OR d.objid NOT IN ({routineIds})))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_proc f WHERE f.oid NOT IN ({routineIds})
-                    AND (f.proowner IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles}))
-                        OR EXISTS (SELECT 1 FROM pg_catalog.aclexplode(f.proacl) a WHERE a.grantee IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles})))))
+            IF {PostgresContractAttestationSql.BuildAuthorityRoleAndNamespaceHygieneConditions(
+                sql.Schema, enrollment.MigratorLogin, roles, Stamp, routineIds, checkNamespaceOwner: true)}
             THEN RAISE EXCEPTION 'mixed_settings_authority_drift' USING ERRCODE = '55000'; END IF;
             """;
     }
@@ -345,12 +347,13 @@ public static partial class PostgresMixedSettingsContract
     {
         var expected = ExpectedBodySql.GetOrCreateValue(context);
         if (expected.TryGetValue(enrollment, out string? sql)) return sql;
-        sql = string.Join("\n", Functions(context, enrollment).Select(function => $"""
-            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc f
-                WHERE f.oid = pg_catalog.to_regprocedure({Text(FunctionSql(context, function.Name) + "(" + function.Signature + ")")})
-                    AND pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(f.prosrc,'UTF8')),'hex') = {Text(Hash(function.Body))})
-            THEN RAISE EXCEPTION 'mixed_settings_exact_body_drift' USING ERRCODE = '55000'; END IF;
-            """));
+        sql = CatalogueGuardWitness(context, enrollment) + "\n"
+        + PostgresContractAttestationSql.BuildExactBodiesSql(
+            context,
+            Functions(context, enrollment),
+            function => (function.Name, function.Signature, function.Body),
+            FunctionSql,
+            "mixed_settings_exact_body_drift");
         expected.Add(enrollment, sql);
         return sql;
     }

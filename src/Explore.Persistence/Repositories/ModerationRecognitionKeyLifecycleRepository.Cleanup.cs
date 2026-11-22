@@ -116,7 +116,11 @@ public sealed partial class ModerationRecognitionKeyLifecycleRepository
         }, token);
     }
 
-    public async Task<ModerationRecognitionKeyLifecycleReceiptCleanup> ForgetExpiredReceiptsAsync(
+    public Task<ModerationRecognitionKeyLifecycleReceiptCleanup> ForgetExpiredReceiptsAsync(
+        Guid? afterIntentId, int limit, CancellationToken token) =>
+        ExecuteOnceAsync(() => ForgetExpiredReceiptsCoreAsync(afterIntentId, limit, token));
+
+    private async Task<ModerationRecognitionKeyLifecycleReceiptCleanup> ForgetExpiredReceiptsCoreAsync(
         Guid? afterIntentId, int limit, CancellationToken token)
     {
         if (limit is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(limit));

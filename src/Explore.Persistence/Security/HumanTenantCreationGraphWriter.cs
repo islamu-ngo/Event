@@ -53,8 +53,10 @@ internal sealed class HumanTenantCreationGraphWriter(
         var physical = transaction.GetDbTransaction();
         if (physical.IsolationLevel != IsolationLevel.Serializable || !connection.Owns(physical))
             throw new UnauthorizedAccessException("Human creation requires its original Serializable transaction.");
-        await PostgresTenantCreationPermissions.RequireCurrentAsync(context, human.Enrollment, identityTopology,
-            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var assertCreatorCatalogue = PostgresTenantCreationPermissions.PrepareCurrentAssertion(
+            context, human.Enrollment, identityTopology);
+        await assertCreatorCatalogue(cancellationToken);
         await PostgresDiscoveryMetadataPermissions.RequireCurrentAsync(context, human.Enrollment,
             globalOnly: true, cancellationToken);
         if (context.ChangeTracker.Entries().Any(entry =>
@@ -182,8 +184,8 @@ internal sealed class HumanTenantCreationGraphWriter(
         {
             RequireEffects();
             await issuer.RequireCurrentAsync(authority, plan, token);
-            await PostgresTenantCreationPermissions.RequireCurrentAsync(context, human.Enrollment, identityTopology,
-                token);
+            RequireEffects();
+            await assertCreatorCatalogue(token);
             await PostgresDiscoveryMetadataPermissions.RequireCurrentAsync(context, human.Enrollment, globalOnly: true, token);
             var current = await ReadSourcesAsync(plan, token);
             if (!current.Tenants.Where(row => row.Id != plan.Creation.TenantId).SequenceEqual(source.Tenants)

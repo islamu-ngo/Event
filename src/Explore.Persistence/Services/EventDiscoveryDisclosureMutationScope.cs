@@ -1,6 +1,7 @@
 using Explore.Domain;
 using Explore.Domain.Enums;
 using System.Data;
+using System.Data.Common;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Settings;
 using Explore.Domain.Federation;
@@ -38,6 +39,7 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
     private readonly HashSet<Guid> _records = [];
     private readonly HashSet<Guid> _newActors = [];
     private readonly HashSet<Guid> _newRecords = [];
+    private readonly Dictionary<Guid, UserCreation> _createdUsers = [];
     private readonly Dictionary<object, PropertyValues> _storedSources = new(ReferenceEqualityComparer.Instance);
     private Guid? _transactionId;
     private bool _terminal;
@@ -428,6 +430,8 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
             .Select(entry => ((User)entry.Entity).Id).ToArray();
         Guid[] newActors = entries.Where(entry => entry.State == EntityState.Added && entry.Entity is Actor)
             .Select(entry => ((Actor)entry.Entity).Id).ToArray();
+        Guid[] newTenants = entries.Where(entry => entry.State == EntityState.Added && entry.Entity is Tenant)
+            .Select(entry => ((Tenant)entry.Entity).Id).ToArray();
         _newActors.UnionWith(newActors);
         _newRecords.UnionWith(entries.Where(entry => entry.State == EntityState.Added && entry.Entity is AtprotoRecord)
             .Select(entry => ((AtprotoRecord)entry.Entity).Id));
@@ -457,7 +461,7 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
                 .SelectMany(entry => Keys(entry, nameof(Event.SubmittedByUserId))))
             .Concat(users).Distinct().ToArray();
         // New anchors have no committed audience; their original INSERT and FK constraints own creation.
-        await FenceKeysAsync<User>(enrollmentUsers.Except(newUsers), cancellationToken);
+        await FenceKeysAsync<User>(enrollmentUsers.Except(newUsers).Except(RequireCreatedUsers()), cancellationToken);
 
         Guid[] organizations = ChangedKeys(owners, "OrganizationId")
             .Concat(entries.Where(entry => entry.Entity is Organization or OrganizationPii)
@@ -572,10 +576,13 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         // source-row classification and implicit source INSERT foreign-key locks.
         // Independent inserters must not both take shared Tenant FK locks and
         // then try to convert them to write locks at terminal finalization.
+        // New parents have no committed audience to fence. Their INSERT and foreign
+        // keys establish ownership; completed creation receipts still govern finalization.
         await FenceTenantParentsAsync(_tenants
             .Concat(entries.Where(entry => entry.Entity is ITenantEntity
                     && TenantSources.Contains(entry.Metadata.ClrType))
-                .SelectMany(entry => Keys(entry, nameof(ITenantEntity.TenantId)))), cancellationToken);
+                .SelectMany(entry => Keys(entry, nameof(ITenantEntity.TenantId))))
+            .Except(newTenants), cancellationToken);
 
         foreach (var checkOwner in ownerChecks)
             await checkOwner();
@@ -754,6 +761,53 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         _terminal = true;
     }
 
+    internal UserCreation[] PrepareUserCreations()
+    {
+        EnsureTransaction();
+        var connection = RelationalConnectionIdentity.Capture(context);
+        var transaction = context.Database.CurrentTransaction!.GetDbTransaction();
+        return context.ChangeTracker.Entries<User>().Where(entry => entry.State == EntityState.Added)
+            .Select(entry => new UserCreation(entry.Entity, entry.Entity.Id, connection, transaction)).ToArray();
+    }
+
+    internal void CompleteUserCreations(UserCreation[] pending)
+    {
+        foreach (var creation in pending)
+        {
+            RequireCreatedUser(creation);
+            _createdUsers[creation.Id] = creation;
+        }
+    }
+
+    internal void InvalidateUserCreations() => _createdUsers.Clear();
+
+    private Guid[] RequireCreatedUsers()
+    {
+        foreach (var creation in _createdUsers.Values)
+            RequireCreatedUser(creation);
+        return _createdUsers.Keys.ToArray();
+    }
+
+    private void RequireCreatedUser(UserCreation creation)
+    {
+        context.RequireBoundTenantLease();
+        if (creation.Id == Guid.Empty || creation.User.Id != creation.Id
+            || creation.Connection.State != ConnectionState.Open
+            || !creation.Connection.Matches(context) || !creation.Connection.Owns(creation.Transaction)
+            || !ReferenceEquals(context.Database.CurrentTransaction?.GetDbTransaction(), creation.Transaction)
+            || context.Entry(creation.User).State == EntityState.Detached)
+            throw new InvalidOperationException("discovery_user_creation_owner_changed");
+    }
+
+    internal sealed class UserCreation(User user, Guid id,
+        RelationalConnectionIdentity connection, DbTransaction transaction)
+    {
+        internal User User { get; } = user;
+        internal Guid Id { get; } = id;
+        internal RelationalConnectionIdentity Connection { get; } = connection;
+        internal DbTransaction Transaction { get; } = transaction;
+    }
+
     internal void Reset()
     {
         _privateHomeErasure?.Invalidate();
@@ -770,6 +824,7 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         _records.Clear();
         _newActors.Clear();
         _newRecords.Clear();
+        _createdUsers.Clear();
         _storedSources.Clear();
         _terminal = false;
         _flushed = false;
@@ -815,7 +870,8 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
             || _tenants.Count != 0 || _identityRevisions.Count != 0 || _deletedTenants.Count != 0
             || context.DiscoveryEnrollmentCreationIds.Any()
             || _tenantParents.Count != 0 || _tenantEnrollmentFenced || _actors.Count != 0
-            || _users.Count != 0 || _records.Count != 0 || _newActors.Count != 0 || _newRecords.Count != 0)
+            || _users.Count != 0 || _records.Count != 0 || _newActors.Count != 0 || _newRecords.Count != 0
+            || _createdUsers.Count != 0)
             throw new InvalidOperationException("Original managed Settings cannot mix discovery mutation owners.");
     }
 

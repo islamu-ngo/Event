@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain;
+using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -9,10 +10,34 @@ namespace Explore.Persistence.Database.ProviderPrimitives;
 
 internal static class StorageScopeTotalsQuery
 {
-    internal static Task<StorageScopeTotals> ReadAsync(
-        ExploreDbContext context, Guid tenantId, string provider, CancellationToken cancellationToken) =>
-        context.Database.SqlQueryRaw<StorageScopeTotals>(BuildSql(context, "{0}", "{1}"), tenantId, provider)
-            .SingleAsync(cancellationToken);
+    internal static async Task<StorageScopeTotals> ReadAsync(
+        ExploreDbContext context, Guid tenantId, string provider, CancellationToken cancellationToken)
+    {
+        // Custody includes soft-deleted rows until irreversible byte deletion is recorded.
+        var sessions = context.StorageUploadSessions.IgnoreQueryFilters([QueryFilterNames.Tenant]);
+        var objects = context.StorageObjects.IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+            .Where(value => value.TenantId == tenantId && value.Provider == provider
+                && value.Provider != StorageProviders.LegacyExternal
+                && !context.StorageObjectDeletionTombstones.Any(tombstone => tombstone.Id == value.Id)
+                && (value.Purpose != StorageObjectPurposes.EventResource
+                    || value.LifecycleState == StorageObjectLifecycleStates.Active
+                    || value.LifecycleState == StorageObjectLifecycleStates.Quarantined
+                    || sessions
+                        .Any(session => session.TenantId == tenantId && session.StorageObjectId == value.Id
+                            && session.Status == StorageUploadSessionStates.Finalized)));
+        var reservations = sessions
+            .Where(session => session.TenantId == tenantId && session.Provider == provider
+                && (session.Status == StorageUploadSessionStates.Reserved || session.Status == StorageUploadSessionStates.Uploading));
+        var totals = await context.Tenants.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
+            .Where(tenant => tenant.Id == tenantId)
+            .Select(_ => new StorageScopeTotals(
+                objects.Sum(value => value.LifecycleState == StorageObjectLifecycleStates.Quarantined ? (long?)0 : value.Size) ?? 0,
+                reservations.Sum(session => (long?)session.ReservedBytes) ?? 0,
+                objects.Sum(value => value.LifecycleState == StorageObjectLifecycleStates.Quarantined ? (long?)value.Size : 0) ?? 0,
+                objects.LongCount()))
+            .SingleOrDefaultAsync(cancellationToken);
+        return totals ?? new(0, 0, 0, 0);
+    }
 
     /// <summary>Produces the complete custody aggregate, using compiled parameter expressions only.</summary>
     internal static string BuildSql(

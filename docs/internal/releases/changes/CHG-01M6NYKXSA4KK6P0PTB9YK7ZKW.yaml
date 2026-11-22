@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6NYKXSA4KK6P0PTB9YK7ZKW
+Title: "keep browser operational responses on their private listener"
+Type: fix
+Scope: observability
+Summary: "Keep browser health and metrics requests out of public HTTPS redirection and UI error-page re-execution while preserving exact physical listener denial and ordinary public HTTPS redirects."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Operational requests still execute the exact physical listener guard. Public operational requests retain 404, private unhealthy responses retain 503, and no-store remains enforced."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Private probes remain on their declared socket instead of following browser HTTPS or UI error redirects. Ordinary public requests still redirect to HTTPS."

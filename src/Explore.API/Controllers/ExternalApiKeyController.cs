@@ -43,6 +43,7 @@ public class ExternalApiKeyController(
         "External API key not found.");
 
     [HttpGet(Name = RouteNames.GetExternalApiKeys)]
+    [TenantReadBootstrap]
     [EndpointSummary("Get visible external API keys")]
     [EndpointDescription("Retrieve API keys owned by the current user or organizations they can manage.")]
     [ProducesResponseType(typeof(List<ExternalApiKeyListDto>), StatusCodes.Status200OK)]
@@ -79,6 +80,7 @@ public class ExternalApiKeyController(
     /// Generic response replay is disabled so it cannot retain or redisclose credential material.
     /// </summary>
     [HttpPost(Name = RouteNames.CreateExternalApiKey)]
+    [TenantReadBootstrap]
     [EndpointSummary("Create a new external API key")]
     [EndpointDescription("Issue an external API key with a required Idempotency-Key. The acknowledged creation reveals the secret once; authorized retries return metadata only.")]
     [ProducesResponseType(typeof(ExternalApiKeyIssuanceDto), StatusCodes.Status200OK)]
@@ -149,6 +151,7 @@ public class ExternalApiKeyController(
     }
 
     [HttpDelete("{id}", Name = RouteNames.DeleteExternalApiKey)]
+    [TenantReadBootstrap]
     [EndpointSummary("Revoke an external API key")]
     [EndpointDescription("Revoke an external API key visible to the current caller.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

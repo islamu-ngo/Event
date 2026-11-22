@@ -77,6 +77,7 @@ public sealed class InstanceTenantPlanController : EventControllerBase
     }
 
     [HttpGet("plans", Name = RouteNames.GetInstanceAdminTenantPlans)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Get Instance Administration Tenant Plans")]
@@ -94,6 +95,7 @@ public sealed class InstanceTenantPlanController : EventControllerBase
     }
 
     [HttpGet("plans/{key}", Name = RouteNames.GetInstanceAdminTenantPlanByKey)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Get Instance Administration Tenant Plan")]
@@ -118,6 +120,7 @@ public sealed class InstanceTenantPlanController : EventControllerBase
     }
 
     [HttpPost("plans", Name = RouteNames.CreateInstanceAdminTenantPlanDraft)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Create Instance Administration Tenant Plan Draft")]
@@ -136,6 +139,7 @@ public sealed class InstanceTenantPlanController : EventControllerBase
     }
 
     [HttpPost("plans/{key}/versions", Name = RouteNames.CreateInstanceAdminTenantPlanVersionDraft)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Create Instance Administration Tenant Plan Version Draft")]
@@ -155,6 +159,7 @@ public sealed class InstanceTenantPlanController : EventControllerBase
     }
 
     [HttpPatch("plans/versions/{versionId:guid}", Name = RouteNames.UpdateInstanceAdminTenantPlanVersionDraft)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Update Instance Administration Tenant Plan Version Draft")]
@@ -176,6 +181,7 @@ public sealed class InstanceTenantPlanController : EventControllerBase
     }
 
     [HttpPost("plans/versions/{versionId:guid}/publish", Name = RouteNames.PublishInstanceAdminTenantPlanVersion)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Publish Instance Administration Tenant Plan Version")]
@@ -197,6 +203,7 @@ public sealed class InstanceTenantPlanController : EventControllerBase
     }
 
     [HttpPost("plans/versions/{versionId:guid}/archive", Name = RouteNames.ArchiveInstanceAdminTenantPlanVersion)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Archive Instance Administration Tenant Plan Version")]
@@ -215,6 +222,7 @@ public sealed class InstanceTenantPlanController : EventControllerBase
     }
 
     [HttpPost("plans/versions/{sourceVersionId:guid}/clone", Name = RouteNames.CloneInstanceAdminTenantPlan)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Clone Instance Administration Tenant Plan")]
@@ -236,6 +244,7 @@ public sealed class InstanceTenantPlanController : EventControllerBase
     }
 
     [HttpPost("plans/validate", Name = RouteNames.ValidateInstanceAdminTenantPlanDraft)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Validate Instance Administration Tenant Plan Draft")]
@@ -253,6 +262,7 @@ public sealed class InstanceTenantPlanController : EventControllerBase
     }
 
     [HttpPost("plans/preview-diff", Name = RouteNames.PreviewInstanceAdminTenantPlanDiff)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Preview Instance Administration Tenant Plan Diff")]

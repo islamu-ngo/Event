@@ -1,5 +1,6 @@
 using System.Text;
 using Explore.Domain;
+using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.Data.Sqlite;
@@ -18,17 +19,19 @@ public sealed class AtprotoTransientStoreContractTests
     public async Task DomainFactories_EnforcePurposeTenantDigestPayloadAndHealthProbeInvariants()
     {
         Guid tenant = Guid.CreateVersion7();
-        AtprotoTransientRecord authentication = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, DigestA, tenant, "opaque", Now.AddMinutes(1).ToUnixTimeMilliseconds());
+        AtprotoTransientRecord authentication = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, DigestA, AtprotoAuthenticationFlowTarget.Targeted(tenant), "opaque", Now.AddMinutes(1).ToUnixTimeMilliseconds());
         AtprotoTransientRecord probe = AtprotoTransientRecord.CreateHealthProbe(DigestB, "probe", Now.AddSeconds(30).ToUnixTimeMilliseconds());
         await Assert.That(authentication.TenantId).IsEqualTo(tenant);
+        await Assert.That(authentication.FlowKind).IsEqualTo(AtprotoAuthenticationFlowKind.Targeted);
         await Assert.That(probe.TenantId).IsNull();
+        await Assert.That(probe.FlowKind).IsNull();
         await Assert.That(probe.Purpose).IsEqualTo(AtprotoTransientPurpose.HealthProbe);
-        await Assert.That(() => AtprotoTransientRecord.Create(AtprotoTransientPurpose.HealthProbe, DigestA, tenant, "opaque", 1)).Throws<ArgumentOutOfRangeException>();
-        await Assert.That(() => AtprotoTransientRecord.Create(AtprotoTransientPurpose.TenantHandoff, DigestA, Guid.Empty, "opaque", 1)).Throws<ArgumentException>();
-        await Assert.That(() => AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, DigestA.ToUpperInvariant(), tenant, "opaque", 1)).Throws<ArgumentException>();
+        await Assert.That(() => AtprotoTransientRecord.Create(AtprotoTransientPurpose.HealthProbe, DigestA, AtprotoAuthenticationFlowTarget.Targeted(tenant), "opaque", 1)).Throws<ArgumentOutOfRangeException>();
+        await Assert.That(() => AtprotoTransientRecord.Create(AtprotoTransientPurpose.TenantHandoff, DigestA, AtprotoAuthenticationFlowTarget.Targeted(Guid.Empty), "opaque", 1)).Throws<ArgumentException>();
+        await Assert.That(() => AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, DigestA.ToUpperInvariant(), AtprotoAuthenticationFlowTarget.Targeted(tenant), "opaque", 1)).Throws<ArgumentException>();
         string oversizedUtf8 = new('é', AtprotoTransientRecord.MaximumProtectedPayloadBytes / 2 + 1);
         await Assert.That(Encoding.UTF8.GetByteCount(oversizedUtf8)).IsGreaterThan(AtprotoTransientRecord.MaximumProtectedPayloadBytes);
-        await Assert.That(() => AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, DigestA, tenant, oversizedUtf8, 1)).Throws<ArgumentException>();
+        await Assert.That(() => AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, DigestA, AtprotoAuthenticationFlowTarget.Targeted(tenant), oversizedUtf8, 1)).Throws<ArgumentException>();
     }
 
     [Test]
@@ -36,7 +39,7 @@ public sealed class AtprotoTransientStoreContractTests
     {
         await using SqliteContractDatabase database = await SqliteContractDatabase.CreateAsync();
         Guid tenant = Guid.CreateVersion7();
-        AtprotoTransientRecord record = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, DigestA, tenant, "opaque", Now.AddMinutes(1).ToUnixTimeMilliseconds());
+        AtprotoTransientRecord record = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, DigestA, AtprotoAuthenticationFlowTarget.Targeted(tenant), "opaque", Now.AddMinutes(1).ToUnixTimeMilliseconds());
         database.Context.Add(record);
         await database.Context.SaveChangesAsync();
         foreach (string propertyName in new[] { nameof(record.Purpose), nameof(record.TokenDigest), nameof(record.TenantId), nameof(record.ProtectedPayload), nameof(record.ExpiresAtUnixMilliseconds) })
@@ -53,15 +56,15 @@ public sealed class AtprotoTransientStoreContractTests
         await using SqliteContractDatabase database = await SqliteContractDatabase.CreateAsync();
         Guid tenant = Guid.CreateVersion7();
         var repository = new AtprotoTransientStoreRepository(database.Context, new FixedTimeProvider(Now));
-        AtprotoTransientRecord first = AtprotoTransientRecord.Create(AtprotoTransientPurpose.TenantHandoff, DigestA, tenant, "first", Now.AddMinutes(1).ToUnixTimeMilliseconds());
-        AtprotoTransientRecord duplicate = AtprotoTransientRecord.Create(AtprotoTransientPurpose.TenantHandoff, DigestA, tenant, "second", Now.AddMinutes(1).ToUnixTimeMilliseconds());
+        AtprotoTransientRecord first = AtprotoTransientRecord.Create(AtprotoTransientPurpose.TenantHandoff, DigestA, AtprotoAuthenticationFlowTarget.Targeted(tenant), "first", Now.AddMinutes(1).ToUnixTimeMilliseconds());
+        AtprotoTransientRecord duplicate = AtprotoTransientRecord.Create(AtprotoTransientPurpose.TenantHandoff, DigestA, AtprotoAuthenticationFlowTarget.Targeted(tenant), "second", Now.AddMinutes(1).ToUnixTimeMilliseconds());
         await Assert.That(await repository.TryCreateAsync(first)).IsTrue();
         await Assert.That(await repository.TryCreateAsync(duplicate)).IsFalse();
         await Assert.That((await repository.ReadAsync(first.Purpose, DigestA, tenant))!.ProtectedPayload).IsEqualTo("first");
         await Assert.That(await repository.ReadAsync(first.Purpose, DigestA, Guid.CreateVersion7())).IsNull();
         await Assert.That(await repository.ReadAsync(AtprotoTransientPurpose.OAuthState, DigestA, tenant)).IsNull();
 
-        AtprotoTransientRecord expiresAtCutoff = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, DigestB, tenant, "expired", Now.ToUnixTimeMilliseconds());
+        AtprotoTransientRecord expiresAtCutoff = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, DigestB, AtprotoAuthenticationFlowTarget.Targeted(tenant), "expired", Now.ToUnixTimeMilliseconds());
         database.Context.Add(expiresAtCutoff);
         await database.Context.SaveChangesAsync();
         await Assert.That(await repository.ReadOAuthStateAsync(DigestB)).IsNull();
@@ -124,13 +127,13 @@ public sealed class AtprotoTransientStoreContractTests
         database.Context.Add(AtprotoTransientRecord.Create(
             AtprotoTransientPurpose.OAuthState,
             DigestA,
-            tenant,
+            AtprotoAuthenticationFlowTarget.Targeted(tenant),
             "at-cutoff",
             Now.ToUnixTimeMilliseconds()));
         database.Context.Add(AtprotoTransientRecord.Create(
             AtprotoTransientPurpose.TenantHandoff,
             DigestB,
-            tenant,
+            AtprotoAuthenticationFlowTarget.Targeted(tenant),
             "live",
             Now.AddMilliseconds(1).ToUnixTimeMilliseconds()));
         await database.Context.SaveChangesAsync();
@@ -147,7 +150,7 @@ public sealed class AtprotoTransientStoreContractTests
     {
         await using SqliteContractDatabase database = await SqliteContractDatabase.CreateAsync();
         Guid tenant = Guid.CreateVersion7();
-        AtprotoTransientRecord record = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, DigestA, tenant, "opaque", Now.AddMinutes(1).ToUnixTimeMilliseconds());
+        AtprotoTransientRecord record = AtprotoTransientRecord.Create(AtprotoTransientPurpose.OAuthState, DigestA, AtprotoAuthenticationFlowTarget.Targeted(tenant), "opaque", Now.AddMinutes(1).ToUnixTimeMilliseconds());
         database.Context.Add(record);
         await database.Context.SaveChangesAsync();
         await using var transaction = await database.Context.Database.BeginTransactionAsync();

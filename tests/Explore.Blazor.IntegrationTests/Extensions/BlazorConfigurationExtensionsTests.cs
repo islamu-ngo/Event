@@ -149,15 +149,17 @@ public sealed class BlazorConfigurationExtensionsTests
         await using var host = new BffSecretPreparationTestHost();
         await host.PrepareLocalAsync(new()
         {
-            ["GOOGLE_CLIENT_ID"] = Guid.NewGuid().ToString("N"),
-            ["GOOGLE_CLIENT_SECRET"] = secret
+            ["KEYCLOAK_ENDPOINT"] = "https://identity.example.test",
+            ["KEYCLOAK_REALM"] = "event",
+            ["KEYCLOAK_CLIENT_ID"] = Guid.NewGuid().ToString("N"),
+            ["KEYCLOAK_BLAZOR_CLIENT_SECRET"] = secret
         }, selected);
 
-        await Assert.That(host.Builder.Configuration["Google:ClientSecret"]).IsEqualTo(secret);
+        await Assert.That(host.Builder.Configuration["Keycloak:ClientSecret"]).IsEqualTo(secret);
         var receipt = host.Receipts.Snapshot().Single();
         await Assert.That(receipt.Authority).IsEqualTo(expected);
         await Assert.That(receipt.AuthorityProfileRevision).IsEqualTo(host.ProfileRevision);
-        await Assert.That(receipt.Consumer).IsEqualTo(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc);
+        await Assert.That(receipt.Consumer).IsEqualTo(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc);
         await Assert.That(receipt.Installed).IsFalse();
     }
 

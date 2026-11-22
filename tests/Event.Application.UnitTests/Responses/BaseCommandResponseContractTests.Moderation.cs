@@ -14,24 +14,10 @@ namespace ApplicationUnitTests.Responses;
 
 public sealed partial class BaseCommandResponseContractTests
 {
-    private static NativeFactoryScenario[] CreateModerationFactoryScenarios() =>
-    [
-        new(typeof(ModerationAllegationResponse), AssertAllegationFactories),
-        new(typeof(ModerationAuthoritySourcesResponse), AssertAuthoritySourceFactories),
-        new(typeof(ModerationMachineSubjectResponse), AssertMachineSubjectFactories),
-        new(typeof(ModerationLifecycleResponse), AssertLifecycleFactories),
-        new(typeof(ModerationQualificationResponse), AssertQualificationFactories),
-        new(typeof(ModerationResourceSafetyResponse), AssertResourceSafetyFactories),
-        new(typeof(ModerationPolicyPublicationCandidateResponse), AssertPublicationCandidateFactories),
-        new(typeof(ModerationPolicyPublicationResponse), AssertPublicationFactories),
-        new(typeof(ModerationReadReceiptResponse), AssertReadReceiptFactories),
-        new(typeof(ModerationSubmissionReceiptResponse), AssertSubmissionReceiptFactories),
-    ];
-
     [Test]
     public async Task EveryNativeOutcomeResponseExecutesItsTypedFactoryContract()
     {
-        foreach (NativeFactoryScenario scenario in CreateModerationFactoryScenarios())
+        foreach (NativeFactoryScenario scenario in CreateNativeFactoryScenarios())
             await scenario.Verify();
     }
 

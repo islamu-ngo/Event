@@ -47,6 +47,15 @@ Runtime governance checks:
 - Endpoint path and stateless mode are never runtime settings. Legacy SSE remains unavailable even when both startup and runtime legacy-SSE values are true.
 - `/health` exposes only bounded MCP booleans such as `startupEnabled`, `runtimeEnabled`, `legacySseRuntimeRequested`, and `legacySseRuntimeEnabled`; it must not include tenant IDs, endpoint URLs, keys, prompts, or raw protocol bodies.
 
+The process health check reads the MCP instance keys through
+`IInstanceSystemSettingsReader`, which owns its independent Global read context.
+It uses `HierarchicalSettingMerge` and `McpSettingGroup.Populate` for the same
+registry defaults and typed values as request resolution. A background health
+scope has no tenant and must not send a tenantless Runtime session through the
+ordinary tenant-settings reader. The native Runtime tenant guard remains intact;
+tenant requests still use `McpRuntimeStateService` and its delegation rules.
+Health reports instance governance only, with no new grants or credential.
+
 Before diagnosing missing tools, rebuild and restart both the API and the MCP client:
 
 ```bash

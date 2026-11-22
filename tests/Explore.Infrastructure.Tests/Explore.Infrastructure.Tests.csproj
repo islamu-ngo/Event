@@ -6,6 +6,7 @@
     <Compile Include="..\Shared\AssuranceOwnershipContext.cs" Link="Fixtures\AssuranceOwnershipContext.cs" />
     <Compile Include="..\Shared\Authorization\ProviderNeutralCorpus.cs" Link="Authorization\ProviderNeutralCorpus.cs" />
     <Compile Include="..\Shared\Settings\SmtpSettingsDatabase.cs" Link="Settings\SmtpSettingsDatabase.cs" />
+    <Compile Include="..\Shared\Settings\VisitorReadPolicyTestAuthority.cs" Link="Settings\VisitorReadPolicyTestAuthority.cs" />
     <Compile Include="..\Shared\ExternalDataProtectionTestAuthority.cs" Link="Fixtures\ExternalDataProtectionTestAuthority.cs" />
     <Compile Include="..\Shared\SecretKitHttpAuthority.cs" Link="Fixtures\SecretKitHttpAuthority.cs" />
     <Using Include="Event.Testing.Secrets" />
@@ -13,6 +14,21 @@
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\InstanceSettingsCommandFixture.cs" Link="Fixtures\InstanceSettingsCommandFixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\TestDbContextOptions.cs" Link="Fixtures\NativeTestDbContextOptions.cs" />
     <Compile Include="..\Shared\Telemetry\EventLocationPrivacyMetricsFactory.cs" Link="Telemetry\EventLocationPrivacyMetricsFactory.cs" />
+    <Compile Include="../Shared/Execution/TestExecutionProfile.cs" Link="Execution/TestExecutionProfile.cs" />
+    <Compile Include="../Shared/Execution/BoundedTestDiscoveryHook.cs" Link="Execution/BoundedTestDiscoveryHook.cs" />
+    <Compile Include="../Shared/Containers/ContainerResourceBounds.cs" Link="Containers/ContainerResourceBounds.cs" />
+    <Compile Include="../Shared/Containers/TestcontainersBuilderExtensions.cs" Link="Containers/TestcontainersBuilderExtensions.cs" />
+    <Using Include="Event.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="Event.Testing.TestSuiteKindAttribute">
+      <_Parameter1>ContainerBacked</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,7 +46,6 @@
     <PackageReference Include="Cerbos.Sdk" />
     <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="NSubstitute" />

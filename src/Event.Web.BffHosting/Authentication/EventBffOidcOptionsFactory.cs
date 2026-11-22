@@ -16,7 +16,6 @@ public interface IEventBffOidcOptionsFactory
 {
     OpenIdConnectOptions CreateKeycloakOptions(EventBffOidcProviderOptions provider);
 
-    OpenIdConnectOptions CreateGoogleOptions(EventBffOidcProviderOptions provider);
 }
 
 public sealed record EventBffOidcProviderOptions(
@@ -41,25 +40,6 @@ public sealed class EventBffOidcOptionsFactory(
             authenticationType: EventBffAuthenticationSchemes.Keycloak,
             requireHttpsMetadata: provider.RequireHttpsMetadata ?? !environment.IsDevelopment(),
             forceIpv4Backchannel: true);
-
-        options.Scope.Clear();
-        options.Scope.Add("openid");
-        options.Scope.Add("profile");
-        options.Scope.Add("email");
-
-        return options;
-    }
-
-    public OpenIdConnectOptions CreateGoogleOptions(EventBffOidcProviderOptions provider)
-    {
-        var options = CreateCommonOptions(
-            provider,
-            callbackPath: "/signin-google",
-            signedOutCallbackPath: null,
-            nameClaimType: "name",
-            authenticationType: EventBffAuthenticationSchemes.Google,
-            requireHttpsMetadata: true,
-            forceIpv4Backchannel: false);
 
         options.Scope.Clear();
         options.Scope.Add("openid");

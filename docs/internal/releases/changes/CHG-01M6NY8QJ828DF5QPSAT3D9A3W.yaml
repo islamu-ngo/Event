@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6NY8QJ828DF5QPSAT3D9A3W
+Title: "admit mapped IPv4 on declared private listeners"
+Type: fix
+Scope: observability
+Summary: "Normalize the physical IPv4-mapped local address before exact private operational address and port admission; preserve wrong-address, wrong-port and undeclared-host denial."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Normalize equivalent physical address representations only. Private address, exact port and declared-host checks remain authoritative; forwarded headers cannot select a listener."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Private health and metrics work when a dual-stack socket represents its IPv4 local address as mapped IPv6."

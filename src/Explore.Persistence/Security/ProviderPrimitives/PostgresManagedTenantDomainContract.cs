@@ -1,4 +1,6 @@
 using Explore.Domain;
+using System.Security.Cryptography;
+using System.Text;
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -7,16 +9,26 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Security;
 
-/// <summary>Migration-owned exact-host discovery restricted to the two public domain-setting keys.</summary>
+/// <summary>Migration-owned read permissions restricted to the two public domain-setting keys.</summary>
 public static class PostgresManagedTenantDomainContract
 {
-    public const string OwnerRole = "event_managed_domain_owner";
-    public const string MigratorRole = "event_managed_domain_migrator";
+    private const string RetiredOwnerRole = "event_managed_domain_owner";
+    private const string RetiredMigratorRole = "event_managed_domain_migrator";
     public const string GlobalRole = "event_managed_domain_global";
     private const string PolicyName = "managed_domain_authority";
 
-    public static string FunctionSql(ExploreDbContext context) =>
-        context.GetService<ISqlGenerationHelper>().DelimitIdentifier("managed_tenant_domain_find", Schema(context));
+    internal static string GlobalPolicyException(ExploreDbContext context, string login)
+    {
+        var entity = context.Model.FindEntityType(typeof(TenantSetting))!;
+        return $"""
+            session_user={Text(login)} AND current_user=session_user
+            AND n.nspname={Text(Schema(context))} AND c.relname={Text(entity.GetTableName()!)}
+            AND p.polname={Text(PolicyName)} AND p.polcmd='r' AND p.polpermissive
+            AND p.polroles=ARRAY[(SELECT oid FROM pg_catalog.pg_roles WHERE rolname={Text(GlobalRole)})]
+            AND p.polwithcheck IS NULL AND p.polqual IS NOT NULL
+            AND pg_catalog.obj_description(p.oid,'pg_policy')={Text(PolicyStamp(context))} || pg_catalog.md5(p.polqual::text)
+            """;
+    }
 
     public static async Task ApplyAsync(ExploreDbContext context, CancellationToken cancellationToken = default)
     {
@@ -35,15 +47,14 @@ public static class PostgresManagedTenantDomainContract
         string schema = sql.DelimitIdentifier(Schema(context));
         string table = sql.DelimitIdentifier(entity.GetTableName()!, Schema(context));
         string key = sql.DelimitIdentifier(entity.FindProperty(nameof(TenantSetting.SettingKey))!.GetColumnName(store)!);
-        string value = sql.DelimitIdentifier(entity.FindProperty(nameof(TenantSetting.Value))!.GetColumnName(store)!);
         string columns = string.Join(", ", entity.GetProperties().Select(property =>
             sql.DelimitIdentifier(property.GetColumnName(store)!)));
-        string function = FunctionSql(context);
+        string function = sql.DelimitIdentifier("managed_tenant_domain_find", Schema(context));
         return $$"""
             DO $roles$
             DECLARE role_name text;
             BEGIN
-                FOREACH role_name IN ARRAY ARRAY['{{OwnerRole}}','{{MigratorRole}}','{{GlobalRole}}'] LOOP
+                FOREACH role_name IN ARRAY ARRAY['{{GlobalRole}}'] LOOP
                     IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = role_name) THEN
                         EXECUTE format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS', role_name);
                     END IF;
@@ -63,38 +74,37 @@ public static class PostgresManagedTenantDomainContract
                     RAISE EXCEPTION 'managed_domain_migration_authority_invalid';
                 END IF;
             END; $roles$;
-            GRANT {{OwnerRole}} TO {{MigratorRole}};
-            GRANT {{MigratorRole}} TO CURRENT_USER;
-            GRANT USAGE, CREATE ON SCHEMA {{schema}} TO {{OwnerRole}};
             GRANT USAGE ON SCHEMA {{schema}} TO {{GlobalRole}};
-            REVOKE ALL ON {{table}} FROM {{OwnerRole}};
-            GRANT SELECT ({{columns}}) ON {{table}} TO {{OwnerRole}};
+            DROP FUNCTION IF EXISTS {{function}}(text, text);
+            REVOKE ALL ON {{table}} FROM {{GlobalRole}};
+            GRANT SELECT ({{columns}}) ON {{table}} TO {{GlobalRole}};
             DROP POLICY IF EXISTS "{{PolicyName}}" ON {{table}};
-            CREATE POLICY "{{PolicyName}}" ON {{table}} FOR SELECT TO {{OwnerRole}}
+            CREATE POLICY "{{PolicyName}}" ON {{table}} FOR SELECT TO {{GlobalRole}}
                 USING ({{key}} IN ('domains.tenant_subdomain', 'domains.tenant_custom_domain'));
-            DO $install$
-            DECLARE previous_role text := current_setting('role');
+            DO $stamp$
             BEGIN
-                PERFORM set_config('role', '{{OwnerRole}}', true);
-                EXECUTE $ddl$
-                CREATE OR REPLACE FUNCTION {{function}}(p_serialized text, p_trailing_dot text)
-                RETURNS SETOF {{table}} LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog
-                AS $body$
-                    SELECT settings.* FROM {{table}} settings
-                    WHERE settings.{{key}} IN ('domains.tenant_subdomain', 'domains.tenant_custom_domain')
-                        AND (lower(settings.{{value}}) = p_serialized OR lower(settings.{{value}}) = p_trailing_dot)
-                    LIMIT 1
-                $body$;
-                $ddl$;
-                EXECUTE $acl$
-                    REVOKE ALL ON FUNCTION {{function}}(text, text) FROM PUBLIC, {{GlobalRole}};
-                    GRANT EXECUTE ON FUNCTION {{function}}(text, text) TO {{GlobalRole}};
-                $acl$;
-                PERFORM set_config('role', previous_role, true);
-            END; $install$;
-            REVOKE CREATE ON SCHEMA {{schema}} FROM {{OwnerRole}};
+                EXECUTE (SELECT format('COMMENT ON POLICY %I ON %s IS %L', p.polname,
+                    {{Text(table)}}, {{Text(PolicyStamp(context))}} || md5(p.polqual::text))
+                    FROM pg_policy p WHERE p.polrelid={{Text(table)}}::regclass AND p.polname='{{PolicyName}}');
+            END; $stamp$;
+            DO $retire$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='{{RetiredOwnerRole}}') THEN
+                    REVOKE ALL ON {{table}} FROM {{RetiredOwnerRole}};
+                    REVOKE CREATE ON SCHEMA {{schema}} FROM {{RetiredOwnerRole}};
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='{{RetiredMigratorRole}}') THEN
+                        REVOKE {{RetiredOwnerRole}} FROM {{RetiredMigratorRole}};
+                    END IF;
+                END IF;
+            END; $retire$;
             """;
     }
+
+    private static string PolicyStamp(ExploreDbContext context) => "event-managed-domain-read:v1:"
+        + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Schema(context) + ":"
+            + context.Model.FindEntityType(typeof(TenantSetting))!.GetTableName() + ":domains.tenant_subdomain:domains.tenant_custom_domain"))) + ":";
+
+    private static string Text(string value) => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
 
     private static string Schema(ExploreDbContext context) =>
         context.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>()?.TargetSchema

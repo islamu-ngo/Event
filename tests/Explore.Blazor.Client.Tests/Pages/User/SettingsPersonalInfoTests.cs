@@ -54,7 +54,7 @@ public sealed class SettingsPersonalInfoTests : IDisposable
             kind = declared ? "Declared" : "Unknown",
             outcome = declared ? "AtLeastThreshold" : "Unknown",
             minimumAge = 18,
-            birthDateRevision = "1",
+            birthDateRevision = 1L,
             evaluatedAt = DateTimeOffset.UtcNow,
             validUntil = DateTimeOffset.UtcNow.AddMinutes(1)
         };

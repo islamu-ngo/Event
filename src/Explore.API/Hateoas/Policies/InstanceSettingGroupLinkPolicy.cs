@@ -15,13 +15,16 @@ public sealed class AtprotoInstanceSettingGroupLinkPolicy : ILinkPolicy<SettingG
         {
             foreach (var link in EmailDeliverySettingsLinkPolicy.TenantLinks(dto))
                 yield return link;
-            if (dto.Category == EventResourceSettingDefinitions.Category && dto.Settings.Any(setting => setting.CanEdit))
+            if ((dto.Category == EventResourceSettingDefinitions.Category && dto.Settings.Any(setting => setting.CanEdit))
+                || (dto.Category == "Tenant" && dto.Settings.Any(setting =>
+                    setting.Key == Explore.Domain.Constants.GovernanceSettingKeys.Tenants.UserRegistrationEnabled && setting.CanEdit)))
             {
                 var tenantId = dto.TenantId.Value;
                 yield return Link(LinkRelations.Edit, RouteNames.UpdateTenantSettingsBatch, "PUT",
                     new { category = dto.Category })
                     .RequirePermission(AuthorizationActions.TenantSettings.Update,
-                        ResourceKinds.TenantSetting, $"{tenantId}:event-resources",
+                        ResourceKinds.TenantSetting, $"{tenantId}:{(dto.Category == EventResourceSettingDefinitions.Category
+                            ? "event-resources" : Explore.Domain.Constants.GovernanceSettingKeys.Tenants.UserRegistrationEnabled)}",
                         new AuthorizationScope(TenantId: tenantId.ToString("D")),
                         new TenantSettingAuthorizationFacts(tenantId));
             }

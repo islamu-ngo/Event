@@ -30,7 +30,7 @@ public sealed class HumanWebhookResourcePortableSourceFenceTests(AdmissionAuthor
         await using var ingress = await EventVisitorCapabilitySqliteFixture.CreateAsync();
         var (subject, forwarding, _) = await HumanSupportAccessSourceFenceTests.CaptureAsync(ingress, null);
         bool sqlServer = provider == PrimaryDatabaseProvider.SqlServer;
-        await using var setup = Open(provider, ingress.TenantId);
+        await using var setup = await OpenAsync(provider, ingress.TenantId);
         if (sqlServer)
             await setup.Database.ExecuteSqlRawAsync(
                 "IF SCHEMA_ID(N'islamu_event') IS NULL EXEC(N'CREATE SCHEMA [islamu_event]')");
@@ -60,7 +60,7 @@ public sealed class HumanWebhookResourcePortableSourceFenceTests(AdmissionAuthor
         await setup.Database.ExecuteSqlRawAsync(
             $"INSERT INTO {Table(setup, typeof(User))} (id,is_deleted) VALUES ({{0}},{{1}})", subject.PrincipalId, false);
         Guid consumer = Guid.CreateVersion7();
-        await using var context = Open(provider, ingress.TenantId);
+        await using var context = await OpenAsync(provider, ingress.TenantId);
         var source = new HumanWebhookResourceSourceFence(context, subject,
             HumanWebhookResourceTarget.From(new OpenSvixAppPortalCommand { ConsumerId = consumer, SessionId = "source" }),
             PolicySourceSetPurpose.RuntimeTenant);
@@ -72,7 +72,7 @@ public sealed class HumanWebhookResourcePortableSourceFenceTests(AdmissionAuthor
         var p = await principal.AcquireAsync(s);
         var held = await source.AcquireAsync(s, p, await support.AcquireAsync(s, p));
         await Assert.That(HumanWebhookResourceProjection.Resource(held.Facts)).IsNull();
-        await using var writer = Open(provider, ingress.TenantId);
+        await using var writer = await OpenAsync(provider, ingress.TenantId);
         await writer.Database.OpenConnectionAsync();
         await writer.Database.ExecuteSqlRawAsync(sqlServer ? "SET LOCK_TIMEOUT 0" : "SET SESSION innodb_lock_wait_timeout = 1");
         string insert = $"INSERT INTO {Table(writer, typeof(WebhookConsumer))} "
@@ -100,10 +100,10 @@ public sealed class HumanWebhookResourcePortableSourceFenceTests(AdmissionAuthor
         await owner.RollbackAsync();
     }
 
-    private ExploreDbContext Open(PrimaryDatabaseProvider provider, Guid tenant)
+    private async Task<ExploreDbContext> OpenAsync(PrimaryDatabaseProvider provider, Guid tenant)
     {
         var options = TestDbContextOptions.Create<ExploreDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.CreateOptions(provider));
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, await fixture.CreateOptionsAsync(provider));
         return new ExploreDbContext(options.Options) { TenantContext = new TenantIdentity(tenant) };
     }
     private static string Table(ExploreDbContext context, Type type)

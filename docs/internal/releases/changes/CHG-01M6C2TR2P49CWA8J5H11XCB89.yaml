@@ -1,0 +1,36 @@
+Change-Id: CHG-01M6C2TR2P49CWA8J5H11XCB89
+Title: "Preserve native receipt recovery custody"
+Type: fix
+Scope: access
+Summary: "Restore persisted recovery shadow state during receipt issuance while retaining exact receipt, source and transaction ownership through the final native recheck."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Admit only the original receipt, tracked source and native recovery
+      advancement under their original context, connection and transaction.
+      Replaced, detached, deleted or altered recovery ownership cannot release
+      a bearer. Restore the stored singleton shadow value rather than inventing
+      a default when attaching a persisted recovery entity.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented
+    Detail: >-
+      Normal issuance preserves the stored recovery singleton. Do not reset
+      recovery metadata to obtain a receipt, treat matching identifiers as
+      native ownership, or treat receipt history as present read authority.

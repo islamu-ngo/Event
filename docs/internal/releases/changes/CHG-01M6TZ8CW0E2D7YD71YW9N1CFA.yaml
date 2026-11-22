@@ -1,0 +1,29 @@
+Change-Id: CHG-01M6TZ8CW0E2D7YD71YW9N1CFA
+Title: "Restore current-user profile reads with bounded account ownership"
+Type: fix
+Scope: access
+Summary: "Read current-user profile scalars and erasure presence through Global while retaining original Runtime custody and live tenant-filtered managed media."
+Group: bounded-current-user-profile
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Detail: "The fixed pre-release Global permission manifest adds eleven profile SELECT columns. Old partial enrollments fail closed; validate this version with fresh development enrollment rather than manual grants."
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Detail: "Preserve Runtime account-read denial and before/after-cache erasure guards. Project only profile scalars, retain denied private birth-date and receipt access, and resolve managed storage through the original Runtime tenant scope."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/privacy-erasure.md
+    Disposition: documented
+    Detail: "Current-user reads no longer request Global account or private saga graphs through Runtime. Cached profiles remain withheld after erasure, and managed image publication is checked live. The fixed Global enrollment change requires fresh pre-release development enrollment; no schema migration is introduced."

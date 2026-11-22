@@ -19,11 +19,6 @@ public static class AuthenticationProviderLockoutPolicy
             enabledProviders.Add(configuration.PrimaryProviderId);
         }
 
-        if (configuration.GoogleSsoEnabled)
-        {
-            enabledProviders.Add((int)AuthenticationProviderKind.Google);
-        }
-
         if (configuration.AtprotoLoginEnabled)
         {
             enabledProviders.Add((int)AuthenticationProviderKind.Atproto);

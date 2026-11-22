@@ -24,8 +24,17 @@ public sealed class EmbeddedPrivacyErasureCounterConfiguration
         });
         builder.HasKey(item => item.Singleton);
         builder.Property(item => item.Singleton).ValueGeneratedNever();
-        builder.Property(item => item.StoreId).ValueGeneratedNever();
-        builder.Property(item => item.Revision).IsConcurrencyToken();
+        // Native defaults initialize pre-recovery catalogs without replacing domain-supplied identities.
+        builder.Property(item => item.StoreId).HasDefaultValueSql("""
+            (lower(printf('%08x-%04x-7%s-%s%s-%s',
+                cast(unixepoch('subsec') * 1000 as integer) >> 16,
+                cast(unixepoch('subsec') * 1000 as integer) & 65535,
+                substr(hex(randomblob(2)), 2),
+                substr('89ab', (random() & 3) + 1, 1),
+                substr(hex(randomblob(2)), 2), hex(randomblob(6)))))
+            """);
+        builder.Property(item => item.Revision).HasDefaultValue(1L).IsConcurrencyToken();
+        builder.Property(item => item.RecoveryGeneration).HasDefaultValue(1L);
         builder.Property(item => item.RetainedFloorSequence).HasDefaultValue(0L);
         builder.Property(item => item.IdentityKeyId).HasMaxLength(64);
         builder.Property(item => item.IdentityKeyVerificationTag).HasMaxLength(64);

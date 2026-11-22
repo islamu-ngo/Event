@@ -67,7 +67,7 @@ public static class PostgresPaidPolicyCeilingContract
                 USING ({ChildPredicate<T>()});
             """;
         string parentPredicate = $"{active} AND {tenant} IS NOT NULL";
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         (string Table, string Sql, string ReadFingerprint, string TenantFingerprint) Specification<T>(string predicate)
         {
             string tableName = context.Model.FindEntityType(typeof(T))!.GetTableName()!;

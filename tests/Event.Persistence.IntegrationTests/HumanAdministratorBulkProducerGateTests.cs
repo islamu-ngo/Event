@@ -54,7 +54,7 @@ public sealed class HumanAdministratorBulkProducerGateTests
         var mutationLock = new RelationalSettingMutationLock(writer, unitOfWork);
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var tenantRepository = new TenantRepository(writer);
-        var capacity = new TenantActivationCapacityPolicy(new InstanceBootstrapStateRepository(writer), tenantRepository,
+        var capacity = new TenantActivationCapacityPolicy(new Event.Persistence.IntegrationTests.Fixtures.TestInstanceBootstrapStateReader(writer), tenantRepository,
             new ManagedTenantProvisioningOperationRepository(writer), Options.Create(new ManagedControlPlaneOptions { Enabled = false }));
         var readiness = new TenantDirectoryOperatorReadinessEvaluator(new TypedSettingsDocumentResolver(
             new TenantSettingsDocumentRepository(writer), cache));

@@ -36,6 +36,7 @@ Start with [Repository README](../../README.md) or the [Documentation Hub](../RE
 | Choose records, classes, or generated contract shapes | [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) | [GOVERNANCE.md](GOVERNANCE.md), [ARCHITECTURE.md](ARCHITECTURE.md), [TESTING.md](TESTING.md) |
 | Research external behavior or assess a dependency license | [IP Governance](legal/IP_GOVERNANCE.md) | [CLA](../../legal/CLA.md), [Mapperly provenance](legal/dependencies/mapperly.md), [CI/CD Governance](CI_CD_GOVERNANCE.md) |
 | Work on Blazor UI | [BLAZOR.md](BLAZOR.md) | [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), [ACCESSIBILITY.md](ACCESSIBILITY.md), [RENDER_POLICIES.md](RENDER_POLICIES.md) |
+| Create, size, or triage a Plane work item (`EVENT-XXX`) | [Work-item taxonomy standard](project-management/work-item-taxonomy-and-granularity-report.md) | [Plane project management ADR](adr/ADR-plane-project-management-standardization.md), [../../.agents/skills/plane-compose/SKILL.md](../../.agents/skills/plane-compose/SKILL.md), [../../.agents/skills/plane-mcp/SKILL.md](../../.agents/skills/plane-mcp/SKILL.md), [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Use an AI coding agent or understand context engineering | [AGENTIC_CONTEXT_ENGINEERING.md](AGENTIC_CONTEXT_ENGINEERING.md) | [../../AGENTS.md](../../AGENTS.md), [../../.agents/contract/intents.yaml](../../.agents/contract/intents.yaml), [QUICK_REFERENCE.md](QUICK_REFERENCE.md) |
 
 ## How To Use This Index
@@ -90,6 +91,8 @@ Start with [Repository README](../../README.md) or the [Documentation Hub](../RE
 - [TEMPLATE_GLOSSARY.md](TEMPLATE_GLOSSARY.md) - placeholder syntax used in generic templates.
 - [FIRST_CONTRIBUTION.md](FIRST_CONTRIBUTION.md) - shortest safe path for docs-only and small-bug PRs.
 - [CONTRIBUTING.md](CONTRIBUTING.md) - contribution workflow and validation steps.
+- [project-management/work-item-taxonomy-and-granularity-report.md](project-management/work-item-taxonomy-and-granularity-report.md) - Single-Project `EVENT` Plane taxonomy: vertical work items, Epics, Surface Labels, Version Modules, priority vs urgency, DoD vs sub-items, GitHub → Plane Intake.
+- [adr/ADR-plane-project-management-standardization.md](adr/ADR-plane-project-management-standardization.md) - binding Plane project-management decisions and the native `plane-compose` + Plane MCP tooling boundary.
 - [DOCUMENTATION_ARCHITECTURE.md](DOCUMENTATION_ARCHITECTURE.md) - docs architecture, ownership, metadata, source-anchor, and quality-gate policy.
 - [DOCUMENTATION_STYLE_GUIDE.md](DOCUMENTATION_STYLE_GUIDE.md) - documentation writing rules.
 - [PUBLIC_DOCS_ROADMAP.md](PUBLIC_DOCS_ROADMAP.md) - future hosted public-docs boundary and candidate pages.

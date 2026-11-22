@@ -804,7 +804,7 @@ public sealed partial class LocalIdentitySynchronizationTests
         services.AddScoped(provider => new ConfiguredAdministratorBootstrapProvider(
             configuration: configuration,
             operatorIdentityOptions: provider.GetRequiredService<IOptions<InstanceOperatorIdentityOptions>>(),
-            bootstrapRepository: provider.GetRequiredService<IInstanceBootstrapStateRepository>()));
+            bootstrapReader: provider.GetRequiredService<IInstanceBootstrapStateReader>()));
     }
 
     private static async Task PrepareNativeAdministratorAsync(

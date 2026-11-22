@@ -1,13 +1,12 @@
 using System.Security.Cryptography;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
+using Event.Testing;
 using Explore.Persistence.Database;
-using TUnit.Core.Interfaces;
 
 namespace Event.Persistence.IntegrationTests.Fixtures;
 
-public sealed class AdmissionAuthorityProviderFixture
-    : IAsyncInitializer, IAsyncDisposable
+public sealed class AdmissionAuthorityProviderFixture : IAsyncDisposable
 {
     private const ushort SqlServerPort = 1433;
     private const ushort MySqlPort = 3306;
@@ -16,37 +15,41 @@ public sealed class AdmissionAuthorityProviderFixture
 
     private readonly string _password =
         "Aa1!" + Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-    private IContainer? _sqlServer;
-    private IContainer? _mariaDb;
-    private IContainer? _mySql;
+    private readonly SemaphoreSlim _startup = new(1, 1);
+    private readonly Dictionary<PrimaryDatabaseProvider, IContainer> _containers = new();
 
-    public async Task InitializeAsync()
-    {
-        _sqlServer = BuildSqlServer();
-        _mariaDb = BuildMySqlFamily(PrimaryDatabaseProvider.MariaDb);
-        _mySql = BuildMySqlFamily(PrimaryDatabaseProvider.MySql);
-
-        using var startupCts = new CancellationTokenSource(StartupTimeout);
-        await Task.WhenAll(
-            _sqlServer.StartAsync(startupCts.Token),
-            _mariaDb.StartAsync(startupCts.Token),
-            _mySql.StartAsync(startupCts.Token));
-    }
-
-    public PrimaryDatabaseConnectionOptions CreateOptions(
+    public async Task<PrimaryDatabaseConnectionOptions> CreateOptionsAsync(
         PrimaryDatabaseProvider provider,
-        PrimaryDatabaseRole role = PrimaryDatabaseRole.Runtime)
+        PrimaryDatabaseRole role = PrimaryDatabaseRole.Runtime,
+        CancellationToken cancellationToken = default)
     {
-        IContainer container = provider switch
+        if (provider is not (PrimaryDatabaseProvider.SqlServer
+            or PrimaryDatabaseProvider.MariaDb
+            or PrimaryDatabaseProvider.MySql))
         {
-            PrimaryDatabaseProvider.SqlServer => _sqlServer
-                ?? throw new InvalidOperationException("SQL Server is not started."),
-            PrimaryDatabaseProvider.MariaDb => _mariaDb
-                ?? throw new InvalidOperationException("MariaDB is not started."),
-            PrimaryDatabaseProvider.MySql => _mySql
-                ?? throw new InvalidOperationException("MySQL is not started."),
-            _ => throw new ArgumentOutOfRangeException(nameof(provider)),
-        };
+            throw new ArgumentOutOfRangeException(nameof(provider));
+        }
+
+        IContainer container;
+        await _startup.WaitAsync(cancellationToken);
+        try
+        {
+            if (!_containers.TryGetValue(provider, out container!))
+            {
+                container = provider == PrimaryDatabaseProvider.SqlServer
+                    ? BuildSqlServer()
+                    : BuildMySqlFamily(provider);
+                _containers.Add(provider, container);
+
+                using var startupCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                startupCts.CancelAfter(StartupTimeout);
+                await container.StartAsync(startupCts.Token);
+            }
+        }
+        finally
+        {
+            _startup.Release();
+        }
 
         return new PrimaryDatabaseConnectionOptions
         {
@@ -82,18 +85,12 @@ public sealed class AdmissionAuthorityProviderFixture
 
     public async ValueTask DisposeAsync()
     {
-        if (_sqlServer is not null)
+        foreach (IContainer container in _containers.Values)
         {
-            await _sqlServer.DisposeAsync();
+            await container.DisposeAsync();
         }
-        if (_mariaDb is not null)
-        {
-            await _mariaDb.DisposeAsync();
-        }
-        if (_mySql is not null)
-        {
-            await _mySql.DisposeAsync();
-        }
+
+        _startup.Dispose();
     }
 
     private IContainer BuildSqlServer() =>
@@ -108,6 +105,7 @@ public sealed class AdmissionAuthorityProviderFixture
             .WithWaitStrategy(
                 Wait.ForUnixContainer()
                     .UntilInternalTcpPortIsAvailable(SqlServerPort))
+            .ApplyBoundedResourcePolicy(ContainerServiceRole.SqlServer)
             .Build();
 
     private IContainer BuildMySqlFamily(PrimaryDatabaseProvider provider)
@@ -119,7 +117,11 @@ public sealed class AdmissionAuthorityProviderFixture
             .WithPortBinding(MySqlPort, assignRandomHostPort: true)
             .WithWaitStrategy(
                 Wait.ForUnixContainer()
-                    .UntilInternalTcpPortIsAvailable(MySqlPort));
+                    .UntilInternalTcpPortIsAvailable(MySqlPort))
+            .ApplyBoundedResourcePolicy(
+                provider == PrimaryDatabaseProvider.MariaDb
+                    ? ContainerServiceRole.MariaDb
+                    : ContainerServiceRole.MySql);
 
         return provider == PrimaryDatabaseProvider.MariaDb
             ? builder

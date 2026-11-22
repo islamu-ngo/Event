@@ -11,6 +11,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Event.Distributed.IntegrationTests;
@@ -34,61 +35,68 @@ public sealed class EnabledWorkerRuntimeTests
                     .WithEnvironment("EmailDispatchProcessor__ProcessingLeaseTimeoutSeconds", "1");
                 return Task.CompletedTask;
             }, cancellationToken);
-        await owner.StartAsync(cancellationToken);
-        using var api = owner.CreateHttpClient("explore-api");
-        Guid userId = await owner.AuthenticateBootstrapAsync(api, cancellationToken);
-        Guid tenantId = await CreateActiveTenantAsync(owner, api, cancellationToken);
-        using (var enabled = await api.PatchAsJsonAsync("/api/instance/settings/smtp",
-            new { deliveryEnabled = true }, cancellationToken))
-            enabled.EnsureSuccessStatusCode();
-
-        var tenantFactory = new TenantExploreDbContextFactory(DatabaseOptions(owner, PrimaryDatabaseRole.Runtime));
-        var admission = new EmailDispatchAdmission(
-            new GlobalExploreDbContextFactory(DatabaseOptions(owner, PrimaryDatabaseRole.Global)), tenantFactory);
-        using var mailpit = owner.CreateHttpClient("mailpit");
-        var pending = await SeedPendingAsync(tenantFactory, tenantId, userId, cancellationToken);
-        await RequireDeliveredAsync(api, mailpit, pending, cancellationToken);
-
-        Task stopped = owner.Application.ResourceNotifications.WaitForResourceAsync(
-            "explore-api", KnownResourceStates.Exited, cancellationToken);
-        var stop = await owner.Application.ResourceCommands.ExecuteCommandAsync(
-            "explore-api", KnownResourceCommands.StopCommand, cancellationToken);
-        await Assert.That(stop.Success).IsTrue();
-        await stopped;
-        using (var operations = owner.CreateHttpClient("explore-api", "operations"))
+        Exception? failure = null;
+        try
         {
-            bool unavailable;
-            try
+            await owner.StartAsync(cancellationToken);
+            using var api = owner.CreateHttpClient("explore-api");
+            Guid userId = await owner.AuthenticateBootstrapAsync(api, cancellationToken);
+            Guid tenantId = await CreateActiveTenantAsync(owner, api, cancellationToken);
+            using (var enabled = await api.PatchAsJsonAsync("/api/instance/settings/smtp",
+                new { deliveryEnabled = new { hasValue = true, value = true } }, cancellationToken))
+                enabled.EnsureSuccessStatusCode();
+
+            var tenantFactory = new TenantExploreDbContextFactory(DatabaseOptions(owner, PrimaryDatabaseRole.Runtime));
+            var admission = new EmailDispatchAdmission(
+                new GlobalExploreDbContextFactory(DatabaseOptions(owner, PrimaryDatabaseRole.Global)), tenantFactory);
+            using var mailpit = owner.CreateHttpClient("mailpit");
+            var pending = await SeedPendingAsync(tenantFactory, tenantId, userId, cancellationToken);
+            await RequireDeliveredAsync(api, mailpit, pending, cancellationToken);
+
+            Task stopped = owner.Application.ResourceNotifications.WaitForResourceAsync(
+                "explore-api", KnownResourceStates.Exited, cancellationToken);
+            var stop = await owner.Application.ResourceCommands.ExecuteCommandAsync(
+                "explore-api", KnownResourceCommands.StopCommand, cancellationToken);
+            await Assert.That(stop.Success).IsTrue();
+            await stopped;
+            using (var operations = owner.CreateHttpClient("explore-api", "operations"))
             {
-                using var response = await operations.GetAsync("/health", cancellationToken);
-                unavailable = response.StatusCode == HttpStatusCode.ServiceUnavailable;
+                bool unavailable;
+                try
+                {
+                    using var response = await operations.GetAsync("/health", cancellationToken);
+                    unavailable = response.StatusCode == HttpStatusCode.ServiceUnavailable;
+                }
+                catch (HttpRequestException) { unavailable = true; }
+                await Assert.That(unavailable).IsTrue();
             }
-            catch (HttpRequestException) { unavailable = true; }
-            await Assert.That(unavailable).IsTrue();
+
+            var original = await SeedPendingAsync(tenantFactory, tenantId, userId, cancellationToken);
+            Guid originalLease = Guid.CreateVersion7();
+            DateTime claimedAt = DateTime.UtcNow;
+            var claimed = await admission.TryClaimSpecificAsync(new(tenantId, original.PublishEventId,
+                originalLease, 8, 2, 1000, 500, claimedAt), cancellationToken);
+            await Assert.That(claimed).IsNotNull();
+            await Assert.That(claimed!.Id).IsEqualTo(original.OutboxId);
+            await Assert.That(claimed.SourceId).IsEqualTo(original.SourceId);
+            await Assert.That(claimed.Status).IsEqualTo(EmailDispatchStatus.Processing);
+            await Assert.That(claimed.ProcessingLeaseToken).IsEqualTo(originalLease);
+            await Assert.That(claimed.AttemptCount).IsEqualTo(0);
+            await WaitUntilAsync(() => Task.FromResult(DateTime.UtcNow > claimedAt.AddSeconds(1)), cancellationToken);
+
+            Task running = owner.Application.ResourceNotifications.WaitForResourceAsync(
+                "explore-api", KnownResourceStates.Running, cancellationToken);
+            var start = await owner.Application.ResourceCommands.ExecuteCommandAsync(
+                "explore-api", KnownResourceCommands.StartCommand, cancellationToken);
+            await Assert.That(start.Success).IsTrue();
+            await running;
+            await owner.Application.ResourceNotifications.WaitForResourceHealthyAsync("explore-api", cancellationToken);
+            await RequireDeliveredAsync(api, mailpit, original, cancellationToken);
+            await RequireDeliveredAsync(api, mailpit, pending, cancellationToken);
         }
-
-        var original = await SeedPendingAsync(tenantFactory, tenantId, userId, cancellationToken);
-        Guid originalLease = Guid.CreateVersion7();
-        DateTime claimedAt = DateTime.UtcNow;
-        var claimed = await admission.TryClaimSpecificAsync(new(tenantId, original.PublishEventId,
-            originalLease, 8, 2, 1000, 500, claimedAt), cancellationToken);
-        await Assert.That(claimed).IsNotNull();
-        await Assert.That(claimed!.Id).IsEqualTo(original.OutboxId);
-        await Assert.That(claimed.SourceId).IsEqualTo(original.SourceId);
-        await Assert.That(claimed.Status).IsEqualTo(EmailDispatchStatus.Processing);
-        await Assert.That(claimed.ProcessingLeaseToken).IsEqualTo(originalLease);
-        await Assert.That(claimed.AttemptCount).IsEqualTo(0);
-        await WaitUntilAsync(() => Task.FromResult(DateTime.UtcNow > claimedAt.AddSeconds(1)), cancellationToken);
-
-        Task running = owner.Application.ResourceNotifications.WaitForResourceAsync(
-            "explore-api", KnownResourceStates.Running, cancellationToken);
-        var start = await owner.Application.ResourceCommands.ExecuteCommandAsync(
-            "explore-api", KnownResourceCommands.StartCommand, cancellationToken);
-        await Assert.That(start.Success).IsTrue();
-        await running;
-        await owner.Application.ResourceNotifications.WaitForResourceHealthyAsync("explore-api", cancellationToken);
-        await RequireDeliveredAsync(api, mailpit, original, cancellationToken);
-        await RequireDeliveredAsync(api, mailpit, pending, cancellationToken);
+        catch (Exception exception) { failure = exception; }
+        using var evidenceDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await owner.CompleteManagedLaunchObservationAsync(failure, evidenceDeadline.Token);
         await owner.DisposeAsync();
         await Assert.That(Directory.Exists(owner.Root)).IsFalse();
     }
@@ -143,8 +151,7 @@ public sealed class EnabledWorkerRuntimeTests
     {
         await using var context = await factory.CreateDbContextAsync(tenantId, cancellationToken);
         context.CurrentUserService = new SeedActor(userId);
-        var recipient = await context.Users.Include(user => user.IdentityEmailClaims).ThenInclude(claim => claim.Evidence)
-            .SingleAsync(user => user.Id == userId, cancellationToken);
+        var recipient = await EmailDeliveryRecipientReader.ReadAsync(context, userId, cancellationToken);
         var address = RecipientEmailAddressResolver.Resolve(recipient, userId);
         await Assert.That(address.HasVerifiedEmail).IsTrue();
         var membership = await context.TenantUsers.SingleAsync(row => row.TenantId == tenantId

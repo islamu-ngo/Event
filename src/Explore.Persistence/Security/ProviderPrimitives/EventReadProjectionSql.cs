@@ -51,8 +51,14 @@ internal static class EventReadProjectionSql
         {
             PostgresTenantMembershipMutationPermissions.TryGetRuntimeColumns(context, type,
                 out var read, out var update, out _);
-            return read.Select(column => (column, Privilege: "SELECT"))
-                .Concat(update.Select(column => (column, Privilege: "UPDATE")))
+            PostgresCategoryMutationPermissions.TryGetRuntimeColumns(context, type,
+                out var categoryRead, out var categoryInsert, out var categoryUpdate, out _);
+            var external = PostgresExternalTenantEnrollmentPermissions.RuntimeColumns(context, type);
+            return read.Concat(categoryRead).Select(column => (column, Privilege: "SELECT"))
+                .Concat(categoryInsert.Select(column => (column, Privilege: "INSERT")))
+                .Concat(update.Concat(categoryUpdate).Select(column => (column, Privilege: "UPDATE")))
+                .Concat(external.Select(grant => (column: grant.Column, grant.Privilege)))
+                .Distinct()
                 .Select(grant => $"(t.oid={Text(names.Table(type))}::regclass AND a.attname={Text(grant.column)} AND permission.privilege={Text(grant.Privilege)})");
         }).ToArray();
         string mutationGrant = mutations.Length == 0 ? "false" : $"""
@@ -63,11 +69,20 @@ internal static class EventReadProjectionSql
             AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
                 WHERE acl.grantee=0 AND acl.privilege_type=permission.privilege)
             """;
-        string mutationProof = mutations.Length == 0 ? "true"
-            : PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment);
-        string delete = sources.Contains(typeof(TenantUserProfile))
-            ? PostgresTenantMembershipMutationPermissions.RuntimeDeletePredicate(context, enrollment, "r.oid", "t.oid")
-            : "false";
+        var proofParts = new List<string>();
+        if (sources.Any(type => PostgresTenantMembershipMutationPermissions.TryGetRuntimeColumns(context, type, out _, out _, out _)))
+            proofParts.Add(PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment));
+        if (sources.Contains(typeof(Category)))
+            proofParts.Add(PostgresCategoryMutationPermissions.OptionalCataloguePredicate(context, enrollment));
+        if (sources.Any(PostgresExternalTenantEnrollmentPermissions.Includes))
+            proofParts.Add(PostgresExternalTenantEnrollmentPermissions.OptionalCataloguePredicate(context, enrollment));
+        string mutationProof = proofParts.Count == 0 ? "true" : string.Join(" AND ", proofParts.Select(part => $"({part})"));
+        var deleteParts = new List<string>();
+        if (sources.Contains(typeof(TenantUserProfile)))
+            deleteParts.Add(PostgresTenantMembershipMutationPermissions.RuntimeDeletePredicate(context, enrollment, "r.oid", "t.oid"));
+        if (sources.Contains(typeof(Category)))
+            deleteParts.Add(PostgresCategoryMutationPermissions.RuntimeCategoryDeletePredicate(context, enrollment, "r.oid", "t.oid"));
+        string delete = deleteParts.Count == 0 ? "false" : string.Join(" OR ", deleteParts.Select(part => $"({part})"));
         return $"""
             IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                 WHERE pg_catalog.pg_has_role({runtime},r.oid,'MEMBER')
@@ -155,7 +170,7 @@ internal static class EventReadProjectionSql
     internal static string PublicSourceGuard(ExploreDbContext context, HumanPrincipalSourceSql names,
         IReadOnlyDictionary<Type, HashSet<string>> sources, string migratorLogin, string diagnosticPrefix)
     {
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         return $"""
             IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n WHERE n.nspname = {Text(names.Schema)}
                 AND n.nspowner = pg_catalog.to_regrole({Text(migratorLogin)})::oid)

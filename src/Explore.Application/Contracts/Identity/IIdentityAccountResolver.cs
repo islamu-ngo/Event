@@ -1,5 +1,4 @@
 using Explore.Application.Authentication;
-using Explore.Domain;
 using Explore.Domain.Services.Identity;
 
 namespace Explore.Application.Contracts.Identity;
@@ -13,4 +12,4 @@ public interface IIdentityAccountResolver
 }
 
 public sealed record IdentityAccountResolution(
-    IdentityCorrelationDecision Decision, User? User, bool CanClaimVerifiedEmail);
+    IdentityCorrelationDecision Decision, Guid? UserId, bool CanClaimVerifiedEmail);

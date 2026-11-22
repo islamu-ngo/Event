@@ -101,6 +101,10 @@ public sealed class RecipientDeliveryMigrationContainerFixture : IAsyncInitializ
                 .WithName(_intendedContainerName!)
                 .WithLabel(OwnerLabel, ownership.Owner).WithLabel(ResourceLabel, "postgres")
                 .WithLabel(FixtureLabel, _fixtureNonce).WithImagePullPolicy(PullPolicy.Never);
+        builder = builder.ApplyBoundedResourcePolicy(
+            Event.Testing.ContainerServiceRole.PostgreSql,
+            hasAssuranceOwner: _assurance is not null,
+            hasExplicitContainerName: !string.IsNullOrWhiteSpace(_intendedContainerName));
         _container = builder.Build();
         await _container.StartAsync();
         RecordStage(AssuranceStage.ContainerStartReturned);

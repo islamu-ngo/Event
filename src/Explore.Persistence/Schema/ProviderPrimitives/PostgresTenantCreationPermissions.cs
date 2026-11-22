@@ -58,13 +58,14 @@ public static class PostgresTenantCreationPermissions
         enrollment.Validate();
         var sources = Sources(context);
         var mechanics = ProvisioningSharedWriterAssertions.TenantCreationInventory(context, enrollment, identityTopology);
-        string fresh = FreshPredicate(context, sources, enrollment.GlobalLogin);
+        string fresh = FreshPredicate(context, sources, enrollment);
         string complete = ManifestPredicate(context, sources, enrollment, true);
         await using var owned = context.Database.CurrentTransaction is null
             ? await context.Database.BeginTransactionAsync(cancellationToken) : null;
         var transaction = context.Database.CurrentTransaction!;
         string savepoint = "tenant_creation_permissions_" + Guid.CreateVersion7().ToString("N");
         await transaction.CreateSavepointAsync(savepoint, cancellationToken);
+        Exception? failure = null;
         try
         {
             if (await ScalarAsync(context, $"SELECT session_user={Text(enrollment.MigratorLogin)} AND current_user=session_user AND pg_catalog.current_setting('role') IN ('none',session_user::text)", cancellationToken) is not true)
@@ -98,16 +99,36 @@ public static class PostgresTenantCreationPermissions
                         await ExecuteAsync(context, $"COMMENT ON POLICY {names.DelimitIdentifier(policy)} ON {source.Table} IS {Text(PolicyStamp(source, enrollment.GlobalLogin, policy) + hash)}", cancellationToken);
                     }
                 }
+                var fence = KeyFence(context);
+                await ExecuteAsync(context, $"GRANT UPDATE ({names.DelimitIdentifier(fence.Column)}) ON {fence.Table} TO {names.DelimitIdentifier(enrollment.GlobalLogin)};", cancellationToken);
                 if (await ScalarAsync(context, "SELECT " + complete, cancellationToken) is not true)
                     throw new InvalidOperationException(Drift);
             }
         }
-        catch
+        catch (Exception exception)
         {
-            await transaction.RollbackToSavepointAsync(savepoint, CancellationToken.None);
+            failure = exception;
+            try
+            {
+                await transaction.RollbackToSavepointAsync(savepoint, CancellationToken.None);
+            }
+            catch (Exception rollbackFailure)
+            {
+                exception.Data["TenantCreationPermissions.SavepointRollbackFailure"] = rollbackFailure;
+            }
             throw;
         }
-        finally { await transaction.ReleaseSavepointAsync(savepoint, CancellationToken.None); }
+        finally
+        {
+            try
+            {
+                await transaction.ReleaseSavepointAsync(savepoint, CancellationToken.None);
+            }
+            catch (Exception releaseFailure) when (failure is not null)
+            {
+                failure.Data["TenantCreationPermissions.SavepointReleaseFailure"] = releaseFailure;
+            }
+        }
         if (owned is not null) await owned.CommitAsync(cancellationToken);
     }
 
@@ -116,10 +137,65 @@ public static class PostgresTenantCreationPermissions
         IdentityDatabaseTopology identityTopology, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        await PrepareCurrentAssertion(context, enrollment, identityTopology)(cancellationToken);
+    }
+
+    /// <summary>Prepares source-declared SQL only; each invocation observes its own cancellation and current database authority.</summary>
+    internal static Func<CancellationToken, Task> PrepareCurrentAssertion(ExploreDbContext context,
+        PostgresNativeQueueEnrollment? enrollment, IdentityDatabaseTopology identityTopology)
+    {
         if (!Enum.IsDefined(identityTopology)) throw new ArgumentOutOfRangeException(nameof(identityTopology));
-        if (!context.Database.IsNpgsql()) return;
+        if (!context.Database.IsNpgsql())
+            return token =>
+            {
+                token.ThrowIfCancellationRequested();
+                return Task.CompletedTask;
+            };
         if (enrollment is null) throw new UnauthorizedAccessException("tenant_creation_enrollment_required");
         enrollment.Validate();
+        var program = context.TenantCreationSources;
+        if (program is null || !program.Matches(context, enrollment, identityTopology))
+            program = CompileSourceProgram(context, enrollment, identityTopology);
+        string sql = program.Manifest;
+        string executable = program.Executable;
+        return token => RequireCurrentAsync(context, sql, executable, token);
+    }
+
+    internal static SourceProgram CompileSourceProgram(ExploreDbContext context,
+        PostgresNativeQueueEnrollment enrollment, IdentityDatabaseTopology identityTopology)
+    {
+        var sources = Sources(context);
+        var mechanics = ProvisioningSharedWriterAssertions.TenantCreationInventory(context, enrollment, identityTopology);
+        string sql = $"SELECT ({SealedSession(enrollment.GlobalLogin)}) AND pg_catalog.current_setting('role') IN ('none',session_user::text) AND pg_catalog.current_setting('session_replication_role')='origin' AND ({ManifestPredicate(context, sources, enrollment, true)}) AND ({ExecutableSourcePredicate(context, sources, mechanics.Writers)})";
+        string executable = ExecutableAssertions(context, mechanics);
+        var namespaces = context.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>();
+        return new(context.Model, context.GetService<IDesignTimeModel>().Model,
+            namespaces is not null, namespaces?.ModelSchema, namespaces?.TargetSchema,
+            enrollment, identityTopology, sql, executable);
+    }
+
+    /// <summary>Expected source text only; its lifetime belongs to one configured Global factory.</summary>
+    internal sealed record SourceProgram(
+        IModel Model, IModel DesignModel, bool HasNamespaces, string? ModelSchema, string? TargetSchema,
+        PostgresNativeQueueEnrollment Enrollment, IdentityDatabaseTopology Topology, string Manifest, string Executable)
+    {
+        internal bool Matches(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+            IdentityDatabaseTopology topology)
+        {
+            var namespaces = context.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>();
+            return ReferenceEquals(Model, context.Model)
+                && ReferenceEquals(DesignModel, context.GetService<IDesignTimeModel>().Model)
+                && HasNamespaces == (namespaces is not null)
+                && StringComparer.Ordinal.Equals(ModelSchema, namespaces?.ModelSchema)
+                && StringComparer.Ordinal.Equals(TargetSchema, namespaces?.TargetSchema)
+                && Enrollment == enrollment && Topology == topology;
+        }
+    }
+
+    private static async Task RequireCurrentAsync(ExploreDbContext context, string sql, string executable,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         context.RequireBoundTenantLease();
         if (context.Database.GetDbConnection() is not NpgsqlConnection connection || connection.State != ConnectionState.Open)
             throw new UnauthorizedAccessException("tenant_creation_open_owner_required");
@@ -146,13 +222,10 @@ public static class PostgresTenantCreationPermissions
         try
         {
             RequireOriginal();
-            var sources = Sources(context);
-            var mechanics = ProvisioningSharedWriterAssertions.TenantCreationInventory(context, enrollment, identityTopology);
-            string sql = $"SELECT ({SealedSession(enrollment.GlobalLogin)}) AND pg_catalog.current_setting('role') IN ('none',session_user::text) AND pg_catalog.current_setting('session_replication_role')='origin' AND ({ManifestPredicate(context, sources, enrollment, true)}) AND ({ExecutableSourcePredicate(context, sources, mechanics.Writers)})";
             if (await ScalarAsync(context, sql, cancellationToken) is not true)
                 throw new UnauthorizedAccessException("tenant_creation_permissions_not_ready");
             RequireOriginal();
-            await ExecuteAsync(context, ExecutableAssertions(context, mechanics), cancellationToken);
+            await ExecuteAsync(context, executable, cancellationToken);
             RequireOriginal();
         }
         finally { connection.StateChange -= Changed; }
@@ -177,11 +250,16 @@ public static class PostgresTenantCreationPermissions
     }
 
     /// <summary>Recognizes only an absent or complete fixed addition; no caller identity or executable protocol is inferred.</summary>
-    internal static string OptionalGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    internal static string OptionalGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        string? externalCataloguePredicate = null, string? workerCataloguePredicate = null)
     {
         enrollment.Validate();
         var sources = Sources(context);
-        return $"(({ManifestPredicate(context, sources, enrollment, false)}) AND (({FreshPredicate(context, sources, enrollment.GlobalLogin)}) OR ({ManifestPredicate(context, sources, enrollment, true)})))";
+        return PostgresExternalTenantEnrollmentPermissions.ComposeCataloguePredicate(context, enrollment,
+            externalCataloguePredicate, reference =>
+                PostgresManagedTenantWorkerCreationPermissions.ComposeCataloguePredicate(context, enrollment,
+                    workerCataloguePredicate, workerReference =>
+                        $"(({ManifestPredicate(context, sources, enrollment, false, reference, workerReference)}) AND (({FreshPredicate(context, sources, enrollment, workerReference)}) OR ({ManifestPredicate(context, sources, enrollment, true, reference, workerReference)})))"));
     }
 
     /// <summary>Exact policy recognition for the readiness query's p/c/n aliases; never a new grant.</summary>
@@ -192,8 +270,72 @@ public static class PostgresTenantCreationPermissions
         return $"COALESCE((session_user={Text(globalLogin)} AND current_user=session_user AND ({(policies.Length == 0 ? "false" : policies)})),false)";
     }
 
+    /// <summary>
+    /// The discovery row fence performs a no-op key UPDATE on the creator's existing User.
+    /// Only that direct, non-grantable key column is declared; User stays outside the
+    /// whole-relation creator catalogue because other fixed contracts own its remaining rights.
+    /// </summary>
+    internal static IReadOnlyList<string> GlobalUpdateColumns(ExploreDbContext context, Type type) =>
+        type == typeof(User) ? Array.AsReadOnly([KeyFence(context).Column]) : [];
+
+    private static (string Table, string Column) KeyFence(ExploreDbContext context)
+    {
+        var entity = context.Model.FindEntityType(typeof(User)) ?? throw new InvalidOperationException("tenant_creation_model_missing");
+        string name = entity.GetTableName() ?? throw new InvalidOperationException("tenant_creation_table_missing");
+        string schema = context.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>()?.TargetSchema
+            ?? entity.GetSchema() ?? "public";
+        string column = entity.FindProperty(nameof(User.Id))!.GetColumnName(StoreObjectIdentifier.Table(name, entity.GetSchema()))
+            ?? throw new InvalidOperationException("tenant_creation_column_missing");
+        return (context.GetService<ISqlGenerationHelper>().DelimitIdentifier(name, schema), column);
+    }
+
+    private static string KeyFencePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment, bool? granted,
+        string? workerCataloguePredicate = null)
+    {
+        var (table, column) = KeyFence(context);
+        string global = Text(enrollment.GlobalLogin);
+        string allowed = "ARRAY[" + string.Join(',', PostgresTenantPreferencePermissions.GlobalUpdateColumns(context)
+            .Append(column).Select(Text)) + "]::text[]";
+        PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(
+            context, typeof(User), out _, out _, out var workerUpdates);
+        string workerAllowed = "ARRAY[" + string.Join(',', workerUpdates.Select(Text)) + "]::text[]";
+        string direct = $"""
+            EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl
+                WHERE a.attrelid=pg_catalog.to_regclass({Text(table)}) AND a.attname={Text(column)}
+                    AND acl.grantee=(SELECT oid FROM pg_catalog.pg_roles WHERE rolname={global})
+                    AND acl.grantor=(SELECT oid FROM pg_catalog.pg_roles WHERE rolname={Text(enrollment.MigratorLogin)})
+                    AND acl.privilege_type='UPDATE' AND NOT acl.is_grantable)
+            """;
+        string presence = granted switch { true => " AND " + direct, false => $" AND NOT ({direct})", null => "" };
+        return PostgresManagedTenantWorkerCreationPermissions.ComposeCataloguePredicate(
+            context, enrollment, workerCataloguePredicate, workerReference => $"""
+            (NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE pg_catalog.pg_has_role({global},r.oid,'MEMBER')
+                AND (pg_catalog.has_table_privilege(r.oid,{Text(table)},'UPDATE')
+                    OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
+                        WHERE a.attrelid=pg_catalog.to_regclass({Text(table)}) AND a.attnum<>0 AND NOT a.attisdropped
+                            AND (pg_catalog.has_column_privilege(r.oid,a.attrelid,a.attnum,'UPDATE WITH GRANT OPTION')
+                                OR (pg_catalog.has_column_privilege(r.oid,a.attrelid,a.attnum,'UPDATE')
+                                    AND NOT (r.rolname={global} AND a.attnum>0
+                                        AND (a.attname=ANY({allowed})
+                                            OR (({workerReference}) IS TRUE AND a.attname=ANY({workerAllowed})))))))))
+            AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl
+                WHERE a.attrelid=pg_catalog.to_regclass({Text(table)}) AND acl.grantee=0 AND acl.privilege_type='UPDATE')
+            {presence})
+            """);
+    }
+
     private static string ManifestPredicate(ExploreDbContext context, Source[] sources,
-        PostgresNativeQueueEnrollment enrollment, bool complete)
+        PostgresNativeQueueEnrollment enrollment, bool complete, string? externalCataloguePredicate = null,
+        string? workerCataloguePredicate = null) =>
+        PostgresExternalTenantEnrollmentPermissions.ComposeCataloguePredicate(context, enrollment,
+            externalCataloguePredicate, reference =>
+                PostgresManagedTenantWorkerCreationPermissions.ComposeCataloguePredicate(
+                    context, enrollment, workerCataloguePredicate, workerReference =>
+                        $"(({SourceManifestPredicate(context, sources, enrollment, complete, reference, workerReference)}) AND ({KeyFencePredicate(context, enrollment, complete ? true : null, workerReference)}))"));
+
+    private static string SourceManifestPredicate(ExploreDbContext context, Source[] sources,
+        PostgresNativeQueueEnrollment enrollment, bool complete, string? externalCataloguePredicate,
+        string? workerCataloguePredicate)
     {
         string global = Text(enrollment.GlobalLogin), runtime = Text(enrollment.RuntimeLogin);
         var globalGrants = sources.SelectMany(source =>
@@ -212,6 +354,11 @@ public static class PostgresTenantCreationPermissions
         var membershipReads = sources.SelectMany(source =>
         {
             PostgresUserTenantMembershipReadPermissions.TryGetGlobalReadColumns(context, source.Type, out var columns);
+            return columns.Select(column => $"({global},{Text(source.Table)},{Text(column)},'SELECT',false)");
+        });
+        var administrativeReads = sources.SelectMany(source =>
+        {
+            PostgresAdministrativeAuthorityReadPermissions.TryGetGlobalReadColumns(context, source.Type, out var columns);
             return columns.Select(column => $"({global},{Text(source.Table)},{Text(column)},'SELECT',false)");
         });
         var membershipMutations = sources.SelectMany(source =>
@@ -240,11 +387,21 @@ public static class PostgresTenantCreationPermissions
                 .Concat(update.Select(column => (column, Privilege: "UPDATE")))
                 .Select(grant => $"({runtime},{Text(source.Table)},{Text(grant.column)},{Text(grant.Privilege)},false)");
         });
+        var externalEnrollment = sources.SelectMany(source =>
+            PostgresExternalTenantEnrollmentPermissions.RuntimeColumns(context, source.Type)
+                .Select(grant => $"({runtime},{Text(source.Table)},{Text(grant.Column)},{Text(grant.Privilege)},false)"));
+        var bootstrapGrants = sources.SelectMany(source =>
+            PostgresSetupLiveStoragePermissions.GlobalBootstrapColumns(context, source.Type)
+                .SelectMany(column => new[] { "SELECT", "INSERT", "UPDATE" }
+                    .Select(privilege => $"({global},{Text(source.Table)},{Text(column)},{Text(privilege)},false)")));
+        bootstrapGrants = bootstrapGrants.Concat(sources.SelectMany(source =>
+            PostgresSetupLiveStoragePermissions.GlobalCompletionColumns(context, source.Type)
+                .Select(grant => $"({global},{Text(source.Table)},{Text(grant.Column)},{Text(grant.Privilege)},false)")));
         // Role already belongs to Runtime's fixed public catalogue. Recognize that direct
         // source intersection without installing it or admitting an inherited role union.
         var role = sources.Single(source => source.Type == typeof(Role));
         PostgresLookupCatalogueReadPermissions.TryGetRuntimeReadColumns(context, typeof(Role), out var runtimeRoleColumns);
-        string expected = "VALUES " + string.Join(',', globalGrants.Concat(workerGrants).Concat(membershipReads).Concat(membershipMutations).Concat(tenantKeyParents).Concat(actorOwnershipReads).Concat(guidanceGrants).Concat(runtimeRoleColumns.Select(column =>
+        string expected = "VALUES " + string.Join(',', globalGrants.Concat(workerGrants).Concat(membershipReads).Concat(administrativeReads).Concat(membershipMutations).Concat(tenantKeyParents).Concat(actorOwnershipReads).Concat(guidanceGrants).Concat(externalEnrollment).Concat(bootstrapGrants).Concat(runtimeRoleColumns.Select(column =>
             $"({runtime},{Text(role.Table)},{Text(column)},'SELECT',false)")));
         string tables = "ARRAY[" + string.Join(',', sources.Select(source => Text(source.Table))) + "]::text[]";
         string required = complete ? $"""
@@ -284,8 +441,11 @@ public static class PostgresTenantCreationPermissions
                                         AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=r.oid
                                             AND acl.grantor=t.relowner AND acl.privilege_type=permission.privilege AND NOT acl.is_grantable)
                                         AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=0 AND acl.privilege_type=permission.privilege))))))
-                AND ({sourceProofs}) AND ({PostgresManagedTenantWorkerCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment)})
-                AND ({PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment)})
+                AND ({sourceProofs}) AND ({PostgresManagedTenantWorkerCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment, workerCataloguePredicate)})
+                AND ({PostgresAdministrativeAuthorityReadPermissions.OptionalGlobalCataloguePredicate(context, enrollment)})
+                AND ({PostgresTenantMembershipMutationPermissions.OptionalCataloguePredicate(context, enrollment, externalCataloguePredicate)})
+                AND ({externalCataloguePredicate ?? PostgresExternalTenantEnrollmentPermissions.OptionalCataloguePredicate(context, enrollment)})
+                AND ({PostgresSetupLiveStoragePermissions.OptionalGlobalCompletionCataloguePredicate(context, enrollment)})
                 AND ({PostgresLearningPermissions.OptionalGuidanceRuntimeCataloguePredicate(context, enrollment)}) {required})
             """;
     }
@@ -298,7 +458,7 @@ public static class PostgresTenantCreationPermissions
                 AND pg_catalog.format_type(a.atttypid,a.atttypmod)={Text(column.StoreType)}
                 AND a.attnotnull={(column.Required ? "true" : "false")} AND a.attidentity='' AND a.attgenerated='')
             """));
-        var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model).SingleOrDefault(table =>
+        var metadata = context.GetTenantTableInventory().SingleOrDefault(table =>
             table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
         string basePolicy = metadata is null ? "NOT c.relrowsecurity AND NOT c.relforcerowsecurity" : $"""
             c.relrowsecurity AND c.relforcerowsecurity AND EXISTS (SELECT 1 FROM pg_catalog.pg_policy p
@@ -312,6 +472,7 @@ public static class PostgresTenantCreationPermissions
             .Select(policy => PolicyPredicate(source, enrollment.GlobalLogin, policy))
             .Concat(PostgresUserTenantMembershipReadPermissions.GlobalSourcePolicies(context, source.Type, enrollment.GlobalLogin))
             .Append(PostgresLearningPermissions.GuidanceRuntimePolicyException(context, source.Type, enrollment))
+            .Concat(PostgresAdministrativeAuthorityReadPermissions.GlobalSourcePolicies(context, source.Type, enrollment.GlobalLogin))
             .Select(predicate => "(" + predicate + ")"));
         string policies = $"NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid=pg_catalog.to_regclass({Text(source.Table)}) AND p.polname IN ({Text(ReadPolicy)},{Text(InsertPolicy)},{Text(DocumentInsertPolicy)}) AND NOT ({(ownedPolicies.Length == 0 ? "false" : ownedPolicies)}))";
         if (complete)
@@ -503,16 +664,26 @@ public static class PostgresTenantCreationPermissions
         return required.Length == 0 ? "true" : string.Join(" AND ", required);
     }
 
-    private static string FreshPredicate(ExploreDbContext context, Source[] sources, string global) =>
+    private static string FreshPredicate(ExploreDbContext context, Source[] sources, PostgresNativeQueueEnrollment enrollment,
+        string? workerCataloguePredicate = null) =>
+        $"(({SourceFreshPredicate(context, sources, enrollment.GlobalLogin)}) AND ({KeyFencePredicate(context, enrollment, false, workerCataloguePredicate)}))";
+
+    private static string SourceFreshPredicate(ExploreDbContext context, Source[] sources, string global) =>
         string.Join(" AND ", sources.Select(source =>
         {
             PostgresUserTenantMembershipReadPermissions.TryGetGlobalReadColumns(context, source.Type, out var membershipColumns);
-            var preexistingReads = membershipColumns.Concat(source.Type == typeof(Tenant)
+            PostgresAdministrativeAuthorityReadPermissions.TryGetGlobalReadColumns(context, source.Type, out var administrativeColumns);
+            var preexistingReads = membershipColumns.Concat(administrativeColumns).Concat(source.Type == typeof(Tenant)
                 ? new[] { source.Columns["Id"].Name } : []).Distinct(StringComparer.Ordinal);
             string baseline = string.Join(" OR ", preexistingReads.Select(column =>
                     $"a.attname={Text(column)} AND acl.privilege_type='SELECT'")
                 .Concat(PostgresTenantMembershipMutationPermissions.GlobalUpdateColumns(context, source.Type)
-                    .Select(column => $"a.attname={Text(column)} AND acl.privilege_type='UPDATE'")));
+                    .Select(column => $"a.attname={Text(column)} AND acl.privilege_type='UPDATE'"))
+                .Concat(PostgresSetupLiveStoragePermissions.GlobalBootstrapColumns(context, source.Type)
+                    .SelectMany(column => new[] { "SELECT", "INSERT", "UPDATE" }
+                        .Select(privilege => $"a.attname={Text(column)} AND acl.privilege_type={Text(privilege)}")))
+                .Concat(PostgresSetupLiveStoragePermissions.GlobalCompletionColumns(context, source.Type)
+                    .Select(grant => $"a.attname={Text(grant.Column)} AND acl.privilege_type={Text(grant.Privilege)}")));
             return $"""
                 NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl
                     WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)})
@@ -557,7 +728,7 @@ public static class PostgresTenantCreationPermissions
 
     private static Source[] Sources(ExploreDbContext context)
     {
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         return Inventory.Select(item =>
         {
             var entity = context.Model.FindEntityType(item.Type) ?? throw new InvalidOperationException("tenant_creation_model_missing");

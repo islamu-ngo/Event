@@ -20,6 +20,8 @@ Also useful:
 - related `dev/active/` or `dev/pause/` workstreams;
 - a concrete user goal such as “review this before implementation” or “rewrite this plan to be executable.”
 
+Review the canonical triad in the main checkout. A scoped execution copy in a worktree is the live ledger for one delegated PR only; it is not a review input that can replace canonical sections, and reviewing another programme's worktree is out of scope.
+
 Before an approval-capable review, require:
 
 - current plan and tasks artifacts (`plan.md`, `tasks.md`);
@@ -55,6 +57,7 @@ For every review, determine:
 5. What is missing that blocks a credible approval?
 6. Do the plan, tasks, and I-VSD report match the review metadata?
 7. Did any proposed rewrite trigger I-VSD refresh under its integration contract?
+8. Which PR scopes are delegated (Implementing or In review), who owns their live ledgers, and which proposed changes must therefore be recorded as amendments for that owner rather than applied?
 
 ## Missing-Context Handling
 
@@ -78,12 +81,16 @@ Recommended wording:
 When the plan claims to follow `implementation-plan`, verify these concrete things:
 
 - `Last Updated: YYYY-MM-DD Europe/Brussels` exists in each file;
-- `plan.md` includes current state, future state, constraints, decisions, phases, testing, docs/internal/ops/security/multi-tenancy/risk/success sections;
+- `plan.md` includes current state, future state, constraints, decisions, PR scopes with their phases, testing, docs/internal/ops/security/multi-tenancy/risk/success sections, and no mutable registry or delegation state;
 - `context.md` includes session progress, quick resume, key files, decisions, constraints, validation baseline, risks, and handoff notes;
-- `tasks.md` includes implementation-maintenance rules, phase breakdown, one build plus at most one selected project test at each phase end, and remaining/deferred work;
-- plan/context/tasks agree on current status and next step.
+- `tasks.md` includes implementation-maintenance rules, a PR registry with delivery, reconciliation, cleanup and delegation fields, phases grouped under stable scope IDs, a targeted gate at each phase end, an acceptance gate per PR, and remaining required work assigned to later scopes;
+- each scope is independently mergeable and states prerequisites and readiness conditions; later scopes may carry rolling detail but retain required outcomes, dependencies and acceptance;
+- context resume selects the active or next eligible PR scope from the registry, not a hard-coded first phase or first unchecked historical task;
+- plan/context/tasks agree on current status, registry state and next scope.
 - plan/context/tasks agree on I-VSD path, reviewed-input revision, status/disposition, CTO-review state, and user approval.
 - the report is current for the reviewed plan/tasks and every material `IVSD-*` mapping resolves.
+
+Every original requested outcome must map to a PR scope and phase/task, or to an explicit user-authorized scope change. A large phase or scope count is not permission to defer scope to backlog, and a merged PR does not satisfy an outcome whose acceptance remains unmet.
 
 If they do not align, treat that as a planning quality issue, not a formatting nit.
 

@@ -201,7 +201,7 @@ public sealed class SecurityExecutionEvidenceApiResourceTests
 
     private static async Task<string> DockerAsync(string endpoint, string[] arguments, CancellationToken token)
     {
-        var command = new ProcessStartInfo("docker")
+        var command = new ProcessStartInfo("/usr/bin/docker")
         { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
         command.ArgumentList.Add("--host");
         command.ArgumentList.Add(endpoint);
@@ -240,23 +240,23 @@ public sealed class SecurityExecutionEvidenceApiResourceTests
         var images = new Dictionary<string, string>(StringComparer.Ordinal) { [reference] = image };
         var initial = new InitialNativeResources(new HashSet<string>(StringComparer.Ordinal),
             new HashSet<string>(StringComparer.Ordinal), new HashSet<string>(StringComparer.Ordinal) { image });
-        var mounts = new JsonArray();
+        string[] destinations = ["/.cache", "/policies", "/runtime-scratch"];
         var volumes = new Dictionary<string, string>(StringComparer.Ordinal);
         var targets = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
-        { [image] = new HashSet<string>(StringComparer.Ordinal) { "/.cache", "/policies", "/tmp" } };
-        foreach (string destination in new[] { "/.cache", "/policies", "/tmp" })
+        { [image] = destinations.ToHashSet(StringComparer.Ordinal) };
+        var mounts = new JsonArray(destinations.Select(destination =>
         {
             string name = Guid.CreateVersion7().ToString("N");
             volumes.Add(name, "/native/volumes/" + name);
-            mounts.Add(new JsonObject
+            return new JsonObject
             {
                 ["Type"] = "volume",
                 ["Name"] = name,
                 ["Source"] = "/native/volumes/" + name,
                 ["Destination"] = destination,
                 ["RW"] = true
-            });
-        }
+            };
+        }).ToArray());
         var row = new JsonObject
         {
             ["Id"] = container,

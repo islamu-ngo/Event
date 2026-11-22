@@ -18,7 +18,7 @@ public static partial class PostgresHumanWebhookResourceSourceContract
             $"pg_catalog.to_regprocedure({Text(sql.Name(routine.Name) + "(" + routine.Signature + ")")})"));
         string routineChecks = PostgresHumanSourceInstallationSql.RoutineGuard(
             sql, routines, Stamp, "human_webhook_routine_drift");
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string policies = string.Join("\n", HumanWebhookResourceSourceSql.Sources.Select(source =>
         {
             string table = Text(sql.Table(source.Type));

@@ -9,7 +9,7 @@ using Explore.Application.Constants;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
-using Explore.Application.Features.Authentication.Continuation.Commands;
+using Explore.Application.Features.Authentication.Continuation.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;

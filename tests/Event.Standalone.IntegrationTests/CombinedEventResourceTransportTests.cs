@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using Event.Standalone.IntegrationTests.Fixtures;
 using Event.Web.BffHosting.Security;
+using Explore.Blazor.IntegrationTests.Fixtures;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -29,7 +30,7 @@ public sealed partial class CombinedEventResourceTransportTests
             AllowAutoRedirect = false,
             HandleCookies = false
         });
-        string cookie = CreateSessionCookie(factory, out _);
+        var (cookie, _) = await CreateSessionCookieAsync(factory);
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
             $"/api/eventresource/{Guid.CreateVersion7():D}/content");
@@ -68,7 +69,7 @@ public sealed partial class CombinedEventResourceTransportTests
                 idempotencyKey = Guid.CreateVersion7().ToString("N")
             })
         };
-        string cookie = CreateSessionCookie(factory, out var principal);
+        var (cookie, principal) = await CreateSessionCookieAsync(factory);
         using var csrfScope = factory.Services.CreateScope();
         var csrf = new Microsoft.AspNetCore.Http.DefaultHttpContext
         {
@@ -89,25 +90,29 @@ public sealed partial class CombinedEventResourceTransportTests
         await Assert.That(await response.Content.ReadAsStringAsync()).DoesNotContain("provider");
     }
 
-    private static string CreateSessionCookie(StandaloneWebApplicationFactory factory, out ClaimsPrincipal principal)
+    private static async Task<(string Cookie, ClaimsPrincipal Principal)> CreateSessionCookieAsync(
+        StandaloneWebApplicationFactory factory)
     {
         var options = factory.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
             .Get(CookieAuthenticationDefaults.AuthenticationScheme);
         string token = new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
             expires: DateTime.UtcNow.AddMinutes(10)));
-        var properties = new AuthenticationProperties();
+        var properties = new AuthenticationProperties { ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(10) };
         properties.StoreTokens([new AuthenticationToken { Name = "access_token", Value = token }]);
         Guid userId = Guid.CreateVersion7();
-        principal = new ClaimsPrincipal(new ClaimsIdentity(
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", userId.ToString("D")),
                 new Claim(ClaimTypes.NameIdentifier, userId.ToString("D"))
             ],
             CookieAuthenticationDefaults.AuthenticationScheme));
-        string protectedTicket = options.TicketDataFormat.Protect(new AuthenticationTicket(
+        string cookie = await TestBffSessionAuthorityRegistration.IssueFreshCookieAsync(factory.Services, new AuthenticationTicket(
             principal,
             properties,
             CookieAuthenticationDefaults.AuthenticationScheme));
-        return $"{options.Cookie.Name}={Uri.EscapeDataString(protectedTicket)}";
+        var context = new Microsoft.AspNetCore.Http.DefaultHttpContext { RequestServices = factory.Services };
+        context.Request.Headers.Cookie = cookie;
+        await Assert.That(await options.ReadStoredTicketAsync(context)).IsNotNull();
+        return (cookie, principal);
     }
 }

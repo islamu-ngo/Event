@@ -110,7 +110,8 @@ public static class PostgresCategoryReadPermissions
                     string fresh = $"""
                         NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                             CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl
-                            WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)}) AND acl.grantee={Role(enrollment.RuntimeLogin)})
+                            WHERE a.attrelid=pg_catalog.to_regclass({Text(source.Table)}) AND acl.grantee={Role(enrollment.RuntimeLogin)}
+                                AND acl.privilege_type='SELECT')
                         """;
                     if (!await IsTrueAsync(context,
                         $"({Catalogue(context, source, enrollment, complete: false)}) AND (({fresh}) OR ({complete}))", cancellationToken))
@@ -265,35 +266,44 @@ public static class PostgresCategoryReadPermissions
                         AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class=t.oid)
                         AND NOT EXISTS (SELECT 1 FROM members r WHERE r.oid=t.relowner OR r.rolsuper OR r.rolbypassrls
                             OR r.rolcreaterole OR r.rolcreatedb OR r.rolreplication OR pg_catalog.has_schema_privilege(r.oid,n.oid,'CREATE')
-                            OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                            OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,TRUNCATE,REFERENCES,TRIGGER')
                                 OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
+                            OR (pg_catalog.has_table_privilege(r.oid,t.oid,'DELETE')
+                                AND NOT ({PostgresCategoryMutationPermissions.RuntimeCategoryDeletePredicate(context, enrollment, "r.oid", "t.oid")}))
                             OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                                 CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                                 WHERE a.attrelid=t.oid AND a.attnum<>0 AND NOT a.attisdropped
                                     AND (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege || ' WITH GRANT OPTION')
                                         OR (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege) AND NOT (
-                                            r.oid={runtime} AND a.attnum>0 AND permission.privilege='SELECT'
+                                            (r.oid={runtime} AND a.attnum>0 AND permission.privilege='SELECT'
                                             AND a.attname=ANY(ARRAY[{string.Join(',', source.Columns.Select(column => Text(column.Name)))}]::text[])
                                             AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
                                                 WHERE acl.grantee=r.oid AND acl.grantor=t.relowner
                                                     AND acl.privilege_type='SELECT' AND NOT acl.is_grantable)
                                             AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
-                                                WHERE acl.grantee=0 AND acl.privilege_type='SELECT'))))))
+                                                WHERE acl.grantee=0 AND acl.privilege_type='SELECT'))
+                                            OR ({PostgresCategoryMutationPermissions.RuntimeCategoryColumnPredicate(
+                                                context, enrollment.RuntimeLogin, "r.oid", "t.oid", "a.attname", "permission.privilege")}))))))
                         AND NOT EXISTS (SELECT 1 FROM global_members r
                             WHERE (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                                 OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                                 OR pg_catalog.has_any_column_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,REFERENCES'))
                         {(complete ? $"AND pg_catalog.has_schema_privilege({runtime},n.oid,'USAGE')" : "")})
+                AND ({PostgresCategoryMutationPermissions.OptionalCataloguePredicate(context, enrollment)})
                 AND ({required}))
             """;
     }
 
-    private static string TenantPolicy(ExploreDbContext context, Source source, string runtimeLogin)
+    private static string TenantPolicy(ExploreDbContext context, Source source, string runtimeLogin) =>
+        TenantPolicySql(context, source.Schema, source.Name,
+            source.Columns.Single(column => column.Property == nameof(Category.TenantId)).Name, runtimeLogin);
+
+    internal static string TenantPolicySql(ExploreDbContext context, string schema, string tableName,
+        string tenantColumn, string runtimeLogin)
     {
-        var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
-            .Single(table => table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
-        if (metadata.AllowsNullTenant || metadata.ParentJoin is not null
-            || metadata.TenantIdColumn != source.Columns.Single(column => column.Property == nameof(Category.TenantId)).Name)
+        var metadata = context.GetTenantTableInventory()
+            .Single(table => table.TableName == tableName && (table.Schema ?? schema) == schema);
+        if (metadata.AllowsNullTenant || metadata.ParentJoin is not null || metadata.TenantIdColumn != tenantColumn)
             throw new InvalidOperationException(Drift);
         string column = metadata.TenantIdColumn ?? throw new InvalidOperationException(Drift);
         string condition = $"({Text("(")} || pg_catalog.quote_ident({Text(column)}) || {Text(" = (NULLIF(current_setting('app.current_tenant_id'::text, true), ''::text))::uuid)")})";
@@ -303,7 +313,7 @@ public static class PostgresCategoryReadPermissions
                 AND p.polcmd='*' AND p.polpermissive AND p.polroles=ARRAY[0::oid]
                 AND pg_catalog.pg_get_expr(p.polqual,p.polrelid)={condition}
                 AND pg_catalog.pg_get_expr(p.polwithcheck,p.polrelid)={condition}
-                AND pg_catalog.obj_description(p.oid,'pg_policy')={Text(PostgresTenantRowLevelSecurityModel.BuildPolicyFingerprintPrefix(metadata, source.Schema))}
+                AND pg_catalog.obj_description(p.oid,'pg_policy')={Text(PostgresTenantRowLevelSecurityModel.BuildPolicyFingerprintPrefix(metadata, schema))}
                     || pg_catalog.md5(p.polqual::text) || ':' || pg_catalog.md5(p.polwithcheck::text)
                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_depend dependency
                     WHERE dependency.classid='pg_catalog.pg_policy'::regclass AND dependency.objid=p.oid

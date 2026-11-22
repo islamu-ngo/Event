@@ -13,7 +13,7 @@ using Microsoft.Extensions.Configuration;
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
 public sealed class GetOnboardingPreflightQueryHandler(
-    IInstanceBootstrapStateRepository instanceBootstrapStateRepository,
+    IInstanceBootstrapStateReader instanceBootstrapStateReader,
     IDeploymentModeProvider deploymentModeProvider,
     ISetupSecretProvider setupSecretProvider,
     ITenantRepository tenantRepository,
@@ -30,7 +30,7 @@ public sealed class GetOnboardingPreflightQueryHandler(
     public async Task<OnboardingPreflightDto> QueryAsync(GetOnboardingPreflightQuery request, CancellationToken cancellationToken)
     {
         var result = new OnboardingPreflightDto();
-        var bootstrap = await instanceBootstrapStateRepository.GetCurrent(cancellationToken);
+        var bootstrap = await instanceBootstrapStateReader.GetCurrent(cancellationToken);
         var onboardingCompleted = bootstrap?.Status == InstanceBootstrapStatus.Completed;
         var deploymentMode = onboardingCompleted
             ? bootstrap!.DeploymentMode

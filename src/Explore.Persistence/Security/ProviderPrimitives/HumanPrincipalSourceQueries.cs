@@ -80,7 +80,8 @@ internal sealed class HumanPrincipalSourceQueries(
             if (_context.Database.IsNpgsql())
             {
                 await using var command = Command(transaction);
-                command.CommandText = PostgresHumanPrincipalSourceContract.AdmissionSql(_context, _enrollment!);
+                string admissionSql = PostgresHumanPrincipalSourceContract.AdmissionSql(_context, _enrollment!);
+                command.CommandText = admissionSql;
                 await command.ExecuteNonQueryAsync(ct);
                 command.CommandText = $"SELECT {(transaction is null
                     ? PostgresHumanPrincipalSourceContract.ObserveFunctionSql(_context)
@@ -91,7 +92,7 @@ internal sealed class HumanPrincipalSourceQueries(
                 native = JsonDocument.Parse((string)(await command.ExecuteScalarAsync(ct)
                     ?? throw new InvalidOperationException("human_principal_native_result_missing")));
                 command.Parameters.Clear();
-                command.CommandText = PostgresHumanPrincipalSourceContract.AdmissionSql(_context, _enrollment!);
+                command.CommandText = admissionSql;
                 await command.ExecuteNonQueryAsync(ct);
             }
             ImmutableArray<T> Rows<T>(int index) =>

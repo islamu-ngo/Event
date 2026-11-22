@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
@@ -29,6 +30,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Api.IntegrationTests.Authentication;
@@ -40,6 +42,25 @@ namespace Event.Api.IntegrationTests.Authentication;
 [NotInParallel]
 public sealed class ProviderTransportDeferredCheckpointTests
 {
+    [Test]
+    public async Task FailedRequestInitializationClearsItsEnvironmentAndHttpContext()
+    {
+        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
+        var originalVariables = Environment.GetEnvironmentVariables().Keys.Cast<string>()
+            .Where(name => name.StartsWith("EVENT_CHECKPOINT_TEST_", StringComparison.Ordinal))
+            .ToHashSet(StringComparer.Ordinal);
+        fixture.Client.Dispose();
+
+        Task<Request> opening = Request.OpenAsync(fixture);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => opening);
+
+        var remainingVariables = Environment.GetEnvironmentVariables().Keys.Cast<string>()
+            .Where(name => name.StartsWith("EVENT_CHECKPOINT_TEST_", StringComparison.Ordinal)
+                && !originalVariables.Contains(name));
+        await Assert.That(remainingVariables).IsEmpty();
+        await Assert.That(fixture.Host.Services.GetRequiredService<IHttpContextAccessor>().HttpContext).IsNull();
+    }
+
     [Test]
     public async Task LowerMutationsCannotBeResolvedAsIndependentNativeOperations()
     {
@@ -94,7 +115,7 @@ public sealed class ProviderTransportDeferredCheckpointTests
         else
             await Assert.That((await handler.ExecuteAsync(command, Token)).IsSuccess).IsTrue();
         await Assert.That(request.Context.Database.CurrentTransaction).IsNull();
-        await using var observer = fixture.Native.CreateDatabase();
+        await using var observer = CreateTenantDatabase(fixture);
         var binding = (await new Explore.Persistence.Repositories.RegistrationProviderRepository(observer)
             .GetBindingAsync(Tenant, seed.Binding.Id, Token))!;
         await Assert.That(binding.FieldMappings.Count).IsEqualTo(expireBeforeMutation ? 0 : 1);
@@ -117,7 +138,7 @@ public sealed class ProviderTransportDeferredCheckpointTests
         ProviderTransport? transport = null;
         await using var request = await Request.OpenAsync(fixture, providerTransport: () => transport!);
         var seed = await SeedAsync(fixture, request.Variable, google: true);
-        await using (var writer = fixture.Native.CreateDatabase())
+        await using (var writer = CreateTenantDatabase(fixture))
         {
             var tuple = GoogleFormsRegistrationProviderDescriptor.SupportedTuple;
             writer.Add(RegistrationProviderCapability.Create(seed.Binding, tuple.ProviderCode,
@@ -148,7 +169,7 @@ public sealed class ProviderTransportDeferredCheckpointTests
         }
         await Assert.That(transport.RequestCount).IsEqualTo(2);
         await Assert.That(request.Context.Database.CurrentTransaction).IsNull();
-        await using var observer = fixture.Native.CreateDatabase();
+        await using var observer = CreateTenantDatabase(fixture);
         var persisted = await observer.RegistrationProviderConnections.AsNoTracking()
             .SingleAsync(row => row.Id == seed.Connection.Id, Token);
         await Assert.That(persisted.LastAccessValidatedAt)
@@ -270,7 +291,7 @@ public sealed class ProviderTransportDeferredCheckpointTests
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             request.Journal.ExecuteAsync(command, prepared, observation, Mutate, Token));
         await Assert.That(transport.RequestCount).IsEqualTo(2);
-        await using var verification = fixture.Native.CreateDatabase();
+        await using var verification = CreateTenantDatabase(fixture);
         var persisted = await verification.RegistrationProviderConnections.AsNoTracking()
             .SingleAsync(row => row.Id == seed.Connection.Id, Token);
         await Assert.That(persisted.LastAccessValidatedAt)
@@ -290,6 +311,225 @@ public sealed class ProviderTransportDeferredCheckpointTests
     }
 
     [Test]
+    [Arguments("tracked-stamp")]
+    [Arguments("tracked-title")]
+    [Arguments("raw-title")]
+    public async Task EventRootTamperingRollsBackNativeCheckpointWrites(string mutation)
+    {
+        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
+        await using var request = await Request.OpenAsync(fixture);
+        var seed = await SeedAsync(fixture, request.Variable, google: true);
+        var original = await request.Context.Events.AsNoTracking()
+            .SingleAsync(row => row.Id == seed.EventId, Token);
+        var command = new PollRegistrationProviderReconciliationCommand(Tenant, seed.EventId, seed.Binding.Id, seed.Now);
+        var prepared = await request.Preparation.PrepareAsync(command, Token);
+        using var transport = new ProviderTransport(request.Context, fixture.Clock, google: true);
+        using var http = new HttpClient(transport);
+        var observation = await request.Journal.ObserveAsync(
+            HumanEventProviderSourceTarget.From(command, seed.EventId), prepared,
+            ct => request.Google(http).ReconcileAsync(seed.Reconciliation, ct), Token);
+        bool reachedRootMutation = false;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            request.Journal.ExecuteAsync(command, prepared, observation, async (_, ct) =>
+            {
+                await Assert.That(request.Context.Database.CurrentTransaction).IsNotNull();
+                var connection = await request.Context.RegistrationProviderConnections
+                    .SingleAsync(row => row.Id == seed.Connection.Id, ct);
+                // Establish another successful native transition before attempting to hide
+                // a root mutation behind its legitimately advanced revision.
+                connection.RecordAccessValidated(transport.AccessAt.AddSeconds(1));
+                await request.Context.SaveChangesAsync(ct);
+                var root = await request.Context.Events.SingleAsync(row => row.Id == seed.EventId, ct);
+                reachedRootMutation = true;
+                if (mutation == "raw-title")
+                {
+                    Guid stampBeforeTampering = root.ConcurrencyStamp;
+                    int affected = await request.Context.Events.Where(row => row.Id == seed.EventId)
+                        .ExecuteUpdateAsync(update => update.SetProperty(row => row.Title, "Unauthorized root title"), ct);
+                    await Assert.That(affected).IsEqualTo(1);
+                    var fresh = await request.Context.Events.AsNoTracking()
+                        .SingleAsync(row => row.Id == seed.EventId, ct);
+                    await Assert.That(fresh.ConcurrencyStamp).IsEqualTo(stampBeforeTampering);
+                    await Assert.That(fresh.Title).IsEqualTo("Unauthorized root title");
+                }
+                else
+                {
+                    if (mutation == "tracked-stamp")
+                        root.ConcurrencyStamp = Guid.CreateVersion7();
+                    else
+                        root.Title = "Unauthorized root title";
+                    await request.Context.SaveChangesAsync(ct);
+                }
+                return true;
+            }, Token));
+
+        await Assert.That(reachedRootMutation).IsTrue();
+        await Assert.That(transport.RequestCount).IsEqualTo(2);
+        await Assert.That(request.Context.Database.CurrentTransaction).IsNull();
+        await AssertUnwrittenAsync(fixture, seed.Connection.Id);
+        await using var observer = CreateTenantDatabase(fixture);
+        var persisted = await observer.Events.AsNoTracking().SingleAsync(row => row.Id == seed.EventId, Token);
+        await Assert.That(persisted.Title).IsEqualTo(original.Title);
+        await Assert.That(persisted.ConcurrencyStamp).IsEqualTo(original.ConcurrencyStamp);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task SharedConnectionFanoutPreservesOnlyOriginallyObservedEventImages(bool tamper)
+    {
+        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
+        await using var request = await Request.OpenAsync(fixture);
+        var seed = await SeedAsync(fixture, request.Variable, google: true);
+        var sibling = await SeedAsync(fixture, request.Variable, google: true, workspace: "sibling");
+        await using (var writer = CreateTenantDatabase(fixture))
+        {
+            writer.Add(RegistrationProviderBinding.Create(Tenant, seed.Connection.Id,
+                sibling.Binding.RegistrationFormId, sibling.Binding.RegistrationFormVersionId,
+                RegistrationProviderPresentationModeEnum.Manual, RegistrationProviderCollectionModeEnum.ProviderHosted,
+                RegistrationProviderCompletionModeEnum.Manual, RegistrationProviderTrustLevelEnum.FullSync, null, seed.Now));
+            await writer.SaveChangesAsync(Token);
+        }
+        var original = await request.Context.Events.AsNoTracking()
+            .SingleAsync(row => row.Id == sibling.EventId, Token);
+        var command = new PollRegistrationProviderReconciliationCommand(Tenant, seed.EventId, seed.Binding.Id, seed.Now);
+        var prepared = await request.Preparation.PrepareAsync(command, Token);
+        var observation = await request.Journal.ObserveAsync(
+            HumanEventProviderSourceTarget.From(command, seed.EventId), prepared,
+            _ => Task.FromResult(true), Token);
+        bool reachedMutation = false;
+        Task<bool> Execute() => request.Journal.ExecuteAsync(command, prepared, observation, async (_, ct) =>
+        {
+            reachedMutation = true;
+            if (tamper)
+                await request.Context.Events.Where(row => row.Id == sibling.EventId)
+                    .ExecuteUpdateAsync(update => update.SetProperty(row => row.Title, "Unauthorized sibling title"), ct);
+            var connection = await request.Context.RegistrationProviderConnections
+                .SingleAsync(row => row.Id == seed.Connection.Id, ct);
+            connection.RecordAccessValidated(seed.Now.AddSeconds(1));
+            await request.Context.SaveChangesAsync(ct);
+            return true;
+        }, Token);
+        if (tamper)
+            await Assert.ThrowsAsync<InvalidOperationException>(Execute);
+        else
+            await Assert.That(await Execute()).IsTrue();
+        await Assert.That(reachedMutation).IsTrue();
+        await using var observer = CreateTenantDatabase(fixture);
+        var persisted = await observer.Events.AsNoTracking().SingleAsync(row => row.Id == sibling.EventId, Token);
+        await Assert.That(persisted.Title).IsEqualTo(original.Title);
+        if (tamper)
+        {
+            await Assert.That(persisted.ConcurrencyStamp).IsEqualTo(original.ConcurrencyStamp);
+            await AssertUnwrittenAsync(fixture, seed.Connection.Id);
+        }
+        else
+            await Assert.That(persisted.ConcurrencyStamp).IsNotEqualTo(original.ConcurrencyStamp);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task LateSavingCallbackCannotIntroduceAnUnstagedEventMutation(bool registerAfterAcquisition)
+    {
+        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
+        await using var request = await Request.OpenAsync(fixture);
+        var seed = await SeedAsync(fixture, request.Variable, google: true);
+        var sibling = await SeedAsync(fixture, request.Variable, google: true, workspace: "sibling");
+        var root = await request.Context.Events.SingleAsync(row => row.Id == sibling.EventId, Token);
+        string originalTitle = root.Title;
+        bool mutate = false;
+        bool callbackRan = false;
+        EventHandler<SavingChangesEventArgs> onSaving = (_, _) =>
+        {
+            if (!mutate) return;
+            callbackRan = true;
+            root.Title = "Unauthorized late title";
+        };
+        if (!registerAfterAcquisition)
+            request.Context.SavingChanges += onSaving;
+        var command = new PollRegistrationProviderReconciliationCommand(Tenant, seed.EventId, seed.Binding.Id, seed.Now);
+        var prepared = await request.Preparation.PrepareAsync(command, Token);
+        using var transport = new ProviderTransport(request.Context, fixture.Clock, google: true);
+        using var http = new HttpClient(transport);
+        var observation = await request.Journal.ObserveAsync(
+            HumanEventProviderSourceTarget.From(command, seed.EventId), prepared,
+            ct => request.Google(http).ReconcileAsync(seed.Reconciliation, ct), Token);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            request.Journal.ExecuteAsync(command, prepared, observation, async (_, ct) =>
+            {
+                var connection = await request.Context.RegistrationProviderConnections
+                    .SingleAsync(row => row.Id == seed.Connection.Id, ct);
+                connection.RecordAccessValidated(transport.AccessAt.AddSeconds(1));
+                if (registerAfterAcquisition)
+                    request.Context.SavingChanges += onSaving;
+                mutate = true;
+                await request.Context.SaveChangesAsync(ct);
+                return true;
+            }, Token));
+        await Assert.That(callbackRan).IsTrue();
+        await AssertUnwrittenAsync(fixture, seed.Connection.Id);
+        await using var observer = CreateTenantDatabase(fixture);
+        var persisted = await observer.Events.AsNoTracking().SingleAsync(row => row.Id == sibling.EventId, Token);
+        await Assert.That(persisted.Title).IsEqualTo(originalTitle);
+    }
+
+    [Test]
+    public async Task MultipleNativeSavesCommitTheirEventRevisionChainInsideOriginalOwner()
+    {
+        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
+        await using var request = await Request.OpenAsync(fixture);
+        var seed = await SeedAsync(fixture, request.Variable, google: true);
+        var original = await request.Context.Events.AsNoTracking()
+            .SingleAsync(row => row.Id == seed.EventId, Token);
+        var command = new PollRegistrationProviderReconciliationCommand(Tenant, seed.EventId, seed.Binding.Id, seed.Now);
+        var prepared = await request.Preparation.PrepareAsync(command, Token);
+        using var transport = new ProviderTransport(request.Context, fixture.Clock, google: true);
+        using var http = new HttpClient(transport);
+        var observation = await request.Journal.ObserveAsync(
+            HumanEventProviderSourceTarget.From(command, seed.EventId), prepared,
+            ct => request.Google(http).ReconcileAsync(seed.Reconciliation, ct), Token);
+        Guid finalStamp = Guid.Empty;
+
+        bool committed = await request.Journal.ExecuteAsync(command, prepared, observation, async (_, ct) =>
+        {
+            var transaction = request.Context.Database.CurrentTransaction?.GetDbTransaction();
+            await Assert.That(transaction).IsNotNull();
+            var root = await request.Context.Events.SingleAsync(row => row.Id == seed.EventId, ct);
+            await Assert.That(root.ConcurrencyStamp).IsNotEqualTo(original.ConcurrencyStamp);
+            var connection = await request.Context.RegistrationProviderConnections
+                .SingleAsync(row => row.Id == seed.Connection.Id, ct);
+            for (int save = 1; save <= 2; save++)
+            {
+                Guid previousStamp = root.ConcurrencyStamp;
+                connection.RecordAccessValidated(transport.AccessAt.AddSeconds(save));
+                await request.Context.SaveChangesAsync(ct);
+                await Assert.That(ReferenceEquals(request.Context.Database.CurrentTransaction?.GetDbTransaction(), transaction)).IsTrue();
+                var fresh = await request.Context.Events.AsNoTracking()
+                    .SingleAsync(row => row.Id == seed.EventId, ct);
+                await Assert.That(fresh.ConcurrencyStamp).IsNotEqualTo(previousStamp);
+                await Assert.That(fresh.ConcurrencyStamp).IsEqualTo(root.ConcurrencyStamp);
+                await Assert.That(fresh.Title).IsEqualTo(original.Title);
+            }
+            finalStamp = root.ConcurrencyStamp;
+            return true;
+        }, Token);
+
+        await Assert.That(committed).IsTrue();
+        await Assert.That(transport.RequestCount).IsEqualTo(2);
+        await Assert.That(request.Context.Database.CurrentTransaction).IsNull();
+        await using var observer = CreateTenantDatabase(fixture);
+        var persisted = await observer.Events.AsNoTracking().SingleAsync(row => row.Id == seed.EventId, Token);
+        await Assert.That(persisted.ConcurrencyStamp).IsEqualTo(finalStamp);
+        await Assert.That(persisted.Title).IsEqualTo(original.Title);
+        var checkpoint = await observer.RegistrationProviderConnections.AsNoTracking()
+            .SingleAsync(row => row.Id == seed.Connection.Id, Token);
+        await Assert.That(checkpoint.LastCredentialRefreshAt).IsEqualTo(transport.RefreshAt);
+        await Assert.That(checkpoint.LastAccessValidatedAt).IsEqualTo(transport.AccessAt.AddSeconds(2));
+    }
+
+    [Test]
     [Arguments(false)]
     [Arguments(true)]
     public async Task OriginalSourcesRejectDriftBeforeOrAfterRealTransportWithoutCheckpointWrites(bool afterRemote)
@@ -304,7 +544,7 @@ public sealed class ProviderTransportDeferredCheckpointTests
         var adapter = request.Google(http);
         async Task Drift()
         {
-            await using var writer = fixture.Native.CreateDatabase();
+            await using var writer = CreateTenantDatabase(fixture);
             await writer.RegistrationProviderConnections.Where(row => row.Id == seed.Connection.Id)
                 .ExecuteUpdateAsync(update => update.SetProperty(row => row.ConformanceEvidenceRevision, "drift"), Token);
         }
@@ -405,9 +645,15 @@ public sealed class ProviderTransportDeferredCheckpointTests
             var supplied = substitution == "command" ? command with { } : command;
             var capability = substitution == "capability"
                 ? await request.Preparation.PrepareAsync(command, Token) : prepared;
+            int businessCalls = 0;
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 journal.ExecuteAsync<RegistrationProviderReconciliationResult, bool>(supplied, capability, observed,
-                    (_, _) => throw new InvalidOperationException("A foreign observation reached business work."), Token));
+                    (_, _) =>
+                    {
+                        businessCalls++;
+                        throw new InvalidOperationException("A foreign observation reached business work.");
+                    }, Token));
+            await Assert.That(businessCalls).IsEqualTo(0);
         }
         await AssertUnwrittenAsync(fixture, seed.Connection.Id);
     }
@@ -418,7 +664,7 @@ public sealed class ProviderTransportDeferredCheckpointTests
     public async Task WorkerTransportKeepsItsExistingImmediateCheckpointSemantics(bool google)
     {
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
-        await using var request = await Request.OpenAsync(fixture, human: false);
+        await using var request = await Request.OpenAsync(fixture, human: false, google: google);
         var seed = await SeedAsync(fixture, request.Variable, google);
         using var transport = new ProviderTransport(request.Context, fixture.Clock, google);
         using var http = new HttpClient(transport);
@@ -428,7 +674,7 @@ public sealed class ProviderTransportDeferredCheckpointTests
             await new FormbricksRegistrationProviderAdapter(http,
                 request.Services.GetRequiredService<ISecretResolver>(), fixture.Clock)
                 .ReconcileAsync(seed.Reconciliation, Token);
-        await using var verification = fixture.Native.CreateDatabase();
+        await using var verification = CreateTenantDatabase(fixture);
         var connection = await verification.RegistrationProviderConnections.AsNoTracking()
             .SingleAsync(row => row.Id == seed.Connection.Id, Token);
         await Assert.That(connection.LastAccessValidatedAt).IsEqualTo(google ? transport.AccessAt : (DateTime?)null);
@@ -439,9 +685,19 @@ public sealed class ProviderTransportDeferredCheckpointTests
     private static Guid Tenant => PlatformDefaults.DefaultTenantId;
     private static CancellationToken Token => LocalIdentityLifecycleHttpFixture.CancellationToken;
 
+    private sealed record SelectedTenant(Guid TenantId) : ITenantContext;
+
+    private static ExploreDbContext CreateTenantDatabase(LocalIdentityLifecycleHttpFixture fixture)
+    {
+        var context = fixture.Native.CreateDatabase();
+        context.TenantContext = new SelectedTenant(Tenant);
+        context.BindTenantLease();
+        return context;
+    }
+
     private static async Task AssertUnwrittenAsync(LocalIdentityLifecycleHttpFixture fixture, Guid connectionId)
     {
-        await using var verification = fixture.Native.CreateDatabase();
+        await using var verification = CreateTenantDatabase(fixture);
         var row = await verification.RegistrationProviderConnections.AsNoTracking()
             .SingleAsync(row => row.Id == connectionId, Token);
         await Assert.That(row.LastCredentialRefreshAt).IsNull();
@@ -456,9 +712,10 @@ public sealed class ProviderTransportDeferredCheckpointTests
                 Connection.AdapterPolicyVersion, Connection.ConformanceEvidenceRevision), Now);
     }
 
-    private static async Task<Seed> SeedAsync(LocalIdentityLifecycleHttpFixture fixture, string variable, bool google)
+    private static async Task<Seed> SeedAsync(LocalIdentityLifecycleHttpFixture fixture, string variable, bool google,
+        string workspace = "checkpoint")
     {
-        await using var context = fixture.Native.CreateDatabase();
+        await using var context = CreateTenantDatabase(fixture);
         DateTime now = fixture.Clock.GetUtcNow().UtcDateTime;
         Guid actor = await context.Actors.Where(row => row.UserId == fixture.Binding.LocalSubjectId)
             .Select(row => row.Id).SingleAsync(Token);
@@ -487,22 +744,32 @@ public sealed class ProviderTransportDeferredCheckpointTests
         var secret = SecretBinding.CreateEnvironmentVariable(SecretDefinitionRegistry.Keys.RegistrationProviders.ApiToken,
             SecretScope.Tenant, Tenant, variable, qualifier: Guid.CreateVersion7().ToString("N"));
         secret.Id = Guid.CreateVersion7();
-        string Generated() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        Environment.SetEnvironmentVariable(variable, google
-            ? JsonSerializer.Serialize(new { refresh_token = Generated(), client_id = Generated(), client_secret = Generated() })
-            : Generated());
         var tuple = google ? GoogleFormsRegistrationProviderDescriptor.SupportedTuple
             : new RegistrationProviderTuple("FORMBRICKS", "CLOUD", "v1", "checkpoint", "checkpoint");
-        var connection = RegistrationProviderConnection.Create(Tenant, "Checkpoint connection",
+        var connection = RegistrationProviderConnection.Create(Tenant, $"Checkpoint connection {workspace}",
             RegistrationProviderKindEnum.ExternalForm, RegistrationProviderDeploymentKindEnum.HostedSaas,
             tuple.ProviderCode, tuple.DeploymentKind, tuple.ApiVersion, tuple.AdapterPolicyVersion,
             tuple.ConformanceEvidenceRevision, google ? "https://forms.googleapis.com/v1" : "https://provider.example/api/v1",
-            google ? "https://docs.google.com" : "https://provider.example", "checkpoint", secret.Id, null, now);
+            google ? "https://docs.google.com" : "https://provider.example", workspace, secret.Id, null, now);
         var binding = RegistrationProviderBinding.Create(Tenant, connection.Id, form.Id, version.Id,
             RegistrationProviderPresentationModeEnum.Manual, RegistrationProviderCollectionModeEnum.ProviderHosted,
             RegistrationProviderCompletionModeEnum.Manual, RegistrationProviderTrustLevelEnum.FullSync, null, now);
         binding.SetDraftProvisionedSurvey("checkpoint", "1");
         context.AddRange(parent, form, secret, connection, binding);
+        context.EventRoleAssignments.Add(EventRoleAssignment.Create(Tenant, parent.Id, fixture.Binding.LocalSubjectId,
+            (int)RoleEnum.EventManager, EventRoleAssignmentStatus.Active, now.AddDays(-1), now.AddHours(1),
+            fixture.Binding.LocalSubjectId));
+        var permission = await context.Permissions.SingleAsync(
+            row => row.MasterCode == PermissionCodes.EventRegistrationManage, Token);
+        if (!await context.RolePermissions.AnyAsync(row =>
+            row.RoleId == (int)RoleEnum.EventManager && row.PermissionId == permission.Id, Token))
+            context.RolePermissions.Add(new RolePermission
+            {
+                RoleId = (int)RoleEnum.EventManager,
+                Role = null!,
+                PermissionId = permission.Id,
+                Permission = null!
+            });
         await context.SaveChangesAsync(Token);
         return new(parent.Id, connection, binding, now);
     }
@@ -512,12 +779,28 @@ public sealed class ProviderTransportDeferredCheckpointTests
         private readonly WebApplicationFactory<Program> _host;
         private readonly AsyncServiceScope _scope;
         private readonly IHttpContextAccessor _accessor;
-        private Request(WebApplicationFactory<Program> host)
+        private Request(WebApplicationFactory<Program> host, bool google)
         {
+            string Generated() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            Environment.SetEnvironmentVariable(Variable, google
+                ? JsonSerializer.Serialize(new { refresh_token = Generated(), client_id = Generated(), client_secret = Generated() })
+                : Generated());
             _host = host;
-            _scope = host.Services.CreateAsyncScope();
-            _accessor = Services.GetRequiredService<IHttpContextAccessor>();
-            Services.GetRequiredService<ITenantContextAccessor>().BindExecutionTenant(Tenant);
+            AsyncServiceScope? scope = null;
+            try
+            {
+                scope = host.Services.CreateAsyncScope();
+                _scope = scope.Value;
+                _accessor = Services.GetRequiredService<IHttpContextAccessor>();
+                Services.GetRequiredService<ITenantContextAccessor>().BindExecutionTenant(Tenant);
+            }
+            catch
+            {
+                Environment.SetEnvironmentVariable(Variable, null);
+                try { scope?.Dispose(); }
+                finally { host.Dispose(); }
+                throw;
+            }
         }
         internal string Variable { get; } = "EVENT_CHECKPOINT_TEST_" + Guid.CreateVersion7().ToString("N");
         internal IServiceProvider Services => _scope.ServiceProvider;
@@ -532,8 +815,8 @@ public sealed class ProviderTransportDeferredCheckpointTests
             Services.GetRequiredService<ISecretResolver>(), Checkpoints,
             Services.GetRequiredService<IGooglePubSubOidcTokenValidator>());
 
-        internal static async Task<Request> OpenAsync(LocalIdentityLifecycleHttpFixture fixture, bool human = true,
-            Func<HttpMessageHandler>? providerTransport = null)
+        internal static Task<Request> OpenAsync(LocalIdentityLifecycleHttpFixture fixture, bool human = true,
+            Func<HttpMessageHandler>? providerTransport = null, bool google = true)
         {
             var host = fixture.Host.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
             {
@@ -542,25 +825,38 @@ public sealed class ProviderTransportDeferredCheckpointTests
                     services.AddHttpClient(GoogleFormsRegistrationProviderAdapter.HttpClientName)
                         .ConfigurePrimaryHttpMessageHandler(providerTransport);
             }));
-            var request = new Request(host);
-            if (human)
+            var request = new Request(host, google);
+            if (!human)
+                return Task.FromResult(request);
+
+            var http = new DefaultHttpContext { RequestServices = request.Services };
+            request._accessor.HttpContext = http;
+            return AuthenticateAsync();
+
+            async Task<Request> AuthenticateAsync()
             {
-                var http = new DefaultHttpContext { RequestServices = request.Services };
-                http.Request.Headers.Authorization = "Bearer " + await fixture.SignInAsync();
-                request._accessor.HttpContext = http;
-                var authenticated = await http.AuthenticateAsync();
-                await Assert.That(authenticated.Succeeded).IsTrue();
-                http.User = authenticated.Principal!;
-                await request.Services.GetRequiredService<IHumanCommitScopePreparation>().PrepareAsync(Token);
+                try
+                {
+                    http.Request.Headers.Authorization = "Bearer " + await fixture.SignInAsync();
+                    var authenticated = await http.AuthenticateAsync();
+                    await Assert.That(authenticated.Succeeded).IsTrue();
+                    http.User = authenticated.Principal!;
+                    await request.Services.GetRequiredService<IHumanCommitScopePreparation>().PrepareAsync(Token);
+                    return request;
+                }
+                catch
+                {
+                    await request.DisposeAsync();
+                    throw;
+                }
             }
-            return request;
         }
         public async ValueTask DisposeAsync()
         {
             Environment.SetEnvironmentVariable(Variable, null);
             _accessor.HttpContext = null;
-            await _scope.DisposeAsync();
-            await _host.DisposeAsync();
+            try { await _scope.DisposeAsync(); }
+            finally { await _host.DisposeAsync(); }
         }
     }
 

@@ -1,0 +1,27 @@
+Change-Id: CHG-01M7ZW1T5T9W5TWHV529ZVYN5F
+Title: "Use TLS for local BFF sessions"
+Type: fix
+Scope: self-hosting
+Summary: "Project the BFF session Redis endpoint using its configured transport scheme."
+Group: local-bff-session-transport
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/testing/DISTRIBUTED_ASSURANCE.md
+    Disposition: documented
+    Detail: "The local AppHost derives the Redis session endpoint scheme from Aspire so the ticket store uses TLS when the resource enables it."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

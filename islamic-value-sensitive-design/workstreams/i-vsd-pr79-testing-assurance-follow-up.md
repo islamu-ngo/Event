@@ -1,25 +1,39 @@
 # I-VSD — PR 79 Testing Assurance Follow-Up
 
-Last Updated: 2026-10-30
-Report revision: 1
+Last Updated: 2026-11-22
+Report revision: 6
 
 ## Review Metadata
 
-- Mode: planning
+- Mode: plan-review
 - Subject: Trustworthy testing assurance and owned execution
 - Workstream: pr79-testing-assurance-follow-up
 - Report kind: workstream assessment
 - Report status: draft
 - Disposition: changes-required
-- Evidence cutoff: 2026-10-30
+- Evidence cutoff: 2026-11-22
 - Reviewed input:
   - dev/backlog/pr79-testing-assurance-follow-up.md
   - Planning triad revision 1, as supplied in chat and saved locally
+  - Planning triad revision 9, 2026-11-20
+  - Working-tree plan revision 13 and execution context, 2026-11-21
+  - Plan revision 15, maintainer deferral/merge decisions, 2026-11-22
+  - Published candidate `cb6f084285` and independent bounded security/privacy
+    and correctness/documentation reviews, 2026-11-22
+  - Observer repair `26e34c1991`: exact image-declared mount validation,
+    no parent volume deletion, and passing native interruption control
+  - Subsequent ownership 77/77 and browser-security modules 36/36; standalone
+    native SQLite migration failure reproduced on untouched `ed15a99dd7`
+  - Standalone relational provider/host-graph fixture 22/22 and resource-cookie
+    consumers 2/2; stored session acceptance and server-owned correlation verified
+  - [ADR-021](../../docs/internal/adr/ADR-021-instance-scoped-hal-authorization.md)
 - Supersedes: none
 
-This update persists the supplied assessment and checks its document mappings.
-It does not independently reproduce the planner's source/research findings,
-establish fresh execution authorization or validate implementation.
+This update reconciles the original findings with actual delivery, maintainer
+decisions and two independent bounded reviews. Those reviews did not find a new
+confirmed exploitable authorization/privacy regression in the inspected paths;
+they did identify documentation corrections and missing runtime evidence.
+They do not establish exhaustive source coverage or runtime certification.
 
 ## Executive Summary
 
@@ -37,10 +51,24 @@ The proposed plan addresses those responsibilities through exact-candidate
 evidence, positive ownership, private artifact custody, native authority tests
 and explicit incomplete/unavailable outcomes.
 
-The report is not implementation-validated. Current-candidate execution,
-upstream reconciliation and stakeholder/operational evidence remain absent.
-Its draft / changes-required disposition permits planning reconciliation, not
-an implementation-complete, security or merge-readiness claim.
+The independent implementation review is bounded source review. The recorded B20
+authorization slice passed 75/75 and the category relationship class passed
+5/5 on earlier sources. The earlier B22 data-protection witness passed 2/2 while
+retaining the developer volumes, but review found that its stop proof was too
+weak; the corrected witness has not run. A later tenant-discovery run was interrupted and is not a
+passing result. These receipts are scoped observations, not proof of the final
+candidate. Current ownership and browser module checks passed 77/77 and 36/36.
+Standalone's relational fixture passed 22/22 provider/host-graph cases and 2/2
+resource-cookie consumers. It uses SQLite `EnsureCreated` and an explicit
+in-process session authority; these are not native migration or distributed
+Redis qualification. Native staging SQLite migration fails identically on
+untouched upstream and is quarantined in develop's backlog. Security CI on
+`75c8e5097d` now exits 3 without the former observer-failed suffix; no admitted
+full-lane receipt is claimed.
+Actual-host browser, worker/restart, load and final provider/scanner execution
+remain unqualified; independent source review is recorded below. Its draft / changes-required
+disposition permits planning reconciliation, not an implementation-complete,
+security or merge-readiness claim.
 
 ## Scope
 
@@ -365,6 +393,39 @@ authorize execution or waive PR 80 restrictions.
 
 ## Evidence Reviewed
 
+Evidence update (2026-11-21): the worktree execution context records category
+relationship tests 5/5, tenant-creation permission tests 25/25, and the earlier
+B22 data-protection witness 2/2. That B22 result cannot prove the intended restart
+because the previous test accepted a health timeout without a terminal state; its
+corrected witness remains unrun. The subsequent tenant-discovery cohort was
+interrupted without a result. These are ledger-reported receipts; this report
+does not independently certify their logs or the final committed candidate.
+An additional mixed-batch regression demonstrated that an empty tenant profile
+could reach an instance-admin shortcut. The local provider now denies mixed
+instance-scope batches with an empty resolved tenant, while instance settings
+and tenant creation retain their separate authority path. The runtime provider
+may split dedicated-resource and discovery checks before delegation, so this is
+not a blanket claim about every top-level batch. An experimental runtime routing
+change was removed because an unbound tenant accessor can resolve a tenant lazily;
+the existing tenant-specific Cerbos selection is retained. Whole-workstream security review and the
+final candidate's provider parity remain necessary before release. The final local
+authorization regression class passed 9/9, including denied non-administrator
+and missing-tenant cases and selected-tenant behavior; two focused independent
+source reviews found no further proven bypass within that local-provider scope.
+
+Implementation refresh (2026-11-20):
+- B20: `PrivateInstanceManagementHttpTests` 24/24 and the complete four-class
+authorization slice 75/75, with the incomplete-setup host origin and the
+instance-scoped HAL batch root causes repaired. Decision: ADR-021.
+- B21: Runtime bootstrap reads use `IInstanceBootstrapStateReader`; mutation and
+startup owners retain the tracked repository. Category/category-type Runtime DML
+is narrow and attested; the detached read-modify-write guard passed 9/9.
+- B19: the SECURITY DEFINER recipient projection and its native drift/authority
+checks passed 4/4 in the prior recorded run.
+- B22: the cleanup-proof retry and concurrent-removal settlement are implemented
+in `OwnedAppHostFixture`; the native Distributed witness is running and no result
+is claimed yet.
+
 Evidence carried forward from the supplied planner assessment:
 - PR 79 backlog and its explicit evidence limitations.
 - PR 80 overlap/restriction handoff.
@@ -378,14 +439,42 @@ Document-update review:
 - Local planning/I-VSD artifact contracts.
 - Stable finding/mitigation, behaviour and task mappings.
 
-The updater did not independently re-review product source, remote PRs, scanner
-results or the external research sources.
+Independent security/privacy review on `cb6f084285` inspected instance-management
+exemptions and credential-cutover authority, local permission-batch fail-closed
+behavior, administrative EF enumeration and named soft-delete filters, recipient
+projection/verified evidence, accepted Global-by-ID delivery scope, secret-binding
+scope and prepared-write transaction custody. No new confirmed exploitable
+regression was found in that bounded inspection. The review was risk-based,
+not an exhaustive review of all changed files; it ran no builds or tests.
+
+Independent correctness/documentation review confirmed the paired release docs
+and fragments, identified stale ledger/assessment claims and the implied downgrade
+promise in the runbook, and retained worker, provider, browser/load and native
+observer gaps. The runbook now requires fresh development provisioning for an
+earlier candidate. Neither review converts missing provider evidence into a pass.
+
+Review of the subsequent observer repair rejected an unsafe draft that inferred
+volume-deletion authority from a new mount. The delivered `26e34c1991` API lane
+never deletes volumes: it removes only proven container IDs with volume removal
+disabled, and withholds cleanup admission if observed volumes remain. The real
+interrupted-owner control passed 1/1, preserving a newly created foreign named
+volume and both anonymous volumes. Ten parser cases, the existing native-resource
+contract and sixteen consumer-boundary cases passed. This control proves that
+specific cleanup boundary, not complete security-lane or product qualification.
 
 ## Missing Evidence
 
-No current build/test/native result was produced during planning or this update.
-No claim of implemented mitigation, ethical outcome, security certification or
-merge readiness is made.
+Independent bounded workstream review has been performed as described above;
+exhaustive source coverage and whole-runtime security/privacy proof remain absent.
+Worker recovery, browser journeys, K6 load, provider matrix and final
+scanner/Sonar evidence are not complete at this evidence cutoff. The corrected
+B22 witness remains unrun and does not certify cleanup or restart behavior.
+The maintainer accepted deferral of unresolved PostgreSQL qualification and does
+not require every CI check green for a practical merge decision. Those choices
+do not turn the reproducible trusted-settings installation defect or missing
+runtime evidence into successful qualification. The development-checkout backlog
+retains concrete follow-ups. No Loki instance or Loki acceptance is required.
+No claim of ethical outcome or security certification follows from these reviews.
 
 ## Context Inventory
 
@@ -404,9 +493,14 @@ Unstable inputs:
 | Date | Previous status | New status | Trigger | Evidence/replacement |
 |---|---|---|---|---|
 | 2026-10-30 | Not persisted | draft | Supplied revision 1 saved with metadata normalization | Supplied triad/report; document-only review, not current-candidate validation |
+| 2026-11-20 | draft | draft / implementation evidence refreshed | B20 75/75, category mutation 9/9, B22 repair compiled and native witness started | Planning revision 9, ADR-021, local test logs; independent review and remaining native lanes still open |
+| 2026-11-21 | draft | draft | Reconcile later scoped receipts and interrupted discovery run | Worktree context and plan revision 13; final candidate and independent review remain open |
+| 2026-11-22 | draft | draft / bounded implementation review reconciled | Maintainer completion and deferral decisions; independent security/privacy and correctness reviews | Plan revision 14 and `cb6f084285`; unverified runtime paths and native-observer repair remain open |
 
 Current status:
-Draft, with planning mappings supplied.
+Draft, with revision-14 decisions and bounded implementation review reconciled;
+full execution of the repaired native observer, runtime receipts and acceptance
+remain open. The observer repair itself and its focused custody control passed.
 
 Before implementation:
 Refresh evidence and restrictions.
@@ -422,11 +516,11 @@ A mapping check is not implementation validation.
 ## Planning Handoff
 
 Bound planning revision:
-PR 79 Testing Assurance Follow-Up triad revision 1, dated 2026-10-30.
+PR 79 Testing Assurance Follow-Up triad revision 14, dated 2026-11-22.
 
 - Workstream: pr79-testing-assurance-follow-up.
-- Status: draft.
-- Reviewed input: PR 79 Testing Assurance Follow-Up planning triad revision 1.
+- Status: draft / bounded implementation review reconciled.
+- Reviewed input: triad revision 14 and the bounded candidate reviews above.
 - Escalations required before: implementation for unresolved authority/scope;
   release for missing mandatory acceptance evidence.
 - Refresh triggers: candidate/ownership reconciliation, material scope or trust

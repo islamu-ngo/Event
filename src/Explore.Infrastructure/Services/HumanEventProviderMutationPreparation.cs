@@ -4,6 +4,7 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.RegistrationProviders.Commands;
 using Explore.Application.Responses;
@@ -36,7 +37,9 @@ public sealed class HumanEventProviderMutationPreparation(
     Func<IPolicySourceSetFence> resolveExclusion,
     Func<IHumanActionCommitFinalizer> resolveFinalizer,
     Func<ISerializableAttemptOwner> resolveOwner,
-    Func<IHumanEventProviderSourceFactory> resolveBusiness) : IHumanEventProviderMutationPreparation
+    Func<IHumanEventProviderSourceFactory> resolveBusiness,
+    Func<IOriginalPrivacyIdentityFenceAuthority> resolvePrivacy,
+    Func<IEventDiscoveryEnrollmentGate> resolveEnrollment) : IHumanEventProviderMutationPreparation
 {
     public async Task<T> ExecutePreparedAsync<T>(ICommand<BaseCommandResponse<Guid>> command,
         IPreparedHumanEventProviderMutation prepared, Func<CancellationToken, Task<T>> mutation,
@@ -47,7 +50,9 @@ public sealed class HumanEventProviderMutationPreparation(
             throw new UnauthorizedAccessException("The prepared Event action belongs to another issuer or command.");
         try
         {
-            return await resolveOwner().ExecuteAsync(async token =>
+            await using var enrollment = command is ImportExternalRegistrationProviderFormVersionCommand
+                ? await resolveEnrollment().AcquireAsync(cancellationToken) : null;
+            return await resolveOwner().ExecuteWithOriginalPrivacyAsync(resolvePrivacy(), async token =>
             {
                 try
                 {
@@ -80,7 +85,9 @@ public sealed class HumanEventProviderMutationPreparation(
             var prepared = await PrepareAsync(command, cancellationToken);
             try
             {
-                return await resolveOwner().ExecuteAsync(async token =>
+                await using var enrollment = command is ImportExternalRegistrationProviderFormVersionCommand
+                    ? await resolveEnrollment().AcquireAsync(cancellationToken) : null;
+                return await resolveOwner().ExecuteWithOriginalPrivacyAsync(resolvePrivacy(), async token =>
                 {
                     try
                     {
@@ -196,6 +203,14 @@ public sealed class HumanEventProviderMutationPreparation(
         var businessFacts = await businessSource.ObserveAsync(cancellationToken);
 
         void Compare(HumanPrincipalSourceFacts currentPrincipal, HumanAuthorizationRouteFacts currentRoute,
+            HumanEventAssignmentSourceFacts currentAssignments, DateTime evaluationUtc, Guid? expectedStamp = null)
+        {
+            CompareAuthority(currentPrincipal, currentRoute, currentAssignments, evaluationUtc);
+            if (currentAssignments.Events.Single(row => row.Id == eventId).ConcurrencyStamp != (expectedStamp ?? eventStamp))
+                throw new UnauthorizedAccessException("The original Event revision has changed.");
+        }
+
+        void CompareAuthority(HumanPrincipalSourceFacts currentPrincipal, HumanAuthorizationRouteFacts currentRoute,
             HumanEventAssignmentSourceFacts currentAssignments, DateTime evaluationUtc)
         {
             RequireCustody();
@@ -203,9 +218,7 @@ public sealed class HumanEventProviderMutationPreparation(
             var currentResource = RequireResource(currentAssignments, tenantId, eventId);
             var projectedRoute = HumanAuthorizationRouteProjector.Project(currentRoute, deployment, false,
                 lifetime.LocalSession is null || currentPrincipal.LocalSession is not null);
-            if (resource != currentResource
-                || currentAssignments.Events.Single(row => row.Id == eventId).ConcurrencyStamp != eventStamp
-                || !route.IsSemanticallyEquivalentTo(projectedRoute))
+            if (resource != currentResource || !route.IsSemanticallyEquivalentTo(projectedRoute))
                 throw new UnauthorizedAccessException("The original Event target or selected route has changed.");
             bool matches = route.Provider == HumanAuthorizationRouteProvider.Local
                 ? local == LocalInputs(currentPrincipal, currentAssignments, currentResource, evaluationUtc)
@@ -220,10 +233,11 @@ public sealed class HumanEventProviderMutationPreparation(
             throw new UnauthorizedAccessException("The original credential expired during subordinate observation.");
         Compare(principalFacts, routeFacts, assignmentFacts, preparedAt.UtcDateTime);
         RequireSupport(supportFacts, preparedAt, check);
+        var exclusionSource = resolveExclusion();
         return new Prepared(this, command, async token =>
         {
             RequireCustody();
-            var exclusion = await resolveExclusion().AcquireAsync(token);
+            var exclusion = await exclusionSource.AcquireAsync(token);
             var principalLease = await principalSource.AcquireAsync(exclusion, token);
             var routeLease = await routeSource.AcquireAsync(exclusion, token);
             var assignmentLease = await assignmentSource.AcquireAsync(exclusion, token);
@@ -248,9 +262,10 @@ public sealed class HumanEventProviderMutationPreparation(
                 var freshRoute = await routeLease.ValidateAsync(finalToken);
                 var freshAssignments = await assignmentLease.ValidateAsync(finalToken);
                 var freshSupport = await supportLease.ValidateAsync(finalToken);
-                await businessLease.ValidateAsync(finalToken);
-                Compare(freshPrincipal, freshRoute, freshAssignments, assignmentEvaluationUtc);
-                final = new(freshPrincipal, freshRoute, freshAssignments, freshSupport);
+                CompareAuthority(freshPrincipal, freshRoute, freshAssignments, assignmentEvaluationUtc);
+                Guid committedStamp = await businessLease.ValidateEventCommitAsync(finalToken);
+                Compare(freshPrincipal, freshRoute, freshAssignments, assignmentEvaluationUtc, committedStamp);
+                final = new(freshPrincipal, freshRoute, freshAssignments, freshSupport, committedStamp);
             }, now =>
             {
                 var fresh = final ?? throw new InvalidOperationException("Final source admission has not completed.");
@@ -262,7 +277,7 @@ public sealed class HumanEventProviderMutationPreparation(
                 // Project BOTH snapshots: an own-write expiry extension cannot stretch the
                 // original prepared grant, but expiry of an irrelevant candidate is harmless.
                 Compare(principalFacts, routeFacts, assignmentFacts, now.UtcDateTime);
-                Compare(fresh.Principal, fresh.Route, fresh.Assignments, now.UtcDateTime);
+                Compare(fresh.Principal, fresh.Route, fresh.Assignments, now.UtcDateTime, fresh.EventStamp);
                 RequireSupport(supportFacts, now, check);
                 RequireSupport(fresh.Support, now, check);
             });
@@ -380,7 +395,7 @@ public sealed class HumanEventProviderMutationPreparation(
     }
 
     private sealed record FinalFacts(HumanPrincipalSourceFacts Principal, HumanAuthorizationRouteFacts Route,
-        HumanEventAssignmentSourceFacts Assignments, HumanSupportAccessSourceFacts Support);
+        HumanEventAssignmentSourceFacts Assignments, HumanSupportAccessSourceFacts Support, Guid EventStamp);
 
     private sealed class Prepared(HumanEventProviderMutationPreparation issuer,
         ICommand<BaseCommandResponse<Guid>> command, Func<CancellationToken, Task> acquire,

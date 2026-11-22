@@ -10,20 +10,20 @@ namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 public sealed class GetSystemOnboardingStatusQueryHandler
     : IQueryHandler<GetSystemOnboardingStatusQuery, SystemOnboardingStatusDto>
 {
-    private readonly IInstanceBootstrapStateRepository _instanceBootstrapStateRepository;
+    private readonly IInstanceBootstrapStateReader _instanceBootstrapStateReader;
     private readonly IDeploymentModeProvider _deploymentModeProvider;
 
     public GetSystemOnboardingStatusQueryHandler(
-        IInstanceBootstrapStateRepository instanceBootstrapStateRepository,
+        IInstanceBootstrapStateReader instanceBootstrapStateReader,
         IDeploymentModeProvider deploymentModeProvider)
     {
-        _instanceBootstrapStateRepository = instanceBootstrapStateRepository;
+        _instanceBootstrapStateReader = instanceBootstrapStateReader;
         _deploymentModeProvider = deploymentModeProvider;
     }
 
     public async Task<SystemOnboardingStatusDto> QueryAsync(GetSystemOnboardingStatusQuery request, CancellationToken cancellationToken)
     {
-        var bootstrap = await _instanceBootstrapStateRepository.GetCurrent(cancellationToken);
+        var bootstrap = await _instanceBootstrapStateReader.GetCurrent(cancellationToken);
         var requiresOnboarding = bootstrap?.Status != InstanceBootstrapStatus.Completed;
         var deploymentMode = requiresOnboarding
             ? await _deploymentModeProvider.GetConfiguredOnboardingModeAsync(cancellationToken)

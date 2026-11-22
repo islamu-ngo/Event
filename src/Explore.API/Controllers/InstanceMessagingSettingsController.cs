@@ -141,6 +141,7 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
     }
 
     [HttpPatch("smtp", Name = RouteNames.UpdateInstanceSmtpSettings)]
+    [InstanceManagement]
     [PrivateNoStore]
     [EndpointSummary("Update Instance SMTP Settings")]
     [EndpointDescription("Updates instance SMTP settings. Requires instance administrator.")]
@@ -178,6 +179,7 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
 
     [HttpGet("resolver-config", Name = RouteNames.GetInstanceResolverConfiguration)]
     [AllowAnonymous]
+    [TenantReadBootstrap]
     [EndpointClassification(EndpointClass.Public)]
     [EndpointSummary("Get Tenant Resolver Configuration")]
     [EndpointDescription("Returns the non-sensitive instance-level tenant resolver configuration used by API clients and the BFF routing bootstrap.")]

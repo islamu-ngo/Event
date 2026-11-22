@@ -1,5 +1,5 @@
 using Explore.Application.Contracts.Operations;
-using Explore.Application.Features.Authentication.Continuation.Commands;
+using Explore.Application.Features.Authentication.Continuation.Requests.Commands;
 using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Features.Localization.Requests.Commands;
 using Explore.Application.Contracts.Identity;

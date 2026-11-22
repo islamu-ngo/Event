@@ -1,8 +1,11 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence.Security;
+using Explore.Persistence.Identity;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.Configuration;
 
 namespace Explore.Persistence.Database;
 
@@ -19,6 +22,7 @@ public sealed class GlobalExploreDbContextFactory :
     IMixedSettingsDbContextFactory
 {
     private readonly PooledDbContextFactory<ExploreDbContext> _pool;
+    private PostgresTenantCreationPermissions.SourceProgram? _tenantCreationSources;
 
     public GlobalExploreDbContextFactory(PrimaryDatabaseConnectionOptions options, int poolSize = 128)
     {
@@ -37,9 +41,25 @@ public sealed class GlobalExploreDbContextFactory :
         _pool = new PooledDbContextFactory<ExploreDbContext>(builder.Options, poolSize);
     }
 
+    /// <summary>Compiles expected source SQL before traffic without opening a connection or observing readiness.</summary>
+    public async Task PrepareTenantCreationSourcesAsync(IConfiguration configuration,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await _pool.CreateDbContextAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!context.Database.IsNpgsql())
+            return;
+        var enrollment = PostgresNativeQueueEnrollment.Bind(configuration);
+        var program = PostgresTenantCreationPermissions.CompileSourceProgram(
+            context, enrollment, IdentityDatabaseConfiguration.GetTopology(configuration));
+        cancellationToken.ThrowIfCancellationRequested();
+        _tenantCreationSources = program;
+    }
+
     public async Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
     {
         var context = await _pool.CreateDbContextAsync(cancellationToken);
+        context.TenantCreationSources = _tenantCreationSources;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -62,6 +82,7 @@ public sealed class GlobalExploreDbContextFactory :
         if (tenantId == Guid.Empty)
             throw new ArgumentException("Mixed settings require an exact tenant or instance target.", nameof(tenantId));
         var context = await _pool.CreateDbContextAsync(cancellationToken);
+        context.TenantCreationSources = _tenantCreationSources;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -90,6 +111,7 @@ public sealed class GlobalExploreDbContextFactory :
             throw new ArgumentException("Settlement requires an exact persisted tenant.", nameof(tenantId));
 
         var context = await _pool.CreateDbContextAsync(cancellationToken);
+        context.TenantCreationSources = _tenantCreationSources;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();

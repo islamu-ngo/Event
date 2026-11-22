@@ -6,6 +6,7 @@ using Explore.Application.Authentication;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Services;
 using Explore.Application.Services.Registration;
 using Explore.Domain;
@@ -178,6 +179,15 @@ public sealed class AuthenticationEfSourceTests(PostgreSqlContainerFixture fixtu
 
     private sealed class CloseAfterAcknowledgedCommit(ExploreDbContext context) : ISerializableAttemptOwner
     {
+        public async Task<T> ExecuteWithOriginalPrivacyAsync<T>(IOriginalPrivacyIdentityFenceAuthority privacy,
+            Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default)
+        {
+            T result = await ((ISerializableAttemptOwner)new EfCoreUnitOfWork(context))
+                .ExecuteWithOriginalPrivacyAsync(privacy, operation, cancellationToken);
+            await context.Database.CloseConnectionAsync();
+            return result;
+        }
+
         public async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default)
         {

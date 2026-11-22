@@ -162,7 +162,7 @@ public sealed class WebhookPublicationClaimRepositoryTests(PostgreSqlContainerFi
         context.TenantContext = tenant;
         var ownership = new WebhookOwnershipScopeResolver(
             tenant, Substitute.For<ICurrentUserService>(),
-            Substitute.For<IInstanceBootstrapStateRepository>(),
+            Substitute.For<IInstanceBootstrapStateReader>(),
             Substitute.For<IOrganizationRepository>(), Substitute.For<IGroupRepository>(),
             Substitute.For<ITenantUserRepository>(), new WebhookConsumerRepository(context),
             Substitute.For<IWebhookEndpointRepository>(), Substitute.For<IWebhookMessageRepository>(),

@@ -318,32 +318,12 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
     }
 
     [Test]
-    [Arguments("instance")]
-    [Arguments("tenant")]
-    [Arguments("organization")]
-    [Arguments("group")]
     [Arguments("health")]
     public async Task NativeObservationRejectsUnknownExecutorBeforeReplacement(string purpose)
     {
         await using var migrator = fixture.CreateDbContext();
         (string Signature, string Role, string Query, int Columns, Func<ExploreDbContext, Task> Install) contract = purpose switch
         {
-            "instance" => (PostgresAdministrativeAuthorityContract.InstanceFunctionSql(migrator) + "(uuid)",
-                PostgresAdministrativeAuthorityContract.GlobalRole,
-                $"SELECT {PostgresAdministrativeAuthorityContract.InstanceFunctionSql(migrator)}(@subject)", 1,
-                context => PostgresAdministrativeAuthorityContract.ApplyAsync(context)),
-            "tenant" => (PostgresAdministrativeAuthorityContract.TenantFunctionSql(migrator) + "(uuid)",
-                PostgresAdministrativeAuthorityContract.GlobalRole,
-                $"SELECT * FROM {PostgresAdministrativeAuthorityContract.TenantFunctionSql(migrator)}(@subject)", 1,
-                context => PostgresAdministrativeAuthorityContract.ApplyAsync(context)),
-            "organization" => (PostgresAdministrativeAuthorityContract.OrganizationFunctionSql(migrator) + "(uuid, uuid)",
-                PostgresAdministrativeAuthorityContract.GlobalRole,
-                $"SELECT * FROM {PostgresAdministrativeAuthorityContract.OrganizationFunctionSql(migrator)}(@subject, NULL)", 1,
-                context => PostgresAdministrativeAuthorityContract.ApplyAsync(context)),
-            "group" => (PostgresAdministrativeAuthorityContract.GroupFunctionSql(migrator) + "(uuid, uuid)",
-                PostgresAdministrativeAuthorityContract.GlobalRole,
-                $"SELECT * FROM {PostgresAdministrativeAuthorityContract.GroupFunctionSql(migrator)}(@subject, NULL)", 1,
-                context => PostgresAdministrativeAuthorityContract.ApplyAsync(context)),
             "health" => (PostgresQueueDrainHealthContract.FunctionSql(migrator) +
                 "(timestamp with time zone, timestamp with time zone)",
                 PostgresQueueDrainHealthContract.GlobalRole,
@@ -386,11 +366,6 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
         Configure(allowed);
         await using var result = await allowed.ExecuteReaderAsync();
         await Assert.That(result.FieldCount).IsEqualTo(contract.Columns);
-        if (purpose == "instance")
-        {
-            await Assert.That(await result.ReadAsync()).IsTrue();
-            await Assert.That(result.GetBoolean(0)).IsFalse();
-        }
 
         void Configure(System.Data.Common.DbCommand command)
         {
@@ -407,6 +382,95 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
                 command.Parameters.Add(parameter);
             }
         }
+    }
+
+    [Test]
+    [Arguments("partial")]
+    [Arguments("table-select")]
+    [Arguments("grant-option")]
+    [Arguments("public")]
+    [Arguments("write")]
+    [Arguments("widened-policy")]
+    [Arguments("missing-policy")]
+    [Arguments("obsolete-function")]
+    public async Task AdministrativeStorageEnrollmentRejectsDriftWithoutRepair(string drift)
+    {
+        await using var migrator = fixture.CreateDbContext();
+        await PostgresAdministrativeAuthorityReadPermissions.ApplyAsync(migrator, fixture.NativeQueueEnrollment);
+        await migrator.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await migrator.Database.BeginTransactionAsync();
+            var names = new HumanPrincipalSourceSql(migrator);
+            string global = names.Quote(fixture.NativeQueueEnrollment.GlobalLogin);
+            var entity = migrator.Model.FindEntityType(typeof(OrganizationMember))!;
+            string table = $"{names.Quote(entity.GetSchema()!)}.{names.Quote(entity.GetTableName()!)}";
+            var store = Microsoft.EntityFrameworkCore.Metadata.StoreObjectIdentifier.Table(
+                entity.GetTableName()!, entity.GetSchema());
+            string user = names.Quote(entity.FindProperty(nameof(OrganizationMember.UserId))!.GetColumnName(store)!);
+            string alteration = drift switch
+            {
+                "partial" => $"REVOKE SELECT ({user}) ON {table} FROM {global}",
+                "table-select" => $"GRANT SELECT ON {table} TO {global}",
+                "grant-option" => $"GRANT SELECT ({user}) ON {table} TO {global} WITH GRANT OPTION",
+                "public" => $"GRANT SELECT ({user}) ON {table} TO PUBLIC",
+                "write" => $"GRANT UPDATE ({user}) ON {table} TO {global}",
+                "widened-policy" => $"ALTER POLICY administrative_scope_global_read ON {table} TO PUBLIC USING (true)",
+                "missing-policy" => $"DROP POLICY administrative_scope_global_read ON {table}",
+                "obsolete-function" => $"""
+                    CREATE FUNCTION {names.Quote(entity.GetSchema()!)}.platform_user_roles_is_admin_for_user(uuid)
+                    RETURNS boolean LANGUAGE sql AS 'SELECT false'
+                    """,
+                _ => throw new ArgumentOutOfRangeException(nameof(drift))
+            };
+            await migrator.Database.ExecuteSqlRawAsync(alteration);
+            bool refused = false;
+            try
+            {
+                await PostgresAdministrativeAuthorityReadPermissions.ApplyAsync(migrator, fixture.NativeQueueEnrollment);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or UnauthorizedAccessException)
+            {
+                refused = true;
+            }
+            await Assert.That(refused).IsTrue();
+            await using var observation = migrator.Database.GetDbConnection().CreateCommand();
+            observation.Transaction = transaction.GetDbTransaction();
+            observation.CommandText = drift switch
+            {
+                "partial" => "SELECT NOT pg_catalog.has_column_privilege(@global, @table, @column, 'SELECT')",
+                "table-select" => "SELECT pg_catalog.has_table_privilege(@global, @table, 'SELECT')",
+                "grant-option" => "SELECT pg_catalog.has_column_privilege(@global, @table, @column, 'SELECT WITH GRANT OPTION')",
+                "public" => """
+                    SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a,
+                        LATERAL pg_catalog.aclexplode(a.attacl) acl
+                        WHERE a.attrelid=pg_catalog.to_regclass(@table) AND a.attname=@column
+                            AND acl.grantee=0 AND acl.privilege_type='SELECT')
+                    """,
+                "write" => "SELECT pg_catalog.has_column_privilege(@global, @table, @column, 'UPDATE')",
+                "widened-policy" => """
+                    SELECT polroles=ARRAY[0::oid] AND pg_catalog.pg_get_expr(polqual,polrelid)='true'
+                    FROM pg_catalog.pg_policy WHERE polrelid=pg_catalog.to_regclass(@table)
+                        AND polname='administrative_scope_global_read'
+                    """,
+                "missing-policy" => """
+                    SELECT NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy
+                        WHERE polrelid=pg_catalog.to_regclass(@table) AND polname='administrative_scope_global_read')
+                    """,
+                "obsolete-function" => """
+                    SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_proc p
+                        JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
+                        WHERE n.nspname=@schema AND p.proname='platform_user_roles_is_admin_for_user')
+                    """,
+                _ => throw new ArgumentOutOfRangeException(nameof(drift))
+            };
+            observation.Parameters.Add(new NpgsqlParameter("global", fixture.NativeQueueEnrollment.GlobalLogin));
+            observation.Parameters.Add(new NpgsqlParameter("table", $"{names.Quote(entity.GetSchema()!)}.{names.Quote(entity.GetTableName()!)}"));
+            observation.Parameters.Add(new NpgsqlParameter("column", entity.FindProperty(nameof(OrganizationMember.UserId))!.GetColumnName(store)!));
+            observation.Parameters.Add(new NpgsqlParameter("schema", entity.GetSchema()!));
+            await Assert.That(await observation.ExecuteScalarAsync()).IsEqualTo(true);
+            await transaction.RollbackAsync();
+        });
+        await PostgresAdministrativeAuthorityReadPermissions.ApplyAsync(migrator, fixture.NativeQueueEnrollment);
     }
 
     internal sealed class AuthenticationGlobalAuthority(PostgreSqlContainerFixture fixture) : IAsyncDisposable

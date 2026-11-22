@@ -22,7 +22,7 @@ public static partial class PostgresHumanEventAssignmentSourceContract
             + ") expected(signature)";
         string routineChecks = PostgresHumanSourceInstallationSql.RoutineGuard(
             sql, routines, Stamp, "human_assignment_routine_drift");
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string policies = string.Join("\n", HumanEventAssignmentSourceSql.Sources.Select(source =>
         {
             string table = Text(sql.Table(source.Type));

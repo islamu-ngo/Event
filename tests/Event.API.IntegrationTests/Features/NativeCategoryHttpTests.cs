@@ -140,9 +140,8 @@ public sealed class NativeCategoryHttpTests
         var afterDelete = await GetListAsync(client);
         await Assert.That(afterDelete.GetProperty("totalCount").GetInt32()).IsEqualTo(baselineCount);
         await Assert.That(Items(afterDelete).Any(item => item.GetProperty("id").GetGuid() == id)).IsFalse();
-        using (var scope = factory.Services.CreateScope())
+        await using (var db = factory.CreateMigratorContext())
         {
-            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             await Assert.That(await db.Categories.IgnoreQueryFilters().AnyAsync(category => category.Id == id)).IsFalse();
         }
         using var missingDelete = await client.DeleteAsync($"/api/category/{id}");
@@ -361,8 +360,7 @@ public sealed class NativeCategoryHttpTests
 
     private static async Task SeedTenantAsync(AuthenticatedWebApplicationFactory factory)
     {
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var db = factory.CreateMigratorContext();
         var status = await db.TenantStatuses.SingleAsync(status => status.Id == (int)TenantStatusEnum.Active);
         db.Tenants.Add(new Tenant
         {
@@ -378,8 +376,7 @@ public sealed class NativeCategoryHttpTests
     private static async Task<Category> SeedCategoryAsync(
         AuthenticatedWebApplicationFactory factory, string name, Guid? parentId = null)
     {
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var db = factory.CreateMigratorContext();
         var tenant = await db.Tenants.IgnoreQueryFilters()
             .SingleAsync(tenant => tenant.Id == PlatformDefaults.DefaultTenantId);
         var category = new Category
@@ -398,15 +395,13 @@ public sealed class NativeCategoryHttpTests
 
     private static async Task<Category> ReadCategoryAsync(AuthenticatedWebApplicationFactory factory, Guid id)
     {
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var db = factory.CreateMigratorContext();
         return await db.Categories.IgnoreQueryFilters().AsNoTracking().SingleAsync(category => category.Id == id);
     }
 
     private static async Task<int> CountCategoriesAsync(AuthenticatedWebApplicationFactory factory)
     {
-        using var scope = factory.Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
-            .Categories.IgnoreQueryFilters().CountAsync();
+        await using var db = factory.CreateMigratorContext();
+        return await db.Categories.IgnoreQueryFilters().CountAsync();
     }
 }

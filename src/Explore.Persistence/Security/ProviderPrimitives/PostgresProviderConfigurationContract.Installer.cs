@@ -12,7 +12,7 @@ public static partial class PostgresProviderConfigurationContract
         string anchor = sql.Name(SourceTable);
         string roles = string.Join(",", Roles.Select(Text));
         string migrator = sql.Quote(enrollment.MigratorLogin);
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         var policyTypes = Sources.Where(type => tenantTables.Any(table =>
             table.TableName == context.Model.FindEntityType(type)!.GetTableName())).ToArray();
         string policyRelations = string.Join(",", policyTypes.Select(type => $"{Text(sql.Table(type))}::regclass"));

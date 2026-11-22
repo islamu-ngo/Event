@@ -85,7 +85,7 @@ public sealed class StandaloneProviderCompositionTests
     public async Task StructuredPostgreSqlOverrideComposesNpgsqlWithoutOpeningConnection()
     {
         string password = Guid.NewGuid().ToString("N");
-        using var provider = ComposePersistence(new Dictionary<string, string?>
+        var configuration = new Dictionary<string, string?>
         {
             ["Database:Provider"] = "PostgreSql",
             ["Database:Host"] = "postgres.example.test",
@@ -95,7 +95,13 @@ public sealed class StandaloneProviderCompositionTests
             ["Database:Runtime:Username"] = "event_runtime",
             ["Database:Runtime:Password"] = password,
             ["Database:Runtime:TlsMode"] = "Required",
-        });
+        };
+        foreach (var role in Enum.GetValues<PrimaryDatabaseRole>())
+        {
+            configuration.TryAdd($"Database:{role}:Username", $"event_{role.ToString().ToLowerInvariant()}");
+            configuration.TryAdd($"Database:{role}:Password", Guid.CreateVersion7().ToString("N"));
+        }
+        using var provider = ComposePersistence(configuration);
         var factory = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>();
         await using var database = factory.CreateDbContext();
         var connection = new NpgsqlConnectionStringBuilder(database.Database.GetDbConnection().ConnectionString);

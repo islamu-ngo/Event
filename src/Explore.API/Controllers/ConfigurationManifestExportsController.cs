@@ -23,6 +23,7 @@ public sealed class ConfigurationManifestExportsController(
     : ControllerBase
 {
     [HttpGet("", Name = RouteNames.ExportConfigurationManifest)]
+    [InstanceManagement]
     [PrivateNoStore]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]

@@ -1,5 +1,5 @@
 using Event.Testing.DataProtection;
-using Event.Api.IntegrationTests.Fixtures;
+using Event.Testing;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;

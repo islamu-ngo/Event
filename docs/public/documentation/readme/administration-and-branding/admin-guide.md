@@ -188,6 +188,17 @@ and directory settings. MultiTenant deployments show **Instance Administration**
 tenant-only controls remain under **Tenant Administration** at `/settings/admin`.
 Tenant management and tenant plans remain available from the console navigation.
 Health, provider status, domain guidance and operational warnings are retained.
+
+Instance administration is scoped to the installation, not to one tenant. Opening
+`/settings/instance` or `/admin/instance` does not require a tenant slug, and the
+control plane never substitutes a default tenant when none is selected. Buttons and
+links that change instance settings, tenant lifecycle, plans or instance-wide
+providers are driven by the API's HAL links, so an operator sees exactly the actions
+their current instance authority permits.
+
+Instance onboarding and administration read bootstrap status through the separate
+instance authority; operators do not need to grant the Runtime database identity
+direct access to bootstrap state.
 Delegated tenant-only administrators can manage tenant settings in SingleTenant
 mode; instance infrastructure remains restricted to instance administrators.
 
@@ -796,6 +807,10 @@ retrying; a rejected move leaves the original placement intact.
 
 Organizers create Organizations and Groups to co-host events:
 - **Verification Badges**: Instance and tenant admins can mark verified organizations to give attendees trust.
+
+Category edits and deletes use concurrency checks to prevent an older view from
+silently overwriting newer changes. If an edit conflicts, reload the current
+record before trying again.
 - **Membership Management**: Assign Owner, Admin, and Member roles within an organization (see [Admin Hierarchy](admin-hierarchy.md)).
 - **Payment Connections**: Organizers onboard their own [Stripe Connect](../events-and-ticketing/paid-events-and-payouts.md) accounts directly through organization settings to receive ticket payouts.
 

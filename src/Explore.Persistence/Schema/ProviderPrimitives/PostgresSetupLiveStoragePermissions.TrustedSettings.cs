@@ -296,7 +296,7 @@ public static partial class PostgresSetupLiveStoragePermissions
         "trusted-setup-settings:v1:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
             $"{table}\n{login}\n{operation}\n{restrictive}\n{string.Join('\n', TrustedSetupSettingsWriter.Keys)}"))) + ":";
     private static string SettingText(string value) => "E'" + value.Replace("\\", "\\\\", StringComparison.Ordinal)
-        .Replace("'", "''", StringComparison.Ordinal) + "'";
+        .Replace("'", "''", StringComparison.Ordinal).Replace("$", "\\044", StringComparison.Ordinal) + "'";
 
     private static (string Table, Dictionary<string, string> Columns) SettingsSource(ExploreDbContext context)
     {

@@ -272,7 +272,7 @@ public static class PostgresTenantApiKeyStoragePermissions
 
     private static string SourcePredicate(ExploreDbContext context, Source source, PostgresNativeQueueEnrollment enrollment)
     {
-        var tenant = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model).SingleOrDefault(table => table.TableName == source.Name
+        var tenant = context.GetTenantTableInventory().SingleOrDefault(table => table.TableName == source.Name
             && (table.Schema ?? source.Schema) == source.Schema);
         if ((source.TenantColumn is null) != (tenant is null))
             throw new InvalidOperationException("tenant_api_key_storage_fixed_inventory_changed");

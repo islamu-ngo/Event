@@ -40,7 +40,7 @@ public static partial class PostgresStorageConfigurationContract
     private static string SourceGuard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var sql = new HumanPrincipalSourceSql(context);
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         string sources = string.Join("\n", Sources.Select(type =>
         {
             var entity = context.Model.FindEntityType(type)!;

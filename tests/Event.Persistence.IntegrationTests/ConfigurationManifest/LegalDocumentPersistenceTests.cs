@@ -1,5 +1,6 @@
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Infrastructure;
@@ -214,7 +215,7 @@ public sealed class LegalDocumentPersistenceTests
             new Explore.Application.Services.TenantLifecycleAccessService(
                 new TenantRepository(context),
                 NSubstitute.Substitute.For<Explore.Application.Contracts.Identity.IAdminContext>(),
-                new InstanceBootstrapStateRepository(context),
+                new TestInstanceBootstrapStateReader(new InstanceBootstrapStateRepository(context)),
                 NSubstitute.Substitute.For<ITenantLookupSource>()));
 
         PublicLegalDocumentQueryResult result = await handler.QueryAsync(

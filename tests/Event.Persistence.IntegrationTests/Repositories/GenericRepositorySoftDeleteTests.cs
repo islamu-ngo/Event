@@ -1,7 +1,9 @@
 using Explore.Application.Contracts.Infrastructure;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -11,6 +13,62 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 
 public sealed class GenericRepositorySoftDeleteTests
 {
+    [Test]
+    public async Task DetachedTenantSoftDeleteRejectsForeignTrackedIdentity()
+    {
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(Guid.CreateVersion7().ToString()).Options;
+        await using var context = new ExploreDbContext(options);
+        Guid tenant = Guid.CreateVersion7();
+        context.TenantContext = new TenantContext(tenant);
+        var tracked = new EventDay
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = Guid.CreateVersion7(),
+            Event = null!,
+            Tenant = null!
+        };
+        context.Attach(tracked);
+        var forged = new EventDay
+        {
+            Id = tracked.Id,
+            TenantId = tenant,
+            Event = null!,
+            Tenant = null!
+        };
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new GenericRepository<EventDay, Guid>(context).Delete(forged));
+        await Assert.That(failure!.Message).IsEqualTo("tracked_tenant_authority_mismatch");
+        await Assert.That(tracked.IsDeleted).IsFalse();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task DetachedSoftDeletePreservesTrackedValuesAndRejectsStaleStamp(bool stale)
+    {
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(Guid.CreateVersion7().ToString()).Options;
+        await using var context = new ExploreDbContext(options);
+        var repository = new GenericRepository<Group, Guid>(context);
+        var tracked = await repository.Create(new Group { FullName = "Original" });
+        var detached = await repository.GetById(tracked.Id);
+        tracked.FullName = "Current";
+        if (stale)
+            await context.SaveChangesAsync();
+
+        if (stale)
+            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => repository.Delete(detached!));
+        else
+            await repository.Delete(detached!);
+
+        await using var verification = new ExploreDbContext(options);
+        var persisted = await verification.Groups.IgnoreQueryFilters(["SoftDelete"])
+            .SingleAsync(group => group.Id == tracked.Id);
+        await Assert.That(persisted.FullName).IsEqualTo("Current");
+        await Assert.That(persisted.IsDeleted).IsEqualTo(!stale);
+    }
+
     [Test]
     [Arguments(CascadeTiming.Immediate)]
     [Arguments(CascadeTiming.OnSaveChanges)]
@@ -28,14 +86,20 @@ public sealed class GenericRepositorySoftDeleteTests
             context.TenantContext = new TenantContext(tenantId);
             context.CurrentUserService = new CurrentUser(userId);
             var group = new Group { FullName = "Soft deletion" };
+            var tenant = CreateTenant(tenantId);
             var participation = new GroupTenant
             {
                 Group = group,
                 GroupId = group.Id,
                 TenantId = tenantId,
-                Tenant = null!,
+                Tenant = tenant,
                 ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
-                ApprovalStatus = null!
+                ApprovalStatus = new ApprovalStatus
+                {
+                    Id = (int)ApprovalStatusEnum.Pending,
+                    MasterCode = "pending",
+                    FullName = "Pending"
+                }
             };
             context.GroupTenants.Add(participation);
             await context.SaveChangesAsync();
@@ -102,14 +166,23 @@ public sealed class GenericRepositorySoftDeleteTests
         await using var context = new ExploreDbContext(options);
         var tenantId = Guid.CreateVersion7();
         context.TenantContext = new TenantContext(tenantId);
+        var tenant = CreateTenant(tenantId);
+        var tag = new Tag
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = tenant,
+            MasterCode = "test-tag",
+            FullName = "Test tag"
+        };
         var link = new TagTypeTags
         {
-            TagId = Guid.CreateVersion7(),
-            Tag = null!,
+            TagId = tag.Id,
+            Tag = tag,
             TagTypeId = 1,
-            TagType = null!,
+            TagType = new TagType { Id = 1, MasterCode = "test-type", FullName = "Test type" },
             TenantId = tenantId,
-            Tenant = null!
+            Tenant = tenant
         };
         context.TagTypeTags.Add(link);
         await context.SaveChangesAsync();
@@ -119,6 +192,93 @@ public sealed class GenericRepositorySoftDeleteTests
 
         await Assert.That(await context.TagTypeTags.AnyAsync(item => item.Id == link.Id)).IsFalse();
         await Assert.That(context.ChangeTracker.CascadeDeleteTiming).IsEqualTo(CascadeTiming.Never);
+    }
+
+    private static Tenant CreateTenant(Guid tenantId) => new()
+    {
+        Id = tenantId,
+        FullName = "Test tenant",
+        Slug = $"test-{tenantId:N}",
+        TenantStatusId = (int)TenantStatusEnum.Active,
+        TenantStatus = new TenantStatus
+        {
+            Id = (int)TenantStatusEnum.Active,
+            MasterCode = "active",
+            FullName = "Active",
+            IsActiveState = true
+        }
+    };
+
+    [Test]
+    public async Task DetachedDelete_WhenOriginalEntityRemainsTrackedInSameContext_DeletesTrackedRowWithoutConflict()
+    {
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(Guid.CreateVersion7().ToString()).Options;
+        await using var context = new ExploreDbContext(options);
+        var tenantId = Guid.CreateVersion7();
+        context.TenantContext = new TenantContext(tenantId);
+        context.CurrentUserService = new CurrentUser(Guid.CreateVersion7());
+        var status = new Explore.Domain.TenantStatus
+        {
+            Id = 1,
+            MasterCode = "active",
+            FullName = "Active",
+            IsActiveState = true
+        };
+        var tenant = new Explore.Domain.Tenant
+        {
+            Id = tenantId,
+            FullName = "Detached delete tenant",
+            Slug = $"detached-delete-{tenantId:N}",
+            TenantStatusId = status.Id,
+            TenantStatus = status
+        };
+        var categoryType = new Explore.Domain.CategoryType
+        {
+            Id = 1,
+            MasterCode = "CAT_TYPE",
+            FullName = "Category Type"
+        };
+        var category = new Explore.Domain.Category
+        {
+            Id = Guid.CreateVersion7(),
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            MasterCode = "CAT",
+            FullName = "Category",
+            TenantId = tenantId,
+            Tenant = tenant
+        };
+        context.TenantStatuses.Add(status);
+        context.Tenants.Add(tenant);
+        context.CategoryTypes.Add(categoryType);
+        context.Categories.Add(category);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var softRepo = new GenericRepository<Group, Guid>(context);
+        var group = await softRepo.Create(new Group { FullName = "Tracked soft" });
+        var detachedGroup = await softRepo.GetById(group.Id)
+            ?? throw new InvalidOperationException("Expected persisted group.");
+        await softRepo.Delete(detachedGroup);
+
+        await Assert.That(await context.Groups.AnyAsync(item => item.Id == group.Id)).IsFalse();
+
+        var hardRepo = new CategoryTypeCategoriesRepository(context);
+        var link = await hardRepo.Create(new CategoryTypeCategories
+        {
+            Id = Guid.CreateVersion7(),
+            CategoryId = category.Id,
+            Category = null!,
+            CategoryTypeId = categoryType.Id,
+            CategoryType = null!,
+            TenantId = tenantId,
+            Tenant = null!
+        });
+        var detachedLink = await hardRepo.GetById(link.Id)
+            ?? throw new InvalidOperationException("Expected persisted category link.");
+        await hardRepo.Delete(detachedLink);
+
+        await Assert.That(await context.CategoryTypeCategories.AnyAsync(item => item.Id == link.Id)).IsFalse();
     }
 
     private sealed record TenantContext(Guid TenantId) : ITenantContext;
@@ -144,4 +304,48 @@ public sealed class GenericRepositorySoftDeleteTests
             return ValueTask.FromResult(result);
         }
     }
+}
+
+[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+[NotInParallel("PersistenceDb")]
+public sealed class GenericRepositorySoftDeletePostgresTests(PostgreSqlContainerFixture fixture)
+{
+    private readonly Guid tenantId = Guid.CreateVersion7();
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task RelationalDetachedSoftDeleteUsesCallerVersion(bool staleVersion)
+    {
+        await using var context = CreateMigratorContext();
+        var repository = new GenericRepository<Group, Guid>(context);
+        var tracked = await repository.Create(new Group { FullName = "Original" });
+        var detached = await repository.GetById(tracked.Id);
+        tracked.FullName = "Current";
+        if (staleVersion)
+        {
+            await context.SaveChangesAsync();
+            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => repository.Delete(detached!));
+        }
+        else
+        {
+            await repository.Delete(detached!);
+        }
+        await using var verification = CreateMigratorContext();
+        var persisted = await verification.Groups.IgnoreQueryFilters(["SoftDelete"])
+            .SingleAsync(group => group.Id == tracked.Id);
+        await Assert.That(persisted.FullName).IsEqualTo("Current");
+        await Assert.That(persisted.IsDeleted).IsEqualTo(!staleVersion);
+    }
+
+    private ExploreDbContext CreateMigratorContext()
+    {
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(builder, fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        var context = new ExploreDbContext(builder.Options) { TenantContext = new SelectedTenant(tenantId) };
+        context.BindTenantLease();
+        return context;
+    }
+
+    private sealed record SelectedTenant(Guid TenantId) : ITenantContext;
 }

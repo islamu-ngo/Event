@@ -311,6 +311,31 @@ Existing documented environment keys used are:
 
 - `BFF_SESSION_REDIS_PASSWORD` and `BFF_SESSION_NAMESPACE`; the dedicated session
   resource supplies `BFF_SESSION_REDIS_ENDPOINT`, without sharing API/cache credentials.
+  The AppHost derives that endpoint from Aspire's endpoint scheme; Aspire 13 enables
+  Redis TLS by default, so the projection resolves to `rediss://…`. The AppHost does
+  not duplicate the scheme, and it does not use `UriExpression` because that URI
+  embeds the password in user information, which the BFF contract rejects. AppHost
+  composition is local-development-only; production API, Blazor, and standalone
+  images receive the endpoint from deployment configuration and have no AppHost
+  project reference. Ordinary Redis caching remains optional and independent of the
+  key-ring design.  `RedisBffTicketStore` selects transport security from the URI scheme and
+  fails closed if the endpoint, namespace, or password is missing or malformed; a
+  plaintext projection must not be treated as a successful session authority.
+  Aspire DCP gives a stopped executable a shorter local budget than the BFF's
+  intentional 25-second graceful-shutdown window, so the runtime witness uses the
+  terminal `Finished`/`Exited` resource state rather than the command's transient
+  success flag. Production deployments retain the 25-second grace period and  do not use AppHost or DCP. When a test deliberately stops and starts the BFF
+  session authority, DCP replaces that container with a new native ID. The fixture
+  permits that replacement only for the explicitly restarted authority, and only
+  while the owner/resource labels, image, volume names and targets, and sole volume
+  consumer remain identical; any changed volume binding still fails. The witness
+  requires the terminal resource state before starting the BFF again; a bounded
+  health probe is supporting unavailability evidence and cannot replace that state.
+  It then requires a successful start and a healthy restart to prove recovery.
+  The parent witness uses the approved 20-minute allowance because a cold native
+  start, BFF restart and authority restart all run within one test. DCP may also remove a test-owned volume concurrently with
+  cleanup; an already-absent volume is treated as settled, while changed volume
+  metadata and foreign consumers still fail the proof.
 
 - `DATABASE_{PURPOSE}_USERNAME` and `DATABASE_{PURPOSE}_PASSWORD`, where PURPOSE
   is `MIGRATOR`, `RUNTIME`, `GLOBAL`, `LOCAL_IDENTITY_WRITER`, `INSTANCE_KEY_READ`,

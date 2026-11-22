@@ -376,6 +376,13 @@ clears merged configuration; appsettings and another provider never supply a
 fallback. Browser sign-in requires this backend even when persistence is SQLite.
 The API and the ordinary cache do not acquire the BFF session password.
 
+AppHost composition is local-development-only. Production API, Blazor, and
+standalone images are deployed separately and receive `BFF_SESSION_REDIS_ENDPOINT`
+from deployment configuration; neither runtime project references `Explore.AppHost`.
+The ordinary Redis cache is optional and separate from this session authority, and
+the platform's key-ring/Data Protection design must not be made to depend on Redis.
+When the optional session authority is selected, it must be provisioned explicitly.
+
 Aspire and Compose declare a dedicated optional `bff-session-authority` resource
 using the admitted pinned image. Persistence of this service and the compatible
 Data Protection authority is necessary for restart continuity. The Compose
@@ -1052,6 +1059,8 @@ When using PostgreSQL as the primary database provider, the platform enforces te
 2. **Vertically Partitioned & Child Entities:** Tables without a direct `tenant_id` column (such as `EventSessionIslamicAspect`, `ExternalApiKeyQuota`, and `LocationPii`) are protected through model-derived relational `EXISTS (SELECT 1 FROM parent ...)` policies linked to their tenant-bearing principal table.
 3. **Fail-Closed Session Semantics:** Policies evaluate `tenant_id = nullif(current_setting('app.current_tenant_id', true), '')::uuid`. When `app.current_tenant_id` is unconfigured or empty, the expression yields `NULL`, returning 0 rows and rejecting cross-tenant inserts with SQLSTATE `42501` (`insufficient_privilege`). This prevents data leaks even under raw SQL execution or accidental `IgnoreQueryFilters()` bypasses.
 4. **Role Privileges:** Application runtime database connections operate under roles with `NOBYPASSRLS` and without `SUPERUSER`, guaranteeing that table owners and runtime connections are strictly constrained by RLS.
+5. **Scoped catalogue writes:** `PostgresCategoryMutationPermissions` installs and attests the exact Runtime DML contract for `categories` (six-column `INSERT`, narrow `UPDATE` of `ConcurrencyStamp`, `MasterCode`, `FullName` and `ParentId`, RLS-enforced `DELETE`) and `category_type_categories` (column-scoped `SELECT` and `INSERT` on `Id`, `CategoryId`, `CategoryTypeId` and `TenantId`, `UPDATE` on the two catalogue keys only, and RLS-enforced `DELETE`). `Id`/`TenantId` updates, grant options, `PUBLIC` and unrelated columns remain outside the contract; widening or partially applying the grant set fails the read-permission attestation. `CategoryType` is read-only for Runtime because its controller exposes only GET operations.
+6. **Global bootstrap reads:** current instance-bootstrap evidence is read through `IInstanceBootstrapStateReader` on the independent Global pool. That is not a Runtime table grant: Runtime direct `SELECT` on `instance_bootstrap_states` still fails with `42501`. Command and startup owners that need tracked rows or `FOR UPDATE` retain `IInstanceBootstrapStateRepository` inside their original transaction authority.
 
 ### Privacy-erasure authority topology
 

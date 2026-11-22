@@ -19,7 +19,7 @@ internal static class AuthenticationCredentialCutoverHandlerSupport
     public static async Task<(Guid InstanceId, Guid ActorId)> RequireCurrentInstanceAsync(
         IUserContext userContext,
         IAdminContext adminContext,
-        IInstanceBootstrapStateRepository bootstrapRepository,
+        IInstanceBootstrapStateReader bootstrapReader,
         CancellationToken cancellationToken)
     {
         if (!userContext.IsAuthenticated
@@ -32,7 +32,7 @@ internal static class AuthenticationCredentialCutoverHandlerSupport
             throw new ApplicationExceptions.AuthorizationException(
                 "Current instance administrator authority is required.");
 
-        var bootstrap = await bootstrapRepository.GetCurrent(cancellationToken);
+        var bootstrap = await bootstrapReader.GetCurrent(cancellationToken);
         if (bootstrap is null || bootstrap.Status != InstanceBootstrapStatus.Completed)
         {
             throw new ApplicationExceptions.AuthorizationException(
@@ -83,7 +83,7 @@ internal static class AuthenticationCredentialCutoverHandlerSupport
 public sealed class CleanupAuthenticationCredentialsCommandHandler(
     IUserContext userContext,
     IAdminContext adminContext,
-    IInstanceBootstrapStateRepository bootstrapRepository,
+    IInstanceBootstrapStateReader bootstrapReader,
     IAuthenticationCredentialCutoverCoordinator coordinator,
     IAuthenticationCredentialCutoverRepository repository,
     TimeProvider timeProvider)
@@ -95,7 +95,7 @@ public sealed class CleanupAuthenticationCredentialsCommandHandler(
         try
         {
             var (instanceId, _) = await AuthenticationCredentialCutoverHandlerSupport
-                .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapRepository, cancellationToken);
+                .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapReader, cancellationToken);
             if (request.Input is null)
                 throw new ValidationException("Authentication credential cleanup approval is required.");
             new AuthenticationCredentialCleanupInputValidator().ValidateAndThrow(request.Input);
@@ -118,7 +118,7 @@ public sealed class CleanupAuthenticationCredentialsCommandHandler(
 public sealed class PrepareAuthenticationCredentialCutoverCommandHandler(
     IUserContext userContext,
     IAdminContext adminContext,
-    IInstanceBootstrapStateRepository bootstrapRepository,
+    IInstanceBootstrapStateReader bootstrapReader,
     IAuthenticationCredentialProfileReader profileReader,
     IAuthenticationCredentialCutoverCoordinator coordinator,
     IAuthenticationCredentialCutoverRepository repository,
@@ -132,7 +132,7 @@ public sealed class PrepareAuthenticationCredentialCutoverCommandHandler(
         try
         {
             var (instanceId, actorId) = await AuthenticationCredentialCutoverHandlerSupport
-                .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapRepository, cancellationToken);
+                .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapReader, cancellationToken);
             if (request.Input is null)
                 throw new ValidationException("Authentication credential cutover input is required.");
             new PrepareAuthenticationCredentialCutoverInputValidator().ValidateAndThrow(request.Input);
@@ -170,7 +170,7 @@ public sealed class PrepareAuthenticationCredentialCutoverCommandHandler(
 public sealed class ReportAuthenticationCredentialActivationCommandHandler(
     IUserContext userContext,
     IAdminContext adminContext,
-    IInstanceBootstrapStateRepository bootstrapRepository,
+    IInstanceBootstrapStateReader bootstrapReader,
     IAuthenticationCredentialCutoverCoordinator coordinator,
     IAuthenticationCredentialCutoverRepository repository,
     TimeProvider timeProvider)
@@ -183,7 +183,7 @@ public sealed class ReportAuthenticationCredentialActivationCommandHandler(
         try
         {
             var (instanceId, _) = await AuthenticationCredentialCutoverHandlerSupport
-                .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapRepository, cancellationToken);
+                .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapReader, cancellationToken);
             if (request.Input is null)
                 throw new ValidationException("Authentication credential activation input is required.");
             new AuthenticationCredentialActivationInputValidator().ValidateAndThrow(request.Input);
@@ -207,7 +207,7 @@ public sealed class ReportAuthenticationCredentialActivationCommandHandler(
 public sealed class AttestAuthenticationCredentialFenceCommandHandler(
     IUserContext userContext,
     IAdminContext adminContext,
-    IInstanceBootstrapStateRepository bootstrapRepository,
+    IInstanceBootstrapStateReader bootstrapReader,
     IAuthenticationCredentialCutoverCoordinator coordinator,
     IAuthenticationCredentialCutoverRepository repository,
     TimeProvider timeProvider)
@@ -220,7 +220,7 @@ public sealed class AttestAuthenticationCredentialFenceCommandHandler(
         try
         {
             var (instanceId, actorId) = await AuthenticationCredentialCutoverHandlerSupport
-                .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapRepository, cancellationToken);
+                .RequireCurrentInstanceAsync(userContext, adminContext, bootstrapReader, cancellationToken);
             if (request.Input is null)
                 throw new ValidationException("Authentication credential fence input is required.");
             new AuthenticationCredentialFenceInputValidator().ValidateAndThrow(request.Input);

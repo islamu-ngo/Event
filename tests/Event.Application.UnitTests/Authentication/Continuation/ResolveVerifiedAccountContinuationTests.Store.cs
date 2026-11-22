@@ -1,6 +1,7 @@
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Continuation;
+using Explore.Application.Features.Authentication.Continuation.Handlers.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
 
@@ -21,7 +22,7 @@ public sealed partial class ResolveVerifiedAccountContinuationTests
         public int FailureStage { get; set; }
         public int CancelStage { get; set; }
         public CancellationTokenSource? Cancellation { get; set; }
-        public ResolveVerifiedAccountContinuationQueryHandler Handler => new(this, this, this);
+        public GetVerifiedAccountContinuationQueryHandler Handler => new(this, this, this);
 
         public Store() => Login = new()
         {

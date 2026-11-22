@@ -16,6 +16,100 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class SecurityExecutionEvidenceIntegrationTests
 {
     [Test]
+    [Arguments("cancelled")]
+    [Arguments("timed-out")]
+    [Arguments("process-status-unavailable")]
+    [Arguments("process-exit-1")]
+    [Arguments("process-exit-2")]
+    [Arguments("process-exit-3")]
+    [Arguments("process-exit-10")]
+    [Arguments("process-exit-137")]
+    [Arguments("process-failed")]
+    [Arguments("owned-processes-remain")]
+    [Arguments("output-limit-exceeded")]
+    [Arguments("process-cleanup-failed")]
+    [Arguments("observer-unsettled")]
+    [Arguments("observer-failed")]
+    [Arguments("resource-proof-rejected")]
+    [Arguments("temporary-cleanup-failed")]
+    [Arguments("report-missing")]
+    public async Task NativeFailureReportsOnlyRegisteredLaneAndFixedOutcome(string outcome)
+    {
+        var process = new SecurityExecutionEvidence.OwnedNativeProcessResult(
+            0, false, false, false, false, true, "private-output"u8.ToArray(), []);
+        var child = new SecurityExecutionEvidence.OwnedChild(process, [1], [], "private-owner", true, true);
+        child = outcome switch
+        {
+            "cancelled" => child with { Process = process with { Cancelled = true, TimedOut = true } },
+            "timed-out" => child with { Process = process with { TimedOut = true } },
+            "process-status-unavailable" => child with { Process = process with { ExitCode = -1 } },
+            "process-exit-1" => child with { Process = process with { ExitCode = 1 } },
+            "process-exit-2" => child with { Process = process with { ExitCode = 2 } },
+            "process-exit-3" => child with { Process = process with { ExitCode = 3 } },
+            "process-exit-10" => child with { Process = process with { ExitCode = 10 } },
+            "process-exit-137" => child with { Process = process with { ExitCode = 137 } },
+            "process-failed" => child with { Process = process with { ExitCode = 200 } },
+            "owned-processes-remain" => child with { Process = process with { ResidualOwnedChildren = true } },
+            "output-limit-exceeded" => child with { Process = process with { ExitCode = 137, OutputLimitExceeded = true } },
+            "process-cleanup-failed" => child with { Process = process with { CleanupSucceeded = false } },
+            "observer-unsettled" => child with { Process = process with { ObserverSettled = false } },
+            "observer-failed" => child with { Process = process with { ObserverFailures = [new InvalidOperationException("private-error")] } },
+            "resource-proof-rejected" => child with { ResourcesAdmitted = false },
+            "temporary-cleanup-failed" => child with { TemporaryRemoved = false },
+            "report-missing" => child with { Report = [] },
+            _ => throw new ArgumentOutOfRangeException(nameof(outcome))
+        };
+        string diagnostic = SecurityExecutionEvidence.NativeExecutionFailureCode(
+            "security-integration", child);
+        await Assert.That(diagnostic).IsEqualTo($"native_execution_failed:security-integration:{outcome}");
+        await Assert.That(SecurityExecutionEvidence.NativeExecutionFailureCode(
+            "private-output\nforged-lane", child)).IsEqualTo("native_execution_failed");
+        foreach (int exitCode in new[] { -2, 14, 15, 200 })
+            await Assert.That(SecurityExecutionEvidence.NativeExecutionFailureCode("security-integration",
+                child with { Process = process with { ExitCode = exitCode } }))
+                .IsEqualTo("native_execution_failed:security-integration:process-failed");
+    }
+
+    [Test]
+    [Arguments("process-exit-137", false, false)]
+    [Arguments("cancelled", true, false)]
+    [Arguments("timed-out", false, true)]
+    public async Task NativeFailurePreservesConcurrentCleanupAndObserverOutcomes(
+        string outcome, bool cancelled, bool timedOut)
+    {
+        var process = new SecurityExecutionEvidence.OwnedNativeProcessResult(
+            137, timedOut, cancelled, false, false, false, "private-output"u8.ToArray(), [])
+        {
+            ObserverSettled = false,
+            ObserverFailures = [new InvalidOperationException("private-error")]
+        };
+        var child = new SecurityExecutionEvidence.OwnedChild(process, [1], [], "private-owner", true, true);
+        await Assert.That(SecurityExecutionEvidence.NativeExecutionFailureCode("security-integration", child))
+            .IsEqualTo($"native_execution_failed:security-integration:{outcome}:process-cleanup-failed:observer-unsettled:observer-failed");
+        await Assert.That(SecurityExecutionEvidence.NativeExecutionFailureCode("private-lane", child))
+            .IsEqualTo("native_execution_failed");
+    }
+
+    [Test]
+    [Arguments("api_creation_inventory_limit", true)]
+    [Arguments("api_creation_root_invalid", true)]
+    [Arguments("private-error\nforged-diagnostic", false)]
+    public async Task ObserverRejectionReportsOnlyAllowlistedCodes(string code, bool allowed)
+    {
+        var process = new SecurityExecutionEvidence.OwnedNativeProcessResult(
+            137, false, false, false, false, true, "private-output"u8.ToArray(), [])
+        {
+            ObserverFailures = [new SecurityExecutionEvidence.OwnedExecutionFailure(code),
+                new SecurityExecutionEvidence.OwnedExecutionFailure("api_image_reference_changed")]
+        };
+        var child = new SecurityExecutionEvidence.OwnedChild(process, [1], [], "private-owner", true, true);
+        string expected = "native_execution_failed:security-integration:process-exit-137:observer-failed";
+        if (allowed) expected += ":" + code;
+        await Assert.That(SecurityExecutionEvidence.NativeExecutionFailureCode("security-integration", child))
+            .IsEqualTo(expected);
+    }
+
+    [Test]
     [Arguments("security-integration", "600s", 615)]
     [Arguments("owned-load-correctness", "1500s", 1515)]
     public async Task TypedUidLaunchBudgetPreservesOrdinaryAndTwentyMinuteLoadRegimes(
@@ -1426,6 +1520,12 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         var apiCreatedInitial = new SecurityExecutionEvidence.InitialNativeResources(
             new HashSet<string>(StringComparer.Ordinal), new HashSet<string>(StringComparer.Ordinal),
             new HashSet<string>(StringComparer.Ordinal) { apiCreatedImageId, "sha256:" + new string('e', 64) });
+        SecurityExecutionEvidence.ApiResourceInputs ApiCreatedInputs(
+            SecurityExecutionEvidence.NativeContainerCreationSnapshot snapshot, SecurityExecutionEvidence.InitialNativeResources initial) =>
+            new(owner, snapshot, apiCreatedImages, initial,
+                new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+                { [apiCreatedImageId] = new HashSet<string>(StringComparer.Ordinal) },
+                new Dictionary<string, string>(StringComparer.Ordinal));
         JsonObject ApiCreatedRow() => new()
         {
             ["Id"] = apiCreatedId,
@@ -1436,16 +1536,16 @@ public sealed class SecurityExecutionEvidenceParentModelTests
             ["Labels"] = new JsonObject { ["islamu.assurance.owner"] = owner, ["islamu.assurance.resource"] = "keycloak" }
         };
         byte[] ApiCreatedBytes(JsonObject row) => JsonSerializer.SerializeToUtf8Bytes(new JsonArray(row.DeepClone()));
-        if (!SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(ApiCreatedRow()), owner,
-            apiCreatedSnapshot, apiCreatedImages, apiCreatedInitial, out var apiCreatedObserved))
+        if (!SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(ApiCreatedRow()),
+            ApiCreatedInputs(apiCreatedSnapshot, apiCreatedInitial), out var apiCreatedObserved))
             throw new InvalidDataException("native_api_creator_resource_join_missing");
-        await Assert.That(apiCreatedObserved!.Single()).IsEqualTo(
+        await Assert.That(apiCreatedObserved!.Single().Container).IsEqualTo(
             new SecurityExecutionEvidence.ObservedOwnedResource(apiCreatedId, apiCreatedImageId, "keycloak", true));
         JsonObject apiUnrelatedRow = ApiCreatedRow();
         apiUnrelatedRow["Id"] = new string('d', 64);
         apiUnrelatedRow["Labels"]!["islamu.assurance.owner"] = new string('d', 32);
-        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(apiUnrelatedRow), owner,
-            apiCreatedSnapshot, apiCreatedImages, apiCreatedInitial, out var apiUnrelatedObserved)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(apiUnrelatedRow),
+            ApiCreatedInputs(apiCreatedSnapshot, apiCreatedInitial), out var apiUnrelatedObserved)).IsTrue();
         await Assert.That(apiUnrelatedObserved!.Count).IsEqualTo(0);
         foreach (string apiConflict in new[] { "same-image-alias", "owner", "resource", "image-id", "container-id",
             "missing-pair", "pending-pair", "pair-image", "pair-id", "initial-container", "uncached-image", "mount" })
@@ -1486,20 +1586,20 @@ public sealed class SecurityExecutionEvidenceParentModelTests
                         ["RW"] = true
                     }); break;
             }
-            if (SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(apiConflictingRow), owner,
-                apiConflictingSnapshot, apiCreatedImages, apiConflictingInitial, out _))
+            if (SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(apiConflictingRow),
+                ApiCreatedInputs(apiConflictingSnapshot, apiConflictingInitial), out _))
                 throw new InvalidDataException("native_api_creator_resource_conflict_accepted_" + apiConflict);
         }
-        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(Encoding.UTF8.GetBytes("[]"), owner,
-            apiCreatedSnapshot, apiCreatedImages, apiCreatedInitial, out var apiCreatedGone)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(Encoding.UTF8.GetBytes("[]"),
+            ApiCreatedInputs(apiCreatedSnapshot, apiCreatedInitial), out var apiCreatedGone)).IsTrue();
         await Assert.That(apiCreatedGone!.Count).IsEqualTo(0);
-        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(Encoding.UTF8.GetBytes("[]"), owner,
-            apiCreatedSnapshot with
+        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(Encoding.UTF8.GetBytes("[]"),
+            ApiCreatedInputs(apiCreatedSnapshot with
             {
                 Created = [],
                 PendingCreationIds = new HashSet<string>(StringComparer.Ordinal)
                 { apiCreatedPair.CreationId }
-            }, apiCreatedImages, apiCreatedInitial, out var apiCreationNotYetVisible)).IsTrue();
+            }, apiCreatedInitial), out var apiCreationNotYetVisible)).IsTrue();
         await Assert.That(apiCreationNotYetVisible!.Count).IsEqualTo(0);
 
         var directPair = apiCreatedPair with { Resource = "docker-wait" };
@@ -3178,6 +3278,24 @@ public sealed class SecurityExecutionEvidenceTransportTests
 public sealed class SecurityExecutionEvidenceProcessTests
 {
     [Test]
+    public async Task ObserverFaultWhileChildRunsIsRecordedWithoutAdmittingTheProcess()
+    {
+        using var fixture = new ProcessFixture();
+        ProcessStartInfo command = await fixture.CommandAsync("hold");
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command,
+            TimeSpan.FromSeconds(10), CancellationToken.None,
+            (_, _) => Task.FromException(new InvalidOperationException("private-error")));
+        await Assert.That(result.ObserverFaultObservedWhileProcessRunning).IsTrue();
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.CleanupSucceeded).IsTrue();
+        await Assert.That(fixture.OwnedChildrenRemain()).IsFalse();
+        var child = new SecurityExecutionEvidence.OwnedChild(result, [1], [], "private-owner", true, true);
+        string diagnostic = SecurityExecutionEvidence.NativeExecutionFailureCode("security-integration", child);
+        await Assert.That(diagnostic).Contains(":observer-fault-while-process-running");
+        await Assert.That(diagnostic.Contains("private-error", StringComparison.Ordinal)).IsFalse();
+    }
+
+    [Test]
     public async Task LiveObserverReceivesActualOwnedIdentityAndClosesItsResourceBeforeReturn()
     {
         using var fixture = new ProcessFixture();
@@ -3259,6 +3377,7 @@ public sealed class SecurityExecutionEvidenceProcessTests
         await Assert.That(handle.IsClosed).IsTrue();
         await Assert.That(File.Exists(resource)).IsFalse();
         await Assert.That(result.ObserverSettled).IsTrue();
+        await Assert.That(result.ObserverFaultObservedWhileProcessRunning).IsFalse();
         await Assert.That(result.Succeeded).IsFalse();
         await Assert.That(result.CleanupSucceeded).IsTrue();
         await Assert.That(fixture.OwnedChildrenRemain()).IsFalse();
@@ -3321,6 +3440,12 @@ public sealed class SecurityExecutionEvidenceProcessTests
         string root = Environment.GetEnvironmentVariable("ISLAMU_RELEASE_NATIVE_CHILD_ROOT")!;
         string canary = Environment.GetEnvironmentVariable("ISLAMU_RELEASE_NATIVE_CHILD_CANARY")!;
         RecordOwnedPid(root, Environment.ProcessId);
+        if (mode == "api-mounted")
+        {
+            if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException();
+            await SecurityExecutionEvidenceApiResourceTests.RunMountedNativeChildAsync();
+            return;
+        }
         if (mode == "clean")
         {
             using Stream standardOutput = Console.OpenStandardOutput();

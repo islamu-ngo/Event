@@ -3,12 +3,13 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Features.Authentication.Continuation.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 
-namespace Explore.Application.Features.Authentication.Continuation.Commands;
+namespace Explore.Application.Features.Authentication.Continuation.Handlers.Commands;
 
 public sealed class JoinVerifiedTenantCommandHandler(
     IHumanCommitScopePreparation humanScope,

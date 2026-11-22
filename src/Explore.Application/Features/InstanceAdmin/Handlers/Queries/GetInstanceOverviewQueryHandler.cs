@@ -23,7 +23,7 @@ public sealed class GetInstanceOverviewQueryHandler(
     ISecretAuthorityStatusReader secretAuthorityStatusReader,
     IConfiguration configuration,
     IAuthenticationCredentialProfileReader authenticationCredentialProfileReader,
-    IInstanceBootstrapStateRepository bootstrapStates)
+    IInstanceBootstrapStateReader bootstrapStates)
     : IQueryHandler<GetInstanceOverviewQuery, InstanceOverviewDto>
 {
     public async Task<InstanceOverviewDto> QueryAsync(

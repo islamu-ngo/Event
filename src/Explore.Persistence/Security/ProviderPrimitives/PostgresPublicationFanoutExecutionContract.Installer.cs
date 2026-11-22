@@ -149,7 +149,7 @@ public static partial class PostgresPublicationFanoutExecutionContract
 
     private static string SourceGuard(ExploreDbContext context, SourceSql sql, PostgresNativeQueueEnrollment enrollment)
     {
-        var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        var tenantTables = context.GetTenantTableInventory();
         return $"""
             IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n WHERE n.nspname = {Text(sql.Names.Schema)}
                 AND n.nspowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid)

@@ -182,6 +182,27 @@ public sealed class PostgresCategoryReadPermissionsTests(PostgreSqlContainerFixt
     public async Task NativeReaderCannotWriteOrUseGlobalCategoryAuthority(string operation)
     {
         var selected = await SeedAsync(includeChild: false);
+        if (operation is "insert" or "delete")
+        {
+            // A read-only PostgresCategoryReadPermissions login must receive zero write privileges.
+            await WithReaderAsync(selected.Tenant, async (login, database, enrollment) =>
+            {
+                await using var writer = Open(PrimaryDatabaseRole.Migrator, selected.Tenant);
+                await writer.Database.OpenConnectionAsync();
+                await PostgresCategoryReadPermissions.ApplyAsync(writer, enrollment);
+                await using var reader = Open(database, new SelectedTenant(selected.Tenant));
+                await reader.Database.OpenConnectionAsync();
+                var readerNames = new HumanPrincipalSourceSql(reader);
+                string readerTable = readerNames.Table(typeof(Category));
+                string readerSql = operation == "insert"
+                    ? $"INSERT INTO {readerTable} DEFAULT VALUES"
+                    : $"DELETE FROM {readerTable} WHERE false";
+                var readerDenied = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(reader, readerSql));
+                await Assert.That(readerDenied!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+            });
+            return;
+        }
+
         await using var context = Open(operation == "global" ? PrimaryDatabaseRole.Global : PrimaryDatabaseRole.Runtime, selected.Tenant);
         await context.Database.OpenConnectionAsync();
         var names = new HumanPrincipalSourceSql(context);
@@ -189,9 +210,7 @@ public sealed class PostgresCategoryReadPermissionsTests(PostgreSqlContainerFixt
         string id = names.Column(typeof(Category), nameof(Category.Id));
         string sql = operation switch
         {
-            "insert" => $"INSERT INTO {table} DEFAULT VALUES",
             "update" => $"UPDATE {table} SET {id}={id} WHERE false",
-            "delete" => $"DELETE FROM {table} WHERE false",
             "system-column" => $"SELECT xmin FROM {table}",
             _ => $"SELECT {id} FROM {table}"
         };
@@ -218,6 +237,7 @@ public sealed class PostgresCategoryReadPermissionsTests(PostgreSqlContainerFixt
     [Arguments("extra-policy")]
     [Arguments("extra-column")]
     [Arguments("partial")]
+    [Arguments("mutation-partial")]
     public async Task InstallerRejectsAuthorityAndPolicyDriftWithoutRepair(string change)
     {
         var selected = await SeedAsync(includeChild: false);
@@ -226,13 +246,14 @@ public sealed class PostgresCategoryReadPermissionsTests(PostgreSqlContainerFixt
             var names = new HumanPrincipalSourceSql(writer);
             string table = names.Table(typeof(Category));
             string column = names.Column(typeof(Category), nameof(Category.MasterCode));
+            string idColumn = names.Column(typeof(Category), nameof(Category.Id));
             string runtime = names.Quote(fixture.NativeQueueEnrollment.RuntimeLogin);
             string global = names.Quote(fixture.NativeQueueEnrollment.GlobalLogin);
             string other = names.Quote("category_drift_" + Guid.CreateVersion7().ToString("N"));
             await ExecuteAsync(writer, change switch
             {
                 "table" => $"GRANT SELECT ON {table} TO {runtime}",
-                "write" => $"GRANT UPDATE ({column}) ON {table} TO {runtime}",
+                "write" => $"GRANT UPDATE ({idColumn}) ON {table} TO {runtime}",
                 "grant-option" => $"GRANT SELECT ({column}) ON {table} TO {runtime} WITH GRANT OPTION",
                 "public" => $"GRANT SELECT ({column}) ON {table} TO PUBLIC",
                 "inherited" => $"CREATE ROLE {other} NOLOGIN; GRANT SELECT ({column}) ON {table} TO {other}; GRANT {other} TO {runtime} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE",
@@ -249,6 +270,7 @@ public sealed class PostgresCategoryReadPermissionsTests(PostgreSqlContainerFixt
                 "extra-policy" => $"CREATE POLICY category_extra ON {table} TO {runtime} USING (true)",
                 "extra-column" => $"ALTER TABLE {table} ADD COLUMN category_unexpected text; GRANT SELECT (category_unexpected) ON {table} TO {runtime}",
                 "partial" => $"REVOKE SELECT ({column}) ON {table} FROM {runtime}",
+                "mutation-partial" => $"REVOKE DELETE ON {table} FROM {runtime}",
                 _ => throw new ArgumentOutOfRangeException(nameof(change))
             });
             string before = await AuthorityImageAsync(writer, fixture.NativeQueueEnrollment.RuntimeLogin);

@@ -838,6 +838,10 @@ public static partial class SecurityExecutionEvidence
 
     internal sealed record InitialNativeResources(IReadOnlySet<string> ContainerIds, IReadOnlySet<string> VolumeNames,
         IReadOnlySet<string> ImageIds);
+    internal sealed record ApiResourceInputs(string Owner, NativeContainerCreationSnapshot Creations,
+        IReadOnlyDictionary<string, string> Images, InitialNativeResources Initial,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> ImageVolumeTargets,
+        IReadOnlyDictionary<string, string> VolumeMountpoints);
     internal sealed record ConfiguredResourceInputs(string Owner, IReadOnlyList<ConfiguredContainerDeclaration> Containers,
         IReadOnlyDictionary<string, string> Images, InitialNativeResources Initial,
         IReadOnlyDictionary<string, IReadOnlySet<string>> ImageVolumeTargets,
@@ -945,16 +949,23 @@ public static partial class SecurityExecutionEvidence
         { return false; }
     }
 
-    internal static bool TryReadApiCreatedResources(byte[] bytes, string owner, NativeContainerCreationSnapshot creations,
-        IReadOnlyDictionary<string, string> imageIds, InitialNativeResources initial,
-        out IReadOnlyList<ObservedOwnedResource>? resources)
+    internal static bool TryReadApiCreatedResources(byte[] bytes, ApiResourceInputs inputs,
+        out IReadOnlyList<ConfiguredOwnedResource>? resources)
     {
         resources = null;
         try
         {
+            string owner = inputs.Owner;
+            NativeContainerCreationSnapshot creations = inputs.Creations;
+            IReadOnlyDictionary<string, string> imageIds = inputs.Images;
+            InitialNativeResources initial = inputs.Initial;
             if (bytes.Length is < 1 or > MaximumReportBytes || owner.Length != 32 || !LowerHex(owner)
                 || creations.Created.Count > 64 || creations.PendingCreationIds.Count > 64 || imageIds.Count > 65_536
-                || initial.ContainerIds.Count > 65_536 || initial.ImageIds.Count > 65_536
+                || initial.ContainerIds.Count > 65_536 || initial.ImageIds.Count > 65_536 || initial.VolumeNames.Count > 65_536
+                || inputs.ImageVolumeTargets.Count > 65_536 || inputs.VolumeMountpoints.Count > 65_536
+                || inputs.ImageVolumeTargets.Any(item => !FullLocalImageId(item.Key) || item.Value.Count > 64
+                    || item.Value.Any(path => !CanonicalObservedMountPath(path)))
+                || inputs.VolumeMountpoints.Any(item => !RuntimeVolumeName(item.Key) || !CanonicalObservedMountPath(item.Value))
                 || initial.ContainerIds.Any(id => id.Length != 64 || !LowerHex(id))
                 || initial.ImageIds.Any(id => !FullLocalImageId(id))
                 || imageIds.Any(item => !BoundedIdentity(item.Key, 2048) || !FullLocalImageId(item.Value))) return false;
@@ -978,7 +989,7 @@ public static partial class SecurityExecutionEvidence
             if (inventory.ValueKind != JsonValueKind.Array || inventory.GetArrayLength() > 65_536
                 || !UniqueProperties(inventory)) return false;
             var allIds = new HashSet<string>(StringComparer.Ordinal);
-            var observed = new List<ObservedOwnedResource>();
+            var observed = new List<ConfiguredOwnedResource>();
             foreach (JsonElement item in inventory.EnumerateArray())
             {
                 string id = Text(item, "Id");
@@ -1004,11 +1015,16 @@ public static partial class SecurityExecutionEvidence
                 }
                 if (!hasPair || pair is null || Text(labels, "islamu.assurance.resource") != pair.Resource
                     || Text(item, "Image") != pair.ImageReference || Text(item, "ImageID") != imageIds[pair.ImageReference]
-                    || !item.TryGetProperty("Mounts", out JsonElement mounts) || mounts.ValueKind != JsonValueKind.Array
-                    || mounts.GetArrayLength() != 0) return false;
+                    || !inputs.ImageVolumeTargets.TryGetValue(imageIds[pair.ImageReference], out var inherited)
+                    || !TryReadRuntimeMounts(item, out var mounts)
+                    || !mounts.Select(mount => mount.Destination).ToHashSet(StringComparer.Ordinal).SetEquals(inherited)) return false;
+                foreach (ObservedContainerMount mount in mounts)
+                    if (mount.Type != "volume" || !mount.ReadWrite || initial.VolumeNames.Contains(mount.Name)
+                        || !inputs.VolumeMountpoints.TryGetValue(mount.Name, out string? mountpoint)
+                        || mountpoint != mount.Source) return false;
                 string state = Text(item, "State");
                 if (state is not ("created" or "restarting" or "running" or "removing" or "paused" or "exited" or "dead")) return false;
-                observed.Add(new(id, imageIds[pair.ImageReference], pair.Resource, state == "running"));
+                observed.Add(new(new(id, imageIds[pair.ImageReference], pair.Resource, state == "running"), mounts));
             }
             resources = observed.AsReadOnly();
             return true;
@@ -3332,6 +3348,7 @@ public static partial class SecurityExecutionEvidence
         Task? observation = null;
         var observerFailures = new List<Exception>();
         bool observerSettled = observer is null;
+        bool observerFaultObservedWhileProcessRunning = false;
         stop.CancelAfter(timeout);
         Task<NativeOutputCapture>? stdout = null;
         Task<NativeOutputCapture>? stderr = null;
@@ -3372,6 +3389,8 @@ public static partial class SecurityExecutionEvidence
                 Task completed = await Task.WhenAny(exit, observation).ConfigureAwait(false);
                 if (completed != observation || observation.IsCompletedSuccessfully)
                     await exit.ConfigureAwait(false);
+                else
+                    observerFaultObservedWhileProcessRunning = observation.IsFaulted && !process.HasExited;
             }
         }
         catch (OperationCanceledException)
@@ -3472,9 +3491,11 @@ public static partial class SecurityExecutionEvidence
             }
         }
         return new OwnedNativeProcessResult(started && process.HasExited ? process.ExitCode : -1,
-            timedOut, cancelled, residual, output.Exceeded || error.Exceeded, cleanup && !invocationFailed, output.Bytes, error.Bytes)
+            timedOut, cancelled, residual, overflow.IsCancellationRequested || output.Exceeded || error.Exceeded,
+            cleanup && !invocationFailed, output.Bytes, error.Bytes)
         {
             ObserverSettled = observerSettled,
+            ObserverFaultObservedWhileProcessRunning = observerFaultObservedWhileProcessRunning,
             ObserverFailures = observerFailures.AsReadOnly()
         };
     }
@@ -3592,6 +3613,7 @@ public static partial class SecurityExecutionEvidence
         byte[] StandardOutput, byte[] StandardError)
     {
         internal bool ObserverSettled { get; init; } = true;
+        internal bool ObserverFaultObservedWhileProcessRunning { get; init; }
         internal IReadOnlyList<Exception> ObserverFailures { get; init; } = [];
         internal bool Succeeded => ExitCode == 0 && !TimedOut && !Cancelled && !ResidualOwnedChildren &&
             !OutputLimitExceeded && CleanupSucceeded && ObserverSettled && ObserverFailures.Count == 0;

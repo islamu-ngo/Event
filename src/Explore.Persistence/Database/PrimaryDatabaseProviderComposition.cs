@@ -153,7 +153,9 @@ public static class PrimaryDatabaseProviderComposition
             new PostgresRuntimeIdentityOptionsExtension(
                 target == PrimaryDatabaseMigrationTarget.Application
                 && options.Provider == PrimaryDatabaseProvider.PostgreSql
-                && options.Role == PrimaryDatabaseRole.Runtime
+                && options.Role is PrimaryDatabaseRole.Runtime
+                    or PrimaryDatabaseRole.EmailPolicyInstanceMutation
+                    or PrimaryDatabaseRole.EmailPolicyTenantMutation
                 && !string.IsNullOrWhiteSpace(options.Username)
                     ? options.Username : null));
 

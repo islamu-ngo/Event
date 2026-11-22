@@ -1,0 +1,30 @@
+Change-Id: CHG-01M7H2S1SC85JJ5W0S5GBR1DDX
+Title: "share the private mixed-settings catalogue assertion"
+Type: perf
+Scope: database
+Summary: "Keep one private compiled catalogue assertion while checking its expected body, metadata, permissions and live source columns at every protected entry."
+Group: mixed-settings-private-catalogue
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Reprovision development-native PostgreSQL profiles before starting this revision. Existing catalogues without the exact private assertion are rejected rather than silently repaired."
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "Every protected entry checks the private assertion's expected body digest, execution metadata and ACL before rerunning complete live catalogue checks. No service identity gains direct execution or runtime DDL rights."
+  Migration:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: documented
+    Detail: "The native installer creates the source-declared private function and derives permanent executor grants from the existing privilege manifest. Altered or incomplete installations remain fail-closed."
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Use a freshly provisioned development-native profile. Private compiled-definition reuse never caches authorization results or removes per-operation checks; no new credential or larger database memory allowance is required."

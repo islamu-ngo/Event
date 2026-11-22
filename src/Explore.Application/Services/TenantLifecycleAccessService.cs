@@ -8,7 +8,7 @@ using Explore.Domain.ValueObjects;
 namespace Explore.Application.Services;
 
 public sealed class TenantLifecycleAccessService(ITenantRepository tenants, IAdminContext adminContext,
-    IInstanceBootstrapStateRepository bootstrapRepository, ITenantLookupSource publicDirectory)
+    IInstanceBootstrapStateReader bootstrapReader, ITenantLookupSource publicDirectory)
     : ITenantLifecycleAccessService
 {
     public async Task<bool> IsPublicAsync(Guid? tenantId, CancellationToken cancellationToken = default)
@@ -29,7 +29,7 @@ public sealed class TenantLifecycleAccessService(ITenantRepository tenants, IAdm
         if (tenant?.TenantStatusId != (int)TenantStatusEnum.Provisioning)
             return false;
 
-        var bootstrap = await bootstrapRepository.GetCurrent(cancellationToken);
+        var bootstrap = await bootstrapReader.GetCurrent(cancellationToken);
         return bootstrap is
         {
             Mode: InstanceBootstrapMode.ConfiguredAdministrator,

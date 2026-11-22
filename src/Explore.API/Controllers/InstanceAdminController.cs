@@ -66,6 +66,7 @@ public sealed class InstanceAdminController : EventControllerBase
     }
 
     [HttpGet("overview", Name = RouteNames.GetInstanceAdminOverview)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Get Instance Administration Overview")]
@@ -83,6 +84,7 @@ public sealed class InstanceAdminController : EventControllerBase
     }
 
     [HttpGet("domains", Name = RouteNames.GetInstanceAdminDomains)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
@@ -101,6 +103,7 @@ public sealed class InstanceAdminController : EventControllerBase
     }
 
     [HttpGet("operations", Name = RouteNames.GetInstanceAdminOperations)]
+    [InstanceManagement]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Get Instance Administration Operations")]
@@ -118,6 +121,7 @@ public sealed class InstanceAdminController : EventControllerBase
     }
 
     [HttpGet("tenants", Name = RouteNames.GetInstanceAdminTenants)]
+    [InstanceManagement]
     [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]

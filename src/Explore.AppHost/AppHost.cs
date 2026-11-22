@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Net.Sockets;
+using System.Runtime.ExceptionServices;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DotNetEnv;
@@ -14,6 +15,7 @@ using Explore.ServiceDefaults.Secrets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 
 const string DefaultInstanceAdminHost = "admin.localhost";
 const int DefaultInstanceAdminPort = 7002;
@@ -729,7 +731,12 @@ else
 object bffSessionEndpoint = builder.Configuration["BFF_SESSION_REDIS_ENDPOINT"]
     ?? builder.Configuration["Bff:SessionAuthority:Endpoint"] ?? string.Empty;
 if (bffSessionAuthority is not null)
-    bffSessionEndpoint = ReferenceExpression.Create($"redis://{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Host)}:{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Port)}");
+    // Follow Aspire's endpoint transport contract rather than duplicating the scheme:
+    // Redis resources enable TLS by default in Aspire 13, so this resolves to rediss.
+    // The ticket store selects StackExchange.Redis TLS from that scheme and fails closed
+    // if plaintext is projected to a TLS listener.
+    bffSessionEndpoint = ReferenceExpression.Create(
+        $"{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Scheme)}://{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Host)}:{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Port)}");
 
 // Register last, after every explicit resource projection. Parent-process .env
 // inheritance must not reintroduce sibling or infrastructure authority.
@@ -914,15 +921,57 @@ if (testingIsolation is not null)
     await testingIsolation.DenyInspectionRunAsync(application);
 var testingExecution = testingIsolation is null
     ? null : application.Services.GetService<TestingApplicationExecution>();
-Task execution = application.RunAsync();
-try { testingExecution?.Observe(execution); }
-catch (Exception observationFailure)
+if (testingIsolation is not null && testingExecution is null)
+    throw new InvalidOperationException("test_application_execution_missing");
+Task execution = testingExecution is null
+    ? application.RunAsync()
+    : RunWithoutDisposalAsync(testingExecution.HostCancellationToken);
+Exception? hostFailure = null;
+try
 {
-    try { await execution; }
-    catch (Exception executionFailure) { throw new AggregateException(observationFailure, executionFailure); }
-    throw;
+    try
+    {
+        testingExecution?.Observe(execution);
+        testingExecution?.ConfirmEntryPoint();
+    }
+    catch (Exception observationFailure)
+    {
+        testingExecution?.FailEntryPoint(observationFailure);
+        testingExecution?.CancelUnstarted();
+        testingExecution?.PermitDisposal();
+        try { await execution; }
+        catch (OperationCanceledException) when (execution.IsCanceled)
+        {
+            // Cancelling an unopened gate settles the unstarted execution.
+        }
+        catch (Exception executionFailure) { throw new AggregateException(observationFailure, executionFailure); }
+        throw;
+    }
+    await execution;
 }
-await execution;
+catch (Exception failure) { hostFailure = failure; }
+if (testingExecution is not null)
+{
+    await testingExecution.WaitForDisposalPermissionAsync();
+    try
+    {
+        await application.DisposeAsync();
+        testingExecution.CompleteDisposal();
+    }
+    catch (Exception disposalFailure)
+    {
+        testingExecution.FailDisposal(disposalFailure);
+        if (hostFailure is not null) throw new AggregateException(hostFailure, disposalFailure);
+        throw;
+    }
+}
+if (hostFailure is not null) ExceptionDispatchInfo.Capture(hostFailure).Throw();
+
+async Task RunWithoutDisposalAsync(CancellationToken cancellationToken)
+{
+    await application.StartAsync(cancellationToken);
+    await application.Services.GetRequiredService<IHost>().WaitForShutdownAsync(cancellationToken);
+}
 
 static LocalPlatformResources AddLocalPlatform(
     IDistributedApplicationBuilder builder,
@@ -994,9 +1043,12 @@ static LocalPlatformResources AddLocalPlatform(
         .WithHttpHealthCheck("/auth/health/ready", endpointName: "mgmt")
         .WaitFor(crdb);
 
-    var cerbosDb = builder.AddContainer("cerbos-db", "postgres", "18-alpine")
-        .WithEnvironment("POSTGRES_USER", cerbosPostgresUser)
-        .WithEnvironment("POSTGRES_PASSWORD", cerbosPostgresPassword)
+    var cerbosPostgresUserParameter = builder.AddParameter("cerbos-postgres-username",
+        () => cerbosPostgresUser, publishValueAsDefault: false, secret: true);
+    var cerbosPostgresPasswordParameter = builder.AddParameter("cerbos-postgres-password",
+        () => cerbosPostgresPassword, publishValueAsDefault: false, secret: true);
+    var cerbosDb = builder.AddPostgres("cerbos-db", cerbosPostgresUserParameter, cerbosPostgresPasswordParameter)
+        .WithImageTag("18-alpine")
         .WithEnvironment("POSTGRES_DB", cerbosPostgresDatabase)
         .WithVolume("islamu-event-cerbos-data", "/var/lib/postgresql")
         .WithBindMount(cerbosSchemaPath, "/docker-entrypoint-initdb.d/cerbos-schema.sql", isReadOnly: true);

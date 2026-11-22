@@ -254,7 +254,7 @@ public static class PostgresWebhookCataloguePermissions
         string table = entity.GetTableName() ?? throw new InvalidOperationException("webhook_catalogue_table_missing");
         string schema = context.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>()?.TargetSchema
             ?? entity.GetSchema() ?? "public";
-        if (PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        if (context.GetTenantTableInventory()
             .Any(source => source.TableName == table && (source.Schema ?? schema) == schema))
             throw new InvalidOperationException("webhook_catalogue_model_tenancy_drift");
         var store = StoreObjectIdentifier.Table(table, entity.GetSchema());

@@ -18,7 +18,7 @@ public static partial class PostgresExternalTenantEnrollmentPermissions
                 AND pg_catalog.format_type(a.atttypid,a.atttypmod)={Text(column.StoreType)}
                 AND a.attnotnull={(column.Required ? "true" : "false")})
             """));
-        var metadata = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model)
+        var metadata = context.GetTenantTableInventory()
             .SingleOrDefault(table => table.TableName == source.Name && (table.Schema ?? source.Schema) == source.Schema);
         string tenant = metadata is null ? "NOT t.relrowsecurity AND NOT t.relforcerowsecurity" : $"""
             t.relrowsecurity AND t.relforcerowsecurity

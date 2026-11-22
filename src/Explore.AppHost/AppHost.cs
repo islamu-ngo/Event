@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Net.Sockets;
+using System.Runtime.ExceptionServices;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DotNetEnv;
@@ -919,15 +920,49 @@ if (testingIsolation is not null)
     await testingIsolation.DenyInspectionRunAsync(application);
 var testingExecution = testingIsolation is null
     ? null : application.Services.GetService<TestingApplicationExecution>();
-Task execution = application.RunAsync();
-try { testingExecution?.Observe(execution); }
-catch (Exception observationFailure)
+if (testingIsolation is not null && testingExecution is null)
+    throw new InvalidOperationException("test_application_execution_missing");
+Task execution = application.RunAsync(testingExecution?.HostCancellationToken ?? CancellationToken.None);
+Exception? hostFailure = null;
+try
 {
-    try { await execution; }
-    catch (Exception executionFailure) { throw new AggregateException(observationFailure, executionFailure); }
-    throw;
+    try
+    {
+        testingExecution?.Observe(execution);
+        testingExecution?.ConfirmEntryPoint();
+    }
+    catch (Exception observationFailure)
+    {
+        testingExecution?.FailEntryPoint(observationFailure);
+        testingExecution?.CancelUnstarted();
+        testingExecution?.PermitDisposal();
+        try { await execution; }
+        catch (OperationCanceledException) when (execution.IsCanceled)
+        {
+            // Cancelling an unopened gate settles the unstarted execution.
+        }
+        catch (Exception executionFailure) { throw new AggregateException(observationFailure, executionFailure); }
+        throw;
+    }
+    await execution;
 }
-await execution;
+catch (Exception failure) { hostFailure = failure; }
+if (testingExecution is not null)
+{
+    await testingExecution.WaitForDisposalPermissionAsync();
+    try
+    {
+        await application.DisposeAsync();
+        testingExecution.CompleteDisposal();
+    }
+    catch (Exception disposalFailure)
+    {
+        testingExecution.FailDisposal(disposalFailure);
+        if (hostFailure is not null) throw new AggregateException(hostFailure, disposalFailure);
+        throw;
+    }
+}
+if (hostFailure is not null) ExceptionDispatchInfo.Capture(hostFailure).Throw();
 
 static LocalPlatformResources AddLocalPlatform(
     IDistributedApplicationBuilder builder,

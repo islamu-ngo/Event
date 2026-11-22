@@ -9,6 +9,23 @@ namespace Event.Distributed.IntegrationTests;
 public sealed partial class AppHostRuntimeTests
 {
     [Test]
+    public async Task BuiltApplicationDoesNotCreateResourcesBeforeStart()
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await using var owner = await OwnedAppHostFixture.CreateAsync("Split", deadline.Token);
+        var containers = await OwnedAppHostFixture.RunDockerAsync(
+            ["ps", "--no-trunc", "-aq", "--filter", $"label=islamu.assurance.owner={owner.RunId}"], deadline.Token);
+        await Assert.That(containers.ExitCode).IsEqualTo(0);
+        await Assert.That(containers.Output.Trim()).IsEqualTo(string.Empty);
+        foreach (string volume in owner.OwnedVolumeNames)
+        {
+            var inspected = await OwnedAppHostFixture.RunDockerAsync(["volume", "inspect", volume], deadline.Token);
+            await Assert.That(inspected.ExitCode).IsNotEqualTo(0);
+            await Assert.That(inspected.Error.Contains("no such volume", StringComparison.OrdinalIgnoreCase)).IsTrue();
+        }
+    }
+
+    [Test]
     public async Task BuiltApplicationDisposalSettlesExecutionBeforeRemovingRoot()
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2));
@@ -19,10 +36,10 @@ public sealed partial class AppHostRuntimeTests
     }
 
     [Test]
-    public async Task MissingExecutionObservationRetainsBuiltOwnerRoot()
+    public async Task MissingExecutionObservationFailsBeforeBuildingHost()
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-        bool verified = false;
+        Exception? failure = null;
         try
         {
             await using var owner = await OwnedAppHostFixture.CreateAsync("Split", false, "SingleTenant", null, builder =>
@@ -30,24 +47,22 @@ public sealed partial class AppHostRuntimeTests
                 builder.Services.RemoveAll<TestingApplicationExecution>();
                 return Task.CompletedTask;
             }, deadline.Token);
-            var failure = await Assert.That(async () => await owner.DisposeAsync()).Throws<AggregateException>();
-            await Assert.That(failure!.Flatten().InnerExceptions.Any(exception => exception is TimeoutException)).IsTrue();
-            await Assert.That(owner.ExecutionSettled).IsFalse();
-            await Assert.That(Directory.Exists(owner.Root)).IsTrue();
-            verified = true;
         }
-        catch (AggregateException) when (verified) { }
+        catch (Exception exception) { failure = exception; }
+        await Assert.That(failure).IsNotNull();
+        await Assert.That(failure!.ToString().Contains("test_application_execution_missing", StringComparison.Ordinal)).IsTrue();
     }
 
     [Test]
-    public async Task DuplicateExecutionObservationRetainsRootWhileStartupIsHeld()
+    public async Task DuplicateExecutionObservationFailsBeforeStartup()
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         using var service = new DelayedStartupService(failDisposal: false);
-        bool verified = false;
+        OwnedAppHostFixture? owner = null;
+        Exception? failure = null;
         try
         {
-            await using var owner = await OwnedAppHostFixture.CreateAsync("Split", false, "SingleTenant", null, builder =>
+            owner = await OwnedAppHostFixture.CreateAsync("Split", false, "SingleTenant", null, builder =>
             {
                 var observer = (TestingApplicationExecution)builder.Services
                     .Single(descriptor => descriptor.ServiceType == typeof(TestingApplicationExecution)).ImplementationInstance!;
@@ -55,39 +70,30 @@ public sealed partial class AppHostRuntimeTests
                 builder.Services.Insert(0, ServiceDescriptor.Singleton<IHostedService>(_ => service));
                 return Task.CompletedTask;
             }, deadline.Token);
-            try
+            await owner.StartAsync(deadline.Token);
+        }
+        catch (Exception exception) { failure = exception; }
+        finally
+        {
+            service.Release.TrySetResult();
+            if (owner is not null)
             {
-                Task startup = owner.StartAsync(deadline.Token);
-                await await Task.WhenAny(service.Entered.Task, startup).WaitAsync(deadline.Token);
-                var resource = owner.Application.Services.GetRequiredService<DistributedApplicationModel>()
-                    .Resources.Single(resource => resource.Name == "postgres");
-                await owner.Application.ResourceNotifications.PublishUpdateAsync(resource,
-                    snapshot => snapshot with { State = new ResourceStateSnapshot(KnownResourceStates.FailedToStart, null) });
-                var failure = await Assert.That(async () => await startup).Throws<AggregateException>();
-                await Assert.That(failure!.Flatten().InnerExceptions.Any(exception =>
-                    exception.Message == "test_application_execution_already_observed")).IsTrue();
-                await Assert.That(async () => await owner.DisposeAsync()).Throws<AggregateException>();
-                await Assert.That(owner.ExecutionSettled).IsFalse();
-                await Assert.That(service.StartingExited.Task.IsCompleted).IsFalse();
-                await Assert.That(Directory.Exists(owner.Root)).IsTrue();
-                verified = true;
-            }
-            finally
-            {
-                service.Release.TrySetResult();
-                if (service.Entered.Task.IsCompleted)
-                    await service.StartingExited.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                try { await owner.DisposeAsync(); }
+                catch (Exception exception) { failure = failure is null ? exception : new AggregateException(failure, exception); }
             }
         }
-        catch (AggregateException) when (verified) { }
+        await Assert.That(failure).IsNotNull();
+        await Assert.That(failure!.ToString().Contains("test_application_execution_already_observed", StringComparison.Ordinal)).IsTrue();
+        await Assert.That(service.Entered.Task.IsCompleted).IsFalse();
     }
 
     [Test]
     public async Task FailedResourceJoinsDelayedStartupAndRetainsDisposalFailure()
     {
-        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(5));
         using var service = new DelayedStartupService();
         OwnedAppHostFixture? owner = null;
+        Exception? testFailure = null;
         bool verified = false;
         try
         {
@@ -101,6 +107,7 @@ public sealed partial class AppHostRuntimeTests
             {
                 Task startup = owner.StartAsync(deadline.Token);
                 await await Task.WhenAny(service.Entered.Task, startup).WaitAsync(deadline.Token);
+                await Assert.That(service.Entered.Task.IsCompleted).IsTrue();
                 var resource = owner.Application.Services.GetRequiredService<DistributedApplicationModel>()
                     .Resources.Single(resource => resource.Name == "postgres");
                 await owner.Application.ResourceNotifications.PublishUpdateAsync(resource,
@@ -109,16 +116,25 @@ public sealed partial class AppHostRuntimeTests
                 await Assert.That(service.Cancelled.Task.IsCompleted).IsTrue();
                 await Assert.That(startup.IsCompleted).IsFalse();
                 service.Release.TrySetResult();
-                var startupFailure = await Assert.That(async () => await startup).Throws<InvalidOperationException>();
-                await Assert.That(startupFailure!.Message).IsEqualTo("test_resource_start_failed:postgres");
+                var startupFailure = await Assert.That(async () => await startup).Throws<AggregateException>();
+                var startupCauses = startupFailure!.Flatten().InnerExceptions.Select(exception => exception.Message).ToArray();
+                await Assert.That(startupCauses.Contains("test_resource_start_failed:postgres", StringComparer.Ordinal)).IsTrue();
+                await Assert.That(startupCauses.Any(message =>
+                    message.StartsWith("test_resource_cleanup_proof_incomplete:", StringComparison.Ordinal))).IsTrue();
+                await Assert.That(service.Disposed).IsFalse();
                 var failure = await Assert.That(async () => await owner.DisposeAsync()).Throws<AggregateException>();
                 var causes = failure!.Flatten().InnerExceptions.Select(exception => exception.Message).ToArray();
                 await Assert.That(causes.Contains("test_resource_start_failed:postgres", StringComparer.Ordinal)).IsTrue();
-                await Assert.That(causes.Contains("assurance_disposal_fault", StringComparer.Ordinal)).IsTrue();
                 await Assert.That(service.Disposed).IsTrue();
+                await Assert.That(causes.Contains("assurance_disposal_fault", StringComparer.Ordinal)).IsTrue();
                 await Assert.That(owner.ExecutionSettled).IsTrue();
                 await Assert.That(Directory.Exists(owner.Root)).IsTrue();
                 verified = true;
+            }
+            catch (Exception exception)
+            {
+                testFailure = exception;
+                throw;
             }
             finally
             {
@@ -128,8 +144,13 @@ public sealed partial class AppHostRuntimeTests
             }
         }
         catch (AggregateException) when (verified) { }
+        catch (Exception cleanupFailure) when (testFailure is not null && !ReferenceEquals(testFailure, cleanupFailure))
+        {
+            throw new AggregateException(testFailure, cleanupFailure);
+        }
         finally
         {
+            service.DisarmDisposalFailure();
             if (owner is not null && owner.ExecutionSettled && Directory.Exists(owner.Root))
             {
                 new TestingResourceIsolation(owner.RunId, owner.Root).VerifyOwnership();
@@ -180,6 +201,8 @@ public sealed partial class AppHostRuntimeTests
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource StartingExited { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool Disposed { get; private set; }
+
+        public void DisarmDisposalFailure() => failDisposal = false;
 
         public async Task StartingAsync(CancellationToken cancellationToken)
         {

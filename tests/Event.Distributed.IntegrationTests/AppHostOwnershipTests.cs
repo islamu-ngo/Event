@@ -297,9 +297,47 @@ public sealed class AppHostOwnershipTests
     }
 
     [Test]
+    public async Task ExecutionStartRequiresPermissionAndUnstartedDisposalCancelsWait()
+    {
+        using var permitted = new TestingApplicationExecution();
+        Task starting = permitted.StartingAsync(CancellationToken.None);
+        await Assert.That(starting.IsCompleted).IsFalse();
+        await Assert.That(permitted.PermitStart()).IsTrue();
+        await starting;
+        permitted.CancelUnstarted();
+        await Assert.That(permitted.StartingAsync(CancellationToken.None).IsCompletedSuccessfully).IsTrue();
+
+        using var cancelled = new TestingApplicationExecution();
+        cancelled.Observe(cancelled.StartingAsync(CancellationToken.None));
+        cancelled.CancelUnstarted();
+        await Assert.That(cancelled.PermitStart()).IsFalse();
+        await Assert.That(async () => await cancelled.StartingAsync(CancellationToken.None)).Throws<OperationCanceledException>();
+        await cancelled.WaitForCompletionAsync(TimeSpan.FromSeconds(1));
+        await Assert.That(cancelled.IsSettled).IsTrue();
+    }
+
+    [Test]
+    public async Task ExecutionDisposalWaitsForPermissionAndPreservesFailure()
+    {
+        using var execution = new TestingApplicationExecution();
+        Task permission = execution.WaitForDisposalPermissionAsync();
+        await Assert.That(permission.IsCompleted).IsFalse();
+        execution.PermitDisposal();
+        await permission;
+        await Assert.That(execution.IsDisposalSettled).IsFalse();
+
+        var expected = new InvalidOperationException("assurance_disposal_fault");
+        execution.FailDisposal(expected);
+        await Assert.That(execution.IsDisposalSettled).IsTrue();
+        var actual = await Assert.That(async () => await execution.WaitForDisposalAsync(TimeSpan.FromSeconds(1)))
+            .Throws<InvalidOperationException>();
+        await Assert.That(ReferenceEquals(actual, expected)).IsTrue();
+    }
+
+    [Test]
     public async Task DuplicateExecutionObservationCannotCertifyCompletion()
     {
-        var observer = new TestingApplicationExecution();
+        using var observer = new TestingApplicationExecution();
         observer.Observe(Task.CompletedTask);
         var running = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await Assert.That(() => observer.Observe(running.Task)).Throws<InvalidOperationException>();
@@ -312,7 +350,7 @@ public sealed class AppHostOwnershipTests
     [Test]
     public async Task CancelledObservationWaitCannotCertifyUnobservedExecution()
     {
-        var observer = new TestingApplicationExecution();
+        using var observer = new TestingApplicationExecution();
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
         await Assert.That(async () => await observer.Completion.WaitAsync(cancelled.Token))
@@ -330,7 +368,7 @@ public sealed class AppHostOwnershipTests
     [Test]
     public async Task FaultedCancellationObservationRetainsItsFailure()
     {
-        var observer = new TestingApplicationExecution();
+        using var observer = new TestingApplicationExecution();
         var failure = new OperationCanceledException("assurance_faulted_cancellation");
         observer.Observe(Task.FromException(failure));
         var observed = await Assert.That(async () => await observer.WaitForCompletionAsync(TimeSpan.FromSeconds(1)))
@@ -342,7 +380,7 @@ public sealed class AppHostOwnershipTests
     [Test]
     public async Task CancelledExecutionObservationCompletesCleanupWait()
     {
-        var observer = new TestingApplicationExecution();
+        using var observer = new TestingApplicationExecution();
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
         observer.Observe(Task.FromCanceled(cancelled.Token));

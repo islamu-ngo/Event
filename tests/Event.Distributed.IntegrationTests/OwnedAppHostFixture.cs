@@ -50,6 +50,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     private readonly CleanupProofFailures cleanupProofFailures = new();
     private Task cleanupObservation = Task.CompletedTask;
     private Task cleanupObservationCancellation = Task.CompletedTask;
+    private Task? cleanupObservationSettlement;
     private bool cleanupPrepared;
     private HashSet<string> initialContainerIds = new(StringComparer.Ordinal);
     private HashSet<string> initialVolumeNames = new(StringComparer.Ordinal);
@@ -254,6 +255,12 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                 postgresBuilder.WithEnvironment($"DATABASE_{purpose}_PASSWORD", owner.EnvironmentAuthority[$"DATABASE_{purpose}_PASSWORD"]);
             if (configureBuilder is not null)
                 await configureBuilder(builder);
+            var executionRegistrations = builder.Services
+                .Where(descriptor => descriptor.ServiceType == typeof(TestingApplicationExecution)).ToArray();
+            if (executionRegistrations.Length != 1 || !ReferenceEquals(executionRegistrations[0].ImplementationInstance, owner.execution))
+                throw new InvalidOperationException("test_application_execution_missing");
+            builder.Services.Configure<HostOptions>(options => options.ServicesStartConcurrently = false);
+            builder.Services.Insert(0, ServiceDescriptor.Singleton<IHostedService>(owner.execution));
             await new TestingResourceIsolation(owner.RunId, owner.Root, profile)
                 .PublishConfiguredContainerModelAsync(builder, cancellationToken);
             owner.volumes = builder.Resources.OfType<ContainerResource>()
@@ -275,6 +282,8 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         }
         catch (Exception creationFailure)
         {
+            owner.execution.CancelUnstarted();
+            owner.execution.PermitDisposal();
             await DisposeFailedCreationAsync(creationFailure, builder, owner);
             throw;
         }
@@ -340,15 +349,34 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     {
         using var startup = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
         startupToken = startup.Token;
+        bool startPermitted = false;
         try
         {
             // StartAsync holds disposalLock until this first task assignment precedes any asynchronous preparation.
             managedObservation = RejectFailedResourcesAsync(managedObservationLifetime.Token);
+            await execution.WaitForEntryPointAsync(startup.Token);
             await PrepareContainerCleanupAsync(startup.Token);
             cleanupPrepared = true;
             cleanupObservation = ObserveContainerCleanupCandidatesAsync(cleanupObservationLifetime.Token);
-            await RunObservedStartupAsync(token => managedObservation.WaitAsync(token), Application.StartAsync,
-                WaitForReadyAsync, applicationLifetime!.StopApplication,
+            async Task StartHostAsync(CancellationToken token)
+            {
+                if (!execution.PermitStart())
+                    throw new OperationCanceledException(token);
+                startPermitted = true;
+                var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                using var registration = applicationLifetime!.ApplicationStarted.Register(() => started.TrySetResult());
+                Task completed = await Task.WhenAny(started.Task, execution.Completion).WaitAsync(token);
+                await completed;
+                if (!started.Task.IsCompletedSuccessfully)
+                    throw new InvalidOperationException("test_application_stopped_before_start");
+            }
+            void StopHost()
+            {
+                applicationLifetime!.StopApplication();
+                execution.CancelHost();
+            }
+            await RunObservedStartupAsync(token => managedObservation.WaitAsync(token), StartHostAsync,
+                WaitForReadyAsync, StopHost,
                 (phase, reason, requested) => managedLaunchObservation?.RecordStartupFailure(phase, reason, requested,
                     cancellationToken.IsCancellationRequested, lifetime.IsCancellationRequested), startup,
                 () => CompleteCleanupProofBeforeStopAsync());
@@ -357,6 +385,9 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         catch (Exception exception) { startupFailure = exception; }
         if (startupFailure is not null)
         {
+            execution.CancelUnstarted();
+            if (startPermitted)
+                execution.CancelHost();
             try { await execution.WaitForCompletionAsync(TimeSpan.FromSeconds(30)); }
             catch (Exception exception) { startupFailure = new AggregateException(startupFailure, exception); }
         }
@@ -701,7 +732,13 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         return new InvalidOperationException(message, original);
     }
 
-    private async Task JoinCleanupObservationAsync()
+    private Task JoinCleanupObservationAsync()
+    {
+        lock (disposalLock)
+            return cleanupObservationSettlement ??= JoinCleanupObservationCoreAsync();
+    }
+
+    private async Task JoinCleanupObservationCoreAsync()
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var failures = new List<Exception>();
@@ -721,8 +758,10 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             try { await CompleteCleanupProofBeforeStopAsync(deadline.Token); }
             catch (Exception failure) { failures.Add(failure); }
         }
-        if (failures.Count != 0)
+        if (!cleanupObservation.IsCompleted || !cleanupObservationCancellation.IsCompleted)
             throw new InvalidOperationException("test_resource_cleanup_observer_unsettled", new AggregateException(failures));
+        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException(failures);
     }
 
     private static string? DockerIdentity(string? value)
@@ -1970,6 +2009,8 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             // Nonterminal owned readers retain their dependencies for the finite outer process boundary.
             if (ManagedLaunchWritersSettled)
             {
+                if (execution.IsSettled && execution.IsDisposalSettled)
+                    execution.Dispose();
                 managedObservationLifetime.Dispose();
                 cleanupObservationLifetime.Dispose();
                 lifetime.Dispose();
@@ -1980,10 +2021,12 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     private bool ManagedLaunchWritersSettled => cleanupObservation.IsCompleted
         && cleanupObservationCancellation.IsCompleted && runningStartup?.IsCompleted != false
         && managedObservation.IsCompleted && managedObservationCancellation.IsCompleted
+        && cleanupObservationSettlement?.IsCompleted != false
         && managedObservationSettlement?.IsCompleted != false;
 
     private async Task DisposeOwnedResourcesAsync()
     {
+        execution.CancelUnstarted();
         var failures = new List<Exception>();
         bool applicationSettled = true;
         try { await CompleteCleanupProofBeforeStopAsync(); }
@@ -1994,54 +2037,54 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         catch (Exception exception) { failures.Add(exception); }
         try { await lifetime.CancelAsync(); }
         catch (Exception exception) { failures.Add(exception); }
+        try { execution.CancelHost(); }
+        catch (Exception exception) { failures.Add(exception); }
         if (Application is not null)
         {
             try { applicationLifetime!.StopApplication(); }
             catch (Exception exception) { failures.Add(exception); }
-            try { await Application.StopAsync(stopDeadline.Token); }
+            try { await execution.WaitForCompletionAsync(TimeSpan.FromSeconds(60)); }
             catch (Exception exception) { failures.Add(exception); }
-            finally
+            if (!execution.IsSettled)
             {
-                try { await JoinCleanupObservationAsync(); }
+                applicationSettled = false;
+                failures.Add(new InvalidOperationException("test_application_execution_unsettled"));
+            }
+            try { await JoinCleanupObservationAsync(); }
+            catch (Exception exception) { failures.Add(exception); }
+            if (runningStartup is not null)
+            {
+                try { await runningStartup.WaitAsync(TimeSpan.FromSeconds(30)); }
+                catch (Exception exception) when (runningStartup.IsCompleted)
+                {
+                    if (startupFailure is null) failures.Add(exception);
+                }
+                catch (TimeoutException exception)
+                {
+                    failures.Add(new InvalidOperationException("test_resource_cleanup_startup_unsettled", exception));
+                }
+            }
+            if (runningStartup?.IsCompleted != false)
+            {
+                try { await CompleteManagedObservationAsync(); }
                 catch (Exception exception) { failures.Add(exception); }
-                if (runningStartup is not null)
-                {
-                    try { await runningStartup.WaitAsync(TimeSpan.FromSeconds(30)); }
-                    catch (Exception exception) when (runningStartup.IsCompleted)
-                    {
-                        if (startupFailure is null) failures.Add(exception);
-                    }
-                    catch (TimeoutException exception)
-                    {
-                        failures.Add(new InvalidOperationException("test_resource_cleanup_startup_unsettled", exception));
-                    }
-                }
-                if (runningStartup?.IsCompleted != false)
-                {
-                    try { await CompleteManagedObservationAsync(); }
-                    catch (Exception exception) { failures.Add(exception); }
-                }
-                if (!cleanupObservation.IsCompleted || !cleanupObservationCancellation.IsCompleted
-                    || runningStartup?.IsCompleted == false || !managedObservation.IsCompleted
-                    || !managedObservationCancellation.IsCompleted)
+            }
+            if (!cleanupObservation.IsCompleted || !cleanupObservationCancellation.IsCompleted
+                || runningStartup?.IsCompleted == false || !managedObservation.IsCompleted
+                || !managedObservationCancellation.IsCompleted)
+            {
+                applicationSettled = false;
+                failures.Add(new InvalidOperationException("test_resource_cleanup_dependencies_unsettled"));
+            }
+            if (applicationSettled)
+            {
+                execution.PermitDisposal();
+                try { await execution.WaitForDisposalAsync(TimeSpan.FromSeconds(60)); }
+                catch (Exception exception)
                 {
                     applicationSettled = false;
-                    failures.Add(new InvalidOperationException("test_resource_cleanup_dependencies_unsettled"));
+                    failures.Add(exception);
                 }
-                else
-                {
-                    // Terminal proof/stop faults do not suppress this independent disposal attempt.
-                    try { await Application.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(60)); }
-                    catch (Exception exception)
-                    {
-                        applicationSettled = false;
-                        failures.Add(exception);
-                    }
-                }
-                try { await execution.WaitForCompletionAsync(TimeSpan.FromSeconds(60)); }
-                catch (Exception exception) { failures.Add(exception); }
-                if (!execution.IsSettled)
-                    applicationSettled = false;
             }
         }
         if (applicationSettled && managedLaunchObservation is not null && ManagedLaunchWritersSettled)

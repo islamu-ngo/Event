@@ -43,7 +43,7 @@ public sealed class UserSettingsService : IUserSettingsService, IAsyncDisposable
 
     public async Task<SettingGroupResponseDto?> GetSettingsAsync(string category, CancellationToken ct = default)
     {
-        if (Volatile.Read(ref _disposed))
+        if (Volatile.Read(ref _disposed) || category == "PublicExperiencePreferences")
             return null;
 
         try
@@ -93,7 +93,7 @@ public sealed class UserSettingsService : IUserSettingsService, IAsyncDisposable
             var dto = new SettingGroupResponseDto
             {
                 Category = category,
-                Settings = settings.Select(kvp => new EffectiveSettingDto
+                Settings = settings.Where(kvp => !IsAnnouncementKey(kvp.Key)).Select(kvp => new EffectiveSettingDto
                 {
                     Key = kvp.Key,
                     Value = kvp.Value,
@@ -116,6 +116,9 @@ public sealed class UserSettingsService : IUserSettingsService, IAsyncDisposable
         string category, IDictionary<string, string> values, CancellationToken ct = default)
     {
         if (Volatile.Read(ref _disposed))
+            return null;
+
+        if (values.Keys.Any(IsAnnouncementKey))
             return null;
 
         if (values.Count == 0)
@@ -181,7 +184,7 @@ public sealed class UserSettingsService : IUserSettingsService, IAsyncDisposable
 
     public async Task<bool> UpdateSettingAsync(string key, string value, CancellationToken ct = default)
     {
-        if (Volatile.Read(ref _disposed))
+        if (Volatile.Read(ref _disposed) || IsAnnouncementKey(key))
             return false;
 
         try
@@ -224,7 +227,7 @@ public sealed class UserSettingsService : IUserSettingsService, IAsyncDisposable
 
     public async Task<bool> ResetSettingAsync(string key, CancellationToken ct = default)
     {
-        if (Volatile.Read(ref _disposed))
+        if (Volatile.Read(ref _disposed) || IsAnnouncementKey(key))
             return false;
 
         try
@@ -283,7 +286,7 @@ public sealed class UserSettingsService : IUserSettingsService, IAsyncDisposable
                 var current = await GetAuthenticatedSettingsAsync(category, ct);
                 if (current is null || generation != Volatile.Read(ref _authenticationGeneration))
                     return false;
-                foreach (var setting in current.Settings)
+                foreach (var setting in current.Settings.Where(setting => !IsAnnouncementKey(setting.Key)))
                 {
                     if (generation != Volatile.Read(ref _authenticationGeneration))
                         return false;
@@ -343,6 +346,62 @@ public sealed class UserSettingsService : IUserSettingsService, IAsyncDisposable
     private async Task<SettingGroupResponseDto?> GetAuthenticatedSettingsAsync(string category, CancellationToken ct)
     {
         return await _apiClient.GetUserSettingsAsync(category, cancellationToken: ct);
+    }
+
+    private static bool IsAnnouncementKey(string key) =>
+        key.StartsWith("public_experience_preferences.announcement_bar.", StringComparison.Ordinal);
+
+    public async Task<ISLAMU.Wire.Contracts.Announcements.AnnouncementDismissalMarkerDto?>
+        GetAnonymousAnnouncementMarkerAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        if (Volatile.Read(ref _disposed) || tenantId == Guid.Empty)
+            return null;
+        long generation = Volatile.Read(ref _authenticationGeneration);
+        try
+        {
+            if (await IsAuthenticatedAsync()
+                || generation != Volatile.Read(ref _authenticationGeneration)
+                || await GetAnonymousTenantAsync() != tenantId.ToString("N"))
+                return null;
+            var module = await GetJsModuleAsync();
+            if (generation != Volatile.Read(ref _authenticationGeneration))
+                return null;
+            var marker = await module.InvokeAsync<ISLAMU.Wire.Contracts.Announcements.AnnouncementDismissalMarkerDto?>(
+                "getAnnouncement", ct, tenantId.ToString("N"));
+            return generation == Volatile.Read(ref _authenticationGeneration)
+                && marker?.Observation?.TenantId == tenantId ? marker : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Anonymous announcement state could not be read ({FailureType}).", ex.GetType().Name);
+            return null;
+        }
+    }
+
+    public async Task<bool> SaveAnonymousAnnouncementMarkerAsync(
+        Guid tenantId, ISLAMU.Wire.Contracts.Announcements.AnnouncementDismissalMarkerDto marker,
+        CancellationToken ct = default)
+    {
+        if (Volatile.Read(ref _disposed) || tenantId == Guid.Empty || marker?.Observation?.TenantId != tenantId)
+            return false;
+        long generation = Volatile.Read(ref _authenticationGeneration);
+        try
+        {
+            if (await IsAuthenticatedAsync()
+                || generation != Volatile.Read(ref _authenticationGeneration)
+                || await GetAnonymousTenantAsync() != tenantId.ToString("N"))
+                return false;
+            var module = await GetJsModuleAsync();
+            if (generation != Volatile.Read(ref _authenticationGeneration))
+                return false;
+            bool applied = await module.InvokeAsync<bool>("setAnnouncement", ct, tenantId.ToString("N"), marker);
+            return applied && !ct.IsCancellationRequested && generation == Volatile.Read(ref _authenticationGeneration);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Anonymous announcement state could not be saved ({FailureType}).", ex.GetType().Name);
+            return false;
+        }
     }
 
     private async Task<bool> IsAuthenticatedAsync()

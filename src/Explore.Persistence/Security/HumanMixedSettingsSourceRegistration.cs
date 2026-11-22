@@ -39,6 +39,8 @@ public static class HumanMixedSettingsSourceRegistration
             var human = lease.HumanScope ?? throw new UnauthorizedAccessException("The original typed subject is required.");
             var lifetime = lease.HumanLifetime ?? throw new UnauthorizedAccessException("The original typed credential is required.");
             if (original.Actor == Guid.Empty || original.Actor != human.Subject.PrincipalId
+                || original.Announcement?.Producer == "announcement-managed-tenant"
+                    && !ReferenceEquals(lease.ManagedAnnouncementOriginal, original.Announcement.Command)
                 || original.TenantId != lease.SelectedTenantId
                 || lease.PolicyPurpose != PolicyMutationPurpose.MixedSettings
                 || human.Purpose != (original.TenantId.HasValue

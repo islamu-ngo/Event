@@ -1,5 +1,6 @@
 using Microsoft.JSInterop;
 using NSubstitute.Extensions;
+using Wire = ISLAMU.Wire.Contracts.Announcements;
 
 namespace Explore.Blazor.Client.Tests.Services;
 
@@ -29,22 +30,22 @@ public sealed class UserSettingsServiceTests
     {
         var first = new SettingGroupResponseDto
         {
-            Category = "PublicExperiencePreferences",
+            Category = PreferenceCategory,
             Settings = [new EffectiveSettingDto
             {
-                Key = "public_experience_preferences.announcement_bar.dismissed_revision", Value = "4"
+                Key = DismissalKey, Value = "4"
             }]
         };
         var second = new SettingGroupResponseDto
         {
-            Category = "PublicExperiencePreferences",
+            Category = PreferenceCategory,
             Settings = [new EffectiveSettingDto
             {
-                Key = "public_experience_preferences.announcement_bar.dismissed_revision", Value = "9"
+                Key = DismissalKey, Value = "9"
             }]
         };
         var apiClient = Substitute.For<ISettingsClient>();
-        apiClient.GetUserSettingsAsync("PublicExperiencePreferences", Arg.Any<string?>(),
+        apiClient.GetUserSettingsAsync(PreferenceCategory, Arg.Any<string?>(),
                 Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(first, second);
         var authentication = new ChangingAuthenticationState();
@@ -53,9 +54,9 @@ public sealed class UserSettingsServiceTests
             Substitute.For<IJSRuntime>(), Substitute.For<ILogger<UserSettingsService>>(),
             Substitute.For<IPublicExperienceService>());
 
-        var original = await service.GetSettingsAsync("PublicExperiencePreferences");
+        var original = await service.GetSettingsAsync(PreferenceCategory);
         authentication.SetUser(Guid.CreateVersion7());
-        var changed = await service.GetSettingsAsync("PublicExperiencePreferences");
+        var changed = await service.GetSettingsAsync(PreferenceCategory);
 
         await Assert.That(original!.Settings.Single().Value).IsEqualTo("4");
         await Assert.That(changed!.Settings.Single().Value).IsEqualTo("9");
@@ -82,17 +83,17 @@ public sealed class UserSettingsServiceTests
     }
 
     [Test]
-    public async Task LogoutCannotReuseAnAuthenticatedDismissalAsAnonymousHistory()
+    public async Task LogoutCannotReuseAnAuthenticatedPreferenceAsAnonymousHistory()
     {
         var apiClient = Substitute.For<ISettingsClient>();
-        apiClient.GetUserSettingsAsync("PublicExperiencePreferences", Arg.Any<string?>(),
+        apiClient.GetUserSettingsAsync(PreferenceCategory, Arg.Any<string?>(),
                 Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new SettingGroupResponseDto
             {
-                Category = "PublicExperiencePreferences",
+                Category = PreferenceCategory,
                 Settings = [new EffectiveSettingDto
                 {
-                    Key = "public_experience_preferences.announcement_bar.dismissed_revision", Value = "4"
+                    Key = DismissalKey, Value = "4"
                 }]
             });
         var authentication = new ChangingAuthenticationState();
@@ -100,10 +101,10 @@ public sealed class UserSettingsServiceTests
         await using var service = new UserSettingsService(apiClient, authentication,
             Substitute.For<IJSRuntime>(), Substitute.For<ILogger<UserSettingsService>>(),
             Substitute.For<IPublicExperienceService>());
-        await service.GetSettingsAsync("PublicExperiencePreferences");
+        await service.GetSettingsAsync(PreferenceCategory);
 
         authentication.SetAnonymous();
-        var anonymous = await service.GetSettingsAsync("PublicExperiencePreferences");
+        var anonymous = await service.GetSettingsAsync(PreferenceCategory);
 
         await Assert.That(anonymous).IsNull();
     }
@@ -114,7 +115,7 @@ public sealed class UserSettingsServiceTests
         var response = new TaskCompletionSource<SettingGroupResponseDto>(TaskCreationOptions.RunContinuationsAsynchronously);
         var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var apiClient = Substitute.For<ISettingsClient>();
-        apiClient.GetUserSettingsAsync("PublicExperiencePreferences", Arg.Any<string?>(),
+        apiClient.GetUserSettingsAsync(PreferenceCategory, Arg.Any<string?>(),
                 Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
@@ -126,16 +127,16 @@ public sealed class UserSettingsServiceTests
         await using var service = new UserSettingsService(apiClient, authentication,
             Substitute.For<IJSRuntime>(), Substitute.For<ILogger<UserSettingsService>>(),
             Substitute.For<IPublicExperienceService>());
-        Task<SettingGroupResponseDto?> pending = service.GetSettingsAsync("PublicExperiencePreferences");
+        Task<SettingGroupResponseDto?> pending = service.GetSettingsAsync(PreferenceCategory);
         await requested.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
         authentication.SetUser(Guid.CreateVersion7());
         response.SetResult(new SettingGroupResponseDto
         {
-            Category = "PublicExperiencePreferences",
+            Category = PreferenceCategory,
             Settings = [new EffectiveSettingDto
             {
-                Key = "public_experience_preferences.announcement_bar.dismissed_revision", Value = "4"
+                Key = DismissalKey, Value = "4"
             }]
         });
 
@@ -190,7 +191,7 @@ public sealed class UserSettingsServiceTests
     }
 
     [Test]
-    public async Task AnonymousDismissalRoundTripsOnlyWithinItsVerifiedTenant()
+    public async Task AnonymousPreferenceRoundTripsOnlyWithinItsVerifiedTenant()
     {
         await using var browser = new AnonymousPreferences();
         var originalTenant = browser.TenantId;
@@ -271,7 +272,7 @@ public sealed class UserSettingsServiceTests
         await using var browser = new AnonymousPreferences();
 
         var result = await browser.Service.UpdateSettingsBatchAsync(PreferenceCategory,
-            new Dictionary<string, string> { ["event_list.page_size"] = "24" });
+            new Dictionary<string, string> { ["ai_assistant_preferences.show_navbar_button"] = "true" });
 
         await Assert.That(result).IsNull();
         await Assert.That(browser.Values.Count).IsEqualTo(0);
@@ -279,7 +280,7 @@ public sealed class UserSettingsServiceTests
     }
 
     [Test]
-    public async Task BrowserWriteFailureDoesNotReportAnAppliedDismissal()
+    public async Task BrowserWriteFailureDoesNotReportAnAppliedPreference()
     {
         await using var browser = new AnonymousPreferences();
         browser.RejectWrites = true;
@@ -307,7 +308,7 @@ public sealed class UserSettingsServiceTests
     }
 
     [Test]
-    public async Task SigningInDoesNotMergeAnonymousDismissalIntoAccountPreferences()
+    public async Task SigningInDoesNotMergeAnonymousPreferencesIntoAccountPreferences()
     {
         await using var browser = new AnonymousPreferences();
         await browser.Service.UpdateSettingAsync(DismissalKey, "4");
@@ -748,8 +749,132 @@ public sealed class UserSettingsServiceTests
         await Assert.That(disposals).IsEqualTo(1);
     }
 
-    private const string PreferenceCategory = "PublicExperiencePreferences";
-    private const string DismissalKey = "public_experience_preferences.announcement_bar.dismissed_revision";
+    [Test]
+    public async Task AnonymousEditionMarkerUsesOnlyTheCurrentTenantAndIgnoresRetiredHistory()
+    {
+        await using var browser = new AnonymousPreferences();
+        var tenant = browser.TenantId;
+        const string retired = "public_experience_preferences.announcement_bar.dismissed_revision";
+        browser.Values[(tenant.ToString("N"), retired)] = "7";
+        var marker = AnnouncementTestData.AnonymousMarker(tenant);
+
+        await Assert.That(await browser.Service.GetAnonymousAnnouncementMarkerAsync(tenant)).IsNull();
+        await Assert.That(await browser.Service.SaveAnonymousAnnouncementMarkerAsync(tenant, marker)).IsTrue();
+        browser.ChangeTenant(AnnouncementTestData.OtherTenant);
+        await Assert.That(await browser.Service.GetAnonymousAnnouncementMarkerAsync(browser.TenantId)).IsNull();
+        browser.ChangeTenant(tenant);
+
+        await Assert.That(await browser.Service.GetAnonymousAnnouncementMarkerAsync(tenant)).IsEqualTo(marker);
+        await Assert.That(await browser.Service.GetSettingsAsync("PublicExperiencePreferences")).IsNull();
+        await Assert.That(browser.Values[(tenant.ToString("N"), retired)]).IsEqualTo("7");
+    }
+
+    [Test]
+    public async Task AuthenticationDuringAnonymousImportCannotFallThroughToAGenericServerMutation()
+    {
+        await using var browser = new AnonymousPreferences();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var imported = new TaskCompletionSource<IJSObjectReference>(TaskCreationOptions.RunContinuationsAsynchronously);
+        browser.Runtime.Configure().InvokeAsync<IJSObjectReference>("import", Arg.Any<object?[]?>())
+            .Returns(_ => { started.TrySetResult(); return new ValueTask<IJSObjectReference>(imported.Task); });
+        bool serverWrite = false;
+        browser.Api.UpdateUserSettingAsync(Arg.Any<string>(), Arg.Any<UpdateSettingValueDto>(),
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { serverWrite = true; return new BaseCommandResponseOfGuid { Success = true }; });
+
+        var pending = browser.Service.SaveAnonymousAnnouncementMarkerAsync(
+            browser.TenantId, AnnouncementTestData.AnonymousMarker(browser.TenantId));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        browser.Authentication.SetUser(AnnouncementTestData.OtherTenant);
+        imported.SetResult(browser.Module);
+
+        await Assert.That(await pending.WaitAsync(TimeSpan.FromSeconds(10))).IsFalse();
+        await Assert.That(serverWrite).IsFalse();
+        await Assert.That(browser.AnnouncementMarkers.Count).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task AnonymousEditionStorageFailureDoesNotClaimDurableSuccess(bool exception)
+    {
+        await using var browser = new AnonymousPreferences();
+        browser.RejectWrites = !exception;
+        browser.ThrowOnWrite = exception;
+
+        var applied = await browser.Service.SaveAnonymousAnnouncementMarkerAsync(
+            browser.TenantId, AnnouncementTestData.AnonymousMarker(browser.TenantId));
+
+        await Assert.That(applied).IsFalse();
+        await Assert.That(browser.AnnouncementMarkers.Count).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task GenericAndAnnouncementReadsShareImportAndDisposeItsLateModuleExactlyOnce()
+    {
+        await using var browser = new AnonymousPreferences();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var imported = new TaskCompletionSource<IJSObjectReference>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int imports = 0, disposals = 0;
+        browser.Runtime.Configure().InvokeAsync<IJSObjectReference>("import", Arg.Any<object?[]?>())
+            .Returns(_ =>
+            {
+                imports++;
+                started.TrySetResult();
+                return new ValueTask<IJSObjectReference>(imported.Task);
+            });
+        browser.Module.Configure().DisposeAsync().Returns(_ =>
+        {
+            disposals++;
+            return ValueTask.CompletedTask;
+        });
+
+        var generic = browser.Service.GetSettingsAsync(PreferenceCategory);
+        var announcement = browser.Service.GetAnonymousAnnouncementMarkerAsync(browser.TenantId);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var disposing = browser.Service.DisposeAsync().AsTask();
+        imported.SetResult(browser.Module);
+        await disposing.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await Assert.That(await generic.WaitAsync(TimeSpan.FromSeconds(10))).IsNull();
+        await Assert.That(await announcement.WaitAsync(TimeSpan.FromSeconds(10))).IsNull();
+        await Assert.That(imports).IsEqualTo(1);
+        await Assert.That(disposals).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task AnnouncementKeysNeverUseGenericClientMutationPorts(bool authenticated)
+    {
+        await using var browser = new AnonymousPreferences();
+        if (authenticated)
+            browser.Authentication.SetUser(AnnouncementTestData.OtherTenant);
+        bool serverWrite = false;
+        browser.Api.UpdateUserSettingAsync(Arg.Any<string>(), Arg.Any<UpdateSettingValueDto>(),
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { serverWrite = true; return new BaseCommandResponseOfGuid { Success = true }; });
+        browser.Api.UpdateUserSettingsBatchAsync(Arg.Any<string>(), Arg.Any<UpdateSettingBatchDto>(),
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { serverWrite = true; return new BatchUpdateResponseDto { Success = true }; });
+        browser.Api.ResetUserSettingAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ => { serverWrite = true; return new BaseCommandResponseOfGuid { Success = true }; });
+
+        await Assert.That(await browser.Service.UpdateSettingAsync(
+            "public_experience_preferences.announcement_bar.dismissed_revision", "7")).IsFalse();
+        await Assert.That(await browser.Service.UpdateSettingsBatchAsync("PublicExperiencePreferences",
+            new Dictionary<string, string> { ["public_experience_preferences.announcement_bar.dismissed_edition"] = "{}" }))
+            .IsNull();
+        await Assert.That(await browser.Service.ResetSettingAsync(
+            "public_experience_preferences.announcement_bar.dismissed_edition")).IsFalse();
+        await Assert.That(serverWrite).IsFalse();
+        await Assert.That(browser.AnnouncementMarkers.Count).IsEqualTo(0);
+        await Assert.That(browser.Values.Count).IsEqualTo(0);
+    }
+
+    private const string PreferenceCategory = "EventList";
+    private const string DismissalKey = "event_list.page_size";
 
     private sealed class AnonymousPreferences : IAsyncDisposable
     {
@@ -757,6 +882,7 @@ public sealed class UserSettingsServiceTests
         internal bool RejectWrites { get; set; }
         internal bool ThrowOnWrite { get; set; }
         internal Dictionary<(string Tenant, string Key), string> Values { get; } = [];
+        internal Dictionary<string, Wire.AnnouncementDismissalMarkerDto> AnnouncementMarkers { get; } = [];
         internal IPublicExperienceService Experience { get; } = Substitute.For<IPublicExperienceService>();
         internal ChangingAuthenticationState Authentication { get; } = new();
         internal ISettingsClient Api { get; } = Substitute.For<ISettingsClient>();
@@ -770,6 +896,24 @@ public sealed class UserSettingsServiceTests
                 Task.FromResult<PublicExperienceSettingsDto?>(new() { TenantId = TenantId }));
             Runtime.InvokeAsync<IJSObjectReference>("import", Arg.Any<object?[]?>())
                 .Returns(new ValueTask<IJSObjectReference>(Module));
+            Module.InvokeAsync<Wire.AnnouncementDismissalMarkerDto?>("getAnnouncement", Arg.Any<CancellationToken>(),
+                    Arg.Any<object?[]?>())
+                .Returns(call =>
+                {
+                    var args = call.ArgAt<object?[]>(2);
+                    return new ValueTask<Wire.AnnouncementDismissalMarkerDto?>(
+                        AnnouncementMarkers.GetValueOrDefault((string)args[0]!));
+                });
+            Module.InvokeAsync<bool>("setAnnouncement", Arg.Any<CancellationToken>(), Arg.Any<object?[]?>())
+                .Returns(call =>
+                {
+                    if (ThrowOnWrite)
+                        throw new JSException("Storage unavailable");
+                    var args = call.ArgAt<object?[]>(2);
+                    if (!RejectWrites)
+                        AnnouncementMarkers[(string)args[0]!] = (Wire.AnnouncementDismissalMarkerDto)args[1]!;
+                    return new ValueTask<bool>(!RejectWrites);
+                });
             Module.InvokeAsync<Dictionary<string, string>?>("getAll", Arg.Any<CancellationToken>(),
                     Arg.Any<object?[]?>())
                 .Returns(call =>

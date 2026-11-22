@@ -12,6 +12,38 @@ namespace Explore.Persistence.Security;
 
 public static partial class PostgresOrdinarySettingsContract
 {
+    internal static async Task<OrdinarySettingsDataImage> ReadAnnouncementImageAsync(
+        ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        Guid? tenant, Guid? user, IReadOnlyCollection<string> keys, CancellationToken token)
+    {
+        context.ValidateTenantLease();
+        if (context.TenantFilterTenantId != tenant || context.IsTenantFilterBypassed
+            || context.IsConfigurationInstanceImportOwner || user == Guid.Empty || user.HasValue && !tenant.HasValue)
+            throw new UnauthorizedAccessException("Announcement reads must retain their selected tenant and subject.");
+        bool openedHere = context.Database.GetDbConnection().State != ConnectionState.Open;
+        if (openedHere)
+            await context.Database.OpenConnectionAsync(token);
+        try
+        {
+            await RequireReadyAsync(context, enrollment, token);
+            await using var command = Command(context);
+            command.CommandText = $"SELECT {FunctionSql(context, "read")}(@tenant,@user,@keys)::text";
+            Add(command, "tenant", NpgsqlDbType.Uuid, tenant);
+            Add(command, "user", NpgsqlDbType.Uuid, user);
+            Add(command, "keys", NpgsqlDbType.Jsonb,
+                JsonSerializer.Serialize(keys.Distinct(StringComparer.Ordinal).ToArray()));
+            using var document = JsonDocument.Parse((string)(await command.ExecuteScalarAsync(token)
+                ?? throw new UnauthorizedAccessException("The announcement source image is absent.")));
+            return document.RootElement.GetProperty("Image").Deserialize<OrdinarySettingsDataImage>()
+                ?? throw new UnauthorizedAccessException("The announcement source image is invalid.");
+        }
+        finally
+        {
+            if (openedHere)
+                await context.Database.CloseConnectionAsync();
+        }
+    }
+
     internal static async Task<(IReadOnlyList<SystemSetting> System, IReadOnlyList<TenantSetting> Tenant)?>
         TryReadHierarchyAsync(ExploreDbContext context, Func<PostgresNativeQueueEnrollment> enrollment,
             Guid? tenant, IReadOnlyCollection<string> keys, CancellationToken token) =>

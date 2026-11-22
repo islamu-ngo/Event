@@ -94,6 +94,18 @@ public class UpdateSettingBatchCommandHandler
     public async Task<BatchUpdateResponseDto> ExecuteAsync(
         UpdateSettingBatchCommand request, CancellationToken cancellationToken)
     {
+        if (request.Values.Keys.Any(AnnouncementSettingMutationGuard.Handles))
+            return new BatchUpdateResponseDto
+            {
+                Success = false,
+                Results = request.Values.Keys.Select(key => new SettingUpdateResultDto
+                {
+                    Key = key,
+                    Applied = false,
+                    SkipReason = AnnouncementSettingMutationGuard.FailureCode
+                }).ToArray(),
+                Message = AnnouncementSettingMutationGuard.FailureCode
+            };
         if (request.Values.Count == 0)
         {
             return new BatchUpdateResponseDto

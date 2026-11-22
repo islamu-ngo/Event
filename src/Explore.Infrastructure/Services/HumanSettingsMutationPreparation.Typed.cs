@@ -118,7 +118,11 @@ public sealed partial class HumanSettingsMutationPreparation
                     settingsGovernance: true,
                     localDecisionSourcesCoLocated: lifetime.LocalSession is null || facts.Principal.LocalSession is not null)))
                 throw new UnauthorizedAccessException("Original typed human or route sources changed.");
-            bool administrator = original.Governance is not null || original.EventPolicy is not null || original.PlanAssignment is not null ? InstancePolicyInput(facts.Principal)
+            bool administrator = original.Governance is not null || original.EventPolicy is not null || original.PlanAssignment is not null
+                || original.Announcement?.Producer is "announcement-instance" or "announcement-managed-tenant"
+                ? InstancePolicyInput(facts.Principal)
+                : original.Announcement is not null ? route.Provider != HumanAuthorizationRouteProvider.Local
+                    || TenantAdministrator(facts.Principal) || InstancePolicyInput(facts.Principal)
                 : original.Onboarding is not null ? TenantAdministrator(facts.Principal) || InstancePolicyInput(facts.Principal)
                 : route.Provider != HumanAuthorizationRouteProvider.Local || TenantAdministrator(facts.Principal);
             if (!administrator)
@@ -131,8 +135,14 @@ public sealed partial class HumanSettingsMutationPreparation
                     AuthorizationActions.Update);
             }
         }
-        var supportCheck = new SupportCheck(original.TenantId.HasValue && original.PlanAssignment is null ? ResourceKinds.TenantSetting : ResourceKinds.InstanceSetting,
-            AuthorizationActions.Update, original.Reporting is { } reporting
+        string announcementAction = original.Announcement?.Update.Change is Explore.Domain.Settings.AnnouncementChange.SetLock announcementLock
+            ? announcementLock.IsLocked ? AuthorizationActions.Lock : AuthorizationActions.Unlock
+            : AuthorizationActions.Update;
+        var supportCheck = new SupportCheck(original.TenantId.HasValue && original.PlanAssignment is null
+                && original.Announcement?.Producer != "announcement-managed-tenant" ? ResourceKinds.TenantSetting : ResourceKinds.InstanceSetting,
+            original.Announcement is null ? AuthorizationActions.Update : announcementAction,
+            original.Announcement is { } announcementFacts ? announcementFacts.Command.AuthorizationFacts
+                : original.Reporting is { } reporting
                 ? ((ISecureRequest)reporting).AuthorizationFacts
                 : original.PlanAssignment is { } plan ? ((ISecureRequest)plan).AuthorizationFacts
                 : original.TenantId is { } tenant ? new TenantScopedAuthorizationFacts(tenant)
@@ -142,7 +152,7 @@ public sealed partial class HumanSettingsMutationPreparation
             Custody();
             if (!lifetime.IsValidAt(now))
                 throw new UnauthorizedAccessException("The original typed credential horizon ended.");
-            if ((original.PlanAssignment is not null || original.Governance is not null)
+            if ((original.PlanAssignment is not null || original.Governance is not null || original.Announcement is not null)
                 && (observed.Support.Forwarding.WasForwarded && !HumanSupportAccessProjection.Context(observed.Support, now).IsActive
                     || current.Support.Forwarding.WasForwarded && !HumanSupportAccessProjection.Context(current.Support, now).IsActive))
                 throw new UnauthorizedAccessException("The original typed support horizon ended.");
@@ -151,6 +161,25 @@ public sealed partial class HumanSettingsMutationPreparation
         }
         Check(observed);
         Time(clock.GetUtcNow());
+        if (original.Announcement is { } announcement)
+        {
+            var secured = announcement.Command;
+            var question = new AuthorizationRequest(
+                announcement.Producer == "announcement-tenant" ? ResourceKinds.TenantSetting : ResourceKinds.InstanceSetting,
+                secured.ResourceId!, announcementAction, Facts: secured.AuthorizationFacts);
+            if (route.Provider == HumanAuthorizationRouteProvider.CerbosInstance)
+            {
+                var decision = await cerbos.AuthorizePreparedHumanAsync(
+                    CerbosPrincipalBuilder.BuildPrincipalFromSources(observed.Principal), question, ambient,
+                    deployment.UsePolicyScope, route.Endpoint!, cancellationToken);
+                if (decision.ReasonCode == AuthorizationDecisionReasonCodes.ProviderUnavailable)
+                    throw new AuthorizationProviderUnavailableException(question.ResourceKind, question.Action);
+                if (!decision.IsAllowed) throw new AuthorizationException(question.ResourceKind, question.Action);
+            }
+            else if (route.Provider != HumanAuthorizationRouteProvider.Local)
+                throw new AuthorizationException(question.ResourceKind, question.Action);
+            Time(clock.GetUtcNow());
+        }
         if (original.PlanAssignment is { } planOriginal)
         {
             ISecureRequest secured = planOriginal;

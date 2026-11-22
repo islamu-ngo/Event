@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Announcements.Requests.Commands;
 using Explore.Application.Features.Appearance.Requests.Commands;
 using Explore.Application.Features.Authentication.Continuation.Requests.Commands;
 using Explore.Application.Features.Users.Requests.Commands;
@@ -26,6 +27,10 @@ internal static class PolicyMutationCommandScope
     internal static bool Handles(Type request) =>
         FooterOperationScope.Handles(request)
         || HandlesLearning(request)
+        || request == typeof(UpdateInstanceAnnouncementCommand)
+        || request == typeof(UpdateTenantAnnouncementCommand)
+        || request == typeof(UpdateManagedTenantAnnouncementCommand)
+        || request == typeof(DismissAnnouncementCommand)
         || request == typeof(UpdateCurrentUserAppearancePreferencesCommand)
         || request == typeof(JoinVerifiedTenantCommand)
         || request == typeof(UpdateLocalizationGovernanceCommand)
@@ -108,6 +113,16 @@ internal static class PolicyMutationCommandScope
             throw new UnauthorizedAccessException("Appearance preferences require the authenticated tenant."),
         JoinVerifiedTenantCommand command when command.TenantId != Guid.Empty => new(command.TenantId),
         JoinVerifiedTenantCommand => throw new UnauthorizedAccessException("Tenant joining requires an explicit target."),
+        UpdateInstanceAnnouncementCommand => PolicyMutationScope.MixedSettingsInstance,
+        UpdateTenantAnnouncementCommand command when command.TenantId == tenantContext?.TenantId =>
+            PolicyMutationScope.MixedSettingsTenant(command.TenantId),
+        UpdateTenantAnnouncementCommand =>
+            throw new UnauthorizedAccessException("Announcement publication requires the authenticated tenant."),
+        UpdateManagedTenantAnnouncementCommand command => PolicyMutationScope.ForManagedAnnouncement(command),
+        DismissAnnouncementCommand command when command.Observed.TenantId == tenantContext?.TenantId =>
+            new(command.Observed.TenantId),
+        DismissAnnouncementCommand =>
+            throw new UnauthorizedAccessException("Announcement dismissal requires the authenticated tenant."),
         UpdateLocalizationGovernanceCommand => PolicyMutationScope.Instance,
         UpdateUserLastActiveTenantCommand => PolicyMutationScope.Instance,
         SaveInstanceOnboardingProfileCommand => PolicyMutationScope.Instance,

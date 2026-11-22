@@ -400,12 +400,8 @@ public class SettingRegistryTests
             GovernanceSettingKeys.PublicExperience.Ctas,
             GovernanceSettingKeys.PublicExperience.EventSectionPresets,
             GovernanceSettingKeys.PublicExperience.DiscoveryAreas,
-            GovernanceSettingKeys.PublicExperience.AnnouncementBarEnabled,
-            GovernanceSettingKeys.PublicExperience.AnnouncementBarMessage,
-            GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkText,
-            GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkUrl,
-            GovernanceSettingKeys.PublicExperience.AnnouncementBarRevision,
-            GovernanceSettingKeys.PublicExperiencePreferences.AnnouncementBarDismissedRevision,
+            GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication,
+            GovernanceSettingKeys.PublicExperiencePreferences.AnnouncementBarDismissedEdition,
             GovernanceSettingKeys.HomeDiscoveryPreferences.AreaId,
             GovernanceSettingKeys.HomeDiscoveryPreferences.Mode,
         });
@@ -414,6 +410,30 @@ public class SettingRegistryTests
         {
             await Assert.That(SettingRegistry.Contains(key)).IsTrue();
         }
+
+        foreach (var retiredKey in new[]
+        {
+            "public_experience.announcement_bar.enabled",
+            "public_experience.announcement_bar.message",
+            "public_experience.announcement_bar.link_text",
+            "public_experience.announcement_bar.link_url",
+            "public_experience.announcement_bar.revision",
+            "public_experience_preferences.announcement_bar.dismissed_revision"
+        })
+        {
+            await Assert.That(SettingRegistry.Contains(retiredKey)).IsFalse();
+            await Assert.That(SettingRegistry.Get(retiredKey)).IsNull();
+        }
+
+        var publication = SettingRegistry.Get(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication);
+
+        await Assert.That(publication).IsNotNull();
+        await Assert.That(publication!.ValueType).IsEqualTo(SettingValueType.Json);
+        await Assert.That(publication.DefaultValue).IsEqualTo("null");
+        await Assert.That(publication.MinScope).IsEqualTo(SettingScope.Instance);
+        await Assert.That(publication.MaxScope).IsEqualTo(SettingScope.Tenant);
+        await Assert.That(publication.IsLockable).IsTrue();
+        await Assert.That(publication.RequiresCoordinatedMutation).IsTrue();
     }
 
     [Test]
@@ -430,9 +450,11 @@ public class SettingRegistryTests
     [Test]
     public async Task Registry_PublicExperienceDismissalPreferenceIsUserScoped()
     {
-        var definition = SettingRegistry.Get(GovernanceSettingKeys.PublicExperiencePreferences.AnnouncementBarDismissedRevision);
+        var definition = SettingRegistry.Get(GovernanceSettingKeys.PublicExperiencePreferences.AnnouncementBarDismissedEdition);
 
         await Assert.That(definition).IsNotNull();
+        await Assert.That(definition!.ValueType).IsEqualTo(SettingValueType.Json);
+        await Assert.That(definition.DefaultValue).IsEqualTo("null");
         await Assert.That(definition!.MinScope).IsEqualTo(SettingScope.User);
         await Assert.That(definition.MaxScope).IsEqualTo(SettingScope.User);
         await Assert.That(definition.IsLockable).IsFalse();

@@ -78,6 +78,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<LearningOnboardingCoordinator>();
         services.AddScoped<ILearningOnboardingCoordinator>(provider =>
             provider.GetRequiredService<LearningOnboardingCoordinator>());
+        services.AddScoped<IAnnouncementClientService, AnnouncementClientService>();
         services.AddScoped<AdmissionScannerCapabilityState>();
         services.AddScoped<IAdmissionScannerCapabilityState>(provider =>
             provider.GetRequiredService<AdmissionScannerCapabilityState>());

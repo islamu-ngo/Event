@@ -13,7 +13,11 @@ public sealed record ConfigurationManifestSettingCatalogEntry(
     ConfigurationManifestScope Scope,
     SettingDefinition Definition,
     int? MaximumStringLength = null,
-    ConfigurationManifestStringArrayDescriptor? StringArray = null);
+    ConfigurationManifestStringArrayDescriptor? StringArray = null,
+    ConfigurationManifestAnnouncementOperationDescriptor? AnnouncementOperation = null);
+
+/// <summary>Declares portable announcement intents; only the tenant scope permits inheritance.</summary>
+public sealed record ConfigurationManifestAnnouncementOperationDescriptor(ConfigurationManifestScope Scope);
 
 /// <summary>Declares JSON string-array items; null allowed values leave semantic constraints to the owning policy.</summary>
 public sealed record ConfigurationManifestStringArrayDescriptor

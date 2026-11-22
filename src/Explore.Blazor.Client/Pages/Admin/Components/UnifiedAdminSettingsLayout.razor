@@ -1,6 +1,7 @@
 @using MudBlazor
 @using Microsoft.AspNetCore.Components
 @using Explore.Blazor.Client.Services
+@using Explore.Blazor.Client.Contracts.Services
 @using Explore.Blazor.Client.Clients
 @using Explore.Blazor.Client.Components.Forms
 @using Explore.Blazor.Client.Constants
@@ -262,7 +263,8 @@ else
                         }
                         else if (_currentSection == "announcement-bar" && IsSingleTenantMode && _canManageTenant)
                         {
-                            <Explore.Blazor.Client.Pages.Admin.Tenant.Components.TenantAnnouncementBarSection Model="_tenantModel" HasExistingAnnouncementBar="_hasAnnouncementBar" />
+                            <Explore.Blazor.Client.Pages.Admin.Tenant.Components.TenantAnnouncementBarSection Model="_announcement" HasExistingAnnouncementBar="_hasAnnouncementBar"
+                                Disabled="_submitState.IsSubmitting || !CanSaveAnnouncement" />
                         }
                         else if (_currentSection == "public-experience" && IsSingleTenantMode && _canManageTenant)
                         {
@@ -341,25 +343,27 @@ else
                                         <MudButton Elevation="0" Variant="Variant.Outlined"
                                                    Color="Color.Error"
                                                    OnClick="RemoveAnnouncementBarAsync"
-                                                   Disabled="_submitState.IsSubmitting"
+                                                   Disabled="_submitState.IsSubmitting || !CanSaveAnnouncement"
                                                    StartIcon="@(_submitState.IsSubmitting ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.Delete)">
                                             @(_submitState.IsSubmitting ? "Saving..." : "Remove Announcement Bar")
                                         </MudButton>
                                     }
-                                    @if (_hasAnnouncementBar && HasUsableAnnouncementBar(_tenantModel))
+                                    @if (_hasAnnouncementBar && HasUsableAnnouncementBar(_announcement))
                                     {
                                         <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Outlined"
                                                    OnClick="@(() => SaveAsync(false))"
-                                                   Disabled="_submitState.IsSubmitting"
+                                                   Disabled="_submitState.IsSubmitting || !CanSaveAnnouncement"
                                                    StartIcon="@(_submitState.IsSubmitting ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.Save)">
                                             @(_submitState.IsSubmitting ? "Saving..." : "Save Text Update")
                                         </MudButton>
                                     }
                                     <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => SaveAsync(true))"
-                                               Disabled="_submitState.IsSubmitting"
+                                               Disabled="_submitState.IsSubmitting || !CanSaveAnnouncement"
                                                StartIcon="@(_submitState.IsSubmitting ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.Campaign)">
                                         @(_submitState.IsSubmitting ? "Saving..." : "Save and Show to Everyone")
                                     </MudButton>
+                                    <MudButton Variant="Variant.Text" OnClick="ReloadAnnouncementAsync"
+                                               Disabled="_submitState.IsSubmitting">Reload announcement source</MudButton>
                                 </MudStack>
                             }
                             else
@@ -405,6 +409,8 @@ else
     private AuthProviderConfigurationDto _authProviderModel = new();
     private AuthorizationProviderConfigurationDto _authorizationProviderModel = new();
     private TenantPolicySettingsDto _tenantModel = new();
+    private AnnouncementDraft _announcement = new();
+    private bool CanSaveAnnouncement => TenantPublicExperienceAdminService.CanSaveAnnouncement(_announcement);
     private TenantPublicExperienceAdminModel _publicExperienceModel = new();
     private Explore.Blazor.Client.Pages.Admin.Tenant.Components.TenantPublicExperienceSection? _publicExperienceSection;
     private AnalyticsGovernanceSettingsDto _analyticsModel = new();
@@ -544,8 +550,8 @@ else
         {
             _tenantModel = new TenantPolicySettingsDto();
             await TenantPublicExperienceAdminService.ApplySingleTenantPolicySettingsAsync(_tenantModel);
-            await TenantPublicExperienceAdminService.ApplyAnnouncementBarSettingsAsync(_tenantModel);
-            _hasAnnouncementBar = HasUsableAnnouncementBar(_tenantModel);
+            _announcement = await TenantPublicExperienceAdminService.GetAnnouncementAsync() ?? new();
+            _hasAnnouncementBar = _announcement.Original?.Source.Group?.Publication is not null;
             _publicExperienceModel = await TenantPublicExperienceAdminService.GetSettingsAsync();
         }
 
@@ -761,11 +767,18 @@ else
                 }));
                 break;
             case "announcement-bar" when IsSingleTenantMode && _canManageTenant:
+                if (!CanSaveAnnouncement)
+                {
+                    _submitState.Complete();
+                    return;
+                }
                 var hadAnnouncementBarBeforeSave = _hasAnnouncementBar;
                 PublicExperienceAdminSaveResult announcementResponse = await TenantPublicExperienceAdminService.SaveAnnouncementBarAsync(
-                    _tenantModel,
+                    _announcement,
                     forceAnnouncementBarRedisplay);
 
+                if (_localAccountsDisposed)
+                    return;
                 if (!announcementResponse.Success)
                 {
                     _submitState.Complete();
@@ -775,7 +788,7 @@ else
                     return;
                 }
 
-                _hasAnnouncementBar = HasUsableAnnouncementBar(_tenantModel);
+                _hasAnnouncementBar = _announcement.Original?.Source.Group?.Publication is not null;
                 _lastAnnouncementSaveStartedWithExistingBar = hadAnnouncementBarBeforeSave;
                 break;
         }
@@ -806,7 +819,8 @@ else
         }
 
         _submitState.Complete();
-        await RefreshShellExperienceAsync(openAiAssistantIfAvailable: ShouldOpenAiAssistantAfterSave());
+        if (_currentSection != "announcement-bar")
+            await RefreshShellExperienceAsync(openAiAssistantIfAvailable: ShouldOpenAiAssistantAfterSave());
 
         var successMessage = _currentSection == "announcement-bar"
             ? GetAnnouncementSaveMessage(_lastAnnouncementSaveStartedWithExistingBar, forceAnnouncementBarRedisplay)
@@ -852,10 +866,8 @@ else
 
     private async Task RemoveAnnouncementBarAsync()
     {
-        _tenantModel.AnnouncementBarEnabled = false;
-        _tenantModel.AnnouncementBarMessage = string.Empty;
-        _tenantModel.AnnouncementBarLinkText = string.Empty;
-        _tenantModel.AnnouncementBarLinkUrl = string.Empty;
+        if (!CanSaveAnnouncement)
+            return;
         _submitState.Start();
         _errorMessage = null;
 
@@ -865,15 +877,14 @@ else
             return;
         }
 
-        PublicExperienceAdminSaveResult response = await TenantPublicExperienceAdminService.SaveAnnouncementBarAsync(
-            _tenantModel,
-            forceRedisplay: false);
+        PublicExperienceAdminSaveResult response = await TenantPublicExperienceAdminService.RemoveAnnouncementOverrideAsync(_announcement);
+        if (_localAccountsDisposed)
+            return;
         _submitState.Complete();
 
         if (response.Success)
         {
             _hasAnnouncementBar = false;
-            await RefreshShellExperienceAsync();
             Snackbar.Add("Announcement bar removed.", Severity.Success);
             return;
         }
@@ -883,8 +894,17 @@ else
             : response.Message;
     }
 
-    private static bool HasUsableAnnouncementBar(TenantPolicySettingsDto model) =>
-        model.AnnouncementBarEnabled == true && !string.IsNullOrWhiteSpace(model.AnnouncementBarMessage);
+    private static bool HasUsableAnnouncementBar(AnnouncementDraft model) =>
+        model.Enabled && !string.IsNullOrWhiteSpace(model.Message);
+
+    private async Task ReloadAnnouncementAsync()
+    {
+        if (_submitState.IsSubmitting || _localAccountsDisposed)
+            return;
+        bool loaded = await TenantPublicExperienceAdminService.ReconcileAnnouncementAsync(_announcement);
+        if (!_localAccountsDisposed)
+            _errorMessage = loaded ? null : "The announcement source could not be reloaded. Your draft is unchanged.";
+    }
 
     private static string GetAnnouncementSaveMessage(bool hadAnnouncementBarBeforeSave, bool forceAnnouncementBarRedisplay)
     {

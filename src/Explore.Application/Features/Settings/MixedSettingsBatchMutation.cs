@@ -38,6 +38,8 @@ public sealed class MixedSettingsBatchMutation
     internal MixedSettingsBatchMutation(object issuer, UpdateSettingBatchCommand original,
         IHumanMixedSettingsSource source, IMixedSettingsBatchStore store, ISerializableAttemptOwner owner)
     {
+        if (original.Values.Keys.Any(AnnouncementSettingMutationGuard.Handles))
+            throw new UnauthorizedAccessException(AnnouncementSettingMutationGuard.FailureCode);
         this.issuer = issuer;
         Original = original;
         Source = source;
@@ -73,6 +75,8 @@ public sealed class MixedSettingsBatchMutation
 
     internal void Compile(UpdateSettingBatchCommand original, ImmutableDictionary<string, string> values)
     {
+        if (values.Keys.Any(AnnouncementSettingMutationGuard.Handles))
+            throw new UnauthorizedAccessException(AnnouncementSettingMutationGuard.FailureCode);
         if (!ReferenceEquals(original, Original) || accepted is not null || !active
             || values.Keys.Any(key => !Original.Values.ContainsKey(key)))
             throw new UnauthorizedAccessException("Mixed compilation must belong to its original active request.");

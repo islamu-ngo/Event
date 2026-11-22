@@ -26,6 +26,7 @@ public sealed class HumanSettingsDataBoundary(IServiceProvider selectedServices)
         string key, HumanSettingsMutationKind kind, string? value = null, bool? isLocked = null,
         Guid? auditActorId = null, CancellationToken cancellationToken = default)
     {
+        AnnouncementSettingMutationGuard.RejectGenericMutation(key);
         var lease = RequireOriginalOwner(dataOwner, auditActorId);
         var import = selectedServices.GetRequiredService<IHumanConfigurationImportAdmission>();
         if (import.CurrentProof is not null)

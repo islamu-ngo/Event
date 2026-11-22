@@ -6,6 +6,14 @@ namespace Explore.API.Hateoas;
 /// </summary>
 public static class RouteNames
 {
+    public const string GetInstanceAnnouncementSource = nameof(GetInstanceAnnouncementSource);
+    public const string GetTenantAnnouncementSource = nameof(GetTenantAnnouncementSource);
+    public const string GetManagedTenantAnnouncementSource = nameof(GetManagedTenantAnnouncementSource);
+    public const string GetMyAnnouncementDismissal = nameof(GetMyAnnouncementDismissal);
+    public const string UpdateInstanceAnnouncement = nameof(UpdateInstanceAnnouncement);
+    public const string UpdateTenantAnnouncement = nameof(UpdateTenantAnnouncement);
+    public const string UpdateManagedTenantAnnouncement = nameof(UpdateManagedTenantAnnouncement);
+    public const string DismissAnnouncement = nameof(DismissAnnouncement);
     public const string GetLearningContext = nameof(GetLearningContext);
     public const string GetLearningGuidancePolicy = nameof(GetLearningGuidancePolicy);
     public const string UpdateLearningGuidancePolicy = nameof(UpdateLearningGuidancePolicy);

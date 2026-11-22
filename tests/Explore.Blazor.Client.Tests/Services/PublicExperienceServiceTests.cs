@@ -181,7 +181,8 @@ public class PublicExperienceServiceTests
 
     [Test]
     [Arguments("tenant")]
-    [Arguments("revision")]
+    [Arguments("edition")]
+    [Arguments("epoch")]
     [Arguments("message")]
     [Arguments("link-text")]
     [Arguments("link-url")]
@@ -190,17 +191,39 @@ public class PublicExperienceServiceTests
     {
         var original = SettingsWithIdentity("Current directory") with
         {
-            TenantId = Guid.CreateVersion7(), AnnouncementBarEnabled = true,
-            AnnouncementBarRevision = 4, AnnouncementBarMessage = "Original"
+            TenantId = AnnouncementTestData.Tenant,
+            Announcement = AnnouncementTestData.Settings(message: "Original").Announcement
         };
+        var announcement = original.Announcement
+            ?? throw new InvalidOperationException("The fixture requires its public announcement.");
         var changed = field switch
         {
-            "tenant" => original with { TenantId = Guid.CreateVersion7() },
-            "revision" => original with { AnnouncementBarRevision = 5 },
-            "message" => original with { AnnouncementBarMessage = "Replacement" },
-            "link-text" => original with { AnnouncementBarLinkText = "Details" },
-            "link-url" => original with { AnnouncementBarLinkUrl = "/events" },
-            "enabled" => original with { AnnouncementBarEnabled = false },
+            "tenant" => original with
+            {
+                TenantId = AnnouncementTestData.OtherTenant,
+                Announcement = AnnouncementTestData.Settings(tenant: AnnouncementTestData.OtherTenant, message: "Original").Announcement
+            },
+            "edition" => original with
+            {
+                Announcement = AnnouncementTestData.Settings(edition: AnnouncementTestData.OtherEdition, message: "Original").Announcement
+            },
+            "epoch" => original with
+            {
+                Announcement = AnnouncementTestData.Settings(epoch: AnnouncementTestData.OtherEpoch, message: "Original").Announcement
+            },
+            "message" => original with { Announcement = announcement with
+            {
+                Material = new() { Message = "Replacement", LinkText = string.Empty, LinkUrl = string.Empty }
+            } },
+            "link-text" => original with { Announcement = announcement with
+            {
+                Material = new() { Message = "Original", LinkText = "Details", LinkUrl = string.Empty }
+            } },
+            "link-url" => original with { Announcement = announcement with
+            {
+                Material = new() { Message = "Original", LinkText = string.Empty, LinkUrl = "/events" }
+            } },
+            "enabled" => original with { Announcement = announcement with { IsVisible = false } },
             _ => throw new ArgumentOutOfRangeException(nameof(field))
         };
         _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
@@ -271,11 +294,13 @@ public class PublicExperienceServiceTests
         var response = new TaskCompletionSource<PublicExperienceSettingsDto>(TaskCreationOptions.RunContinuationsAsynchronously);
         var older = SettingsWithIdentity("Earlier directory") with
         {
-            TenantId = Guid.CreateVersion7(), AnnouncementBarRevision = 4
+            TenantId = AnnouncementTestData.Tenant, Announcement = AnnouncementTestData.Settings().Announcement
         };
         var newer = SettingsWithIdentity("Current directory") with
         {
-            TenantId = Guid.CreateVersion7(), AnnouncementBarRevision = 5
+            TenantId = AnnouncementTestData.OtherTenant,
+            Announcement = AnnouncementTestData.Settings(tenant: AnnouncementTestData.OtherTenant,
+                edition: AnnouncementTestData.OtherEdition).Announcement
         };
         _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
                 Arg.Any<CancellationToken>())
@@ -310,7 +335,9 @@ public class PublicExperienceServiceTests
         var response = new TaskCompletionSource<PublicExperienceSettingsDto>(TaskCreationOptions.RunContinuationsAsynchronously);
         var newer = SettingsWithIdentity("Current directory") with
         {
-            TenantId = Guid.CreateVersion7(), AnnouncementBarRevision = 5
+            TenantId = AnnouncementTestData.OtherTenant,
+            Announcement = AnnouncementTestData.Settings(tenant: AnnouncementTestData.OtherTenant,
+                edition: AnnouncementTestData.OtherEdition).Announcement
         };
         _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
                 Arg.Any<CancellationToken>())
@@ -358,11 +385,13 @@ public class PublicExperienceServiceTests
         var response = new TaskCompletionSource<PublicExperienceSettingsDto>(TaskCreationOptions.RunContinuationsAsynchronously);
         var earlier = SettingsWithIdentity("Earlier directory") with
         {
-            TenantId = Guid.CreateVersion7(), AnnouncementBarRevision = 4
+            TenantId = AnnouncementTestData.Tenant, Announcement = AnnouncementTestData.Settings().Announcement
         };
         var current = SettingsWithIdentity("Current directory") with
         {
-            TenantId = Guid.CreateVersion7(), AnnouncementBarRevision = 5
+            TenantId = AnnouncementTestData.OtherTenant,
+            Announcement = AnnouncementTestData.Settings(tenant: AnnouncementTestData.OtherTenant,
+                edition: AnnouncementTestData.OtherEdition).Announcement
         };
         _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
                 Arg.Any<CancellationToken>())
@@ -413,7 +442,9 @@ public class PublicExperienceServiceTests
         var secondResponse = new TaskCompletionSource<PublicExperienceSettingsDto>(TaskCreationOptions.RunContinuationsAsynchronously);
         var newer = SettingsWithIdentity("Current directory") with
         {
-            TenantId = Guid.CreateVersion7(), AnnouncementBarRevision = 5
+            TenantId = AnnouncementTestData.OtherTenant,
+            Announcement = AnnouncementTestData.Settings(tenant: AnnouncementTestData.OtherTenant,
+                edition: AnnouncementTestData.OtherEdition).Announcement
         };
         _apiClient.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
                 Arg.Any<CancellationToken>())
@@ -433,7 +464,10 @@ public class PublicExperienceServiceTests
         var second = _service.GetSettingsAsync();
         await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-        firstResponse.SetResult(SettingsWithIdentity("Earlier directory") with { AnnouncementBarRevision = 4 });
+        firstResponse.SetResult(SettingsWithIdentity("Earlier directory") with
+        {
+            TenantId = AnnouncementTestData.Tenant, Announcement = AnnouncementTestData.Settings().Announcement
+        });
 
         await Assert.That(await first.WaitAsync(TimeSpan.FromSeconds(10))).IsNull();
         await Assert.That(_service.SettingsAvailability).IsEqualTo(PublicExperienceAvailability.Unknown);

@@ -5,6 +5,8 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.TenantOnboarding.Requests.Commands;
 using Explore.Application.Notifications;
 using Explore.Application.Settings;
+using Explore.Application.Features.Announcements;
+using Explore.Domain.Settings;
 
 namespace Explore.Application.Features.Settings;
 
@@ -22,11 +24,14 @@ public sealed partial class TypedSettingsOriginal
 
     internal TypedSettingsOriginal(CompleteTenantOnboardingCommand command, Guid tenant)
     {
+        OnboardingAnnouncement = command.Settings.Announcement is null ? null
+            : AnnouncementTransportMapper.ToNative(command.Settings.Announcement, AnnouncementOwner.ForTenant(tenant));
         Onboarding = command with
         {
             Settings = command.Settings with
             {
-                AiAssistantAllowedModelIds = command.Settings.AiAssistantAllowedModelIds.ToImmutableArray()
+                AiAssistantAllowedModelIds = command.Settings.AiAssistantAllowedModelIds.ToImmutableArray(),
+                Announcement = OnboardingAnnouncement is null ? null : AnnouncementTransportMapper.ToDto(OnboardingAnnouncement)
             },
             DirectoryOperatorIdentity = command.DirectoryOperatorIdentity with { }
         };
@@ -46,7 +51,7 @@ public sealed partial class TypedSettingsOriginal
     public UpdateTenantReportingIntakePolicyCommand? Reporting { get; }
     public Guid Actor { get; }
     public Guid? TenantId { get; }
-    public string Producer => Governance?.Producer ?? (EventPolicy is not null ? "event-policy"
+    public string Producer => Announcement?.Producer ?? Governance?.Producer ?? (EventPolicy is not null ? "event-policy"
         : Onboarding is not null ? "tenant-onboarding" : PlanAssignment is not null ? "tenant-plan-assignment" : "reporting-intake");
     public string Serialize() => JsonSerializer.Serialize(this);
 }
@@ -63,6 +68,8 @@ public sealed record TypedSettingsEffect(string Key, string? Value, bool? IsLock
 /// </summary>
 public interface ITypedSettingsOriginalStore
 {
+    Task<(AnnouncementPublicationResult Result, ImmutableArray<SettingChangedNotification> DeferredNotifications)>
+        ApplyAnnouncementAsync(TypedSettingsOriginal original, CancellationToken cancellationToken);
     Task ObserveAsync(TypedSettingsOriginal original, IHumanMixedSettingsSource source,
         CancellationToken cancellationToken);
     Task<ImmutableArray<TypedSettingsEffect>> AcquireAndCompileAsync(

@@ -12,6 +12,7 @@ using Explore.Application.Features.PaidEventPolicies;
 using Explore.Application.Notifications;
 using Explore.Application.Settings;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Settings;
 using Explore.Domain.Settings.Documents;
 
@@ -32,6 +33,7 @@ public sealed class ConfigurationImportSectionApplier(
         ConfigurationImportPreviewRequest request, HumanConfigurationImportAuthority authority,
         DateTime occurredAt, string artifactDigest, ConfigurationImportArtifactParser parser,
         IHumanConfigurationImportPublicationFactory publicationFactory,
+        IHumanConfigurationImportAnnouncementFactory announcementFactory,
         OriginalLockGroups originalLocks,
         CancellationToken cancellationToken)
     {
@@ -40,7 +42,9 @@ public sealed class ConfigurationImportSectionApplier(
         var compiled = await CompileSectionsAsync(target, sourceBytes, request, authority.Subject,
             authority.Subject.PrincipalId, occurredAt, artifactDigest, parser, cancellationToken,
             effects => publicationFactory.ObservePublicationAsync(authority, operationId, artifactDigest,
-                effects, occurredAt, cancellationToken), originalLocks.Targets);
+                effects, occurredAt, cancellationToken), originalLocks.Targets,
+            intents => announcementFactory.ObserveAnnouncementAsync(authority, operationId, artifactDigest,
+                intents, occurredAt, cancellationToken));
         return new(this, operationId, authority.Subject, target, artifactDigest, compiled);
     }
 
@@ -60,9 +64,13 @@ public sealed class ConfigurationImportSectionApplier(
                         PublicationPolicyMutationKind.Set, effect.Value, group.Key,
                         group.Key.HasValue ? null : false)).ToImmutableArray(), compiled.PublicationStore))
                 .ToImmutableArray();
+        var announcementStore = compiled.AnnouncementStore;
+        var announcements = announcementStore is null ? ImmutableArray<HumanConfigurationImportAnnouncement>.Empty
+            : compiled.AnnouncementIntents.Select(intent => new HumanConfigurationImportAnnouncement(
+                original.OperationId, original.Subject, original.Target, original.Digest, intent, announcementStore)).ToImmutableArray();
         return new(original.OperationId, original.Subject, original.Target, original.Digest,
-            compiled.Effects, validateSources, token => compiled.Apply(publications, token),
-            publications, compiled.PublicationStore);
+            compiled.Effects, validateSources, token => compiled.Apply(publications, announcements, token),
+            publications, compiled.PublicationStore, announcements, announcementStore);
     }
 
     public Task<ImmutableArray<SettingChangedNotification>> ApplyAsync(
@@ -112,7 +120,7 @@ public sealed class ConfigurationImportSectionApplier(
     {
         var compiled = await CompileSectionsAsync(target, sourceBytes, request, subject, actorUserId,
             occurredAt, artifactDigest, parser, cancellationToken);
-        return await compiled.Apply([], cancellationToken);
+        return await compiled.Apply([], [], cancellationToken);
     }
 
     private async Task<CompiledSections> CompileSectionsAsync(
@@ -122,7 +130,9 @@ public sealed class ConfigurationImportSectionApplier(
         CancellationToken cancellationToken,
         Func<ImmutableArray<HumanConfigurationImportSettingEffect>, Task<IHumanConfigurationImportPublicationStore>>?
             observePublication = null,
-        ImmutableDictionary<string, Guid>? originalTargets = null)
+        ImmutableDictionary<string, Guid>? originalTargets = null,
+        Func<ImmutableArray<AnnouncementImportIntent>, Task<IHumanConfigurationImportAnnouncementStore>>?
+            observeAnnouncement = null)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(request);
@@ -139,6 +149,7 @@ public sealed class ConfigurationImportSectionApplier(
         ConfigurationManifestInstanceV1Alpha2? instance = null;
         var tenantSections = ImmutableArray.CreateBuilder<(Guid TenantId, ConfigurationManifestTenantSpecV1Alpha2 Spec)>();
         var effects = ImmutableArray.CreateBuilder<HumanConfigurationImportSettingEffect>();
+        var announcementIntents = ImmutableArray.CreateBuilder<AnnouncementImportIntent>();
         if (target.Scope == ConfigurationImportScope.Instance)
         {
             var parsed = parser.Parse(sourceBytes);
@@ -187,7 +198,12 @@ public sealed class ConfigurationImportSectionApplier(
             PublicationPolicySettingKeys.All.Contains(effect.Key, StringComparer.Ordinal)).ToImmutableArray();
         var publicationStore = observePublication is not null && !publicationEffects.IsEmpty
             ? await observePublication(publicationEffects) : null;
-        return new(frozenEffects, publicationStore, async (publications, token) =>
+        var intents = announcementIntents.ToImmutable();
+        if (!intents.IsEmpty && observeAnnouncement is null)
+            throw Blocked("announcement_original_import_required");
+        var announcementStore = !intents.IsEmpty && observeAnnouncement is not null
+            ? await observeAnnouncement(intents) : null;
+        return new(frozenEffects, publicationStore, intents, announcementStore, async (publications, announcements, token) =>
         {
             var notifications = ImmutableArray.CreateBuilder<SettingChangedNotification>();
             var ownedLegalDocuments = new List<LegalDocument>();
@@ -201,6 +217,8 @@ public sealed class ConfigurationImportSectionApplier(
                     tenant.Spec.Documents, tenant.Spec.LegalDocuments, selected, subject, operation,
                     actorUserId, occurredAt, artifactDigest, notifications, ownedLegalDocuments, token,
                     publications.SingleOrDefault(publication => publication.TenantId == tenant.TenantId));
+            foreach (var announcement in announcements)
+                notifications.AddRange(await announcement.Store.ApplyAsync(announcement, token));
             if (ownedLegalDocuments.Count > 0)
                 await legalDocuments.FlushConfigurationImportInCurrentTransactionAsync(transactionId, target,
                     target.Scope == ConfigurationImportScope.Instance
@@ -220,6 +238,13 @@ public sealed class ConfigurationImportSectionApplier(
             var scope = tenantId.HasValue ? SettingScope.Tenant : SettingScope.Instance;
             foreach (var pair in settings.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {
+                if (pair.Key == GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)
+                {
+                    var owner = tenantId.HasValue ? AnnouncementOwner.ForTenant(tenantId.Value) : AnnouncementOwner.Instance;
+                    announcementIntents.Add(new(owner, AnnouncementConfigurationProjection.Parse(owner, pair.Value)));
+                    continue;
+                }
+                AnnouncementSettingMutationGuard.RejectGenericMutation(pair.Key);
                 effects.Add(new(scope, tenantId, pair.Key, HumanSettingsMutationKind.SetValue, pair.Value.GetRawText()));
                 // These exact import boundaries replace the lock field with false. Resource
                 // value writes and tenant coordinated writes preserve it and get no lock grant.
@@ -233,7 +258,9 @@ public sealed class ConfigurationImportSectionApplier(
 
     internal sealed record CompiledSections(ImmutableArray<HumanConfigurationImportSettingEffect> Effects,
         IHumanConfigurationImportPublicationStore? PublicationStore,
-        Func<ImmutableArray<HumanConfigurationImportPublication>, CancellationToken,
+        ImmutableArray<AnnouncementImportIntent> AnnouncementIntents,
+        IHumanConfigurationImportAnnouncementStore? AnnouncementStore,
+        Func<ImmutableArray<HumanConfigurationImportPublication>, ImmutableArray<HumanConfigurationImportAnnouncement>, CancellationToken,
             Task<ImmutableArray<SettingChangedNotification>>> Apply);
 
     internal sealed class OriginalSections(ConfigurationImportSectionApplier compiler, Guid operationId,
@@ -380,6 +407,7 @@ public sealed class ConfigurationImportSectionApplier(
             ConfigurationManifestInstanceSettingMutation[] remaining =
             [.. source.Settings
                 .Where(pair => !EventResourceSettingMutationGuard.Handles(pair.Key)
+                    && pair.Key != GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication
                     && (publication is null || !PublicationPolicySettingKeys.All.Contains(pair.Key, StringComparer.Ordinal)))
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(pair => new ConfigurationManifestInstanceSettingMutation(
@@ -465,6 +493,7 @@ public sealed class ConfigurationImportSectionApplier(
             ConfigurationManifestTenantSettingMutation[] guarded = settings
                 .Where(pair => ConfigurationManifestCatalog.TenantSettings[pair.Key]
                     .Definition.RequiresCoordinatedMutation
+                    && pair.Key != GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication
                     && !EventResourceSettingMutationGuard.Handles(pair.Key))
                 .Select(Mutation)
                 .ToArray();

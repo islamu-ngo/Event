@@ -40,6 +40,41 @@ and query evaluation. Inspect phase timestamps before changing resources or
 rerunning; see [the measured budget](CI_CD_GOVERNANCE.md#required-repository-settings).
 Only the complete analysis for the selected head supplies scanner evidence.
 
+## Announcement Publication And Dismissal Recovery
+
+Announcement publications use coordinated values in the existing settings
+tables; account dismissals remain tenant/user-owned preferences. The approved
+PostgreSQL migrator installs the required native storage contracts and the new
+import owner's fixed RLS policies. First creation under existing FORCE RLS must
+preserve that protection; later policy or function drift is a refusal, not an
+instruction to disable RLS or reinstall over unexplained changes.
+
+Republish legacy scalar announcements through the typed editor. Do not convert
+integer markers into editions, backfill hashes, delete legacy rows or edit
+stored publication JSON to manufacture an edition. A content change or explicit
+redisplay creates a new material edition. Visibility alone preserves it.
+Removing a tenant override resumes inheritance, while disabling it keeps that
+tenant source selected and hides the bar.
+
+After a source/marker conflict, read the current source and private self state
+before another deliberate action. An uncertain save must be reconciled by reads,
+not automatically replayed under new tenant headers. Generic preference reset
+cannot erase the specialized account marker; signing in never imports a browser
+marker. Configuration artifacts contain semantic changes, not reusable runtime
+editions, source epochs or private dismissal evidence.
+
+Targeted verification uses `AnnouncementPublicationTests` in Domain,
+`AnnouncementTransportMappingTests`, `AnnouncementSettingValueCodecTests`,
+`AnnouncementConfigurationProjectionTests` and `AnnouncementOriginalCompilationTests`
+in Application; `AnnouncementEditionAdmissionTests` and the announcement cases
+of `HumanSettingsMutationPreparationTests` exercise real HTTP/original owners.
+`AnnouncementNativeProtocolTests.cs` contains the dedicated PostgreSQL storage
+cases. Seven affected client suites include actual generated-client request
+serialization, retained bar behavior and cache/editor/privacy boundaries.
+Build only the affected project, slice with its native TUnit tree-node filter,
+and record actual counts. These checks do not replace the programme's final
+provider/architecture matrix or separately recorded actual-host accessibility.
+
 ## Complete release-impact metadata
 
 For dependency-audit reproduction, restore the Standalone container profile with

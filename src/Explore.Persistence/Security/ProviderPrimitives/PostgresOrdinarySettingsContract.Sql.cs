@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Settings;
 using Explore.Domain;
@@ -188,6 +189,7 @@ public static partial class PostgresOrdinarySettingsContract
     }
 
     private static bool Specialized(string key) => AtprotoFederationSettingPolicy.IsDedicatedKey(key)
+        || key == GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication
         || EmailDeliverySettingKeys.Contains(key)
         || key.Trim().Equals(EventResourceProviderBindingDocument.SettingKey, StringComparison.OrdinalIgnoreCase)
         || EventResourceSettingMutationGuard.Handles(key) || VisitorAccessSettingMutationGuard.Handles(key)
@@ -362,6 +364,37 @@ public static partial class PostgresOrdinarySettingsContract
             """;
     }
 
+    private static string UnchangedBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        var sql = new HumanPrincipalSourceSql(context);
+        return $"""
+            DECLARE admitted {sql.Name(AttemptTable)}%ROWTYPE; p_tenant uuid; p_user uuid;
+            BEGIN
+                {Guard(context, enrollment)}
+                {AttemptRead(context, enrollment)}
+                IF p_key IS DISTINCT FROM {Text(GovernanceSettingKeys.PublicExperiencePreferences.AnnouncementBarDismissedEdition)}
+                    OR session_user <> {Text(enrollment.RuntimeLogin)} OR p_tenant IS NULL OR p_user IS NULL
+                    OR pg_catalog.jsonb_array_length(admitted.request->'Effects') <> 1
+                    OR pg_catalog.jsonb_array_length(admitted.request->'Keys') <> 2
+                    OR NOT (admitted.request->'Keys' ? {Text(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)})
+                    OR admitted.pending IS NOT NULL OR admitted.observed
+                    OR admitted.completed ? p_key
+                    OR NOT EXISTS (SELECT 1 FROM pg_catalog.jsonb_array_elements(admitted.request->'Effects') e
+                        WHERE e->>'Key' = p_key COLLATE "C"
+                            AND (e->>'Scope')::integer = {(int)SettingScope.User}
+                            AND (e->>'Operation')::integer = {(int)HumanSettingsOperation.UserSettings}
+                            AND (e->>'Kind')::integer = {(int)HumanSettingsMutationKind.SetValue}
+                            AND (e->>'TenantId')::uuid = p_tenant AND (e->>'UserId')::uuid = p_user)
+                    OR p_expected IS DISTINCT FROM admitted.image
+                    OR admitted.image IS DISTINCT FROM {ImageSql(context, "p_tenant", "p_user", "admitted.request->'Keys'")}
+                THEN RAISE EXCEPTION 'ordinary_settings_unchanged_image' USING ERRCODE = '42501'; END IF;
+                UPDATE {sql.Name(AttemptTable)} SET finished = false,
+                    completed = completed || pg_catalog.jsonb_build_object(p_key,'unchanged')
+                    WHERE attempt = admitted.attempt AND backend = admitted.backend;
+            END;
+            """;
+    }
+
     private static string ChangedBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var sql = new HumanPrincipalSourceSql(context);
@@ -441,6 +474,7 @@ public static partial class PostgresOrdinarySettingsContract
         "learning_retain" => LearningRetainBody(context, enrollment),
         "acquire" => AcquireBody(context, enrollment),
         "write" => WriteBody(context, enrollment),
+        "unchanged" => UnchangedBody(context, enrollment),
         "complete" => CompleteBody(context, enrollment, true),
         "verify" => CompleteBody(context, enrollment, false),
         "changed" => ChangedBody(context, enrollment),

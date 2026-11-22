@@ -197,11 +197,11 @@ public sealed partial class MixedSettingsNativeContractTests
     [Arguments("missing-cleanup")]
     [Arguments("ceiling-key")]
     [Arguments("tenant-lock")]
-    [Arguments("revision")]
+    [Arguments("unrequested-announcement")]
     public async Task TypedNativeOnboardingFootprintIsClosedToItsOriginalProducer(string change)
     {
         var seeded = await SeedAsync();
-        var settings = new UpdateTenantPolicyRequest { ForceAnnouncementBarRedisplay = true };
+        var settings = new UpdateTenantPolicyRequest();
         var command = new CompleteTenantOnboardingCommand
         {
             UserId = seeded.Actor,
@@ -232,15 +232,12 @@ public sealed partial class MixedSettingsNativeContractTests
             .First(row => row.GetProperty(nameof(SystemSetting.AllowedValues)).ValueKind == JsonValueKind.Array);
         await Assert.That(system[constrained.GetProperty(nameof(SystemSetting.SettingKey)).GetString()!].AllowedValues)
             .IsEqualTo(constrained.GetProperty(nameof(SystemSetting.AllowedValues)).GetRawText());
-        var effects = TenantPolicySettingService.CompileOriginal(settings, system, "native-original", null).ToList();
+        var effects = TenantPolicySettingService.CompileOriginal(settings, system, "native-original", null, null, null).ToList();
         if (change == "missing-cleanup") effects.RemoveAll(effect => effect.Key == GovernanceSettingKeys.Domains.TenantCustomDomain);
         if (change == "ceiling-key") effects.Add(new(GovernanceSettingKeys.Domains.AllowTenantCustomDomain, "true"));
         if (change == "tenant-lock") effects[0] = effects[0] with { IsLocked = true };
-        if (change == "revision")
-        {
-            int revision = effects.FindIndex(effect => effect.Key == GovernanceSettingKeys.PublicExperience.AnnouncementBarRevision);
-            effects[revision] = effects[revision] with { Value = "2" };
-        }
+        if (change == "unrequested-announcement")
+            effects.Add(new(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication, "{}"));
         await using var owner = await caller.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         await ReadTypedAsync(caller, seeded, request, before);
         Task compile = TypedCallAsync(caller, "typed_compile", JsonSerializer.Serialize(effects), request);
@@ -293,7 +290,7 @@ public sealed partial class MixedSettingsNativeContractTests
         var data = JsonNode.Parse(before)!["Data"]!;
         var system = MixedSettingsDataImage.Rows<SystemSetting>(data.ToJsonString())
             .ToDictionary(row => row.SettingKey, StringComparer.Ordinal);
-        var effects = TenantPolicySettingService.CompileOriginal(settings, system, "native-original", null);
+        var effects = TenantPolicySettingService.CompileOriginal(settings, system, "native-original", null, null, null);
         await Assert.That(effects.Single(effect => effect.Key == key).Remove).IsTrue();
         var old = data[nameof(TenantSetting)]!.AsArray().OfType<JsonObject>()
             .SingleOrDefault(row => row[nameof(TenantSetting.SettingKey)]!.GetValue<string>() == key);

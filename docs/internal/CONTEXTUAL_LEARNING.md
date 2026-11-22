@@ -189,17 +189,80 @@ reentrant refresh or reset cannot expose the superseded identity to its caller.
 
 `AnnouncementBar` loads preferences after its first interactive render,
 subscribes to account/settings changes and invalidates pending work on disposal.
-A replacement settings load blocks dismissal of the previous revision.
+A replacement settings load blocks dismissal of the previous observation.
 The preference service shares one module acquisition; disposal rejects later
 work and releases a pending import once it completes, exactly once.
 
-Dismissal hides the bar only when the batch succeeds and exactly one matching
-`public_experience_preferences.announcement_bar.dismissed_revision` result is
-applied. Missing, duplicate, null, failed or unapplied results leave the bar
-visible with a status message; another explicit close action can retry.
-This browser repair retains the integer revision contract. Server-issued
-material editions and coordinated inherited publication remain separate work;
-neither this source integration nor component mocks prove actual-host behavior.
+`AnnouncementClientService` consumes the generated `IAnnouncementsClient`.
+Authenticated dismissal uses the private self resource and its HAL action,
+not a generic settings batch. Anonymous markers remain local under the
+tenant-scoped dismissed-edition key and are never merged into an account.
+Generic settings paths neither read nor write the protected announcement slots.
+An uncertain mutation is reconciled by reads, never automatically replayed.
+Only a confirmed result for the still-current account, tenant and observation
+may hide the bar. After change callbacks run, dismissal reports success only if
+it still owns the displayed state. A newer read that replaces the display
+supersedes that success even if the dismissal identity is unchanged. Component
+mocks do not certify actual-host behavior.
+
+Dismissal transport ownership survives public-settings invalidation and remains
+bound to its captured announcement identity. A refreshed view may display a
+replacement edition, but it cannot dispatch the same pending dismissal again.
+An unconfirmed attempt records uncertainty for the original tenant, owner and
+material edition, whether the replacement read completes before or after
+settlement. A tenant override remains independently dismissible, and removing
+it does not clear uncertainty for the inherited edition. A source epoch change
+alone does not change dismissal identity. The bar offers reconciliation only
+for the displayed identity, and an explicit read can clear only uncertainty
+for that identity already recorded when the read started.
+Publication keeps its pending write gate through public refresh too.
+An attempted publication that is canceled or uncertain requires an explicit
+source read before publishing can be offered again. Late cancellation fences
+only the source still owned by that attempt after change callbacks; it does not
+invalidate a newer explicit source read. Authentication replacement invalidates
+the former account's ownership.
+
+## Announcement Material Editions And Source Ownership
+
+The publication group is a coordinated source value, not independently
+replaceable enabled/message/link/revision scalars. Instance and tenant groups
+each retain an opaque source epoch, including an empty tenant tombstone after
+override removal. Publishing changed material or explicit redisplay issues a new
+material edition; visibility and lock transitions preserve that edition while
+advancing the affected source epoch.
+
+Resolution selects a complete owner publication. A disabled tenant publication
+suppresses instance fallback. Removing that publication resumes inheritance;
+an instance lock can mask the tenant source without destroying it. Dismissal
+identity is `(current tenant, selected owner, material edition)`, while admission
+also verifies the captured source epochs. Thus same-edition hide/show or
+remove/restore cycles reject an old observation without redisplaying content
+already dismissed under the same identity.
+
+The private command binds the current authenticated user and selected tenant
+server-side. It compares the observed publication and expected persisted marker
+inside the acquired original settings frame. An already-matching marker returns
+without rewriting its row or audit fields; stale observations and marker
+conflicts do not write. Ordinary reset cannot erase this specialized marker.
+Legacy integer markers are neither interpreted as editions nor backfilled.
+
+Source-specific publication requests capture their original source and carry an
+explicit change. Onboarding without announcement intent cannot republish
+inherited material. Configuration artifacts carry semantic changes, not runtime
+epochs, editions or private markers. C# owns compilation, decisions and private
+completion; provider primitives supply the acquired storage boundary.
+
+Announcement import admission also requires an internally issued ownership
+reference for the exact store object. The native factory registers its selected
+owner, issuer and original authority with concrete validation/completion
+callbacks; a public factory forwarding a genuine subject cannot attest a fake
+store. Joined proofs and finalizers retain that reference and recheck the live
+native owner. The weak-key registry records provenance, not cached successful
+authorization or permission to reuse an ended credential lifetime.
+
+The C10b verification ledger records actual commands and remaining acceptance
+gates. API schema generation and source compilation alone do not certify HTTP,
+generated-client serialization, native provider behavior or hosted UI.
 
 ## C04 Semantic Tour Contract
 

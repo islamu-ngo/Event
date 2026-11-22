@@ -82,6 +82,7 @@ internal sealed record OrdinarySettingsDataImage(
 {
     internal static string[] Keys(OrdinarySettingsMutation mutation) =>
         mutation.Effects.Where(effect => !AtprotoFederationSettingPolicy.IsDedicatedKey(effect.Key)).Select(effect => effect.Key)
+            .Concat(mutation.ReadKeys)
             .Concat(mutation.RequiresTenantVerificationCeiling
                 ? [GovernanceSettingKeys.Organizations.TenantCanOmitVerification] : Array.Empty<string>())
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();

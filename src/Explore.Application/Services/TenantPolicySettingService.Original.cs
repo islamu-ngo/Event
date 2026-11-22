@@ -4,6 +4,8 @@ using Explore.Application.DTOs.TenantPolicy;
 using Explore.Application.Features.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
+using Explore.Domain.Settings;
+using Explore.Application.Features.Announcements;
 
 namespace Explore.Application.Services;
 
@@ -24,11 +26,7 @@ public partial class TenantPolicySettingService
         GovernanceSettingKeys.Routing.DefaultPublicHomePage,
         GovernanceSettingKeys.Domains.TenantSubdomain,
         GovernanceSettingKeys.Domains.TenantCustomDomain,
-        GovernanceSettingKeys.PublicExperience.AnnouncementBarEnabled,
-        GovernanceSettingKeys.PublicExperience.AnnouncementBarMessage,
-        GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkText,
-        GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkUrl,
-        GovernanceSettingKeys.PublicExperience.AnnouncementBarRevision,
+        GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication,
         GovernanceSettingKeys.Policies.CommunityGuidelinesContent,
         GovernanceSettingKeys.Routing.RenderPolicy.Preset,
         GovernanceSettingKeys.Routing.RenderPolicy.AdvancedEnabled,
@@ -52,12 +50,13 @@ public partial class TenantPolicySettingService
     ];
 
     /// <summary>
-    /// Compiles the original onboarding policy only from its acquired ceilings, tenant slug,
-    /// and revision. The result is data; it cannot acquire or complete a persistence owner.
+    /// Compiles onboarding from acquired ceilings, source state and owner-supplied tokens.
+    /// The result is data; it cannot acquire or complete a persistence owner.
     /// </summary>
     public static ImmutableArray<TypedSettingsEffect> CompileOriginal(
         UpdateTenantPolicyRequest settings, IReadOnlyDictionary<string, SystemSetting> system,
-        string? tenantSlug, string? announcementRevision)
+        string? tenantSlug, AnnouncementSourceSnapshot? announcementSource,
+        Guid? allocatedEdition, Guid? allocatedSelectionEpoch)
     {
         var effects = ImmutableArray.CreateBuilder<TypedSettingsEffect>();
         SystemSetting? Row(string key) => system.GetValueOrDefault(key);
@@ -116,13 +115,29 @@ public partial class TenantPolicySettingService
             NormalizeSubdomain(settings.Subdomain) ?? NormalizeSubdomain(tenantSlug) ?? "default");
         Text(GovernanceSettingKeys.Domains.TenantCustomDomain, NormalizeOptionalHost(settings.CustomDomain),
             Boolean(GovernanceSettingKeys.Domains.AllowTenantCustomDomain, true));
-        Bool(GovernanceSettingKeys.PublicExperience.AnnouncementBarEnabled, settings.AnnouncementBarEnabled);
-        Text(GovernanceSettingKeys.PublicExperience.AnnouncementBarMessage, settings.AnnouncementBarMessage);
-        Text(GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkText, settings.AnnouncementBarLinkText);
-        Text(GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkUrl, settings.AnnouncementBarLinkUrl);
-        if (settings.ForceAnnouncementBarRedisplay)
-            Set(GovernanceSettingKeys.PublicExperience.AnnouncementBarRevision,
-                JsonSerializer.Serialize(DeserializeInteger(announcementRevision, 0) + 1));
+        if (settings.Announcement is { } announcement)
+        {
+            if (announcementSource is null || announcementSource.Owner.TenantId is null)
+                throw new ArgumentException("Onboarding publication requires its acquired tenant source.", nameof(announcementSource));
+            var update = AnnouncementTransportMapper.ToNative(announcement, announcementSource.Owner);
+            if (update.Expected != announcementSource)
+                throw new ArgumentException("The announcement source changed before onboarding publication.");
+            if (update.Change is AnnouncementChange.SetLock)
+                throw new ArgumentException("Announcement locks require their dedicated original command.");
+            bool changed = AnnouncementPublicationPolicy.RequiresSelectionEpoch(
+                announcementSource.Group, announcementSource.IsLocked, update.Change);
+            if (changed && (announcementSource.IsLocked
+                || Row(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)?.IsLocked == true))
+                throw new UnauthorizedAccessException("The acquired announcement source is locked.");
+            var write = AnnouncementPublicationPolicy.Apply(announcementSource.Owner, announcementSource.Group,
+                announcementSource.IsLocked, update.Change, allocatedEdition, allocatedSelectionEpoch);
+            if (changed)
+                effects.Add(new(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication,
+                    AnnouncementSettingValueCodec.SerializeGroup(write.Group
+                        ?? throw new InvalidOperationException("An announcement transition must retain its source group."))));
+        }
+        else if (allocatedEdition.HasValue || allocatedSelectionEpoch.HasValue)
+            throw new ArgumentException("Onboarding without announcement intent cannot consume publication tokens.");
         Text(GovernanceSettingKeys.Policies.CommunityGuidelinesContent, settings.CommunityGuidelinesContent);
 
         bool render = !multi || Boolean(GovernanceSettingKeys.Routing.RenderPolicy.AllowTenantOverride, false);

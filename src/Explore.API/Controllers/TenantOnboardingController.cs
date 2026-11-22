@@ -22,6 +22,8 @@ namespace Explore.API.Controllers;
 [ApiController]
 [EndpointClassification(EndpointClass.Authenticated)]
 [RequireMultiTenant]
+[PrivateNoStore]
+[OutputCache(NoStore = true)]
 public class TenantOnboardingController : EventControllerBase
 {
     private static readonly ApiValidationProblemDescriptor CompleteValidationProblem = new(

@@ -5,6 +5,8 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
+using Explore.Application.Features.Announcements;
+using Explore.Application.Features.Announcements.Requests.Commands;
 using Explore.Application.Features.Appearance.Requests.Commands;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
@@ -132,12 +134,13 @@ public sealed class OrdinarySettingsMutationStore(
     {
         await VerifyAsync(source, cancellationToken);
         var issued = RequireIssued(source);
+        if (issued.Mutation.Original is DismissAnnouncementCommand && !issued.DismissalInvoked)
+            throw new UnauthorizedAccessException("The original dismissal has not privately completed.");
+        foreach (var effect in issued.Mutation.Effects.Where(effect => !AtprotoFederationSettingPolicy.IsDedicatedKey(effect.Key)))
+            if (!issued.CompletedKeys.Contains(effect.Key) && !ProvesRefusal(issued, effect))
+                throw new UnauthorizedAccessException("An accepted ordinary effect has no private completion or excluded refusal.");
         if (issued.NativeAttempt is not null)
             await PostgresOrdinarySettingsContract.RequireCompleteAsync(issued.NativeAttempt, issued.Expected!, cancellationToken);
-        else
-            foreach (var effect in issued.Mutation.Effects.Where(effect => !AtprotoFederationSettingPolicy.IsDedicatedKey(effect.Key)))
-                if (!issued.CompletedKeys.Contains(effect.Key) && !ProvesRefusal(issued, effect))
-                    throw new UnauthorizedAccessException("An accepted ordinary effect has no private completion or excluded refusal.");
     }
 
     public async Task VerifyAsync(IOrdinarySettingsSource source, CancellationToken cancellationToken)
@@ -340,6 +343,61 @@ public sealed class OrdinarySettingsMutationStore(
         catch { issued.State = 2; throw; }
     }
 
+    public async Task<AnnouncementDismissalResult> ApplyAnnouncementDismissalAsync(
+        IOrdinarySettingsSource source, DismissAnnouncementCommand original, CancellationToken cancellationToken)
+    {
+        var issued = RequireIssued(source);
+        try
+        {
+            var preparation = services.GetRequiredService<IHumanSettingsMutationPreparation>();
+            issued.RequireAcquired();
+            if (!ReferenceEquals(issued.Mutation.Original, original)
+                || !ReferenceEquals(preparation.CurrentOrdinarySource, source) || issued.DismissalInvoked
+                || issued.Subject.PrincipalId != original.ActorUserId || issued.TenantId != original.Observed.TenantId)
+                throw new UnauthorizedAccessException("Dismissal requires its exact active original owner.");
+            issued.DismissalInvoked = true;
+            await VerifyAsync(source, cancellationToken);
+            string publicationKey = GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication;
+            string markerKey = GovernanceSettingKeys.PublicExperiencePreferences.AnnouncementBarDismissedEdition;
+            var image = issued.Expected!;
+            var system = image.System[publicationKey];
+            var tenant = image.Tenant[publicationKey];
+            var markerRow = image.User[markerKey];
+            var resolved = AnnouncementPublicationPolicy.Resolve(original.Observed.TenantId,
+                new(AnnouncementOwner.Instance, AnnouncementSettingValueCodec.DeserializeGroup(system?.Value), system?.Locked ?? false),
+                new(AnnouncementOwner.ForTenant(original.Observed.TenantId),
+                    AnnouncementSettingValueCodec.DeserializeGroup(tenant?.Value), tenant?.Locked ?? false));
+            var marker = AnnouncementSettingValueCodec.DeserializeMarker(markerRow?.Value);
+            if (marker is not null && marker.Observation.TenantId != original.Observed.TenantId)
+                throw new ArgumentException("The stored dismissal marker belongs to another tenant.");
+            var decision = AnnouncementPublicationPolicy.DecideDismissal(
+                original.Observed, resolved, original.ExpectedMarker, marker);
+            if (decision != AnnouncementDismissalDecision.Apply)
+            {
+                if (!issued.CompletedKeys.Add(markerKey))
+                    throw new UnauthorizedAccessException("The original dismissal cannot complete twice.");
+                if (issued.NativeAttempt is { } attempt)
+                    await PostgresOrdinarySettingsContract.CompleteUnchangedAsync(
+                        attempt, markerKey, image, cancellationToken);
+                await VerifyAsync(source, cancellationToken);
+                return new(decision, marker);
+            }
+
+            var replacement = new AnnouncementDismissalMarker(original.Observed);
+            issued.DismissalWriting = true;
+            try
+            {
+                await WriteUserAsync(source, original.Observed.TenantId, original.ActorUserId, markerKey,
+                    markerRow is null ? OrdinaryUserPreferenceWrite.Create : OrdinaryUserPreferenceWrite.Update,
+                    AnnouncementSettingValueCodec.SerializeMarker(replacement), cancellationToken);
+            }
+            finally { issued.DismissalWriting = false; }
+            await VerifyAsync(source, cancellationToken);
+            return new(decision, replacement);
+        }
+        catch { issued.State = 2; throw; }
+    }
+
     public async Task<UserPreference?> WriteUserAsync(IOrdinarySettingsSource source, Guid tenantId,
         Guid userId, string key, OrdinaryUserPreferenceWrite operation, string? value, CancellationToken cancellationToken)
     {
@@ -403,6 +461,10 @@ public sealed class OrdinarySettingsMutationStore(
         try
         {
             var preparation = services.GetRequiredService<IHumanSettingsMutationPreparation>();
+            if (AnnouncementSettingMutationGuard.Handles(key)
+                && (key != GovernanceSettingKeys.PublicExperiencePreferences.AnnouncementBarDismissedEdition
+                    || issued.Mutation.Original is not DismissAnnouncementCommand || !issued.DismissalWriting))
+                throw new UnauthorizedAccessException(AnnouncementSettingMutationGuard.FailureCode);
             if (!ReferenceEquals(preparation.CurrentOrdinarySource, source))
                 throw new UnauthorizedAccessException("Ordinary writes require their original issuer's active callback.");
             await preparation.RequireCurrentOwnedAsync(scope, tenantId, userId, key, kind, value, locked, token);
@@ -560,6 +622,8 @@ public sealed class OrdinarySettingsMutationStore(
         internal PostgresOrdinarySettingsContract.IAttempt? NativeAttempt { get; set; }
         internal DbTransaction? Transaction { get; set; }
         internal bool Writing { get; set; }
+        internal bool DismissalInvoked { get; set; }
+        internal bool DismissalWriting { get; set; }
         internal int State;
 
         internal void RequireSelection()

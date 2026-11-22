@@ -17,12 +17,16 @@ public static partial class PostgresMixedSettingsContract
     private static string TypedRequestGuard => $"""
         IF p_request IS NULL OR pg_catalog.jsonb_typeof(p_request) IS DISTINCT FROM 'object'
             OR (SELECT count(*) FROM pg_catalog.jsonb_object_keys(p_request)) <>
-                (CASE WHEN p_request->>'Producer' = 'tenant-plan-assignment' OR p_request ? 'Governance' THEN 7 ELSE 6 END)
+                (CASE WHEN p_request->>'Producer' = 'tenant-plan-assignment'
+                    OR p_request ? 'Governance' OR p_request ? 'Announcement' THEN 7 ELSE 6 END)
             OR p_request->>'Producer' NOT IN ('event-policy','tenant-onboarding','reporting-intake','tenant-plan-assignment',
+                'announcement-instance','announcement-tenant','announcement-managed-tenant',
                 {string.Join(",", GovernanceFamilies.Select(pair => Text(pair.Producer)))})
             OR p_request->>'Producer' IS NULL
             OR (p_request ? 'Governance') IS DISTINCT FROM
                 (p_request->>'Producer' IN ({string.Join(",", GovernanceFamilies.Select(pair => Text(pair.Producer)))}))
+            OR (p_request ? 'Announcement') IS DISTINCT FROM
+                (p_request->>'Producer' IN ('announcement-instance','announcement-tenant','announcement-managed-tenant'))
             OR (p_request->>'TenantId')::uuid IS DISTINCT FROM p_tenant
             OR (p_request->>'Actor')::uuid IS NULL
             OR (p_request->>'Actor')::uuid = '00000000-0000-0000-0000-000000000000'::uuid
@@ -51,6 +55,24 @@ public static partial class PostgresMixedSettingsContract
                     OR (p_request->'PlanAssignment'->>'TenantId')::uuid IS DISTINCT FROM p_tenant
                     OR (p_request->'PlanAssignment'->>'AssignmentId')::uuid IS NULL
                     OR (p_request->'PlanAssignment'->>'AssignmentId')::uuid = '00000000-0000-0000-0000-000000000000'::uuid
+                    OR p_request->'EventPolicy' IS DISTINCT FROM 'null'::jsonb
+                    OR p_request->'Onboarding' IS DISTINCT FROM 'null'::jsonb
+                    OR p_request->'Reporting' IS DISTINCT FROM 'null'::jsonb
+                WHEN 'announcement-instance' THEN p_tenant IS NOT NULL
+                    OR pg_catalog.jsonb_typeof(p_request->'Announcement'->'Input') IS DISTINCT FROM 'object'
+                    OR p_request->'Announcement'->>'Producer' IS DISTINCT FROM p_request->>'Producer'
+                    OR p_request->'EventPolicy' IS DISTINCT FROM 'null'::jsonb
+                    OR p_request->'Onboarding' IS DISTINCT FROM 'null'::jsonb
+                    OR p_request->'Reporting' IS DISTINCT FROM 'null'::jsonb
+                WHEN 'announcement-tenant' THEN p_tenant IS NULL
+                    OR pg_catalog.jsonb_typeof(p_request->'Announcement'->'Input') IS DISTINCT FROM 'object'
+                    OR p_request->'Announcement'->>'Producer' IS DISTINCT FROM p_request->>'Producer'
+                    OR p_request->'EventPolicy' IS DISTINCT FROM 'null'::jsonb
+                    OR p_request->'Onboarding' IS DISTINCT FROM 'null'::jsonb
+                    OR p_request->'Reporting' IS DISTINCT FROM 'null'::jsonb
+                WHEN 'announcement-managed-tenant' THEN p_tenant IS NULL
+                    OR pg_catalog.jsonb_typeof(p_request->'Announcement'->'Input') IS DISTINCT FROM 'object'
+                    OR p_request->'Announcement'->>'Producer' IS DISTINCT FROM p_request->>'Producer'
                     OR p_request->'EventPolicy' IS DISTINCT FROM 'null'::jsonb
                     OR p_request->'Onboarding' IS DISTINCT FROM 'null'::jsonb
                     OR p_request->'Reporting' IS DISTINCT FROM 'null'::jsonb
@@ -162,7 +184,7 @@ public static partial class PostgresMixedSettingsContract
                 """;
         return $"""
             DECLARE admitted {sql.Name(AttemptTable)}%ROWTYPE; effect jsonb; key text; patch jsonb; original_effects jsonb;
-                stored_revision text; revision integer; locked boolean; input_name text; email_time timestamptz;
+                locked boolean; input_name text; email_time timestamptz;
             BEGIN
                 {Guard(context, enrollment)}
                 {Caller(enrollment, true)}
@@ -173,6 +195,7 @@ public static partial class PostgresMixedSettingsContract
                 IF NOT FOUND OR admitted.request IS DISTINCT FROM p_request OR admitted.accepted IS NOT NULL
                     OR pg_catalog.jsonb_typeof(p_accepted) IS DISTINCT FROM 'array'
                     OR pg_catalog.jsonb_array_length(p_accepted) = 0 AND p_request->>'Producer' <> 'tenant-plan-assignment'
+                        AND NOT (p_request ? 'Announcement')
                     OR (SELECT count(*) FROM pg_catalog.jsonb_array_elements(p_accepted)) <>
                         (SELECT count(DISTINCT e->>'Key') FROM pg_catalog.jsonb_array_elements(p_accepted) e)
                 THEN RAISE EXCEPTION 'typed_settings_original_compilation' USING ERRCODE = '42501'; END IF;
@@ -184,12 +207,17 @@ public static partial class PostgresMixedSettingsContract
                         (SELECT pg_catalog.jsonb_agg(value ORDER BY value->>'Key') FROM pg_catalog.jsonb_array_elements(p_accepted))
                     THEN RAISE EXCEPTION 'typed_settings_patch_substituted' USING ERRCODE = '42501'; END IF;
                 ELSIF p_request->>'Producer' = 'tenant-onboarding' THEN
-                    IF ARRAY(SELECT value->>'Key' FROM pg_catalog.jsonb_array_elements(p_accepted) ORDER BY value->>'Key')
+                    IF ARRAY(SELECT value->>'Key' FROM pg_catalog.jsonb_array_elements(p_accepted)
+                            WHERE value->>'Key' <> {Text(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)}
+                            ORDER BY value->>'Key')
                         IS DISTINCT FROM ARRAY(SELECT requested.setting_key
                             FROM unnest(ARRAY[{string.Join(",", TenantPolicySettingService.OriginalWriteKeys.Select(Text))}]::text[]) AS requested(setting_key)
-                            WHERE requested.setting_key <> {Text(GovernanceSettingKeys.PublicExperience.AnnouncementBarRevision)}
-                                OR p_request->'Onboarding'->'Settings'->'ForceAnnouncementBarRedisplay' = 'true'::jsonb ORDER BY requested.setting_key)
+                            WHERE requested.setting_key <> {Text(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)}
+                            ORDER BY requested.setting_key)
                     THEN RAISE EXCEPTION 'typed_settings_onboarding_footprint_changed' USING ERRCODE = '42501'; END IF;
+                ELSIF p_request ? 'Announcement' THEN
+                    IF pg_catalog.jsonb_array_length(p_accepted) > 1
+                    THEN RAISE EXCEPTION 'typed_settings_announcement_footprint_changed' USING ERRCODE = '42501'; END IF;
                 ELSIF p_request->>'Producer' = 'tenant-plan-assignment' THEN
                     {PlanCompile(context)}
                 ELSIF p_request ? 'Governance' THEN
@@ -207,8 +235,12 @@ public static partial class PostgresMixedSettingsContract
                         OR key IS NULL OR effect->'Remove' IS DISTINCT FROM (effect->'Value' = 'null'::jsonb)::text::jsonb
                         OR (effect->'Value' <> 'null'::jsonb AND pg_catalog.jsonb_typeof(effect->'Value') <> 'string')
                         OR p_tenant IS NOT NULL AND p_request->>'Producer' <> 'tenant-plan-assignment'
+                            AND NOT (p_request ? 'Announcement')
                             AND effect->'IsLocked' IS DISTINCT FROM 'null'::jsonb
                         OR p_tenant IS NULL AND pg_catalog.jsonb_typeof(effect->'IsLocked') IS DISTINCT FROM 'boolean'
+                        OR p_tenant IS NOT NULL AND p_request ? 'Announcement'
+                            AND effect->'IsLocked' <> 'null'::jsonb
+                            AND pg_catalog.jsonb_typeof(effect->'IsLocked') IS DISTINCT FROM 'boolean'
                         OR (CASE p_request->>'Producer'
                             WHEN 'event-policy' THEN key NOT IN ({string.Join(",", instanceKeys.Select(Text))}) OR effect->'Remove' = 'true'::jsonb
                             WHEN 'tenant-onboarding' THEN key NOT IN ({string.Join(",", TenantPolicySettingService.OriginalWriteKeys.Select(Text))})
@@ -216,9 +248,16 @@ public static partial class PostgresMixedSettingsContract
                                 OR effect->'Remove' = 'true'::jsonb
                                 OR effect->>'Value' IS DISTINCT FROM (p_request->'Reporting'->'Policy'->'Enabled')::text
                             WHEN 'tenant-plan-assignment' THEN effect->'Remove' = 'true'::jsonb
+                            WHEN 'announcement-instance' THEN key <> {Text(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)}
+                                OR effect->'Remove' = 'true'::jsonb
+                            WHEN 'announcement-tenant' THEN key <> {Text(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)}
+                                OR effect->'Remove' = 'true'::jsonb
+                            WHEN 'announcement-managed-tenant' THEN key <> {Text(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)}
+                                OR effect->'Remove' = 'true'::jsonb
                             ELSE NOT (p_request ? 'Governance') OR effect->'Remove' = 'true'::jsonb END)
                     THEN RAISE EXCEPTION 'typed_settings_effect_widened' USING ERRCODE = '42501'; END IF;
                     IF p_request->>'Producer' NOT IN ('reporting-intake','tenant-plan-assignment')
+                        AND NOT (p_request ? 'Announcement')
                         AND p_tenant IS NOT NULL AND effect->'Remove' = 'false'::jsonb AND EXISTS (
                         SELECT 1 FROM {sql.Table(typeof(SystemSetting))}
                         WHERE {sql.Column(typeof(SystemSetting), nameof(SystemSetting.SettingKey))} = key
@@ -238,20 +277,10 @@ public static partial class PostgresMixedSettingsContract
                             effect->'Remove' IS DISTINCT FROM pg_catalog.to_jsonb(locked)
                             OR NOT locked AND effect->>'Value' IS DISTINCT FROM (p_request->'Onboarding'->'Settings'->input_name)::text)
                         THEN RAISE EXCEPTION 'typed_settings_publication_cleanup_changed' USING ERRCODE = '42501'; END IF;
-                        IF key = {Text(GovernanceSettingKeys.PublicExperience.AnnouncementBarRevision)} THEN
-                            SELECT {sql.Column(typeof(TenantSetting), nameof(TenantSetting.Value))} INTO stored_revision
-                                FROM {sql.Table(typeof(TenantSetting))}
-                                WHERE {sql.Column(typeof(TenantSetting), nameof(TenantSetting.TenantId))} = p_tenant
-                                    AND {sql.Column(typeof(TenantSetting), nameof(TenantSetting.SettingKey))} = key;
-                            BEGIN
-                                revision := COALESCE(pg_catalog.btrim(stored_revision,'"'),'0')::integer;
-                            EXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range THEN revision := 0;
-                            END;
-                            revision := CASE WHEN revision = 2147483647 THEN -2147483648 ELSE revision + 1 END;
-                            IF effect->'Remove' IS DISTINCT FROM pg_catalog.to_jsonb(locked)
-                                OR NOT locked AND effect->>'Value' IS DISTINCT FROM revision::text
-                            THEN RAISE EXCEPTION 'typed_settings_original_revision_changed' USING ERRCODE = '42501'; END IF;
-                        END IF;
+                        IF key = {Text(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)}
+                            AND (effect->'Remove' = 'true'::jsonb
+                                OR COALESCE(p_request->'Onboarding'->'Settings'->'Announcement','null'::jsonb) = 'null'::jsonb)
+                        THEN RAISE EXCEPTION 'typed_settings_announcement_original_missing' USING ERRCODE = '42501'; END IF;
                     END IF;
                 END LOOP;
                 UPDATE {sql.Name(AttemptTable)} SET accepted = p_accepted
@@ -313,7 +342,7 @@ public static partial class PostgresMixedSettingsContract
                                 IS DISTINCT FROM (after_row - ({mutable}))
                             OR p_tenant IS NULL AND after_row->'IsLocked' IS DISTINCT FROM effect->'IsLocked'
                             OR p_tenant IS NOT NULL AND after_row->'IsLocked' IS DISTINCT FROM
-                                (CASE WHEN admitted.request->>'Producer' = 'tenant-plan-assignment'
+                                (CASE WHEN (admitted.request->>'Producer' = 'tenant-plan-assignment' OR admitted.request ? 'Announcement')
                                     AND effect->'IsLocked' <> 'null'::jsonb THEN effect->'IsLocked'
                                     ELSE COALESCE(stored->'IsLocked','false'::jsonb) END)
                             OR stored IS NULL AND (after_row->>'CreatedBy')::uuid IS DISTINCT FROM admitted.actor
@@ -321,7 +350,7 @@ public static partial class PostgresMixedSettingsContract
                                 AND (after_row->>'UpdatedBy')::uuid IS DISTINCT FROM admitted.actor
                         THEN RAISE EXCEPTION 'typed_settings_noncanonical_row' USING ERRCODE = '42501'; END IF;
                         {(type == typeof(SystemSetting) ? GovernanceMetadata("admitted.request", "key") : "")}
-                        IF p_tenant IS NOT NULL AND EXISTS (
+                        IF p_tenant IS NOT NULL AND NOT (admitted.request ? 'Announcement') AND EXISTS (
                             SELECT 1 FROM {sql.Table(typeof(SystemSetting))} ceiling
                             WHERE ceiling.{sql.Column(typeof(SystemSetting), nameof(SystemSetting.SettingKey))} = key
                                 AND ceiling.{sql.Column(typeof(SystemSetting), nameof(SystemSetting.IsLocked))})

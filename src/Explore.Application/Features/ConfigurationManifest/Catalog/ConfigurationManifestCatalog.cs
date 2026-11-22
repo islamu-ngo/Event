@@ -96,6 +96,7 @@ public static class ConfigurationManifestCatalog
             TenantSetting(RoutingSettingDefinitions.DefaultPublicHomePage),
             TenantSetting(AppearanceSettingDefinitions.DefaultThemeMode),
             TenantSetting(PublicExperienceSettingDefinitions.Mode),
+            TenantSetting(PublicExperienceSettingDefinitions.AnnouncementBarPublication),
             TenantSetting(
                 PublicExperienceSettingDefinitions.EventCatalogLabel,
                 maximumStringLength: 100)
@@ -124,6 +125,7 @@ public static class ConfigurationManifestCatalog
             .Concat(EventResourceSettingDefinitions.All
                 .Where(definition => definition.MaxScope >= SettingScope.Tenant)
                 .Select(definition => definition.Key))
+            .Append(PublicExperienceSettingDefinitions.AnnouncementBarPublication.Key)
             .Order(StringComparer.Ordinal)
             .ToArray();
         if (!coordinatedKeys.SequenceEqual(expectedCoordinatedKeys, StringComparer.Ordinal))
@@ -177,6 +179,7 @@ public static class ConfigurationManifestCatalog
                 PublicExperienceSettingDefinitions.EventCatalogLabel,
                 maximumStringLength: 100),
             InstanceSetting(PublicExperienceSettingDefinitions.Mode),
+            InstanceSetting(PublicExperienceSettingDefinitions.AnnouncementBarPublication),
             InstanceSetting(RoutingSettingDefinitions.DefaultPublicHomePage),
             InstanceSetting(TenantSettingDefinitions.SelfServiceRegistration),
             InstanceSetting(TenantSettingDefinitions.WhiteLabelingEnabled)
@@ -207,6 +210,7 @@ public static class ConfigurationManifestCatalog
             EventSettingDefinitions.OrganizationSubmissionEnabled.Key,
             EventSettingDefinitions.RequireApproval.Key,
             EventSettingDefinitions.UserSubmissionEnabled.Key,
+            PublicExperienceSettingDefinitions.AnnouncementBarPublication.Key,
             .. EventResourceSettingDefinitions.All.Select(definition => definition.Key)
         ];
         if (!coordinatedKeys.SequenceEqual(
@@ -274,7 +278,10 @@ public static class ConfigurationManifestCatalog
             ConfigurationManifestScope.Tenant,
             definition,
             maximumStringLength,
-            StringArrayDescriptors.GetValueOrDefault(definition.Key));
+            StringArrayDescriptors.GetValueOrDefault(definition.Key),
+            ReferenceEquals(definition, PublicExperienceSettingDefinitions.AnnouncementBarPublication)
+                ? new(ConfigurationManifestScope.Tenant)
+                : null);
 
     private static ConfigurationManifestSettingCatalogEntry InstanceSetting(
         SettingDefinition definition,
@@ -283,5 +290,8 @@ public static class ConfigurationManifestCatalog
             ConfigurationManifestScope.Instance,
             definition,
             maximumStringLength,
-            StringArrayDescriptors.GetValueOrDefault(definition.Key));
+            StringArrayDescriptors.GetValueOrDefault(definition.Key),
+            ReferenceEquals(definition, PublicExperienceSettingDefinitions.AnnouncementBarPublication)
+                ? new(ConfigurationManifestScope.Instance)
+                : null);
 }

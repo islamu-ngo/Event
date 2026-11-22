@@ -3,6 +3,7 @@ namespace Explore.Application.Features.ConfigurationManifest.Importing;
 using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
 using Explore.Application.Features.ConfigurationManifest.Moderation;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
@@ -116,7 +117,8 @@ public sealed record ConfigurationImportSectionSnapshot
         bool requiresExternalSetup,
         string? stableMappingIdentity = null,
         string? blockingReasonCode = null,
-        string? warningReasonCode = null)
+        string? warningReasonCode = null,
+        JsonElement? settingsImage = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sectionKey);
         ConfigurationImportContractGuard.ValidateDigest(
@@ -147,6 +149,7 @@ public sealed record ConfigurationImportSectionSnapshot
             : ConfigurationImportSafeCode.Normalize(
                 warningReasonCode,
                 nameof(warningReasonCode));
+        SettingsImage = settingsImage?.Clone();
     }
 
     public string SectionKey { get; }
@@ -158,6 +161,7 @@ public sealed record ConfigurationImportSectionSnapshot
     public string? StableMappingIdentity { get; }
     public string? BlockingReasonCode { get; }
     public string? WarningReasonCode { get; }
+    public JsonElement? SettingsImage { get; }
 
 }
 
@@ -310,7 +314,12 @@ public sealed record ConfigurationImportPreview
 public sealed class ConfigurationImportPreviewComposer
 {
     public ConfigurationImportPreview Compose(
-        ConfigurationImportPreviewInput input)
+        ConfigurationImportPreviewInput input) => ComposeCore(input, afterApply: false);
+
+    internal ConfigurationImportPreview ComposeAfterApply(
+        ConfigurationImportPreviewInput input) => ComposeCore(input, afterApply: true);
+
+    private static ConfigurationImportPreview ComposeCore(ConfigurationImportPreviewInput input, bool afterApply)
     {
         ArgumentNullException.ThrowIfNull(input);
         var items = ImmutableArray.CreateBuilder<ConfigurationImportPreviewItem>();
@@ -329,7 +338,7 @@ public sealed class ConfigurationImportPreviewComposer
                 source,
                 targetBySection,
                 mappedTargetIdentities,
-                input));
+                input, afterApply));
         }
 
         foreach (ConfigurationImportSectionSnapshot target in input.TargetSections)
@@ -400,7 +409,7 @@ public sealed class ConfigurationImportPreviewComposer
             targetBySection,
         IReadOnlyDictionary<string, ConfigurationImportSectionSnapshot>
             mappedTargets,
-        ConfigurationImportPreviewInput input)
+        ConfigurationImportPreviewInput input, bool afterApply)
     {
         if (ModerationConfigurationImportSections.IsModeration(source.SectionKey))
         {
@@ -543,20 +552,13 @@ public sealed class ConfigurationImportPreviewComposer
                 "configuration_import_section_added");
         }
 
-        return Item(
-            source,
-            string.Equals(
-                source.NormalizedDigest,
-                target.NormalizedDigest,
-                StringComparison.Ordinal)
-                ? ConfigurationImportPreviewCategory.Unchanged
-                : ConfigurationImportPreviewCategory.Changed,
-            string.Equals(
-                source.NormalizedDigest,
-                target.NormalizedDigest,
-                StringComparison.Ordinal)
-                ? "configuration_import_section_unchanged"
-                : "configuration_import_section_changed");
+        bool equivalent = source.SettingsImage is { } requestedSettings && target.SettingsImage is { } actualSettings
+            ? AnnouncementConfigurationProjection.MatchesSettings(requestedSettings, actualSettings,
+                source.SectionKey.StartsWith("instance.", StringComparison.Ordinal)
+                    ? ConfigurationManifestScope.Instance : ConfigurationManifestScope.Tenant, afterApply)
+            : string.Equals(source.NormalizedDigest, target.NormalizedDigest, StringComparison.Ordinal);
+        return Item(source, equivalent ? ConfigurationImportPreviewCategory.Unchanged : ConfigurationImportPreviewCategory.Changed,
+            equivalent ? "configuration_import_section_unchanged" : "configuration_import_section_changed");
     }
 
     private static ConfigurationImportPreviewBinding CreateBinding(

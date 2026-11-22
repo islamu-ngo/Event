@@ -164,8 +164,8 @@ public sealed class TenantSupportAccessEvidenceSectionTests : IDisposable
                 IsCurrentUserInstanceAdmin = false,
                 SelectedDeploymentMode = "MultiTenant"
             }));
-        _publicExperienceAdminService.ApplyAnnouncementBarSettingsAsync(Arg.Any<TenantPolicySettingsDto>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
+        _publicExperienceAdminService.GetAnnouncementAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Explore.Blazor.Client.Contracts.Services.AnnouncementDraft?>(null));
         _publicExperienceAdminService.GetSettingsAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new TenantPublicExperienceAdminModel()));
         _brandingSettingsAdminService.GetAsync(Arg.Any<CancellationToken>())

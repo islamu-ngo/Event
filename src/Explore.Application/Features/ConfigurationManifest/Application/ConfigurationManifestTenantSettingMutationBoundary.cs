@@ -5,6 +5,7 @@ using Explore.Application.Features.ConfigurationManifest.Catalog;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Validation;
 using Explore.Application.Settings;
+using Explore.Domain.Settings;
 
 public sealed record ConfigurationManifestTenantSettingMutation(
     string Key,
@@ -88,6 +89,7 @@ public sealed class ConfigurationManifestTenantSettingMutationBoundary(
         foreach (ConfigurationManifestTenantSettingMutation mutation in input.Mutations)
         {
             ArgumentNullException.ThrowIfNull(mutation);
+            AnnouncementSettingMutationGuard.RejectGenericMutation(mutation.Key);
             if (!seenKeys.Add(mutation.Key)
                 || !ConfigurationManifestCatalog.TryGetTenantSetting(
                     mutation.Key,

@@ -72,6 +72,7 @@ public sealed class ConfigurationManifestInstanceSettingMutationBoundary(
                  in input.Mutations)
         {
             ArgumentNullException.ThrowIfNull(mutation);
+            AnnouncementSettingMutationGuard.RejectGenericMutation(mutation.Key);
             if (!seenKeys.Add(mutation.Key)
                 || !ConfigurationManifestCatalog.TryGetInstanceSetting(
                     mutation.Key,

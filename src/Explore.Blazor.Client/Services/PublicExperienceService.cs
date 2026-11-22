@@ -34,6 +34,7 @@ public class PublicExperienceService : IPublicExperienceService
     private long _settingsGeneration;
     private PublicExperienceAvailability _settingsAvailability;
     private PublicExperienceSettingsDto? _cachedSettings;
+    private ISLAMU.Wire.Contracts.Announcements.AnnouncementPublicStateDto? _announcementSnapshot;
     private DateTimeOffset _settingsCacheExpiresAt;
     private PublicExperienceShellDto? _cachedShell;
     private DateTimeOffset _shellCacheExpiresAt;
@@ -177,6 +178,7 @@ public class PublicExperienceService : IPublicExperienceService
         {
             ++_settingsGeneration;
             _cachedSettings = null;
+            _announcementSnapshot = null;
             _settingsCacheExpiresAt = default;
             _settingsAvailability = PublicExperienceAvailability.Unknown;
             _cachedShell = null;
@@ -211,15 +213,13 @@ public class PublicExperienceService : IPublicExperienceService
 
     private void CacheSettings(PublicExperienceSettingsDto settings)
     {
+        var announcement = AnnouncementClientService.SnapshotPublic(settings.Announcement);
         bool changed = _settingsAvailability != PublicExperienceAvailability.Available
             || _cachedSettings is not { } previous
             || previous.TenantId != settings.TenantId
-            || previous.AnnouncementBarEnabled != settings.AnnouncementBarEnabled
-            || previous.AnnouncementBarRevision != settings.AnnouncementBarRevision
-            || previous.AnnouncementBarMessage != settings.AnnouncementBarMessage
-            || previous.AnnouncementBarLinkText != settings.AnnouncementBarLinkText
-            || previous.AnnouncementBarLinkUrl != settings.AnnouncementBarLinkUrl;
+            || _announcementSnapshot != announcement;
         _cachedSettings = settings;
+        _announcementSnapshot = announcement;
         _settingsCacheExpiresAt = _clock.GetUtcNow().Add(CacheDuration);
         _settingsAvailability = PublicExperienceAvailability.Available;
         if (changed)
@@ -237,6 +237,7 @@ public class PublicExperienceService : IPublicExperienceService
     {
         bool changed = _settingsAvailability != PublicExperienceAvailability.Unavailable;
         _cachedSettings = null;
+        _announcementSnapshot = null;
         _settingsCacheExpiresAt = default;
         _settingsAvailability = PublicExperienceAvailability.Unavailable;
         if (changed)

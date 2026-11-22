@@ -138,13 +138,51 @@ this change. If the current tenant cannot be established, no anonymous preferenc
 is read or saved.
 
 The close action keeps the announcement visible and reports a save failure when
-storage or the server does not confirm the dismissal. You can explicitly try
-again. Switching account, tenant or announcement settings invalidates pending
-results so an older save cannot hide the replacement announcement.
+storage or the server does not confirm the dismissal. Reconcile the current
+state before trying again. Switching account, tenant or announcement settings
+invalidates pending results so an older save cannot hide the replacement
+announcement. If a newer check shows the same announcement is still visible,
+an older dismissal confirmation won't hide it.
 
-This repair keeps the existing integer announcement revision. It does not add
-multiple publications, scheduling, acknowledgements or the later material-edition
-contract.
+Refreshing announcement settings does not repeat a pending dismissal. A tenant
+override can be dismissed independently, even if dismissal of the inherited
+announcement was never confirmed. If the inherited announcement returns, use
+the reconciliation action to check its saved state before trying to dismiss it
+again. A refresh that started before the dismissal settled cannot clear that
+uncertainty.
+
+Each announcement has a server-issued material edition. Changing its message or
+link publishes a new edition, which can appear again after you dismissed the
+previous one. Hiding and showing the same announcement does not clear your
+dismissal. The edition also identifies its instance or tenant owner: an
+instance announcement and a tenant announcement remain separate even when their
+text is identical.
+
+An older page may ask you to refresh before dismissing an announcement after its
+source changed, even when the visible text looks unchanged. Refreshing does not
+automatically repeat a failed save. Closing this optional bar is not consent,
+completion of learning, or acknowledgement of a required notice.
+
+## Managing The Announcement Source
+
+Administrators edit a complete announcement rather than several independent
+settings. Save changed message or link content to publish a new edition; use
+explicit redisplay when unchanged content should appear again. A visibility-only
+change retains the material edition.
+
+If you cancel a save already in progress or the editor cannot confirm it, reload
+the announcement source before trying again. The editor does not repeat the save
+automatically.
+
+A disabled tenant announcement stays selected and hides the bar instead of
+falling back to the instance announcement. Remove the tenant override to inherit
+the instance source again. An instance lock can mask a tenant's stored source
+without deleting it.
+
+Old integer revisions and their dismissal markers are no longer used or
+converted. Republish existing scalar-configured announcements through the
+announcement editor. Configuration exports contain semantic announcement changes,
+not reusable runtime editions or browser/account dismissal evidence.
 
 ## Tenant Guidance Choices
 

@@ -3,6 +3,30 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-31
+
+- The single announcement bar now uses complete instance/tenant publications,
+  server-issued material editions and source witnesses instead of independent
+  scalar fields and integer revisions. Eight named announcement operations
+  provide private source reads, typed publication and current-user dismissal.
+  HAL links advertise actions; a stale source or marker expectation conflicts
+  without writing. Closing the bar remains an optional preference, not required
+  acknowledgement or learning evidence.
+- Generic settings mutation and reset cannot replace the coordinated publication
+  or erase its private dismissal marker. Configuration imports carry semantic
+  changes, not reusable runtime editions or private evidence. Existing scalar
+  announcements require explicit republishing; no revision-to-edition backfill
+  is performed.
+- Native API/schema generation and per-tag client generation completed. Four
+  selected PostgreSQL cases passed for restricted no-write completion and
+  first-owner installation under existing FORCE RLS with later drift refusal.
+  All 25 targeted HTTP admission/lifecycle cases and 167 affected client cases
+  passed, including generated dismissal serialization with an explicit null
+  expectation. The three factory/store ownership regressions also passed after
+  native ownership issuance was separated from public self-attestation.
+  Remaining native cases, hosted acceptance and the final programme matrix
+  remain open.
+
 ## 2026-10-30
 
 - C05 policy source adds private read-only-default GET and Guid-CAS PATCH at

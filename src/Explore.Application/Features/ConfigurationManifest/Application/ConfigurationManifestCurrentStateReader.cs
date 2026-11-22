@@ -12,8 +12,11 @@ using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Moderation;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Features.ConfigurationManifest.Validation;
+using Explore.Application.Features.Announcements;
 using Explore.Application.Settings;
 using Explore.Domain;
+using Explore.Domain.Constants;
+using Explore.Domain.Settings;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 using Explore.Domain.Settings.Documents;
@@ -164,8 +167,7 @@ public sealed class ConfigurationManifestCurrentStateReader(
                     View = view == ConfigurationManifestExportView.Portable
                         ? ConfigurationManifestExportMetadataValues.PortableView
                         : ConfigurationManifestExportMetadataValues.OverridesView,
-                    EffectiveValuesFlattened =
-                        view == ConfigurationManifestExportView.Portable,
+                    EffectiveValuesFlattened = false,
                     SensitiveValuesOmitted = true,
                     AuthorityScope = ConfigurationManifestExportMetadataValues
                         .InstanceAndTenantsAuthorityScope,
@@ -238,7 +240,7 @@ public sealed class ConfigurationManifestCurrentStateReader(
                 View = view == ConfigurationManifestExportView.Portable
                     ? ConfigurationManifestExportMetadataValues.PortableView
                     : ConfigurationManifestExportMetadataValues.OverridesView,
-                EffectiveValuesFlattened = view == ConfigurationManifestExportView.Portable,
+                EffectiveValuesFlattened = false,
                 SensitiveValuesOmitted = true,
                 AuthorityScope = ConfigurationManifestExportMetadataValues.TenantAuthorityScope,
                 SovereignValuesOmitted = true,
@@ -347,9 +349,15 @@ public sealed class ConfigurationManifestCurrentStateReader(
                      value => value.SettingKey,
                      StringComparer.Ordinal))
         {
+            if (setting.SettingKey == GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)
+                continue;
             if (ConfigurationManifestCatalog.TryGetInstanceSetting(setting.SettingKey, out _))
                 AddUnique(values, setting.SettingKey, ParseJson(setting.Value));
         }
+        var announcement = stored.SingleOrDefault(setting =>
+            setting.SettingKey == GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication);
+        AddUnique(values, GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication,
+            ExportAnnouncement(AnnouncementOwner.Instance, announcement?.Value, announcement?.IsLocked ?? false));
 
         return values;
     }
@@ -367,12 +375,18 @@ public sealed class ConfigurationManifestCurrentStateReader(
                      value => value.SettingKey,
                      StringComparer.Ordinal))
         {
+            if (setting.SettingKey == GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)
+                continue;
             if (setting.TenantId == tenantId
                 && ConfigurationManifestCatalog.TryGetTenantSetting(setting.SettingKey, out _))
             {
                 AddUnique(values, setting.SettingKey, ParseJson(setting.Value));
             }
         }
+        var announcement = stored.SingleOrDefault(setting => setting.TenantId == tenantId
+            && setting.SettingKey == GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication);
+        AddUnique(values, GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication,
+            ExportAnnouncement(AnnouncementOwner.ForTenant(tenantId), announcement?.Value, announcement?.IsLocked ?? false));
 
         return values;
     }
@@ -415,30 +429,56 @@ public sealed class ConfigurationManifestCurrentStateReader(
         SettingContext context,
         CancellationToken cancellationToken)
     {
+        var scalarKeys = expectedKeys.Where(key =>
+            key != GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication).ToArray();
         IReadOnlyList<ResolvedSetting> resolved = await settingsResolver.ResolveBatchAsync(
-            expectedKeys,
+            scalarKeys,
             context,
             cancellationToken);
-        if (resolved.Count != expectedKeys.Count)
+        if (resolved.Count != scalarKeys.Length)
         {
             throw new InvalidOperationException(
                 "The settings resolver returned an incomplete configuration manifest catalog.");
         }
 
         var values = new SortedDictionary<string, JsonElement>(StringComparer.Ordinal);
-        for (int index = 0; index < expectedKeys.Count; index++)
+        for (int index = 0; index < scalarKeys.Length; index++)
         {
-            if (!string.Equals(resolved[index].Key, expectedKeys[index], StringComparison.Ordinal))
+            if (!string.Equals(resolved[index].Key, scalarKeys[index], StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
                     "The settings resolver returned an unexpected configuration manifest key.");
             }
 
-            values.Add(expectedKeys[index], ParseJson(resolved[index].Value));
+            values.Add(scalarKeys[index], ParseJson(resolved[index].Value));
+        }
+        if (expectedKeys.Contains(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication, StringComparer.Ordinal))
+        {
+            if (context.TenantId is { } tenant)
+            {
+                var row = await tenantSettings.GetByTenantAndKey(
+                    tenant, GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication, cancellationToken);
+                if (row is not null && (row.TenantId != tenant
+                    || row.SettingKey != GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication))
+                    throw new InvalidOperationException("The announcement repository returned another owner's setting.");
+                values.Add(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication,
+                    ExportAnnouncement(AnnouncementOwner.ForTenant(tenant), row?.Value, row?.IsLocked ?? false));
+            }
+            else
+            {
+                var row = (await systemSettings.GetAllSettings(cancellationToken: cancellationToken))
+                    .SingleOrDefault(setting => setting.SettingKey == GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication);
+                values.Add(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication,
+                    ExportAnnouncement(AnnouncementOwner.Instance, row?.Value, row?.IsLocked ?? false));
+            }
         }
 
         return values;
     }
+
+    private static JsonElement ExportAnnouncement(AnnouncementOwner owner, string? value, bool locked) =>
+        AnnouncementConfigurationProjection.Export(
+            new(owner, AnnouncementSettingValueCodec.DeserializeGroup(value), locked));
 
     private async Task<SortedDictionary<string, ConfigurationManifestDocumentV1Alpha2>>
         ReadTenantDocumentOverridesAsync(Guid tenantId, CancellationToken cancellationToken)

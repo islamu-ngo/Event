@@ -5,6 +5,7 @@ using Explore.Application.Constants;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.Announcements;
 using Explore.Application.Features.InstanceAdmin.Handlers.Commands;
 using Explore.Application.Features.InstanceAdmin.Plans;
 using Explore.Application.Features.InstanceAdmin.Requests.Commands;
@@ -487,6 +488,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
         public Task<PublicationPolicyMutationResult> ApplyEventPolicyAsync(TypedSettingsOriginal original, CancellationToken token) => inner.ApplyEventPolicyAsync(original, token);
         public Task<IReadOnlyList<SettingChangedNotification>> ApplyOnboardingAsync(TypedSettingsOriginal original, CancellationToken token) => inner.ApplyOnboardingAsync(original, token);
         public Task<PublicationPolicyMutationResult> ApplyReportingAsync(TypedSettingsOriginal original, CancellationToken token) => inner.ApplyReportingAsync(original, token);
+        public Task<(AnnouncementPublicationResult Result, ImmutableArray<SettingChangedNotification> DeferredNotifications)> ApplyAnnouncementAsync(TypedSettingsOriginal original, CancellationToken token) => inner.ApplyAnnouncementAsync(original, token);
         public Task<IReadOnlyList<SettingChangedNotification>> ApplyGovernanceAsync(TypedSettingsOriginal original, CancellationToken token) => inner.ApplyGovernanceAsync(original, token);
         public void InvalidateGovernanceAfterCommit(TypedSettingsOriginal original) => inner.InvalidateGovernanceAfterCommit(original);
         public async Task RequireCompleteAsync(TypedSettingsOriginal original, CancellationToken token)

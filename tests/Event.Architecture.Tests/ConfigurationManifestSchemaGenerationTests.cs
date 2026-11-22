@@ -65,12 +65,108 @@ public sealed class ConfigurationManifestSchemaGenerationTests
     [Test]
     public async Task JsonSettingWithoutDescriptor_RemainsRejectedByBothGenerators()
     {
-        var undescribed = new ConfigurationManifestSettingCatalogEntry(
-            ConfigurationManifestScope.Tenant, EventResourceSettingDefinitions.EnabledDeliveryTypes);
-        await Assert.That(() => ConfigurationManifestJsonSchemaGenerator.GenerateConfigurationManifest(
-            [undescribed], ConfigurationManifestCatalog.TenantDocuments.Values)).Throws<InvalidOperationException>();
-        await Assert.That(() => ConfigurationManifestJsonSchemaGenerator.GenerateTenantConfigurationPackage(
-            [undescribed], ConfigurationManifestCatalog.TenantDocuments.Values)).Throws<InvalidOperationException>();
+        foreach (SettingDefinition definition in new[]
+        {
+            EventResourceSettingDefinitions.EnabledDeliveryTypes,
+            PublicExperienceSettingDefinitions.AnnouncementBarPublication
+        })
+        {
+            var undescribed = new ConfigurationManifestSettingCatalogEntry(
+                ConfigurationManifestScope.Tenant, definition);
+            await Assert.That(() => ConfigurationManifestJsonSchemaGenerator.GenerateConfigurationManifest(
+                [undescribed], ConfigurationManifestCatalog.TenantDocuments.Values)).Throws<InvalidOperationException>();
+            await Assert.That(() => ConfigurationManifestJsonSchemaGenerator.GenerateTenantConfigurationPackage(
+                [undescribed], ConfigurationManifestCatalog.TenantDocuments.Values)).Throws<InvalidOperationException>();
+        }
+    }
+
+    [Test]
+    public async Task GeneratedAnnouncementOperations_AreClosedTypedAndScopeBoundInBothArtifacts()
+    {
+        using JsonDocument manifest = JsonDocument.Parse(
+            ConfigurationManifestJsonSchemaGenerator.GenerateConfigurationManifest());
+        using JsonDocument package = JsonDocument.Parse(
+            ConfigurationManifestJsonSchemaGenerator.GenerateTenantConfigurationPackage());
+        foreach (var (settings, tenantScope) in new[]
+        {
+            (manifest.RootElement.GetProperty("$defs").GetProperty("instanceSettings"), false),
+            (manifest.RootElement.GetProperty("$defs").GetProperty("tenantSettings"), true),
+            (package.RootElement.GetProperty("$defs").GetProperty("tenantSettings"), true)
+        })
+        {
+            JsonElement schema = settings.GetProperty("properties")
+                .GetProperty(PublicExperienceSettingDefinitions.AnnouncementBarPublication.Key);
+            JsonElement[] alternatives = schema.GetProperty("oneOf").EnumerateArray().ToArray();
+            string[] operations = alternatives.Select(alternative => alternative.GetProperty("properties")
+                .GetProperty("operation").GetProperty("const").GetString()!).ToArray();
+            string[] expectedOperations = tenantScope
+                ? ["publish", "disable", "setLock", "inherit"]
+                : ["publish", "disable", "setLock"];
+            await Assert.That(operations).IsEquivalentTo(expectedOperations);
+
+            foreach (JsonElement alternative in alternatives)
+            {
+                JsonElement properties = alternative.GetProperty("properties");
+                string operation = properties.GetProperty("operation").GetProperty("const").GetString()!;
+                var expectedTypes = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["operation"] = "string",
+                    ["currentLock"] = "boolean"
+                };
+                if (operation == "publish")
+                {
+                    expectedTypes["enabled"] = "boolean";
+                    expectedTypes["message"] = "string";
+                    expectedTypes["linkText"] = "string";
+                    expectedTypes["linkUrl"] = "string";
+                    expectedTypes["redisplay"] = "boolean";
+                }
+                else if (operation == "setLock")
+                    expectedTypes["isLocked"] = "boolean";
+
+                await Assert.That(alternative.GetProperty("type").GetString()).IsEqualTo("object");
+                await Assert.That(alternative.GetProperty("additionalProperties").GetBoolean()).IsFalse();
+                await Assert.That(properties.EnumerateObject().Select(property => property.Name).ToArray())
+                    .IsEquivalentTo(expectedTypes.Keys.ToArray());
+                await Assert.That(alternative.GetProperty("required").EnumerateArray()
+                    .Select(value => value.GetString()!).ToArray())
+                    .IsEquivalentTo(expectedTypes.Keys.Where(name => name != "currentLock").ToArray());
+                foreach (var (name, type) in expectedTypes)
+                {
+                    JsonElement property = properties.GetProperty(name);
+                    await Assert.That(property.GetProperty("type").GetString()).IsEqualTo(type);
+                    if (type == "string" && name != "operation")
+                    {
+                        await Assert.That(property.TryGetProperty("minLength", out _)).IsFalse();
+                        await Assert.That(property.TryGetProperty("format", out _)).IsFalse();
+                    }
+                }
+            }
+        }
+    }
+
+    [Test]
+    public async Task AnnouncementDescriptor_WithWrongScopeDefinitionOrCompetingShape_FailsClosed()
+    {
+        ConfigurationManifestSettingCatalogEntry announcement =
+            ConfigurationManifestCatalog.TenantSettings[PublicExperienceSettingDefinitions.AnnouncementBarPublication.Key];
+        foreach (ConfigurationManifestSettingCatalogEntry invalid in new[]
+        {
+            announcement with
+            {
+                AnnouncementOperation = new(ConfigurationManifestScope.Instance)
+            },
+            announcement with { Definition = EventResourceSettingDefinitions.EnabledDeliveryTypes },
+            announcement with { Definition = PublicExperienceSettingDefinitions.EventCatalogLabel },
+            announcement with { StringArray = new() },
+            announcement with { AnnouncementOperation = null, StringArray = new() }
+        })
+        {
+            await Assert.That(() => ConfigurationManifestJsonSchemaGenerator.GenerateConfigurationManifest(
+                [], [], [invalid], [])).Throws<InvalidOperationException>();
+            await Assert.That(() => ConfigurationManifestJsonSchemaGenerator.GenerateTenantConfigurationPackage(
+                [invalid], [])).Throws<InvalidOperationException>();
+        }
     }
 
     [Test]

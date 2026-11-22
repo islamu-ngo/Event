@@ -4,6 +4,7 @@ using Explore.API.Hateoas;
 using Explore.API.Hateoas.Assemblers;
 using Explore.API.Hateoas.Policies;
 using Explore.API.Hateoas.Resources;
+using Explore.API.Controllers;
 using Explore.Application.Contracts.Hateoas;  // For ILinkPolicy, ICollectionLinkPolicy
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
@@ -76,6 +77,7 @@ using Explore.Application.DTOs.TenantUserRoleGrant;
 using Explore.Application.DTOs.User;
 using Explore.Application.DTOs.Webhooks;
 using ISLAMU.Wire.Contracts.Learning;
+using ISLAMU.Wire.Contracts.Announcements;
 
 /// <summary>
 /// Registers all HATEOAS resource assemblers and their link policies.
@@ -88,6 +90,10 @@ public static class HateoasAssemblerRegistration
     /// </summary>
     public static IServiceCollection AddHateoasAssemblers(this IServiceCollection services)
     {
+        services.AddHalResource<AnnouncementSourceResource, AnnouncementSourceLinkPolicy, AnnouncementSourceCollectionLinkPolicy>();
+        services.AddHalResource<AnnouncementSelfStateDto, AnnouncementSelfLinkPolicy, AnnouncementSelfCollectionLinkPolicy>();
+        services.AddHalResource<AnnouncementPublicationReceiptDto, AnnouncementPublicationReceiptLinkPolicy, AnnouncementPublicationReceiptCollectionLinkPolicy>();
+        services.AddHalResource<AnnouncementDismissalReceiptDto, AnnouncementDismissalReceiptLinkPolicy, AnnouncementDismissalReceiptCollectionLinkPolicy>();
         services.AddHalResource<LearningContextDto, LearningContextLinkPolicy, LearningContextCollectionLinkPolicy>();
         services.AddHalResource<LearningGuidancePolicyDto, LearningGuidancePolicyLinkPolicy, LearningGuidancePolicyCollectionLinkPolicy>();
         services.AddHalResource<LearningTourPlanDto, LearningTourPlanLinkPolicy, LearningTourPlanCollectionLinkPolicy>();

@@ -45,11 +45,7 @@ public partial class TenantPolicySettingService
         GovernanceSettingKeys.Organizations.TenantCanOmitVerification,
         GovernanceSettingKeys.Organizations.VerificationRequired,
         GovernanceSettingKeys.Policies.CommunityGuidelinesContent,
-        GovernanceSettingKeys.PublicExperience.AnnouncementBarEnabled,
-        GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkText,
-        GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkUrl,
-        GovernanceSettingKeys.PublicExperience.AnnouncementBarMessage,
-        GovernanceSettingKeys.PublicExperience.AnnouncementBarRevision,
+        GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication,
         GovernanceSettingKeys.Routing.DefaultPublicHomePage,
         GovernanceSettingKeys.Routing.RenderPolicy.Admin.PrerenderEnabled,
         GovernanceSettingKeys.Routing.RenderPolicy.Admin.RenderMode,
@@ -76,6 +72,8 @@ public partial class TenantPolicySettingService
         UpdateTenantPolicyRequest settings,
         CancellationToken cancellationToken = default)
     {
+        if (settings.Announcement is not null)
+            throw new UnauthorizedAccessException("Announcement publication requires the acquired original onboarding owner.");
         return _mutationLock.ExecuteManyAsync(
             TenantPolicySettingKeys,
             token => ApplyTenantSettingsInsideLocksAsync(tenantId, actorUserId, settings, token),
@@ -106,19 +104,6 @@ public partial class TenantPolicySettingService
         Task SetStringListTenantOverrideAsync(Guid id, string key, IReadOnlyList<string> values, bool allowed, Guid? actor) =>
             SetStringListTenantOverrideCoreAsync(
                 id, key, values, CanOverride(key, allowed), actor, notifications, cancellationToken);
-        async Task UpsertTenantOverrideAsync(Guid id, string key, string value, Guid? actor)
-        {
-            if (!CanOverride(key, true))
-            {
-                await RemoveTenantOverrideCoreAsync(
-                    id, key, actor, notifications, cancellationToken);
-                return;
-            }
-
-            await UpsertTenantOverrideCoreAsync(
-                id, key, value, actor, notifications, cancellationToken);
-        }
-
         var eventCardClickSetting = systemSettings.GetValueOrDefault(GovernanceSettingKeys.Events.CardClickOpensDetailPage);
         var requireVerificationSetting = systemSettings.GetValueOrDefault(GovernanceSettingKeys.Organizations.VerificationRequired);
         var canOmitVerificationSetting = systemSettings.GetValueOrDefault(GovernanceSettingKeys.Organizations.TenantCanOmitVerification);
@@ -280,49 +265,6 @@ public partial class TenantPolicySettingService
             NormalizeOptionalHost(settings.CustomDomain),
             customDomainSetting?.IsLocked != true && DeserializeBoolean(allowCustomDomainSetting?.Value, true),
             actorUserId);
-
-        await SetBooleanTenantOverrideAsync(
-            tenantId,
-            GovernanceSettingKeys.PublicExperience.AnnouncementBarEnabled,
-            settings.AnnouncementBarEnabled,
-            true,
-            actorUserId);
-
-        await SetStringTenantOverrideAsync(
-            tenantId,
-            GovernanceSettingKeys.PublicExperience.AnnouncementBarMessage,
-            settings.AnnouncementBarMessage,
-            true,
-            actorUserId);
-
-        await SetStringTenantOverrideAsync(
-            tenantId,
-            GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkText,
-            settings.AnnouncementBarLinkText,
-            true,
-            actorUserId);
-
-        await SetStringTenantOverrideAsync(
-            tenantId,
-            GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkUrl,
-            settings.AnnouncementBarLinkUrl,
-            true,
-            actorUserId);
-
-        if (settings.ForceAnnouncementBarRedisplay)
-        {
-            var revisionSetting = await _tenantSettingRepository.GetByTenantAndKey(
-                tenantId,
-                GovernanceSettingKeys.PublicExperience.AnnouncementBarRevision,
-                cancellationToken);
-            var nextRevision = DeserializeInteger(revisionSetting?.Value, 0) + 1;
-
-            await UpsertTenantOverrideAsync(
-                tenantId,
-                GovernanceSettingKeys.PublicExperience.AnnouncementBarRevision,
-                JsonSerializer.Serialize(nextRevision),
-                actorUserId);
-        }
 
         await SetStringTenantOverrideAsync(
             tenantId,

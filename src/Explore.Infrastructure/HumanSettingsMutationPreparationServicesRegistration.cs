@@ -15,6 +15,7 @@ public static class HumanSettingsMutationPreparationServicesRegistration
     public static IServiceCollection AddHumanSettingsMutationPreparation(this IServiceCollection services)
     {
         services.TryAddScoped<IHumanSettingsMutationPreparation, HumanSettingsMutationPreparation>();
+        services.TryAddScoped<Explore.Application.Features.Announcements.AnnouncementEditionResolver>();
         services.TryAddScoped<IHumanTenantPreferencePreparation, HumanTenantPreferencePreparation>();
         services.TryAddScoped<IHumanLearningMutationPreparation, HumanLearningMutationPreparation>();
         services.TryAddScoped<ILearningGuidancePolicyReader, LearningGuidancePolicyReader>();

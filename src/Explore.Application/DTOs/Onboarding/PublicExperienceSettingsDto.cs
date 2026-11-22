@@ -1,5 +1,6 @@
 using Explore.Application.DTOs.Footer;
 using Explore.Application.DTOs.PublicExperience;
+using ISLAMU.Wire.Contracts.Announcements;
 
 namespace Explore.Application.DTOs.Onboarding;
 
@@ -31,11 +32,7 @@ public sealed record PublicExperienceSettingsDto
     public bool AllowOrganizationSelfRegistration { get; init; } = true;
     public bool AllowGroupSelfRegistration { get; init; } = true;
     public bool EventCardClickOpensDetailPage { get; init; }
-    public bool AnnouncementBarEnabled { get; init; }
-    public string AnnouncementBarMessage { get; init; } = string.Empty;
-    public string AnnouncementBarLinkText { get; init; } = string.Empty;
-    public string AnnouncementBarLinkUrl { get; init; } = string.Empty;
-    public int AnnouncementBarRevision { get; init; }
+    public AnnouncementPublicStateDto? Announcement { get; init; }
     public string CommunityGuidelinesContent { get; init; } = string.Empty;
     public IReadOnlyList<string> EnabledModules
     {

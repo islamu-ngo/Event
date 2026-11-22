@@ -576,6 +576,8 @@ public sealed class ConfigurationImportApplyService(
             operationId, target, sourceBytes, request, prepared!.Authority, now, session.ArtifactDigest,
             parser, ImportOwnerFactory() as IHumanConfigurationImportPublicationFactory
                 ?? throw new InvalidOperationException("The selected import owner has no original publication source."),
+            ImportOwnerFactory() as IHumanConfigurationImportAnnouncementFactory
+                ?? throw new InvalidOperationException("The selected import owner has no original announcement source."),
             originalLocks, cancellationToken);
         var authorized = new ConfigurationImportAuthorizedArtifact(
             sourceBytes,
@@ -679,8 +681,16 @@ public sealed class ConfigurationImportApplyService(
                 verificationRequest,
                 cancellationToken,
                 inCurrentTransaction: true);
-        ConfigurationImportPreview verification =
-            previewComposer.Compose(verificationPreparation.Input);
+        if (admittedApply?.AnnouncementStore is { } verifiedAnnouncements)
+        {
+            var ownership = HumanConfigurationImportAnnouncementOwnership.Require(verifiedAnnouncements, importAdmission,
+                prepared?.Authority
+                    ?? throw new UnauthorizedAccessException("The original announcement import authority is unavailable."));
+            await ownership.RequireCompletedAsync(cancellationToken);
+        }
+        ConfigurationImportPreview verification = admittedApply?.AnnouncementStore is not null
+            ? previewComposer.ComposeAfterApply(verificationPreparation.Input)
+            : previewComposer.Compose(verificationPreparation.Input);
         if (preparation.Input.ModerationPreview is { } nativePreview)
         {
             // Verify the actual post-apply artifact, including every selected tenant, rather than

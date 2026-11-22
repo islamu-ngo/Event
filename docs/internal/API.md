@@ -3,6 +3,40 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
+## Source-Bound Announcements
+
+`AnnouncementsController` exposes eight named operations:
+
+| Resource | Read | Write |
+| --- | --- | --- |
+| Instance source | `GET /api/announcements/instance` | `PUT /api/announcements/instance` |
+| Current tenant source | `GET /api/announcements/tenant` | `PUT /api/announcements/tenant` |
+| Managed tenant source | `GET /api/announcements/tenants/{tenantId}` | `PUT /api/announcements/tenants/{tenantId}` |
+| Current user's dismissal | `GET /api/announcements/self` | `POST /api/announcements/self/dismiss` |
+
+These are private original-human operations with `no-store` responses. GET
+actions retain anonymous endpoint metadata, but their query boundary requires
+an authenticated, admitted subject; absence of that subject fails closed.
+Source edits and dismissal affordances come from HAL links. The generated
+`IAnnouncementsClient` consumes the registered named DTO schemas, including
+their nested source, owner, witness and receipt values.
+
+Publication carries a captured source plus an explicit change. Dismissal carries
+`observed` and required nullable `expectedMarker`; owner `tenantId` is also
+required nullable, with null representing the instance owner. No client-supplied
+user identifier selects the marker row. The server binds account and tenant and
+checks both source identity and persisted-marker expectation under the acquired
+settings original. Applied and already-dismissed receipts are distinct; source
+or marker conflicts return 409 without mutation. Publication source conflicts
+return 409 and a locked publication returns 403.
+
+Ordinary settings endpoints cannot replace or reset these coordinated slots.
+Public experience exposes the resolved publication observation, not another
+user's dismissal state. Configuration import accepts semantic announcement
+intent rather than transportable runtime epochs, editions or private evidence.
+See [Contextual Learning](CONTEXTUAL_LEARNING.md#announcement-material-editions-and-source-ownership)
+for resolution and same-edition source-cycle behavior.
+
 ## Private Contextual Learning
 
 `LearningController` defines nine named `/api/learning` operations:

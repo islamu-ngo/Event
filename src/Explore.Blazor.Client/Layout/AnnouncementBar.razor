@@ -12,7 +12,7 @@
                   Dense="true"
                   Variant="@Variant.Text"
                   ContentAlignment="HorizontalAlignment.Center"
-                  ShowCloseIcon="@(!_isSaving && !_isLoading)"
+                  ShowCloseIcon="@(!_isSaving && !_isLoading && _canDismiss)"
                   CloseIconClicked="CloseBar"
                   NoIcon="true">
             <div class="announcement-bar__content">
@@ -32,7 +32,9 @@
                 }
                 @if (_saveFailed)
                 {
-                    <MudText role="status">Dismissal could not be saved. Try again.</MudText>
+                    <MudText role="status">Dismissal could not be confirmed. Reload before trying again.</MudText>
+                    <MudButton Variant="Variant.Text" Disabled="@(_isSaving || _isLoading)"
+                               OnClick="ReconcileAnnouncementAsync">Reload announcement</MudButton>
                 }
             </div>
         </MudAlert>

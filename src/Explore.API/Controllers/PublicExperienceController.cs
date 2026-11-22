@@ -48,6 +48,7 @@ public class PublicExperienceController : ControllerBase
     [HttpGet("settings", Name = RouteNames.GetPublicExperienceSettings)]
     [AllowAnonymous]
     [PrivateNoStore]
+    [OutputCache(NoStore = true)]
     [EndpointSummary("Get Public Experience Settings")]
     [EndpointDescription("Returns effective home-page and white-label settings for the current tenant context.")]
     [ProducesResponseType(typeof(PublicExperienceSettingsDto), StatusCodes.Status200OK)]
@@ -67,6 +68,7 @@ public class PublicExperienceController : ControllerBase
     [ProducesResponseType(typeof(PublicExperienceShellDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     [PrivateNoStore]
+    [OutputCache(NoStore = true)]
     public async Task<ActionResult<PublicExperienceShellDto>> GetShell(CancellationToken cancellationToken = default)
     {
         var shell = await _shellHandler.QueryAsync(new GetPublicExperienceShellQuery(), cancellationToken);

@@ -143,7 +143,7 @@ public class TenantOnboardingService : ITenantOnboardingService
             return await _api.CompleteTenantOnboardingAsync(
                 new CompleteTenantOnboardingRequest
                 {
-                    Settings = ToRequest(settings, false),
+                    Settings = ToRequest(settings),
                     DirectoryOperatorIdentity = new TenantDirectoryOperatorIdentityInputDto
                     {
                         PublicName = identity.PublicName,
@@ -243,9 +243,7 @@ public class TenantOnboardingService : ITenantOnboardingService
         AiAssistantProvider = "none"
     };
 
-    private static UpdateTenantPolicyRequest ToRequest(
-        TenantPolicySettingsDto settings,
-        bool forceAnnouncementBarRedisplay) => new()
+    private static UpdateTenantPolicyRequest ToRequest(TenantPolicySettingsDto settings) => new()
         {
             AllowUserSubmittedEvents = settings.AllowUserSubmittedEvents,
             AllowOrganizationSubmittedEvents = settings.AllowOrganizationSubmittedEvents,
@@ -258,11 +256,6 @@ public class TenantOnboardingService : ITenantOnboardingService
             PreferredHomePage = settings.PreferredHomePage,
             Subdomain = settings.Subdomain,
             CustomDomain = settings.CustomDomain,
-            AnnouncementBarEnabled = settings.AnnouncementBarEnabled,
-            AnnouncementBarMessage = settings.AnnouncementBarMessage,
-            AnnouncementBarLinkText = settings.AnnouncementBarLinkText,
-            AnnouncementBarLinkUrl = settings.AnnouncementBarLinkUrl,
-            ForceAnnouncementBarRedisplay = forceAnnouncementBarRedisplay,
             CommunityGuidelinesContent = settings.CommunityGuidelinesContent,
             RenderPolicyPreset = settings.RenderPolicyPreset,
             EnableAdvancedRenderPolicyOverrides = settings.EnableAdvancedRenderPolicyOverrides,

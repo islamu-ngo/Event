@@ -1,5 +1,6 @@
 @using MudBlazor
 @using Explore.Blazor.Client.Services
+@using Explore.Blazor.Client.Contracts.Services
 
 <div class="settings-section">
     <div class="settings-section-header">
@@ -8,7 +9,7 @@
             Add a dismissible message above the site navigation. Leave it disabled to show no announcement bar.
             @if (HasExistingAnnouncementBar)
             {
-                <span>A text-only save keeps previous user dismissals. Use "Save and show to everyone" when the announcement should reappear for users who already closed it.</span>
+                <span>Changing the message or link publishes a new edition. Use "Save and show to everyone" to redisplay unchanged material.</span>
             }
             else
             {
@@ -18,56 +19,56 @@
     </div>
 
     <MudStack Spacing="3" Class="settings-form-section mt-4">
-        <MudSwitch T="bool?" @bind-Value="Model.AnnouncementBarEnabled" Color="Color.Primary">
+        <MudSwitch T="bool" @bind-Value="Model.Enabled" Color="Color.Primary" Disabled="IsReadOnly">
             Show announcement bar
         </MudSwitch>
 
         <MudTextField T="string"
-                      @bind-Value="Model.AnnouncementBarMessage"
+                      @bind-Value="Model.Message"
                       Label="Announcement message"
                       Variant="Variant.Outlined"
                       Lines="3"
                       FullWidth="true"
-                      Disabled="Model.AnnouncementBarEnabled != true"
+                      Disabled="IsReadOnly || !Model.Enabled"
                       HelperText="Required when the announcement bar is enabled." />
 
         <MudGrid Spacing="3">
             <MudItem xs="12" md="5">
                 <MudTextField T="string"
-                              @bind-Value="Model.AnnouncementBarLinkText"
+                              @bind-Value="Model.LinkText"
                               Label="Optional link text"
                               Variant="Variant.Outlined"
                               FullWidth="true"
-                              Disabled="Model.AnnouncementBarEnabled != true" />
+                              Disabled="IsReadOnly || !Model.Enabled" />
             </MudItem>
             <MudItem xs="12" md="7">
                 <MudTextField T="string"
-                              @bind-Value="Model.AnnouncementBarLinkUrl"
+                              @bind-Value="Model.LinkUrl"
                               Label="Optional link URL"
                               Variant="Variant.Outlined"
                               FullWidth="true"
-                              Disabled="Model.AnnouncementBarEnabled != true"
+                              Disabled="IsReadOnly || !Model.Enabled"
                               HelperText="Use a relative path such as /events or a full https:// URL." />
             </MudItem>
         </MudGrid>
 
-        @if (Model.AnnouncementBarEnabled == true && string.IsNullOrWhiteSpace(Model.AnnouncementBarMessage))
+        @if (Model.Enabled && string.IsNullOrWhiteSpace(Model.Message))
         {
             <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
                 The bar will stay hidden until a message is provided.
             </MudAlert>
         }
 
-        @if (Model.AnnouncementBarEnabled == true && !string.IsNullOrWhiteSpace(Model.AnnouncementBarMessage))
+        @if (Model.Enabled && !string.IsNullOrWhiteSpace(Model.Message))
         {
             <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" NoIcon="true">
                 <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Justify="Justify.Center">
                     <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" />
-                    <MudText Typo="Typo.body2">@Model.AnnouncementBarMessage</MudText>
-                    @if (!string.IsNullOrWhiteSpace(Model.AnnouncementBarLinkText) && !string.IsNullOrWhiteSpace(Model.AnnouncementBarLinkUrl))
+                    <MudText Typo="Typo.body2">@Model.Message</MudText>
+                    @if (!string.IsNullOrWhiteSpace(Model.LinkText) && !string.IsNullOrWhiteSpace(Model.LinkUrl))
                     {
-                        <MudLink Href="@Model.AnnouncementBarLinkUrl" Color="Color.Primary">
-                            @Model.AnnouncementBarLinkText
+                        <MudLink Href="@Model.LinkUrl" Color="Color.Primary">
+                            @Model.LinkText
                         </MudLink>
                     }
                 </MudStack>
@@ -78,8 +79,13 @@
 
 @code {
     [Parameter]
-    public TenantPolicySettingsDto Model { get; set; } = new();
+    public AnnouncementDraft Model { get; set; } = new();
 
     [Parameter]
     public bool HasExistingAnnouncementBar { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    private bool IsReadOnly => Disabled || Model.Original?._links?.ContainsKey("publish") != true;
 }

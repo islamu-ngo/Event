@@ -253,6 +253,11 @@ public class BlazorTestContext : BunitContext
             .Returns(Task.FromResult<SettingGroupResponseDto?>(null));
         Services.AddSingleton(userSettingsService);
 
+        var announcements = Substitute.For<IAnnouncementClientService>();
+        announcements.LoadAsync(Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<AnnouncementDisplayState?>(null));
+        Services.AddSingleton(announcements);
+
         var shellContextService = Substitute.For<IUiShellContextService>();
         shellContextService.GetCachedContextAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<UiShellContextDto?>(null));

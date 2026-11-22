@@ -236,6 +236,8 @@ public static class ConfigurationImportArtifactSnapshotFactory
     {
         ConfigurationPortabilitySectionDescriptor descriptor =
             ConfigurationPortabilityRegistry.Sections[sectionKey];
+        using var settings = sectionKey.EndsWith(".settings", StringComparison.Ordinal)
+            ? JsonDocument.Parse(normalizedBytes.ToArray()) : null;
         return new ConfigurationImportSectionSnapshot(
             sectionKey,
             ConfigurationImportDigest.ComputeBytes(normalizedBytes),
@@ -243,7 +245,8 @@ public static class ConfigurationImportArtifactSnapshotFactory
             descriptor.SupportsPreview,
             descriptor.SupportsDiff,
             requiresExternalSetup: false,
-            blockingReasonCode: blockingReasonCode);
+            blockingReasonCode: blockingReasonCode,
+            settingsImage: settings?.RootElement);
     }
 
     private static void WriteNormalized(

@@ -1,5 +1,5 @@
 using Explore.Blazor.Client.Layout;
-using Microsoft.JSInterop;
+using Explore.Blazor.Client.Tests.Services;
 using MudBlazor;
 
 namespace Explore.Blazor.Client.Tests.Learning;
@@ -9,10 +9,7 @@ public sealed class AnnouncementBarStateTests
     [Test]
     public async Task AppliedDismissalHidesTheBarAndUpdatesHeaderVisibility()
     {
-        using var harness = new AnnouncementHarness();
-        harness.Preferences.UpdateSettingsBatchAsync(PreferenceCategory,
-                Arg.Any<IDictionary<string, string>>(), Arg.Any<CancellationToken>())
-            .Returns(Saved());
+        await using var harness = new AnnouncementHarness();
         var cut = harness.Render();
 
         await cut.InvokeAsync(() => cut.FindComponent<MudAlert>().Instance.CloseIconClicked.InvokeAsync());
@@ -23,30 +20,33 @@ public sealed class AnnouncementBarStateTests
 
     [Test]
     [Arguments("null")]
-    [Arguments("failed-batch")]
-    [Arguments("unapplied-key")]
-    [Arguments("missing-key")]
-    [Arguments("wrong-key")]
-    [Arguments("missing-results")]
-    [Arguments("duplicate-key")]
+    [Arguments("unknown-decision")]
+    [Arguments("wrong-edition")]
+    [Arguments("missing-marker")]
+    [Arguments("wrong-owner")]
+    [Arguments("missing-observation")]
+    [Arguments("unsettled-read")]
     public async Task UnconfirmedDismissalRemainsVisibleWithAnHonestFailureStatus(string outcome)
     {
-        using var harness = new AnnouncementHarness();
-        BatchUpdateResponseDto? result = outcome switch
-        {
-            "null" => null,
-            "failed-batch" => Saved() with { Success = false },
-            "unapplied-key" => new() { Success = true, Results = [new() { Key = DismissalKey, Applied = false }] },
-            "missing-key" => new() { Success = true, Results = [] },
-            "wrong-key" => new() { Success = true, Results = [new() { Key = "event_list.page_size", Applied = true }] },
-            "missing-results" => new() { Success = true, Results = null! },
-            "duplicate-key" => new() { Success = true, Results =
-                [new() { Key = DismissalKey, Applied = true }, new() { Key = DismissalKey, Applied = false }] },
-            _ => throw new ArgumentOutOfRangeException(nameof(outcome))
-        };
-        harness.Preferences.UpdateSettingsBatchAsync(PreferenceCategory,
-                Arg.Any<IDictionary<string, string>>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(result));
+        await using var harness = new AnnouncementHarness();
+        harness.Api.DismissAnnouncementAsync(Arg.Any<AnnouncementDismissRequestDto>(),
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                var result = harness.Saved();
+                switch (outcome)
+                {
+                    case "null": return Task.FromResult<HalResourceOfAnnouncementDismissalReceiptDto>(null!);
+                    case "unknown-decision": result.Decision = 99; break;
+                    case "wrong-edition": result.Marker!.Observation.Edition = AnnouncementTestData.OtherEdition; break;
+                    case "missing-marker": result.Marker = null; break;
+                    case "wrong-owner": result.Marker!.Observation.Owner.TenantId = AnnouncementTestData.Tenant; break;
+                    case "missing-observation": result.Marker!.Observation = null!; break;
+                    case "unsettled-read": harness.ClearMarker(); break;
+                    default: throw new ArgumentOutOfRangeException(nameof(outcome));
+                }
+                return Task.FromResult(result);
+            });
         var cut = harness.Render();
 
         await cut.InvokeAsync(() => cut.FindComponent<MudAlert>().Instance.CloseIconClicked.InvokeAsync());
@@ -57,11 +57,10 @@ public sealed class AnnouncementBarStateTests
     }
 
     [Test]
-    public async Task CurrentRevisionDismissalIsReadAfterInteractiveRendering()
+    public async Task CurrentEditionDismissalIsReadAfterInteractiveRendering()
     {
-        using var harness = new AnnouncementHarness();
-        harness.Preferences.GetSettingsAsync(PreferenceCategory, Arg.Any<CancellationToken>())
-            .Returns(Preference("4"));
+        await using var harness = new AnnouncementHarness();
+        harness.StoreCurrentMarker();
 
         var cut = harness.Render();
 
@@ -69,15 +68,17 @@ public sealed class AnnouncementBarStateTests
     }
 
     [Test]
-    public async Task ExplicitRetryCanSaveAfterAFailedDismissal()
+    public async Task ExplicitReconciliationAndRetryCanSaveAfterAFailedDismissal()
     {
-        using var harness = new AnnouncementHarness();
-        harness.Preferences.UpdateSettingsBatchAsync(PreferenceCategory,
-                Arg.Any<IDictionary<string, string>>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<BatchUpdateResponseDto?>(null), Task.FromResult<BatchUpdateResponseDto?>(Saved()));
+        await using var harness = new AnnouncementHarness();
+        harness.Api.DismissAnnouncementAsync(Arg.Any<AnnouncementDismissRequestDto>(),
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult<HalResourceOfAnnouncementDismissalReceiptDto>(null!),
+                _ => Task.FromResult(harness.Saved()));
         var cut = harness.Render();
         await cut.InvokeAsync(() => cut.FindComponent<MudAlert>().Instance.CloseIconClicked.InvokeAsync());
 
+        await cut.InvokeAsync(() => cut.FindComponent<MudButton>().Instance.OnClick.InvokeAsync());
         await cut.InvokeAsync(() => cut.FindComponent<MudAlert>().Instance.CloseIconClicked.InvokeAsync());
 
         await Assert.That(cut.FindAll(".announcement-bar").Count).IsEqualTo(0);
@@ -85,117 +86,119 @@ public sealed class AnnouncementBarStateTests
     }
 
     [Test]
-    public async Task RevisionChangeIgnoresThePreviousDismissalSaveCallback()
+    public async Task EditionChangeIgnoresThePreviousDismissalSaveCallback()
     {
-        using var harness = new AnnouncementHarness();
+        await using var harness = new AnnouncementHarness();
         var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var saved = new TaskCompletionSource<BatchUpdateResponseDto?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        harness.Preferences.UpdateSettingsBatchAsync(PreferenceCategory,
-                Arg.Any<IDictionary<string, string>>(), Arg.Any<CancellationToken>())
-            .Returns(_ =>
-            {
-                requested.TrySetResult();
-                return saved.Task;
-            });
+        var saved = new TaskCompletionSource<HalResourceOfAnnouncementDismissalReceiptDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.HoldDismissal(requested, saved);
         var cut = harness.Render();
         Task closing = cut.InvokeAsync(() => cut.FindComponent<MudAlert>().Instance.CloseIconClicked.InvokeAsync());
         await requested.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-        harness.Settings = harness.Settings with { AnnouncementBarRevision = 5, AnnouncementBarMessage = "New announcement" };
+        harness.Settings = AnnouncementTestData.Settings(edition: AnnouncementTestData.OtherEdition, message: "New announcement");
         await cut.InvokeAsync(harness.NotifySettingsChanged);
-        saved.SetResult(Saved());
+        saved.SetResult(harness.Saved());
         await closing.WaitAsync(TimeSpan.FromSeconds(10));
 
         await Assert.That(cut.FindAll(".announcement-bar").Count).IsEqualTo(1);
         await Assert.That(cut.FindComponent<MudAlert>().Instance.ShowCloseIcon).IsTrue();
         await Assert.That(cut.Find(".announcement-bar__text").TextContent.Trim())
-            .IsEqualTo(harness.Settings.AnnouncementBarMessage);
+            .IsEqualTo(harness.Settings.Announcement!.Material!.Message);
         await Assert.That(harness.Visibility.Last()).IsTrue();
+    }
+
+    [Test]
+    public async Task SamePublicationRefreshOffersReconciliationAfterPendingDismissalSettles()
+    {
+        await using var harness = new AnnouncementHarness();
+        var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var saved = new TaskCompletionSource<HalResourceOfAnnouncementDismissalReceiptDto>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.HoldDismissal(requested, saved);
+        var cut = harness.Render();
+        Task closing = cut.InvokeAsync(() => cut.FindComponent<MudAlert>().Instance.CloseIconClicked.InvokeAsync());
+        await requested.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        harness.Settings = AnnouncementTestData.Settings(epoch: AnnouncementTestData.OtherEpoch);
+        await cut.InvokeAsync(harness.NotifySettingsChanged);
+        saved.SetResult(harness.Saved());
+        await closing.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await Assert.That(cut.FindAll(".announcement-bar").Count).IsEqualTo(1);
+        await Assert.That(cut.FindComponent<MudAlert>().Instance.ShowCloseIcon).IsFalse();
+        await Assert.That(cut.FindAll("[role='status']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindComponent<MudButton>().Instance.Disabled).IsFalse();
     }
 
     [Test]
     public async Task TenantChangeIgnoresThePreviousDismissalSaveCallback()
     {
-        using var harness = new AnnouncementHarness();
+        await using var harness = new AnnouncementHarness();
         var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var saved = new TaskCompletionSource<BatchUpdateResponseDto?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        harness.Preferences.UpdateSettingsBatchAsync(PreferenceCategory,
-                Arg.Any<IDictionary<string, string>>(), Arg.Any<CancellationToken>())
-            .Returns(_ =>
-            {
-                requested.TrySetResult();
-                return saved.Task;
-            });
+        var saved = new TaskCompletionSource<HalResourceOfAnnouncementDismissalReceiptDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.HoldDismissal(requested, saved);
         var cut = harness.Render();
         Task closing = cut.InvokeAsync(() => cut.FindComponent<MudAlert>().Instance.CloseIconClicked.InvokeAsync());
         await requested.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-        harness.Settings = harness.Settings with { TenantId = Guid.CreateVersion7() };
+        harness.Settings = AnnouncementTestData.Settings(tenant: AnnouncementTestData.OtherTenant);
         await cut.InvokeAsync(harness.NotifySettingsChanged);
-        saved.SetResult(Saved());
+        saved.SetResult(harness.Saved());
         await closing.WaitAsync(TimeSpan.FromSeconds(10));
 
         await Assert.That(cut.FindAll(".announcement-bar").Count).IsEqualTo(1);
         await Assert.That(cut.Find(".announcement-bar__text").TextContent.Trim())
-            .IsEqualTo(harness.Settings.AnnouncementBarMessage);
+            .IsEqualTo(harness.Settings.Announcement!.Material!.Message);
         await Assert.That(harness.Visibility.Last()).IsTrue();
     }
 
     [Test]
-    public async Task ReplacementSettingsBlockDismissalUntilTheirPreferencesAreLoaded()
+    public async Task ReplacementSettingsBlockDismissalUntilTheirPrivateStateIsLoaded()
     {
-        using var harness = new AnnouncementHarness();
+        await using var harness = new AnnouncementHarness();
         var cut = harness.Render();
         var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var preferences = new TaskCompletionSource<SettingGroupResponseDto?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        harness.Preferences.GetSettingsAsync(PreferenceCategory, Arg.Any<CancellationToken>())
-            .Returns(_ =>
-            {
-                requested.TrySetResult();
-                return preferences.Task;
-            });
-        string? savedRevision = null;
-        harness.Preferences.UpdateSettingsBatchAsync(PreferenceCategory,
-                Arg.Any<IDictionary<string, string>>(), Arg.Any<CancellationToken>())
+        var preferences = new TaskCompletionSource<HalResourceOfAnnouncementSelfStateDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Api.GetMyAnnouncementDismissalAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { requested.TrySetResult(); return preferences.Task; },
+                _ => Task.FromResult(harness.CurrentSelf()));
+        Guid? savedEdition = null;
+        harness.Api.DismissAnnouncementAsync(Arg.Any<AnnouncementDismissRequestDto>(),
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {
-                savedRevision = call.Arg<IDictionary<string, string>>()[DismissalKey];
-                return Saved();
+                savedEdition = call.Arg<AnnouncementDismissRequestDto>().Observed.Edition;
+                return harness.Saved();
             });
 
-        harness.Settings = harness.Settings with { AnnouncementBarRevision = 5 };
+        harness.Settings = AnnouncementTestData.Settings(edition: AnnouncementTestData.OtherEdition);
         await cut.InvokeAsync(harness.NotifySettingsChanged);
         await requested.Task.WaitAsync(TimeSpan.FromSeconds(10));
         await cut.InvokeAsync(() => cut.FindComponent<MudAlert>().Instance.CloseIconClicked.InvokeAsync());
-        await Assert.That(savedRevision).IsNull();
+        await Assert.That(savedEdition).IsNull();
         Task loaded = OnNextMarkup(cut);
-        preferences.SetResult(null);
+        preferences.SetResult(harness.CurrentSelf());
         await loaded.WaitAsync(TimeSpan.FromSeconds(10));
         await cut.InvokeAsync(() => cut.FindComponent<MudAlert>().Instance.CloseIconClicked.InvokeAsync());
 
-        await Assert.That(savedRevision).IsEqualTo("5");
+        await Assert.That(savedEdition).IsEqualTo(AnnouncementTestData.OtherEdition);
         await Assert.That(cut.FindAll(".announcement-bar").Count).IsEqualTo(0);
     }
 
     [Test]
     public async Task AccountChangeIgnoresThePreviousDismissalSaveCallback()
     {
-        using var harness = new AnnouncementHarness();
+        await using var harness = new AnnouncementHarness();
         var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var saved = new TaskCompletionSource<BatchUpdateResponseDto?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        harness.Preferences.UpdateSettingsBatchAsync(PreferenceCategory,
-                Arg.Any<IDictionary<string, string>>(), Arg.Any<CancellationToken>())
-            .Returns(_ =>
-            {
-                requested.TrySetResult();
-                return saved.Task;
-            });
+        var saved = new TaskCompletionSource<HalResourceOfAnnouncementDismissalReceiptDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.HoldDismissal(requested, saved);
         var cut = harness.Render();
         Task closing = cut.InvokeAsync(() => cut.FindComponent<MudAlert>().Instance.CloseIconClicked.InvokeAsync());
         await requested.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
         await cut.InvokeAsync(harness.Authentication.ChangeAccount);
-        saved.SetResult(Saved());
+        saved.SetResult(harness.Saved());
         await closing.WaitAsync(TimeSpan.FromSeconds(10));
 
         await Assert.That(cut.FindAll(".announcement-bar").Count).IsEqualTo(1);
@@ -203,27 +206,25 @@ public sealed class AnnouncementBarStateTests
     }
 
     [Test]
-    public async Task NewSettingsCannotBeOverwrittenByAnOlderPreferenceRead()
+    public async Task NewSettingsCannotBeOverwrittenByAnOlderPrivateStateRead()
     {
-        using var harness = new AnnouncementHarness();
+        await using var harness = new AnnouncementHarness();
         var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var preferences = new TaskCompletionSource<SettingGroupResponseDto?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        harness.Preferences.GetSettingsAsync(PreferenceCategory, Arg.Any<CancellationToken>())
-            .Returns(_ =>
-            {
-                requested.TrySetResult();
-                return preferences.Task;
-            }, _ => Task.FromResult<SettingGroupResponseDto?>(null));
+        var preferences = new TaskCompletionSource<HalResourceOfAnnouncementSelfStateDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var old = AnnouncementTestData.Self(harness.Settings, new() { Observation = AnnouncementTestData.Observation() });
+        harness.Api.GetMyAnnouncementDismissalAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { requested.TrySetResult(); return preferences.Task; },
+                _ => Task.FromResult(harness.CurrentSelf()));
         var cut = harness.Render();
         await requested.Task.WaitAsync(TimeSpan.FromSeconds(10));
         var visible = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         harness.BecameVisible = visible;
 
-        harness.Settings = harness.Settings with { AnnouncementBarRevision = 5, AnnouncementBarMessage = "New announcement" };
+        harness.Settings = AnnouncementTestData.Settings(edition: AnnouncementTestData.OtherEdition, message: "New announcement");
         await cut.InvokeAsync(harness.NotifySettingsChanged);
         await visible.Task.WaitAsync(TimeSpan.FromSeconds(10));
         Task rendered = OnNextMarkup(cut);
-        preferences.SetResult(Preference("99"));
+        preferences.SetResult(old);
         await rendered.WaitAsync(TimeSpan.FromSeconds(10));
 
         await Assert.That(cut.FindAll(".announcement-bar").Count).IsEqualTo(1);
@@ -233,22 +234,16 @@ public sealed class AnnouncementBarStateTests
     [Test]
     public async Task DisposedBarIgnoresAnOutstandingDismissalResult()
     {
-        using var harness = new AnnouncementHarness();
+        await using var harness = new AnnouncementHarness();
         var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var saved = new TaskCompletionSource<BatchUpdateResponseDto?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        harness.Preferences.UpdateSettingsBatchAsync(PreferenceCategory,
-                Arg.Any<IDictionary<string, string>>(), Arg.Any<CancellationToken>())
-            .Returns(_ =>
-            {
-                requested.TrySetResult();
-                return saved.Task;
-            });
+        var saved = new TaskCompletionSource<HalResourceOfAnnouncementDismissalReceiptDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.HoldDismissal(requested, saved);
         var cut = harness.Render();
         Task closing = cut.InvokeAsync(() => cut.FindComponent<MudAlert>().Instance.CloseIconClicked.InvokeAsync());
         await requested.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
         await cut.InvokeAsync(cut.Instance.Dispose);
-        saved.SetResult(Saved());
+        saved.SetResult(harness.Saved());
         await closing.WaitAsync(TimeSpan.FromSeconds(10));
 
         await Assert.That(harness.Visibility.Last()).IsTrue();
@@ -257,57 +252,27 @@ public sealed class AnnouncementBarStateTests
     [Test]
     public async Task ProductionSettingsRefreshUpdatesTheBarAndInvalidatesPendingDismissal()
     {
-        using var context = new BlazorTestContext();
-        var publicApi = Substitute.For<IPublicExperienceClient>();
-        var current = new PublicExperienceSettingsDto
-        {
-            TenantId = Guid.CreateVersion7(), AnnouncementBarEnabled = true,
-            AnnouncementBarRevision = 4, AnnouncementBarMessage = "Original announcement",
-            DirectoryOperator = new TenantDirectoryOperatorPublicDto
-                { PublicName = "Directory", LegalName = "Directory legal name" }
-        };
-        publicApi.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(_ => Task.FromResult(current));
-        var experience = new PublicExperienceService(publicApi, Substitute.For<ILogger<PublicExperienceService>>());
-        var authentication = new ChangingAuthenticationState();
-        authentication.ChangeAccount();
-        var api = Substitute.For<ISettingsClient>();
-        api.GetUserSettingsAsync(PreferenceCategory, Arg.Any<string?>(), Arg.Any<string?>(),
-                Arg.Any<CancellationToken>()).Returns(Preference("0"));
-        await using var preferences = new UserSettingsService(api, authentication,
-            Substitute.For<IJSRuntime>(), Substitute.For<ILogger<UserSettingsService>>(), experience);
-        context.Services.AddSingleton<IPublicExperienceService>(experience);
-        context.Services.AddSingleton<IUserSettingsService>(preferences);
-        context.Services.AddSingleton<AuthenticationStateProvider>(authentication);
+        await using var harness = new AnnouncementHarness(production: true);
         var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var saved = new TaskCompletionSource<BatchUpdateResponseDto>(TaskCreationOptions.RunContinuationsAsynchronously);
-        string? savedRevision = null;
-        api.UpdateUserSettingsBatchAsync(PreferenceCategory, Arg.Any<UpdateSettingBatchDto>(),
-                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                savedRevision = call.Arg<UpdateSettingBatchDto>().Values[DismissalKey];
-                requested.TrySetResult();
-                return saved.Task;
-            });
-        var cut = context.RenderMudComponent<AnnouncementBar>();
+        var saved = new TaskCompletionSource<HalResourceOfAnnouncementDismissalReceiptDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.HoldDismissal(requested, saved);
+        var cut = harness.Render();
         await Assert.That(cut.FindAll(".announcement-bar").Count).IsEqualTo(1);
         Task closing = cut.InvokeAsync(() => cut.FindComponent<MudAlert>().Instance.CloseIconClicked.InvokeAsync());
         await requested.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-        current = current with { AnnouncementBarRevision = 5, AnnouncementBarMessage = "Replacement announcement" };
+        harness.Settings = AnnouncementTestData.Settings(edition: AnnouncementTestData.OtherEdition, message: "Replacement announcement");
         Task refreshed = OnNextMarkup(cut, () => cut.FindAll(".announcement-bar__text")
-            .SingleOrDefault()?.TextContent.Trim() == current.AnnouncementBarMessage);
-        await cut.InvokeAsync(async () => { await experience.GetSettingsAsync(); });
+            .SingleOrDefault()?.TextContent.Trim() == harness.Settings.Announcement!.Material!.Message);
+        await cut.InvokeAsync(async () => { await harness.Experience.GetSettingsAsync(); });
         await refreshed.WaitAsync(TimeSpan.FromSeconds(10));
-        saved.SetResult(Saved());
+        saved.SetResult(harness.Saved());
         await closing.WaitAsync(TimeSpan.FromSeconds(10));
 
-        await Assert.That(savedRevision).IsEqualTo("4");
+        await Assert.That(harness.Written?.Edition).IsEqualTo(AnnouncementTestData.Edition);
         await Assert.That(cut.FindAll(".announcement-bar").Count).IsEqualTo(1);
         await Assert.That(cut.Find(".announcement-bar__text").TextContent.Trim())
-            .IsEqualTo(current.AnnouncementBarMessage);
+            .IsEqualTo(harness.Settings.Announcement!.Material!.Message);
         await Assert.That(cut.FindAll("[role='status']").Count).IsEqualTo(0);
     }
 
@@ -316,47 +281,18 @@ public sealed class AnnouncementBarStateTests
     [Arguments(true)]
     public async Task ProductionUnavailableTransitionHidesTheBarWithoutARefetchLoop(bool missingIdentity)
     {
-        using var context = new BlazorTestContext();
-        var publicApi = Substitute.For<IPublicExperienceClient>();
-        var current = new PublicExperienceSettingsDto
-        {
-            TenantId = Guid.CreateVersion7(), AnnouncementBarEnabled = true,
-            AnnouncementBarRevision = 4, AnnouncementBarMessage = "Current announcement",
-            DirectoryOperator = new TenantDirectoryOperatorPublicDto
-                { PublicName = "Directory", LegalName = "Directory legal name" }
-        };
-        bool unavailable = false;
-        int publicReads = 0;
-        publicApi.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(_ =>
-            {
-                publicReads++;
-                if (unavailable && !missingIdentity)
-                    return Task.FromException<PublicExperienceSettingsDto>(new HttpRequestException("Unavailable"));
-                return Task.FromResult(unavailable ? current with { DirectoryOperator = null } : current);
-            });
-        var experience = new PublicExperienceService(publicApi, Substitute.For<ILogger<PublicExperienceService>>());
-        var authentication = new ChangingAuthenticationState();
-        authentication.ChangeAccount();
-        var api = Substitute.For<ISettingsClient>();
-        api.GetUserSettingsAsync(PreferenceCategory, Arg.Any<string?>(), Arg.Any<string?>(),
-                Arg.Any<CancellationToken>()).Returns(Preference("0"));
-        await using var preferences = new UserSettingsService(api, authentication,
-            Substitute.For<IJSRuntime>(), Substitute.For<ILogger<UserSettingsService>>(), experience);
-        context.Services.AddSingleton<IPublicExperienceService>(experience);
-        context.Services.AddSingleton<IUserSettingsService>(preferences);
-        context.Services.AddSingleton<AuthenticationStateProvider>(authentication);
-        var cut = context.RenderMudComponent<AnnouncementBar>();
+        await using var harness = new AnnouncementHarness(production: true);
+        var cut = harness.Render();
         await Assert.That(cut.FindAll(".announcement-bar").Count).IsEqualTo(1);
         Task hidden = OnNextMarkup(cut, () => cut.FindAll(".announcement-bar").Count == 0);
 
-        unavailable = true;
-        await cut.InvokeAsync(async () => { await experience.GetSettingsAsync(); });
+        harness.Unavailable = true;
+        harness.MissingIdentity = missingIdentity;
+        await cut.InvokeAsync(async () => { await harness.Experience.GetSettingsAsync(); });
         await hidden.WaitAsync(TimeSpan.FromSeconds(10));
 
-        await Assert.That(experience.SettingsAvailability).IsEqualTo(PublicExperienceAvailability.Unavailable);
-        await Assert.That(publicReads).IsEqualTo(2);
+        await Assert.That(harness.Experience.SettingsAvailability).IsEqualTo(PublicExperienceAvailability.Unavailable);
+        await Assert.That(harness.PublicReads).IsEqualTo(2);
         await Assert.That(cut.FindAll(".announcement-bar").Count).IsEqualTo(0);
     }
 
@@ -375,41 +311,86 @@ public sealed class AnnouncementBarStateTests
         return rendered.Task;
     }
 
-    private const string PreferenceCategory = "PublicExperiencePreferences";
-    private const string DismissalKey = "public_experience_preferences.announcement_bar.dismissed_revision";
-
-    private static BatchUpdateResponseDto Saved() => new()
-    {
-        Success = true, Results = [new SettingUpdateResultDto { Key = DismissalKey, Applied = true }]
-    };
-
-    private static SettingGroupResponseDto Preference(string revision) => new()
-    {
-        Category = PreferenceCategory,
-        Settings = [new EffectiveSettingDto { Key = DismissalKey, Value = revision }]
-    };
-
-    private sealed class AnnouncementHarness : IDisposable
+    private sealed class AnnouncementHarness : IAsyncDisposable
     {
         private readonly BlazorTestContext _context = new();
-        internal IPublicExperienceService Experience { get; } = Substitute.For<IPublicExperienceService>();
-        internal IUserSettingsService Preferences { get; } = Substitute.For<IUserSettingsService>();
+        private readonly AnnouncementClientService _service;
+        private AnnouncementDismissalMarkerDto? _marker;
+        private int _markerAccount;
+        private int _writeAccount;
+        internal IPublicExperienceService Experience { get; }
+        internal IAnnouncementsClient Api { get; } = Substitute.For<IAnnouncementsClient>();
         internal ChangingAuthenticationState Authentication { get; } = new();
         internal List<bool> Visibility { get; } = [];
         internal TaskCompletionSource? BecameVisible { get; set; }
-        internal PublicExperienceSettingsDto Settings { get; set; } = new()
-        {
-            TenantId = Guid.CreateVersion7(), AnnouncementBarEnabled = true,
-            AnnouncementBarRevision = 4, AnnouncementBarMessage = "Announcement"
-        };
+        internal PublicExperienceSettingsDto Settings { get; set; } = AnnouncementTestData.Settings();
+        internal AnnouncementObservationDto? Written { get; private set; }
+        internal bool Unavailable { get; set; }
+        internal bool MissingIdentity { get; set; }
+        internal int PublicReads { get; private set; }
 
-        internal AnnouncementHarness()
+        internal AnnouncementHarness(bool production = false)
         {
-            Experience.GetCachedSettingsAsync().Returns(_ => Task.FromResult<PublicExperienceSettingsDto?>(Settings));
+            if (production)
+            {
+                var publicApi = Substitute.For<IPublicExperienceClient>();
+                publicApi.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                    .Returns(_ =>
+                    {
+                        PublicReads++;
+                        if (Unavailable && !MissingIdentity)
+                            return Task.FromException<PublicExperienceSettingsDto>(new HttpRequestException("Unavailable"));
+                        return Task.FromResult(Unavailable ? Settings with { DirectoryOperator = null } : Settings);
+                    });
+                Experience = new PublicExperienceService(publicApi, Substitute.For<ILogger<PublicExperienceService>>());
+            }
+            else
+            {
+                Experience = Substitute.For<IPublicExperienceService>();
+                Experience.GetCachedSettingsAsync().Returns(_ => Task.FromResult<PublicExperienceSettingsDto?>(Settings));
+            }
+            Api.GetMyAnnouncementDismissalAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                .Returns(_ => CurrentSelf());
+            Api.When(api => api.DismissAnnouncementAsync(Arg.Any<AnnouncementDismissRequestDto>(),
+                    Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()))
+                .Do(call =>
+                {
+                    Written = call.Arg<AnnouncementDismissRequestDto>().Observed;
+                    _writeAccount = Authentication.Version;
+                });
+            Api.DismissAnnouncementAsync(Arg.Any<AnnouncementDismissRequestDto>(),
+                    Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                .Returns(_ => Saved());
+            _service = new(Api, Experience, Substitute.For<IUserSettingsService>(), Authentication,
+                Substitute.For<ILogger<AnnouncementClientService>>());
             _context.Services.AddSingleton(Experience);
-            _context.Services.AddSingleton(Preferences);
+            _context.Services.AddSingleton<IAnnouncementClientService>(_service);
             _context.Services.AddSingleton<AuthenticationStateProvider>(Authentication);
         }
+
+        internal HalResourceOfAnnouncementSelfStateDto CurrentSelf() => AnnouncementTestData.Self(Settings,
+            _markerAccount == Authentication.Version && _marker?.Observation?.TenantId == Settings.Announcement!.TenantId ? _marker : null);
+
+        internal HalResourceOfAnnouncementDismissalReceiptDto Saved()
+        {
+            _marker = new() { Observation = Written ?? Settings.Announcement!.Observation! };
+            _markerAccount = _writeAccount;
+            return new() { Decision = 0, Marker = _marker, _links = new Dictionary<string, HalLink>() };
+        }
+
+        internal void StoreCurrentMarker()
+        {
+            _marker = new() { Observation = Settings.Announcement!.Observation! };
+            _markerAccount = Authentication.Version;
+        }
+
+        internal void ClearMarker() => _marker = null;
+
+        internal void HoldDismissal(TaskCompletionSource requested,
+            TaskCompletionSource<HalResourceOfAnnouncementDismissalReceiptDto> saved) =>
+            Api.DismissAnnouncementAsync(Arg.Any<AnnouncementDismissRequestDto>(),
+                    Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                .Returns(_ => { requested.TrySetResult(); return saved.Task; });
 
         internal IRenderedComponent<AnnouncementBar> Render() =>
             _context.RenderMudComponent<AnnouncementBar>(parameters => parameters
@@ -422,19 +403,24 @@ public sealed class AnnouncementBarStateTests
 
         internal void NotifySettingsChanged() => Experience.SettingsChanged += Raise.Event<Action>();
 
-        public void Dispose() => _context.Dispose();
+        public async ValueTask DisposeAsync()
+        {
+            await _service.DisposeAsync();
+            _context.Dispose();
+        }
     }
 
     private sealed class ChangingAuthenticationState : AuthenticationStateProvider
     {
-        private AuthenticationState _state = new(new ClaimsPrincipal(new ClaimsIdentity()));
-
+        private AuthenticationState _state = new(new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, AnnouncementTestData.Tenant.ToString("D"))], "TestAuth")));
+        internal int Version { get; private set; }
         public override Task<AuthenticationState> GetAuthenticationStateAsync() => Task.FromResult(_state);
-
         internal void ChangeAccount()
         {
+            Version++;
             _state = new(new ClaimsPrincipal(new ClaimsIdentity(
-                [new Claim(ClaimTypes.NameIdentifier, Guid.CreateVersion7().ToString("D"))], "TestAuth")));
+                [new Claim(ClaimTypes.NameIdentifier, AnnouncementTestData.OtherTenant.ToString("D"))], "TestAuth")));
             NotifyAuthenticationStateChanged(Task.FromResult(_state));
         }
     }

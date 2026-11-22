@@ -4,6 +4,25 @@ internal static class HalOpenApiSchemaCatalog
 {
     public static IReadOnlyList<Type> RegisteredDtoTypes { get; } =
     [
+        typeof(Explore.API.Controllers.AnnouncementSourceResource),
+        typeof(Explore.API.Controllers.AnnouncementSourceTarget),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementOwnerDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementMaterialDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementPublicationDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementGroupDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementSourceDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementSourceWitnessDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementObservationDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementDismissalMarkerDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementChangeDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementUpdateDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementDismissRequestDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementPublicStateDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementSelfStateDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementPublicationOutcomeDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementPublicationReceiptDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementDismissalDecisionDto),
+        typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementDismissalReceiptDto),
         // Private learning wire contracts, including named nested and strict input objects.
         typeof(ISLAMU.Wire.Contracts.Learning.LearningContextDto),
         typeof(ISLAMU.Wire.Contracts.Learning.LearningGuidancePolicyDto),
@@ -410,6 +429,10 @@ internal static class HalOpenApiSchemaCatalog
 
     public static IReadOnlyDictionary<string, Type> DetailResourceMappings { get; } = new Dictionary<string, Type>
     {
+        ["HalResourceOfAnnouncementSourceResource"] = typeof(Explore.API.Controllers.AnnouncementSourceResource),
+        ["HalResourceOfAnnouncementSelfStateDto"] = typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementSelfStateDto),
+        ["HalResourceOfAnnouncementPublicationReceiptDto"] = typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementPublicationReceiptDto),
+        ["HalResourceOfAnnouncementDismissalReceiptDto"] = typeof(ISLAMU.Wire.Contracts.Announcements.AnnouncementDismissalReceiptDto),
         ["HalResourceOfLearningContextDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningContextDto),
         ["HalResourceOfLearningGuidancePolicyDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningGuidancePolicyDto),
         ["HalResourceOfLearningTourPlanDto"] = typeof(ISLAMU.Wire.Contracts.Learning.LearningTourPlanDto),

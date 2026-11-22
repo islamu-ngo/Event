@@ -16,18 +16,42 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class SecurityExecutionEvidenceIntegrationTests
 {
     [Test]
-    [Arguments(false, false, "failed")]
-    [Arguments(false, true, "timed-out")]
-    [Arguments(true, false, "cancelled")]
-    [Arguments(true, true, "cancelled")]
-    public async Task NativeFailureReportsOnlyRegisteredLaneAndFixedOutcome(
-        bool cancelled, bool timedOut, string outcome)
+    [Arguments("cancelled")]
+    [Arguments("timed-out")]
+    [Arguments("process-failed")]
+    [Arguments("owned-processes-remain")]
+    [Arguments("output-limit-exceeded")]
+    [Arguments("process-cleanup-failed")]
+    [Arguments("observer-unsettled")]
+    [Arguments("observer-failed")]
+    [Arguments("resource-proof-rejected")]
+    [Arguments("temporary-cleanup-failed")]
+    [Arguments("report-missing")]
+    public async Task NativeFailureReportsOnlyRegisteredLaneAndFixedOutcome(string outcome)
     {
+        var process = new SecurityExecutionEvidence.OwnedNativeProcessResult(
+            0, false, false, false, false, true, "private-output"u8.ToArray(), []);
+        var child = new SecurityExecutionEvidence.OwnedChild(process, [1], [], "private-owner", true, true);
+        child = outcome switch
+        {
+            "cancelled" => child with { Process = process with { Cancelled = true, TimedOut = true } },
+            "timed-out" => child with { Process = process with { TimedOut = true } },
+            "process-failed" => child with { Process = process with { ExitCode = 1 } },
+            "owned-processes-remain" => child with { Process = process with { ResidualOwnedChildren = true } },
+            "output-limit-exceeded" => child with { Process = process with { OutputLimitExceeded = true } },
+            "process-cleanup-failed" => child with { Process = process with { CleanupSucceeded = false } },
+            "observer-unsettled" => child with { Process = process with { ObserverSettled = false } },
+            "observer-failed" => child with { Process = process with { ObserverFailures = [new InvalidOperationException("private-error")] } },
+            "resource-proof-rejected" => child with { ResourcesAdmitted = false },
+            "temporary-cleanup-failed" => child with { TemporaryRemoved = false },
+            "report-missing" => child with { Report = [] },
+            _ => throw new ArgumentOutOfRangeException(nameof(outcome))
+        };
         string diagnostic = SecurityExecutionEvidence.NativeExecutionFailureCode(
-            "security-integration", cancelled, timedOut);
+            "security-integration", child);
         await Assert.That(diagnostic).IsEqualTo($"native_execution_failed:security-integration:{outcome}");
         await Assert.That(SecurityExecutionEvidence.NativeExecutionFailureCode(
-            "private-output\nforged-lane", cancelled, timedOut)).IsEqualTo("native_execution_failed");
+            "private-output\nforged-lane", child)).IsEqualTo("native_execution_failed");
     }
 
     [Test]

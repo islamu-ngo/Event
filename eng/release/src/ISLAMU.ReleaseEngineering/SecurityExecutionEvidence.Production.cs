@@ -469,7 +469,7 @@ public static partial class SecurityExecutionEvidence
     internal sealed record LoadToolInputs(string Executable, string ExecutableSha256, string Script, string ScriptSha256);
     private sealed record OwnedInputs(CandidateSourceIdentity Source, string Fingerprint, byte[] Manifest,
         IReadOnlyDictionary<string, OwningManagedTarget> Targets, LoadToolInputs? LoadTool);
-    private sealed record OwnedChild(OwnedNativeProcessResult Process, byte[] Report, byte[] ResourceEvidence,
+    internal sealed record OwnedChild(OwnedNativeProcessResult Process, byte[] Report, byte[] ResourceEvidence,
         string Owner, bool ResourcesAdmitted, bool TemporaryRemoved)
     {
         internal bool Succeeded => Process.Succeeded && ResourcesAdmitted && TemporaryRemoved;
@@ -483,11 +483,24 @@ public static partial class SecurityExecutionEvidence
         internal List<(string[] Uids, OwnedChild Child)> Invocations { get; } = [];
     }
 
-    internal static string NativeExecutionFailureCode(string lane, bool cancelled, bool timedOut)
+    internal static string NativeExecutionFailureCode(string lane, OwnedChild child)
     {
         if (!SecurityControlRegister.ExecutionRequirements.ContainsKey(lane))
             return "native_execution_failed";
-        string outcome = cancelled ? "cancelled" : timedOut ? "timed-out" : "failed";
+        string outcome = child.Process switch
+        {
+            { Cancelled: true } => "cancelled",
+            { TimedOut: true } => "timed-out",
+            { ExitCode: not 0 } => "process-failed",
+            { ResidualOwnedChildren: true } => "owned-processes-remain",
+            { OutputLimitExceeded: true } => "output-limit-exceeded",
+            { CleanupSucceeded: false } => "process-cleanup-failed",
+            { ObserverSettled: false } => "observer-unsettled",
+            { ObserverFailures.Count: > 0 } => "observer-failed",
+            _ when !child.ResourcesAdmitted => "resource-proof-rejected",
+            _ when !child.TemporaryRemoved => "temporary-cleanup-failed",
+            _ => "report-missing"
+        };
         return $"native_execution_failed:{lane}:{outcome}";
     }
 
@@ -582,8 +595,7 @@ public static partial class SecurityExecutionEvidence
                         if (!child.Succeeded || child.Report.Length == 0)
                         {
                             lane.Outcome = child.Process.Cancelled ? "cancelled" : child.Process.TimedOut ? "timed-out" : "failed";
-                            throw new OwnedExecutionFailure(NativeExecutionFailureCode(
-                                lane.Id, child.Process.Cancelled, child.Process.TimedOut));
+                            throw new OwnedExecutionFailure(NativeExecutionFailureCode(lane.Id, child));
                         }
                     }
                     lane.Outcome = "passed";

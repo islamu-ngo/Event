@@ -1,7 +1,7 @@
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Localization;
+using Explore.Blazor.Client.Services.Interop;
 using Microsoft.Extensions.Logging;
-using Microsoft.JSInterop;
 
 namespace Explore.Blazor.Client.Services;
 
@@ -10,12 +10,14 @@ namespace Explore.Blazor.Client.Services;
 /// </summary>
 public sealed class LanguagePreferenceService : ILanguagePreferenceService
 {
-    private readonly IJSRuntime _jsRuntime;
+    private readonly ILanguagePreferenceCookieInterop _cookieInterop;
     private readonly ILogger<LanguagePreferenceService> _logger;
 
-    public LanguagePreferenceService(IJSRuntime jsRuntime, ILogger<LanguagePreferenceService> logger)
+    public LanguagePreferenceService(
+        ILanguagePreferenceCookieInterop cookieInterop,
+        ILogger<LanguagePreferenceService> logger)
     {
-        _jsRuntime = jsRuntime;
+        _cookieInterop = cookieInterop;
         _logger = logger;
     }
 
@@ -31,9 +33,7 @@ public sealed class LanguagePreferenceService : ILanguagePreferenceService
 
         try
         {
-            await using var module = await _jsRuntime.InvokeAsync<IJSObjectReference>(
-                "import", ct, "/js/bff.js");
-            return await module.InvokeAsync<bool>("persistLanguagePreference", ct, entry.Code);
+            return await _cookieInterop.PersistLanguagePreferenceAsync(entry.Code, ct);
         }
         catch (Exception ex)
         {

@@ -159,7 +159,6 @@ public static class PostgresCategoryMutationPermissions
             string savepoint = "category_mutation_permissions_" + Guid.CreateVersion7().ToString("N");
             RequireOriginal();
             await transaction.CreateSavepointAsync(savepoint, cancellationToken);
-            bool rolledBack = false;
             try
             {
                 if (!await IsTrueAsync(context, Identity(enrollment.MigratorLogin), cancellationToken))
@@ -208,18 +207,14 @@ public static class PostgresCategoryMutationPermissions
             }
             catch (Exception failure)
             {
-                if (!rolledBack)
+                try
                 {
-                    try
-                    {
-                        await transaction.RollbackToSavepointAsync(savepoint, CancellationToken.None);
-                        await transaction.ReleaseSavepointAsync(savepoint, CancellationToken.None);
-                        rolledBack = true;
-                    }
-                    catch (Exception cleanup)
-                    {
-                        failure.Data["category_mutation_savepoint_cleanup_error"] = cleanup.Message;
-                    }
+                    await transaction.RollbackToSavepointAsync(savepoint, CancellationToken.None);
+                    await transaction.ReleaseSavepointAsync(savepoint, CancellationToken.None);
+                }
+                catch (Exception cleanup)
+                {
+                    failure.Data["category_mutation_savepoint_cleanup_error"] = cleanup.Message;
                 }
                 throw;
             }

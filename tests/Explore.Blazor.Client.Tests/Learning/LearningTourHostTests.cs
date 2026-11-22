@@ -126,6 +126,28 @@ public sealed class LearningTourHostTests : IDisposable
     }
 
     [Test]
+    public async Task FinalNextPersistsCompletionBeforeClosingTheMountedRenderer()
+    {
+        var host = _context.Render<LearningTourHost>();
+        await host.Find("section.learning-tour > button").ClickAsync(new());
+        await host.FindAll("section.learning-tour > button")[1].ClickAsync(new()).WaitAsync(Deadline);
+
+        await host.Find(".learning-tour__controls > button").ClickAsync(new()).WaitAsync(Deadline);
+        await host.Find(".learning-tour__controls > button").ClickAsync(new()).WaitAsync(Deadline);
+
+        await Assert.That(_coordinator.IsActive).IsFalse();
+        await Assert.That(_coordinator.Failure).IsNull();
+        await Assert.That(host.FindAll(".learning-tour__controls").Count).IsEqualTo(0);
+        await Assert.That(_fixture.Outcomes.Select(outcome => outcome.Action))
+            .IsEquivalentTo(new[]
+            {
+                LearningTourAction.Progress,
+                LearningTourAction.Progress,
+                LearningTourAction.Complete
+            });
+    }
+
+    [Test]
     public async Task DisposedHostDetachesRendererAndInvalidatesOfferedPlan()
     {
         var host = _context.Render<LearningTourHost>();

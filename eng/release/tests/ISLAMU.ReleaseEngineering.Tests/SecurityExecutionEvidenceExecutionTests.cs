@@ -50,7 +50,7 @@ public sealed class SecurityExecutionEvidenceIntegrationTests
             "process-exit-137" => child with { Process = process with { ExitCode = 137 } },
             "process-failed" => child with { Process = process with { ExitCode = 200 } },
             "owned-processes-remain" => child with { Process = process with { ResidualOwnedChildren = true } },
-            "output-limit-exceeded" => child with { Process = process with { OutputLimitExceeded = true } },
+            "output-limit-exceeded" => child with { Process = process with { ExitCode = 137, OutputLimitExceeded = true } },
             "process-cleanup-failed" => child with { Process = process with { CleanupSucceeded = false } },
             "observer-unsettled" => child with { Process = process with { ObserverSettled = false } },
             "observer-failed" => child with { Process = process with { ObserverFailures = [new InvalidOperationException("private-error")] } },

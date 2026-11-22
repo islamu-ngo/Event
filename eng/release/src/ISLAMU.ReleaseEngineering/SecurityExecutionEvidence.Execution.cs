@@ -3472,7 +3472,8 @@ public static partial class SecurityExecutionEvidence
             }
         }
         return new OwnedNativeProcessResult(started && process.HasExited ? process.ExitCode : -1,
-            timedOut, cancelled, residual, output.Exceeded || error.Exceeded, cleanup && !invocationFailed, output.Bytes, error.Bytes)
+            timedOut, cancelled, residual, overflow.IsCancellationRequested || output.Exceeded || error.Exceeded,
+            cleanup && !invocationFailed, output.Bytes, error.Bytes)
         {
             ObserverSettled = observerSettled,
             ObserverFailures = observerFailures.AsReadOnly()

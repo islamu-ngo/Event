@@ -491,12 +491,12 @@ public static partial class SecurityExecutionEvidence
         {
             { Cancelled: true } => "cancelled",
             { TimedOut: true } => "timed-out",
+            { OutputLimitExceeded: true } => "output-limit-exceeded",
             { ExitCode: -1 } => "process-status-unavailable",
             { ExitCode: 1 or 2 or 3 or 10 } => $"process-exit-{child.Process.ExitCode}",
             { ExitCode: 137 } => "process-exit-137",
             { ExitCode: not 0 } => "process-failed",
             { ResidualOwnedChildren: true } => "owned-processes-remain",
-            { OutputLimitExceeded: true } => "output-limit-exceeded",
             { CleanupSucceeded: false } => "process-cleanup-failed",
             { ObserverSettled: false } => "observer-unsettled",
             { ObserverFailures.Count: > 0 } => "observer-failed",

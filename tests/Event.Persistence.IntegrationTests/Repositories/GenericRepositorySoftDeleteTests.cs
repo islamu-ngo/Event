@@ -86,14 +86,20 @@ public sealed class GenericRepositorySoftDeleteTests
             context.TenantContext = new TenantContext(tenantId);
             context.CurrentUserService = new CurrentUser(userId);
             var group = new Group { FullName = "Soft deletion" };
+            var tenant = CreateTenant(tenantId);
             var participation = new GroupTenant
             {
                 Group = group,
                 GroupId = group.Id,
                 TenantId = tenantId,
-                Tenant = null!,
+                Tenant = tenant,
                 ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
-                ApprovalStatus = null!
+                ApprovalStatus = new ApprovalStatus
+                {
+                    Id = (int)ApprovalStatusEnum.Pending,
+                    MasterCode = "pending",
+                    FullName = "Pending"
+                }
             };
             context.GroupTenants.Add(participation);
             await context.SaveChangesAsync();
@@ -160,14 +166,23 @@ public sealed class GenericRepositorySoftDeleteTests
         await using var context = new ExploreDbContext(options);
         var tenantId = Guid.CreateVersion7();
         context.TenantContext = new TenantContext(tenantId);
+        var tenant = CreateTenant(tenantId);
+        var tag = new Tag
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = tenant,
+            MasterCode = "test-tag",
+            FullName = "Test tag"
+        };
         var link = new TagTypeTags
         {
-            TagId = Guid.CreateVersion7(),
-            Tag = null!,
+            TagId = tag.Id,
+            Tag = tag,
             TagTypeId = 1,
-            TagType = null!,
+            TagType = new TagType { Id = 1, MasterCode = "test-type", FullName = "Test type" },
             TenantId = tenantId,
-            Tenant = null!
+            Tenant = tenant
         };
         context.TagTypeTags.Add(link);
         await context.SaveChangesAsync();
@@ -178,6 +193,21 @@ public sealed class GenericRepositorySoftDeleteTests
         await Assert.That(await context.TagTypeTags.AnyAsync(item => item.Id == link.Id)).IsFalse();
         await Assert.That(context.ChangeTracker.CascadeDeleteTiming).IsEqualTo(CascadeTiming.Never);
     }
+
+    private static Tenant CreateTenant(Guid tenantId) => new()
+    {
+        Id = tenantId,
+        FullName = "Test tenant",
+        Slug = $"test-{tenantId:N}",
+        TenantStatusId = (int)TenantStatusEnum.Active,
+        TenantStatus = new TenantStatus
+        {
+            Id = (int)TenantStatusEnum.Active,
+            MasterCode = "active",
+            FullName = "Active",
+            IsActiveState = true
+        }
+    };
 
     [Test]
     public async Task DetachedDelete_WhenOriginalEntityRemainsTrackedInSameContext_DeletesTrackedRowWithoutConflict()

@@ -197,6 +197,13 @@ The internal base URI uses the HTTPS scheme so that API HTTPS-redirection
 middleware does not redirect synthetic requests away from their selected
 handlers. Dispatch remains in process; this does not introduce a network hop.
 
+Trusted server-generated batches coordinate at most eight active transport
+requests and 32 FIFO waiters. Waiting observes request cancellation; overflow
+returns non-cacheable `429` with `Retry-After: 1`. Each acquired transport slot
+still enters native `EarlyRequestAdmission`, which remains zero-queue and
+enforces its unchanged process, internal and time-window budgets. Transport
+coordination does not replay work or cache identity decisions.
+
 The public-experience service retains unavailable public settings and shell
 results for its existing five-minute cache interval, returning no stale public
 operator identity. Cached consumers therefore do not repeatedly refetch the

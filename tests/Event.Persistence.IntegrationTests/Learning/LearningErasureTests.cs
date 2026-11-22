@@ -13,7 +13,7 @@ public sealed class LearningErasureTests
     public async Task PurgeAndAbsenceRequireAnExplicitBoundSubjectTransaction()
     {
         await using var database = await LearningProviderDatabase.CreateAsync();
-        await database.SeedLearningAsync(withChildren: true);
+        var original = await database.SeedLearningAsync(withChildren: true);
         await using var context = database.Open(null);
         var store = new LearningPrivacyErasureStore(context);
         var intent = LearningProviderDatabase.Intent(database.UserId);
@@ -22,6 +22,8 @@ public sealed class LearningErasureTests
         await using var observer = database.Open(database.TenantId);
         await Assert.That((await new LearningRepository(observer)
             .GetStateAsync(database.TenantId, database.UserId, false, default))!.Practices.Count).IsEqualTo(1);
+        await Assert.That(await observer.Set<LearningTourStepProgress>().Select(row => row.Id).ToArrayAsync())
+            .IsEquivalentTo(original.Tours.SelectMany(row => row.Steps).Select(row => row.Id));
     }
 
     [Test]
@@ -34,6 +36,15 @@ public sealed class LearningErasureTests
         first = await AcknowledgeAsync(database, first);
         second = await AcknowledgeAsync(database, second);
         other = await AcknowledgeAsync(database, other);
+        await using (var before = database.OpenSystem())
+        {
+            await Assert.That(await before.Set<LearningTourStepProgress>().Select(row => row.Id).ToArrayAsync())
+                .IsEquivalentTo(new[] { first, second, other }.SelectMany(state => state.Tours)
+                    .SelectMany(tour => tour.Steps).Select(step => step.Id));
+            await Assert.That(await before.LearningRequirementAcknowledgements.Select(row => row.Id).ToArrayAsync())
+                .IsEquivalentTo(new[] { first, second, other }
+                    .SelectMany(state => state.RequirementAcknowledgements).Select(row => row.Id));
+        }
         await using (var context = database.Open(null))
         {
             await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
@@ -51,6 +62,8 @@ public sealed class LearningErasureTests
             .IsEquivalentTo([other.Id]);
         await Assert.That(await observer.Set<LearningTourProgress>().Select(row => row.Id).ToArrayAsync())
             .IsEquivalentTo(other.Tours.Select(row => row.Id));
+        await Assert.That(await observer.Set<LearningTourStepProgress>().Select(row => row.Id).ToArrayAsync())
+            .IsEquivalentTo(other.Tours.SelectMany(row => row.Steps).Select(row => row.Id));
         await Assert.That(await observer.Set<LearningPracticeState>().Select(row => row.Id).ToArrayAsync())
             .IsEquivalentTo(other.Practices.Select(row => row.Id));
         await Assert.That(await observer.LearningRequirementAcknowledgements.Select(row => row.Id).ToArrayAsync())
@@ -71,6 +84,13 @@ public sealed class LearningErasureTests
         await using var database = await LearningProviderDatabase.CreateAsync();
         var original = await database.SeedLearningAsync(withChildren: true);
         original = await AcknowledgeAsync(database, original);
+        await using (var before = database.Open(database.TenantId))
+        {
+            await Assert.That(await before.Set<LearningTourStepProgress>().Select(row => row.Id).ToArrayAsync())
+                .IsEquivalentTo(original.Tours.SelectMany(row => row.Steps).Select(row => row.Id));
+            await Assert.That(await before.LearningRequirementAcknowledgements.Select(row => row.Id).ToArrayAsync())
+                .IsEquivalentTo(original.RequirementAcknowledgements.Select(row => row.Id));
+        }
         var intent = LearningProviderDatabase.Intent(database.UserId);
         await using (var context = database.Open(null))
         {
@@ -90,6 +110,15 @@ public sealed class LearningErasureTests
             await Assert.That(row.Id).IsEqualTo(original.Id);
             await Assert.That(row.Revision).IsEqualTo(original.Revision);
             await Assert.That(row.Tours.Select(value => value.Id)).IsEquivalentTo(original.Tours.Select(value => value.Id));
+            await Assert.That(row.Tours.SelectMany(value => value.Steps).Select(value => value.Id))
+                .IsEquivalentTo(original.Tours.SelectMany(value => value.Steps).Select(value => value.Id));
+            var step = row.Tours.Single().Steps.Single();
+            var originalStep = original.Tours.Single().Steps.Single();
+            await Assert.That(step.TenantId).IsEqualTo(originalStep.TenantId);
+            await Assert.That(step.TourProgressId).IsEqualTo(originalStep.TourProgressId);
+            await Assert.That(step.StepKey).IsEqualTo(originalStep.StepKey);
+            await Assert.That(step.StepVersion).IsEqualTo(originalStep.StepVersion);
+            await Assert.That(step.CompletedAtUtc).IsEqualTo(originalStep.CompletedAtUtc);
             await Assert.That(row.Practices.Select(value => value.Id)).IsEquivalentTo(original.Practices.Select(value => value.Id));
             await Assert.That(row.RequirementAcknowledgements.Select(value => value.Id))
                 .IsEquivalentTo(original.RequirementAcknowledgements.Select(value => value.Id));
@@ -112,6 +141,7 @@ public sealed class LearningErasureTests
         await using var observer = database.OpenSystem();
         await Assert.That(await observer.UserLearningStates.CountAsync()).IsEqualTo(0);
         await Assert.That(await observer.Set<LearningTourProgress>().CountAsync()).IsEqualTo(0);
+        await Assert.That(await observer.Set<LearningTourStepProgress>().CountAsync()).IsEqualTo(0);
         await Assert.That(await observer.Set<LearningPracticeState>().CountAsync()).IsEqualTo(0);
         await Assert.That(await observer.LearningRequirementAcknowledgements.CountAsync()).IsEqualTo(0);
         await Assert.That(await observer.TenantLearningSpaces.CountAsync()).IsEqualTo(1);
@@ -121,7 +151,7 @@ public sealed class LearningErasureTests
     public async Task CrossTenantAbsenceFailureRollsBackEarlierWritesInTheSameTransaction()
     {
         await using var database = await LearningProviderDatabase.CreateAsync();
-        await database.SeedLearningAsync(database.OtherTenantId, withChildren: true);
+        var subject = await database.SeedLearningAsync(database.OtherTenantId, withChildren: true);
         var unrelated = await database.SeedLearningAsync(userId: database.OtherUserId, withChildren: true);
         await using (var context = database.Open(database.TenantId))
         {
@@ -146,6 +176,9 @@ public sealed class LearningErasureTests
         await Assert.That(await observer.UserLearningStates.AnyAsync(row =>
             row.UserId == database.UserId && row.TenantId == database.OtherTenantId)).IsTrue();
         await Assert.That(await observer.Set<LearningPracticeState>().CountAsync()).IsEqualTo(2);
+        await Assert.That(await observer.Set<LearningTourStepProgress>().Select(row => row.Id).ToArrayAsync())
+            .IsEquivalentTo(new[] { subject, unrelated }.SelectMany(state => state.Tours)
+                .SelectMany(tour => tour.Steps).Select(step => step.Id));
     }
 
     private static async Task<UserLearningState> AcknowledgeAsync(

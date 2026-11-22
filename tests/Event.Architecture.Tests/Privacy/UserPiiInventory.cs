@@ -78,6 +78,7 @@ internal static class UserPiiInventory
         Local("VisitorEnrollmentOperation.CredentialOperationId", "VisitorEnrollmentOperation.LocalSubjectId", "LocalIdentityCredentialStateStore", UserPiiDisposition.HardDelete),
         Local("VisitorEnrollmentOperation.TenantUserId", "VisitorEnrollmentOperation.LocalSubjectId", "LocalIdentityCredentialStateStore", UserPiiDisposition.HardDelete),
         Local("VisitorEnrollmentOperation.IntentDigest", "VisitorEnrollmentOperation.LocalSubjectId", "LocalIdentityCredentialStateStore", UserPiiDisposition.HardDelete),
+        Local("UserLearningState.UserId", "UserLearningState.UserId", "HumanLearningMutationStore", UserPiiDisposition.HardDelete),
         Local("Event.SourcePublisherName", "Event provenance metadata; not subject-owned", "Event provenance import handlers", UserPiiDisposition.BoundedRetain,
             "Preserve source attribution for event provenance", "Event record lifecycle"),
         Local("Event.SubmittedByUserId", "Event.SubmittedByUserId", "CreateEventCommandHandler", UserPiiDisposition.Anonymize,

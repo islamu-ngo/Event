@@ -174,12 +174,13 @@ public sealed class LearningProviderContractTests
     }
 
     [Test]
-    public async Task ChildNaturalKeysRejectDuplicateTourVersionsAndPracticeContexts()
+    public async Task ChildNaturalKeysRejectDuplicateTourVersionsPracticeContextsStepsAndAcknowledgements()
     {
         await using var database = await LearningProviderDatabase.CreateAsync();
-        var state = await database.SeedLearningAsync(withChildren: true);
+        var state = await SeedConstraintChildrenAsync(database);
         await using var context = database.Open(database.TenantId);
-        foreach (Type child in new[] { typeof(LearningTourProgress), typeof(LearningPracticeState) })
+        foreach (Type child in new[] { typeof(LearningTourProgress), typeof(LearningPracticeState),
+            typeof(LearningTourStepProgress), typeof(LearningRequirementAcknowledgement) })
         {
             var entity = context.Model.FindEntityType(child)!;
             var table = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
@@ -190,11 +191,14 @@ public sealed class LearningProviderContractTests
                 sql.DelimitIdentifier(property.GetColumnName(table)!)));
             string values = string.Join(", ", properties.Select(property => property.Name == "Id"
                 ? "{0}" : sql.DelimitIdentifier(property.GetColumnName(table)!)));
-            string parent = sql.DelimitIdentifier(entity.FindProperty("UserLearningStateId")!.GetColumnName(table)!);
+            bool step = child == typeof(LearningTourStepProgress);
+            string parent = sql.DelimitIdentifier(entity.FindProperty(
+                step ? "TourProgressId" : "UserLearningStateId")!.GetColumnName(table)!);
+            Guid parentId = step ? state.Tours.Single().Id : state.Id;
             var failure = await Assert.ThrowsAsync<System.Data.Common.DbException>(() =>
                 context.Database.ExecuteSqlRawAsync(
                     $"INSERT INTO {name} ({columns}) SELECT {values} FROM {name} WHERE {parent} = {{1}}",
-                    Guid.CreateVersion7(), state.Id));
+                    Guid.CreateVersion7(), parentId));
             await Assert.That(failure switch
             {
                 Npgsql.PostgresException postgres => postgres.SqlState == "23505",
@@ -206,25 +210,31 @@ public sealed class LearningProviderContractTests
         }
         await Assert.That(await context.Set<LearningTourProgress>().CountAsync()).IsEqualTo(1);
         await Assert.That(await context.Set<LearningPracticeState>().CountAsync()).IsEqualTo(1);
+        await Assert.That(await context.Set<LearningTourStepProgress>().CountAsync()).IsEqualTo(1);
+        await Assert.That(await context.LearningRequirementAcknowledgements.CountAsync()).IsEqualTo(1);
     }
 
     [Test]
     public async Task CompositeChildForeignKeysRejectAnotherTenantEvenWhenParentExists()
     {
         await using var database = await LearningProviderDatabase.CreateAsync();
-        var state = await database.SeedLearningAsync(withChildren: true);
+        var state = await SeedConstraintChildrenAsync(database);
         await using var context = database.Open(database.TenantId);
-        foreach (Type child in new[] { typeof(LearningTourProgress), typeof(LearningPracticeState) })
+        foreach (Type child in new[] { typeof(LearningTourProgress), typeof(LearningPracticeState),
+            typeof(LearningTourStepProgress), typeof(LearningRequirementAcknowledgement) })
         {
             var entity = context.Model.FindEntityType(child)!;
             var table = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
             var sql = context.GetService<ISqlGenerationHelper>();
             string tenantColumn = sql.DelimitIdentifier(entity.FindProperty(nameof(LearningPracticeState.TenantId))!.GetColumnName(table)!);
-            string parentColumn = sql.DelimitIdentifier(entity.FindProperty(nameof(LearningPracticeState.UserLearningStateId))!.GetColumnName(table)!);
+            bool step = child == typeof(LearningTourStepProgress);
+            string parentColumn = sql.DelimitIdentifier(entity.FindProperty(
+                step ? "TourProgressId" : "UserLearningStateId")!.GetColumnName(table)!);
+            Guid parentId = step ? state.Tours.Single().Id : state.Id;
             string name = sql.DelimitIdentifier(table.Name, table.Schema);
             var failure = await Assert.ThrowsAsync<System.Data.Common.DbException>(() => context.Database.ExecuteSqlRawAsync(
                 $"UPDATE {name} SET {tenantColumn} = {{0}} WHERE {parentColumn} = {{1}}",
-                database.OtherTenantId, state.Id));
+                database.OtherTenantId, parentId));
             await Assert.That(failure switch
             {
                 Npgsql.PostgresException postgres => postgres.SqlState == "23503",
@@ -236,6 +246,20 @@ public sealed class LearningProviderContractTests
         }
         await Assert.That(await context.Set<LearningTourProgress>().CountAsync()).IsEqualTo(1);
         await Assert.That(await context.Set<LearningPracticeState>().CountAsync()).IsEqualTo(1);
+        await Assert.That(await context.Set<LearningTourStepProgress>().CountAsync()).IsEqualTo(1);
+        await Assert.That(await context.LearningRequirementAcknowledgements.CountAsync()).IsEqualTo(1);
+    }
+
+    private static async Task<UserLearningState> SeedConstraintChildrenAsync(LearningProviderDatabase database)
+    {
+        await database.SeedLearningAsync(withChildren: true);
+        await using var context = database.Open(database.TenantId);
+        var repository = new LearningRepository(context);
+        var state = (await repository.GetStateAsync(database.TenantId, database.UserId, true, default))!;
+        state.AcknowledgeRequirement(Guid.CreateVersion7(), LearningRequirementDefinition.Current,
+            new string('A', 64), Guid.CreateVersion7(), state.Revision, LearningProviderDatabase.Now);
+        await repository.SaveChangesAsync(default);
+        return state;
     }
 
     [Test]

@@ -4,12 +4,13 @@ using Explore.Domain.Learning;
 using Explore.Persistence;
 using Explore.Persistence.Privacy;
 using Explore.Persistence.Repositories;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using static Event.Persistence.IntegrationTests.Learning.LearningPersistenceSqliteTests;
+using Microsoft.EntityFrameworkCore.Storage;
+using static Event.Persistence.IntegrationTests.Learning.LearningProviderDatabase;
 
 namespace Event.Persistence.IntegrationTests.Learning;
 
+[Category("LearningProvider")]
 public sealed class LearningSemanticPersistenceTests
 {
     private static readonly string PlanFingerprint = new('A', 64);
@@ -20,7 +21,7 @@ public sealed class LearningSemanticPersistenceTests
     [Test]
     public async Task ReloadIncludesStableStepEvidenceAndAcceptedClaimSources()
     {
-        await using var database = await LearningDatabase.CreateAsync();
+        await using var database = await LearningProviderDatabase.CreateAsync();
         UserLearningState original = await SeedSemanticAsync(database);
         await using var context = database.Open(database.TenantId);
         var stored = (await new LearningRepository(context)
@@ -42,7 +43,7 @@ public sealed class LearningSemanticPersistenceTests
     [Test]
     public async Task StepReadsRemainTenantQualifiedAndUnboundReadsFailClosed()
     {
-        await using var database = await LearningDatabase.CreateAsync();
+        await using var database = await LearningProviderDatabase.CreateAsync();
         await SeedSemanticAsync(database);
         await using var other = database.Open(database.OtherTenantId);
         await Assert.That(await other.Set<LearningTourStepProgress>().AnyAsync()).IsFalse();
@@ -53,24 +54,24 @@ public sealed class LearningSemanticPersistenceTests
     [Test]
     public async Task PhysicalCompositeForeignKeyRejectsAnotherTenantAndMissingParent()
     {
-        await using var database = await LearningDatabase.CreateAsync();
+        await using var database = await LearningProviderDatabase.CreateAsync();
         await SeedSemanticAsync(database);
         await using var context = database.Open(database.TenantId);
-        var foreignTenant = await Assert.ThrowsAsync<SqliteException>(() =>
+        var foreignTenant = await Assert.ThrowsAsync<System.Data.Common.DbException>(() =>
             context.Set<LearningTourStepProgress>()
                 .ExecuteUpdateAsync(update => update.SetProperty(row => row.TenantId, database.OtherTenantId)));
-        await Assert.That(foreignTenant!.SqliteExtendedErrorCode).IsEqualTo(787);
+        await Assert.That(IsForeignKeyViolation(foreignTenant!)).IsTrue();
         Guid missingParent = Guid.CreateVersion7();
-        var orphan = await Assert.ThrowsAsync<SqliteException>(() =>
+        var orphan = await Assert.ThrowsAsync<System.Data.Common.DbException>(() =>
             context.Set<LearningTourStepProgress>()
                 .ExecuteUpdateAsync(update => update.SetProperty(row => row.TourProgressId, missingParent)));
-        await Assert.That(orphan!.SqliteExtendedErrorCode).IsEqualTo(787);
+        await Assert.That(IsForeignKeyViolation(orphan!)).IsTrue();
     }
 
     [Test]
     public async Task PhysicalUniquenessBindsTenantParentKeyAndSemanticVersion()
     {
-        await using var database = await LearningDatabase.CreateAsync();
+        await using var database = await LearningProviderDatabase.CreateAsync();
         var original = await SeedSemanticAsync(database);
         Guid parent = original.Tours.Single().Id;
         await using var context = database.Open(database.TenantId);
@@ -78,12 +79,19 @@ public sealed class LearningSemanticPersistenceTests
         var state = (await repository.GetStateAsync(database.TenantId, database.UserId, true, default))!;
         RecordHelp(state);
         await repository.SaveChangesAsync(default);
-        var failure = await Assert.ThrowsAsync<SqliteException>(() =>
+        var failure = await Assert.ThrowsAsync<System.Data.Common.DbException>(() =>
             context.Set<LearningTourStepProgress>()
                 .Where(row => row.TourProgressId == parent && row.StepKey == "shell.help")
                 .ExecuteUpdateAsync(update => update.SetProperty(row => row.StepKey, "shell.navigation")
                     .SetProperty(row => row.StepVersion, 1)));
-        await Assert.That(failure!.SqliteExtendedErrorCode).IsEqualTo(2067);
+        await Assert.That(failure switch
+        {
+            Npgsql.PostgresException postgres => postgres.SqlState == "23505",
+            Microsoft.Data.Sqlite.SqliteException sqlite => sqlite.SqliteExtendedErrorCode == 2067,
+            Microsoft.Data.SqlClient.SqlException sqlServer => sqlServer.Number is 2601 or 2627,
+            MySqlConnector.MySqlException mysql => mysql.Number == 1062,
+            _ => false
+        }).IsTrue();
         await context.Set<LearningTourStepProgress>()
             .Where(row => row.TourProgressId == parent && row.StepKey == "shell.help")
             .ExecuteUpdateAsync(update => update.SetProperty(row => row.StepKey, "shell.navigation")
@@ -98,7 +106,7 @@ public sealed class LearningSemanticPersistenceTests
     [Test]
     public async Task CompetingLoadedProgressKeepsOnlyTheWinningChild()
     {
-        await using var database = await LearningDatabase.CreateAsync();
+        await using var database = await LearningProviderDatabase.CreateAsync();
         await SeedSemanticAsync(database);
         await using var first = database.Open(database.TenantId);
         await using var second = database.Open(database.TenantId);
@@ -122,7 +130,7 @@ public sealed class LearningSemanticPersistenceTests
     [Test]
     public async Task PruningOldMaterialDeletesItsStepsAfterCompatibleCarryForward()
     {
-        await using var database = await LearningDatabase.CreateAsync();
+        await using var database = await LearningProviderDatabase.CreateAsync();
         var original = await SeedSemanticAsync(database);
         Guid retiredTour = original.Tours.Single().Id;
         await using (var context = database.Open(database.TenantId))
@@ -156,20 +164,23 @@ public sealed class LearningSemanticPersistenceTests
     [Test]
     public async Task ProtectedSubjectPurgeRemovesStepsAcrossTenantsAndPreservesOtherOwner()
     {
-        await using var database = await LearningDatabase.CreateAsync();
+        await using var database = await LearningProviderDatabase.CreateAsync();
         await SeedSemanticAsync(database);
         await SeedSemanticAsync(database, database.OtherTenantId);
         var retained = await SeedSemanticAsync(database, userId: database.OtherUserId);
         await using (var context = database.Open(null))
         {
-            await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
-            var store = new LearningPrivacyErasureStore(context);
-            var intent = Intent(database.UserId);
-            await Assert.ThrowsAsync<InvalidOperationException>(() => store.RequireAbsentAsync(intent, default));
-            await store.PurgeAsync(intent, default);
-            await store.RequireAbsentAsync(intent, default);
-            await store.PurgeAsync(intent, default);
-            await transaction.CommitAsync();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+                await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+                var store = new LearningPrivacyErasureStore(context);
+                var intent = Intent(database.UserId);
+                await Assert.ThrowsAsync<InvalidOperationException>(() => store.RequireAbsentAsync(intent, default));
+                await store.PurgeAsync(intent, default);
+                await store.RequireAbsentAsync(intent, default);
+                await store.PurgeAsync(intent, default);
+                await transaction.CommitAsync();
+            });
         }
         await using var first = database.Open(database.TenantId);
         await using var second = database.Open(database.OtherTenantId);
@@ -183,7 +194,7 @@ public sealed class LearningSemanticPersistenceTests
     }
 
     private static async Task<UserLearningState> SeedSemanticAsync(
-        LearningDatabase database, Guid? tenantId = null, Guid? userId = null)
+        LearningProviderDatabase database, Guid? tenantId = null, Guid? userId = null)
     {
         Guid tenant = tenantId ?? database.TenantId;
         var state = UserLearningState.Create(Guid.CreateVersion7(), tenant, userId ?? database.UserId, Now);
@@ -206,7 +217,12 @@ public sealed class LearningSemanticPersistenceTests
             Guid.CreateVersion7(), LearningTourAction.Progress, "shell.help", 2, null,
             PlanFingerprint, PolicySourceStamp, state.Revision, Now.AddSeconds(2));
 
-    private static PrivacyErasureIntent Intent(Guid subjectId) => PrivacyErasureIntent.Record(
-        Guid.CreateVersion7(), 1, PrivacyErasureSubjectKind.User, subjectId,
-        PrivacyErasureReasonCode.SubjectErasureRequest, 1, Now, Now);
+    private static bool IsForeignKeyViolation(System.Data.Common.DbException failure) => failure switch
+    {
+        Npgsql.PostgresException postgres => postgres.SqlState == "23503",
+        Microsoft.Data.Sqlite.SqliteException sqlite => sqlite.SqliteExtendedErrorCode == 787,
+        Microsoft.Data.SqlClient.SqlException sqlServer => sqlServer.Number == 547,
+        MySqlConnector.MySqlException mysql => mysql.Number == 1452,
+        _ => false
+    };
 }

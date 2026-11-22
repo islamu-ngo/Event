@@ -23,10 +23,11 @@ public sealed class LearningMigrationRoundTripTests
         var assembly = context.GetService<IMigrationsAssembly>();
         var migrations = assembly.Migrations
             .Where(pair => pair.Key.EndsWith("_AddTenantLearningState", StringComparison.Ordinal)
-                || pair.Key.EndsWith("_AddSemanticLearningSteps", StringComparison.Ordinal))
+                || pair.Key.EndsWith("_AddSemanticLearningSteps", StringComparison.Ordinal)
+                || pair.Key.EndsWith("_AddLearningGuidancePolicy", StringComparison.Ordinal))
             .OrderBy(pair => pair.Key, StringComparer.Ordinal)
             .Select(pair => assembly.CreateMigration(pair.Value, context.Database.ProviderName!)).ToArray();
-        await Assert.That(migrations.Length).IsEqualTo(2);
+        await Assert.That(migrations.Length).IsEqualTo(3);
         var generator = context.GetService<IMigrationsSqlGenerator>();
         string query = database.Provider switch
         {
@@ -96,7 +97,8 @@ public sealed class LearningMigrationRoundTripTests
     {
         await context.Database.OpenConnectionAsync();
         foreach (Type type in new[] { typeof(TenantLearningSpace), typeof(UserLearningState),
-            typeof(LearningTourProgress), typeof(LearningTourStepProgress), typeof(LearningPracticeState) })
+            typeof(LearningTourProgress), typeof(LearningTourStepProgress), typeof(LearningPracticeState),
+            typeof(LearningRequirementAcknowledgement) })
         {
             var entity = context.Model.FindEntityType(type)!;
             string table = entity.GetTableName()!;

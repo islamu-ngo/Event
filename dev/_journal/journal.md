@@ -3667,6 +3667,56 @@ temporary probe; the expected deparse was not guessed.
 **Promotion Consideration**:
 - [x] Stays in journal only; bounded launch-calibration lesson, not a new general test-runner policy.
 
+---
+
+[2026-10-30 Europe/Brussels] — Diagnose login reads under their actual database purpose
+
+**Context**: Contextual onboarding needed genuine original-human PostgreSQL
+source admission. An explicit external privacy-authority test profile passed
+host composition but failed real Local login before learning assertions.
+
+**Symptom / Observation**: The targeted Persistence Release build succeeded.
+The single `OriginalRuntimeHumanRetainsSourcesWithDedicatedExternalAuthority`
+case failed during login with HTTP503 and Npgsql SQLSTATE42501. A bounded,
+test-only EF command-error observer identified the actual command connection
+as `LocalIdentityWriter` and confirmed that its generated SELECT requested
+`DeclaredBirthDate`, `BirthDateCollectionReceiptId` and `BirthDateRevision`.
+Only fixed purpose/property labels and booleans were reported; no SQL,
+parameters, credentials or exception messages were retained by that observer.
+
+**Root Cause**: `IdentityAccountResolver.ResolveAsync` calls generic
+`UserRepository.GetById`, whose `Include(user => user.Pii)` loads the full PII
+entity. `LocalIdentityWriterInventory` deliberately permits SELECT of only
+UserId, Email, FirstName and LastName on UserPii, excluding the three private
+birth fields. The actual failed query and the declared purpose therefore
+disagree. The synchronization handler catches the exception and returns a
+controlled failure, so middleware exception observation alone missed it.
+
+**Resolution**: Unresolved and quarantined from the learning packet. Separate
+identity-lookup correction scope was requested; no production repository,
+authorization, authentication or grant was changed. The recommended correction
+is an identity-purpose read consistent with its admitted data, not expanded
+birth-data access. The new external-profile case was not executed against an
+untouched baseline; this is not an invented baseline reproduction or a learning
+invariant Red result.
+
+**Why This Matters for Future Work**: Establish the physical command's purpose
+and requested fields before changing a fixture or widening permissions. An
+independent authority topology does not change the login's identity purpose,
+and a caught login failure can prevent every downstream feature assertion.
+Keep these setup failures separate from feature test results.
+
+**References**:
+- `src/Explore.Persistence/Repositories/UserRepository.cs:16`
+- `src/Explore.Application/Services/IdentityAccountResolver.cs`
+- `src/Explore.Persistence/Identity/LocalIdentityWriterInventory.cs`
+- `src/Explore.Application/Features/Users/Handlers/Commands/SyncUserCommandHandler.cs`
+- `tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.cs`
+- `dev/active/contextual-tenant-onboarding/contextual-tenant-onboarding-context.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the correction and its regression proof remain open.
+
 [2026-11-01 Europe/Brussels] — Shared privacy transactions have a different commit observer
 
 **Context**: While repairing SQLite Studio and initial draft creation during

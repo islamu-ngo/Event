@@ -377,6 +377,8 @@ public static class ApiHostServiceCollectionExtensions
         builder.Services.AddSingleton<RecyclableMemoryStreamManager>();
 
         builder.Services.AddControllers()
+            // Controllers belong to the API, not runtime dependencies that may contain design-time types.
+            .ConfigureApplicationPartManager(parts => parts.ApplicationParts.Clear())
             .AddApplicationPart(typeof(ApiHostServiceCollectionExtensions).Assembly)
             .AddJsonOptions(options =>
             {

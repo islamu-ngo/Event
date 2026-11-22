@@ -2,8 +2,13 @@ using System.Net;
 using System.Reflection;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
+using Explore.API.Hosting;
 using Explore.ServiceDefaults.HealthChecks;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using TUnit.Assertions;
 using TUnit.Core;
@@ -12,6 +17,28 @@ namespace Event.Api.IntegrationTests.Hosting;
 
 public sealed class ApiHostCompositionTests
 {
+    [Test]
+    public async Task HostComposition_DiscoversOnlyApiOwnedControllers()
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = "Testing",
+            ApplicationName = typeof(ApiHostCompositionTests).Assembly.GetName().Name
+        });
+        builder.AddApiHostServices(static () => false);
+        await using var services = builder.Services.BuildServiceProvider();
+        var parts = services.GetRequiredService<ApplicationPartManager>();
+        var apiAssembly = typeof(ApiHostServiceCollectionExtensions).Assembly;
+
+        await Assert.That(parts.ApplicationParts.OfType<AssemblyPart>()
+                .Select(part => part.Assembly))
+            .IsEquivalentTo(new[] { apiAssembly });
+        var controllers = new ControllerFeature();
+        parts.PopulateFeature(controllers);
+        await Assert.That(controllers.Controllers).IsNotEmpty();
+        await Assert.That(controllers.Controllers.All(controller => controller.Assembly == apiAssembly)).IsTrue();
+    }
+
     [Test]
     public async Task ApiHostModules_ExposeReusablePublicCompositionSeams()
     {

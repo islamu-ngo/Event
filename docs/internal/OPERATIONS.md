@@ -3,6 +3,16 @@
 
 # Operations
 
+## API Controller Assembly Ownership
+
+`AddApiHostServices` owns the MVC controller boundary: it clears inferred
+application parts and adds only the API assembly. Combined hosting must not scan
+persistence, migration or orchestration dependencies as controller libraries.
+Those assemblies can contain design-time types whose tooling dependencies are
+intentionally absent from the serving output. Adding EF design packages to the
+runtime is not the correction. JSON/HAL configuration and explicit test
+application parts registered after API composition retain their normal roles.
+
 ## Private Learning Rollout And Recovery
 
 Learning adds four tenant-filtered entity tables through the generated

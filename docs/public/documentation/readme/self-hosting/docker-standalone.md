@@ -101,6 +101,11 @@ embedded privacy-authority startup migration assemblies. Deploy the
 whole published output or image; do not assemble it by copying migration binaries
 from a separate API or development workspace.
 
+The serving host discovers controllers only from its API assembly. If an older
+build fails during controller discovery with a missing EF design-tool assembly,
+use the corrected complete Standalone output rather than adding design packages
+or manually copying individual dependency binaries into the deployment.
+
 ### Step 1: Create a Persistent Volume
 
 ISLAMU Event Standalone requires persistent storage mounted at `/app/data` to retain the primary database, privacy-erasure authority, Data Protection keys, and uploaded media:

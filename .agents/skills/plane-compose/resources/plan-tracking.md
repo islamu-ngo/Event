@@ -51,8 +51,10 @@ Audit the Tracking Plan against the budget (no item per phase/test/review, no PR
 cd event
 plane schema validate && plane validate --offline
 plane push --work-only --dry-run          # must list exactly this plan's creates/updates
-printf 'y\n' | plane push --work-only     # v0.5.2 has no --yes; keep the conflict check on
+plane push --work-only                    # interactive; v0.5.2 has no --yes; keep the conflict check on
 ```
+
+Run the push interactively and read each prompt before you answer it. Confirm only when the prompt shows exactly the reviewed dry-run plan. Never answer a conflict prompt or any prompt you didn't expect: decline, then follow [conflict resolution](conflict-resolution.md). Don't pipe input into the push, because an unexpected leading prompt would consume it before anyone could stop. Existing receipts from earlier create-only pushes stay as they are.
 
 1. If the dry run lists another task's pending file, hold that file back (move it out of `work/`, push, restore it unchanged). Never edit another task's file.
 2. Read the minted ID from the active file and its UUID with `jq -r '.work_items["id:EVENT-N"].remote_id' .plane/state.json`.
@@ -76,7 +78,7 @@ printf 'y\n' | plane push --work-only     # v0.5.2 has no --yes; keep the confli
 3. **Merged:** confirm the actual merge state and target branch, then reconcile the final reviewed delivery against the scope's required acceptance in the canonical triad. Only then set the S item or Sub-item to `Done`. A squash or rebase merge counts as merged even though the original commit identities changed. A PR closed without merging, or only approved, is not delivered: the item stays open (`In Progress` or `Changes Requested`) until the user re-scopes it; `Won't Do` or `Replaced` needs the user's explicit direction.
 4. **Unmet acceptance after merge:** a merged PR does not silently complete a required criterion. Keep the item open, or record the remaining obligation as an approved successor scope in the same programme (with its own item when it will merge separately). Never move required programme scope to `dev/backlog/` or close it by checking a task.
 5. **M parent:** `Done` only after every Sub-item is `Done` and every retained programme obligation is satisfied, not merely when the last PR merges.
-6. If PR automation already moved an item remotely, mirror that state in YAML before the next push (check with MCP `retrieve_by_identifier`, `fields: state,updated_at`); otherwise the conflict check reports it. If automation set `Done` before reconciliation finished, finish the reconciliation; if it shows an unmet criterion, move the item back to an open state and record why in one MCP comment.
+6. If PR automation already moved an item remotely, mirror that state in YAML before the next push (check with MCP `retrieve_by_identifier`, `fields: state,updated_at`); otherwise the conflict check reports it ([conflict resolution](conflict-resolution.md#default-targeted-cloud-read-then-a-local-field-merge)). If automation set `Done` before reconciliation finished, finish the reconciliation; if it shows an unmet criterion, move the item back to an open state and record why in one MCP comment.
 
 After a non-final PR, stop here. The active YAML file and the canonical triad stay in place for the next scope.
 

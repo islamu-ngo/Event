@@ -14,8 +14,9 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
     private readonly AuthenticationStateProvider _authentication;
     private readonly ILogger<AnnouncementClientService> _logger;
     private readonly object _gate = new();
-    private readonly Dictionary<long, Wire.AnnouncementObservationDto> _pendingDismissals = [];
-    private readonly Dictionary<(Guid Tenant, Guid? OwnerTenant, Guid Edition), long> _uncertainDismissals = [];
+    private readonly Dictionary<long, (bool Authenticated, Wire.AnnouncementObservationDto Observation)> _pendingDismissals = [];
+    private readonly Dictionary<(bool Authenticated, (Guid Tenant, Guid? OwnerTenant, Guid Edition) Publication), long>
+        _uncertainDismissals = [];
     private long _generation;
     private long _authenticationGeneration;
     private long _displaySequence;
@@ -103,9 +104,10 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
             }
             else
             {
-                marker = await _preferences.GetAnonymousAnnouncementMarkerAsync(tenant, cancellationToken);
-                if (!Current(generation, cancellationToken) || sequence != _displaySequence)
+                var read = await _preferences.GetAnonymousAnnouncementMarkerAsync(tenant, cancellationToken);
+                if (!read.Success || !Current(generation, cancellationToken) || sequence != _displaySequence)
                     return null;
+                marker = read.Marker;
                 action = observed is not null;
             }
             bool dismissed = marker is not null && SameIdentity(marker.Observation, observed);
@@ -116,7 +118,7 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
                 if (reconcile && observed is not null)
                 {
                     // A read can settle only uncertainty already recorded when it started.
-                    var identity = DismissalIdentity(observed);
+                    var identity = (authenticated, DismissalIdentity(observed));
                     if (_uncertainDismissals.TryGetValue(identity, out var settled) && settled <= settlementAtReadStart)
                         _uncertainDismissals.Remove(identity);
                 }
@@ -173,7 +175,7 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
                     if (!Current(generation, cancellationToken) || !ReferenceEquals(state, Display))
                         return false;
                     attempted = true;
-                    _pendingDismissals.Add(generation, observed);
+                    _pendingDismissals.Add(generation, (authenticated, observed));
                     pending = _client.DismissAnnouncementAsync(new()
                     {
                         Observed = Transport(observed),
@@ -202,7 +204,7 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
                     if (!Current(generation, cancellationToken) || !ReferenceEquals(state, Display))
                         return false;
                     attempted = true;
-                    _pendingDismissals.Add(generation, observed);
+                    _pendingDismissals.Add(generation, (authenticated, observed));
                 }
                 if (!await _preferences.SaveAnonymousAnnouncementMarkerAsync(
                         state.TenantId, marker, cancellationToken)
@@ -227,16 +229,24 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
             lock (_gate)
             {
                 _pendingDismissals.Remove(generation);
-                if (!_disposed && authenticationGeneration == _authenticationGeneration)
+                if (!_disposed && (!authenticated || authenticationGeneration == _authenticationGeneration))
                 {
                     if (attempted && (accepted is null || cancellationToken.IsCancellationRequested))
-                        _uncertainDismissals[DismissalIdentity(observed)] = ++_dismissalSettlementSequence;
-                    if (_generation == generation || SameIdentity(Display?.Observation, observed))
+                        _uncertainDismissals[(authenticated, DismissalIdentity(observed))] = ++_dismissalSettlementSequence;
+                    if (authenticated == _authenticatedDisplay
+                        && (_generation == generation
+                            || SameDismissalStorage(Display?.Observation, observed, authenticated)))
                     {
                         ++_displaySequence;
                         IsSaving = HasPendingDismissal(Display?.Observation);
-                        if (Display is { } current && HasUncertainDismissal(current.Observation))
-                            Display = current with { CanDismiss = false };
+                        if (Display is { } current)
+                        {
+                            bool canDismiss = (!authenticated || current.CanDismiss)
+                                && current.Observation is not null && current.IsVisible && !current.IsDismissed
+                                && !IsSaving && !HasUncertainDismissal(current.Observation);
+                            if (current.CanDismiss != canDismiss)
+                                Display = current with { CanDismiss = canDismiss };
+                        }
                     }
                 }
             }
@@ -586,10 +596,16 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
         !_disposed && generation == Volatile.Read(ref _generation) && !token.IsCancellationRequested;
 
     private bool HasPendingDismissal(Wire.AnnouncementObservationDto? observation) =>
-        _pendingDismissals.Values.Any(pending => SameIdentity(pending, observation));
+        _pendingDismissals.Values.Any(pending => pending.Authenticated == _authenticatedDisplay
+            && SameDismissalStorage(pending.Observation, observation, pending.Authenticated));
+
+    private static bool SameDismissalStorage(Wire.AnnouncementObservationDto? left,
+        Wire.AnnouncementObservationDto? right, bool authenticated) =>
+        left is not null && right is not null
+        && (authenticated ? SameIdentity(left, right) : left.TenantId == right.TenantId);
 
     private bool HasUncertainDismissal(Wire.AnnouncementObservationDto? observation) =>
-        observation is not null && _uncertainDismissals.ContainsKey(DismissalIdentity(observation));
+        observation is not null && _uncertainDismissals.ContainsKey((_authenticatedDisplay, DismissalIdentity(observation)));
 
     private void OnAuthenticationChanged(Task<AuthenticationState> _) => Invalidate(authentication: true);
     private void OnPublicChanged() => Invalidate(authentication: false);
@@ -609,10 +625,12 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
             IsSaving = false;
             if (authentication)
             {
-                _pendingDismissals.Clear();
+                foreach (var pending in _pendingDismissals.Where(pair => pair.Value.Authenticated).Select(pair => pair.Key).ToArray())
+                    _pendingDismissals.Remove(pending);
                 _publishing = false;
                 ++_authenticationGeneration;
-                _uncertainDismissals.Clear();
+                foreach (var uncertain in _uncertainDismissals.Keys.Where(key => key.Authenticated).ToArray())
+                    _uncertainDismissals.Remove(uncertain);
                 _publishFence = false;
             }
         }

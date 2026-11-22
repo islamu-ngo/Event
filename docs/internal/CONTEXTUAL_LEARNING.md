@@ -223,11 +223,24 @@ bound to its captured announcement identity. A refreshed view may display a
 replacement edition, but it cannot dispatch the same pending dismissal again.
 An unconfirmed attempt records uncertainty for the original tenant, owner and
 material edition, whether the replacement read completes before or after
-settlement. A tenant override remains independently dismissible, and removing
-it does not clear uncertainty for the inherited edition. A source epoch change
+settlement. Once the pending operation settles, a tenant override remains
+independently dismissible, and removing it does not clear uncertainty for the
+inherited edition. A source epoch change
 alone does not change dismissal identity. The bar offers reconciliation only
 for the displayed identity, and an explicit read can clear only uncertainty
 for that identity already recorded when the read started.
+The anonymous marker read result distinguishes a successful empty read from
+unavailable storage, cancellation or a lost browser scope. An unavailable read
+cannot clear uncertainty. Pending and uncertain guest operations retain their
+tenant-local storage identity through sign-in and sign-out, separately from
+authenticated account operations. A late guest completion cannot update an
+account display; returning to that guest storage still requires the original
+operation to settle and an explicit successful read to reconcile it.
+Guest writes share one browser marker slot per tenant, so a replacement edition
+may display immediately but cannot start another dismissal until the prior guest
+write settles. Settlement releases that tenant's busy state without applying the
+old marker or transferring its uncertainty to the replacement edition. This gate
+belongs to the scoped service and does not claim coordination across browser tabs.
 Publication keeps its pending write gate through public refresh too.
 An attempted publication that is canceled or uncertain requires an explicit
 source read before publishing can be offered again. Late cancellation fences

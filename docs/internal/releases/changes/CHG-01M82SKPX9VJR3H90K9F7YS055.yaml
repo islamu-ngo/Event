@@ -1,0 +1,37 @@
+Change-Id: CHG-01M82SKPX9VJR3H90K9F7YS055
+Title: "retain guest dismissal ownership until reconciliation"
+Type: fix
+Scope: notifications
+Summary: "Keep failed browser reads unconfirmed and retain tenant-local guest dismissal ownership through authentication and edition changes."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Unavailable browser reads cannot settle an unconfirmed dismissal. Guest
+      pending writes and uncertainty survive sign-in and sign-out independently
+      of account state. Writes for replacement editions share the same tenant
+      browser slot within the scoped service; account HAL authority is retained.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      A failed read requires explicit successful reconciliation. Replacement
+      content remains visible while an earlier guest save settles, then regains
+      its close action without inheriting the old edition's marker or uncertainty.
+      The gate does not coordinate browser tabs or merge guest history into accounts.

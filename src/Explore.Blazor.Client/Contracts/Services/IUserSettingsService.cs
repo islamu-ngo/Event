@@ -36,7 +36,7 @@ public interface IUserSettingsService
     /// </summary>
     void InvalidateCache(string category);
 
-    Task<ISLAMU.Wire.Contracts.Announcements.AnnouncementDismissalMarkerDto?> GetAnonymousAnnouncementMarkerAsync(
+    Task<AnnouncementMarkerReadResult> GetAnonymousAnnouncementMarkerAsync(
         Guid tenantId, CancellationToken ct = default);
 
     Task<bool> SaveAnonymousAnnouncementMarkerAsync(

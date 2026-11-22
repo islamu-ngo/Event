@@ -149,11 +149,18 @@ announcement. If a newer check shows the same announcement is still visible,
 an older dismissal confirmation won't hide it.
 
 Refreshing announcement settings does not repeat a pending dismissal. A tenant
-override can be dismissed independently, even if dismissal of the inherited
-announcement was never confirmed. If the inherited announcement returns, use
+override can be dismissed independently after an earlier guest save settles,
+even if that save was never confirmed. If the inherited announcement returns, use
 the reconciliation action to check its saved state before trying to dismiss it
 again. A refresh that started before the dismissal settled cannot clear that
 uncertainty.
+A failed browser-storage read also leaves the result unconfirmed. Signing in
+and then returning to anonymous browsing does not repeat an outstanding guest
+save: wait for it to settle and use reconciliation to read its result. Your
+account's announcement state remains separate from that browser marker.
+While an anonymous save is still running, a replacement announcement may appear
+but its close action waits for the earlier save to finish. The earlier save does
+not dismiss the replacement.
 
 Each announcement has a server-issued material edition. Changing its message or
 link publishes a new edition, which can appear again after you dismissed the

@@ -758,13 +758,19 @@ public sealed class UserSettingsServiceTests
         browser.Values[(tenant.ToString("N"), retired)] = "7";
         var marker = AnnouncementTestData.AnonymousMarker(tenant);
 
-        await Assert.That(await browser.Service.GetAnonymousAnnouncementMarkerAsync(tenant)).IsNull();
+        var absent = await browser.Service.GetAnonymousAnnouncementMarkerAsync(tenant);
+        await Assert.That(absent.Success).IsTrue();
+        await Assert.That(absent.Marker).IsNull();
         await Assert.That(await browser.Service.SaveAnonymousAnnouncementMarkerAsync(tenant, marker)).IsTrue();
         browser.ChangeTenant(AnnouncementTestData.OtherTenant);
-        await Assert.That(await browser.Service.GetAnonymousAnnouncementMarkerAsync(browser.TenantId)).IsNull();
+        var otherTenant = await browser.Service.GetAnonymousAnnouncementMarkerAsync(browser.TenantId);
+        await Assert.That(otherTenant.Success).IsTrue();
+        await Assert.That(otherTenant.Marker).IsNull();
         browser.ChangeTenant(tenant);
 
-        await Assert.That(await browser.Service.GetAnonymousAnnouncementMarkerAsync(tenant)).IsEqualTo(marker);
+        var retained = await browser.Service.GetAnonymousAnnouncementMarkerAsync(tenant);
+        await Assert.That(retained.Success).IsTrue();
+        await Assert.That(retained.Marker).IsEqualTo(marker);
         await Assert.That(await browser.Service.GetSettingsAsync("PublicExperiencePreferences")).IsNull();
         await Assert.That(browser.Values[(tenant.ToString("N"), retired)]).IsEqualTo("7");
     }
@@ -837,7 +843,9 @@ public sealed class UserSettingsServiceTests
         await disposing.WaitAsync(TimeSpan.FromSeconds(10));
 
         await Assert.That(await generic.WaitAsync(TimeSpan.FromSeconds(10))).IsNull();
-        await Assert.That(await announcement.WaitAsync(TimeSpan.FromSeconds(10))).IsNull();
+        var unavailable = await announcement.WaitAsync(TimeSpan.FromSeconds(10));
+        await Assert.That(unavailable.Success).IsFalse();
+        await Assert.That(unavailable.Marker).IsNull();
         await Assert.That(imports).IsEqualTo(1);
         await Assert.That(disposals).IsEqualTo(1);
     }

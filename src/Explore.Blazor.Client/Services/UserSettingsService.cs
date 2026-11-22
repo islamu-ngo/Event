@@ -351,30 +351,31 @@ public sealed class UserSettingsService : IUserSettingsService, IAsyncDisposable
     private static bool IsAnnouncementKey(string key) =>
         key.StartsWith("public_experience_preferences.announcement_bar.", StringComparison.Ordinal);
 
-    public async Task<ISLAMU.Wire.Contracts.Announcements.AnnouncementDismissalMarkerDto?>
+    public async Task<AnnouncementMarkerReadResult>
         GetAnonymousAnnouncementMarkerAsync(Guid tenantId, CancellationToken ct = default)
     {
         if (Volatile.Read(ref _disposed) || tenantId == Guid.Empty)
-            return null;
+            return new(false, null);
         long generation = Volatile.Read(ref _authenticationGeneration);
         try
         {
             if (await IsAuthenticatedAsync()
                 || generation != Volatile.Read(ref _authenticationGeneration)
                 || await GetAnonymousTenantAsync() != tenantId.ToString("N"))
-                return null;
+                return new(false, null);
             var module = await GetJsModuleAsync();
             if (generation != Volatile.Read(ref _authenticationGeneration))
-                return null;
+                return new(false, null);
             var marker = await module.InvokeAsync<ISLAMU.Wire.Contracts.Announcements.AnnouncementDismissalMarkerDto?>(
                 "getAnnouncement", ct, tenantId.ToString("N"));
             return generation == Volatile.Read(ref _authenticationGeneration)
-                && marker?.Observation?.TenantId == tenantId ? marker : null;
+                && (marker is null || marker.Observation?.TenantId == tenantId)
+                ? new(true, marker) : new(false, null);
         }
         catch (Exception ex)
         {
             _logger.LogWarning("Anonymous announcement state could not be read ({FailureType}).", ex.GetType().Name);
-            return null;
+            return new(false, null);
         }
     }
 

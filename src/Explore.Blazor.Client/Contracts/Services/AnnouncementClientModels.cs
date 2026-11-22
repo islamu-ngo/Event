@@ -7,6 +7,12 @@ public sealed record AnnouncementDisplayState(
     Guid TenantId, Wire.AnnouncementObservationDto? Observation,
     Wire.AnnouncementMaterialDto? Material, bool IsVisible, bool IsDismissed, bool CanDismiss);
 
+/// <summary>Distinguishes a successful empty browser read from an unavailable read.</summary>
+public sealed record AnnouncementMarkerReadResult(bool Success, Wire.AnnouncementDismissalMarkerDto? Marker)
+{
+    public override string ToString() => nameof(AnnouncementMarkerReadResult);
+}
+
 public enum AnnouncementEditScope { Instance, Tenant, ManagedTenant }
 
 public sealed record AnnouncementPublicationClientResult(

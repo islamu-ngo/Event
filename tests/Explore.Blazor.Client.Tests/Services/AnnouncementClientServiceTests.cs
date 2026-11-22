@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Explore.Blazor.Client.Contracts.Services;
+using Microsoft.JSInterop;
 using Wire = ISLAMU.Wire.Contracts.Announcements;
 
 namespace Explore.Blazor.Client.Tests.Services;
@@ -359,7 +360,7 @@ public sealed class AnnouncementClientServiceTests
         harness.Authentication.SetAuthenticated(false);
         Wire.AnnouncementDismissalMarkerDto? stored = null;
         harness.Preferences.GetAnonymousAnnouncementMarkerAsync(AnnouncementTestData.Tenant, Arg.Any<CancellationToken>())
-            .Returns(_ => stored);
+            .Returns(_ => new AnnouncementMarkerReadResult(true, stored));
         harness.Preferences.SaveAnonymousAnnouncementMarkerAsync(AnnouncementTestData.Tenant,
                 Arg.Any<Wire.AnnouncementDismissalMarkerDto>(), Arg.Any<CancellationToken>())
             .Returns(call => { stored = call.Arg<Wire.AnnouncementDismissalMarkerDto>(); return true; });
@@ -375,6 +376,144 @@ public sealed class AnnouncementClientServiceTests
 
         await Assert.That(anonymous!.IsDismissed).IsTrue();
         await Assert.That(stored!.Observation.Edition).IsEqualTo(AnnouncementTestData.Edition);
+    }
+
+    [Test]
+    public async Task FailedGuestReconciliationReadKeepsAnUnconfirmedDismissalFenced()
+    {
+        var browser = new GuestAnnouncementStorage
+        {
+            CompleteFirstWrite = commit =>
+            {
+                commit();
+                throw new JSException("The browser committed the marker but its acknowledgement was lost.");
+            }
+        };
+        await using var harness = new Harness(browser.Runtime);
+        harness.Authentication.SetAuthenticated(false);
+        var service = harness.Service;
+        var guest = await service.LoadAsync();
+        await Assert.That(guest!.CanDismiss).IsTrue();
+        await Assert.That(await service.DismissAsync()).IsFalse();
+        await Assert.That(browser.StoredMarker).IsEqualTo(AnnouncementTestData.AnonymousMarker());
+        await Assert.That(service.RequiresReconciliation).IsTrue();
+
+        browser.ReadUnavailable = true;
+        await service.LoadAsync(reconcile: true);
+
+        await Assert.That(service.RequiresReconciliation).IsTrue();
+        await Assert.That(service.Display?.CanDismiss == true).IsFalse();
+        await Assert.That(await service.DismissAsync()).IsFalse();
+
+        browser.ReadUnavailable = false;
+        var reconciled = await service.LoadAsync(reconcile: true);
+
+        await Assert.That(reconciled!.IsDismissed).IsTrue();
+        await Assert.That(service.RequiresReconciliation).IsFalse();
+        await Assert.That(await service.DismissAsync()).IsFalse();
+        await Assert.That(browser.StoredMarker).IsEqualTo(AnnouncementTestData.AnonymousMarker());
+    }
+
+    [Test]
+    public async Task ReturningToTheSameGuestStorageDoesNotReplayAnOutstandingDismissal()
+    {
+        var dispatched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCommit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var timeout = TimeSpan.FromSeconds(10);
+        var browser = new GuestAnnouncementStorage
+        {
+            CompleteFirstWrite = async commit =>
+            {
+                dispatched.SetResult();
+                await releaseCommit.Task;
+                commit();
+                return true;
+            }
+        };
+        await using var harness = new Harness(browser.Runtime);
+        harness.Authentication.SetAuthenticated(false);
+        var service = harness.Service;
+        var guest = await service.LoadAsync();
+        await Assert.That(guest!.CanDismiss).IsTrue();
+
+        var saving = service.DismissAsync();
+        try
+        {
+            await dispatched.Task.WaitAsync(timeout);
+            harness.Authentication.SetAuthenticated(true, AnnouncementTestData.OtherTenant);
+            var account = await service.LoadAsync().WaitAsync(timeout);
+            await Assert.That(account!.CanDismiss).IsTrue();
+            await Assert.That(service.RequiresReconciliation).IsFalse();
+
+            harness.Authentication.SetAuthenticated(false);
+            await service.LoadAsync().WaitAsync(timeout);
+            await Assert.That(await service.DismissAsync().WaitAsync(timeout)).IsFalse();
+            await Assert.That(browser.StoredMarker).IsNull();
+        }
+        finally
+        {
+            releaseCommit.TrySetResult();
+            await saving.WaitAsync(timeout);
+        }
+
+        await Assert.That(await saving).IsFalse();
+        await Assert.That(browser.StoredMarker).IsEqualTo(AnnouncementTestData.AnonymousMarker());
+        await service.LoadAsync();
+        await Assert.That(service.RequiresReconciliation).IsTrue();
+
+        var reconciled = await service.LoadAsync(reconcile: true);
+
+        await Assert.That(reconciled!.IsDismissed).IsTrue();
+        await Assert.That(service.RequiresReconciliation).IsFalse();
+        await Assert.That(browser.StoredMarker).IsEqualTo(AnnouncementTestData.AnonymousMarker());
+    }
+
+    [Test]
+    public async Task ReplacementGuestEditionWaitsForTheOriginalBrowserSlotWrite()
+    {
+        var dispatched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCommit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var timeout = TimeSpan.FromSeconds(10);
+        var browser = new GuestAnnouncementStorage
+        {
+            CompleteFirstWrite = async commit =>
+            {
+                dispatched.SetResult();
+                await releaseCommit.Task;
+                commit();
+                return true;
+            }
+        };
+        await using var harness = new Harness(browser.Runtime);
+        harness.Authentication.SetAuthenticated(false);
+        var service = harness.Service;
+        await service.LoadAsync();
+        var saving = service.DismissAsync();
+        try
+        {
+            await dispatched.Task.WaitAsync(timeout);
+            harness.Settings = AnnouncementTestData.Settings(
+                edition: AnnouncementTestData.OtherEdition, epoch: AnnouncementTestData.OtherEpoch);
+            harness.Experience.SettingsChanged += Raise.Event<Action>();
+            var replacement = await service.LoadAsync().WaitAsync(timeout);
+
+            await Assert.That(replacement!.IsVisible).IsTrue();
+            await Assert.That(await service.DismissAsync().WaitAsync(timeout)).IsFalse();
+            await Assert.That(browser.StoredMarker).IsNull();
+        }
+        finally
+        {
+            releaseCommit.TrySetResult();
+            await saving.WaitAsync(timeout);
+        }
+
+        await Assert.That(await saving).IsFalse();
+        await Assert.That(service.IsSaving).IsFalse();
+        await Assert.That(service.Display!.CanDismiss).IsTrue();
+        await Assert.That(service.RequiresReconciliation).IsFalse();
+        await Assert.That(await service.DismissAsync()).IsTrue();
+        await Assert.That(browser.StoredMarker!.Observation.Edition).IsEqualTo(AnnouncementTestData.OtherEdition);
+        await Assert.That((await service.LoadAsync())!.IsDismissed).IsTrue();
     }
 
     [Test]
@@ -710,6 +849,7 @@ public sealed class AnnouncementClientServiceTests
 
     private sealed class Harness : IAsyncDisposable
     {
+        private readonly UserSettingsService? _browserPreferences;
         internal IAnnouncementsClient Api { get; } = Substitute.For<IAnnouncementsClient>();
         internal IPublicExperienceService Experience { get; } = Substitute.For<IPublicExperienceService>();
         internal IUserSettingsService Preferences { get; } = Substitute.For<IUserSettingsService>();
@@ -720,10 +860,12 @@ public sealed class AnnouncementClientServiceTests
         internal HalResourceOfAnnouncementSourceResource Source { get; set; } = AnnouncementTestData.Source();
         internal AnnouncementClientService Service { get; }
 
-        internal Harness()
+        internal Harness(IJSRuntime? browser = null)
         {
             Experience.GetCachedSettingsAsync().Returns(_ => Task.FromResult<PublicExperienceSettingsDto?>(Settings));
             Experience.GetSettingsAsync().Returns(_ => Task.FromResult<PublicExperienceSettingsDto?>(Settings));
+            Preferences.GetAnonymousAnnouncementMarkerAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(new AnnouncementMarkerReadResult(true, null));
             Api.GetMyAnnouncementDismissalAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
                 .Returns(_ => Self);
             Api.GetTenantAnnouncementSourceAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
@@ -736,7 +878,11 @@ public sealed class AnnouncementClientServiceTests
             Api.DismissAnnouncementAsync(Arg.Any<AnnouncementDismissRequestDto>(),
                     Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
                 .Returns(_ => Applied());
-            Service = new(Api, Experience, Preferences, Authentication, Substitute.For<ILogger<AnnouncementClientService>>());
+            if (browser is not null)
+                _browserPreferences = new(Substitute.For<ISettingsClient>(), Authentication, browser,
+                    Substitute.For<ILogger<UserSettingsService>>(), Experience);
+            Service = new(Api, Experience, (IUserSettingsService?)_browserPreferences ?? Preferences, Authentication,
+                Substitute.For<ILogger<AnnouncementClientService>>());
         }
 
         internal HalResourceOfAnnouncementDismissalReceiptDto Applied()
@@ -750,7 +896,55 @@ public sealed class AnnouncementClientServiceTests
             return new() { Decision = 0, Marker = marker, _links = new Dictionary<string, HalLink>() };
         }
 
-        public ValueTask DisposeAsync() => Service.DisposeAsync();
+        public async ValueTask DisposeAsync()
+        {
+            await Service.DisposeAsync();
+            if (_browserPreferences is not null)
+                await _browserPreferences.DisposeAsync();
+        }
+    }
+
+    private sealed class GuestAnnouncementStorage
+    {
+        private readonly Dictionary<string, Wire.AnnouncementDismissalMarkerDto> _markers = [];
+        internal IJSRuntime Runtime { get; } = Substitute.For<IJSRuntime>();
+        internal bool ReadUnavailable { get; set; }
+        internal Func<Action, ValueTask<bool>>? CompleteFirstWrite { get; init; }
+        internal Wire.AnnouncementDismissalMarkerDto? StoredMarker =>
+            _markers.GetValueOrDefault(AnnouncementTestData.Tenant.ToString("N"));
+
+        internal GuestAnnouncementStorage()
+        {
+            var module = Substitute.For<IJSObjectReference>();
+            bool firstWrite = true;
+            Runtime.InvokeAsync<IJSObjectReference>("import", Arg.Any<object?[]?>())
+                .Returns(new ValueTask<IJSObjectReference>(module));
+            module.InvokeAsync<Wire.AnnouncementDismissalMarkerDto?>("getAnnouncement", Arg.Any<CancellationToken>(),
+                    Arg.Any<object?[]?>())
+                .Returns(call =>
+                {
+                    if (ReadUnavailable)
+                        throw new JSException("The browser could not read announcement storage.");
+                    var args = call.ArgAt<object?[]>(2);
+                    return new ValueTask<Wire.AnnouncementDismissalMarkerDto?>(_markers.GetValueOrDefault((string)args[0]!));
+                });
+            module.InvokeAsync<bool>("setAnnouncement", Arg.Any<CancellationToken>(), Arg.Any<object?[]?>())
+                .Returns(call =>
+                {
+                    var args = call.ArgAt<object?[]>(2);
+                    var tenant = (string)args[0]!;
+                    var marker = (Wire.AnnouncementDismissalMarkerDto)args[1]!;
+                    void Commit() => _markers[tenant] = marker;
+
+                    if (firstWrite && CompleteFirstWrite is { } complete)
+                    {
+                        firstWrite = false;
+                        return complete(Commit);
+                    }
+                    Commit();
+                    return new ValueTask<bool>(true);
+                });
+        }
     }
 
     private sealed class Authentication : AuthenticationStateProvider

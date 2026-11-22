@@ -116,7 +116,15 @@ jobs:
         env:
           # Native PostgreSQL contract installation exceeded the default 1 GiB limit.
           ISLAMU_CONTAINER_MEMORY_MB: 4096
-        run: dotnet run --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/*/OpenApiDocument_*" --minimum-expected-tests 5 --no-progress --report-trx --report-trx-filename openapi-invariants.trx
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker events --filter event=oom --filter event=die \
+            --format '{{.Action}} {{.Actor.ID}} exit={{index .Actor.Attributes "exitCode"}}' \
+            > "$RUNNER_TEMP/openapi-container-events.log" 2>/dev/null &
+          docker_events_pid=$!
+          trap 'status=$?; kill "$docker_events_pid" 2>/dev/null || true; wait "$docker_events_pid" 2>/dev/null || true; if [ "$status" -ne 0 ]; then grep -E "^(oom|die) [[:xdigit:]]{64} exit=([0-9]+|<no value>)$" "$RUNNER_TEMP/openapi-container-events.log" || true; fi' EXIT
+          dotnet run --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/*/OpenApiDocument_*" --minimum-expected-tests 5 --no-progress --report-trx --report-trx-filename openapi-invariants.trx
 
       - name: Build API Contract Inventory
         if: steps.changes.outputs.relevant == 'true'

@@ -55,6 +55,7 @@ public static class StandaloneHostApplicationExtensions
 
             await next(context);
         });
+        app.UsePublicStaticAssetAuthenticationBoundary();
         app.UseCombinedApiBridge();
         // Explicit top-level registration prevents automatic authorization from
         // running before the browser cookie has become a trusted API request.

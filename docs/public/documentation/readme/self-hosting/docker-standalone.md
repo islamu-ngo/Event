@@ -142,6 +142,10 @@ requests return `503`; realtime activities remain blocked until a fresh check
 succeeds. Restore service availability and retry rather than disabling admission
 limits. A definitively invalid or revoked identity still requires a new sign-in.
 
+Public manifest scripts and styles load anonymously even when the browser
+sends a session cookie. Identity-check outages therefore do not gate these
+public files; protected operations still require a fresh successful check.
+
 Unavailable public header/footer configuration can remain hidden for the
 existing five-minute public-data cache interval. After correcting operator
 configuration, reload the page or explicitly refresh configuration to obtain

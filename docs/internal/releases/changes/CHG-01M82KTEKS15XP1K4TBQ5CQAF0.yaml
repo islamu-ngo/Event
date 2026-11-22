@@ -1,0 +1,38 @@
+Change-Id: CHG-01M82KTEKS15XP1K4TBQ5CQAF0
+Title: "keep public assets independent of cookie authority"
+Type: fix
+Scope: access
+Summary: "Serve explicitly anonymous public manifest assets without browser credentials while preserving normal authentication for protected requests."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Only explicitly anonymous manifest assets marked with PublicStaticAssetMetadata
+      use the boundary, and only for GET or HEAD. Temporarily remove Cookie and
+      Authorization headers and the incoming principal, then restore all three in
+      finally. Protected pages, API operations, mutations and unknown paths retain
+      normal authentication. Host, HTTPS, security headers and admission still run.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: >-
+      Public manifest scripts and styles load independently of session-cookie
+      validation availability in both Standalone and Blazor hosting. Identity
+      outages do not gate these public files; protected operations continue to
+      require their existing successful authentication and authorization checks.

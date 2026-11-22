@@ -66,6 +66,51 @@ public sealed class LocalBffCredentialReplacementTests
     public enum UnavailableCookieAuthority { Throttled, ServerError, TransportFailure, TimedOut, CircuitOpen }
 
     [Test]
+    [Arguments("GET")]
+    [Arguments("HEAD")]
+    public async Task PublicManifestAssetRemainsAnonymousWithoutConsultingUnavailableCookieAuthority(string method)
+    {
+        await using var fixture = new Fixture(serveStaticAssets: true);
+        string asset = fixture.Services.GetServices<Microsoft.AspNetCore.Routing.EndpointDataSource>()
+            .SelectMany(source => source.Endpoints)
+            .OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>()
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .Where(path => path is not null
+                && !path.Contains('{', StringComparison.Ordinal)
+                && path.Contains("notification-refresh.", StringComparison.Ordinal)
+                && path.EndsWith(".js", StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .First()!;
+        if (!asset.StartsWith('/')) asset = "/" + asset;
+        using HttpClient anonymous = fixture.CreateClient();
+        using HttpResponseMessage expected = await anonymous.GetAsync(asset, CancellationToken);
+        byte[] expectedBytes = await expected.Content.ReadAsByteArrayAsync(CancellationToken);
+        await Assert.That(expected.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(expectedBytes.Length > 0).IsTrue();
+        fixture.Transport.OrdinaryLogin = true;
+        using HttpResponseMessage login = await fixture.LoginAsync();
+        AuthenticationTicket ticket = await fixture.ReadCookieTicketAsync(login);
+        fixture.Transport.IdentityUnavailable = UnavailableCookieAuthority.Throttled;
+        int before = fixture.Transport.CurrentUserRequests;
+
+        using HttpResponseMessage response = await fixture.RequestWithTicketAsync(ticket, new HttpMethod(method), asset);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.Headers.Contains("Set-Cookie")).IsFalse();
+        await Assert.That(fixture.Transport.CurrentUserRequests).IsEqualTo(before);
+        byte[] bytes = await response.Content.ReadAsByteArrayAsync(CancellationToken);
+        await Assert.That(bytes).IsEquivalentTo(method == "GET" ? expectedBytes : []);
+        using HttpResponseMessage unknown = await fixture.RequestWithTicketAsync(
+            ticket, HttpMethod.Get, "/js/unknown-private-operation.js");
+        await Assert.That(unknown.StatusCode).IsEqualTo(HttpStatusCode.ServiceUnavailable);
+        using HttpResponseMessage mutation = await fixture.RequestWithTicketAsync(ticket, HttpMethod.Post, asset);
+        await Assert.That(mutation.StatusCode).IsEqualTo(HttpStatusCode.ServiceUnavailable);
+        using HttpResponseMessage protectedOperation = await fixture.StatusWithTicketAsync(ticket);
+        await Assert.That(protectedOperation.StatusCode).IsEqualTo(HttpStatusCode.ServiceUnavailable);
+        await Assert.That(fixture.Transport.CurrentUserRequests > before).IsTrue();
+    }
+
+    [Test]
     [Arguments(true, "/", "/settings/instance?section=getting-started")]
     [Arguments(true, "https://untrusted.example.test/redirect", "/settings/instance?section=getting-started")]
     [Arguments(true, "/events", "/events")]
@@ -931,10 +976,12 @@ public sealed class LocalBffCredentialReplacementTests
         private readonly Dictionary<AuthenticationTicket, string> _originalCookies = new(ReferenceEqualityComparer.Instance);
 
         internal Fixture(bool deploymentLocalOverride = true, bool suppressStartupHttpContext = false,
-            bool observeCircuitLifetime = false, RedisBffTicketStoreTests.Authority? sessionAuthority = null)
+            bool observeCircuitLifetime = false, RedisBffTicketStoreTests.Authority? sessionAuthority = null,
+            bool serveStaticAssets = false)
         {
             _factory = _root.WithWebHostBuilder(builder =>
             {
+                if (serveStaticAssets) builder.UseStaticWebAssets();
                 if (deploymentLocalOverride) builder.UseSetting("Authentication:Provider", "local");
                 builder.ConfigureTestServices(services =>
                 {
@@ -1024,6 +1071,14 @@ public sealed class LocalBffCredentialReplacementTests
         {
             using HttpClient client = CreateClient();
             using var request = new HttpRequestMessage(HttpMethod.Get, "/auth/status");
+            request.Headers.Add("Cookie", _originalCookies[ticket]);
+            return await client.SendAsync(request, CancellationToken);
+        }
+
+        internal async Task<HttpResponseMessage> RequestWithTicketAsync(AuthenticationTicket ticket, HttpMethod method, string path)
+        {
+            using HttpClient client = CreateClient();
+            using var request = new HttpRequestMessage(method, path);
             request.Headers.Add("Cookie", _originalCookies[ticket]);
             return await client.SendAsync(request, CancellationToken);
         }
@@ -1317,6 +1372,7 @@ public sealed class LocalBffCredentialReplacementTests
         internal string CreateFreshSameUserAccessToken() => CreateAccessToken(userId: _userId, provider: TokenProvider.Local);
         internal RevokedCookieAuthority? CookieDefect { get; set; }
         internal UnavailableCookieAuthority? IdentityUnavailable { get; set; }
+        internal int CurrentUserRequests;
         internal bool OrdinaryLogin { get; set; }
         internal bool OmitEmail { get; set; }
         internal bool ReadyAfterReplacement { get; set; }
@@ -1355,6 +1411,7 @@ public sealed class LocalBffCredentialReplacementTests
             string path = request.RequestUri!.AbsolutePath;
             if (path.Equals("/api/user", StringComparison.OrdinalIgnoreCase))
             {
+                Interlocked.Increment(ref CurrentUserRequests);
                 if (Interlocked.Exchange(ref _pauseNextCurrentUserProbe, 0) == 1)
                 {
                     _currentUserProbeReached.TrySetResult();

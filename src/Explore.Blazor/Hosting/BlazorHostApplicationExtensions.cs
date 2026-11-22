@@ -176,6 +176,7 @@ public static class BlazorHostApplicationExtensions
         pipeline.UseLocalCredentialPrivacyHeaders();
         pipeline.UseLocalVisitorEnrollmentPrivacyHeaders();
         pipeline.UseRouting();
+        pipeline.UsePublicStaticAssetAuthenticationBoundary();
         pipeline.UseAuthentication();
         pipeline.UseAdmissionCheckInBffTransport();
         pipeline.UseAntiforgeryTokenMiddleware(app);

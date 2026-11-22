@@ -211,6 +211,15 @@ same fail-closed result during rendering. Explicit reads, `ResetCache`, and
 expiry can obtain fresh public configuration. This cache does not contain
 browser-session validation or private action authority.
 
+`MapSelectedStaticAssets` marks identity-independent manifest assets with
+`PublicStaticAssetMetadata` and explicit anonymous access in both ordinary and
+Assurance selection. For these endpoints only, GET/HEAD requests run with an
+anonymous principal and without Cookie/Authorization headers. The BFF boundary
+restores the incoming request state afterward and runs before Standalone's
+outer authentication as well as Blazor authentication. Host, HTTPS, security
+headers and native admission still execute; pages, unknown paths, mutations
+and API operations retain their existing authentication requirements.
+
 Local identity validation distinguishes rejection from unavailability.
 `BffAdminClaimsTransformation.ValidateLocalSessionAsync` preserves definitive
 identity rejection, but translates throttling, server failures, transport errors,

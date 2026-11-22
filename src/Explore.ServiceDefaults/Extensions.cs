@@ -131,7 +131,9 @@ public static class Extensions
             if (app.Environment.IsEnvironment("Assurance")
                 && (app.Configuration["ISLAMU_TEST_ROOT"] is not null || app.Configuration["ISLAMU_TEST_RUN_ID"] is not null))
                 throw new InvalidOperationException("managed_served_assets_selection_rejected");
-            app.MapStaticAssets();
+            app.MapStaticAssets()
+                .WithMetadata(Explore.ServiceDefaults.PublicStaticAssetMetadata.Instance)
+                .AllowAnonymous();
             return;
         }
         selection.Map(app);
@@ -221,7 +223,9 @@ public static class Extensions
             try
             {
                 VerifyFilesAsync(CancellationToken.None).GetAwaiter().GetResult();
-                app.MapStaticAssets(Endpoint!.Path);
+                app.MapStaticAssets(Endpoint!.Path)
+                    .WithMetadata(Explore.ServiceDefaults.PublicStaticAssetMetadata.Instance)
+                    .AllowAnonymous();
                 VerifyFilesAsync(CancellationToken.None).GetAwaiter().GetResult();
                 mapped = true;
             }

@@ -472,7 +472,9 @@ language and ASP.NET culture cookies must reach the browser; an InteractiveServe
 HTTP self-call can save the database preference while losing those response
 cookies. `LanguageProvider` seeds its first render from the request UI culture
 before persisting hydration state, so a prerendered English default cannot replace
-the selected request culture during hydration.
+the selected request culture during hydration. Once a newer language selection
+owns the live UI culture, an earlier initialization cannot overwrite it when
+that initialization completes.
 
 ## Storage Upload Proxy Boundary
 

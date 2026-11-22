@@ -508,6 +508,7 @@ public static partial class SecurityExecutionEvidence
         if (!child.Process.CleanupSucceeded && outcome != "process-cleanup-failed") diagnostic += ":process-cleanup-failed";
         if (!child.Process.ObserverSettled && outcome != "observer-unsettled") diagnostic += ":observer-unsettled";
         if (child.Process.ObserverFailures.Count > 0 && outcome != "observer-failed") diagnostic += ":observer-failed";
+        if (child.Process.ObserverFaultObservedWhileProcessRunning) diagnostic += ":observer-fault-while-process-running";
         return diagnostic;
     }
 

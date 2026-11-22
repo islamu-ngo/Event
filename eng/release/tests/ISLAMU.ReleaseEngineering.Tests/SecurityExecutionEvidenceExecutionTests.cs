@@ -3253,6 +3253,24 @@ public sealed class SecurityExecutionEvidenceTransportTests
 public sealed class SecurityExecutionEvidenceProcessTests
 {
     [Test]
+    public async Task ObserverFaultWhileChildRunsIsRecordedWithoutAdmittingTheProcess()
+    {
+        using var fixture = new ProcessFixture();
+        ProcessStartInfo command = await fixture.CommandAsync("hold");
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command,
+            TimeSpan.FromSeconds(10), CancellationToken.None,
+            (_, _) => Task.FromException(new InvalidOperationException("private-error")));
+        await Assert.That(result.ObserverFaultObservedWhileProcessRunning).IsTrue();
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.CleanupSucceeded).IsTrue();
+        await Assert.That(fixture.OwnedChildrenRemain()).IsFalse();
+        var child = new SecurityExecutionEvidence.OwnedChild(result, [1], [], "private-owner", true, true);
+        string diagnostic = SecurityExecutionEvidence.NativeExecutionFailureCode("security-integration", child);
+        await Assert.That(diagnostic).Contains(":observer-fault-while-process-running");
+        await Assert.That(diagnostic.Contains("private-error", StringComparison.Ordinal)).IsFalse();
+    }
+
+    [Test]
     public async Task LiveObserverReceivesActualOwnedIdentityAndClosesItsResourceBeforeReturn()
     {
         using var fixture = new ProcessFixture();
@@ -3334,6 +3352,7 @@ public sealed class SecurityExecutionEvidenceProcessTests
         await Assert.That(handle.IsClosed).IsTrue();
         await Assert.That(File.Exists(resource)).IsFalse();
         await Assert.That(result.ObserverSettled).IsTrue();
+        await Assert.That(result.ObserverFaultObservedWhileProcessRunning).IsFalse();
         await Assert.That(result.Succeeded).IsFalse();
         await Assert.That(result.CleanupSucceeded).IsTrue();
         await Assert.That(fixture.OwnedChildrenRemain()).IsFalse();

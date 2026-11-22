@@ -3332,6 +3332,7 @@ public static partial class SecurityExecutionEvidence
         Task? observation = null;
         var observerFailures = new List<Exception>();
         bool observerSettled = observer is null;
+        bool observerFaultObservedWhileProcessRunning = false;
         stop.CancelAfter(timeout);
         Task<NativeOutputCapture>? stdout = null;
         Task<NativeOutputCapture>? stderr = null;
@@ -3372,6 +3373,8 @@ public static partial class SecurityExecutionEvidence
                 Task completed = await Task.WhenAny(exit, observation).ConfigureAwait(false);
                 if (completed != observation || observation.IsCompletedSuccessfully)
                     await exit.ConfigureAwait(false);
+                else
+                    observerFaultObservedWhileProcessRunning = observation.IsFaulted && !process.HasExited;
             }
         }
         catch (OperationCanceledException)
@@ -3476,6 +3479,7 @@ public static partial class SecurityExecutionEvidence
             cleanup && !invocationFailed, output.Bytes, error.Bytes)
         {
             ObserverSettled = observerSettled,
+            ObserverFaultObservedWhileProcessRunning = observerFaultObservedWhileProcessRunning,
             ObserverFailures = observerFailures.AsReadOnly()
         };
     }
@@ -3593,6 +3597,7 @@ public static partial class SecurityExecutionEvidence
         byte[] StandardOutput, byte[] StandardError)
     {
         internal bool ObserverSettled { get; init; } = true;
+        internal bool ObserverFaultObservedWhileProcessRunning { get; init; }
         internal IReadOnlyList<Exception> ObserverFailures { get; init; } = [];
         internal bool Succeeded => ExitCode == 0 && !TimedOut && !Cancelled && !ResidualOwnedChildren &&
             !OutputLimitExceeded && CleanupSucceeded && ObserverSettled && ObserverFailures.Count == 0;

@@ -16,6 +16,7 @@ public sealed class BffPreferenceAntiforgeryTests : IAsyncDisposable
     {
         _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
+            BaseAddress = new Uri("https://localhost"),
             AllowAutoRedirect = false,
             HandleCookies = true
         });

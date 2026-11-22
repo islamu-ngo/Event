@@ -91,6 +91,25 @@ public sealed class SecurityExecutionEvidenceIntegrationTests
     }
 
     [Test]
+    [Arguments("api_creation_inventory_limit", true)]
+    [Arguments("api_creation_root_invalid", true)]
+    [Arguments("private-error\nforged-diagnostic", false)]
+    public async Task ObserverRejectionReportsOnlyAllowlistedCodes(string code, bool allowed)
+    {
+        var process = new SecurityExecutionEvidence.OwnedNativeProcessResult(
+            137, false, false, false, false, true, "private-output"u8.ToArray(), [])
+        {
+            ObserverFailures = [new SecurityExecutionEvidence.OwnedExecutionFailure(code),
+                new SecurityExecutionEvidence.OwnedExecutionFailure("api_image_reference_changed")]
+        };
+        var child = new SecurityExecutionEvidence.OwnedChild(process, [1], [], "private-owner", true, true);
+        string expected = "native_execution_failed:security-integration:process-exit-137:observer-failed";
+        if (allowed) expected += ":" + code;
+        await Assert.That(SecurityExecutionEvidence.NativeExecutionFailureCode("security-integration", child))
+            .IsEqualTo(expected);
+    }
+
+    [Test]
     [Arguments("security-integration", "600s", 615)]
     [Arguments("owned-load-correctness", "1500s", 1515)]
     public async Task TypedUidLaunchBudgetPreservesOrdinaryAndTwentyMinuteLoadRegimes(

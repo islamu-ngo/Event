@@ -509,6 +509,17 @@ public static partial class SecurityExecutionEvidence
         if (!child.Process.ObserverSettled && outcome != "observer-unsettled") diagnostic += ":observer-unsettled";
         if (child.Process.ObserverFailures.Count > 0 && outcome != "observer-failed") diagnostic += ":observer-failed";
         if (child.Process.ObserverFaultObservedWhileProcessRunning) diagnostic += ":observer-fault-while-process-running";
+        if (child.Process.ObserverFailures.FirstOrDefault() is OwnedExecutionFailure
+            {
+                Code: "api_native_creator_identity_missing"
+                or "api_creation_root_invalid" or "api_creation_inventory_limit"
+                or "api_creation_filename_invalid" or "api_creation_records_changed"
+                or "api_creation_capture_invalid" or "api_creation_capture_changed"
+                or "api_creation_capture_conflict" or "api_image_reference_changed"
+                or "api_resource_inventory_limit" or "api_created_resource_observation_invalid"
+                or "owned_resource_identity_changed"
+            } observed)
+            return diagnostic + ":" + observed.Code;
         return diagnostic;
     }
 

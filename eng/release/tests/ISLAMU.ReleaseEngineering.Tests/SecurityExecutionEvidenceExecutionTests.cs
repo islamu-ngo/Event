@@ -18,8 +18,12 @@ public sealed class SecurityExecutionEvidenceIntegrationTests
     [Test]
     [Arguments("cancelled")]
     [Arguments("timed-out")]
+    [Arguments("process-status-unavailable")]
+    [Arguments("process-exit-1")]
     [Arguments("process-exit-2")]
+    [Arguments("process-exit-3")]
     [Arguments("process-exit-10")]
+    [Arguments("process-exit-137")]
     [Arguments("process-failed")]
     [Arguments("owned-processes-remain")]
     [Arguments("output-limit-exceeded")]
@@ -38,8 +42,12 @@ public sealed class SecurityExecutionEvidenceIntegrationTests
         {
             "cancelled" => child with { Process = process with { Cancelled = true, TimedOut = true } },
             "timed-out" => child with { Process = process with { TimedOut = true } },
+            "process-status-unavailable" => child with { Process = process with { ExitCode = -1 } },
+            "process-exit-1" => child with { Process = process with { ExitCode = 1 } },
             "process-exit-2" => child with { Process = process with { ExitCode = 2 } },
+            "process-exit-3" => child with { Process = process with { ExitCode = 3 } },
             "process-exit-10" => child with { Process = process with { ExitCode = 10 } },
+            "process-exit-137" => child with { Process = process with { ExitCode = 137 } },
             "process-failed" => child with { Process = process with { ExitCode = 200 } },
             "owned-processes-remain" => child with { Process = process with { ResidualOwnedChildren = true } },
             "output-limit-exceeded" => child with { Process = process with { OutputLimitExceeded = true } },
@@ -56,7 +64,7 @@ public sealed class SecurityExecutionEvidenceIntegrationTests
         await Assert.That(diagnostic).IsEqualTo($"native_execution_failed:security-integration:{outcome}");
         await Assert.That(SecurityExecutionEvidence.NativeExecutionFailureCode(
             "private-output\nforged-lane", child)).IsEqualTo("native_execution_failed");
-        foreach (int exitCode in new[] { -1, 1, 14 })
+        foreach (int exitCode in new[] { -2, 14, 15, 200 })
             await Assert.That(SecurityExecutionEvidence.NativeExecutionFailureCode("security-integration",
                 child with { Process = process with { ExitCode = exitCode } }))
                 .IsEqualTo("native_execution_failed:security-integration:process-failed");

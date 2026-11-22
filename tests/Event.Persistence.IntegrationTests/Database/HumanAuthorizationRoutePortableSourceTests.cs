@@ -41,6 +41,7 @@ public sealed class HumanAuthorizationRoutePortableSourceTests
         await Assert.That(prepared.Settings.All(row => row.System is null && row.Tenant is null)).IsTrue();
         var initial = HumanAuthorizationRouteProjector.Project(prepared, deployment, true, true);
         await Assert.That(initial.Provider).IsEqualTo(HumanAuthorizationRouteProvider.Local);
+        await using var securityGate = await new HumanSecuritySourceGate(context).AcquireAsync();
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var held = await source.AcquireAsync(await fence.AcquireAsync());
         // Store a previously absent row with different raw bytes but identical effective Local mode.

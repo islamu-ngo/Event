@@ -491,6 +491,8 @@ public static partial class SecurityExecutionEvidence
         {
             { Cancelled: true } => "cancelled",
             { TimedOut: true } => "timed-out",
+            { ExitCode: 2 } => "process-exit-2",
+            { ExitCode: 10 } => "process-exit-10",
             { ExitCode: not 0 } => "process-failed",
             { ResidualOwnedChildren: true } => "owned-processes-remain",
             { OutputLimitExceeded: true } => "output-limit-exceeded",

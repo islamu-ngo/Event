@@ -16,6 +16,21 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class SecurityExecutionEvidenceIntegrationTests
 {
     [Test]
+    [Arguments(false, false, "failed")]
+    [Arguments(false, true, "timed-out")]
+    [Arguments(true, false, "cancelled")]
+    [Arguments(true, true, "cancelled")]
+    public async Task NativeFailureReportsOnlyRegisteredLaneAndFixedOutcome(
+        bool cancelled, bool timedOut, string outcome)
+    {
+        string diagnostic = SecurityExecutionEvidence.NativeExecutionFailureCode(
+            "security-integration", cancelled, timedOut);
+        await Assert.That(diagnostic).IsEqualTo($"native_execution_failed:security-integration:{outcome}");
+        await Assert.That(SecurityExecutionEvidence.NativeExecutionFailureCode(
+            "private-output\nforged-lane", cancelled, timedOut)).IsEqualTo("native_execution_failed");
+    }
+
+    [Test]
     [Arguments("security-integration", "600s", 615)]
     [Arguments("owned-load-correctness", "1500s", 1515)]
     public async Task TypedUidLaunchBudgetPreservesOrdinaryAndTwentyMinuteLoadRegimes(

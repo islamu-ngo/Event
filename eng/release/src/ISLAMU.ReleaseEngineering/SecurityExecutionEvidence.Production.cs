@@ -482,6 +482,15 @@ public static partial class SecurityExecutionEvidence
         internal OwnedChild? Discovery { get; set; }
         internal List<(string[] Uids, OwnedChild Child)> Invocations { get; } = [];
     }
+
+    internal static string NativeExecutionFailureCode(string lane, bool cancelled, bool timedOut)
+    {
+        if (!SecurityControlRegister.ExecutionRequirements.ContainsKey(lane))
+            return "native_execution_failed";
+        string outcome = cancelled ? "cancelled" : timedOut ? "timed-out" : "failed";
+        return $"native_execution_failed:{lane}:{outcome}";
+    }
+
     private sealed record CompletedOwnedRun(OwnedExecutionRequest Request,
         IReadOnlyList<OwnedLane> Lanes, IReadOnlyDictionary<string, IReadOnlyList<byte[]>> Proofs,
         IReadOnlyDictionary<string, IReadOnlyList<string>> InvocationDigests);
@@ -573,7 +582,8 @@ public static partial class SecurityExecutionEvidence
                         if (!child.Succeeded || child.Report.Length == 0)
                         {
                             lane.Outcome = child.Process.Cancelled ? "cancelled" : child.Process.TimedOut ? "timed-out" : "failed";
-                            throw new OwnedExecutionFailure("native_execution_failed");
+                            throw new OwnedExecutionFailure(NativeExecutionFailureCode(
+                                lane.Id, child.Process.Cancelled, child.Process.TimedOut));
                         }
                     }
                     lane.Outcome = "passed";

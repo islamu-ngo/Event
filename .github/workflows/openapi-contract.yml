@@ -113,6 +113,9 @@ jobs:
 
       - name: Run Stable OpenAPI Invariants
         if: steps.changes.outputs.relevant == 'true'
+        env:
+          # Native PostgreSQL contract installation exceeded the default 1 GiB limit.
+          ISLAMU_CONTAINER_MEMORY_MB: 4096
         run: dotnet run --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/*/OpenApiDocument_*" --minimum-expected-tests 5 --no-progress --report-trx --report-trx-filename openapi-invariants.trx
 
       - name: Build API Contract Inventory

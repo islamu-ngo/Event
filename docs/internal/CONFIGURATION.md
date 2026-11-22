@@ -466,12 +466,12 @@ Generate or verify the artifact with the repository-pinned .NET SDK:
 dotnet run \
   --project eng/configuration-manifest-schema/src/ISLAMU.ConfigurationManifest.SchemaGenerator/ISLAMU.ConfigurationManifest.SchemaGenerator.csproj \
   --configuration Release -- \
-  --write schemas/configuration-manifest-v1alpha2.schema.json
+  --write manifest schemas/configuration-manifest-v1alpha2.schema.json
 
 dotnet run \
   --project eng/configuration-manifest-schema/src/ISLAMU.ConfigurationManifest.SchemaGenerator/ISLAMU.ConfigurationManifest.SchemaGenerator.csproj \
   --configuration Release -- \
-  --check schemas/configuration-manifest-v1alpha2.schema.json
+  --check manifest schemas/configuration-manifest-v1alpha2.schema.json
 ```
 
 Never hand-edit the generated artifact. JSON Schema supports editor completion and

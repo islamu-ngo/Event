@@ -1,13 +1,17 @@
 @using Explore.Blazor.Client.Contracts.Services.Ai
+@using Explore.Blazor.Client.Contracts.Services.Shell
 @using Explore.Blazor.Client.Components.Shell.AiAssistant
 @using Explore.Blazor.Client.Services.Ai
 @using Explore.Blazor.Client.Services.Shell
+@using Explore.Blazor.Client.Services.Learning
+@using Explore.Blazor.Client.Contracts.Services.Learning
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Rendering
 @using Microsoft.JSInterop
 @implements IAsyncDisposable
 
 @inject IJSRuntime JsRuntime
+@inject ILearningTargetRegistry TourTargets
 
 @if (AiAssistantState.IsAvailable)
 {
@@ -17,6 +21,7 @@
     }
 
     <aside id="ai-assistant-rail"
+           @ref="_tourConversation"
            class="@RootClass"
            data-testid="shell-ai-rail"
            aria-label="AI Assistant"
@@ -104,7 +109,7 @@
         @* Drawer removed in favor of history sidebar overlay *@
 
         @* ── Chat body ── *@
-        <div class="ai-rail__body">
+        <div id="@($"{_tourElementPrefix}-response")" @ref="_tourResponse" class="ai-rail__body">
             @if (ConversationState.IsLoading)
             {
                 <div class="ai-rail__placeholder" role="status" aria-live="polite">
@@ -156,6 +161,7 @@
         @* ── Composer (bottom-pinned) ── *@
         @if (ConversationState.SelectedConversation is not null)
         {
+            <section id="@($"{_tourElementPrefix}-composer")" @ref="_tourComposer" aria-label="AI message composer">
             <AiConversationComposer @ref="_conversationComposer"
                                     Mode="AiPresentationMode.Live"
                                     IdPrefix="ai-rail"
@@ -186,6 +192,7 @@
                                     OnReferenceSelected="SelectReferenceAsync"
                                     OnReferenceSearchOpened="OpenReferenceSearchFromMenuAsync"
                                     OnSend="SendMessageAsync" />
+            </section>
         }
 
         @* ── History Overlay (Plane-style right sidebar overlay) ── *@
@@ -279,6 +286,53 @@
 
     [Parameter]
     public bool StartNewConversation { get; set; }
+
+    [CascadingParameter(Name = "LearningPresentationContext")]
+    public LearningPresentationContext? TourPresentation { get; set; }
+
+    private readonly string _tourElementPrefix = $"learning-ai-{Guid.NewGuid():N}";
+    private ElementReference _tourConversation;
+    private ElementReference _tourComposer;
+    private ElementReference _tourResponse;
+
+    private void PublishAiTour()
+    {
+        if (_disposed || TourPresentation is not { } ownerContext
+            || !AiAssistantState.IsAvailable
+            || (HostedInWorkspace ? ShellState.ActiveWorkspace != WorkspaceKey.Ai
+                : ShellState.ActiveWorkspace == WorkspaceKey.Ai || !AiAssistantState.IsOpen)
+            || ConversationState.SelectedConversation is not { } conversation)
+        {
+            TourTargets.Remove(this);
+            return;
+        }
+
+        var presentation = ownerContext with
+        {
+            Family = LearningTourFamily.NormalAi,
+            Generation = $"{ownerContext.Generation}:ai:{conversation.Id}:{(HostedInWorkspace ? "workspace" : "panel")}",
+            EventId = null
+        };
+        var blocked = ConversationState.IsLoading || _isLoadingConversations
+            || _isSynchronizingWorkspaceRequest || _isCommandRunning || _isCancelRunRunning
+            || _busyActionIds.Count > 0 || GetActiveRunId() is not null
+            || !string.IsNullOrWhiteSpace(_promptText) || _selectedImages.Count > 0
+            || _modelMenuOpen || _showConversations || _isReferenceAutocompleteOpen;
+        var targets = new List<LearningTarget>();
+        if (!string.IsNullOrWhiteSpace(_tourConversation.Id))
+            targets.Add(new("normal-ai.conversation", "ai-assistant-rail", _tourConversation));
+        if (!ConversationState.IsLoading && !string.IsNullOrWhiteSpace(_tourComposer.Id))
+            targets.Add(new("normal-ai.composer", $"{_tourElementPrefix}-composer", _tourComposer));
+        if (!ConversationState.IsLoading && !string.IsNullOrWhiteSpace(_tourResponse.Id))
+            targets.Add(new("normal-ai.response", $"{_tourElementPrefix}-response", _tourResponse));
+        TourTargets.Publish(this, presentation, blocked, targets.ToArray());
+    }
+
+    private void OnTourConversationChanged()
+    {
+        TourTargets.Remove(this);
+        StateHasChanged();
+    }
 
     private const int MaxSelectedImages = 4;
     private const long MaxImageBytes = 5 * 1024 * 1024;
@@ -374,7 +428,7 @@
     {
         _wasOpen = AiAssistantState.IsOpen;
         AiAssistantState.OnChange += OnAiAssistantStateChanged;
-        ConversationState.OnChange += StateHasChanged;
+        ConversationState.OnChange += OnTourConversationChanged;
     }
 
     protected override async Task OnParametersSetAsync()
@@ -448,6 +502,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        PublishAiTour();
         if (ConversationState.SelectedConversation is not null)
         {
             await AttachPromptKeyboardHandlerAsync();
@@ -475,6 +530,7 @@
 
     private void OnAiAssistantStateChanged()
     {
+        TourTargets.Remove(this);
         _ = InvokeAsync(HandleAiAssistantStateChangedAsync);
     }
 
@@ -1638,6 +1694,7 @@
     private void OnPromptInput(string value)
     {
         _promptText = value;
+        PublishAiTour();
         SyncSelectedReferencesWithPromptText();
         UpdateReferenceAutocompleteFromPrompt();
     }
@@ -1645,6 +1702,7 @@
     private void OnPromptChange(string value)
     {
         _promptText = value;
+        PublishAiTour();
         SyncSelectedReferencesWithPromptText();
         UpdateReferenceAutocompleteFromPrompt();
     }
@@ -1940,8 +1998,9 @@
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
+        TourTargets.Remove(this);
         AiAssistantState.OnChange -= OnAiAssistantStateChanged;
-        ConversationState.OnChange -= StateHasChanged;
+        ConversationState.OnChange -= OnTourConversationChanged;
 
         if (_promptModule is not null)
         {

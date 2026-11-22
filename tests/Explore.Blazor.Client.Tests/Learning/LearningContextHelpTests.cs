@@ -49,6 +49,12 @@ public sealed class LearningContextHelpTests : IDisposable
         _ctx.Services.AddSingleton(Substitute.For<IAnalyticsInterop>());
         _ctx.Services.AddSingleton(Substitute.For<ICookieConsentInterop>());
         _ctx.Services.AddSingleton(new CookieConsentStateService());
+        var footerClient = Substitute.For<IFooterClient>();
+        footerClient.GetFooterConfigAsync(cancellationToken: Arg.Any<CancellationToken>())
+            .Returns(new FooterConfigDto { Settings = new FooterSettingsDto { Enabled = false, ShowCookieSettingsLink = true } });
+        _ctx.Services.AddSingleton(footerClient);
+        _ctx.Services.AddSingleton(TimeProvider.System);
+        _ctx.Services.AddScoped<IFooterPresentationService, FooterPresentationService>();
         _learning.LoadContextAsync(Arg.Any<CancellationToken>()).Returns(_ =>
         {
             _privateRead.TrySetResult();
@@ -63,6 +69,28 @@ public sealed class LearningContextHelpTests : IDisposable
     }
 
     public void Dispose() => _ctx.Dispose();
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ManualReplayRequiresTheCurrentWorkspaceAffordance(bool available)
+    {
+        _ctx.SetAuthenticatedUser(_userId, "Learner");
+        var invoked = false;
+        var help = _ctx.Render<LearningContextHelp>(parameters => parameters
+            .Add(component => component.ReplayGuidanceAvailable, available)
+            .Add(component => component.ReplayGuidance, () => invoked = true));
+        var actions = help.FindAll("[data-testid='learning-help-replay']");
+        await Assert.That(actions.Count).IsEqualTo(available ? 1 : 0);
+        await Assert.That(invoked).IsFalse();
+        if (available)
+        {
+            help.Find("details").SetAttribute("open", string.Empty);
+            await help.Find("[data-testid='learning-help-replay']").ClickAsync(new());
+            await Assert.That(invoked).IsTrue();
+            await Assert.That(help.Find("details").HasAttribute("open")).IsFalse();
+        }
+    }
 
     [Test]
     [Arguments(false, "anonymous")]
@@ -302,7 +330,7 @@ public sealed class LearningContextHelpTests : IDisposable
     [Test]
     [Arguments(false)]
     [Arguments(true)]
-    public async Task ActualMainLayout_ForwardsOnlyServerAdvertisedSettingsScopesToHelp(bool grants)
+    public async Task ActualMainLayout_ForwardsServerScopesAndLoadsTheInteractiveLearner(bool grants)
     {
         var shell = Substitute.For<IUiShellContextService>();
         var requested = Signal();
@@ -342,7 +370,7 @@ public sealed class LearningContextHelpTests : IDisposable
         await Assert.That(cut.FindAll("[data-testid='learning-context-help'] a[href*='/settings/']").Count)
             .IsEqualTo(grants ? 4 : 0);
         await Assert.That(HelpActions(cut.FindAll("a,button,summary")).Any()).IsTrue();
-        await Assert.That(_privateRead.Task.IsCompleted).IsFalse();
+        await _privateRead.Task.WaitAsync(Timeout);
     }
 
     [Test]

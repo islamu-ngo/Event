@@ -21,7 +21,8 @@
 }
 
 .learning-help__trigger:focus-visible,
-.learning-help__content a:focus-visible {
+.learning-help__content a:focus-visible,
+.learning-help__content button:focus-visible {
     outline: 2px solid var(--mud-palette-primary);
     outline-offset: 2px;
 }

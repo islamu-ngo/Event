@@ -431,8 +431,12 @@
     <div class="navbar__dropdown-overlay" @onclick="CloseDropdown" aria-hidden="true"></div>
 }
 
-<LearningContextHelp AuthorizedSettingsScopes="@HelpSettingsScopes" />
+<LearningContextHelp AuthorizedSettingsScopes="@HelpSettingsScopes"
+                     ReplayGuidanceAvailable="@ReplayGuidanceAvailable"
+                     ReplayGuidance="@ReplayGuidance" />
 
 @code {
     [Parameter] public IEnumerable<SettingsScopeDto>? HelpSettingsScopes { get; set; }
+    [Parameter] public bool ReplayGuidanceAvailable { get; set; }
+    [Parameter] public EventCallback ReplayGuidance { get; set; }
 }

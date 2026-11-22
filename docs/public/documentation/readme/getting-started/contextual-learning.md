@@ -6,8 +6,9 @@ description: Private authored learning storage, simulation boundaries, and opera
 
 The private learning hub at `/learning` offers available exercises under your
 current membership and tenant guidance policy. It stores learning preferences
-and practice separately from real event work. Tour overlays remain a separate
-delivery step.
+and practice separately from real event work. Contextual guidance belongs to the
+workspace you enter; it never starts a walkthrough or performs real work without
+your explicit action.
 
 ## Six Private Exercises
 
@@ -247,13 +248,34 @@ Compatible completed evidence survives a temporarily unavailable step or a
 reordered tour. Historical completion or skip remains distinct from coverage of
 the steps applicable now; updated guidance may introduce new work without
 rewriting that history. Completion requires coverage of every applicable step.
-These backend semantics do not mean a tour renderer has shipped.
+The contextual presentation uses the currently rendered shell, Studio, event
+management or normal-AI controls. A due invitation is rechecked with the server;
+only **Start guidance** acquires a claim. You can skip or choose a one-hour,
+one-day or one-week reminder without opening an overlay. **Help** offers manual
+replay when the current source permits it, including after automatic guidance
+was hidden.
+
+Navigation, a changed account/context, a lost target or a competing dialog stops
+the old presentation. A failed or uncertain save never advances a step by
+guessing or automatically replaying the request. Missing event-management
+entries remain unavailable rather than being replaced with sample events.
+An empty real AI response region can be explained without sending a live
+message or inventing an AI response.
+
+Release acceptance still requires the separately recorded actual-host and
+accessibility checks; compilation and component tests alone do not certify
+those behaviors.
 
 Replay must be a deliberate learner choice. Skip and snooze can dismiss an
 unclaimed invitation; snooze offers one hour, one day or one week rather than an
 arbitrary deadline. An owned claim can be released after its source is removed
 without restoring access to that source. No tour starts again automatically,
 and lessons never become a hard gate on production work.
+
+During a deliberate replay, Next can move past a step whose current version
+you already covered without saving that coverage again. Reviewing known steps
+does not extend the claim's lifetime. New coverage still requires a successful
+save; an expired claim requires reopening guidance.
 
 Practice is bounded to 20 self/actor contexts and six recipes per context,
 1 KiB per record and 128 KiB per learner. Learners may clear their own practice

@@ -11,8 +11,10 @@ The workstream includes the private learning backend, an authenticated learning
 hub and six isolated authored exercises, including shared-chat simulation.
 Permanent Help and private self/member panels consume the existing scoped
 learning contract; tenant guidance has a dedicated policy editor.
-Rendered tours remain an ordered successor with accessibility, comprehension
-and renderer package-admission release gates.
+Rendered tours use server-authored plans and semantic progress through the
+scoped coordinator and mounted GuideFlow host. Accessibility, comprehension
+and final renderer admission remain release gates; component tests and the
+recorded Studio/Event Management browser checks do not complete those gates.
 
 Learning is optional. An authenticated, active tenant member may learn in self
 context without publishing, organization administration or event-creation
@@ -245,6 +247,12 @@ Suppression, snooze, skip and existing coverage require explicit `Replay` for a
 manual claim. Replay preserves historical completed/skipped outcomes and
 compatible evidence; nothing automatically replays a tour. Learning remains
 optional and is not a hard production gate.
+
+The coordinator uses its accepted receipt to recognize coverage already
+recorded for the current family, material and semantic step version. Next can
+display that covered step's successor without resubmitting Progress or renewing
+the claim. New coverage still requires an accepted server write, and the
+original claim must remain live even when advancing over existing coverage.
 
 ## Typed Tenant Policy Storage
 
@@ -618,7 +626,9 @@ counts or source inspection.
 
 ### Renderer Admission And Contribution Ledger
 
-GuideFlow remains an uninstalled candidate. On 2026-10-30, exact 1.0.1 catalog
+GuideFlow 1.0.1 is selected following the developer's 2026-10-31 confirmation of
+MIT and instruction to retain it. Selected-graph and hosted conformance remain
+execution gates. On 2026-10-30, exact 1.0.1 catalog
 metadata declared MIT/net8.0, and a streaming archive digest matched the catalog
 SHA512. This is provenance evidence, not dependency or hosted-behavior admission.
 The [source-free admission record](../../dev/active/contextual-tenant-onboarding/contextual-tenant-onboarding-renderer-admission.md)
@@ -626,16 +636,32 @@ contains sources, integrity evidence, notice/graph limits and remaining checks.
 
 | Evidence class | Current disposition |
 | --- | --- |
-| Verified renderer capability | No runtime behavior verified; exact metadata/integrity only |
+| Verified renderer capability | Exact native package restore and Release component compilation; deterministic core/host lifecycle tests. Actual browser behavior remains unverified |
 | Documented, not verified on the pinned artifact | Earlier public-API research records lifecycle/cancellation, navigation/state, async content and optional local storage |
 | Reproduced generic gap | None; no missing hook or contribution is inferred |
 | Event-owned responsibility | Tenant policy, HAL/authorization, original identity, claims, progress, erasure and presentation arbitration |
-| Accepted/deferred action | Retain candidate, uninstalled pending attribution clarification after the renderer-path question timed out; selected graph, host modes and accessibility remain open |
+| Accepted/deferred action | Developer confirmed MIT and retained exact 1.0.1 on 2026-10-31; install and implement against the supplied GuideFlow interface skill, then verify graph, host modes and accessibility |
 
-No package input or lockfile changed. No upstream message was sent. Subsequent
+The earlier metadata audit changed no package input or lockfile. No upstream message was sent. Subsequent
 implementation must receive the sanitized requirements in a fresh context;
 the research context expanded a README usage example and is not an
 implementation context from that point onward.
+
+The client now registers one scoped `LearningOnboardingCoordinator`, a
+`LearningTargetRegistry` and a narrow renderer bridge to `LearningTourHost`.
+Actual layout/Studio/event-navigation/AI owners publish post-render element
+references with their current context generation and remove departed targets.
+The shell binds authenticated private learning only after resolving its tenant;
+public prerender does not load that state.
+
+The server's current `tour-plan` HAL relation gates reads and renderer mounting.
+Due-family observations cause a fresh automatic **invitation read**, never an
+automatic claim. Explicit Start claims; accepted semantic progress controls
+Next. Skip and the closed snooze durations use the original source without
+claiming an unstarted tour. Help replay requests a fresh plan before explicit
+start. Current-scope, target, policy, expiry and disposal fences prevent old
+continuations from opening or writing in a replacement context. Renderer
+persistence is disabled and navigation cannot substitute for server progress.
 
 ### Historical Backend Receipts (Before C04 Semantic Changes)
 

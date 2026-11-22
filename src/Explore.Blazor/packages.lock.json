@@ -417,6 +417,7 @@
           "DiffPlex": "[1.9.0, )",
           "Event.Wire.Contracts": "[1.0.0, )",
           "FluentValidation": "[12.1.1, )",
+          "GuideFlow": "[1.0.1, 1.0.1]",
           "Microsoft.AspNetCore.Components.WebAssembly": "[10.0.14, )",
           "Microsoft.AspNetCore.Components.WebAssembly.Authentication": "[10.0.10, )",
           "MudBlazor": "[9.7.0, )",
@@ -478,6 +479,12 @@
         "requested": "[12.1.1, )",
         "resolved": "12.1.1",
         "contentHash": "EPpkIe1yh1a0OXyC100oOA8WMbZvqUu5plwhvYcb7oSELfyUZzfxV48BLhvs3kKo4NwG7MGLNgy1RJiYtT8Dpw=="
+      },
+      "GuideFlow": {
+        "type": "CentralTransitive",
+        "requested": "[1.0.1, 1.0.1]",
+        "resolved": "1.0.1",
+        "contentHash": "cKlgbz6FwNYHzWSCOQiQqRSGZb9Cj9+kbKOCVlSJaz2hctTqNCGJWxBQ9+xBo9qtOL9+U9YlY7IdYBpFGuDD9w=="
       },
       "Microsoft.AspNetCore.Components.WebAssembly": {
         "type": "CentralTransitive",

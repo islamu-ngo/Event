@@ -1,7 +1,7 @@
 @inject ITranslationService Translation
 @inject NavigationManager Navigation
 
-<details class="learning-help" data-testid="learning-context-help">
+<details @key="_disclosureGeneration" class="learning-help" data-testid="learning-context-help">
     <summary class="learning-help__trigger">@T("ui.learning.help.label", "Help")</summary>
     <div class="learning-help__content">
         <p class="learning-help__title">@T("ui.learning.help.title", "What would you like to do?")</p>
@@ -16,6 +16,12 @@
         </dl>
         <AuthorizeView>
             <Authorized>
+                @if (_interactiveReady && ReplayGuidanceAvailable && ReplayGuidance.HasDelegate)
+                {
+                    <button type="button" dir="auto" data-testid="learning-help-replay" @onclick="ReplayAsync">
+                        @T("ui.learning.help.replay", "Replay guidance for this workspace")
+                    </button>
+                }
                 <dl class="learning-help__goals">
                     <dt>@T("ui.learning.help.organize.title", "Organize as yourself")</dt>
                     <dd>@T("ui.learning.help.organize.body", "Use the event creation or Studio action when it is available. Studio lists managed work; an event's management pages hold its details, schedule and publication controls.")</dd>
@@ -56,7 +62,17 @@
 
 @code {
     [Parameter] public IEnumerable<SettingsScopeDto>? AuthorizedSettingsScopes { get; set; }
+    [Parameter] public bool ReplayGuidanceAvailable { get; set; }
+    [Parameter] public EventCallback ReplayGuidance { get; set; }
     private bool _interactiveReady;
+    private long _disclosureGeneration;
+
+    private async Task ReplayAsync()
+    {
+        // Hand off to the tour with a fresh, closed native disclosure.
+        ++_disclosureGeneration;
+        await ReplayGuidance.InvokeAsync();
+    }
 
     protected override void OnAfterRender(bool firstRender)
     {

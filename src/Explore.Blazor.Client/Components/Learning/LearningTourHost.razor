@@ -1,0 +1,299 @@
+@using Explore.Blazor.Client.Clients
+@using Explore.Blazor.Client.Contracts.Services.Learning
+@using Explore.Blazor.Client.Services.Learning
+@using GuideFlow.Components
+@using GuideFlow.Enums
+@using GuideFlow.Models
+@implements IAsyncDisposable
+@inject ILearningOnboardingCoordinator Coordinator
+@inject ILearningTourHost Renderer
+@inject ILearningClientService Learning
+@inject ILearningTargetRegistry Targets
+@inject ITranslationService Translation
+
+<section class="learning-tour" aria-label="@T("ui.learning.tour.title", "Workspace guidance")">
+    @if (HasOfferAffordance)
+    {
+        <button type="button" class="learning-tour__action" disabled="@(Coordinator.IsBusy || Coordinator.IsActive)"
+                @ref="_invoker" @onclick="OfferAsync">
+            @T("ui.learning.tour.offer", "Show workspace guidance")
+        </button>
+        @if (Coordinator.CanStart)
+        {
+            <button type="button" class="learning-tour__action" @onclick="StartAsync">
+                @T("ui.learning.tour.start", "Start guidance")
+            </button>
+            <button type="button" class="learning-tour__action" @onclick="SkipAsync">
+                @T("ui.learning.tour.skip", "Skip this tour")
+            </button>
+            <button type="button" class="learning-tour__action" @onclick="() => SnoozeAsync(LearningSnoozeDuration.OneHour)">
+                @T("ui.learning.tour.snooze.hour", "Remind me in one hour")
+            </button>
+            <button type="button" class="learning-tour__action" @onclick="() => SnoozeAsync(LearningSnoozeDuration.OneDay)">
+                @T("ui.learning.tour.snooze.day", "Remind me in one day")
+            </button>
+            <button type="button" class="learning-tour__action" @onclick="() => SnoozeAsync(LearningSnoozeDuration.OneWeek)">
+                @T("ui.learning.tour.snooze.week", "Remind me in one week")
+            </button>
+        }
+    }
+    @if (Coordinator.Failure is { } failure)
+    {
+        <p role="status" dir="auto">@failure</p>
+    }
+</section>
+
+@if (HasOfferAffordance)
+{
+<div class="learning-tour__renderer" @onkeydown="OnRendererKeyDownAsync">
+<MudFocusTrap Disabled="@(!Coordinator.IsActive || _step is null)" DefaultFocus="DefaultFocus.FirstChild">
+<GuideFlowTour @ref="_tour" TourOptions="_options"
+               OnBeforeStepChange="BlockAutomaticNavigation"
+               OnComplete="CloseAsync"
+               OnCloseClick="CloseFromRendererAsync">
+    @if (_step is { } step && _target is { } target)
+    {
+        var stepGeneration = _generation;
+        <GuideFlowStep @key="target.ElementId" Element="@($"#{target.ElementId}")"
+                       Title="@T("ui.learning.tour.title", "Workspace guidance")" Order="0"
+                       OnPopoverRender="@(_ => OnPopoverRenderedAsync(stepGeneration))"
+                       ShowBack="false" ShowNext="false" ShowSkip="false" ShowClose="false">
+            <ChildContent>
+                @if (Coordinator.Plan?.Steps is { } steps)
+                {
+                    <p class="learning-tour__progress" dir="auto">@string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                        T("ui.learning.tour.progress", "Step {0} of {1}"), steps.ToList().IndexOf(step) + 1, steps.Count)</p>
+                }
+                <p tabindex="-1" dir="auto" @ref="_instruction">@T(step.Instruction.Key, step.Instruction.Fallback)</p>
+            </ChildContent>
+            <ButtonsContent>
+                <div class="learning-tour__controls">
+                    <button type="button" class="learning-tour__action learning-tour__action--primary" disabled="@Coordinator.IsBusy" @onclick="NextAsync">@T("ui.learning.tour.next", "Next")</button>
+                    <button type="button" class="learning-tour__action" disabled="@Coordinator.IsBusy" @onclick="SkipAsync">@T("ui.learning.tour.skip", "Skip this tour")</button>
+                    <button type="button" class="learning-tour__action" @onclick="CloseAsync">@T("ui.learning.tour.close", "Close guidance")</button>
+                </div>
+            </ButtonsContent>
+        </GuideFlowStep>
+    }
+</GuideFlowTour>
+</MudFocusTrap>
+</div>
+}
+
+@code {
+    private bool HasOfferAffordance => Learning.Scope is not null
+        && Learning.Context?._links?.ContainsKey("tour-plan") == true;
+
+    private readonly TourOptions _options = new()
+    {
+        PersistState = false,
+        TrackVisited = false,
+        Animate = false,
+        AnimateCutout = false,
+        ScrollBehavior = GuideFlow.Enums.ScrollBehavior.Instant,
+        AllowKeyboardControl = false,
+        TrapFocus = false,
+        AllowClose = false,
+        OverlayClickBehavior = OverlayClickBehavior.Close,
+        DisableActiveInteraction = true
+    };
+    private readonly SemaphoreSlim _driverGate = new(1, 1);
+    private GuideFlowTour? _tour;
+    private LearningTourStepDto? _step;
+    private LearningTarget? _target;
+    private TaskCompletionSource? _rendered;
+    private CancellationToken _showToken;
+    private ElementReference _invoker;
+    private ElementReference _instruction;
+    private LearningClientScope? _invokingScope;
+    private bool _restoreFocus;
+    private bool _focusInstruction;
+    private long _generation;
+    private bool _disposed;
+    private HalResourceOfLearningContextDto? _invitationSource;
+    private readonly HashSet<LearningTourFamily> _offeredFamilies = [];
+
+    protected override void OnInitialized()
+    {
+        Renderer.Attach(ShowAsync, HideAsync);
+        Coordinator.Changed += OnChanged;
+        Learning.Changed += OnChanged;
+        Targets.Changed += OnChanged;
+    }
+
+    private Task OfferAsync() => Coordinator.OfferAsync();
+
+    private Task StartAsync()
+    {
+        _invokingScope = Learning.Scope;
+        return Coordinator.StartAsync();
+    }
+
+    private Task NextAsync() => Coordinator.NextAsync();
+    private Task SkipAsync() => Coordinator.SkipAsync();
+    private Task SnoozeAsync(LearningSnoozeDuration duration) => Coordinator.SnoozeAsync(duration);
+    private Task CloseAsync() => Coordinator.CloseAsync();
+    private string T(string key, string fallback) => Translation.T(key, fallback);
+    private Task CloseFromRendererAsync(TourContext _) => Coordinator.CloseAsync();
+    private Task OnRendererKeyDownAsync(KeyboardEventArgs args) =>
+        args.Key is "Escape" && Coordinator.IsActive ? Coordinator.CloseAsync() : Task.CompletedTask;
+
+    private Task OnPopoverRenderedAsync(long generation)
+    {
+        if (_disposed || generation != _generation || _showToken.IsCancellationRequested)
+            return Task.CompletedTask;
+        _focusInstruction = true;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    // Only the coordinator advances semantic progress. Arrow keys and vendor
+    // navigation cannot bypass its awaited server receipt.
+    private static void BlockAutomaticNavigation(BeforeStepChangeEventArgs args) =>
+        args.Cancel = args.TargetStepIndex != 0;
+
+    private async Task ShowAsync(LearningTourStepDto step, LearningTarget target, CancellationToken token)
+    {
+        var rendered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await InvokeAsync(() =>
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            token.ThrowIfCancellationRequested();
+            ++_generation;
+            _rendered?.TrySetCanceled();
+            _rendered = rendered;
+            _showToken = token;
+            _invokingScope ??= Learning.Scope;
+            _focusInstruction = false;
+            _step = step;
+            _target = target;
+            StateHasChanged();
+        });
+        await rendered.Task.WaitAsync(token);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusInstruction && !Coordinator.IsBusy && Coordinator.IsActive && _step is not null
+            && !_disposed && _invokingScope is not null && Learning.Scope == _invokingScope)
+        {
+            _focusInstruction = false;
+            await _instruction.FocusAsync(preventScroll: true);
+        }
+
+        if (_restoreFocus && !Coordinator.IsBusy && !Coordinator.IsActive)
+        {
+            _restoreFocus = false;
+            var invokingScope = _invokingScope;
+            _invokingScope = null;
+            if (!_disposed && HasOfferAffordance && invokingScope is not null
+                && Learning.Scope == invokingScope)
+                await _invoker.FocusAsync(preventScroll: true);
+        }
+
+        if (!ReferenceEquals(_invitationSource, Learning.Context))
+        {
+            _invitationSource = Learning.Context;
+            _offeredFamilies.Clear();
+        }
+        if (!_disposed && HasOfferAffordance && !Targets.IsBlocked
+            && !Coordinator.IsActive && !Coordinator.IsBusy
+            && Targets.Current is { } presentation
+            && Learning.Context?.Tours?.Any(tour =>
+                tour.Family == presentation.Family && tour.CanInvite == true) == true
+            && _offeredFamilies.Add(presentation.Family))
+            await Coordinator.OfferAsync(automatic: true);
+
+        if (_rendered is not { } rendered || rendered.Task.IsCompleted || _tour is null)
+            return;
+        var generation = _generation;
+        var token = _showToken;
+        await _driverGate.WaitAsync();
+        try
+        {
+            if (rendered.Task.IsCompleted || _disposed || generation != _generation || token.IsCancellationRequested)
+            {
+                rendered.TrySetCanceled();
+                return;
+            }
+            await _tour.DestroyAsync();
+            if (_disposed || generation != _generation || token.IsCancellationRequested)
+            {
+                rendered.TrySetCanceled();
+                return;
+            }
+            await _tour.DriveAsync(0);
+            if (_disposed || generation != _generation || token.IsCancellationRequested)
+            {
+                await _tour.DestroyAsync();
+                rendered.TrySetCanceled();
+                return;
+            }
+            await InvokeAsync(StateHasChanged);
+            rendered.TrySetResult();
+        }
+        catch (Exception exception)
+        {
+            rendered.TrySetException(exception);
+        }
+        finally
+        {
+            _driverGate.Release();
+        }
+    }
+
+    private async Task HideAsync()
+    {
+        await InvokeAsync(() =>
+        {
+            ++_generation;
+            _rendered?.TrySetCanceled();
+            _rendered = null;
+            _focusInstruction = false;
+            _step = null;
+            _target = null;
+            if (!_disposed)
+                StateHasChanged();
+        });
+        await _driverGate.WaitAsync();
+        try
+        {
+            if (_tour is not null)
+                await _tour.DestroyAsync();
+            if (!_disposed && _invokingScope is not null && Learning.Scope == _invokingScope)
+            {
+                // The offer remains disabled until the coordinator's transition
+                // finishes. Restore only after that enabled state has rendered.
+                _restoreFocus = true;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        finally
+        {
+            _driverGate.Release();
+        }
+    }
+
+    private void OnChanged()
+    {
+        if (!_disposed)
+            _ = InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+            return;
+        _disposed = true;
+        Coordinator.Changed -= OnChanged;
+        Learning.Changed -= OnChanged;
+        Targets.Changed -= OnChanged;
+        try
+        {
+            await Coordinator.CancelAsync();
+        }
+        finally
+        {
+            Renderer.Detach();
+        }
+    }
+}

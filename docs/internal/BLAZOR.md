@@ -71,6 +71,29 @@ Actual-host keyboard, screen-reader, theme, RTL and viewport assurance remains
 part of programme exit, not a claim supplied by those tests. The backend
 contracts and erasure rules remain in [CONTEXTUAL_LEARNING.md](CONTEXTUAL_LEARNING.md).
 
+### Contextual Tour Presentation
+
+GuideFlow 1.0.1 is a rendering dependency of the client, with its packaged
+stylesheet/module referenced by the server document. One scoped coordinator
+owns server-plan/claim/progress transitions; one mounted host owns presentation.
+The target registry contains actual post-render element references from the
+shell, Studio, event navigation and shared normal-AI rail, not synthetic cards
+or guessed selectors. Context generations and owner disposal remove stale
+targets. Existing dialogs and edited/saving content defer optional guidance.
+
+A current HAL `tour-plan` relation gates both plan reads and renderer mounting.
+Server-derived due-family observations can produce a fresh invitation read;
+they never acquire a claim automatically. Explicit Start claims, accepted
+semantic receipts advance Next, and explicit skip/snooze use the original
+current source. Help replay fetches a fresh plan before starting. Renderer
+local storage is disabled. Uncertain writes are not replayed, and old outcomes
+never use replacement tenant headers.
+
+The authenticated interactive layout resolves its tenant before loading private
+learning. Anonymous/static rendering retains public Help without initializing
+the private renderer. Native component and Studio integration tests do not
+replace the separate actual-host accessibility/audience gate.
+
 ## Guided Instance Administration
 
 `InstanceGettingStartedSection` reads existing onboarding status/journey services;

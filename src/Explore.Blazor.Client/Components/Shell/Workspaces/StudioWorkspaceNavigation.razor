@@ -1,7 +1,10 @@
 @using Explore.Blazor.Client.Contracts.Services.Shell
+@using Explore.Blazor.Client.Services.Learning
+@using Explore.Blazor.Client.Contracts.Services.Learning
 @implements IWorkspaceNavigationProvider
 @implements IDisposable
 @inject NavigationManager Navigation
+@inject ILearningTargetRegistry TourTargets
 
 @if (_eventId is Guid eventId)
 {
@@ -10,7 +13,9 @@
 else
 {
     <nav class="studio-workspace-navigation" aria-label="@AriaLabel" data-testid="studio-workspace-navigation">
-        <StudioActorSwitcher />
+        <div id="learning-studio-actor" @ref="_tourActor">
+            <StudioActorSwitcher />
+        </div>
         <MudNavMenu Dense="false" Class="studio-workspace-navigation__menu px-2">
             <div class="studio-workspace-navigation__header">
                 <MudText Typo="Typo.h6" Class="studio-workspace-navigation__title">Studio</MudText>
@@ -33,6 +38,10 @@ else
 
 @code {
     private Guid? _eventId;
+    private ElementReference _tourActor;
+
+    [CascadingParameter(Name = "LearningPresentationContext")]
+    public LearningPresentationContext? TourPresentation { get; set; }
 
     public string AriaLabel => "Studio navigation";
 
@@ -44,6 +53,7 @@ else
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
+        TourTargets.Remove(this);
         UpdateEventContext();
         _ = InvokeAsync(StateHasChanged);
     }
@@ -60,8 +70,19 @@ else
                 : null;
     }
 
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (_eventId is null && TourPresentation is { Family: LearningTourFamily.Studio } presentation
+            && !string.IsNullOrWhiteSpace(_tourActor.Id))
+            TourTargets.Publish(this, presentation, false,
+                new LearningTarget("studio.actor-context", "learning-studio-actor", _tourActor));
+        else
+            TourTargets.Remove(this);
+    }
+
     public void Dispose()
     {
+        TourTargets.Remove(this);
         Navigation.LocationChanged -= OnLocationChanged;
         GC.SuppressFinalize(this);
     }

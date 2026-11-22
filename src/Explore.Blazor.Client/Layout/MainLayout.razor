@@ -10,6 +10,7 @@
 <MudSnackbarProvider />
 <AnalyticsInitializer />
 
+<CascadingValue Value="@TourPresentation" Name="LearningPresentationContext">
 @* Skip-to-content link — first focusable element on every page (WCAG 2.4.1) *@
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
@@ -21,12 +22,16 @@
         {
             <header class="main-layout__header">
                 <AnnouncementBar OnVisibilityChanged="OnAnnouncementVisibilityChanged" />
-                <nav aria-label="Sidebar navigation">
-                    <NavMenu HelpSettingsScopes="@_shellContext?.SettingsScopes" />
+                <nav id="learning-shell-navigation" @ref="_tourNavigation" aria-label="Sidebar navigation">
+                    <NavMenu HelpSettingsScopes="@_shellContext?.SettingsScopes"
+                             ReplayGuidanceAvailable="@CanReplayGuidance"
+                             ReplayGuidance="@ReplayGuidanceAsync" />
                 </nav>
                 <SupportAccessBanner OnVisibilityChanged="OnSupportAccessBannerVisibilityChanged" />
             </header>
-            <AppWorkspaceRail />
+            <div id="learning-shell-workspaces" @ref="_tourWorkspaces">
+                <AppWorkspaceRail />
+            </div>
         }
         else
         {
@@ -46,12 +51,21 @@
 
         <DockLayoutHost Scope="@DockScope.Shell" MinimumContentWidth="@ActiveWorkspaceContentFloor">
             <MudMainContent Class="main-layout__main" Style="padding-top: 0 !important;">
-                <main id="main-content" tabindex="-1" class="@MainContentClass" style="@MainContentStyle">
+                <main id="main-content" tabindex="-1" class="@MainContentClass" style="@MainContentStyle"
+                      @oninput="SuspendTourForContentInteraction"
+                      @onchange="SuspendTourForContentInteraction"
+                      @onsubmit="SuspendTourForContentInteraction">
                     @if (_hideChrome)
                     {
                         <LearningContextHelp AuthorizedSettingsScopes="@_shellContext?.SettingsScopes" />
                     }
                     @Body
+                    @if (!_hideChrome && !IsAuthenticationEntryRoute)
+                    {
+                        <section id="learning-shell-help" @ref="_tourHelp" aria-label="Workspace guidance">
+                            <LearningTourHost />
+                        </section>
+                    }
                 </main>
                 @if (!_hideChrome)
                 {
@@ -62,6 +76,7 @@
     </MudLayout>
 </MudRTLProvider>
 </div>
+</CascadingValue>
 
 @* ARIA live regions for screen reader announcements — must exist in DOM at all times *@
 <div id="aria-live-polite" aria-live="polite" aria-atomic="true" class="sr-only"></div>

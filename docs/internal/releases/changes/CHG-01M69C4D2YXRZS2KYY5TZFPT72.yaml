@@ -1,0 +1,37 @@
+Change-Id: CHG-01M69C4D2YXRZS2KYY5TZFPT72
+Title: "offer guidance inside the workspace a user enters"
+Type: feat
+Scope: onboarding
+Summary: "Add explicit-start shell, Studio, event-management and normal-AI guidance with semantic targets, fresh server claims and scope-safe cancellation."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Original HAL, scope, plan, claim and semantic progress receipts govern
+      client transitions. Public prerender does not read private learning or
+      initialize the renderer. Replaced contexts and uncertain writes cannot
+      reopen an old overlay or replay mutations under new tenant headers.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      Current workspaces offer optional invitations; explicit Start, Skip,
+      closed snooze intervals and Help replay preserve private learning state.
+      GuideFlow1.0.1 supplies presentation only and retains its MIT terms.
+      Existing deployment authority remains required for Standalone hosting.

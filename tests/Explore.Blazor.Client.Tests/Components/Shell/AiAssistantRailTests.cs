@@ -2,6 +2,7 @@ using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Components.Shell.AiAssistant;
 using Explore.Blazor.Client.Contracts.Services.Ai;
 using Explore.Blazor.Client.Services.Ai;
+using Explore.Blazor.Client.Services.Learning;
 using Explore.Blazor.Client.Services.Shell;
 using Explore.Blazor.Client.Tests;
 using Microsoft.AspNetCore.Components.Forms;
@@ -33,6 +34,48 @@ public sealed class AiAssistantRailTests : IDisposable
     public void Dispose()
     {
         _ctx.Dispose();
+    }
+
+    [Test]
+    public async Task EmptyConversationPublishesRealGuidanceTargetsWithoutAnAiResponse()
+    {
+        var conversation = new HalResourceOfAiConversationDto
+        {
+            Id = Guid.CreateVersion7(),
+            Messages = []
+        };
+        _conversationState.SelectConversation(conversation);
+        _clientService.GetConversationCollectionAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<HalCollectionResourceOfAiConversationSummaryDto?>(
+                CreateConversationCollection([])));
+        _shellState.SetPolicy(tenantEnabled: true, tenantAvailable: true,
+            allowAnonymousAccess: false, isAuthenticated: true);
+        _shellState.Open();
+        var registry = _ctx.Services.GetRequiredService<LearningTargetRegistry>();
+        var presentation = new LearningPresentationContext(LearningTourFamily.NormalAi, "ai-entry");
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void Observe()
+        {
+            if (registry.Current is { Family: LearningTourFamily.NormalAi } current
+                && !registry.IsBlocked && registry.Find(current, "normal-ai.composer") is not null
+                && registry.Find(current, "normal-ai.response") is not null)
+                ready.TrySetResult();
+        }
+        registry.Changed += Observe;
+        try
+        {
+            _ctx.RenderMudComponent<CascadingValue<LearningPresentationContext>>(parameters => parameters
+                .Add(component => component.Name, "LearningPresentationContext")
+                .Add(component => component.Value, presentation)
+                .AddChildContent<AiAssistantRail>());
+            Observe();
+            await ready.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await Assert.That(conversation.Messages?.Count).IsEqualTo(0);
+        }
+        finally
+        {
+            registry.Changed -= Observe;
+        }
     }
 
     [Test]

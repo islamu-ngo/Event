@@ -1,8 +1,12 @@
 @page "/studio/events"
 @using Microsoft.AspNetCore.Authorization
+@using Explore.Blazor.Client.Services.Learning
+@using Explore.Blazor.Client.Contracts.Services.Learning
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inherits StudioEventPageBase
+@implements IDisposable
+@inject ILearningTargetRegistry TourTargets
 
 <PageTitle>Studio Events</PageTitle>
 
@@ -40,7 +44,7 @@
     }
     else if (Result.Items.Count == 0)
     {
-        <section class="studio-page__state" aria-labelledby="studio-events-empty-title" data-testid="studio-events-empty">
+        <section id="learning-studio-events" @ref="_tourEventList" class="studio-page__state" aria-labelledby="studio-events-empty-title" data-testid="studio-events-empty">
             <MudIcon Icon="@Icons.Material.Outlined.EventBusy" Size="Size.Large" Color="Color.Secondary" aria-hidden="true" />
             <MudText Id="studio-events-empty-title" Typo="Typo.h5" HtmlTag="h2">No managed events yet</MudText>
             <MudText Typo="Typo.body1" Color="Color.Secondary">
@@ -58,7 +62,7 @@
     }
     else
     {
-        <section aria-labelledby="studio-event-list-title">
+        <section id="learning-studio-events" @ref="_tourEventList" aria-labelledby="studio-event-list-title">
             <MudText Id="studio-event-list-title" HtmlTag="h2" Class="sr-only">Managed events</MudText>
             <div class="studio-event-list" data-testid="studio-event-list">
                 @foreach (var item in Result.Items)
@@ -66,7 +70,15 @@
                     <article class="studio-event-list__item">
                         <div class="studio-event-list__content">
                             <MudText Typo="Typo.h6" HtmlTag="h3">
-                                <a class="studio-event-list__link" href="@($"/studio/events/{item.Id}")">@item.Title</a>
+                                @if (ReferenceEquals(item, Result.Items.FirstOrDefault()) && item.Id.HasValue)
+                                {
+                                    <a id="learning-studio-manage-event" @ref="_tourManageEvent"
+                                       class="studio-event-list__link" href="@($"/studio/events/{item.Id}")">@item.Title</a>
+                                }
+                                else
+                                {
+                                    <a class="studio-event-list__link" href="@($"/studio/events/{item.Id}")">@item.Title</a>
+                                }
                             </MudText>
                             <div class="studio-event-list__metadata">
                                 @if (!string.IsNullOrWhiteSpace(item.EventStatusFullName))
@@ -113,3 +125,34 @@
         </section>
     }
 </MudContainer>
+
+@code {
+    [CascadingParameter(Name = "LearningPresentationContext")]
+    public LearningPresentationContext? TourPresentation { get; set; }
+
+    private ElementReference _tourEventList;
+    private ElementReference _tourManageEvent;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (TourPresentation is not { Family: LearningTourFamily.Studio } presentation)
+        {
+            TourTargets.Remove(this);
+            return;
+        }
+
+        var targets = new List<LearningTarget>();
+        var blocked = IsLoading || ErrorMessage is not null || Result.Items.FirstOrDefault()?.Id is null;
+        if (!IsLoading && ErrorMessage is null && !string.IsNullOrWhiteSpace(_tourEventList.Id))
+            targets.Add(new("studio.event-list", "learning-studio-events", _tourEventList));
+        if (!blocked && !string.IsNullOrWhiteSpace(_tourManageEvent.Id))
+            targets.Add(new("studio.event-management", "learning-studio-manage-event", _tourManageEvent));
+        TourTargets.Publish(this, presentation, blocked, targets.ToArray());
+    }
+
+    public new void Dispose()
+    {
+        TourTargets.Remove(this);
+        base.Dispose();
+    }
+}

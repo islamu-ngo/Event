@@ -9,6 +9,7 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
+using Event.Testing;
 using Event.Api.IntegrationTests.Seeds;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;

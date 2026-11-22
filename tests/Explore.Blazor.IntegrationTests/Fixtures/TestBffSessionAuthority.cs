@@ -88,7 +88,7 @@ internal sealed class TestBffSessionAuthority(TimeProvider? clock = null) : ITic
     public async Task<bool> IsActiveAsync(BffSessionBinding binding, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var ticket = await RetrieveAsync(binding.Handle);
+        var ticket = await RetrieveAsync(binding.Handle, cancellationToken);
         return ticket is not null
             && BffSessionIdentity.TryGetBinding(ticket.Principal, out var current)
             && current == binding;

@@ -349,7 +349,6 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     {
         using var startup = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
         startupToken = startup.Token;
-        bool startPermitted = false;
         try
         {
             // StartAsync holds disposalLock until this first task assignment precedes any asynchronous preparation.
@@ -362,7 +361,6 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             {
                 if (!execution.PermitStart())
                     throw new OperationCanceledException(token);
-                startPermitted = true;
                 var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 using var registration = applicationLifetime!.ApplicationStarted.Register(() => started.TrySetResult());
                 Task completed = await Task.WhenAny(started.Task, execution.Completion).WaitAsync(token);
@@ -386,8 +384,8 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         if (startupFailure is not null)
         {
             execution.CancelUnstarted();
-            if (startPermitted)
-                execution.CancelHost();
+            try { execution.CancelHost(); }
+            catch (Exception exception) { startupFailure = new AggregateException(startupFailure, exception); }
             try { await execution.WaitForCompletionAsync(TimeSpan.FromSeconds(30)); }
             catch (Exception exception) { startupFailure = new AggregateException(startupFailure, exception); }
         }

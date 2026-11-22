@@ -1,7 +1,7 @@
 # I-VSD — PR 79 Testing Assurance Follow-Up
 
 Last Updated: 2026-11-22
-Report revision: 4
+Report revision: 6
 
 ## Review Metadata
 
@@ -17,11 +17,15 @@ Report revision: 4
   - Planning triad revision 1, as supplied in chat and saved locally
   - Planning triad revision 9, 2026-11-20
   - Working-tree plan revision 13 and execution context, 2026-11-21
-  - Plan revision 14, maintainer deferral/merge decisions, 2026-11-22
+  - Plan revision 15, maintainer deferral/merge decisions, 2026-11-22
   - Published candidate `cb6f084285` and independent bounded security/privacy
     and correctness/documentation reviews, 2026-11-22
   - Observer repair `26e34c1991`: exact image-declared mount validation,
     no parent volume deletion, and passing native interruption control
+  - Subsequent ownership 77/77 and browser-security modules 36/36; standalone
+    native SQLite migration failure reproduced on untouched `ed15a99dd7`
+  - Standalone relational provider/host-graph fixture 22/22 and resource-cookie
+    consumers 2/2; stored session acceptance and server-owned correlation verified
   - [ADR-021](../../docs/internal/adr/ADR-021-instance-scoped-hal-authorization.md)
 - Supersedes: none
 
@@ -47,14 +51,22 @@ The proposed plan addresses those responsibilities through exact-candidate
 evidence, positive ownership, private artifact custody, native authority tests
 and explicit incomplete/unavailable outcomes.
 
-The report is not independently implementation-validated. The recorded B20
+The independent implementation review is bounded source review. The recorded B20
 authorization slice passed 75/75 and the category relationship class passed
 5/5 on earlier sources. The earlier B22 data-protection witness passed 2/2 while
 retaining the developer volumes, but review found that its stop proof was too
 weak; the corrected witness has not run. A later tenant-discovery run was interrupted and is not a
 passing result. These receipts are scoped observations, not proof of the final
-candidate. Worker, browser, K6, provider-matrix, scanner and independent-review
-evidence remain absent. Its draft / changes-required
+candidate. Current ownership and browser module checks passed 77/77 and 36/36.
+Standalone's relational fixture passed 22/22 provider/host-graph cases and 2/2
+resource-cookie consumers. It uses SQLite `EnsureCreated` and an explicit
+in-process session authority; these are not native migration or distributed
+Redis qualification. Native staging SQLite migration fails identically on
+untouched upstream and is quarantined in develop's backlog. Security CI on
+`75c8e5097d` now exits 3 without the former observer-failed suffix; no admitted
+full-lane receipt is claimed.
+Actual-host browser, worker/restart, load and final provider/scanner execution
+remain unqualified; independent source review is recorded below. Its draft / changes-required
 disposition permits planning reconciliation, not an implementation-complete,
 security or merge-readiness claim.
 
@@ -487,7 +499,8 @@ Unstable inputs:
 
 Current status:
 Draft, with revision-14 decisions and bounded implementation review reconciled;
-final native-observer repair, runtime receipts and acceptance remain open.
+full execution of the repaired native observer, runtime receipts and acceptance
+remain open. The observer repair itself and its focused custody control passed.
 
 Before implementation:
 Refresh evidence and restrictions.

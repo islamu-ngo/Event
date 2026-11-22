@@ -30,6 +30,11 @@ startup; it is not permission to serve with broken relationships, forge migratio
 history or replace normal migration with `EnsureCreated`. Generated migration
 files and their constraint definitions remain untouched.
 
+Browser sessions separately require the Redis ticket authority even with a
+SQLite application database. This is not the ordinary availability cache and
+must not fall back to one. See the [Standalone operator guide](../public/documentation/readme/self-hosting/docker-standalone.md)
+and [session authority inputs](../public/documentation/readme/configuration-and-operations/environment-variables.md#shared-browser-session-authority).
+
 ## Private Learning Rollout And Recovery
 
 Learning adds four tenant-filtered entity tables through the generated

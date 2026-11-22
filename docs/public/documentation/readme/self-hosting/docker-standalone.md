@@ -77,7 +77,7 @@ unavailable until explicit directory activation.
 
 | Advantage | Consideration |
 |---|---|
-| **Zero External Infrastructure**: Runs on built-in SQLite persistence; no PostgreSQL server or Redis required. | **Single Replica**: SQLite requires exactly one running container instance (no horizontal multi-container scaling). |
+| **Embedded Application Database**: SQLite needs no PostgreSQL server. Browser sign-in additionally requires the dedicated Redis session authority. | **Single Replica**: SQLite requires exactly one running container instance (no horizontal multi-container scaling). |
 | **Single-Process Footprint**: Runs API, BFF/UI, and SQLite in one container without auxiliary database servers. | **Local-First Storage**: Media and database files live in a mounted Docker volume. |
 | **Instant Onboarding**: In-process migrations apply automatically before the HTTP port opens. | **Multi-Platform Support**: Official multi-arch images built for `linux/amd64` and `linux/arm64`. |
 
@@ -135,6 +135,17 @@ exhaustive reference. Its PostgreSQL host, port and role settings must not be
 carried into SQLite configuration. Use the small Standalone projection below and
 the [environment reference](../configuration-and-operations/environment-variables.md)
 for advanced settings. Restrict the file to its operator (`chmod 600 .env`).
+
+Browser sign-in requires `BFF_SESSION_REDIS_ENDPOINT`, `BFF_SESSION_NAMESPACE`
+and `BFF_SESSION_REDIS_PASSWORD`, even when the application database is SQLite.
+Provision the dedicated session service and matching password before signing in;
+the ordinary availability cache is not a substitute. Its address must be
+reachable from the Standalone process or container. Follow the
+[shared browser session authority contract](../configuration-and-operations/environment-variables.md#shared-browser-session-authority).
+Local password creation also requires the pinned, operator-owned
+`AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH` and
+`AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256` snapshot described in the
+[Local Identity password policy](../configuration-and-operations/authentication-providers.md).
 
 Temporary Local identity-check failures, including API throttling, block protected
 operations without deleting an otherwise valid browser session. Protected HTTP

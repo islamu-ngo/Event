@@ -12,6 +12,46 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class SecurityExecutionEvidenceApiResourceTests
 {
     private const string ProbeImage = "ghcr.io/cerbos/cerbos:0.53.0";
+    private static readonly Lazy<string> DockerExecutable = new(() =>
+        ResolveDockerExecutable(Environment.GetEnvironmentVariable("PATH") ?? string.Empty));
+
+    private static string ResolveDockerExecutable(string searchPath)
+    {
+        foreach (string directory in searchPath.Split(Path.PathSeparator))
+        {
+            if (!Path.IsPathFullyQualified(directory)) continue;
+            var candidate = new FileInfo(Path.Combine(directory, "docker"));
+            if (!candidate.Exists) continue;
+            string resolved = candidate.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? candidate.FullName;
+            if ((File.GetUnixFileMode(resolved) & (UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute)) == 0)
+                continue;
+            return candidate.FullName;
+        }
+        throw new InvalidDataException("api_probe_docker_unavailable");
+    }
+
+    [Test]
+    public async Task DockerSelectionRequiresAnAbsoluteExecutableAndSupportsCustomInstallations()
+    {
+        using var fixture = new SecurityExecutionEvidenceProcessTests.ProcessFixture();
+        string unusable = Directory.CreateDirectory(Path.Combine(fixture.Root, "not-executable")).FullName;
+        string installation = Directory.CreateDirectory(Path.Combine(fixture.Root, "custom-bin")).FullName;
+        string first = Path.Combine(unusable, "docker");
+        string executable = Path.Combine(installation, "command-launcher");
+        string command = Path.Combine(installation, "docker");
+        await File.WriteAllTextAsync(first, string.Empty);
+        await File.WriteAllTextAsync(executable, string.Empty);
+        File.SetUnixFileMode(first, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        File.SetUnixFileMode(executable, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        File.CreateSymbolicLink(command, executable);
+
+        string selected = ResolveDockerExecutable(string.Join(Path.PathSeparator, ".", unusable, installation));
+
+        await Assert.That(selected).IsEqualTo(command);
+        await Assert.That(Path.IsPathFullyQualified(selected)).IsTrue();
+        await Assert.That(() => ResolveDockerExecutable(string.Join(Path.PathSeparator, ".", unusable)))
+            .Throws<InvalidDataException>();
+    }
 
     [Test]
     [Explicit]
@@ -201,7 +241,7 @@ public sealed class SecurityExecutionEvidenceApiResourceTests
 
     private static async Task<string> DockerAsync(string endpoint, string[] arguments, CancellationToken token)
     {
-        var command = new ProcessStartInfo("/usr/bin/docker")
+        var command = new ProcessStartInfo(DockerExecutable.Value)
         { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
         command.ArgumentList.Add("--host");
         command.ArgumentList.Add(endpoint);

@@ -504,7 +504,11 @@ public static partial class SecurityExecutionEvidence
             _ when !child.TemporaryRemoved => "temporary-cleanup-failed",
             _ => "report-missing"
         };
-        return $"native_execution_failed:{lane}:{outcome}";
+        string diagnostic = $"native_execution_failed:{lane}:{outcome}";
+        if (!child.Process.CleanupSucceeded && outcome != "process-cleanup-failed") diagnostic += ":process-cleanup-failed";
+        if (!child.Process.ObserverSettled && outcome != "observer-unsettled") diagnostic += ":observer-unsettled";
+        if (child.Process.ObserverFailures.Count > 0 && outcome != "observer-failed") diagnostic += ":observer-failed";
+        return diagnostic;
     }
 
     private sealed record CompletedOwnedRun(OwnedExecutionRequest Request,

@@ -71,6 +71,26 @@ public sealed class SecurityExecutionEvidenceIntegrationTests
     }
 
     [Test]
+    [Arguments("process-exit-137", false, false)]
+    [Arguments("cancelled", true, false)]
+    [Arguments("timed-out", false, true)]
+    public async Task NativeFailurePreservesConcurrentCleanupAndObserverOutcomes(
+        string outcome, bool cancelled, bool timedOut)
+    {
+        var process = new SecurityExecutionEvidence.OwnedNativeProcessResult(
+            137, timedOut, cancelled, false, false, false, "private-output"u8.ToArray(), [])
+        {
+            ObserverSettled = false,
+            ObserverFailures = [new InvalidOperationException("private-error")]
+        };
+        var child = new SecurityExecutionEvidence.OwnedChild(process, [1], [], "private-owner", true, true);
+        await Assert.That(SecurityExecutionEvidence.NativeExecutionFailureCode("security-integration", child))
+            .IsEqualTo($"native_execution_failed:security-integration:{outcome}:process-cleanup-failed:observer-unsettled:observer-failed");
+        await Assert.That(SecurityExecutionEvidence.NativeExecutionFailureCode("private-lane", child))
+            .IsEqualTo("native_execution_failed");
+    }
+
+    [Test]
     [Arguments("security-integration", "600s", 615)]
     [Arguments("owned-load-correctness", "1500s", 1515)]
     public async Task TypedUidLaunchBudgetPreservesOrdinaryAndTwentyMinuteLoadRegimes(

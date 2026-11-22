@@ -240,7 +240,10 @@ public sealed class HumanAuthorizationRouteUnusualLoginTests(HumanAuthorizationR
         {
             setting = new SystemSetting
             {
-                Id = Guid.CreateVersion7(), SettingKey = key, Value = "\"local\"", ValueType = SettingValueType.String,
+                Id = Guid.CreateVersion7(),
+                SettingKey = key,
+                Value = "\"local\"",
+                ValueType = SettingValueType.String,
                 CreatedAt = DateTime.UtcNow
             };
             migrator.SystemSettings.Add(setting);

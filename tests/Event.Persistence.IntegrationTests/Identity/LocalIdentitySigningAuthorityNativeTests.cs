@@ -200,13 +200,15 @@ public sealed class LocalIdentitySigningAuthorityNativeTests(LocalIdentitySignin
         IdentityAccountResolution resolution = await resolver.ResolveAsync(account, null, token);
 
         await Assert.That(resolution.Decision).IsEqualTo(IdentityCorrelationDecision.ExactBinding);
-        await Assert.That(resolution.User).IsNotNull();
-        await Assert.That(resolution.User!.Id).IsEqualTo(subject);
-        await Assert.That(resolution.User.Pii).IsNull();
-        await Assert.That(resolution.User.Actor).IsNotNull();
-        await Assert.That(resolution.User.Actor!.Id).IsEqualTo(actorId);
-        await Assert.That(resolution.User.Actor.UserId).IsEqualTo(subject);
-        await Assert.That(resolution.User.Actor.Pii).IsNull();
+        await Assert.That(resolution.UserId).IsEqualTo(subject);
+        User? binding = await new UserRepository(application).GetLocalIdentityBindingAsync(subject, token);
+        await Assert.That(binding).IsNotNull();
+        await Assert.That(binding!.Id).IsEqualTo(subject);
+        await Assert.That(binding.Pii).IsNull();
+        await Assert.That(binding.Actor).IsNotNull();
+        await Assert.That(binding.Actor!.Id).IsEqualTo(actorId);
+        await Assert.That(binding.Actor.UserId).IsEqualTo(subject);
+        await Assert.That(binding.Actor.Pii).IsNull();
         await Assert.That(application.ChangeTracker.Entries<UserPii>().Any()).IsFalse();
     }
 

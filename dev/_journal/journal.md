@@ -3884,3 +3884,46 @@ that the entire registered security lane or product runtime passed.
 
 **Promotion Consideration**:
 - [x] Stays in journal; the delivered API cleanup boundary is documented in TESTING.md.
+
+[2026-11-23 Europe/Brussels] — Bind ownership before opening scoped refresh consumers
+
+**Context**: While reconciling contextual guidance after actor changes and private
+learning invalidation, the real scoped facade correctly rejected stale responses
+but the mounted shell did not consistently request replacement state.
+
+**Symptom / Observation**: A delayed former-actor read left guidance unavailable
+for the replacement actor. Adding the missing refresh consumer then exposed a
+second defect: initial loading could issue three reads where only the original
+and replacement requests were expected.
+
+**Root Cause**: `MainLayout` originally loaded private learning only during its
+first render. The facade could later invalidate its owner and publish
+`RequiresContextRefresh`, but nothing consumed that signal. Opening the new
+consumer before tenant binding was complete allowed synchronous ownership
+notifications to reenter loading during shell hydration.
+
+**Resolution**: Bind the tenant before dock hydration opens the consumer, then
+consume the facade signal after preference and dock hydration. The facade
+consumes its signal before transport, so failed reads remain consumed across
+ordinary renders and navigation until another explicit invalidation. The complete
+mounted layout class passed 40/40 with
+`dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --no-build --verbosity quiet -- --treenode-filter '/*/*/*MainLayoutTests/*' --maximum-parallel-tests 2`.
+Both adjacent mounted Help cases passed using the existing real facade with
+`dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --no-build --verbosity quiet -- --treenode-filter '/*/*/*LearningContextHelpTests/ActualMainLayout_ForwardsServerScopesAndLoadsTheInteractiveLearner*' --maximum-parallel-tests 2`.
+No automatic retry, duplicate actor cache or production renderer workaround was
+introduced.
+
+**Why This Matters for Future Work**: Rejecting stale work does not itself make a
+replacement owner live. A scoped invalidation signal needs a consumer, and that
+consumer must remain closed until ownership inputs are bound. Treat notifications
+as potentially synchronous; an awaited initializer does not prevent reentrancy.
+
+**References**:
+- `src/Explore.Blazor.Client/Layout/MainLayout.razor.cs`
+- `src/Explore.Blazor.Client/Services/Learning/LearningClientService.cs`
+- `tests/Explore.Blazor.Client.Tests/Layout/MainLayoutTests.cs`
+- `tests/Explore.Blazor.Client.Tests/Learning/LearningContextHelpTests.cs`
+- `docs/internal/CONTEXTUAL_LEARNING.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal; the feature's refresh lifecycle is documented in CONTEXTUAL_LEARNING.md.

@@ -83,6 +83,7 @@ public class BlazorTestContext : BunitContext
         Services.AddGuideFlow();
         Services.AddSingleton(Substitute.For<Explore.Blazor.Client.Clients.ILearningClient>());
         Services.AddSingleton(Substitute.For<ILearningClientService>());
+        Services.AddSingleton(Substitute.For<Explore.Blazor.Client.Contracts.Services.IAnnouncementClientService>());
         Services.AddScoped<LearningTargetRegistry>();
         Services.AddScoped<ILearningTargetRegistry>(provider =>
             provider.GetRequiredService<LearningTargetRegistry>());

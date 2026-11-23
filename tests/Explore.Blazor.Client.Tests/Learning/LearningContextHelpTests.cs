@@ -372,7 +372,15 @@ public sealed class LearningContextHelpTests : IDisposable
             return response.Task;
         });
         _ctx.Services.AddSingleton(shell);
-        _ctx.SetAuthenticatedUser(_userId, "Learner");
+        var transport = Substitute.For<ILearningClient>();
+        transport.GetLearningContextAsync(Arg.Any<string?>(), Arg.Any<Guid?>(),
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                _privateRead.TrySetResult();
+                return Task.FromResult(PrivateContext());
+            });
+        using var facade = CreateFacade(transport);
         _ctx.Services.GetRequiredService<NavigationManager>().NavigateTo("/events");
         var cut = _ctx.Render<MainLayout>(parameters => parameters.Add(component => component.Body,
             (RenderFragment)(builder => builder.AddContent(0, "Public event content"))));
@@ -1099,7 +1107,9 @@ public sealed class LearningContextHelpTests : IDisposable
         LearnerRevision = settled ? 3 : 2,
         Preferences = new()
         {
-            SuppressAutomaticTours = settled, HideLearning = settled, PinLearning = settled
+            SuppressAutomaticTours = settled,
+            HideLearning = settled,
+            PinLearning = settled
         },
         Requirement = new()
         {
@@ -1118,23 +1128,26 @@ public sealed class LearningContextHelpTests : IDisposable
             ["preferences"] = new() { Href = "/api/learning/preferences", Method = "PUT" },
             ["acknowledge-requirement"] = new()
             {
-                Href = "/api/learning/requirements/tenant-admin-orientation/acknowledgement", Method = "POST"
+                Href = "/api/learning/requirements/tenant-admin-orientation/acknowledgement",
+                Method = "POST"
             }
         }
     };
 
     private static HalResourceOfLearningMutationReceiptDto PrivateReceipt(
         HalResourceOfLearningContextDto state) => new()
-    {
-        ScopeStamp = state.ScopeStamp,
-        LearnerRevision = state.LearnerRevision,
-        ResourceRevision = state.ResourceRevision,
-        State = new()
         {
-            TenantId = state.TenantId, UserId = state.UserId,
-            Preferences = state.Preferences, Requirement = state.Requirement
-        }
-    };
+            ScopeStamp = state.ScopeStamp,
+            LearnerRevision = state.LearnerRevision,
+            ResourceRevision = state.ResourceRevision,
+            State = new()
+            {
+                TenantId = state.TenantId,
+                UserId = state.UserId,
+                Preferences = state.Preferences,
+                Requirement = state.Requirement
+            }
+        };
 
     private static TaskCompletionSource Signal() =>
         new(TaskCreationOptions.RunContinuationsAsynchronously);

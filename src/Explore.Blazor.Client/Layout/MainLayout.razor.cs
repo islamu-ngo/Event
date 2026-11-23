@@ -326,13 +326,11 @@ public partial class MainLayout : LayoutComponentBase, IDisposable
             }
 
             await HydrateShellPreferencesAsync();
-            await HydrateShellDockLayoutAsync();
-            if (isAuthenticated && !_hideChrome && !IsAuthenticationEntryRoute
-                && _shellContext?.TenantId is { } learningTenantId && learningTenantId != Guid.Empty)
-            {
+            if (_shellContext?.TenantId is { } learningTenantId && learningTenantId != Guid.Empty)
                 Learning.SetTenantContext(learningTenantId);
-                await Learning.LoadContextAsync(_tourLifetime.Token);
-            }
+            await HydrateShellDockLayoutAsync();
+            if (isAuthenticated)
+                await LoadLearningContextIfRequiredAsync();
 
             try
             {
@@ -397,7 +395,22 @@ public partial class MainLayout : LayoutComponentBase, IDisposable
 
             _isInitialized = true;
         }
+        else
+        {
+            await LoadLearningContextIfRequiredAsync();
+        }
         PublishTourLayout();
+    }
+
+    private async Task LoadLearningContextIfRequiredAsync()
+    {
+        if (_tourDisposed || !_shellPreferencesHydrated || !_shellDockLayoutHydrated
+            || !Learning.RequiresContextRefresh || Learning.IsBusy
+            || _hideChrome || IsAuthenticationEntryRoute
+            || _shellContext?.TenantId is not { } tenantId || tenantId == Guid.Empty)
+            return;
+
+        await Learning.LoadContextAsync(_tourLifetime.Token);
     }
 
     private async Task DarkModeToggle()

@@ -43,6 +43,15 @@ cancels replaced work and rejects late responses even when the transport ignores
 cancellation. Static rendering does not read or embed private practice.
 Opening an address never starts an exercise or recreates a removed source.
 
+`MainLayout` consumes the facade's `RequiresContextRefresh` signal after shell
+preferences and dock layout have hydrated. It binds the tenant before dock
+hydration opens that consumer, so synchronous ownership notifications cannot
+start a duplicate initial read. Later owner invalidation requests one fresh
+context; a delayed response for the former actor cannot restore its guidance.
+The facade consumes the signal before transport. A failed read therefore does
+not turn ordinary renders or route changes into a retry loop; another explicit
+invalidation is required.
+
 Choices and confirmation submit closed server-defined actions with one intent,
 scope stamp and observed learner/practice revisions. A valid receipt is not a
 fresh capability: the facade rereads actual HAL resources before publishing the

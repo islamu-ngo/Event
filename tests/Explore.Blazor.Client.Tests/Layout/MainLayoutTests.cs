@@ -1,11 +1,14 @@
+using System.Collections.Concurrent;
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.Ai;
+using Explore.Blazor.Client.Contracts.Services.Learning;
 using Explore.Blazor.Client.Contracts.Services.Shell;
 using Explore.Blazor.Client.Contracts.Services.SupportAccess;
 using Explore.Blazor.Client.Layout;
 using Explore.Blazor.Client.Services.Ai;
 using Explore.Blazor.Client.Services.Docking;
+using Explore.Blazor.Client.Services.Learning;
 using Explore.Blazor.Client.Services.Shell;
 using MudBlazor;
 
@@ -31,6 +34,8 @@ public class MainLayoutTests : IDisposable
     public MainLayoutTests()
     {
         _ctx = new BlazorTestContext();
+        _ctx.JSInterop.SetupModule("./_content/GuideFlow/guideflow.module.js")
+            .SetupVoid("destroy").SetVoidResult();
 
         // Explicit state registration for assertion control (not via AddShellStateMocks)
         _ctx.Services.AddScoped<AiAssistantState>();
@@ -68,6 +73,7 @@ public class MainLayoutTests : IDisposable
         // Override IUserService for SyncUserAsync assertions (last AddSingleton wins)
         _userService = Substitute.For<IUserService>();
         _ctx.Services.AddSingleton(_userService);
+        _ctx.Services.AddSingleton(Substitute.For<IStudioContextService>());
 
         // Override IPublicExperienceService for settings assertions
         _publicExperienceService = Substitute.For<IPublicExperienceService>();
@@ -140,6 +146,148 @@ public class MainLayoutTests : IDisposable
     }
 
     public void Dispose() => _ctx.Dispose();
+
+    [Test]
+    public async Task ActorChangeDuringInitialLearningReadKeepsGuidanceForTheNewOwner()
+    {
+        var tenantId = Guid.CreateVersion7();
+        var userId = Guid.CreateVersion7();
+        var firstActorId = Guid.CreateVersion7();
+        var nextActorId = Guid.CreateVersion7();
+        var firstActor = new ManagedActorDto { ActorId = firstActorId };
+        var nextActor = new ManagedActorDto { ActorId = nextActorId };
+        ManagedActorDto[] actors = [firstActor, nextActor];
+        var (facade, transport) = CreateLearningFacade(tenantId, userId, actors);
+        var firstScope = new LearningClientScope(tenantId, userId, $"actor:{firstActorId:D}");
+        var nextScope = new LearningClientScope(tenantId, userId, $"actor:{nextActorId:D}");
+        var preferences = new TaskCompletionSource<ShellPreferenceState>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstResponse = new TaskCompletionSource<HalResourceOfLearningContextDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var initialRenderContinued = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var requestedKeys = new ConcurrentQueue<string>();
+        _shellPreferencesService.LoadAsync(Arg.Any<UiShellContextDto>(), Arg.Any<CancellationToken>())
+            .Returns(preferences.Task);
+        _appearanceThemeService.InitializeAsync(Arg.Any<MudThemeProvider>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                initialRenderContinued.TrySetResult();
+                return Task.CompletedTask;
+            });
+        transport.GetLearningContextAsync(Arg.Any<string>(), cancellationToken: Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var key = call.ArgAt<string>(0);
+                requestedKeys.Enqueue(key);
+                if (key != firstScope.ContextKey)
+                    return Task.FromResult(LearningContext(nextScope, "next-owner"));
+                firstRequested.TrySetResult();
+                return firstResponse.Task;
+            });
+
+        var cut = RenderLayout();
+        await Assert.That(requestedKeys.Count).IsEqualTo(0);
+        await cut.InvokeAsync(() => preferences.SetResult(
+            new ShellPreferenceState(WorkspaceKey.Events.Value, firstActorId, "/settings/personal")));
+        cut.WaitForState(() => firstRequested.Task.IsCompleted, TimeSpan.FromSeconds(10));
+        try
+        {
+            await cut.InvokeAsync(() =>
+                _ctx.Services.GetRequiredService<UiShellState>().TrySetActiveActor(nextActorId, actors));
+            WaitForLearningGuidance(cut, facade, nextScope.ContextKey);
+        }
+        finally
+        {
+            firstResponse.TrySetResult(LearningContext(firstScope, "superseded-owner"));
+            await initialRenderContinued.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+
+        await Assert.That(requestedKeys.ToArray()).IsEquivalentTo([firstScope.ContextKey, nextScope.ContextKey]);
+        await Assert.That(facade.Scope).IsEqualTo(nextScope);
+        await Assert.That(facade.Context!.ScopeStamp).IsEqualTo("next-owner");
+        await Assert.That(cut.FindAll("[data-testid='learning-help-replay']").Count).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task ClearedLearningScopeReloadsOnceAndFailedReadsWaitForAnotherInvalidation()
+    {
+        var tenantId = Guid.CreateVersion7();
+        var userId = Guid.CreateVersion7();
+        var (facade, transport) = CreateLearningFacade(tenantId, userId);
+        var scope = new LearningClientScope(tenantId, userId, "self");
+        var attempts = 0;
+        transport.GetLearningContextAsync(Arg.Any<string>(), cancellationToken: Arg.Any<CancellationToken>())
+            .Returns(_ => Interlocked.Increment(ref attempts) switch
+            {
+                1 => Task.FromResult(LearningContext(scope, "initial")),
+                2 => Task.FromException<HalResourceOfLearningContextDto>(new HttpRequestException("Learning is unavailable.")),
+                _ => Task.FromResult(LearningContext(scope, "recovered"))
+            });
+        var cut = RenderLayout();
+        WaitForLearningGuidance(cut, facade, scope.ContextKey);
+
+        await cut.InvokeAsync(facade.Clear);
+        cut.WaitForState(() => facade.Failure == LearningClientFailure.RequestFailed, TimeSpan.FromSeconds(10));
+        await Assert.That(cut.FindAll("[data-testid='learning-help-replay']").Count).IsEqualTo(0);
+        var navigation = _ctx.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/learning");
+        cut.Render();
+        navigation.NavigateTo("/studio/events");
+        cut.Render();
+        await Assert.That(attempts).IsEqualTo(2);
+        await Assert.That(facade.RequiresContextRefresh).IsFalse();
+
+        await cut.InvokeAsync(facade.Clear);
+        WaitForLearningGuidance(cut, facade, scope.ContextKey);
+
+        await Assert.That(attempts).IsEqualTo(3);
+        await Assert.That(facade.Context!.ScopeStamp).IsEqualTo("recovered");
+    }
+
+    private (LearningClientService Facade, ILearningClient Transport) CreateLearningFacade(
+        Guid tenantId, Guid userId, params ManagedActorDto[] actors)
+    {
+        var transport = Substitute.For<ILearningClient>();
+        _ctx.Services.AddSingleton(transport);
+        _ctx.Services.AddScoped<LearningClientService>();
+        _ctx.Services.AddScoped<ILearningClientService>(services =>
+            services.GetRequiredService<LearningClientService>());
+        _ctx.SetAuthenticatedUser(userId, "Layout learner");
+        _ctx.Services.GetRequiredService<CurrentUserState>().NotifyUpdated(new UserDto { Id = userId });
+        _ctx.Services.GetRequiredService<IUiShellContextService>()
+            .GetCachedContextAsync(Arg.Any<CancellationToken>())
+            .Returns(new UiShellContextDto
+            {
+                TenantId = tenantId,
+                ManagedActors = actors.ToList(),
+                Workspaces = new WorkspaceAvailabilityDto { Events = true, Studio = true, Settings = true }
+            });
+        return (_ctx.Services.GetRequiredService<LearningClientService>(), transport);
+    }
+
+    private static HalResourceOfLearningContextDto LearningContext(LearningClientScope scope, string stamp) => new()
+    {
+        TenantId = scope.TenantId,
+        UserId = scope.UserId,
+        ContextKey = scope.ContextKey,
+        ScopeStamp = stamp,
+        ResourceRevision = 1,
+        LearnerRevision = 1,
+        Preferences = new() { SuppressAutomaticTours = true },
+        Requirement = new(),
+        Capabilities = new(),
+        Tours = [],
+        Lessons = [],
+        OwnedPractices = [],
+        _links = new Dictionary<string, HalLink>
+        {
+            ["tour-plan"] = new() { Href = "/api/learning/tours/shell", Method = "GET" }
+        }
+    };
+
+    private static void WaitForLearningGuidance(
+        IRenderedComponent<MainLayout> layout, LearningClientService facade, string contextKey) =>
+        layout.WaitForState(() => facade.Scope?.ContextKey == contextKey
+            && layout.FindAll("[data-testid='learning-help-replay']").Count == 1, TimeSpan.FromSeconds(10));
 
     [Test]
     public async Task MobileViewportClosesOpenWorkspaceNavigation()

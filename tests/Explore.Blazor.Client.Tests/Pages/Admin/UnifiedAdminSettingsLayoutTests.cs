@@ -932,7 +932,10 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
     {
         var draft = new Explore.Blazor.Client.Contracts.Services.AnnouncementDraft
         {
-            Enabled = true, Message = "Unsaved draft", LinkText = "Details", LinkUrl = "/events"
+            Enabled = true,
+            Message = "Unsaved draft",
+            LinkText = "Details",
+            LinkUrl = "/events"
         };
         var cut = _ctx.RenderMudComponent<Explore.Blazor.Client.Pages.Admin.Tenant.Components.TenantAnnouncementBarSection>(
             parameters => parameters.Add(component => component.Model, draft));

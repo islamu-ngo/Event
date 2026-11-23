@@ -223,11 +223,16 @@ internal sealed class HumanLearningPolicyMutationStore(
 
     private static string DocumentImage(TenantSettingsDocument row) => JsonSerializer.Serialize(new
     {
-        row.Id, row.TenantId, row.DocumentKey, row.SchemaVersion, row.DefaultsVersion,
+        row.Id,
+        row.TenantId,
+        row.DocumentKey,
+        row.SchemaVersion,
+        row.DefaultsVersion,
         Payload = LearningGuidancePolicyCodec.Encode(LearningGuidancePolicyCodec.Decode(
             new(row.Id, row.TenantId, row.SchemaVersion, row.DefaultsVersion, row.PayloadJson, row.ConcurrencyStamp))),
         row.ConcurrencyStamp,
-        CreatedAt = DateTime.SpecifyKind(row.CreatedAt, DateTimeKind.Utc), row.CreatedBy,
+        CreatedAt = DateTime.SpecifyKind(row.CreatedAt, DateTimeKind.Utc),
+        row.CreatedBy,
         UpdatedAt = row.UpdatedAt is { } updated ? DateTime.SpecifyKind(updated, DateTimeKind.Utc) : (DateTime?)null,
         row.UpdatedBy
     });

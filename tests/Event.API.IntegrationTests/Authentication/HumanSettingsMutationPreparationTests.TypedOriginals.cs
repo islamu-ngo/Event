@@ -55,9 +55,14 @@ public sealed partial class HumanSettingsMutationPreparationTests
             row.TenantId == fixture.TenantId && row.UserId == fixture.UserId);
         context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            TenantUserId = member.Id, TenantUser = member,
-            RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant,
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            TenantUserId = member.Id,
+            TenantUser = member,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant,
             GrantedAt = fixture.Clock.GetUtcNow().UtcDateTime
         });
         await context.SaveChangesAsync();
@@ -94,8 +99,12 @@ public sealed partial class HumanSettingsMutationPreparationTests
                 {
                     [key] = JsonSerializer.SerializeToElement(new
                     {
-                        operation = "publish", enabled = true, message = "Owned import regression",
-                        linkText = "", linkUrl = "", redisplay = true
+                        operation = "publish",
+                        enabled = true,
+                        message = "Owned import regression",
+                        linkText = "",
+                        linkUrl = "",
+                        redisplay = true
                     })
                 }
             }
@@ -104,8 +113,10 @@ public sealed partial class HumanSettingsMutationPreparationTests
         var parsed = parser.ParseTenantPackage(bytes);
         var request = new ConfigurationImportPreviewRequest
         {
-            SelectedSectionKeys = ["tenant.settings"], Mappings = new Dictionary<string, string>(),
-            ApplyMode = ConfigurationImportApplyMode.ApplySelected, GrantedApprovalCodes = []
+            SelectedSectionKeys = ["tenant.settings"],
+            Mappings = new Dictionary<string, string>(),
+            ApplyMode = ConfigurationImportApplyMode.ApplySelected,
+            GrantedApprovalCodes = []
         };
         var compiler = fixture.Services.GetRequiredService<ConfigurationImportSectionApplier>();
         string? before = await context.Set<TenantSetting>().AsNoTracking()

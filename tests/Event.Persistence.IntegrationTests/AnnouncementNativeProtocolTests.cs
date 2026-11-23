@@ -85,8 +85,10 @@ public sealed class AnnouncementImportInstallationTests
             new(Guid.CreateVersion7(), new("Existing RLS publication", "", "")));
         migration.SystemSettings.Add(new SystemSetting
         {
-            SettingKey = key, Value = AnnouncementSettingValueCodec.SerializeGroup(original),
-            ValueType = SettingValueType.Json, IsLocked = false
+            SettingKey = key,
+            Value = AnnouncementSettingValueCodec.SerializeGroup(original),
+            ValueType = SettingValueType.Json,
+            IsLocked = false
         });
         await migration.SaveChangesAsync();
         var options = TestDbContextOptions.Create<ExploreDbContext>();
@@ -220,7 +222,8 @@ public sealed partial class OrdinarySettingsNativeContractTests
         {
             row = new SystemSetting
             {
-                SettingKey = key, ValueType = SettingValueType.Json,
+                SettingKey = key,
+                ValueType = SettingValueType.Json,
                 Value = AnnouncementSettingValueCodec.SerializeGroup(original)
             };
             migration.SystemSettings.Add(row);
@@ -284,7 +287,11 @@ public sealed partial class OrdinarySettingsNativeContractTests
         migration.Tenants.Add(Tenant(tenant));
         migration.Set<TenantSetting>().Add(new TenantSetting
         {
-            TenantId = tenant, Tenant = null!, SettingKey = key, Value = originalValue, IsLocked = true
+            TenantId = tenant,
+            Tenant = null!,
+            SettingKey = key,
+            Value = originalValue,
+            IsLocked = true
         });
         await migration.SaveChangesAsync();
         await using var caller = Open(PrimaryDatabaseRole.Global);
@@ -365,7 +372,11 @@ public sealed partial class OrdinarySettingsNativeContractTests
         var before = await ReadAsync(caller, tenant, user, request["Keys"]);
         migration.UserPreferences.Add(new UserPreference
         {
-            TenantId = tenant, Tenant = null!, UserId = user, SettingKey = key, Value = stored
+            TenantId = tenant,
+            Tenant = null!,
+            UserId = user,
+            SettingKey = key,
+            Value = stored
         });
         await migration.SaveChangesAsync();
 

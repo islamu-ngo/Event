@@ -222,7 +222,9 @@ public sealed class LearningPolicyAdmissionTests(LearningHttpFixture fixture)
             if (control is null)
                 setup.SystemSettings.Add(new SystemSetting
                 {
-                    Id = Guid.CreateVersion7(), SettingKey = key, Value = "false",
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = key,
+                    Value = "false",
                     ValueType = SettingValueType.Boolean
                 });
             else
@@ -232,8 +234,11 @@ public sealed class LearningPolicyAdmissionTests(LearningHttpFixture fixture)
             if (tenantOverride is null)
                 setup.Set<TenantSetting>().Add(new TenantSetting
                 {
-                    Id = Guid.CreateVersion7(), TenantId = isolated.TenantId, Tenant = null!,
-                    SettingKey = key, Value = "true"
+                    Id = Guid.CreateVersion7(),
+                    TenantId = isolated.TenantId,
+                    Tenant = null!,
+                    SettingKey = key,
+                    Value = "true"
                 });
             else
                 tenantOverride.Value = "true";
@@ -275,8 +280,11 @@ public sealed class LearningPolicyAdmissionTests(LearningHttpFixture fixture)
         };
         var family = new Dictionary<string, object?>
         {
-            ["family"] = "Shell", ["enabled"] = true, ["automaticInvitations"] = true,
-            ["invitationAudience"] = null, ["manualAccessAudience"] = null
+            ["family"] = "Shell",
+            ["enabled"] = true,
+            ["automaticInvitations"] = true,
+            ["invitationAudience"] = null,
+            ["manualAccessAudience"] = null
         };
         switch (violation)
         {
@@ -390,7 +398,9 @@ public sealed class LearningPolicyAdmissionTests(LearningHttpFixture fixture)
             if (control is null)
                 setup.SystemSettings.Add(new SystemSetting
                 {
-                    Id = Guid.CreateVersion7(), SettingKey = controlKey, Value = "true",
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = controlKey,
+                    Value = "true",
                     ValueType = SettingValueType.Boolean
                 });
             else
@@ -403,7 +413,8 @@ public sealed class LearningPolicyAdmissionTests(LearningHttpFixture fixture)
         barrier.Armed = true;
         var pending = administrator.Client.PatchAsJsonAsync(Route, new
         {
-            expectedConcurrencyStamp = (Guid?)null, policy = OptionalPolicy()
+            expectedConcurrencyStamp = (Guid?)null,
+            policy = OptionalPolicy()
         });
         try
         {
@@ -480,7 +491,8 @@ public sealed class LearningPolicyAdmissionTests(LearningHttpFixture fixture)
         await Assert.That(get.Headers.CacheControl?.NoStore).IsTrue();
         using var patch = await administrator.Client.PatchAsJsonAsync(Route, new
         {
-            expectedConcurrencyStamp = stamp, policy = OptionalPolicy()
+            expectedConcurrencyStamp = stamp,
+            policy = OptionalPolicy()
         });
         await Assert.That(patch.StatusCode).IsEqualTo(HttpStatusCode.InternalServerError);
         await using var inspection = isolated.OpenInspection();
@@ -503,7 +515,8 @@ public sealed class LearningPolicyAdmissionTests(LearningHttpFixture fixture)
 
         using var response = await administrator.Client.PatchAsJsonAsync(Route, new
         {
-            expectedConcurrencyStamp = (Guid?)null, policy = OptionalPolicy()
+            expectedConcurrencyStamp = (Guid?)null,
+            policy = OptionalPolicy()
         });
 
         await Assert.That(interruption.Applied).IsTrue();
@@ -724,8 +737,11 @@ public sealed class LearningPolicyAdmissionTests(LearningHttpFixture fixture)
         var context = await LearningOperationTests.Context(member.Client);
         using var preference = await member.Client.PatchAsJsonAsync("/api/learning/preferences", new LearningUpdatePreferencesRequest
         {
-            ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = context.LearnerRevision,
-            SuppressAutomaticTours = !hidden, HideLearning = hidden, PinLearning = false
+            ExpectedScopeStamp = context.ScopeStamp,
+            ExpectedRevision = context.LearnerRevision,
+            SuppressAutomaticTours = !hidden,
+            HideLearning = hidden,
+            PinLearning = false
         });
         await Assert.That(preference.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var plan = await PolicyPlanAsync(member.Client);
@@ -841,7 +857,8 @@ public sealed class LearningPolicyAdmissionTests(LearningHttpFixture fixture)
         using var removed = await administrator.Client.PostAsJsonAsync("/api/learning/space/actions", new LearningManageSpaceRequest
         {
             ExpectedScopeStamp = administratorContext.ScopeStamp,
-            ExpectedRevision = administratorContext.ResourceRevision, Action = LearningSpaceAction.Remove
+            ExpectedRevision = administratorContext.ResourceRevision,
+            Action = LearningSpaceAction.Remove
         });
         await Assert.That(removed.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var unavailable = await LearningOperationTests.Context(member.Client);
@@ -857,9 +874,11 @@ public sealed class LearningPolicyAdmissionTests(LearningHttpFixture fixture)
         var releasedReceipt = (await released.Content.ReadFromJsonAsync<LearningMutationReceiptDto>())!;
         var clear = start with
         {
-            IntentId = Guid.CreateVersion7(), PracticeId = practice.Id,
+            IntentId = Guid.CreateVersion7(),
+            PracticeId = practice.Id,
             ExpectedRevision = releasedReceipt.LearnerRevision,
-            ExpectedPracticeRevision = practice.Revision, Action = LearningPracticeAction.Clear
+            ExpectedPracticeRevision = practice.Revision,
+            Action = LearningPracticeAction.Clear
         };
         using var cleared = await member.Client.PostAsJsonAsync("/api/learning/practice/actions", clear);
         await Assert.That(cleared.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -994,9 +1013,14 @@ public sealed class LearningPolicyAdmissionTests(LearningHttpFixture fixture)
 
     private static LearningApplyPracticeActionRequest StartPractice(LearningContextDto context) => new()
     {
-        ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = context.LearnerRevision,
-        ExpectedPracticeRevision = 0, IntentId = Guid.CreateVersion7(), ContextKey = "self",
-        RecipeKey = "event-details", MaterialVersion = 1, Action = LearningPracticeAction.Start
+        ExpectedScopeStamp = context.ScopeStamp,
+        ExpectedRevision = context.LearnerRevision,
+        ExpectedPracticeRevision = 0,
+        IntentId = Guid.CreateVersion7(),
+        ContextKey = "self",
+        RecipeKey = "event-details",
+        MaterialVersion = 1,
+        Action = LearningPracticeAction.Start
     };
 
     private static async Task<LearningTourPlanDto> PolicyPlanAsync(HttpClient client)

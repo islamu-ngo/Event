@@ -139,8 +139,10 @@ public sealed class AnnouncementEditionAdmissionTests
             ["edition"] = Guid.Parse("019a3b40-0000-7000-8000-000000000002"),
             ["sourceWitness"] = new JsonObject
             {
-                ["instanceSelectionEpoch"] = null, ["instanceIsLocked"] = false,
-                ["tenantSelectionEpoch"] = null, ["tenantIsLocked"] = false
+                ["instanceSelectionEpoch"] = null,
+                ["instanceIsLocked"] = false,
+                ["tenantSelectionEpoch"] = null,
+                ["tenantIsLocked"] = false
             }
         };
         var input = new JsonObject { ["observed"] = observation, ["expectedMarker"] = null };
@@ -179,7 +181,8 @@ public sealed class AnnouncementEditionAdmissionTests
             ["expectedSource"] = new JsonObject
             {
                 ["owner"] = new JsonObject { ["tenantId"] = owner },
-                ["group"] = null, ["isLocked"] = false
+                ["group"] = null,
+                ["isLocked"] = false
             }
         };
         using var request = Authenticated(HttpMethod.Put, path, token, input.ToJsonString());

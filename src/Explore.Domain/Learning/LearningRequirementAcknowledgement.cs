@@ -47,8 +47,11 @@ public sealed class LearningRequirementAcknowledgement : ITenantEntity
     internal static LearningRequirementAcknowledgement Create(Guid id, UserLearningState owner,
         LearningRequirementDefinition definition) => new()
         {
-            Id = id, TenantId = owner.TenantId, UserLearningStateId = owner.Id,
-            RequirementKey = definition.RequirementKey, MaterialVersion = definition.MaterialVersion
+            Id = id,
+            TenantId = owner.TenantId,
+            UserLearningStateId = owner.Id,
+            RequirementKey = definition.RequirementKey,
+            MaterialVersion = definition.MaterialVersion
         };
 
     internal void Acknowledge(string policySourceStamp, Guid intentId, string fingerprint, DateTime utcNow)

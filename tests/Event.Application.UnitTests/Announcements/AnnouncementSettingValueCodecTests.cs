@@ -122,7 +122,9 @@ public sealed class AnnouncementSettingValueCodecTests
             {
                 [key] = new()
                 {
-                    TenantId = Tenant, Tenant = null!, SettingKey = key,
+                    TenantId = Tenant,
+                    Tenant = null!,
+                    SettingKey = key,
                     Value = AnnouncementSettingValueCodec.SerializeGroup(new(Epoch, false, null))
                 }
             }) ?? throw new InvalidOperationException("The hierarchy must resolve the existing instance publication.");

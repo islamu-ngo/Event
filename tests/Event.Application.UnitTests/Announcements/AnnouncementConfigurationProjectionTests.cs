@@ -108,8 +108,13 @@ public sealed class AnnouncementConfigurationProjectionTests
         {
             [GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication] = new
             {
-                operation = "publish", enabled = true, message = "Notice", linkText = "", linkUrl = "",
-                redisplay, currentLock = false
+                operation = "publish",
+                enabled = true,
+                message = "Notice",
+                linkText = "",
+                linkUrl = "",
+                redisplay,
+                currentLock = false
             }
         });
         var target = JsonSerializer.SerializeToElement(new Dictionary<string, object>

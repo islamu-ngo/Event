@@ -17,8 +17,11 @@ internal static class LearningRepresentation
         LearningSourceFacts sources = operation.Sources
             ?? throw new InvalidOperationException("Learning representation requires its retained source image.");
         bool currentPack = operation.Space is null
-            || operation.Space is { IsRemoved: false, PackKey: LearningLessonCatalog.PackKey,
-                PackVersion: LearningLessonCatalog.MaterialVersion };
+            || operation.Space is
+            {
+                IsRemoved: false, PackKey: LearningLessonCatalog.PackKey,
+                PackVersion: LearningLessonCatalog.MaterialVersion
+            };
         LearningGuidancePolicy policy = LearningGuidancePolicyCodec.Decode(sources.GuidanceDocument);
         bool canPractice = LearningAccessPolicy.CanPractice(policy, true, operation.CanManageSpace);
         LearningDisplayTextDto? practiceUnavailableReason = !currentPack
@@ -159,8 +162,11 @@ internal static class LearningRepresentation
             Revision = practice.Revision,
             LearnerRevision = operation.State?.Revision
                 ?? throw new InvalidOperationException("An owned practice requires its learner state."),
-            CanSimulate = operation.Space is { IsRemoved: false, PackKey: LearningLessonCatalog.PackKey,
-                PackVersion: LearningLessonCatalog.MaterialVersion },
+            CanSimulate = operation.Space is
+            {
+                IsRemoved: false, PackKey: LearningLessonCatalog.PackKey,
+                PackVersion: LearningLessonCatalog.MaterialVersion
+            },
             CanClearPractice = true,
             Simulation = simulation
         };

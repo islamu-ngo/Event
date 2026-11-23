@@ -22,8 +22,12 @@ public sealed class LearningContextLinkPolicy : ILinkPolicy<LearningContextDto>
         foreach (LearningTourFamily family in dto.Tours.Select(tour => tour.Family).Distinct()
                      .Where(family => family != LearningTourFamily.EventManagement || dto.EventContextId.HasValue))
             yield return new("tour-plan", RouteNames.GetLearningTourPlan,
-                new { family = family.ToString(), contextKey = dto.ContextKey,
-                    eventContextId = family == LearningTourFamily.EventManagement ? dto.EventContextId : null },
+                new
+                {
+                    family = family.ToString(),
+                    contextKey = dto.ContextKey,
+                    eventContextId = family == LearningTourFamily.EventManagement ? dto.EventContextId : null
+                },
                 "GET", RequiresAuth: true);
 
         yield return new("preferences", RouteNames.UpdateLearningPreferences, null, "PATCH", RequiresAuth: true);
@@ -57,8 +61,12 @@ public sealed class LearningTourPlanLinkPolicy : ILinkPolicy<LearningTourPlanDto
     public IEnumerable<LinkDefinition> GetLinks(LearningTourPlanDto dto, ClaimsPrincipal? user)
     {
         yield return new(LinkRelations.Self, RouteNames.GetLearningTourPlan,
-            new { family = dto.Family.ToString(), contextKey = dto.ContextKey,
-                eventContextId = dto.EventContextId }, "GET", RequiresAuth: true);
+            new
+            {
+                family = dto.Family.ToString(),
+                contextKey = dto.ContextKey,
+                eventContextId = dto.EventContextId
+            }, "GET", RequiresAuth: true);
         yield return new("learning-context", RouteNames.GetLearningContext,
             new { contextKey = dto.ContextKey, eventContextId = dto.EventContextId }, "GET", RequiresAuth: true);
         if (dto.CanClaim)
@@ -94,8 +102,11 @@ public sealed class LearningMutationReceiptLinkPolicy : ILinkPolicy<LearningMuta
     public IEnumerable<LinkDefinition> GetLinks(LearningMutationReceiptDto dto, ClaimsPrincipal? user)
     {
         yield return new("learning-context", RouteNames.GetLearningContext,
-            new { contextKey = dto.State?.ContextKey ?? dto.Practice?.ContextKey ?? "self",
-                eventContextId = dto.State?.EventContextId }, "GET", RequiresAuth: true);
+            new
+            {
+                contextKey = dto.State?.ContextKey ?? dto.Practice?.ContextKey ?? "self",
+                eventContextId = dto.State?.EventContextId
+            }, "GET", RequiresAuth: true);
         if (dto.Practice is { } practice)
             yield return new("practice", RouteNames.GetLearningPractice,
                 new { id = practice.Id }, "GET", RequiresAuth: true);

@@ -265,7 +265,8 @@ public sealed class LearningSimulationContractTests
         AssertReadOnly(context.Tours);
         var completion = new LearningTourStepCompletionDto
         {
-            StepKey = "shell.navigation", StepVersion = 1,
+            StepKey = "shell.navigation",
+            StepVersion = 1,
             CompletedAtUtc = new DateTimeOffset(2026, 10, 29, 12, 0, 0, TimeSpan.Zero)
         };
         var completions = new List<LearningTourStepCompletionDto> { completion };
@@ -276,7 +277,8 @@ public sealed class LearningSimulationContractTests
 
         var facts = new List<LearningSyntheticFactDto> { new("capacity", "12") };
         LearningSyntheticPresentationDto presentation = Apply("event-details", LearningPracticeAction.Start).Presentation
-            with { Facts = facts };
+            with
+        { Facts = facts };
         facts.Clear();
         await Assert.That(presentation.Facts.Single().Value).IsEqualTo("12");
         AssertReadOnly(presentation.Facts);
@@ -288,9 +290,13 @@ public sealed class LearningSimulationContractTests
         LearningPracticeDto practice = new()
         {
             Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
-            ScopeStamp = "scope", LearnerRevision = 1,
-            ContextKey = "self", RecipeKey = "event-details", MaterialVersion = 1,
-            Revision = 1, Simulation = Apply("event-details", LearningPracticeAction.Start)
+            ScopeStamp = "scope",
+            LearnerRevision = 1,
+            ContextKey = "self",
+            RecipeKey = "event-details",
+            MaterialVersion = 1,
+            Revision = 1,
+            Simulation = Apply("event-details", LearningPracticeAction.Start)
         };
         await Assert.That(JsonSerializer.Deserialize<LearningPracticeDto>(JsonSerializer.Serialize(practice))!.Simulation.StepKey)
             .IsEqualTo("choose");
@@ -323,17 +329,29 @@ public sealed class LearningSimulationContractTests
         LearningTourClaimDto claim = new()
         {
             Token = Guid.Parse("00000000-0000-0000-0000-000000000002"),
-            Family = LearningTourFamily.Studio, MaterialVersion = 2,
+            Family = LearningTourFamily.Studio,
+            MaterialVersion = 2,
             ExpiresAtUtc = new DateTimeOffset(2026, 10, 28, 12, 2, 0, TimeSpan.Zero),
-            Revision = 3, PlanFingerprint = new string('A', 64), PolicySourceStamp = new string('B', 64)
+            Revision = 3,
+            PlanFingerprint = new string('A', 64),
+            PolicySourceStamp = new string('B', 64)
         };
         LearningMutationReceiptDto receipt = new()
         {
             Id = Guid.Parse("00000000-0000-0000-0000-000000000004"),
             ScopeStamp = "scope",
-            ResourceRevision = 3, LearnerRevision = 3, Claim = claim, State = Context(),
-            Space = new() { Id = Guid.Parse("00000000-0000-0000-0000-000000000003"), Status = LearningSpaceStatus.Active,
-                PackKey = "learning-core", MaterialVersion = 1, Revision = 1 },
+            ResourceRevision = 3,
+            LearnerRevision = 3,
+            Claim = claim,
+            State = Context(),
+            Space = new()
+            {
+                Id = Guid.Parse("00000000-0000-0000-0000-000000000003"),
+                Status = LearningSpaceStatus.Active,
+                PackKey = "learning-core",
+                MaterialVersion = 1,
+                Revision = 1
+            },
             SimulationStatus = LearningSimulationStatus.Simulated
         };
         LearningMutationReceiptDto rebound = JsonSerializer.Deserialize<LearningMutationReceiptDto>(JsonSerializer.Serialize(receipt))!;
@@ -352,13 +370,16 @@ public sealed class LearningSimulationContractTests
     {
         LearningTourProgressDto tour = new()
         {
-            Family = LearningTourFamily.Shell, MaterialVersion = 2, CurrentCoverage = false
+            Family = LearningTourFamily.Shell,
+            MaterialVersion = 2,
+            CurrentCoverage = false
         };
         LearningLessonDto lesson = LearningLessonCatalog.Lessons[0];
         RequireBoundRefusal(() => Context() with { Tours = Enumerable.Repeat(tour, 9).ToArray() });
         var completed = new LearningTourStepCompletionDto
         {
-            StepKey = "shell.navigation", StepVersion = 1,
+            StepKey = "shell.navigation",
+            StepVersion = 1,
             CompletedAtUtc = new DateTimeOffset(2026, 10, 29, 12, 0, 0, TimeSpan.Zero)
         };
         RequireBoundRefusal(() => tour with { CompletedSteps = Enumerable.Repeat(completed, 33).ToArray() });
@@ -376,13 +397,18 @@ public sealed class LearningSimulationContractTests
     {
         TenantId = Guid.Parse("00000000-0000-0000-0000-000000000004"),
         UserId = Guid.Parse("00000000-0000-0000-0000-000000000005"),
-        ScopeStamp = "scope", ResourceRevision = 0, LearnerRevision = 0,
+        ScopeStamp = "scope",
+        ResourceRevision = 0,
+        LearnerRevision = 0,
         SpaceStatus = LearningSpaceStatus.Absent,
-        Preferences = new(), Capabilities = new() { CanLearn = true },
+        Preferences = new(),
+        Capabilities = new() { CanLearn = true },
         Requirement = new()
         {
-            RequirementKey = "tenant-admin-orientation", MaterialVersion = 1,
-            Status = LearningRequirementStatus.NotApplicable, PolicySourceStamp = "scope"
+            RequirementKey = "tenant-admin-orientation",
+            MaterialVersion = 1,
+            Status = LearningRequirementStatus.NotApplicable,
+            PolicySourceStamp = "scope"
         }
     };
 

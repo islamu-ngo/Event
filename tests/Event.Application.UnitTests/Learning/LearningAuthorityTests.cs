@@ -72,7 +72,7 @@ public sealed class LearningAuthorityTests
         await Assert.That(unavailable.Plan.Steps).IsEmpty();
         await Assert.That(unavailable.Definition).IsNull();
         await Assert.That(() => LearningTourPlanResolver.Resolve(operation with
-            { TenantId = Guid.CreateVersion7() }, sources, WireFamily.Shell))
+        { TenantId = Guid.CreateVersion7() }, sources, WireFamily.Shell))
             .Throws<UnauthorizedAccessException>();
     }
 
@@ -139,7 +139,9 @@ public sealed class LearningAuthorityTests
         LearningAccessPolicy.RequireInteractiveAccess(progress, false, operation.Sources!);
         LearningAccessPolicy.RequireInteractiveAccess(progress with
         {
-            Action = LearningTourAction.Complete, StepKey = null, StepVersion = null
+            Action = LearningTourAction.Complete,
+            StepKey = null,
+            StepVersion = null
         }, false, operation.Sources!);
         LearningAccessPolicy.RequireInteractiveAccess(claim with { Replay = true }, true, operation.Sources!);
 
@@ -337,11 +339,11 @@ public sealed class LearningAuthorityTests
         Guid tenant = facts.SelectedTenantId!.Value;
         await Assert.That(LearningAccessPolicy.IsActiveLearner(facts with { TenantMemberships = [] }, tenant)).IsFalse();
         await Assert.That(LearningAccessPolicy.IsActiveLearner(facts with
-            { TenantMemberships = [facts.TenantMemberships[0] with { StatusId = (int)TenantUserStatusEnum.Suspended }] }, tenant)).IsFalse();
+        { TenantMemberships = [facts.TenantMemberships[0] with { StatusId = (int)TenantUserStatusEnum.Suspended }] }, tenant)).IsFalse();
         await Assert.That(LearningAccessPolicy.IsActiveLearner(facts with
-            { TenantMemberships = [facts.TenantMemberships[0] with { IsDeleted = true }] }, tenant)).IsFalse();
+        { TenantMemberships = [facts.TenantMemberships[0] with { IsDeleted = true }] }, tenant)).IsFalse();
         await Assert.That(LearningAccessPolicy.IsActiveLearner(facts with
-            { TenantMemberships = [facts.TenantMemberships[0], facts.TenantMemberships[0]] }, tenant)).IsFalse();
+        { TenantMemberships = [facts.TenantMemberships[0], facts.TenantMemberships[0]] }, tenant)).IsFalse();
         await Assert.That(LearningAccessPolicy.IsActiveLearner(facts, Guid.CreateVersion7())).IsFalse();
         await Assert.That(LearningAccessPolicy.IsActiveLearner(facts with { SelectedTenantId = null }, tenant)).IsFalse();
     }
@@ -352,9 +354,9 @@ public sealed class LearningAuthorityTests
         HumanPrincipalSourceFacts facts = Member();
         Guid tenant = facts.SelectedTenantId!.Value;
         await Assert.That(LearningAccessPolicy.IsActiveLearner(facts with
-            { Users = [facts.Users[0] with { IsDeleted = true }] }, tenant)).IsFalse();
+        { Users = [facts.Users[0] with { IsDeleted = true }] }, tenant)).IsFalse();
         await Assert.That(LearningAccessPolicy.IsActiveLearner(facts with
-            { Users = [facts.Users[0], facts.Users[0]] }, tenant)).IsFalse();
+        { Users = [facts.Users[0], facts.Users[0]] }, tenant)).IsFalse();
         await Assert.That(LearningAccessPolicy.IsActiveLearner(facts with { Users = [] }, tenant)).IsFalse();
     }
 
@@ -368,7 +370,7 @@ public sealed class LearningAuthorityTests
         HumanPrincipalSourceFacts facts = Member();
         Guid tenant = facts.SelectedTenantId!.Value;
         await Assert.That(LearningAccessPolicy.IsActiveLearner(facts with
-            { Tenants = [new(tenant, (int)status, false)] }, tenant)).IsFalse();
+        { Tenants = [new(tenant, (int)status, false)] }, tenant)).IsFalse();
     }
 
     [Test]
@@ -377,9 +379,11 @@ public sealed class LearningAuthorityTests
         HumanPrincipalSourceFacts facts = Member();
         var actor = new Actor
         {
-            ActorType = null!, Pii = null!,
+            ActorType = null!,
+            Pii = null!,
             Id = Guid.CreateVersion7(),
-            ActorTypeId = (int)ActorTypeEnum.User, UserId = facts.PrincipalId
+            ActorTypeId = (int)ActorTypeEnum.User,
+            UserId = facts.PrincipalId
         };
         await Assert.That(LearningAccessPolicy.IsActorMember(facts, actor)).IsTrue();
         actor.UserId = Guid.CreateVersion7();
@@ -393,9 +397,11 @@ public sealed class LearningAuthorityTests
         Guid organization = Guid.CreateVersion7();
         var actor = new Actor
         {
-            ActorType = null!, Pii = null!,
+            ActorType = null!,
+            Pii = null!,
             Id = Guid.CreateVersion7(),
-            ActorTypeId = (int)ActorTypeEnum.Organization, OrganizationId = organization
+            ActorTypeId = (int)ActorTypeEnum.Organization,
+            OrganizationId = organization
         };
         var membership = new HumanPrincipalOwnerMembershipFact(Guid.CreateVersion7(),
             facts.SelectedTenantId.Value, Guid.CreateVersion7(), organization,
@@ -403,15 +409,15 @@ public sealed class LearningAuthorityTests
         facts = facts with { Organizations = [membership] };
         await Assert.That(LearningAccessPolicy.IsActorMember(facts, actor)).IsTrue();
         await Assert.That(LearningAccessPolicy.IsActorMember(facts with
-            { Organizations = [membership with { ApprovalStatusId = (int)ApprovalStatusEnum.Revoked }] }, actor)).IsFalse();
+        { Organizations = [membership with { ApprovalStatusId = (int)ApprovalStatusEnum.Revoked }] }, actor)).IsFalse();
         await Assert.That(LearningAccessPolicy.IsActorMember(facts with
-            { Organizations = [membership with { PlacementIsDeleted = true }] }, actor)).IsFalse();
+        { Organizations = [membership with { PlacementIsDeleted = true }] }, actor)).IsFalse();
         await Assert.That(LearningAccessPolicy.IsActorMember(facts with
-            { Organizations = [membership with { PlacementIsSuspended = true }] }, actor)).IsFalse();
+        { Organizations = [membership with { PlacementIsSuspended = true }] }, actor)).IsFalse();
         await Assert.That(LearningAccessPolicy.IsActorMember(facts with
-            { Organizations = [membership with { OwnerIsDeleted = true }] }, actor)).IsFalse();
+        { Organizations = [membership with { OwnerIsDeleted = true }] }, actor)).IsFalse();
         await Assert.That(LearningAccessPolicy.IsActorMember(facts with
-            { Organizations = [membership with { TenantId = Guid.CreateVersion7() }] }, actor)).IsFalse();
+        { Organizations = [membership with { TenantId = Guid.CreateVersion7() }] }, actor)).IsFalse();
     }
 
     [Test]
@@ -421,9 +427,11 @@ public sealed class LearningAuthorityTests
         Guid owner = Guid.CreateVersion7();
         var actor = new Actor
         {
-            ActorType = null!, Pii = null!,
+            ActorType = null!,
+            Pii = null!,
             Id = Guid.CreateVersion7(),
-            ActorTypeId = (int)ActorTypeEnum.Group, GroupId = owner
+            ActorTypeId = (int)ActorTypeEnum.Group,
+            GroupId = owner
         };
         var membership = new HumanPrincipalOwnerMembershipFact(Guid.CreateVersion7(),
             facts.SelectedTenantId.Value, Guid.CreateVersion7(), owner,
@@ -431,7 +439,7 @@ public sealed class LearningAuthorityTests
         await Assert.That(LearningAccessPolicy.IsActorMember(facts with { Organizations = [membership] }, actor)).IsFalse();
         await Assert.That(LearningAccessPolicy.IsActorMember(facts with { Groups = [membership] }, actor)).IsTrue();
         await Assert.That(LearningAccessPolicy.IsActorMember(facts with
-            { Groups = [membership with { PlacementIsSuspended = true }] }, actor)).IsFalse();
+        { Groups = [membership with { PlacementIsSuspended = true }] }, actor)).IsFalse();
     }
 
     [Test]
@@ -440,9 +448,12 @@ public sealed class LearningAuthorityTests
         HumanPrincipalSourceFacts facts = Member();
         var actor = new Actor
         {
-            ActorType = null!, Pii = null!,
+            ActorType = null!,
+            Pii = null!,
             Id = Guid.CreateVersion7(),
-            ActorTypeId = (int)ActorTypeEnum.User, UserId = facts.PrincipalId, IsSuspended = true
+            ActorTypeId = (int)ActorTypeEnum.User,
+            UserId = facts.PrincipalId,
+            IsSuspended = true
         };
         await Assert.That(LearningAccessPolicy.IsActorMember(facts, actor)).IsFalse();
         actor.IsSuspended = false;

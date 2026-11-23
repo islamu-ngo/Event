@@ -150,8 +150,10 @@ public static class AnnouncementTransportMapper
         {
             AnnouncementChange.Publish publish => new()
             {
-                Kind = "publish", Material = ToDto(publish.Material),
-                Enabled = publish.Enabled, Redisplay = publish.Redisplay
+                Kind = "publish",
+                Material = ToDto(publish.Material),
+                Enabled = publish.Enabled,
+                Redisplay = publish.Redisplay
             },
             AnnouncementChange.SetEnabled enabled => new() { Kind = "set-enabled", Enabled = enabled.Enabled },
             AnnouncementChange.SetLock locked => new() { Kind = "set-lock", IsLocked = locked.IsLocked },

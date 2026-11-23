@@ -178,11 +178,16 @@ public sealed class LocalEventManagementHttpTests
         using var claimResponse = await fixture.PostAuthorizedAsync("/api/learning/tours/claim",
             new LearningClaimTourRequest
             {
-                ExpectedScopeStamp = plan.ScopeStamp, ExpectedRevision = plan.LearnerRevision,
-                IntentId = Guid.CreateVersion7(), Family = plan.Family,
-                MaterialVersion = plan.MaterialVersion, ContextKey = plan.ContextKey,
-                EventContextId = result.Id, ExpectedPlanFingerprint = plan.PlanFingerprint,
-                ExpectedPolicySourceStamp = plan.PolicySourceStamp, Replay = true
+                ExpectedScopeStamp = plan.ScopeStamp,
+                ExpectedRevision = plan.LearnerRevision,
+                IntentId = Guid.CreateVersion7(),
+                Family = plan.Family,
+                MaterialVersion = plan.MaterialVersion,
+                ContextKey = plan.ContextKey,
+                EventContextId = result.Id,
+                ExpectedPlanFingerprint = plan.PlanFingerprint,
+                ExpectedPolicySourceStamp = plan.PolicySourceStamp,
+                Replay = true
             }, token);
         await Assert.That(claimResponse.StatusCode).IsEqualTo(HttpStatusCode.OK)
             .Because(fixture.FailureMetadata);
@@ -192,11 +197,17 @@ public sealed class LocalEventManagementHttpTests
         using var progressResponse = await fixture.PostAuthorizedAsync("/api/learning/tours/outcome",
             new LearningRecordTourOutcomeRequest
             {
-                ExpectedScopeStamp = plan.ScopeStamp, ExpectedRevision = claimed!.LearnerRevision,
-                IntentId = Guid.CreateVersion7(), ClaimToken = claimed.Claim!.Token,
-                ContextKey = plan.ContextKey, EventContextId = result.Id, Family = plan.Family,
-                MaterialVersion = plan.MaterialVersion, Action = LearningTourAction.Progress,
-                StepKey = step.StepKey, StepVersion = step.StepVersion,
+                ExpectedScopeStamp = plan.ScopeStamp,
+                ExpectedRevision = claimed!.LearnerRevision,
+                IntentId = Guid.CreateVersion7(),
+                ClaimToken = claimed.Claim!.Token,
+                ContextKey = plan.ContextKey,
+                EventContextId = result.Id,
+                Family = plan.Family,
+                MaterialVersion = plan.MaterialVersion,
+                Action = LearningTourAction.Progress,
+                StepKey = step.StepKey,
+                StepVersion = step.StepVersion,
                 ExpectedPlanFingerprint = plan.PlanFingerprint,
                 ExpectedPolicySourceStamp = plan.PolicySourceStamp
             }, token);

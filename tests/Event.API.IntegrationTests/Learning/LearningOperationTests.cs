@@ -31,9 +31,14 @@ public sealed class LearningOperationTests(LearningHttpFixture fixture)
         var counts = await Effects(before);
         var start = new LearningApplyPracticeActionRequest
         {
-            ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = context.LearnerRevision,
-            ExpectedPracticeRevision = 0, IntentId = Guid.CreateVersion7(), ContextKey = "self",
-            RecipeKey = recipe, MaterialVersion = 1, Action = WireAction.Start
+            ExpectedScopeStamp = context.ScopeStamp,
+            ExpectedRevision = context.LearnerRevision,
+            ExpectedPracticeRevision = 0,
+            IntentId = Guid.CreateVersion7(),
+            ContextKey = "self",
+            RecipeKey = recipe,
+            MaterialVersion = 1,
+            Action = WireAction.Start
         };
         var started = await Apply(member.Client, start);
         var repeated = await Apply(member.Client, start);
@@ -41,16 +46,22 @@ public sealed class LearningOperationTests(LearningHttpFixture fixture)
         await Assert.That(repeated.LearnerRevision).IsEqualTo(started.LearnerRevision);
         var choose = start with
         {
-            IntentId = Guid.CreateVersion7(), PracticeId = started.Practice.Id,
-            ExpectedRevision = started.LearnerRevision, ExpectedPracticeRevision = started.Practice.Revision,
-            Action = WireAction.Choose, ChoiceKey = choice
+            IntentId = Guid.CreateVersion7(),
+            PracticeId = started.Practice.Id,
+            ExpectedRevision = started.LearnerRevision,
+            ExpectedPracticeRevision = started.Practice.Revision,
+            Action = WireAction.Choose,
+            ChoiceKey = choice
         };
         var chosen = await Apply(member.Client, choose);
         await Assert.That(chosen.Practice!.Simulation.Value).IsEqualTo(value);
         var confirmed = await Apply(member.Client, choose with
         {
-            IntentId = Guid.CreateVersion7(), ExpectedRevision = chosen.LearnerRevision,
-            ExpectedPracticeRevision = chosen.Practice.Revision, Action = WireAction.Confirm, ChoiceKey = null
+            IntentId = Guid.CreateVersion7(),
+            ExpectedRevision = chosen.LearnerRevision,
+            ExpectedPracticeRevision = chosen.Practice.Revision,
+            Action = WireAction.Confirm,
+            ChoiceKey = null
         });
         await Assert.That(confirmed.Practice!.Simulation.Status).IsEqualTo(LearningSimulationStatus.Simulated);
         await Assert.That(confirmed.Practice.Simulation.Step).IsEqualTo(2);
@@ -75,9 +86,14 @@ public sealed class LearningOperationTests(LearningHttpFixture fixture)
         var context = await Context(owner.Client);
         var started = await Apply(owner.Client, new()
         {
-            ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = 0,
-            ExpectedPracticeRevision = 0, IntentId = Guid.CreateVersion7(), ContextKey = "self",
-            RecipeKey = "event-details", MaterialVersion = 1, Action = WireAction.Start
+            ExpectedScopeStamp = context.ScopeStamp,
+            ExpectedRevision = 0,
+            ExpectedPracticeRevision = 0,
+            IntentId = Guid.CreateVersion7(),
+            ContextKey = "self",
+            RecipeKey = "event-details",
+            MaterialVersion = 1,
+            Action = WireAction.Start
         });
         using var read = await stranger.Client.GetAsync($"/api/learning/practice/{started.Practice!.Id:D}");
         await Assert.That(read.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
@@ -85,9 +101,15 @@ public sealed class LearningOperationTests(LearningHttpFixture fixture)
         using var mutation = await stranger.Client.PostAsJsonAsync("/api/learning/practice/actions",
             new LearningApplyPracticeActionRequest
             {
-                ExpectedScopeStamp = foreign.ScopeStamp, ExpectedRevision = 0, ExpectedPracticeRevision = 1,
-                PracticeId = started.Practice.Id, IntentId = Guid.CreateVersion7(), ContextKey = "self",
-                RecipeKey = "event-details", MaterialVersion = 1, Action = WireAction.Clear
+                ExpectedScopeStamp = foreign.ScopeStamp,
+                ExpectedRevision = 0,
+                ExpectedPracticeRevision = 1,
+                PracticeId = started.Practice.Id,
+                IntentId = Guid.CreateVersion7(),
+                ContextKey = "self",
+                RecipeKey = "event-details",
+                MaterialVersion = 1,
+                Action = WireAction.Clear
             });
         await Assert.That(mutation.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
         await Assert.That((await Context(owner.Client)).OwnedPractices.Single().Id).IsEqualTo(started.Practice.Id);
@@ -101,9 +123,14 @@ public sealed class LearningOperationTests(LearningHttpFixture fixture)
         var context = await Context(member.Client);
         var start = new LearningApplyPracticeActionRequest
         {
-            ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = 0,
-            ExpectedPracticeRevision = 0, IntentId = Guid.CreateVersion7(), ContextKey = "self",
-            RecipeKey = "event-details", MaterialVersion = 1, Action = WireAction.Start
+            ExpectedScopeStamp = context.ScopeStamp,
+            ExpectedRevision = 0,
+            ExpectedPracticeRevision = 0,
+            IntentId = Guid.CreateVersion7(),
+            ContextKey = "self",
+            RecipeKey = "event-details",
+            MaterialVersion = 1,
+            Action = WireAction.Start
         };
         var started = await Apply(member.Client, start);
         using var changed = await member.Client.PostAsJsonAsync("/api/learning/practice/actions",
@@ -111,8 +138,11 @@ public sealed class LearningOperationTests(LearningHttpFixture fixture)
         await Assert.That(changed.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         using var stale = await member.Client.PostAsJsonAsync("/api/learning/practice/actions", start with
         {
-            IntentId = Guid.CreateVersion7(), PracticeId = started.Practice!.Id,
-            ExpectedPracticeRevision = 1, Action = WireAction.Choose, ChoiceKey = "online"
+            IntentId = Guid.CreateVersion7(),
+            PracticeId = started.Practice!.Id,
+            ExpectedPracticeRevision = 1,
+            Action = WireAction.Choose,
+            ChoiceKey = "online"
         });
         await Assert.That(stale.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         var retained = await Context(member.Client);
@@ -131,7 +161,8 @@ public sealed class LearningOperationTests(LearningHttpFixture fixture)
         var claimed = (await claimedResponse.Content.ReadFromJsonAsync<LearningMutationReceiptDto>())!;
         using var lost = await member.Client.PostAsJsonAsync("/api/learning/tours/claim", claim with
         {
-            IntentId = Guid.CreateVersion7(), ExpectedRevision = claimed.LearnerRevision
+            IntentId = Guid.CreateVersion7(),
+            ExpectedRevision = claimed.LearnerRevision
         });
         await Assert.That(lost.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         var progressed = await ProgressTourSteps(member.Client, plan, claimed);
@@ -181,23 +212,33 @@ public sealed class LearningOperationTests(LearningHttpFixture fixture)
 
     internal static LearningClaimTourRequest TourClaim(LearningTourPlanDto plan, bool replay) => new()
     {
-        ExpectedScopeStamp = plan.ScopeStamp, ExpectedRevision = plan.LearnerRevision,
-        IntentId = Guid.CreateVersion7(), Family = plan.Family, MaterialVersion = plan.MaterialVersion,
-        ContextKey = plan.ContextKey, EventContextId = plan.EventContextId,
-        ExpectedPlanFingerprint = plan.PlanFingerprint, ExpectedPolicySourceStamp = plan.PolicySourceStamp,
+        ExpectedScopeStamp = plan.ScopeStamp,
+        ExpectedRevision = plan.LearnerRevision,
+        IntentId = Guid.CreateVersion7(),
+        Family = plan.Family,
+        MaterialVersion = plan.MaterialVersion,
+        ContextKey = plan.ContextKey,
+        EventContextId = plan.EventContextId,
+        ExpectedPlanFingerprint = plan.PlanFingerprint,
+        ExpectedPolicySourceStamp = plan.PolicySourceStamp,
         Replay = replay
     };
 
     internal static LearningRecordTourOutcomeRequest TourAction(
         LearningTourPlanDto plan, LearningMutationReceiptDto claimed, WireTourAction action) => new()
-    {
-        ExpectedScopeStamp = claimed.ScopeStamp, ExpectedRevision = claimed.LearnerRevision,
-        IntentId = Guid.CreateVersion7(), ClaimToken = claimed.Claim!.Token,
-        Family = claimed.Claim.Family, MaterialVersion = claimed.Claim.MaterialVersion,
-        ContextKey = plan.ContextKey, EventContextId = plan.EventContextId, Action = action,
-        ExpectedPlanFingerprint = claimed.Claim.PlanFingerprint,
-        ExpectedPolicySourceStamp = claimed.Claim.PolicySourceStamp
-    };
+        {
+            ExpectedScopeStamp = claimed.ScopeStamp,
+            ExpectedRevision = claimed.LearnerRevision,
+            IntentId = Guid.CreateVersion7(),
+            ClaimToken = claimed.Claim!.Token,
+            Family = claimed.Claim.Family,
+            MaterialVersion = claimed.Claim.MaterialVersion,
+            ContextKey = plan.ContextKey,
+            EventContextId = plan.EventContextId,
+            Action = action,
+            ExpectedPlanFingerprint = claimed.Claim.PlanFingerprint,
+            ExpectedPolicySourceStamp = claimed.Claim.PolicySourceStamp
+        };
 
     internal static async Task<LearningMutationReceiptDto> ProgressTourSteps(
         HttpClient client, LearningTourPlanDto plan, LearningMutationReceiptDto claimed)
@@ -208,7 +249,8 @@ public sealed class LearningOperationTests(LearningHttpFixture fixture)
             var input = TourAction(plan, claimed, WireTourAction.Progress) with
             {
                 ExpectedRevision = latest.LearnerRevision,
-                StepKey = step.StepKey, StepVersion = step.StepVersion
+                StepKey = step.StepKey,
+                StepVersion = step.StepVersion
             };
             using var response = await client.PostAsJsonAsync("/api/learning/tours/outcome", input);
             await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -254,8 +296,11 @@ public sealed class LearningFinalAdmissionTests
         var context = await LearningOperationTests.Context(member.Client);
         var input = new LearningUpdatePreferencesRequest
         {
-            ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = 0,
-            SuppressAutomaticTours = true, HideLearning = false, PinLearning = false
+            ExpectedScopeStamp = context.ScopeStamp,
+            ExpectedRevision = 0,
+            SuppressAutomaticTours = true,
+            HideLearning = false,
+            PinLearning = false
         };
         Explore.Domain.PrivacyErasureIntent fact;
         if (eraseFirst)
@@ -321,8 +366,11 @@ public sealed class LearningFinalAdmissionTests
         using var response = await member.Client.PatchAsJsonAsync("/api/learning/preferences",
             new LearningUpdatePreferencesRequest
             {
-                ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = 0,
-                SuppressAutomaticTours = true, HideLearning = false, PinLearning = false
+                ExpectedScopeStamp = context.ScopeStamp,
+                ExpectedRevision = 0,
+                SuppressAutomaticTours = true,
+                HideLearning = false,
+                PinLearning = false
             });
 
         await Assert.That(interception.Observed).IsTrue();
@@ -355,8 +403,11 @@ public sealed class LearningFinalAdmissionTests
         using var response = await member.Client.PatchAsJsonAsync("/api/learning/preferences",
             new LearningUpdatePreferencesRequest
             {
-                ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = 0,
-                SuppressAutomaticTours = true, HideLearning = false, PinLearning = false
+                ExpectedScopeStamp = context.ScopeStamp,
+                ExpectedRevision = 0,
+                SuppressAutomaticTours = true,
+                HideLearning = false,
+                PinLearning = false
             });
         await Assert.That(interception.Observed).IsTrue();
         await Assert.That(response.IsSuccessStatusCode).IsFalse();
@@ -392,8 +443,11 @@ public sealed class LearningFinalAdmissionTests
         using var response = await member.Client.PatchAsJsonAsync("/api/learning/preferences",
             new LearningUpdatePreferencesRequest
             {
-                ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = 0,
-                SuppressAutomaticTours = true, HideLearning = false, PinLearning = false
+                ExpectedScopeStamp = context.ScopeStamp,
+                ExpectedRevision = 0,
+                SuppressAutomaticTours = true,
+                HideLearning = false,
+                PinLearning = false
             });
         await Assert.That(interception.Observed).IsTrue();
         await Assert.That(response.IsSuccessStatusCode).IsFalse();
@@ -424,8 +478,11 @@ public sealed class LearningFinalAdmissionTests
         using var response = await member.Client.PatchAsJsonAsync("/api/learning/preferences",
             new LearningUpdatePreferencesRequest
             {
-                ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = 0,
-                SuppressAutomaticTours = true, HideLearning = true, PinLearning = false
+                ExpectedScopeStamp = context.ScopeStamp,
+                ExpectedRevision = 0,
+                SuppressAutomaticTours = true,
+                HideLearning = true,
+                PinLearning = false
             });
         await Assert.That(interception.Observed).IsTrue();
         await Assert.That(response.IsSuccessStatusCode).IsFalse();

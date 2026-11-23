@@ -215,13 +215,19 @@ public sealed class LearningPersistenceSqliteTests
             database._model = context.Model;
             context.Add(new TenantStatus
             {
-                Id = (int)TenantStatusEnum.Active, MasterCode = "Active", FullName = "Active", IsActiveState = true
+                Id = (int)TenantStatusEnum.Active,
+                MasterCode = "Active",
+                FullName = "Active",
+                IsActiveState = true
             });
             foreach (Guid tenantId in new[] { database.TenantId, database.OtherTenantId })
                 context.Add(new Tenant
                 {
-                    Id = tenantId, FullName = "Learning storage fixture", Slug = $"learning-{tenantId:N}",
-                    TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                    Id = tenantId,
+                    FullName = "Learning storage fixture",
+                    Slug = $"learning-{tenantId:N}",
+                    TenantStatusId = (int)TenantStatusEnum.Active,
+                    TenantStatus = null!
                 });
             context.AddRange(new User { Id = database.UserId, Pii = null! },
                 new User { Id = database.OtherUserId, Pii = null! });

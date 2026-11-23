@@ -124,8 +124,11 @@ public sealed class LearningPostgresPermissionsTests(PostgreSqlContainerFixture 
         context.BindTenantLease();
         context.AddRange(new[] { ids.Tenant, ids.OtherTenant }.Select(id => new Tenant
         {
-            Id = id, Slug = $"learning-native-{id:N}", FullName = "Native learning assurance",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = id,
+            Slug = $"learning-native-{id:N}",
+            FullName = "Native learning assurance",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         }));
         context.AddRange(new User { Id = ids.User, Pii = null! }, new User { Id = ids.OtherUser, Pii = null! });
         await using var human = new HumanSecuritySourceGate(context);

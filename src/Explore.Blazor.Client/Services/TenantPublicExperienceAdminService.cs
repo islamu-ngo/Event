@@ -328,7 +328,9 @@ public sealed class TenantPublicExperienceAdminService(
         string message = model.Message.Trim(), linkText = model.LinkText.Trim(), linkUrl = model.LinkUrl.Trim();
         var result = await announcements.PublishAsync(source, new()
         {
-            Kind = "publish", Enabled = enabled, Redisplay = forceRedisplay,
+            Kind = "publish",
+            Enabled = enabled,
+            Redisplay = forceRedisplay,
             Material = new() { Message = message, LinkText = linkText, LinkUrl = linkUrl }
         }, cancellationToken);
         if (!result.Success || result.Source is not { } fresh)

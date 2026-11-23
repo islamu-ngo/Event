@@ -278,21 +278,21 @@ public static class LearningLessonCatalog
         string recipe, string key, LearningPracticeChoiceSlot slot, int value,
         string label, string explanation, string resultKey, string heading,
         string resultDescription, params LearningSyntheticFactDto[] facts) => new()
-    {
-        Key = key,
-        Slot = slot,
-        Value = value,
-        Label = Text(recipe, $"choices.{key}.label", label),
-        Explanation = Text(recipe, $"choices.{key}.explanation", explanation),
-        ResultKey = resultKey,
-        Result = new()
         {
-            ScenarioKey = recipe,
-            Heading = Text(recipe, $"results.{resultKey}.heading", heading),
-            Description = Text(recipe, $"results.{resultKey}.description", resultDescription),
-            Facts = facts
-        }
-    };
+            Key = key,
+            Slot = slot,
+            Value = value,
+            Label = Text(recipe, $"choices.{key}.label", label),
+            Explanation = Text(recipe, $"choices.{key}.explanation", explanation),
+            ResultKey = resultKey,
+            Result = new()
+            {
+                ScenarioKey = recipe,
+                Heading = Text(recipe, $"results.{resultKey}.heading", heading),
+                Description = Text(recipe, $"results.{resultKey}.description", resultDescription),
+                Facts = facts
+            }
+        };
 
     private static LearningDisplayTextDto Text(string recipe, string key, string fallback) =>
         new($"Learning.{PackKey}.{recipe}.{key}", fallback);

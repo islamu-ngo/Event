@@ -25,12 +25,12 @@ public sealed class LearningTourStepProgress : ITenantEntity
 
     internal static LearningTourStepProgress Create(LearningTourProgress owner,
         LearningTourStep step, DateTime completedAtUtc) => new()
-    {
-        Id = Guid.CreateVersion7(completedAtUtc),
-        TenantId = owner.TenantId,
-        TourProgressId = owner.Id,
-        StepKey = step.StepKey,
-        StepVersion = step.StepVersion,
-        CompletedAtUtc = completedAtUtc
-    };
+        {
+            Id = Guid.CreateVersion7(completedAtUtc),
+            TenantId = owner.TenantId,
+            TourProgressId = owner.Id,
+            StepKey = step.StepKey,
+            StepVersion = step.StepVersion,
+            CompletedAtUtc = completedAtUtc
+        };
 }

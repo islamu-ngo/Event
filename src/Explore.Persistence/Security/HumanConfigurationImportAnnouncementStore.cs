@@ -307,16 +307,28 @@ internal sealed class HumanConfigurationImportAnnouncementStore : IHumanConfigur
         if (owner.TenantId is { } tenant)
             return Snapshot(new TenantSetting
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!, SettingKey = Key,
-                Value = value, IsLocked = locked, CreatedAt = occurredAt, CreatedBy = authority.Subject.PrincipalId
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant,
+                Tenant = null!,
+                SettingKey = Key,
+                Value = value,
+                IsLocked = locked,
+                CreatedAt = occurredAt,
+                CreatedBy = authority.Subject.PrincipalId
             }, typeof(TenantSetting));
         var definition = SettingRegistry.Get(Key)
             ?? throw new InvalidOperationException("The announcement group definition is missing.");
         return Snapshot(new SystemSetting
         {
-            Id = Guid.CreateVersion7(), SettingKey = Key, Value = value, IsLocked = locked,
-            ValueType = definition.ValueType, Description = definition.Description, Category = definition.Category,
-            CreatedAt = occurredAt, CreatedBy = authority.Subject.PrincipalId
+            Id = Guid.CreateVersion7(),
+            SettingKey = Key,
+            Value = value,
+            IsLocked = locked,
+            ValueType = definition.ValueType,
+            Description = definition.Description,
+            Category = definition.Category,
+            CreatedAt = occurredAt,
+            CreatedBy = authority.Subject.PrincipalId
         }, typeof(SystemSetting));
     }
 

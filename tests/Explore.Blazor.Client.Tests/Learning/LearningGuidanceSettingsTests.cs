@@ -999,7 +999,8 @@ public sealed class LearningGuidanceSettingsTests : IDisposable
         var users = Substitute.For<IUserClient>();
         users.GetCurrentUserAsync().Returns(Task.FromResult(new HalResourceOfUserDto
         {
-            Id = _userId, ActorId = _profileActorId
+            Id = _userId,
+            ActorId = _profileActorId
         }));
         _ctx.Services.AddSingleton(users);
         _ctx.Services.AddScoped<IUserService, UserService>();
@@ -1214,17 +1215,24 @@ public sealed class LearningGuidanceSettingsTests : IDisposable
     {
         var context = new HalResourceOfLearningContextDto
         {
-            TenantId = source.TenantId, UserId = source.UserId,
-            ContextKey = source.ContextKey, ScopeStamp = source.ScopeStamp,
-            LearnerRevision = source.LearnerRevision + 1, ResourceRevision = source.ResourceRevision,
-            SpaceId = source.SpaceId, SpaceStatus = source.SpaceStatus, Preferences = source.Preferences,
+            TenantId = source.TenantId,
+            UserId = source.UserId,
+            ContextKey = source.ContextKey,
+            ScopeStamp = source.ScopeStamp,
+            LearnerRevision = source.LearnerRevision + 1,
+            ResourceRevision = source.ResourceRevision,
+            SpaceId = source.SpaceId,
+            SpaceStatus = source.SpaceStatus,
+            Preferences = source.Preferences,
             Capabilities = source.Capabilities,
             Requirement = source.Requirement with
             {
                 Status = LearningRequirementStatus.Satisfied,
                 AcknowledgedAtUtc = new DateTimeOffset(2026, 10, 30, 12, 0, 0, TimeSpan.Zero)
             },
-            Tours = [], Lessons = [], OwnedPractices = [],
+            Tours = [],
+            Lessons = [],
+            OwnedPractices = [],
             _links = new Dictionary<string, HalLink>()
         };
         return context;
@@ -1232,13 +1240,19 @@ public sealed class LearningGuidanceSettingsTests : IDisposable
 
     private static HalResourceOfLearningMutationReceiptDto Receipt(HalResourceOfLearningContextDto context) => new()
     {
-        Id = Guid.CreateVersion7(), ScopeStamp = context.ScopeStamp,
-        ResourceRevision = context.ResourceRevision, LearnerRevision = context.LearnerRevision,
+        Id = Guid.CreateVersion7(),
+        ScopeStamp = context.ScopeStamp,
+        ResourceRevision = context.ResourceRevision,
+        LearnerRevision = context.LearnerRevision,
         State = new()
         {
-            TenantId = context.TenantId, UserId = context.UserId, ContextKey = context.ContextKey,
-            ScopeStamp = context.ScopeStamp, LearnerRevision = context.LearnerRevision,
-            ResourceRevision = context.ResourceRevision, Preferences = context.Preferences,
+            TenantId = context.TenantId,
+            UserId = context.UserId,
+            ContextKey = context.ContextKey,
+            ScopeStamp = context.ScopeStamp,
+            LearnerRevision = context.LearnerRevision,
+            ResourceRevision = context.ResourceRevision,
+            Preferences = context.Preferences,
             Requirement = context.Requirement
         }
     };
@@ -1296,7 +1310,8 @@ public sealed class LearningGuidanceSettingsTests : IDisposable
         ConcurrencyStamp = Guid.CreateVersion7(),
         Policy = new()
         {
-            Enabled = true, AutomaticInvitations = true,
+            Enabled = true,
+            AutomaticInvitations = true,
             InvitationAudience = LearningGuidanceAudience.ActiveMembers,
             ManualAccessAudience = LearningGuidanceAudience.TenantAdministrators,
             RequirementPolicy = LearningRequirementPolicy.Optional,

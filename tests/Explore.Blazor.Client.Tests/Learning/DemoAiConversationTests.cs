@@ -570,7 +570,8 @@ public sealed class DemoAiConversationTests : IDisposable
             .Add(component => component.Name, "TenantContext")
             .Add(component => component.Value, new TenantContext
             {
-                TenantId = _tenantId, IsAuthenticated = true
+                TenantId = _tenantId,
+                IsAuthenticated = true
             })
             .AddChildContent<LearningPractice>(child => child
                 .Add(component => component.PracticeId, _practiceId)));
@@ -594,10 +595,16 @@ public sealed class DemoAiConversationTests : IDisposable
 
     private HalResourceOfLearningContextDto Context(long learnerRevision = 2) => new()
     {
-        TenantId = _tenantId, UserId = _userId, ContextKey = "self",
-        ScopeStamp = "demo-self-scope", ResourceRevision = 7, LearnerRevision = learnerRevision,
-        SpaceId = Guid.CreateVersion7(), SpaceStatus = LearningSpaceStatus.Active,
-        Preferences = new(), Capabilities = new() { CanLearn = true, CanSimulate = true },
+        TenantId = _tenantId,
+        UserId = _userId,
+        ContextKey = "self",
+        ScopeStamp = "demo-self-scope",
+        ResourceRevision = 7,
+        LearnerRevision = learnerRevision,
+        SpaceId = Guid.CreateVersion7(),
+        SpaceStatus = LearningSpaceStatus.Active,
+        Preferences = new(),
+        Capabilities = new() { CanLearn = true, CanSimulate = true },
         Tours = [],
         Lessons =
         [
@@ -633,49 +640,66 @@ public sealed class DemoAiConversationTests : IDisposable
 
     private HalResourceOfLearningPracticeDto Practice(
         string step, long revision, long learnerRevision, string? choice = null) => new()
-    {
-        Id = _practiceId, ContextKey = "self", ScopeStamp = "demo-self-scope",
-        RecipeKey = "ai-example-review", MaterialVersion = 1,
-        Revision = revision, LearnerRevision = learnerRevision,
-        CanSimulate = true,
-        Simulation = new()
         {
-            RecipeKey = "ai-example-review", MaterialVersion = 1, StepKey = step,
-            Step = step == "result" ? 2 : step == "confirm" ? 1 : 0,
-            ChoiceSlot = choice == "accept-example" ? LearningPracticeChoiceSlot.Primary
-                : choice == "reject-example" ? LearningPracticeChoiceSlot.Secondary : LearningPracticeChoiceSlot.None,
-            Value = choice == "accept-example" ? 1 : 0,
-            ChoiceKey = choice, IsConfirmed = step == "result",
-            Status = step == "result" ? LearningSimulationStatus.Simulated
-                : step == "confirm" ? LearningSimulationStatus.AwaitingConfirmation : LearningSimulationStatus.Choosing,
-            Receipt = step == "result" ? new()
+            Id = _practiceId,
+            ContextKey = "self",
+            ScopeStamp = "demo-self-scope",
+            RecipeKey = "ai-example-review",
+            MaterialVersion = 1,
+            Revision = revision,
+            LearnerRevision = learnerRevision,
+            CanSimulate = true,
+            Simulation = new()
             {
-                RecipeKey = "ai-example-review", MaterialVersion = 1, ChoiceKey = choice!,
-                ResultKey = choice == "accept-example" ? "example-accepted" : "example-rejected",
-                IsSimulation = true, ProductionEffects = false
-            } : null
-        },
-        _links = new Dictionary<string, HalLink>
-        {
-            [step == "choose" ? "simulate-choice" : step == "confirm" ? "simulate-confirm" : "reset-simulation"] =
+                RecipeKey = "ai-example-review",
+                MaterialVersion = 1,
+                StepKey = step,
+                Step = step == "result" ? 2 : step == "confirm" ? 1 : 0,
+                ChoiceSlot = choice == "accept-example" ? LearningPracticeChoiceSlot.Primary
+                : choice == "reject-example" ? LearningPracticeChoiceSlot.Secondary : LearningPracticeChoiceSlot.None,
+                Value = choice == "accept-example" ? 1 : 0,
+                ChoiceKey = choice,
+                IsConfirmed = step == "result",
+                Status = step == "result" ? LearningSimulationStatus.Simulated
+                : step == "confirm" ? LearningSimulationStatus.AwaitingConfirmation : LearningSimulationStatus.Choosing,
+                Receipt = step == "result" ? new()
+                {
+                    RecipeKey = "ai-example-review",
+                    MaterialVersion = 1,
+                    ChoiceKey = choice!,
+                    ResultKey = choice == "accept-example" ? "example-accepted" : "example-rejected",
+                    IsSimulation = true,
+                    ProductionEffects = false
+                } : null
+            },
+            _links = new Dictionary<string, HalLink>
+            {
+                [step == "choose" ? "simulate-choice" : step == "confirm" ? "simulate-confirm" : "reset-simulation"] =
                 new() { Href = "/api/learning/practices/actions", Method = "POST" }
-        }
-    };
+            }
+        };
 
     private HalResourceOfLearningMutationReceiptDto Receipt(
         HalResourceOfLearningContextDto context, HalResourceOfLearningPracticeDto practice) => new()
-    {
-        Id = _practiceId, ScopeStamp = context.ScopeStamp, ResourceRevision = context.ResourceRevision,
-        LearnerRevision = context.LearnerRevision,
-        State = new() { TenantId = context.TenantId, UserId = context.UserId },
-        Practice = new()
         {
-            Id = practice.Id, ScopeStamp = practice.ScopeStamp, ContextKey = practice.ContextKey,
-            RecipeKey = practice.RecipeKey, MaterialVersion = practice.MaterialVersion,
-            Revision = practice.Revision, LearnerRevision = practice.LearnerRevision, Simulation = practice.Simulation
-        },
-        SimulationStatus = practice.Simulation.Status
-    };
+            Id = _practiceId,
+            ScopeStamp = context.ScopeStamp,
+            ResourceRevision = context.ResourceRevision,
+            LearnerRevision = context.LearnerRevision,
+            State = new() { TenantId = context.TenantId, UserId = context.UserId },
+            Practice = new()
+            {
+                Id = practice.Id,
+                ScopeStamp = practice.ScopeStamp,
+                ContextKey = practice.ContextKey,
+                RecipeKey = practice.RecipeKey,
+                MaterialVersion = practice.MaterialVersion,
+                Revision = practice.Revision,
+                LearnerRevision = practice.LearnerRevision,
+                Simulation = practice.Simulation
+            },
+            SimulationStatus = practice.Simulation.Status
+        };
 
     private static TaskCompletionSource<T> Signal<T>() =>
         new(TaskCreationOptions.RunContinuationsAsynchronously);

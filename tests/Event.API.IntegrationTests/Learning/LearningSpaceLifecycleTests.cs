@@ -21,7 +21,9 @@ public sealed class LearningSpaceLifecycleTests
         await Assert.That(links.TryGetProperty("recreate-learning-space", out _)).IsFalse();
         var remove = new LearningManageSpaceRequest
         {
-            ExpectedScopeStamp = absent.ScopeStamp, ExpectedRevision = 0, Action = LearningSpaceAction.Remove
+            ExpectedScopeStamp = absent.ScopeStamp,
+            ExpectedRevision = 0,
+            Action = LearningSpaceAction.Remove
         };
         using var removedResponse = await administrator.Client.PostAsJsonAsync("/api/learning/space/actions", remove);
         await Assert.That(removedResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -61,28 +63,35 @@ public sealed class LearningSpaceLifecycleTests
         using var removal = await administrator.Client.PostAsJsonAsync("/api/learning/space/actions",
             new LearningManageSpaceRequest
             {
-                ExpectedScopeStamp = source.ScopeStamp, ExpectedRevision = source.ResourceRevision, Action = LearningSpaceAction.Remove
+                ExpectedScopeStamp = source.ScopeStamp,
+                ExpectedRevision = source.ResourceRevision,
+                Action = LearningSpaceAction.Remove
             });
         await Assert.That(removal.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var outcome = LearningOperationTests.TourAction(plan, claim, LearningTourAction.Progress) with
         {
             ExpectedRevision = progressed.LearnerRevision,
-            StepKey = plan.Steps[0].StepKey, StepVersion = plan.Steps[0].StepVersion
+            StepKey = plan.Steps[0].StepKey,
+            StepVersion = plan.Steps[0].StepVersion
         };
         using var progress = await member.Client.PostAsJsonAsync("/api/learning/tours/outcome", outcome);
         await Assert.That(progress.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         using var complete = await member.Client.PostAsJsonAsync("/api/learning/tours/outcome",
             outcome with
             {
-                IntentId = Guid.CreateVersion7(), Action = LearningTourAction.Complete,
-                StepKey = null, StepVersion = null
+                IntentId = Guid.CreateVersion7(),
+                Action = LearningTourAction.Complete,
+                StepKey = null,
+                StepVersion = null
             });
         await Assert.That(complete.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         using var release = await member.Client.PostAsJsonAsync("/api/learning/tours/outcome",
             outcome with
             {
-                IntentId = Guid.CreateVersion7(), Action = LearningTourAction.Interrupt,
-                StepKey = null, StepVersion = null
+                IntentId = Guid.CreateVersion7(),
+                Action = LearningTourAction.Interrupt,
+                StepKey = null,
+                StepVersion = null
             });
         await Assert.That(release.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var final = await LearningOperationTests.Context(member.Client);

@@ -212,8 +212,11 @@ internal sealed class HumanLearningMutationStore(
         {
             bool ownerCleanup = mutation.Intent is LearningPreferencesIntent
                 or LearningPracticeIntent { Action: LearningPracticeAction.Clear }
-                or LearningTourOutcomeIntent { Action: LearningTourAction.Skip or LearningTourAction.Interrupt
-                    or LearningTourAction.Snooze }
+                or LearningTourOutcomeIntent
+            {
+                Action: LearningTourAction.Skip or LearningTourAction.Interrupt
+                    or LearningTourAction.Snooze
+            }
                 || mutation.Intent is LearningTourOutcomeIntent retained && state?.Tours.Any(tour =>
                     tour.Family == retained.Family && tour.MaterialVersion == retained.MaterialVersion
                     && tour.LastIntentId == retained.IntentId) == true;
@@ -260,88 +263,88 @@ internal sealed class HumanLearningMutationStore(
                         preference.PinLearning, preference.ExpectedRevision, mutation.UpdatedAtUtc);
                     break;
                 case LearningTourClaimIntent claim:
-                {
-                    RequireTourMaterial(claim.MaterialVersion);
-                    var resolved = ResolveTour(mutation, state, space, claim.Family);
-                    RequirePlan(resolved.Plan, claim.ExpectedPlanFingerprint, claim.ExpectedPolicySourceStamp);
-                    var definition = resolved.Definition
-                        ?? throw Conflict("The current tour is unavailable.");
-                    var progress = state.Tours.SingleOrDefault(value =>
-                        value.Family == claim.Family && value.MaterialVersion == claim.MaterialVersion);
-                    bool duplicate = state.LastIntentId == claim.IntentId || progress?.LastIntentId == claim.IntentId;
-                    if (!duplicate && !claim.Replay && state.IsHidden)
-                        throw Conflict("Hidden guidance requires explicit manual replay.");
-                    Guid claimId = duplicate
-                        && state.ActiveTourId == progress?.Id && state.ActiveClaimId.HasValue
-                        ? state.ActiveClaimId.Value : mutation.CandidateClaimId;
-                    state.ClaimSemanticTour(progress?.Id ?? mutation.CandidateChildId, definition,
-                        claimId, claim.IntentId, claim.ExpectedRevision, mutation.UpdatedAtUtc,
-                        claim.ExpectedPlanFingerprint, claim.ExpectedPolicySourceStamp,
-                        claim.ContextKey, claim.EventContextId, claim.Replay);
-                    _claimDeadline = duplicate ? null : state.ClaimExpiresAtUtc;
-                    break;
-                }
-                case LearningTourOutcomeIntent outcome:
-                {
-                    RequireTourMaterial(outcome.MaterialVersion);
-                    var progress = state.Tours.SingleOrDefault(value =>
-                        value.Family == outcome.Family && value.MaterialVersion == outcome.MaterialVersion);
-                    bool duplicate = state.LastIntentId == outcome.IntentId || progress?.LastIntentId == outcome.IntentId;
-                    if (duplicate && progress?.LastIntentId != outcome.IntentId)
-                        throw Conflict("The retained action belongs to another tour family or material version.");
-                    bool release = outcome.ClaimToken.HasValue && outcome.Action is
-                        LearningTourAction.Skip or LearningTourAction.Interrupt or LearningTourAction.Snooze;
-                    LearningTourDefinition definition;
-                    if (duplicate || release)
-                        definition = LearningExperienceCatalog.GetDefinition(outcome.Family);
-                    else
                     {
-                        var resolved = ResolveTour(mutation, state, space, outcome.Family);
-                        RequirePlan(resolved.Plan, outcome.ExpectedPlanFingerprint, outcome.ExpectedPolicySourceStamp);
-                        definition = resolved.Definition ?? throw Conflict("The current tour is unavailable.");
+                        RequireTourMaterial(claim.MaterialVersion);
+                        var resolved = ResolveTour(mutation, state, space, claim.Family);
+                        RequirePlan(resolved.Plan, claim.ExpectedPlanFingerprint, claim.ExpectedPolicySourceStamp);
+                        var definition = resolved.Definition
+                            ?? throw Conflict("The current tour is unavailable.");
+                        var progress = state.Tours.SingleOrDefault(value =>
+                            value.Family == claim.Family && value.MaterialVersion == claim.MaterialVersion);
+                        bool duplicate = state.LastIntentId == claim.IntentId || progress?.LastIntentId == claim.IntentId;
+                        if (!duplicate && !claim.Replay && state.IsHidden)
+                            throw Conflict("Hidden guidance requires explicit manual replay.");
+                        Guid claimId = duplicate
+                            && state.ActiveTourId == progress?.Id && state.ActiveClaimId.HasValue
+                            ? state.ActiveClaimId.Value : mutation.CandidateClaimId;
+                        state.ClaimSemanticTour(progress?.Id ?? mutation.CandidateChildId, definition,
+                            claimId, claim.IntentId, claim.ExpectedRevision, mutation.UpdatedAtUtc,
+                            claim.ExpectedPlanFingerprint, claim.ExpectedPolicySourceStamp,
+                            claim.ContextKey, claim.EventContextId, claim.Replay);
+                        _claimDeadline = duplicate ? null : state.ClaimExpiresAtUtc;
+                        break;
                     }
-                    _claimDeadline = duplicate || !outcome.ClaimToken.HasValue ? null : state.ClaimExpiresAtUtc;
-                    state.RecordSemanticTourAction(progress?.Id ?? mutation.CandidateChildId, definition,
-                        outcome.ClaimToken, outcome.IntentId, outcome.Action, outcome.StepKey,
-                        outcome.StepVersion, outcome.SnoozeDuration, outcome.ExpectedPlanFingerprint,
-                        outcome.ExpectedPolicySourceStamp, outcome.ExpectedRevision, mutation.UpdatedAtUtc,
-                        outcome.ContextKey, outcome.EventContextId);
-                    break;
-                }
+                case LearningTourOutcomeIntent outcome:
+                    {
+                        RequireTourMaterial(outcome.MaterialVersion);
+                        var progress = state.Tours.SingleOrDefault(value =>
+                            value.Family == outcome.Family && value.MaterialVersion == outcome.MaterialVersion);
+                        bool duplicate = state.LastIntentId == outcome.IntentId || progress?.LastIntentId == outcome.IntentId;
+                        if (duplicate && progress?.LastIntentId != outcome.IntentId)
+                            throw Conflict("The retained action belongs to another tour family or material version.");
+                        bool release = outcome.ClaimToken.HasValue && outcome.Action is
+                            LearningTourAction.Skip or LearningTourAction.Interrupt or LearningTourAction.Snooze;
+                        LearningTourDefinition definition;
+                        if (duplicate || release)
+                            definition = LearningExperienceCatalog.GetDefinition(outcome.Family);
+                        else
+                        {
+                            var resolved = ResolveTour(mutation, state, space, outcome.Family);
+                            RequirePlan(resolved.Plan, outcome.ExpectedPlanFingerprint, outcome.ExpectedPolicySourceStamp);
+                            definition = resolved.Definition ?? throw Conflict("The current tour is unavailable.");
+                        }
+                        _claimDeadline = duplicate || !outcome.ClaimToken.HasValue ? null : state.ClaimExpiresAtUtc;
+                        state.RecordSemanticTourAction(progress?.Id ?? mutation.CandidateChildId, definition,
+                            outcome.ClaimToken, outcome.IntentId, outcome.Action, outcome.StepKey,
+                            outcome.StepVersion, outcome.SnoozeDuration, outcome.ExpectedPlanFingerprint,
+                            outcome.ExpectedPolicySourceStamp, outcome.ExpectedRevision, mutation.UpdatedAtUtc,
+                            outcome.ContextKey, outcome.EventContextId);
+                        break;
+                    }
                 case LearningPracticeIntent input:
-                {
-                    RequirePracticeMaterial(input.MaterialVersion);
-                    var current = state.Practices.SingleOrDefault(value =>
-                        value.ContextKey == input.ContextKey && value.RecipeKey == input.RecipeKey);
-                    if (input.PracticeId.HasValue && current?.Id != input.PracticeId
-                        && !(input.Action == LearningPracticeAction.Clear && state.LastIntentId == input.IntentId))
-                        throw new NotFoundException("Learning practice", input.PracticeId);
-                    bool duplicate = state.LastIntentId == input.IntentId || current?.LastIntentId == input.IntentId;
-                    Wire.LearningSimulationStateDto? restored = null;
-                    if (!duplicate && current is not null && !LearningLessonCatalog.TryRestore(current.RecipeKey,
-                            current.RecipeVersion, (Wire.LearningPracticeChoiceSlot)current.Choice,
-                            current.Step, current.Value, current.IsConfirmed, out restored))
-                        throw Conflict("The stored practice is not an authored state.");
-                    if (!LearningLessonCatalog.TryGetLesson(input.RecipeKey, input.MaterialVersion, out var lesson))
-                        throw new ArgumentException("The recipe is not part of the shipped pack.");
-                    var choice = input.ChoiceKey is null ? null
-                        : lesson.Choices.SingleOrDefault(value => value.Key == input.ChoiceKey);
-                    if (input.Action == LearningPracticeAction.Choose && choice is null)
-                        throw new ArgumentException("Choose a shipped recipe option.");
-                    if (input.Action != LearningPracticeAction.Choose && input.ChoiceKey is not null)
-                        throw new ArgumentException("Only Choose accepts an authored option.");
-                    if (!duplicate && !LearningLessonCatalog.TryApply(input.RecipeKey, input.MaterialVersion,
-                            (Wire.LearningPracticeAction)input.Action, input.ChoiceKey, restored, out _))
-                        throw Conflict("The practice action is not valid in the current state.");
-                    state.ApplyPractice(input.PracticeId ?? current?.Id ?? mutation.CandidateChildId,
-                        input.ContextKey, input.RecipeKey, input.MaterialVersion, input.Action,
-                        input.Action == LearningPracticeAction.Choose
-                            ? (LearningPracticeChoice)choice!.Slot : LearningPracticeChoice.None,
-                        input.Action == LearningPracticeAction.Choose ? 1 : 0,
-                        input.Action == LearningPracticeAction.Choose ? choice!.Value : 0,
-                        input.IntentId, input.ExpectedRevision, input.ExpectedPracticeRevision, mutation.UpdatedAtUtc);
-                    break;
-                }
+                    {
+                        RequirePracticeMaterial(input.MaterialVersion);
+                        var current = state.Practices.SingleOrDefault(value =>
+                            value.ContextKey == input.ContextKey && value.RecipeKey == input.RecipeKey);
+                        if (input.PracticeId.HasValue && current?.Id != input.PracticeId
+                            && !(input.Action == LearningPracticeAction.Clear && state.LastIntentId == input.IntentId))
+                            throw new NotFoundException("Learning practice", input.PracticeId);
+                        bool duplicate = state.LastIntentId == input.IntentId || current?.LastIntentId == input.IntentId;
+                        Wire.LearningSimulationStateDto? restored = null;
+                        if (!duplicate && current is not null && !LearningLessonCatalog.TryRestore(current.RecipeKey,
+                                current.RecipeVersion, (Wire.LearningPracticeChoiceSlot)current.Choice,
+                                current.Step, current.Value, current.IsConfirmed, out restored))
+                            throw Conflict("The stored practice is not an authored state.");
+                        if (!LearningLessonCatalog.TryGetLesson(input.RecipeKey, input.MaterialVersion, out var lesson))
+                            throw new ArgumentException("The recipe is not part of the shipped pack.");
+                        var choice = input.ChoiceKey is null ? null
+                            : lesson.Choices.SingleOrDefault(value => value.Key == input.ChoiceKey);
+                        if (input.Action == LearningPracticeAction.Choose && choice is null)
+                            throw new ArgumentException("Choose a shipped recipe option.");
+                        if (input.Action != LearningPracticeAction.Choose && input.ChoiceKey is not null)
+                            throw new ArgumentException("Only Choose accepts an authored option.");
+                        if (!duplicate && !LearningLessonCatalog.TryApply(input.RecipeKey, input.MaterialVersion,
+                                (Wire.LearningPracticeAction)input.Action, input.ChoiceKey, restored, out _))
+                            throw Conflict("The practice action is not valid in the current state.");
+                        state.ApplyPractice(input.PracticeId ?? current?.Id ?? mutation.CandidateChildId,
+                            input.ContextKey, input.RecipeKey, input.MaterialVersion, input.Action,
+                            input.Action == LearningPracticeAction.Choose
+                                ? (LearningPracticeChoice)choice!.Slot : LearningPracticeChoice.None,
+                            input.Action == LearningPracticeAction.Choose ? 1 : 0,
+                            input.Action == LearningPracticeAction.Choose ? choice!.Value : 0,
+                            input.IntentId, input.ExpectedRevision, input.ExpectedPracticeRevision, mutation.UpdatedAtUtc);
+                        break;
+                    }
                 default:
                     throw new InvalidOperationException("The learning intent is not registered.");
             }

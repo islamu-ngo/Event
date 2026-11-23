@@ -62,7 +62,10 @@ public sealed class AnnouncementTransportMappingTests
             {
                 "publish" => new()
                 {
-                    Kind = kind, Material = Material(), Enabled = true, Redisplay = false
+                    Kind = kind,
+                    Material = Material(),
+                    Enabled = true,
+                    Redisplay = false
                 },
                 "set-enabled" => new() { Kind = kind, Enabled = false },
                 "set-lock" => new() { Kind = kind, IsLocked = true },
@@ -100,7 +103,11 @@ public sealed class AnnouncementTransportMappingTests
             "missing-redisplay" => new() { Kind = "publish", Material = material, Enabled = true },
             "publish-with-lock" => new()
             {
-                Kind = "publish", Material = material, Enabled = true, Redisplay = false, IsLocked = false
+                Kind = "publish",
+                Material = material,
+                Enabled = true,
+                Redisplay = false,
+                IsLocked = false
             },
             "enable-with-material" => new() { Kind = "set-enabled", Enabled = true, Material = material },
             "lock-with-enabled" => new() { Kind = "set-lock", IsLocked = true, Enabled = false },
@@ -230,7 +237,8 @@ public sealed class AnnouncementTransportMappingTests
         var observed = AnnouncementTransportMapper.ToDto(Observation());
         var foreign = observed with
         {
-            TenantId = OtherTenant, Owner = new() { TenantId = OtherTenant }
+            TenantId = OtherTenant,
+            Owner = new() { TenantId = OtherTenant }
         };
         var input = new AnnouncementDismissRequestDto
         {
@@ -246,7 +254,8 @@ public sealed class AnnouncementTransportMappingTests
     {
         var input = new AnnouncementDismissRequestDto
         {
-            Observed = AnnouncementTransportMapper.ToDto(Observation()), ExpectedMarker = null
+            Observed = AnnouncementTransportMapper.ToDto(Observation()),
+            ExpectedMarker = null
         };
         var node = JsonSerializer.SerializeToNode(input, Json)?.AsObject()
             ?? throw new InvalidOperationException("Dismissal transport must serialize.");
@@ -267,7 +276,8 @@ public sealed class AnnouncementTransportMappingTests
     {
         var input = new AnnouncementDismissRequestDto
         {
-            Observed = AnnouncementTransportMapper.ToDto(Observation()), ExpectedMarker = null
+            Observed = AnnouncementTransportMapper.ToDto(Observation()),
+            ExpectedMarker = null
         };
         var node = JsonSerializer.SerializeToNode(input, Json)?.AsObject()
             ?? throw new InvalidOperationException("Dismissal transport must serialize.");
@@ -342,7 +352,9 @@ public sealed class AnnouncementTransportMappingTests
 
     private static AnnouncementMaterialDto Material() => new()
     {
-        Message = "Message", LinkText = "Details", LinkUrl = "/events"
+        Message = "Message",
+        LinkText = "Details",
+        LinkUrl = "/events"
     };
 
     private static AnnouncementSourceSnapshot Source(AnnouncementOwner owner) =>

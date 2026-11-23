@@ -93,7 +93,8 @@ public sealed class LearningContractTests(LearningHttpFixture fixture)
         using var response = await member.Client.PostAsJsonAsync("/api/learning/space/actions",
             new LearningManageSpaceRequest
             {
-                ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = 0,
+                ExpectedScopeStamp = context.ScopeStamp,
+                ExpectedRevision = 0,
                 Action = LearningSpaceAction.Remove
             });
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
@@ -169,17 +170,24 @@ public sealed class LearningContractTests(LearningHttpFixture fixture)
         using HttpResponseMessage response = invalidInput == "foreign-owner"
             ? await member.Client.PatchAsJsonAsync("/api/learning/preferences", new
             {
-                expectedScopeStamp = new string('0', 64), expectedRevision = 0,
-                suppressAutomaticTours = true, hideLearning = false, pinLearning = false,
+                expectedScopeStamp = new string('0', 64),
+                expectedRevision = 0,
+                suppressAutomaticTours = true,
+                hideLearning = false,
+                pinLearning = false,
                 userId = Guid.CreateVersion7()
             })
             : await member.Client.PostAsJsonAsync("/api/learning/tours/claim", new
             {
-                expectedScopeStamp = new string('0', 64), expectedRevision = 0,
+                expectedScopeStamp = new string('0', 64),
+                expectedRevision = 0,
                 intentId = Guid.CreateVersion7(),
-                family = 1, materialVersion = 2, contextKey = "self",
+                family = 1,
+                materialVersion = 2,
+                contextKey = "self",
                 expectedPlanFingerprint = new string('0', 64),
-                expectedPolicySourceStamp = new string('0', 64), replay = false
+                expectedPolicySourceStamp = new string('0', 64),
+                replay = false
             });
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
@@ -253,7 +261,8 @@ public sealed class LearningHttpFixture : IAsyncInitializer, IAsyncDisposable
     {
         HttpClient client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost")
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost")
         });
         client.DefaultRequestHeaders.Add(TenantHeaderNames.TenantSlug, _tenantSlug);
         return client;
@@ -271,17 +280,25 @@ public sealed class LearningHttpFixture : IAsyncInitializer, IAsyncDisposable
             Tenant tenant = await database.Tenants.SingleAsync(row => row.Id == TenantId);
             var membership = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                UserId = user.Id, User = user, StatusId = (int)TenantUserStatusEnum.Active,
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                UserId = user.Id,
+                User = user,
+                StatusId = (int)TenantUserStatusEnum.Active,
                 JoinedAt = _factory.Services.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime
             };
             database.TenantUsers.Add(membership);
             if (administrator)
                 database.TenantUserRoleGrants.Add(new TenantUserRoleGrant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                    TenantUserId = membership.Id, TenantUser = membership,
-                    RoleId = (int)RoleEnum.TenantAdmin, Role = null!,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant.Id,
+                    Tenant = tenant,
+                    TenantUserId = membership.Id,
+                    TenantUser = membership,
+                    RoleId = (int)RoleEnum.TenantAdmin,
+                    Role = null!,
                     RoleScopeId = (int)RoleScopeEnum.Tenant,
                     GrantedAt = _factory.Services.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime
                 });

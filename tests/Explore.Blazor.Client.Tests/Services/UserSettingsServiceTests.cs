@@ -319,7 +319,7 @@ public sealed class UserSettingsServiceTests
             {
                 Category = PreferenceCategory,
                 Settings = accountValues.Select(pair => new EffectiveSettingDto
-                    { Key = pair.Key, Value = pair.Value }).ToList()
+                { Key = pair.Key, Value = pair.Value }).ToList()
             });
         browser.Api.UpdateUserSettingsBatchAsync(PreferenceCategory, Arg.Any<UpdateSettingBatchDto>(),
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
@@ -332,7 +332,7 @@ public sealed class UserSettingsServiceTests
                 {
                     Success = true,
                     Results = values.Select(pair => new SettingUpdateResultDto
-                        { Key = pair.Key, Applied = true }).ToList()
+                    { Key = pair.Key, Applied = true }).ToList()
                 };
             });
         browser.Api.UpdateUserSettingAsync(Arg.Any<string>(), Arg.Any<UpdateSettingValueDto>(),
@@ -395,7 +395,8 @@ public sealed class UserSettingsServiceTests
         browser.Authentication.SetUser(Guid.CreateVersion7());
         response.SetResult(new BatchUpdateResponseDto
         {
-            Success = true, Results = [new SettingUpdateResultDto { Key = DismissalKey, Applied = true }]
+            Success = true,
+            Results = [new SettingUpdateResultDto { Key = DismissalKey, Applied = true }]
         });
 
         await Assert.That(await pending.WaitAsync(TimeSpan.FromSeconds(10))).IsNull();
@@ -514,7 +515,8 @@ public sealed class UserSettingsServiceTests
                 await MutateSingle();
                 return new BatchUpdateResponseDto
                 {
-                    Success = true, Results = [new SettingUpdateResultDto { Key = DismissalKey, Applied = true }]
+                    Success = true,
+                    Results = [new SettingUpdateResultDto { Key = DismissalKey, Applied = true }]
                 };
             });
         async Task<bool> StartMutation() => operation switch
@@ -593,7 +595,7 @@ public sealed class UserSettingsServiceTests
         {
             TenantId = Guid.CreateVersion7(),
             DirectoryOperator = new TenantDirectoryOperatorPublicDto
-                { PublicName = "Directory", LegalName = "Directory legal name" }
+            { PublicName = "Directory", LegalName = "Directory legal name" }
         };
         Guid? originalTenant = current.TenantId;
         publicApi.GetPublicExperienceSettingsAsync(Arg.Any<string?>(), Arg.Any<string?>(),
@@ -650,7 +652,7 @@ public sealed class UserSettingsServiceTests
             {
                 storageUsed = true;
                 return new ValueTask<Dictionary<string, string>?>(new Dictionary<string, string>
-                    { [DismissalKey] = "4" });
+                { [DismissalKey] = "4" });
             });
         var read = browser.Service.GetSettingsAsync(PreferenceCategory);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(10));

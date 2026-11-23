@@ -81,13 +81,13 @@ public static class LearningGuidancePolicyCodec
 
     public static Wire.LearningGuidancePolicyDto ToDto(ResolvedLearningGuidancePolicy resolved,
         bool isCurrentTenantAdministrator) => new()
-    {
-        SchemaVersion = resolved.SchemaVersion,
-        DefaultsVersion = resolved.DefaultsVersion,
-        ConcurrencyStamp = resolved.ConcurrencyStamp,
-        Policy = ToPayload(resolved.Policy),
-        CanEdit = isCurrentTenantAdministrator && resolved.AllowTenantEdits
-    };
+        {
+            SchemaVersion = resolved.SchemaVersion,
+            DefaultsVersion = resolved.DefaultsVersion,
+            ConcurrencyStamp = resolved.ConcurrencyStamp,
+            Policy = ToPayload(resolved.Policy),
+            CanEdit = isCurrentTenantAdministrator && resolved.AllowTenantEdits
+        };
 
     private static void RequireClosedObject(JsonElement value, string[] required, string[]? optional = null)
     {

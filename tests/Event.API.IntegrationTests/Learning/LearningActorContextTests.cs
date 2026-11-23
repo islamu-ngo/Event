@@ -27,9 +27,14 @@ public sealed class LearningActorContextTests(LearningHttpFixture fixture)
         using var startResponse = await member.Client.PostAsJsonAsync("/api/learning/practice/actions",
             new LearningApplyPracticeActionRequest
             {
-                ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = 0, ExpectedPracticeRevision = 0,
-                IntentId = Guid.CreateVersion7(), ContextKey = key, RecipeKey = "event-details",
-                MaterialVersion = 1, Action = LearningPracticeAction.Start
+                ExpectedScopeStamp = context.ScopeStamp,
+                ExpectedRevision = 0,
+                ExpectedPracticeRevision = 0,
+                IntentId = Guid.CreateVersion7(),
+                ContextKey = key,
+                RecipeKey = "event-details",
+                MaterialVersion = 1,
+                Action = LearningPracticeAction.Start
             });
         await Assert.That(startResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var start = (await startResponse.Content.ReadFromJsonAsync<LearningMutationReceiptDto>())!;
@@ -59,10 +64,15 @@ public sealed class LearningActorContextTests(LearningHttpFixture fixture)
         using var clearResponse = await member.Client.PostAsJsonAsync("/api/learning/practice/actions",
             new LearningApplyPracticeActionRequest
             {
-                ExpectedScopeStamp = owner.ScopeStamp, ExpectedRevision = owner.LearnerRevision,
-                ExpectedPracticeRevision = start.Practice!.Revision, PracticeId = start.Practice.Id,
-                IntentId = Guid.CreateVersion7(), ContextKey = key, RecipeKey = "event-details",
-                MaterialVersion = 1, Action = LearningPracticeAction.Clear
+                ExpectedScopeStamp = owner.ScopeStamp,
+                ExpectedRevision = owner.LearnerRevision,
+                ExpectedPracticeRevision = start.Practice!.Revision,
+                PracticeId = start.Practice.Id,
+                IntentId = Guid.CreateVersion7(),
+                ContextKey = key,
+                RecipeKey = "event-details",
+                MaterialVersion = 1,
+                Action = LearningPracticeAction.Clear
             });
         await Assert.That(clearResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var cleared = (await clearResponse.Content.ReadFromJsonAsync<LearningMutationReceiptDto>())!;
@@ -78,7 +88,8 @@ public sealed class LearningActorContextTests(LearningHttpFixture fixture)
         {
             Id = Guid.CreateVersion7(),
             ActorTypeId = (int)(group ? ActorTypeEnum.Group : ActorTypeEnum.Organization),
-            ActorType = null!, Pii = new ActorPii { DisplayName = "Learning member context" }
+            ActorType = null!,
+            Pii = new ActorPii { DisplayName = "Learning member context" }
         };
         Guid placementId = Guid.CreateVersion7();
         if (group)
@@ -88,34 +99,58 @@ public sealed class LearningActorContextTests(LearningHttpFixture fixture)
             actor.GroupId = owner.Id;
             var placement = new GroupTenant
             {
-                Id = placementId, TenantId = fixture.TenantId, Tenant = null!, GroupId = owner.Id,
-                Group = owner, ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!
+                Id = placementId,
+                TenantId = fixture.TenantId,
+                Tenant = null!,
+                GroupId = owner.Id,
+                Group = owner,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!
             };
             database.AddRange(actor, owner, placement, new GroupMember
             {
-                Id = Guid.CreateVersion7(), GroupTenantId = placementId, GroupTenant = placement,
-                TenantId = fixture.TenantId, Tenant = null!, UserId = userId, User = null!,
-                RoleId = (int)RoleEnum.GroupMember, Role = null!
+                Id = Guid.CreateVersion7(),
+                GroupTenantId = placementId,
+                GroupTenant = placement,
+                TenantId = fixture.TenantId,
+                Tenant = null!,
+                UserId = userId,
+                User = null!,
+                RoleId = (int)RoleEnum.GroupMember,
+                Role = null!
             });
         }
         else
         {
             var owner = new Organization
             {
-                Id = Guid.CreateVersion7(), Pii = new OrganizationPii { FullName = "Learning organization" }, Actor = actor
+                Id = Guid.CreateVersion7(),
+                Pii = new OrganizationPii { FullName = "Learning organization" },
+                Actor = actor
             };
             actor.Organization = owner;
             actor.OrganizationId = owner.Id;
             var placement = new OrganizationTenant
             {
-                Id = placementId, TenantId = fixture.TenantId, Tenant = null!, OrganizationId = owner.Id,
-                Organization = owner, ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!
+                Id = placementId,
+                TenantId = fixture.TenantId,
+                Tenant = null!,
+                OrganizationId = owner.Id,
+                Organization = owner,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!
             };
             database.AddRange(actor, owner, placement, new OrganizationMember
             {
-                Id = Guid.CreateVersion7(), OrganizationTenantId = placementId, OrganizationTenant = placement,
-                TenantId = fixture.TenantId, Tenant = null!, UserId = userId, User = null!,
-                RoleId = (int)RoleEnum.OrgMember, Role = null!
+                Id = Guid.CreateVersion7(),
+                OrganizationTenantId = placementId,
+                OrganizationTenant = placement,
+                TenantId = fixture.TenantId,
+                Tenant = null!,
+                UserId = userId,
+                User = null!,
+                RoleId = (int)RoleEnum.OrgMember,
+                Role = null!
             });
         }
         await using var human = new HumanSecuritySourceGate(database);

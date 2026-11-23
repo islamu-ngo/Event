@@ -683,18 +683,18 @@ public sealed class LearningClientService : ILearningClientService
         HalResourceOfLearningContextDto source, string recipeKey, int materialVersion,
         LearningPracticeAction action, string contextKey, Guid? practiceId,
         long practiceRevision, string? choiceKey) => new()
-    {
-        ExpectedScopeStamp = source.ScopeStamp,
-        ExpectedRevision = source.LearnerRevision,
-        IntentId = Guid.CreateVersion7(),
-        ExpectedPracticeRevision = practiceRevision,
-        PracticeId = practiceId,
-        ContextKey = contextKey,
-        RecipeKey = recipeKey,
-        MaterialVersion = materialVersion,
-        Action = action,
-        ChoiceKey = choiceKey
-    };
+        {
+            ExpectedScopeStamp = source.ScopeStamp,
+            ExpectedRevision = source.LearnerRevision,
+            IntentId = Guid.CreateVersion7(),
+            ExpectedPracticeRevision = practiceRevision,
+            PracticeId = practiceId,
+            ContextKey = contextKey,
+            RecipeKey = recipeKey,
+            MaterialVersion = materialVersion,
+            Action = action,
+            ChoiceKey = choiceKey
+        };
 
     private static LearningGuidancePolicyPayload CopyPolicy(LearningGuidancePolicyPayload policy) => new()
     {

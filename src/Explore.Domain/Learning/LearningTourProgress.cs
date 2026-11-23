@@ -34,8 +34,12 @@ public sealed class LearningTourProgress : ITenantEntity
         LearningTourFamily family, int materialVersion, DateTime utcNow) =>
         new()
         {
-            Id = id, TenantId = owner.TenantId, UserLearningStateId = owner.Id,
-            Family = family, MaterialVersion = materialVersion, UpdatedAtUtc = utcNow
+            Id = id,
+            TenantId = owner.TenantId,
+            UserLearningStateId = owner.Id,
+            Family = family,
+            MaterialVersion = materialVersion,
+            UpdatedAtUtc = utcNow
         };
 
     internal void CarryCompatibleEvidence(LearningTourDefinition definition,

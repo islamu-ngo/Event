@@ -571,8 +571,11 @@ public sealed class LearningSourceRetentionPostgresTests(PostgreSqlContainerFixt
                     {
                         row = new SystemSetting
                         {
-                            Id = Guid.CreateVersion7(), SettingKey = key, Value = "false",
-                            ValueType = SettingValueType.Boolean, CreatedAt = LearningProviderDatabase.Now
+                            Id = Guid.CreateVersion7(),
+                            SettingKey = key,
+                            Value = "false",
+                            ValueType = SettingValueType.Boolean,
+                            CreatedAt = LearningProviderDatabase.Now
                         };
                         arrangement.SystemSettings.Add(row);
                     }
@@ -585,13 +588,19 @@ public sealed class LearningSourceRetentionPostgresTests(PostgreSqlContainerFixt
                 var rows = new SourceRows(fixture, arrangement, events.Row, ai.Row, events.Original, ai.Original);
                 arrangement.Tenants.Add(new Tenant
                 {
-                    Id = rows.TenantId, FullName = "Learning retained sources", Slug = $"learning-sources-{rows.TenantId:N}",
-                    TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                    Id = rows.TenantId,
+                    FullName = "Learning retained sources",
+                    Slug = $"learning-sources-{rows.TenantId:N}",
+                    TenantStatusId = (int)TenantStatusEnum.Active,
+                    TenantStatus = null!
                 });
                 arrangement.Set<TenantSetting>().Add(new TenantSetting
                 {
-                    Id = Guid.CreateVersion7(), TenantId = rows.TenantId, Tenant = null!,
-                    SettingKey = GovernanceSettingKeys.Events.UserSubmissionEnabled, Value = "true",
+                    Id = Guid.CreateVersion7(),
+                    TenantId = rows.TenantId,
+                    Tenant = null!,
+                    SettingKey = GovernanceSettingKeys.Events.UserSubmissionEnabled,
+                    Value = "true",
                     CreatedAt = LearningProviderDatabase.Now
                 });
                 await using var human = new HumanSecuritySourceGate(arrangement);
@@ -628,8 +637,11 @@ public sealed class LearningSourceRetentionPostgresTests(PostgreSqlContainerFixt
                 case "tenant-insert":
                     writer.Set<TenantSetting>().Add(new TenantSetting
                     {
-                        Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!,
-                        SettingKey = GovernanceSettingKeys.AiAssistant.Enabled, Value = "true",
+                        Id = Guid.CreateVersion7(),
+                        TenantId = TenantId,
+                        Tenant = null!,
+                        SettingKey = GovernanceSettingKeys.AiAssistant.Enabled,
+                        Value = "true",
                         CreatedAt = LearningProviderDatabase.Now
                     });
                     break;
@@ -835,8 +847,11 @@ public sealed class LearningGuidanceStoragePostgresTests
         }
         var tenants = new[] { tenantId, foreignTenantId }.Select(id => new Tenant
         {
-            Id = id, Slug = $"guidance-permissions-{id:N}", FullName = "Guidance storage permission witness",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = id,
+            Slug = $"guidance-permissions-{id:N}",
+            FullName = "Guidance storage permission witness",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         }).ToArray();
         migrator.Tenants.AddRange(tenants);
         var branding = TenantSettingsDocument.Create(
@@ -907,7 +922,7 @@ public sealed class LearningGuidanceStoragePostgresTests
             command.Parameters.Add(new NpgsqlParameter("schema", 1));
             command.Parameters.Add(new NpgsqlParameter("defaults", defaultsVersion));
             command.Parameters.Add(new NpgsqlParameter("payload", NpgsqlTypes.NpgsqlDbType.Jsonb)
-                { Value = initialPayload });
+            { Value = initialPayload });
             command.Parameters.Add(new NpgsqlParameter("stamp", initialStamp));
             command.Parameters.Add(new NpgsqlParameter("created", LearningProviderDatabase.Now));
             return await command.ExecuteNonQueryAsync(token);
@@ -922,7 +937,7 @@ public sealed class LearningGuidanceStoragePostgresTests
                 """;
             command.Parameters.Add(new NpgsqlParameter("id", documentId));
             command.Parameters.Add(new NpgsqlParameter("payload", NpgsqlTypes.NpgsqlDbType.Jsonb)
-                { Value = updatedPayload });
+            { Value = updatedPayload });
             command.Parameters.Add(new NpgsqlParameter("stamp", updatedStamp));
             return await command.ExecuteNonQueryAsync(token);
         }
@@ -1406,7 +1421,10 @@ internal sealed class LearningProviderDatabase : IAsyncDisposable
         if (!await context.Set<TenantStatus>().AnyAsync(row => row.Id == (int)TenantStatusEnum.Active))
             context.Add(new TenantStatus
             {
-                Id = (int)TenantStatusEnum.Active, MasterCode = "Active", FullName = "Active", IsActiveState = true
+                Id = (int)TenantStatusEnum.Active,
+                MasterCode = "Active",
+                FullName = "Active",
+                IsActiveState = true
             });
     }
 
@@ -1415,8 +1433,11 @@ internal sealed class LearningProviderDatabase : IAsyncDisposable
         foreach (Guid tenant in new[] { TenantId, OtherTenantId })
             context.Add(new Tenant
             {
-                Id = tenant, FullName = "Learning provider assurance", Slug = $"learning-{tenant:N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                Id = tenant,
+                FullName = "Learning provider assurance",
+                Slug = $"learning-{tenant:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
             });
         context.AddRange(new User { Id = UserId, Pii = null! }, new User { Id = OtherUserId, Pii = null! });
         await using var humanOwner = new HumanSecuritySourceGate(context);

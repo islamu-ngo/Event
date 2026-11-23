@@ -421,15 +421,15 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
 
     private Task<HalResourceOfAnnouncementSourceResource> ReadSourceAsync(
         AnnouncementEditScope scope, Guid? managedTenant, CancellationToken token) => scope switch
-    {
-        AnnouncementEditScope.Instance when managedTenant is null =>
-            _client.GetInstanceAnnouncementSourceAsync(cancellationToken: token),
-        AnnouncementEditScope.Tenant when managedTenant is null =>
-            _client.GetTenantAnnouncementSourceAsync(cancellationToken: token),
-        AnnouncementEditScope.ManagedTenant when managedTenant is { } tenant && tenant != Guid.Empty =>
-            _client.GetManagedTenantAnnouncementSourceAsync(tenant, cancellationToken: token),
-        _ => throw new ArgumentException("An exact announcement editing context is required.", nameof(scope))
-    };
+        {
+            AnnouncementEditScope.Instance when managedTenant is null =>
+                _client.GetInstanceAnnouncementSourceAsync(cancellationToken: token),
+            AnnouncementEditScope.Tenant when managedTenant is null =>
+                _client.GetTenantAnnouncementSourceAsync(cancellationToken: token),
+            AnnouncementEditScope.ManagedTenant when managedTenant is { } tenant && tenant != Guid.Empty =>
+                _client.GetManagedTenantAnnouncementSourceAsync(tenant, cancellationToken: token),
+            _ => throw new ArgumentException("An exact announcement editing context is required.", nameof(scope))
+        };
 
     private static bool MatchesTarget(HalResourceOfAnnouncementSourceResource source,
         Wire.AnnouncementSourceDto snapshot, AnnouncementEditScope scope, Guid? managed) =>
@@ -470,8 +470,13 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
         return input switch
         {
             { Kind: "publish", Material: not null, Enabled: not null, Redisplay: not null, IsLocked: null } =>
-                new() { Kind = input.Kind, Material = Transport(Snapshot(input.Material)),
-                    Enabled = input.Enabled, Redisplay = input.Redisplay },
+                new()
+                {
+                    Kind = input.Kind,
+                    Material = Transport(Snapshot(input.Material)),
+                    Enabled = input.Enabled,
+                    Redisplay = input.Redisplay
+                },
             { Kind: "set-enabled", Material: null, Enabled: not null, Redisplay: null, IsLocked: null } =>
                 new() { Kind = input.Kind, Enabled = input.Enabled },
             { Kind: "set-lock", Material: null, Enabled: null, Redisplay: null, IsLocked: not null } =>
@@ -522,11 +527,15 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
             throw new ArgumentException("The announcement observation is invalid.", nameof(value));
         return new()
         {
-            TenantId = value.TenantId, Owner = new() { TenantId = value.Owner.TenantId }, Edition = value.Edition,
+            TenantId = value.TenantId,
+            Owner = new() { TenantId = value.Owner.TenantId },
+            Edition = value.Edition,
             SourceWitness = new()
             {
-                InstanceSelectionEpoch = witness.InstanceSelectionEpoch, InstanceIsLocked = witness.InstanceIsLocked,
-                TenantSelectionEpoch = witness.TenantSelectionEpoch, TenantIsLocked = witness.TenantIsLocked
+                InstanceSelectionEpoch = witness.InstanceSelectionEpoch,
+                InstanceIsLocked = witness.InstanceIsLocked,
+                TenantSelectionEpoch = witness.TenantSelectionEpoch,
+                TenantIsLocked = witness.TenantIsLocked
             }
         };
     }
@@ -548,10 +557,12 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
                 throw new ArgumentException("The announcement source group is invalid.", nameof(value));
             group = new()
             {
-                SelectionEpoch = original.SelectionEpoch, Enabled = original.Enabled,
+                SelectionEpoch = original.SelectionEpoch,
+                Enabled = original.Enabled,
                 Publication = original.Publication is null ? null : new()
                 {
-                    Edition = original.Publication.Edition, Material = Snapshot(original.Publication.Material)
+                    Edition = original.Publication.Edition,
+                    Material = Snapshot(original.Publication.Material)
                 }
             };
         }
@@ -563,7 +574,9 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
 
     private static AnnouncementObservationDto Transport(Wire.AnnouncementObservationDto value) => new()
     {
-        TenantId = value.TenantId, Owner = new() { TenantId = value.Owner.TenantId }, Edition = value.Edition,
+        TenantId = value.TenantId,
+        Owner = new() { TenantId = value.Owner.TenantId },
+        Edition = value.Edition,
         SourceWitness = new()
         {
             InstanceSelectionEpoch = value.SourceWitness.InstanceSelectionEpoch,
@@ -578,13 +591,16 @@ public sealed class AnnouncementClientService : IAnnouncementClientService
 
     private static AnnouncementSourceDto Transport(Wire.AnnouncementSourceDto value) => new()
     {
-        Owner = new() { TenantId = value.Owner.TenantId }, IsLocked = value.IsLocked,
+        Owner = new() { TenantId = value.Owner.TenantId },
+        IsLocked = value.IsLocked,
         Group = value.Group is null ? null : new()
         {
-            SelectionEpoch = value.Group.SelectionEpoch, Enabled = value.Group.Enabled,
+            SelectionEpoch = value.Group.SelectionEpoch,
+            Enabled = value.Group.Enabled,
             Publication = value.Group.Publication is null ? null : new()
             {
-                Edition = value.Group.Publication.Edition, Material = Transport(value.Group.Publication.Material)
+                Edition = value.Group.Publication.Edition,
+                Material = Transport(value.Group.Publication.Material)
             }
         }
     };

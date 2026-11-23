@@ -69,7 +69,8 @@ public sealed class LearningRaceTests
         var pending = member.Client.PostAsJsonAsync("/api/learning/tours/outcome",
             LearningOperationTests.TourAction(plan, claimed, LearningTourAction.Progress) with
             {
-                StepKey = plan.Steps[0].StepKey, StepVersion = plan.Steps[0].StepVersion
+                StepKey = plan.Steps[0].StepKey,
+                StepVersion = plan.Steps[0].StepVersion
             });
         Explore.Domain.PrivacyErasureIntent? fact = null;
         try
@@ -217,8 +218,11 @@ public sealed class LearningRaceTests
 
     private static LearningUpdatePreferencesRequest Preferences(LearningContextDto context) => new()
     {
-        ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = context.LearnerRevision,
-        SuppressAutomaticTours = true, HideLearning = false, PinLearning = false
+        ExpectedScopeStamp = context.ScopeStamp,
+        ExpectedRevision = context.LearnerRevision,
+        SuppressAutomaticTours = true,
+        HideLearning = false,
+        PinLearning = false
     };
 
     private sealed class LearningWriteBarrier : SaveChangesInterceptor

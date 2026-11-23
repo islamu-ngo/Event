@@ -15,6 +15,6 @@ public sealed class LearningRequirementAcknowledgementConfiguration
         builder.Property(value => value.PolicySourceStamp).HasMaxLength(64).IsUnicode(false).IsRequired();
         builder.Property(value => value.LastIntentFingerprint).HasMaxLength(64).IsUnicode(false).IsRequired();
         builder.HasIndex(value => new
-            { value.TenantId, value.UserLearningStateId, value.RequirementKey, value.MaterialVersion }).IsUnique();
+        { value.TenantId, value.UserLearningStateId, value.RequirementKey, value.MaterialVersion }).IsUnique();
     }
 }

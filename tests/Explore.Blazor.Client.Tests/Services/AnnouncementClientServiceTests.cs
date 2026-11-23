@@ -83,7 +83,8 @@ public sealed class AnnouncementClientServiceTests
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new HalResourceOfAnnouncementDismissalReceiptDto
             {
-                Decision = 0, Marker = new() { Observation = AnnouncementTestData.Observation(epoch: AnnouncementTestData.OtherEpoch) }
+                Decision = 0,
+                Marker = new() { Observation = AnnouncementTestData.Observation(epoch: AnnouncementTestData.OtherEpoch) }
             });
         await harness.Service.LoadAsync();
 
@@ -530,7 +531,9 @@ public sealed class AnnouncementClientServiceTests
                 harness.Source = fresh;
                 return new HalResourceOfAnnouncementPublicationReceiptDto
                 {
-                    Outcome = 0, Source = fresh.Source, _links = new Dictionary<string, HalLink>()
+                    Outcome = 0,
+                    Source = fresh.Source,
+                    _links = new Dictionary<string, HalLink>()
                 };
             });
 
@@ -843,7 +846,9 @@ public sealed class AnnouncementClientServiceTests
 
     private static AnnouncementChangeDto PublishChange() => new()
     {
-        Kind = "publish", Enabled = true, Redisplay = false,
+        Kind = "publish",
+        Enabled = true,
+        Redisplay = false,
         Material = new() { Message = "Replacement", LinkText = string.Empty, LinkUrl = string.Empty }
     };
 
@@ -993,84 +998,99 @@ internal static class AnnouncementTestData
 
     internal static AnnouncementObservationDto Observation(Guid? tenant = null, Guid? edition = null,
         Guid? epoch = null, bool tenantOwner = false) => new()
-    {
-        TenantId = tenant ?? Tenant, Owner = new() { TenantId = tenantOwner ? tenant ?? Tenant : null },
-        Edition = edition ?? Edition,
-        SourceWitness = new()
         {
-            InstanceSelectionEpoch = epoch ?? Epoch, InstanceIsLocked = false,
-            TenantSelectionEpoch = tenantOwner ? epoch ?? Epoch : null, TenantIsLocked = false
-        }
-    };
+            TenantId = tenant ?? Tenant,
+            Owner = new() { TenantId = tenantOwner ? tenant ?? Tenant : null },
+            Edition = edition ?? Edition,
+            SourceWitness = new()
+            {
+                InstanceSelectionEpoch = epoch ?? Epoch,
+                InstanceIsLocked = false,
+                TenantSelectionEpoch = tenantOwner ? epoch ?? Epoch : null,
+                TenantIsLocked = false
+            }
+        };
 
     internal static PublicExperienceSettingsDto Settings(Guid? tenant = null, Guid? edition = null,
         string message = "Announcement", Guid? epoch = null, bool tenantOwner = false) => new()
-    {
-        TenantId = tenant ?? Tenant,
-        Announcement = new()
         {
-            TenantId = tenant ?? Tenant, Observation = Observation(tenant, edition, epoch, tenantOwner), IsVisible = true,
-            Material = new() { Message = message, LinkText = string.Empty, LinkUrl = string.Empty }
-        },
-        DirectoryOperator = new() { PublicName = "Directory", LegalName = "Directory legal name" }
-    };
+            TenantId = tenant ?? Tenant,
+            Announcement = new()
+            {
+                TenantId = tenant ?? Tenant,
+                Observation = Observation(tenant, edition, epoch, tenantOwner),
+                IsVisible = true,
+                Material = new() { Message = message, LinkText = string.Empty, LinkUrl = string.Empty }
+            },
+            DirectoryOperator = new() { PublicName = "Directory", LegalName = "Directory legal name" }
+        };
 
     internal static HalResourceOfAnnouncementSelfStateDto Self(PublicExperienceSettingsDto settings,
         AnnouncementDismissalMarkerDto? marker = null) => new()
-    {
-        TenantId = settings.Announcement!.TenantId, CurrentObservation = settings.Announcement.Observation,
-        Marker = marker, _links = new Dictionary<string, HalLink>
         {
-            ["self"] = new() { Href = "/api/announcements/self", Method = "GET" },
-            ["dismiss"] = new() { Href = "/api/announcements/self/dismiss", Method = "POST" }
-        }
-    };
+            TenantId = settings.Announcement!.TenantId,
+            CurrentObservation = settings.Announcement.Observation,
+            Marker = marker,
+            _links = new Dictionary<string, HalLink>
+            {
+                ["self"] = new() { Href = "/api/announcements/self", Method = "GET" },
+                ["dismiss"] = new() { Href = "/api/announcements/self/dismiss", Method = "POST" }
+            }
+        };
 
     internal static HalResourceOfAnnouncementSourceResource Source(
         Guid? edition = null, Guid? epoch = null, string message = "Announcement", bool canPublish = true,
         AnnouncementEditScope scope = AnnouncementEditScope.Tenant, Guid? tenant = null) => new()
-    {
-        Target = (int)scope,
-        Source = new()
         {
-            Owner = new() { TenantId = scope == AnnouncementEditScope.Instance ? null : tenant ?? Tenant },
-            IsLocked = false,
-            Group = new()
+            Target = (int)scope,
+            Source = new()
             {
-                SelectionEpoch = epoch ?? Epoch, Enabled = true,
-                Publication = new()
+                Owner = new() { TenantId = scope == AnnouncementEditScope.Instance ? null : tenant ?? Tenant },
+                IsLocked = false,
+                Group = new()
                 {
-                    Edition = edition ?? Edition,
-                    Material = new() { Message = message, LinkText = string.Empty, LinkUrl = string.Empty }
+                    SelectionEpoch = epoch ?? Epoch,
+                    Enabled = true,
+                    Publication = new()
+                    {
+                        Edition = edition ?? Edition,
+                        Material = new() { Message = message, LinkText = string.Empty, LinkUrl = string.Empty }
+                    }
+                }
+            },
+            _links = canPublish
+            ? new Dictionary<string, HalLink>
+            {
+                ["publish"] = new()
+                {
+                    Href = scope switch
+                    {
+                        AnnouncementEditScope.Instance => "/api/announcements/instance",
+                        AnnouncementEditScope.Tenant => "/api/announcements/tenant",
+                        AnnouncementEditScope.ManagedTenant => "/api/announcements/tenants/" + (tenant ?? Tenant).ToString("D"),
+                        _ => throw new ArgumentOutOfRangeException(nameof(scope))
+                    },
+                    Method = "PUT"
                 }
             }
-        },
-        _links = canPublish
-            ? new Dictionary<string, HalLink> { ["publish"] = new()
-            {
-                Href = scope switch
-                {
-                    AnnouncementEditScope.Instance => "/api/announcements/instance",
-                    AnnouncementEditScope.Tenant => "/api/announcements/tenant",
-                    AnnouncementEditScope.ManagedTenant => "/api/announcements/tenants/" + (tenant ?? Tenant).ToString("D"),
-                    _ => throw new ArgumentOutOfRangeException(nameof(scope))
-                },
-                Method = "PUT"
-            } }
             : new Dictionary<string, HalLink>()
-    };
+        };
 
     internal static Wire.AnnouncementDismissalMarkerDto AnonymousMarker(Guid? tenant = null, Guid? edition = null,
         Guid? epoch = null) => new()
-    {
-        Observation = new()
         {
-            TenantId = tenant ?? Tenant, Owner = new() { TenantId = null }, Edition = edition ?? Edition,
-            SourceWitness = new()
+            Observation = new()
             {
-                InstanceSelectionEpoch = epoch ?? Epoch, InstanceIsLocked = false,
-                TenantSelectionEpoch = null, TenantIsLocked = false
+                TenantId = tenant ?? Tenant,
+                Owner = new() { TenantId = null },
+                Edition = edition ?? Edition,
+                SourceWitness = new()
+                {
+                    InstanceSelectionEpoch = epoch ?? Epoch,
+                    InstanceIsLocked = false,
+                    TenantSelectionEpoch = null,
+                    TenantIsLocked = false
+                }
             }
-        }
-    };
+        };
 }

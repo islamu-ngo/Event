@@ -188,12 +188,15 @@ public sealed class AnnouncementsController(
             or AnnouncementDismissalDecision.NotVisible)
             return Problem(statusCode: StatusCodes.Status409Conflict, title: "Announcement dismissal changed",
                 detail: "Refresh private announcement state before submitting another dismissal.",
-                extensions: new Dictionary<string, object?> { ["code"] = result.Decision switch
+                extensions: new Dictionary<string, object?>
                 {
-                    AnnouncementDismissalDecision.SourceChanged => "announcement_source_changed",
-                    AnnouncementDismissalDecision.MarkerChanged => "announcement_marker_changed",
-                    _ => "announcement_not_visible"
-                } });
+                    ["code"] = result.Decision switch
+                    {
+                        AnnouncementDismissalDecision.SourceChanged => "announcement_source_changed",
+                        AnnouncementDismissalDecision.MarkerChanged => "announcement_marker_changed",
+                        _ => "announcement_not_visible"
+                    }
+                });
         if (result.Decision is not (AnnouncementDismissalDecision.Apply or AnnouncementDismissalDecision.AlreadyDismissed)
             || result.Marker is null)
             throw new InvalidOperationException("A settled announcement dismissal requires its marker.");
@@ -229,7 +232,8 @@ public sealed class AnnouncementsController(
             await cacheStore.EvictByTagAsync("public-experience-shell", cancellationToken);
         return Ok(await publicationAssembler.ToResource(new()
         {
-            Outcome = outcome, Source = AnnouncementTransportMapper.ToDto(result.Source)
+            Outcome = outcome,
+            Source = AnnouncementTransportMapper.ToDto(result.Source)
         }, HttpContext));
     }
 }

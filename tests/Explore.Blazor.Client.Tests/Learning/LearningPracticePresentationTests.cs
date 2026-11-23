@@ -688,7 +688,8 @@ public sealed class LearningPracticePresentationTests : IDisposable
             .Add(component => component.Name, "TenantContext")
             .Add(component => component.Value, new TenantContext
             {
-                TenantId = _tenantId, IsAuthenticated = true
+                TenantId = _tenantId,
+                IsAuthenticated = true
             })
             .AddChildContent<LearningPractice>(child =>
                 child.Add(component => component.PracticeId, _practiceId)));
@@ -768,7 +769,9 @@ public sealed class LearningPracticePresentationTests : IDisposable
         practice.LearnerRevision = learnerRevision;
         practice.Simulation = new()
         {
-            RecipeKey = recipe, MaterialVersion = 1, StepKey = step,
+            RecipeKey = recipe,
+            MaterialVersion = 1,
+            StepKey = step,
             Step = step == "result" ? 2 : step == "confirm" ? 1 : 0,
             ChoiceSlot = step is "confirm" or "result"
                 ? LearningPracticeChoiceSlot.Primary : LearningPracticeChoiceSlot.None,
@@ -781,8 +784,12 @@ public sealed class LearningPracticePresentationTests : IDisposable
             IsConfirmed = step == "result",
             Receipt = step == "result" ? new()
             {
-                RecipeKey = recipe, MaterialVersion = 1, ChoiceKey = choice!,
-                ResultKey = resultKey!, IsSimulation = true, ProductionEffects = false
+                RecipeKey = recipe,
+                MaterialVersion = 1,
+                ChoiceKey = choice!,
+                ResultKey = resultKey!,
+                IsSimulation = true,
+                ProductionEffects = false
             } : null
         };
         practice._links = new Dictionary<string, HalLink>
@@ -796,18 +803,25 @@ public sealed class LearningPracticePresentationTests : IDisposable
 
     private HalResourceOfLearningMutationReceiptDto Receipt(
         HalResourceOfLearningContextDto context, HalResourceOfLearningPracticeDto? practice) => new()
-    {
-        Id = _practiceId, ScopeStamp = context.ScopeStamp,
-        ResourceRevision = context.ResourceRevision, LearnerRevision = context.LearnerRevision,
-        State = new() { TenantId = context.TenantId, UserId = context.UserId },
-        Practice = practice is null ? null : new()
         {
-            Id = practice.Id, ScopeStamp = practice.ScopeStamp, ContextKey = practice.ContextKey,
-            RecipeKey = practice.RecipeKey, MaterialVersion = practice.MaterialVersion,
-            Revision = practice.Revision, LearnerRevision = practice.LearnerRevision, Simulation = practice.Simulation
-        },
-        SimulationStatus = practice?.Simulation.Status ?? LearningSimulationStatus.Cleared
-    };
+            Id = _practiceId,
+            ScopeStamp = context.ScopeStamp,
+            ResourceRevision = context.ResourceRevision,
+            LearnerRevision = context.LearnerRevision,
+            State = new() { TenantId = context.TenantId, UserId = context.UserId },
+            Practice = practice is null ? null : new()
+            {
+                Id = practice.Id,
+                ScopeStamp = practice.ScopeStamp,
+                ContextKey = practice.ContextKey,
+                RecipeKey = practice.RecipeKey,
+                MaterialVersion = practice.MaterialVersion,
+                Revision = practice.Revision,
+                LearnerRevision = practice.LearnerRevision,
+                Simulation = practice.Simulation
+            },
+            SimulationStatus = practice?.Simulation.Status ?? LearningSimulationStatus.Cleared
+        };
 
     private RoutedNavigation ConfigureNavigation(string pathBase)
     {
@@ -876,8 +890,12 @@ public sealed class LearningPracticePresentationTests : IDisposable
         CanClearPractice = true,
         Simulation = new()
         {
-            RecipeKey = "event-details", MaterialVersion = 1, StepKey = "initial",
-            Step = 0, Value = 0, IsConfirmed = false
+            RecipeKey = "event-details",
+            MaterialVersion = 1,
+            StepKey = "initial",
+            Step = 0,
+            Value = 0,
+            IsConfirmed = false
         },
         _links = new Dictionary<string, HalLink>
         {

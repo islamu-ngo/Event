@@ -179,9 +179,13 @@ public sealed class LearningRequirementAdmissionTests
 
         using var response = await administrator.Client.PostAsJsonAsync(Route, new
         {
-            input.IntentId, input.ExpectedScopeStamp, input.ExpectedRevision,
-            input.ExpectedPolicySourceStamp, input.MaterialVersion,
-            userId = Guid.CreateVersion7(), contextKey = $"actor:{Guid.CreateVersion7():D}"
+            input.IntentId,
+            input.ExpectedScopeStamp,
+            input.ExpectedRevision,
+            input.ExpectedPolicySourceStamp,
+            input.MaterialVersion,
+            userId = Guid.CreateVersion7(),
+            contextKey = $"actor:{Guid.CreateVersion7():D}"
         });
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
@@ -397,8 +401,11 @@ public sealed class LearningRequirementAdmissionTests
 
     private static LearningUpdatePreferencesRequest Preferences(LearningContextDto context) => new()
     {
-        ExpectedScopeStamp = context.ScopeStamp, ExpectedRevision = context.LearnerRevision,
-        SuppressAutomaticTours = true, HideLearning = true, PinLearning = false
+        ExpectedScopeStamp = context.ScopeStamp,
+        ExpectedRevision = context.LearnerRevision,
+        SuppressAutomaticTours = true,
+        HideLearning = true,
+        PinLearning = false
     };
 
     private static async Task SetRequiredPolicyAsync(HttpClient client, bool automaticInvitations = true)
@@ -412,9 +419,12 @@ public sealed class LearningRequirementAdmissionTests
             expectedConcurrencyStamp = stamp.ValueKind == JsonValueKind.Null ? (Guid?)null : stamp.GetGuid(),
             policy = new
             {
-                enabled = true, automaticInvitations,
-                invitationAudience = "ActiveMembers", manualAccessAudience = "ActiveMembers",
-                requirementPolicy = "TenantAdminOrientationAcknowledgement", familyOverrides = Array.Empty<object>()
+                enabled = true,
+                automaticInvitations,
+                invitationAudience = "ActiveMembers",
+                manualAccessAudience = "ActiveMembers",
+                requirementPolicy = "TenantAdminOrientationAcknowledgement",
+                familyOverrides = Array.Empty<object>()
             }
         });
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);

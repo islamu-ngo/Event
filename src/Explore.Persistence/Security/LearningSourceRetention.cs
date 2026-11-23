@@ -110,8 +110,18 @@ internal sealed class LearningSourceRetention(
                 document.PayloadJson, document.ConcurrencyStamp);
         }
         object? SystemImage(string key) => system.TryGetValue(key, out var row)
-            ? new { row.Id, row.SettingKey, row.Value, row.IsLocked, row.SettingValueTypeId,
-                row.AllowedValues, row.Description, row.Category, row.DisplayOrder } : null;
+            ? new
+            {
+                row.Id,
+                row.SettingKey,
+                row.Value,
+                row.IsLocked,
+                row.SettingValueTypeId,
+                row.AllowedValues,
+                row.Description,
+                row.Category,
+                row.DisplayOrder
+            } : null;
         object? TenantImage(string key) => tenant.TryGetValue(key, out var row)
             ? new { row.Id, row.TenantId, row.SettingKey, row.Value, row.IsLocked } : null;
         var workspace = Keys.Where(key => key != AllowTenantEditsKey)

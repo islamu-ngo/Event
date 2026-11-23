@@ -85,12 +85,16 @@ public sealed class AiAssistantRailTests : IDisposable
         var resultId = Guid.CreateVersion7();
         var action = new ProposedActions2
         {
-            Id = Guid.CreateVersion7(), Kind = "CreateEventDraft", Status = "Executed",
-            ResultResourceId = resultId, PayloadJson = """{"title":"Community Iftar"}"""
+            Id = Guid.CreateVersion7(),
+            Kind = "CreateEventDraft",
+            Status = "Executed",
+            ResultResourceId = resultId,
+            PayloadJson = """{"title":"Community Iftar"}"""
         };
         var conversation = new HalResourceOfAiConversationDto
         {
-            Id = conversationId, ProposedActions = [action]
+            Id = conversationId,
+            ProposedActions = [action]
         };
         _conversationState.SelectConversation(conversation);
         _clientService.GetConversationCollectionAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())

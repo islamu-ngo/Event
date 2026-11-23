@@ -32,9 +32,12 @@ public static class LearningAccessPolicy
     {
         if (intent is LearningPreferencesIntent or LearningSpaceIntent or LearningRequirementAcknowledgementIntent
             or LearningPracticeIntent { Action: Explore.Domain.Learning.LearningPracticeAction.Clear }
-            or LearningTourOutcomeIntent { ClaimToken: not null, Action:
+            or LearningTourOutcomeIntent
+            {
+                ClaimToken: not null, Action:
                 Explore.Domain.Learning.LearningTourAction.Skip or Explore.Domain.Learning.LearningTourAction.Interrupt
-                or Explore.Domain.Learning.LearningTourAction.Snooze })
+                or Explore.Domain.Learning.LearningTourAction.Snooze
+            })
             return;
 
         LearningGuidancePolicy policy = LearningGuidancePolicyCodec.Decode(sources.GuidanceDocument);

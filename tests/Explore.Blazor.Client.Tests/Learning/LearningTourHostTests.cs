@@ -61,7 +61,9 @@ public sealed class LearningTourHostTests : IDisposable
         var host = _context.Render<LearningTourHost>();
         var step = new LearningTourStepDto
         {
-            StepKey = "shell.navigation", StepVersion = 1, TargetKey = "shell.navigation",
+            StepKey = "shell.navigation",
+            StepVersion = 1,
+            TargetKey = "shell.navigation",
             Instruction = new() { Key = "navigation", Fallback = instruction }
         };
         await host.InvokeAsync(() => _coordinator.OfferAsync());

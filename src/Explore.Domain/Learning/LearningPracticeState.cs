@@ -45,8 +45,12 @@ public sealed class LearningPracticeState : ITenantEntity
         string recipeKey, int recipeVersion) =>
         new()
         {
-            Id = id, TenantId = owner.TenantId, UserLearningStateId = owner.Id,
-            ContextKey = contextKey, RecipeKey = recipeKey, RecipeVersion = recipeVersion
+            Id = id,
+            TenantId = owner.TenantId,
+            UserLearningStateId = owner.Id,
+            ContextKey = contextKey,
+            RecipeKey = recipeKey,
+            RecipeVersion = recipeVersion
         };
 
     internal void Apply(LearningPracticeAction action, LearningPracticeChoice choice, int step, int value,

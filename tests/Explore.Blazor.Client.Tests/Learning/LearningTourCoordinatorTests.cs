@@ -499,28 +499,35 @@ internal sealed class LearningTourFixture : IDisposable
     internal HalResourceOfLearningMutationReceiptDto Receipt(long revision, string? step = null,
         LearningTourOutcome outcome = LearningTourOutcome.InProgress,
         DateTimeOffset? snoozedUntil = null) => new()
-    {
-        ScopeStamp = "scope",
-        LearnerRevision = revision,
-        State = new()
         {
-            TenantId = Scope.TenantId, UserId = Scope.UserId, ContextKey = "self",
-            ScopeStamp = "scope", LearnerRevision = revision,
-            Tours =
+            ScopeStamp = "scope",
+            LearnerRevision = revision,
+            State = new()
+            {
+                TenantId = Scope.TenantId,
+                UserId = Scope.UserId,
+                ContextKey = "self",
+                ScopeStamp = "scope",
+                LearnerRevision = revision,
+                Tours =
             [
                 new() { Family = LearningTourFamily.Shell, MaterialVersion = 2, Outcome = outcome,
                     SnoozedUntilUtc = snoozedUntil,
                     CompletedSteps = step is null ? [] :
                         [new() { StepKey = step, StepVersion = 1, CompletedAtUtc = Clock.Now }] }
             ]
-        },
-        Claim = new()
-        {
-            Token = Guid.CreateVersion7(), Family = LearningTourFamily.Shell, MaterialVersion = 2,
-            PlanFingerprint = "plan", PolicySourceStamp = "policy",
-            ExpiresAtUtc = Clock.Now.AddMinutes(5), Revision = revision
-        }
-    };
+            },
+            Claim = new()
+            {
+                Token = Guid.CreateVersion7(),
+                Family = LearningTourFamily.Shell,
+                MaterialVersion = 2,
+                PlanFingerprint = "plan",
+                PolicySourceStamp = "policy",
+                ExpiresAtUtc = Clock.Now.AddMinutes(5),
+                Revision = revision
+            }
+        };
 
     public void Dispose() => Coordinator.Dispose();
 }

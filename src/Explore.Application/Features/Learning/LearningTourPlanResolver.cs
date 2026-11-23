@@ -25,8 +25,11 @@ public static class LearningTourPlanResolver
         LearningGuidancePolicy policy = LearningGuidancePolicyCodec.Decode(acquired.GuidanceDocument);
         var eligibility = policy.Evaluate((DomainFamily)family, true, operation.CanManageSpace);
         bool sourceAvailable = operation.Space is null
-            || operation.Space is { IsRemoved: false, PackKey: LearningLessonCatalog.PackKey,
-                PackVersion: LearningLessonCatalog.MaterialVersion };
+            || operation.Space is
+            {
+                IsRemoved: false, PackKey: LearningLessonCatalog.PackKey,
+                PackVersion: LearningLessonCatalog.MaterialVersion
+            };
         bool contextAvailable = sourceAvailable && (family switch
         {
             WireFamily.Shell => true,

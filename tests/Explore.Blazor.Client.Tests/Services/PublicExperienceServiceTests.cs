@@ -259,18 +259,27 @@ public class PublicExperienceServiceTests
             {
                 Announcement = AnnouncementTestData.Settings(epoch: AnnouncementTestData.OtherEpoch, message: "Original").Announcement
             },
-            "message" => original with { Announcement = announcement with
+            "message" => original with
             {
-                Material = new() { Message = "Replacement", LinkText = string.Empty, LinkUrl = string.Empty }
-            } },
-            "link-text" => original with { Announcement = announcement with
+                Announcement = announcement with
+                {
+                    Material = new() { Message = "Replacement", LinkText = string.Empty, LinkUrl = string.Empty }
+                }
+            },
+            "link-text" => original with
             {
-                Material = new() { Message = "Original", LinkText = "Details", LinkUrl = string.Empty }
-            } },
-            "link-url" => original with { Announcement = announcement with
+                Announcement = announcement with
+                {
+                    Material = new() { Message = "Original", LinkText = "Details", LinkUrl = string.Empty }
+                }
+            },
+            "link-url" => original with
             {
-                Material = new() { Message = "Original", LinkText = string.Empty, LinkUrl = "/events" }
-            } },
+                Announcement = announcement with
+                {
+                    Material = new() { Message = "Original", LinkText = string.Empty, LinkUrl = "/events" }
+                }
+            },
             "enabled" => original with { Announcement = announcement with { IsVisible = false } },
             _ => throw new ArgumentOutOfRangeException(nameof(field))
         };
@@ -342,7 +351,8 @@ public class PublicExperienceServiceTests
         var response = new TaskCompletionSource<PublicExperienceSettingsDto>(TaskCreationOptions.RunContinuationsAsynchronously);
         var older = SettingsWithIdentity("Earlier directory") with
         {
-            TenantId = AnnouncementTestData.Tenant, Announcement = AnnouncementTestData.Settings().Announcement
+            TenantId = AnnouncementTestData.Tenant,
+            Announcement = AnnouncementTestData.Settings().Announcement
         };
         var newer = SettingsWithIdentity("Current directory") with
         {
@@ -433,7 +443,8 @@ public class PublicExperienceServiceTests
         var response = new TaskCompletionSource<PublicExperienceSettingsDto>(TaskCreationOptions.RunContinuationsAsynchronously);
         var earlier = SettingsWithIdentity("Earlier directory") with
         {
-            TenantId = AnnouncementTestData.Tenant, Announcement = AnnouncementTestData.Settings().Announcement
+            TenantId = AnnouncementTestData.Tenant,
+            Announcement = AnnouncementTestData.Settings().Announcement
         };
         var current = SettingsWithIdentity("Current directory") with
         {
@@ -514,7 +525,8 @@ public class PublicExperienceServiceTests
 
         firstResponse.SetResult(SettingsWithIdentity("Earlier directory") with
         {
-            TenantId = AnnouncementTestData.Tenant, Announcement = AnnouncementTestData.Settings().Announcement
+            TenantId = AnnouncementTestData.Tenant,
+            Announcement = AnnouncementTestData.Settings().Announcement
         });
 
         await Assert.That(await first.WaitAsync(TimeSpan.FromSeconds(10))).IsNull();

@@ -1,10 +1,126 @@
 [changelog]
 body = """
-# Release {{ version }}
-{% for commit in commits %}\
-{{ commit.group }}\
-- {{ commit.scope }}: {{ commit.message }} ({{ commit.id }})
-{% endfor %}\
+# Release {% if extra and extra.version %}{{ extra.version }}{% else %}{{ version | trim_start_matches(pat="v") }}{% endif %}
+
+{% if extra %}
+Release line `{{ extra.line }}` | Date `{{ extra.releaseDate }}` | Channel `{{ extra.channel }}` | Previous `{{ extra.previousPublishedTag }}`
+
+## Maintainer Summary
+
+{{ extra.maintainerSummary }}
+{% endif %}
+
+## Community Admin
+
+{% if commits | length == 0 -%}
+No community-visible product changes in this release.
+{% else -%}
+{% for group, group_commits in commits | group_by(attribute="group") %}
+### {{ group }}
+
+{% for commit in group_commits -%}
+- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}{% if commit.extra and commit.extra.title %}{{ commit.extra.title }}{% else %}{{ commit.message }}{% endif %}{% if commit.extra and commit.extra.backport %} (backport){% endif %} (`{% if commit.extra and commit.extra.displayId %}{{ commit.extra.displayId }}{% else %}{{ commit.id }}{% endif %}`)
+{% if commit.extra and commit.extra.summary %}  {{ commit.extra.summary }}
+{% endif -%}
+{% endfor %}
+{% endfor -%}
+{% endif %}
+
+## Self-Hoster / Operator
+
+{% set breaking_commits = commits | filter(attribute="breaking", value=true) -%}
+{% if breaking_commits | length > 0 -%}
+### Breaking Operational Changes
+
+{% for commit in breaking_commits -%}
+- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}{{ commit.message }} (`{% if commit.extra and commit.extra.displayId %}{{ commit.extra.displayId }}{% else %}{{ commit.id }}{% endif %}`){% if commit.breaking_description %} — {{ commit.breaking_description }}{% endif %}
+{% endfor %}
+{% endif -%}
+
+{% if extra and extra.impactEntries and extra.impactEntries | length > 0 -%}
+### Operator & Impact Guidance
+
+{% for impact in extra.impactEntries -%}
+{% if impact.category != "openapi" -%}
+- **{{ impact.category }}** (`{{ impact.changeId }}`, {{ impact.disposition }}): {{ impact.detail }} (Evidence: `{{ impact.reference }}`)
+{% endif -%}
+{% endfor %}
+{% endif -%}
+
+{% if extra and extra.contractDiff -%}
+{% set config_changes = extra.contractDiff.changes | filter(attribute="family", value="configuration") -%}
+{% set migration_changes = extra.contractDiff.changes | filter(attribute="family", value="migrations") -%}
+{% if config_changes | length > 0 -%}
+### Configuration Contract Changes
+
+{% for change in config_changes -%}
+- [{{ change.severity }}] `{{ change.target }}` ({{ change.kind }}): {{ change.summary }}
+{% endfor %}
+{% endif -%}
+{% if migration_changes | length > 0 -%}
+### Database Migration Ledger
+
+{% for change in migration_changes -%}
+- [{{ change.severity }}] `{{ change.target }}` ({{ change.kind }}): {{ change.summary }}
+{% endfor %}
+{% endif -%}
+{% endif -%}
+
+{% if extra and extra.images and extra.images | length > 0 -%}
+### Verified Container Images
+
+{% for image in extra.images -%}
+- **{{ image.imageName }}** (`{{ image.digest }}`)
+{% for reference in image.canonicalReferences -%}
+  - `{{ reference }}`
+{% endfor -%}
+{% endfor %}
+{% endif -%}
+
+{% if breaking_commits | length == 0 and (not extra or not extra.impactEntries or extra.impactEntries | length == 0) and (not extra or not extra.images or extra.images | length == 0) -%}
+No additional operator action items recorded for this release.
+{% endif %}
+
+## Developer / API Integrator
+
+{% if breaking_commits | length > 0 -%}
+### Breaking API & Contract Changes
+
+{% for commit in breaking_commits -%}
+- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}{{ commit.message }} (`{% if commit.extra and commit.extra.displayId %}{{ commit.extra.displayId }}{% else %}{{ commit.id }}{% endif %}`){% if commit.breaking_description %} — {{ commit.breaking_description }}{% endif %}
+{% endfor %}
+{% endif -%}
+
+{% if extra and extra.contractDiff -%}
+{% set api_changes = extra.contractDiff.changes | filter(attribute="family", value="openapi") -%}
+{% if api_changes | length > 0 -%}
+### OpenAPI & HAL Contract Evidence
+
+{% for change in api_changes -%}
+- [{{ change.severity }}] `{{ change.target }}` ({{ change.kind }}): {{ change.summary }}
+{% endfor %}
+{% else -%}
+No OpenAPI or HAL schema contract changes detected between pinned revisions.
+{% endif -%}
+{% else -%}
+No OpenAPI or HAL schema contract changes recorded for this release.
+{% endif -%}
+
+{% if extra and extra.impactEntries and extra.impactEntries | length > 0 -%}
+{% for impact in extra.impactEntries -%}
+{% if impact.category == "openapi" -%}
+- **openapi** (`{{ impact.changeId }}`, {{ impact.disposition }}): {{ impact.detail }} (Evidence: `{{ impact.reference }}`)
+{% endif -%}
+{% endfor %}
+{% endif %}
+
+{% if extra and extra.rangeDisplayIds and extra.rangeDisplayIds | length > 0 -%}
+## Complete Commit Range
+
+{% for display_id in extra.rangeDisplayIds -%}
+- `{{ display_id }}`
+{% endfor -%}
+{% endif %}
 """
 trim = true
 render_always = true

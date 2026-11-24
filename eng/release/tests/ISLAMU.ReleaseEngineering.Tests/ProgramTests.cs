@@ -214,6 +214,7 @@ public sealed class ProgramTests
         await Assert.That(text).Contains("ensure-git-cliff");
         await Assert.That(text).Contains("verify-release-tag");
         await Assert.That(text).Contains("diff-contracts");
+        await Assert.That(text).Contains("--image-manifest");
         await Assert.That(text).Contains("preflight-range");
         await Assert.That(text).DoesNotContain("run-promoted");
         await Assert.That(text).DoesNotContain("verify-candidate");

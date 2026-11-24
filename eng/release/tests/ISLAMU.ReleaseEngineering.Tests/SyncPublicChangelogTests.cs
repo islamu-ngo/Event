@@ -161,6 +161,25 @@ public sealed class SyncPublicChangelogTests
         await Assert.That(missing).IsEqualTo(Program.UsageError);
     }
 
+    [Test]
+    public async Task RejectsReleaseNotesContainingLeakedContributorIdentity()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new ChangelogFixture();
+        fixture.CreateSignedRelease("1.1.0", "2026-08-14", "Attendees can edit details.");
+        string notesPath = Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", "1.1.0", "release-notes.md");
+        await File.AppendAllTextAsync(notesPath, "\nMaintainer contact: leak@example.org\n");
+
+        (int code, string output) = fixture.Run();
+
+        await Assert.That(code).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(output).Contains("rendered_notes_identity_or_provider");
+    }
+
     private static string Digest(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
     private sealed class PublicationInterruptedException : Exception;

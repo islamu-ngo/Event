@@ -13,14 +13,15 @@ public static class PrepareCommand
         string repositoryRoot,
         string platform,
         TimeSpan timeout,
-        IGitCliffExecutor? gitCliffExecutor = null)
+        IGitCliffExecutor? gitCliffExecutor = null,
+        IGitObjectReader? gitObjectReader = null)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(output);
 
-        if (args.Length != 2)
+        if (!TryParseArgs(args, out string? releaseDirectoryArg, out string? imageManifestPath))
         {
-            output.WriteLine("invalid_arguments: prepare requires release directory");
+            output.WriteLine("invalid_arguments: prepare requires <release-directory> [--image-manifest <path>]");
             return Program.UsageError;
         }
 
@@ -32,7 +33,7 @@ public static class PrepareCommand
                 return Reject(output, "prepare_repository_root_invalid");
             }
 
-            string releaseDirectory = ResolveChild(root, args[1], mustExist: true);
+            string releaseDirectory = ResolveChild(root, releaseDirectoryArg!, mustExist: true);
             string expectedReleaseParent = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases");
             if (!string.Equals(Path.GetDirectoryName(releaseDirectory), expectedReleaseParent, PathComparison))
             {
@@ -55,18 +56,48 @@ public static class PrepareCommand
             }
 
             ReleaseDescriptor descriptor = descriptorOnly.Descriptor;
+            string headOid = RunGit(root, "rev-parse", "HEAD^{commit}").Trim();
             string? pinnedObjectsDiagnostic = ValidatePinnedObjects(root, descriptor, timeout, out GitTagVerificationResult? verifiedBaseline);
             if (pinnedObjectsDiagnostic is not null)
             {
                 return Reject(output, pinnedObjectsDiagnostic);
             }
 
+            IReadOnlyList<EnrichedImageReference>? verifiedImages = null;
+            if (imageManifestPath is not null)
+            {
+                string resolvedManifest = Path.IsPathFullyQualified(imageManifestPath)
+                    ? imageManifestPath
+                    : Path.Combine(root, imageManifestPath);
+                ReleaseImageManifestLoadResult manifestResult = ReleaseImageManifest.LoadFromFile(
+                    resolvedManifest,
+                    descriptor.Version,
+                    expectedCommitOid: headOid);
+                if (!manifestResult.IsValid || manifestResult.Manifest is null)
+                {
+                    return Reject(output, manifestResult.Diagnostic ?? "image_manifest_invalid");
+                }
+
+                verifiedImages = manifestResult.Manifest.Images;
+            }
+
             IReadOnlyList<ReleaseCommit> commits = GitTagSignatureVerifier.ReadCommitRange(root, descriptor.PreviousPublishedTag, "HEAD", timeout);
             string[] rangeOids = commits.Select(commit => commit.Oid).ToArray();
             ReleasePolicy policy = ReleasePolicy.LoadFromRepositoryRoot(root);
 
-            string[] linkedChangeIds = commits
-                .Select(commit => policy.EvaluateCommit(commit.Message).ChangeId)
+            var evaluatedCommits = new List<(ReleaseCommit Commit, CommitPolicyResult Result)>(commits.Count);
+            foreach (ReleaseCommit commit in commits)
+            {
+                evaluatedCommits.Add((commit, policy.EvaluateCommit(commit.Message)));
+            }
+
+            string[] omittedRangeOids = evaluatedCommits
+                .Where(item => item.Result.IsValid && item.Result.ReleaseVisibility != ReleaseVisibility.Visible)
+                .Select(item => item.Commit.Oid)
+                .ToArray();
+
+            string[] linkedChangeIds = evaluatedCommits
+                .Select(item => item.Result.ChangeId)
                 .OfType<string>()
                 .Distinct(StringComparer.Ordinal)
                 .Order(StringComparer.Ordinal)
@@ -90,13 +121,13 @@ public static class PrepareCommand
                 lockPath,
                 Environment.GetEnvironmentVariable(GitCliffToolchainStore.DefaultBundleEnvironmentVariable),
                 platform);
+            var toolConfig = new GitCliffToolConfiguration(lockPath, toolDirectory, configPath, platform, timeout);
+            string commitRange = $"{descriptor.PreviousPublishedTag}..HEAD";
 
             IGitCliffExecutor executor = gitCliffExecutor ?? GitCliffProcessExecutor.Default;
             string? suggestedVersion = null;
             if (!descriptor.Version.Contains('-', StringComparison.Ordinal))
             {
-                var toolConfig = new GitCliffToolConfiguration(lockPath, toolDirectory, configPath, platform, timeout);
-                string commitRange = $"{descriptor.PreviousPublishedTag}..HEAD";
                 GitCliffBumpVersionResult bumpResult = executor.SuggestBumpedVersion(
                     new GitCliffBumpVersionRequest(toolConfig, root, commitRange));
                 if (!bumpResult.IsValid || string.IsNullOrWhiteSpace(bumpResult.SuggestedVersion))
@@ -123,40 +154,59 @@ public static class PrepareCommand
                 return Reject(output, diagnostic);
             }
 
-            string contextJson = context.Json;
+            TimeSpan diffTimeout = timeout < TimeSpan.FromSeconds(15) ? TimeSpan.FromSeconds(15) : timeout;
+            IGitObjectReader objectReader = gitObjectReader ?? new GitProcessObjectReader(root, diffTimeout);
+            ReleaseContractDiffResult contractDiff = ReleaseContractDiffPipeline.Default.Execute(
+                objectReader,
+                descriptor.ReleaseRange.PreviousOid,
+                headOid);
+            if (!contractDiff.IsValid || contractDiff.Artifact is null || contractDiff.Json is null)
+            {
+                return Reject(output, contractDiff.Diagnostic ?? "prepare_contract_diff_failed");
+            }
 
-            var renderRequest = new GitCliffRenderRequest(
-                lockPath,
-                toolDirectory,
-                configPath,
-                StrictUtf8.GetBytes(contextJson),
-                platform,
-                Path.Combine(Path.GetTempPath(), "islamu-release-renderer"),
-                timeout);
+            string contextJson = context.Json;
+            byte[] contextBytes = StrictUtf8.GetBytes(contextJson);
+            byte[] contractDiffBytes = StrictUtf8.GetBytes(contractDiff.Json);
+            string contextPath = Path.Combine(releaseDirectory, "release-context.v1.json");
+            string contractDiffPath = Path.Combine(releaseDirectory, "contract-diff.v1.json");
+
+            if (File.Exists(contextPath) && !File.ReadAllBytes(contextPath).AsSpan().SequenceEqual(contextBytes))
+            {
+                return Reject(output, "prepare_generated_file_unexpected");
+            }
+
+            if (File.Exists(contractDiffPath) && !File.ReadAllBytes(contractDiffPath).AsSpan().SequenceEqual(contractDiffBytes))
+            {
+                return Reject(output, "prepare_generated_file_unexpected");
+            }
+
             ReleasePreparationResult result = ReleasePreparation.Prepare(new ReleasePreparationRequest(
                 releaseDirectory,
+                root,
                 input,
                 context,
                 summaryBytes,
                 rangeOids,
-                renderRequest));
+                omittedRangeOids,
+                toolConfig,
+                executor,
+                commitRange,
+                contractDiff.Artifact,
+                verifiedImages));
             if (!result.IsValid)
             {
                 return Reject(output, result.Diagnostic!);
             }
 
-            string contextPath = Path.Combine(releaseDirectory, "release-context.v1.json");
-            byte[] contextBytes = StrictUtf8.GetBytes(contextJson);
-            if (File.Exists(contextPath))
-            {
-                if (!File.ReadAllBytes(contextPath).AsSpan().SequenceEqual(contextBytes))
-                {
-                    return Reject(output, "prepare_generated_file_unexpected");
-                }
-            }
-            else
+            if (!File.Exists(contextPath))
             {
                 WriteAtomic(contextPath, contextBytes);
+            }
+
+            if (!File.Exists(contractDiffPath))
+            {
+                WriteAtomic(contractDiffPath, contractDiffBytes);
             }
 
             output.Write(result.CommitMessage);
@@ -166,6 +216,35 @@ public static class PrepareCommand
         {
             return Reject(output, "prepare_input_invalid");
         }
+    }
+
+    private static bool TryParseArgs(string[] args, out string? releaseDirectory, out string? imageManifestPath)
+    {
+        releaseDirectory = null;
+        imageManifestPath = null;
+        if (args.Length is not (2 or 4))
+        {
+            return false;
+        }
+
+        releaseDirectory = args[1];
+        if (string.IsNullOrWhiteSpace(releaseDirectory) || releaseDirectory.StartsWith("--", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (args.Length == 4)
+        {
+            if (!string.Equals(args[2], "--image-manifest", StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(args[3]))
+            {
+                return false;
+            }
+
+            imageManifestPath = args[3];
+        }
+
+        return true;
     }
 
     private static string? ValidatePinnedObjects(

@@ -11,7 +11,8 @@ public sealed record PublicChangelogRelease(
     string Summary,
     string NotesSha256,
     string TagObjectId,
-    string TargetOid);
+    string TargetOid,
+    IReadOnlyList<EnrichedImageReference>? Images = null);
 
 public sealed record PublicChangelogResult(
     bool IsValid, byte[]? Page, string? Diagnostic, string? HighestStableVersion, string? Warning = null);
@@ -233,6 +234,18 @@ public static class PublicChangelogPolicy
             .Append("- Signed annotated tag: `").Append(tagName).Append("` (`").Append(release.TagObjectId).Append("`)\n")
             .Append("- Authoritative notes SHA-256: `").Append(release.NotesSha256).Append("`\n")
             .Append("- [Authoritative release notes](").Append(notes).Append(")\n");
+
+        if (release.Images is { Count: > 0 })
+        {
+            foreach (EnrichedImageReference image in release.Images.OrderBy(i => i.ImageName, StringComparer.Ordinal))
+            {
+                foreach (string reference in image.CanonicalReferences.Order(StringComparer.Ordinal))
+                {
+                    builder.Append("- Container image (`").Append(image.ImageName).Append("`): `").Append(reference).Append("`\n");
+                }
+            }
+        }
+
         text = builder.ToString();
         return true;
     }

@@ -258,6 +258,94 @@ public sealed class GitCliffIntegrationTests
         await Assert.That(internalOnly.SuggestedVersion).IsEqualTo("2.0.0");
     }
 
+    [Test]
+    public async Task RealBinaryEndToEndPipelineRendersThreePersonasWithContractDiffAndVerifiedImageManifestByteIdentically()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string sourceRoot = RepositoryRoot.Find();
+        using var repo = new TemporaryGitRepository();
+        repo.CopyFileFromRepo(sourceRoot, "eng/release/toolchain.lock.json");
+        repo.CopyFileFromRepo(sourceRoot, "eng/release/cliff.toml");
+        repo.CopyFileFromRepo(sourceRoot, "eng/release/policy/release-policy.yaml");
+        repo.CopyFileFromRepo(sourceRoot, "eng/release/policy/scope-registry.yaml");
+        repo.WriteFile(".env.example", "DATABASE_PROVIDER=postgres\nLEGACY_VAR=secret-before-value\n");
+        repo.WriteFile("schemas/openapi_islamu-event.json", """{"openapi":"3.1.1","paths":{"/api/events":{"get":{"responses":{"200":{"description":"OK"}}}}}}""");
+        repo.WriteFile("src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs", "// v1");
+        repo.WriteFile("src/Explore.Persistence/Migrations/20260901000000_Init.cs", "// init");
+        string baseOid = repo.CommitAll("fix(events): baseline event setup");
+        repo.TagAnnotated("v1.0.0", baseOid);
+
+        repo.WriteFile(".env.example", "DATABASE_PROVIDER=postgres\n# NEW_CACHE_MODE=redis\n");
+        repo.WriteFile("schemas/openapi_islamu-event.json", """{"openapi":"3.1.1","paths":{"/api/events":{"get":{"responses":{"200":{"description":"OK"}}}},"/api/events/featured":{"get":{"responses":{"200":{"description":"OK"}}}}}}""");
+        repo.WriteFile("src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs", "// v2");
+        repo.WriteFile("src/Explore.Persistence/Migrations/20261124120000_AddFeaturedFlag.cs", "// add featured");
+        repo.CommitAll("feat(discovery): highlight featured community events\n\nAuthor body should never leak: secret-dev@example.invalid");
+        string headOid = repo.Commit("refactor(release): internal pipeline tidy");
+
+        string releaseDir = Path.Combine(repo.Root, "docs", "internal", "releases", "1.1.0");
+        Directory.CreateDirectory(releaseDir);
+        File.WriteAllText(
+            Path.Combine(releaseDir, "release.yaml"),
+            $"Version: 1.1.0\nLine: v1.1\nRelease-Date: 2026-11-24\nBase-Stable-Tag: v1.0.0\nPrevious-Published-Tag: v1.0.0\nRelease-Range:\n  Base-Ref: v1.0.0\n  Base-Oid: {baseOid}\n  Previous-Ref: v1.0.0\n  Previous-Oid: {baseOid}\nCompatibility:\n  - v1\nImpact-Dispositions:\n  breaking: not-applicable\n  security: not-applicable\n  migration: not-applicable\n  configuration: not-applicable\n  openapi: not-applicable\n  operator: not-applicable\n");
+        File.WriteAllText(Path.Combine(releaseDir, "summary.md"), "Featured events are now highlighted across discovery surfaces.\n");
+
+        string imageManifestPath = Path.Combine(repo.Root, "release-images.v1.json");
+        File.WriteAllText(imageManifestPath, ReleaseImageManifestTests.ValidManifestJson("1.1.0", headOid));
+
+        using var out1 = new StringWriter();
+        int firstCode = PrepareCommand.Run(
+            ["prepare", "docs/internal/releases/1.1.0", "--image-manifest", imageManifestPath],
+            out1,
+            repo.Root,
+            GitCliffToolchainStore.GetCurrentPlatform(),
+            TimeSpan.FromSeconds(15));
+        await Assert.That(firstCode).IsEqualTo(Program.Success).Because(out1.ToString());
+
+        byte[] contextBytes1 = await File.ReadAllBytesAsync(Path.Combine(releaseDir, "release-context.v1.json"));
+        byte[] renderContextBytes1 = await File.ReadAllBytesAsync(Path.Combine(releaseDir, "release-rendering-context.v1.json"));
+        byte[] contractDiffBytes1 = await File.ReadAllBytesAsync(Path.Combine(releaseDir, "contract-diff.v1.json"));
+        byte[] notesBytes1 = await File.ReadAllBytesAsync(Path.Combine(releaseDir, "release-notes.md"));
+
+        using var out2 = new StringWriter();
+        int secondCode = PrepareCommand.Run(
+            ["prepare", "docs/internal/releases/1.1.0", "--image-manifest", imageManifestPath],
+            out2,
+            repo.Root,
+            GitCliffToolchainStore.GetCurrentPlatform(),
+            TimeSpan.FromSeconds(15));
+        await Assert.That(secondCode).IsEqualTo(Program.Success).Because(out2.ToString());
+
+        await Assert.That(await File.ReadAllBytesAsync(Path.Combine(releaseDir, "release-context.v1.json"))).IsEquivalentTo(contextBytes1);
+        await Assert.That(await File.ReadAllBytesAsync(Path.Combine(releaseDir, "release-rendering-context.v1.json"))).IsEquivalentTo(renderContextBytes1);
+        await Assert.That(await File.ReadAllBytesAsync(Path.Combine(releaseDir, "contract-diff.v1.json"))).IsEquivalentTo(contractDiffBytes1);
+        await Assert.That(await File.ReadAllBytesAsync(Path.Combine(releaseDir, "release-notes.md"))).IsEquivalentTo(notesBytes1);
+
+        string notes = System.Text.Encoding.UTF8.GetString(notesBytes1);
+        string renderContext = System.Text.Encoding.UTF8.GetString(renderContextBytes1);
+        await Assert.That(notes).StartsWith("# Release 1.1.0\n");
+        await Assert.That(notes).Contains("## Maintainer Summary");
+        await Assert.That(notes).Contains("## Community Admin");
+        await Assert.That(notes).Contains("highlight featured community events");
+        await Assert.That(notes).Contains("## Self-Hoster / Operator");
+        await Assert.That(notes).Contains("LEGACY_VAR");
+        await Assert.That(notes).Contains("AddFeaturedFlag");
+        await Assert.That(notes).Contains("### Verified Container Images");
+        await Assert.That(notes).Contains("atcr.io/islamu-ngo/event-api@sha256:" + new string('1', 64));
+        await Assert.That(notes).Contains("ghcr.io/islamu-ngo/event-migration@sha256:" + new string('4', 64));
+        await Assert.That(notes).Contains("## Developer / API Integrator");
+        await Assert.That(notes).Contains("GET /api/events/featured");
+        await Assert.That(notes).Contains("## Complete Commit Range");
+        await Assert.That(notes).DoesNotContain("secret-dev@example.invalid");
+        await Assert.That(notes).DoesNotContain("secret-before-value");
+        await Assert.That(notes).DoesNotContain("Release Test");
+        await Assert.That(renderContext).DoesNotContain("secret-dev@example.invalid");
+        await Assert.That(renderContext).DoesNotContain("Release Test");
+    }
+
     private static GitCliffToolConfiguration CreateVerifiedToolConfiguration(string configPath)
     {
         string repoRoot = RepositoryRoot.Find();
@@ -339,6 +427,28 @@ public sealed class GitCliffIntegrationTests
             string file = Path.Combine(Root, $"change-{sequence}.txt");
             File.WriteAllText(file, $"change {sequence}\n");
             Git("add", file);
+            Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "commit", "-q", "-m", message);
+            return Git("rev-parse", "HEAD^{commit}").Trim();
+        }
+
+        public void WriteFile(string relativePath, string content)
+        {
+            string full = Path.Combine(Root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+            File.WriteAllText(full, content);
+        }
+
+        public void CopyFileFromRepo(string repoRoot, string relativePath)
+        {
+            string source = Path.Combine(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            string dest = Path.Combine(Root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+            File.Copy(source, dest, overwrite: true);
+        }
+
+        public string CommitAll(string message)
+        {
+            Git("add", "-A");
             Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "commit", "-q", "-m", message);
             return Git("rev-parse", "HEAD^{commit}").Trim();
         }

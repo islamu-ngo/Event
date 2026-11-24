@@ -295,6 +295,13 @@ public static class SyncPublicChangelogCommand
             string summaryText = Utf8.GetString(ReadBounded(summaryPath)).TrimEnd('\n');
             byte[] contextBytes = ReadBounded(contextPath);
             byte[] notesBytes = ReadBounded(notesPath);
+            ArtifactPolicyResult notesPolicy = ReleaseArtifactPolicy.ValidateRenderedReleaseNotes(Utf8.GetString(notesBytes));
+            if (!notesPolicy.IsValid)
+            {
+                diagnostic = notesPolicy.Diagnostics.Count == 0 ? "changelog_notes_invalid" : notesPolicy.Diagnostics[0];
+                return false;
+            }
+
             ReleaseContext? context = JsonSerializer.Deserialize<ReleaseContext>(contextBytes, JsonOptions);
             if (context is null)
             {

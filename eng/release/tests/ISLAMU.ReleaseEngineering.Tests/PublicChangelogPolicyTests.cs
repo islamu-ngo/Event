@@ -151,6 +151,32 @@ public sealed class PublicChangelogPolicyTests
         await Assert.That(PublicChangelogPolicy.ReplaceRegion([], generated, bootstrap: false).IsValid).IsFalse();
     }
 
+    [Test]
+    public async Task IncludesVerifiedContainerDigestsOnlyWhenImageReferencesArePresent()
+    {
+        PublicChangelogRelease withoutImages = Release("1.1.0", "2026-09-01");
+        PublicChangelogRelease withImages = withoutImages with
+        {
+            Images =
+            [
+                new EnrichedImageReference(
+                    "api",
+                    "sha256:" + new string('1', 64),
+                    [
+                        "atcr.io/islamu-ngo/event-api@sha256:" + new string('1', 64),
+                        "ghcr.io/islamu-ngo/event-api@sha256:" + new string('1', 64),
+                    ]),
+            ],
+        };
+
+        string withoutText = Encoding.UTF8.GetString(PublicChangelogPolicy.Generate([withoutImages], new Uri("https://example.org/releases/")).Page!);
+        string withText = Encoding.UTF8.GetString(PublicChangelogPolicy.Generate([withImages], new Uri("https://example.org/releases/")).Page!);
+
+        await Assert.That(withoutText).DoesNotContain("@sha256:");
+        await Assert.That(withText).Contains("atcr.io/islamu-ngo/event-api@sha256:" + new string('1', 64));
+        await Assert.That(withText).Contains("ghcr.io/islamu-ngo/event-api@sha256:" + new string('1', 64));
+    }
+
     private static PublicChangelogRelease Release(string version, string date) => new(
         new ReleaseDescriptor(version, "v1.0", DateOnly.Parse(date, System.Globalization.CultureInfo.InvariantCulture), "v0.9.0", "v0.9.0",
             new ReleaseRangeReference("refs/tags/v0.9.0", new string('c', 40), "refs/tags/v0.9.0", new string('c', 40)), [], new Dictionary<string, string>()),

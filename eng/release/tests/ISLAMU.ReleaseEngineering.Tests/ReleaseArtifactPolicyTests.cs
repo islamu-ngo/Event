@@ -233,4 +233,35 @@ public sealed class ReleaseArtifactPolicyTests
         await Assert.That(exponentOne.SequenceEqual(integer)).IsTrue();
         await Assert.That(Encoding.UTF8.GetString(integer)).IsEqualTo("{\n  \"value\": 1\n}\n");
     }
+
+    [Test]
+    public async Task ValidateRenderedReleaseNotesAcceptsThreePersonaMarkdownWithOciDigestsAndRejectsIdentitySecretHtmlAndEmbargo()
+    {
+        string validNotes =
+            "# Release 1.1.0\n\n" +
+            "## Maintainer Summary\n\nAttendees can edit registration details.\n\n" +
+            "## Community Admin\n\n- registration: let attendees edit details (`cccccccccccc`)\n\n" +
+            "## Self-Hoster / Operator\n\n" +
+            "### Verified Container Images\n\n" +
+            "- `atcr.io/islamu-ngo/event-api@sha256:" + new string('1', 64) + "`\n" +
+            "- `ghcr.io/islamu-ngo/event-api@sha256:" + new string('1', 64) + "`\n\n" +
+            "## Developer / API Integrator\n\nNo API contract changes.\n\n" +
+            "## Complete Commit Range\n\n- `cccccccccccc`\n";
+
+        ArtifactPolicyResult ok = ReleaseArtifactPolicy.ValidateRenderedReleaseNotes(validNotes);
+        ArtifactPolicyResult email = ReleaseArtifactPolicy.ValidateRenderedReleaseNotes(validNotes + "\nContact maintainer@example.org\n");
+        ArtifactPolicyResult handle = ReleaseArtifactPolicy.ValidateRenderedReleaseNotes(validNotes + "\nThanks @octocat\n");
+        ArtifactPolicyResult forgeUrl = ReleaseArtifactPolicy.ValidateRenderedReleaseNotes(validNotes + "\nhttps://github.com/islamu-ngo/Event/pull/42\n");
+        ArtifactPolicyResult embargo = ReleaseArtifactPolicy.ValidateRenderedReleaseNotes(validNotes + "\nRestricted-Details: private exploit\n");
+        ArtifactPolicyResult secret = ReleaseArtifactPolicy.ValidateRenderedReleaseNotes(validNotes + "\napi_key=super-secret-value\n");
+        ArtifactPolicyResult html = ReleaseArtifactPolicy.ValidateRenderedReleaseNotes(validNotes + "\n<script>alert(1)</script>\n");
+
+        await Assert.That(ok.IsValid).IsTrue().Because(string.Join(", ", ok.Diagnostics));
+        await Assert.That(email.Diagnostics).Contains("rendered_notes_identity_or_provider");
+        await Assert.That(handle.Diagnostics).Contains("rendered_notes_identity_or_provider");
+        await Assert.That(forgeUrl.Diagnostics).Contains("rendered_notes_identity_or_provider");
+        await Assert.That(embargo.Diagnostics).Contains("rendered_notes_embargo_or_restricted");
+        await Assert.That(secret.Diagnostics).Contains("rendered_notes_secret_material");
+        await Assert.That(html.Diagnostics).Contains("rendered_notes_raw_html");
+    }
 }

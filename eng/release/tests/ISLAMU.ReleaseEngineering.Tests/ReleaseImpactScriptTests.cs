@@ -1,18 +1,17 @@
-using System.Diagnostics;
 using System.Text.Json;
+using ISLAMU.ReleaseEngineering;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
 
-[NotInParallel]
 public sealed class ReleaseImpactScriptTests
 {
     [Test]
     public async Task ImgBotModifiedAssetsDoNotRequireHumanChecklist()
     {
-        int exit = await RunAsync("imgbot[bot]", "Bot", null, 1,
-            new { filename = "assets/banner.png", status = "modified" });
+        ReleaseImpactEvaluationResult result = Evaluate("imgbot[bot]", "Bot", null, 1,
+            new ReleaseImpactChangedFile("assets/banner.png", ReleaseImpactFileChangeKind.Modified, null));
 
-        await Assert.That(exit).IsEqualTo(0);
+        await Assert.That(result.IsValid).IsTrue();
     }
 
     [Test]
@@ -25,9 +24,10 @@ public sealed class ReleaseImpactScriptTests
     public async Task AutomaticDispositionRequiresExactIdentityAndSafeModifiedAssets(
         string author, string accountType, string filename, string status)
     {
-        int exit = await RunAsync(author, accountType, null, 1, new { filename, status });
+        ReleaseImpactEvaluationResult result = EvaluateFromJson(author, accountType, null, 1,
+            new { filename, status });
 
-        await Assert.That(exit).IsNotEqualTo(0);
+        await Assert.That(result.IsValid).IsFalse();
     }
 
     [Test]
@@ -35,37 +35,37 @@ public sealed class ReleaseImpactScriptTests
     [Arguments(2)]
     public async Task MissingOrIncompleteFilesCannotProveNoImpact(int expectedCount)
     {
-        int exit = await RunAsync("contributor", "User", "## Release Impact\n- [x] Not applicable\n",
+        ReleaseImpactEvaluationResult result = EvaluateFromJson("contributor", "User", "## Release Impact\n- [x] Not applicable\n",
             expectedCount, new { filename = "assets/banner.png", status = "modified" });
 
-        await Assert.That(exit).IsNotEqualTo(0);
+        await Assert.That(result.IsValid).IsFalse();
     }
 
     [Test]
     public async Task RenameClassifiesBothOriginalAndCurrentPaths()
     {
-        int exit = await RunAsync("contributor", "User", "## Release Impact\n- [x] Not applicable\n", 1,
+        ReleaseImpactEvaluationResult result = EvaluateFromJson("contributor", "User", "## Release Impact\n- [x] Not applicable\n", 1,
             new { filename = "assets/banner.png", status = "renamed", previous_filename = "src/security.cs" });
 
-        await Assert.That(exit).IsNotEqualTo(0);
+        await Assert.That(result.IsValid).IsFalse();
     }
 
     [Test]
     public async Task ImgBotMixedSourceAndImageChangesCannotReceiveAutomaticDisposition()
     {
-        int exit = await RunAsync("imgbot[bot]", "Bot", null, 2,
+        ReleaseImpactEvaluationResult result = EvaluateFromJson("imgbot[bot]", "Bot", null, 2,
             new { filename = "assets/banner.png", status = "modified" },
             new { filename = "src/security.cs", status = "modified" });
 
-        await Assert.That(exit).IsNotEqualTo(0);
+        await Assert.That(result.IsValid).IsFalse();
     }
 
     [Test]
     public async Task EmptyFileMetadataCannotEstablishNoImpact()
     {
-        int exit = await RunAsync("contributor", "User", "## Release Impact\n- [x] Not applicable\n", 1);
+        ReleaseImpactEvaluationResult result = EvaluateFromJson("contributor", "User", "## Release Impact\n- [x] Not applicable\n", 1);
 
-        await Assert.That(exit).IsNotEqualTo(0);
+        await Assert.That(result.IsValid).IsFalse();
     }
 
     [Test]
@@ -77,110 +77,85 @@ public sealed class ReleaseImpactScriptTests
     public async Task EveryImpactCategoryRequiresItsOwnDisposition(string filename, string label)
     {
         var metadata = new { filename, status = "modified" };
-        int omitted = await RunAsync("contributor", "User", "## Release Impact\n- [x] Not applicable\n", 1, metadata);
-        int documented = await RunAsync("contributor", "User",
+        ReleaseImpactEvaluationResult omitted = EvaluateFromJson("contributor", "User", "## Release Impact\n- [x] Not applicable\n", 1, metadata);
+        ReleaseImpactEvaluationResult documented = EvaluateFromJson("contributor", "User",
             $"## Release Impact\n- [x] {label}\nDetails:\nReviewed release impact.\n", 1, metadata);
 
-        await Assert.That(omitted).IsNotEqualTo(0);
-        await Assert.That(documented).IsEqualTo(0);
+        await Assert.That(omitted.IsValid).IsFalse();
+        await Assert.That(documented.IsValid).IsTrue().Because(documented.Message);
     }
 
     [Test]
     public async Task HumanNoImpactAndDocumentedSecurityDispositionsRemainValid()
     {
-        int noImpact = await RunAsync("contributor", "User", "## Release Impact\n- [x] Not applicable\n", 1,
+        ReleaseImpactEvaluationResult noImpact = EvaluateFromJson("contributor", "User", "## Release Impact\n- [x] Not applicable\n", 1,
             new { filename = "assets/banner.png", status = "modified" });
-        int security = await RunAsync("contributor", "User",
+        ReleaseImpactEvaluationResult security = EvaluateFromJson("contributor", "User",
             "## Release Impact\n- [x] Security/auth impact documented\nDetails:\nReviewed security change.\n", 1,
             new { filename = "src/security.cs", status = "modified" });
 
-        await Assert.That(noImpact).IsEqualTo(0);
-        await Assert.That(security).IsEqualTo(0);
+        await Assert.That(noImpact.IsValid).IsTrue();
+        await Assert.That(security.IsValid).IsTrue();
     }
 
     [Test]
     [Arguments(false)]
     [Arguments(true)]
-    public async Task LargePullRequestRequiresEveryFileWithoutEnvironmentPayload(bool omitLastFile)
+    public async Task LargePullRequestRequiresEveryFileInProcessWithoutCompilerSpawns(bool omitLastFile)
     {
         object[] files = Enumerable.Range(0, omitLastFile ? 3000 : 3001)
             .Select(index => (object)new
             {
                 filename = $"assets/reviewed-image-with-a-long-enough-name-to-exceed-environment-limits-{index}.png",
-                status = "modified"
+                status = "modified",
             }).ToArray();
-        int exit = await RunAsync("contributor", "User",
+
+        ReleaseImpactEvaluationResult result = EvaluateFromJson("contributor", "User",
             "## Release Impact\n- [x] Not applicable\n", 3001, files);
-        await Assert.That(exit == 0).IsEqualTo(!omitLastFile);
+
+        await Assert.That(result.IsValid).IsEqualTo(!omitLastFile);
     }
 
-    private static async Task<int> RunAsync(
-        string author, string accountType, string? body, int expectedCount, params object[] files)
+    [Test]
+    public async Task TrustedBotsSkipReleaseImpactValidation()
     {
-        string root = FindRepositoryRoot();
-        string directory = Path.Combine(Path.GetTempPath(), $"release-impact-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(directory);
-        try
-        {
-            string eventPath = Path.Combine(directory, "event.json");
-            await File.WriteAllTextAsync(eventPath, JsonSerializer.Serialize(new
-            {
-                pull_request = new
-                {
-                    user = new { login = author, type = accountType },
-                    body,
-                    changed_files = expectedCount
-                }
-            }));
-            var start = new ProcessStartInfo("dotnet")
-            {
-                WorkingDirectory = root,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            };
-            start.ArgumentList.Add("run");
-            start.ArgumentList.Add(".ci/scripts/validate-release-impact-pr.cs");
-            start.ArgumentList.Add("--");
-            start.ArgumentList.Add(eventPath);
-            start.Environment.Remove("GITHUB_TOKEN");
-            string metadataPath = Path.Combine(directory, "files.json");
-            await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(files));
-            start.Environment.Remove("RELEASE_IMPACT_FILE_METADATA");
-            start.Environment["RELEASE_IMPACT_FILE_METADATA_PATH"] = metadataPath;
-            using var process = new Process { StartInfo = start, EnableRaisingEvents = true };
-            var exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            process.Exited += (_, _) => exited.TrySetResult();
-            if (!process.Start()) throw new InvalidOperationException("release-impact-process-start-failed");
-            Task<string> output = process.StandardOutput.ReadToEndAsync();
-            Task<string> error = process.StandardError.ReadToEndAsync();
-            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-            try
-            {
-                await exited.Task.WaitAsync(deadline.Token);
-                await Task.WhenAll(output, error).WaitAsync(deadline.Token);
-            }
-            catch
-            {
-                if (!process.HasExited) process.Kill(entireProcessTree: true);
-                throw;
-            }
-            return process.ExitCode;
-        }
-        finally
-        {
-            Directory.Delete(directory, recursive: true);
-        }
+        ReleaseImpactEvaluationResult dependabot = Evaluate("dependabot[bot]", "Bot", null, 0);
+        ReleaseImpactEvaluationResult actionsBot = Evaluate("github-actions[bot]", "Bot", null, 0);
+
+        await Assert.That(dependabot.IsValid).IsTrue();
+        await Assert.That(actionsBot.IsValid).IsTrue();
     }
 
-    private static string FindRepositoryRoot()
+    private static ReleaseImpactEvaluationResult Evaluate(
+        string author,
+        string accountType,
+        string? body,
+        int expectedCount,
+        params ReleaseImpactChangedFile[] files) =>
+        ReleaseImpactPolicy.Evaluate(new ReleaseImpactEvaluationRequest(
+            author,
+            string.Equals(accountType, "Bot", StringComparison.Ordinal),
+            body ?? string.Empty,
+            expectedCount,
+            files));
+
+    private static ReleaseImpactEvaluationResult EvaluateFromJson(
+        string author,
+        string accountType,
+        string? body,
+        int expectedCount,
+        params object[] files)
     {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-        while (directory is not null)
+        string eventJson = JsonSerializer.Serialize(new
         {
-            if (File.Exists(Path.Combine(directory.FullName, "Explore.slnx"))) return directory.FullName;
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException("release-impact-repository-not-found");
+            pull_request = new
+            {
+                user = new { login = author, type = accountType },
+                body,
+                changed_files = expectedCount,
+            },
+        });
+        string filesJson = JsonSerializer.Serialize(files);
+        return ReleaseImpactPolicy.EvaluateFromJson(eventJson, filesJson);
     }
 }

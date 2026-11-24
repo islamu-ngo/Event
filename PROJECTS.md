@@ -89,6 +89,7 @@ projects and their focused test/release owners are removed from this solution.
 | `tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj` | Owned Aspire topology/lifecycle, browser journeys and bounded load orchestration | Host-free `Harness`; minutes for actual graph/browser/load | Harness on change; real profiles **Ring 3** |
 | `tests/Event.Benchmarks/Event.Benchmarks.csproj` | BenchmarkDotNet microbenchmarks | Manual | On demand |
 | `tests/Event.Setup.*.Tests/...` | Setup Assistant unit and integration tests | < 5s | On change |
+| `eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj` | Release CLI, toolchain verification, SSH tag verification, commit/input/context policy, security routing, release impact, contract diffing, and `git-cliff` integration | < 3s unit / < 15s full | **Ring 1 / Ring 2** (required in `_build-test.yml` & `workflow-security.yml`) |
 
 ---
 

@@ -127,8 +127,8 @@ jobs:
           dotnet run --project "$submission_project" --configuration Release --no-build --no-restore -- \
             --minimum-expected-tests 48 --results-directory workflow-security-results/submission-tests
           dotnet run --project "$release_project" --configuration Release --no-build --no-restore -- \
-            --treenode-filter "/*/*/*ReleaseImpactScriptTests/*" --minimum-expected-tests 18 \
-            --results-directory workflow-security-results/metadata-tests
+            --minimum-expected-tests 100 \
+            --results-directory workflow-security-results/release-engineering-tests
 
       - name: Run actionlint
         if: ${{ steps.changes.outputs.run-scan == 'true' }}

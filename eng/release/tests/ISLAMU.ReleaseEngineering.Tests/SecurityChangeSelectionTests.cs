@@ -199,7 +199,6 @@ public sealed class SecurityChangeSelectionTests
     [Arguments("src/Event.Standalone/Hosting/StandaloneHostApplicationExtensions.cs")]
     [Arguments("src/Event.Web.BffHosting/Security/BffProxyHeaderSanitizer.cs")]
     [Arguments("eng/security/security-control-register.json")]
-    [Arguments("eng/release/src/ISLAMU.ReleaseEngineering/SecurityExecutionEvidence.cs")]
     [Arguments("src/Explore.ServiceDefaults/Diagnostics/EndpointSecurityInventory.cs")]
     [Arguments("tests/Event.API.IntegrationTests/Hosting/ApiEndpointApplicabilityTests.cs")]
     [Arguments("tests/Event.Standalone.IntegrationTests/HostedWorkerActivationTests.cs")]
@@ -225,9 +224,20 @@ public sealed class SecurityChangeSelectionTests
 
     [Test]
     [Arguments("README.md")]
+    [Arguments("AGENTS.md")]
+    [Arguments("PROJECTS.md")]
     [Arguments("docs/public/changelog/README.md")]
     [Arguments("docs/public/operations/deployment.md")]
-    public async Task KnownPublicDocumentationRemainsAnHonestNoOp(string path)
+    [Arguments("docs/internal/CI_CD_GOVERNANCE.md")]
+    [Arguments("docs/internal/SECURITY-MODEL.md")]
+    [Arguments("dev/_journal/journal.md")]
+    [Arguments("islamic-value-sensitive-design/workstreams/i-vsd-release-engineering-modernization.md")]
+    [Arguments(".agents/skills/conventional-commit/SKILL.md")]
+    [Arguments(".agents/rules/tests.md")]
+    [Arguments("eng/release/src/ISLAMU.ReleaseEngineering/Program.cs")]
+    [Arguments("eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ProgramTests.cs")]
+    [Arguments("eng/release/cliff.toml")]
+    public async Task KnownDocumentationSkillAndReleaseToolingPathsSkipContainerSecurityTests(string path)
     {
         await Assert.That(SecurityChangeSelection.RequiresExecution([path])).IsFalse();
     }
@@ -271,7 +281,6 @@ public sealed class SecurityChangeSelectionTests
     [Test]
     [Arguments("future-component/behavior.cs")]
     [Arguments("src/Explore.API/HostingNotes.md")]
-    [Arguments("docs/internal/SECURITY-MODEL.md")]
     [Arguments("docs/public/setup.json")]
     [Arguments("docs/public/browser.js")]
     [Arguments("docs/public/../../src/Contract.md")]

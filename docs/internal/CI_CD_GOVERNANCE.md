@@ -52,112 +52,19 @@ Workflow architecture checks verify the native command wiring, read-only
 authority, fork-safe secret handling and serial Setup execution. They do not
 require the retired inline path-glob list to remain in the workflow shell script.
 
-## Security integration fixture execution
+## Security integration and benchmark execution
 
-The security workflow observes the fixed system `/usr/bin/stat` link chain,
-resolved target, version line and entry mode before execution. These finite
-infrastructure diagnostics contain no candidate paths, configuration or secrets.
-They do not select or admit the utility: native non-link, regular-file and
-fingerprint checks remain authoritative, including when the observation succeeds.
+`security-tests.yml` uses `select-security-changes` from `ISLAMU.ReleaseEngineering` to decide whether container-backed security integration tests must run. Documentation-only Markdown changes (`README.md`, `AGENTS.md`, `PROJECTS.md`, `docs/public/**/*.md`, `docs/internal/**/*.md`, `dev/**/*.md`, `islamic-value-sensitive-design/**/*.md`), agent skills/rules (`.agents/**`), and isolated release tooling (`eng/release/**`) skip container security tests, while any runtime, security (`eng/security/**`), build, workflow, schema, or unknown/malformed path fails safe to `run-tests=true`.
 
-Native security execution selects the fixed system stat entry once per process.
-Only that infrastructure leaf alias may resolve; its entry ancestors and selected
-target ancestors must remain nonlinked, and the final basename must stay `stat`.
-Capture and both metadata invocations use the same selected executable.
-Candidate files, assemblies, manifests and policy inputs never receive alias resolution.
-Selector failures use the existing owned-execution rejection path with fixed
-`stat_tool_*` codes. Missing or inaccessible filesystem targets produce
-`stat_tool_selection_unavailable`; underlying exception messages and paths are
-not part of the diagnostic.
+`verify-security-register` validates `eng/security/security-control-register.json` structurally, supporting lifecycle progression from `pending` to `verified`/`mitigated`/`accepted` when valid `finalDisposition`, non-empty `executionEvidence`, and non-empty `codeArtifactIdentity` are present.
 
-Native discovery may render a simple fixture constructor in `typeName`.
-The shared parser accepts only the complete `ClassName(SimpleFixtureName)` form
-and joins its CLR class, unchanged method and display name to the register and
-TRX. Opaque UIDs remain execution selectors; canonical identity collisions fail.
+When selected, `security-tests.yml` invokes TUnit directly against `tests/Event.API.IntegrationTests` (`Category=Security`, `Category=PolicyContract`) and `tests/Event.Distributed.IntegrationTests` (`Category=Distributed`, `BrowserJourneyTests`, `BrowserSecurityVectorTests`, `Category=LoadControl`, `Category=Load`), publishing TRX reports as `security-test-evidence`. `performance-smoke.yml` invokes BenchmarkDotNet directly against `tests/Event.Benchmarks` in dry mode.
 
-The browser prerequisite uses `eng/tools/InstallAssuranceBrowser.cs` with its
-own generated lock at `eng/tools/InstallAssuranceBrowser/packages.lock.json`.
-The installer requires locked restore and retains the approved Playwright
-version. It must not reuse or overwrite `eng/tools/packages.lock.json`, which
-belongs to other tools: disabling lock generation does not bypass an existing
-lock and causes `NU1005`. Verify the ordinary installer command against its
-committed lock before interpreting a prerequisite failure as a browser or
-runtime regression. Installation alone is not browser execution evidence.
+`_build-test.yml` and `workflow-security.yml` run `eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj` directly in required CI, and PR release-impact checks execute `.ci/scripts/validate-release-impact-pr.cs` as a thin adapter over in-process `ReleaseImpactPolicy`.
 
-The selected SDK servicing baseline is recorded in
-[Operations](OPERATIONS.md#sdk-and-runtime-servicing). This branch provisions
-Chromium through the file-based `eng/tools/InstallAssuranceBrowser.cs` entrypoint.
-Its dedicated `eng/tools/InstallAssuranceBrowser/packages.lock.json` owns the
-installer's package graph without colliding with the neighboring tools lock.
-The provisioner runs as a framework-dependent tool with `PublishAot=false`;
-its lock must not require a native compiler for one developer host architecture.
-Regenerate it with the selected SDK, then verify locked restore and the portable
-package graph. Tools that use native AOT still require a serviced compiler for
-[GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9).
-Playwright remains at its separately approved version; auditing stays enabled.
+The browser prerequisite uses `eng/tools/InstallAssuranceBrowser.cs` with its own generated lock at `eng/tools/InstallAssuranceBrowser/packages.lock.json`. The installer requires locked restore and retains the approved Playwright version without colliding with `eng/tools/packages.lock.json`.
 
-Release-impact validation executes the trusted base checkout. A patched SDK
-on the pull-request head does not upgrade that checkout: its SDK pin must
-receive the reviewed servicing change before the protected job can use it.
-Do not switch this job to untrusted head code or suppress an advisory to
-make the check pass.
-
-The existing `security-execution.v1.json` packet is governed by the embedded
-`executionRequirements` in `eng/security/security-control-register.json`.
-Producer and validator derive each registered lane's project, closed host
-profile, environment, selector and required identities from the same validated
-requirements. The owning verb is `execute-security-execution`. Admission requires
-every registered lane and its exact native result variants, with no
-missing/skipped results or reused report/execution identities. Candidate,
-run/attempt and retained artifact byte hashes must agree.
-Provider, database role and authentication remain `not-attested`.
-
-The daemon control client excludes ambient trace headers and baggage through its
-own handler. Wire-level context-isolation checks and the explicit read-only
-daemon probe remain prerequisite diagnostics, not registered-lane admission.
-
-Establish uncached engine readiness on the selected socket before bounded
-assurance requests; cached Desktop proxy responses do not prove a running VM.
-Retain the asynchronous client's five-second request budget and separate
-readiness evidence. A canceled DELETE with no accepted response has an unknown
-outcome, not successful cleanup.
-
-The API lanes require their registered key witnesses within the complete
-category report. Owned lanes require equality between registered and observed
-named variants, so adding an unregistered passing case also rejects admission
-until the registration is refreshed against its compiled candidate.
-
-The local integration registration declares the two dedicated API test-host
-lanes and the existing owned runtime, browser journeys, browser security vectors,
-native load control and load correctness lanes. Owned named variants are source
-expectations until the final compiled candidate's discovery independently
-confirms their exact names, uniqueness and counts. Partial or contradictory
-registration fails; missing, skipped, extra or stale owned results cannot be
-substituted. Synthetic parser fixtures and isolated browser-module controls
-never certify a healthy owned host.
-
-The owning producer has bounded compiler and helper verification, with remote
-workflow activation held. Clean committed-candidate API execution, its fresh
-successor against copied old reports, live managed-entry/served-input witnesses
-and final seven-profile source/evidence admission remain pending. The earlier
-owning-executor source commit retained two lanes; the local workflow/register
-integration does not turn authored scenarios into passing runtime evidence.
-Rebuilding must bind the actual committed candidate revision; any later candidate source,
-input, registration or workflow change invalidates the final execution proof.
-
-The always-present required security job uses the existing conservative native
-change router and accepts only its exact true/false result. Unknown routing
-output fails. Selected runs build the registered API and distributed hosts with
-the exact candidate SourceRevisionId, provision external prerequisites, and call
-the existing owning verb once for all registered lanes. It uploads only the
-newly admitted public directory after successful execution; raw reports, private
-run roots and provisioning diagnostics are excluded, including on failure.
-The workflow has no separate Bash test/harvesting path. Missing managed launch
-evidence still rejects execution; the local integration does not bypass it.
-
-The native runner's timeout covers its entire serial batch. API batches retain
-600 seconds; each isolated load UID retains 1500 seconds for its twenty-minute
-regime and lifecycle allowance. For N actual selected UIDs, runtime uses `720*N`
+The selected SDK servicing baseline is recorded in [Operations](OPERATIONS.md#sdk-and-runtime-servicing). Release-impact validation executes the trusted base checkout so PR-head code cannot run with elevated context.
 seconds, journeys `1200*N`, and browser security `240*N+1020`. Each owned batch is
 capped at 19800 seconds (330 minutes), with the parent process deadline fifteen
 seconds later. The existing closed lane and matching registered host profile

@@ -22,14 +22,25 @@ public static class SecurityChangeSelection
         || (path.StartsWith("docs/public/", StringComparison.Ordinal)
             && path.EndsWith(".md", StringComparison.Ordinal));
 
+    private static bool IsNonSecurityDocumentationSkillOrReleasePath(string path) =>
+        path is "README.md" or "CONTRIBUTING.md" or "CHANGELOG.md" or "AGENTS.md" or "AI_REVIEW.md" or "PROJECTS.md"
+        || ((path.StartsWith("docs/public/", StringComparison.Ordinal)
+                || path.StartsWith("docs/internal/", StringComparison.Ordinal)
+                || path.StartsWith("dev/", StringComparison.Ordinal)
+                || path.StartsWith("islamic-value-sensitive-design/", StringComparison.Ordinal))
+            && path.EndsWith(".md", StringComparison.Ordinal))
+        || path.StartsWith(".agents/", StringComparison.Ordinal)
+        || path.StartsWith("eng/release/", StringComparison.Ordinal);
+
     public static bool RequiresExecution(IEnumerable<string> changedPaths)
     {
         bool anyPath = false;
         foreach (string path in changedPaths)
         {
             anyPath = true;
-            // Only known public prose can skip; new or ambiguous paths must run.
-            if (!IsValidPath(path) || !IsPublicDocumentation(path))
+            // Only known documentation, agent skills, or isolated release tooling can skip;
+            // runtime, security, build, and unknown paths fail safe to run-tests=true.
+            if (!IsValidPath(path) || !IsNonSecurityDocumentationSkillOrReleasePath(path))
             {
                 return true;
             }

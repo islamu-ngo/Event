@@ -135,10 +135,50 @@ public sealed class SecurityControlRegisterTests
     }
 
     [Test]
-    [Arguments("missing-reference")]
+    [Arguments("verified", "Protected", "ci-run-123", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", true)]
+    [Arguments("mitigated", "Improvable", "pr-88-evidence", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", true)]
+    [Arguments("accepted", "Not applicable", "steward-review-2026-11", "cccccccccccccccccccccccccccccccccccccccc", true)]
+    [Arguments("verified", "Protected", "", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false)]
+    [Arguments("verified", null, "ci-run-123", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false)]
+    [Arguments("verified", "Protected", "ci-run-123", null, false)]
+    [Arguments("mitigated", "UnknownDisposition", "ci-run-123", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false)]
+    [Arguments("pending", "Protected", "ci-run-123", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false)]
+    [Arguments("closed", "Protected", "ci-run-123", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false)]
+    public async Task ControlLifecycleProgressionRequiresStructuralEvidenceAndValidDisposition(
+        string verificationStatus,
+        string? finalDisposition,
+        string evidenceEntry,
+        string? codeArtifactIdentity,
+        bool expected)
+    {
+        JsonObject register = JsonNode.Parse(File.ReadAllBytes(RegisterPath()))!.AsObject();
+        JsonObject first = register["references"]!.AsArray()[0]!.AsObject();
+        first["verificationStatus"] = verificationStatus;
+        first["finalDisposition"] = finalDisposition is null ? null : JsonValue.Create(finalDisposition);
+        first["executionEvidence"] = string.IsNullOrEmpty(evidenceEntry) ? new JsonArray() : new JsonArray(evidenceEntry);
+        first["codeArtifactIdentity"] = codeArtifactIdentity is null ? null : JsonValue.Create(codeArtifactIdentity);
+
+        string directory = Path.Combine(Path.GetTempPath(), "security-register-lifecycle-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string path = Path.Combine(directory, "register.json");
+        try
+        {
+            File.WriteAllText(path, register.ToJsonString());
+            bool accepted = SecurityControlRegister.TryValidate(path, out string diagnostic);
+
+            await Assert.That(accepted).IsEqualTo(expected).Because(diagnostic);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    [Arguments("empty-references")]
     [Arguments("duplicate-reference")]
     [Arguments("unknown-owner")]
-    [Arguments("missing-scenario")]
+    [Arguments("unknown-scenario-reference")]
     [Arguments("unknown-family-reference")]
     [Arguments("unassigned-reference")]
     [Arguments("duplicate-supplementary-mechanism")]
@@ -146,12 +186,12 @@ public sealed class SecurityControlRegisterTests
     [Arguments("missing-runtime-host")]
     [Arguments("test-provider-as-supported-engine")]
     [Arguments("unqualified-provider-finding")]
-    [Arguments("missing-typed-pair")]
+    [Arguments("empty-typed-pairs")]
     [Arguments("missing-execution-owner-evidence")]
     [Arguments("unknown-standard-profile")]
-    [Arguments("missing-native-pair")]
-    [Arguments("missing-class")]
-    [Arguments("missing-mitigation")]
+    [Arguments("empty-native-pairs")]
+    [Arguments("empty-classes")]
+    [Arguments("empty-mitigations")]
     [Arguments("mixed-standard-version")]
     [Arguments("unearned-closure")]
     [Arguments("missing-execution-requirements")]
@@ -187,8 +227,8 @@ public sealed class SecurityControlRegisterTests
             case "wrong-required-project":
                 register["executionRequirements"]![0]!["project"] = "unrelated.csproj";
                 break;
-            case "missing-reference":
-                references.RemoveAt(0);
+            case "empty-references":
+                references.Clear();
                 break;
             case "duplicate-reference":
                 first["id"] = "REF-209";
@@ -196,8 +236,8 @@ public sealed class SecurityControlRegisterTests
             case "unknown-owner":
                 first["owningPhases"] = new JsonArray(30);
                 break;
-            case "missing-scenario":
-                (register["scenarios"]?.AsArray() ?? throw new InvalidDataException()).RemoveAt(49);
+            case "unknown-scenario-reference":
+                first["scenarios"] = new JsonArray("S99");
                 break;
             case "unknown-family-reference":
                 JsonObject family = register["families"]?[0]?.AsObject() ?? throw new InvalidDataException();
@@ -230,8 +270,8 @@ public sealed class SecurityControlRegisterTests
             case "unqualified-provider-finding":
                 register["qualifiedMappings"]!["providerPairs"]![0]!["findingId"] = "IVSD-F001";
                 break;
-            case "missing-typed-pair":
-                register["typedContractInventory"]!["dtoPairs"]!.AsArray().RemoveAt(0);
+            case "empty-typed-pairs":
+                register["typedContractInventory"]!["dtoPairs"]!.AsArray().Clear();
                 break;
             case "missing-execution-owner-evidence":
                 register["executionOwnerInventory"]![0]!["requiredEvidence"] = "";
@@ -239,14 +279,14 @@ public sealed class SecurityControlRegisterTests
             case "unknown-standard-profile":
                 register["asvs"]!["requirements"]![0]!["prerequisiteProfiles"] = new JsonArray("test-only");
                 break;
-            case "missing-native-pair":
-                register["typedContractInventory"]!["nativePairs"]!.AsArray().RemoveAt(0);
+            case "empty-native-pairs":
+                register["typedContractInventory"]!["nativePairs"]!.AsArray().Clear();
                 break;
-            case "missing-class":
-                (register["classes"]?.AsArray() ?? throw new InvalidDataException()).RemoveAt(0);
+            case "empty-classes":
+                (register["classes"]?.AsArray() ?? throw new InvalidDataException()).Clear();
                 break;
-            case "missing-mitigation":
-                (register["apiFindingMitigationPairs"]?.AsArray() ?? throw new InvalidDataException()).RemoveAt(0);
+            case "empty-mitigations":
+                (register["apiFindingMitigationPairs"]?.AsArray() ?? throw new InvalidDataException()).Clear();
                 break;
             case "mixed-standard-version":
                 JsonObject asvs = register["asvs"]?.AsObject() ?? throw new InvalidDataException();

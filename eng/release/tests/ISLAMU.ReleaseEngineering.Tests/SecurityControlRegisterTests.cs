@@ -37,7 +37,7 @@ public sealed class SecurityControlRegisterTests
     [Arguments("duplicate-variant", false)]
     public async Task OwnedProfilesRequireACompleteClosedRegistration(string variant, bool expected)
     {
-        JsonObject register = SecurityExecutionEvidenceFixture.OwnedRegister(RegisterPath());
+        JsonObject register = OwnedRegister(RegisterPath());
         JsonArray requirements = register["executionRequirements"]!.AsArray();
         JsonObject runtime = requirements[2]!.AsObject();
         switch (variant)
@@ -275,6 +275,64 @@ public sealed class SecurityControlRegisterTests
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    private static JsonObject OwnedRegister(string shippedRegister)
+    {
+        var register = JsonNode.Parse(File.ReadAllBytes(shippedRegister))!.AsObject();
+        JsonArray requirements = register["executionRequirements"]!.AsArray();
+        foreach ((string id, string profile) in new[]
+        {
+            ("owned-runtime", "owned-apphost-assurance"),
+            ("owned-browser-journeys", "owned-browser-assurance"),
+            ("owned-browser-security", "owned-browser-assurance"),
+            ("owned-load-control", "owned-apphost-load-assurance"),
+            ("owned-load-correctness", "owned-apphost-load-assurance"),
+        })
+        {
+            foreach (JsonNode? previous in requirements.Where(requirement =>
+                requirement?["laneId"]?.GetValue<string>() == id).ToArray())
+            {
+                requirements.Remove(previous);
+            }
+
+            requirements.Add(new JsonObject
+            {
+                ["laneId"] = id,
+                ["project"] = "tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj",
+                ["hostProfile"] = profile,
+                ["requiredTests"] = new JsonArray(new[] { "alpha", "beta" }.Select(variant =>
+                {
+                    var test = new JsonObject
+                    {
+                        ["className"] = "Synthetic.OwnedProfile",
+                        ["methodName"] = "SyntheticWitness",
+                        ["testName"] = $"SyntheticWitness({id}, {variant})",
+                    };
+                    if (id == "owned-runtime")
+                    {
+                        test["lifecycle"] = new JsonObject
+                        {
+                            ["stage"] = "none",
+                            ["completion"] = "success",
+                            ["directContainers"] = false,
+                            ["resource"] = null,
+                            ["signals"] = new JsonArray(),
+                            ["rootDisposition"] = "not-applicable",
+                        };
+                    }
+
+                    if (id == "owned-load-correctness")
+                    {
+                        test["loadPurpose"] = variant == "alpha" ? "foundation" : "programme";
+                    }
+
+                    return (JsonNode)test;
+                }).ToArray()),
+            });
+        }
+
+        return register;
     }
 
     private static string RegisterPath([CallerFilePath] string sourcePath = "") =>

@@ -587,7 +587,7 @@ public static class ChangeWorkflowCommand
             .Where(entry => entry.Length != 0)
             .Select(entry =>
             {
-                int separator = entry.IndexOf('\0');
+                int separator = entry.IndexOf('\0', StringComparison.Ordinal);
                 if (separator <= 0)
                 {
                     throw new ChangeWorkflowException("change_git_log_invalid");
@@ -871,8 +871,8 @@ public static class ChangeWorkflowCommand
     {
         if (string.IsNullOrWhiteSpace(value) ||
             value.Length > 2_048 ||
-            value.Contains('\r') ||
-            value.Contains('\n') ||
+            value.Contains('\r', StringComparison.Ordinal) ||
+            value.Contains('\n', StringComparison.Ordinal) ||
             value.Any(char.IsControl))
         {
             throw new ChangeWorkflowException(diagnostic);

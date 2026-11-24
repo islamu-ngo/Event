@@ -6,8 +6,8 @@ using System.Text.Json.Serialization;
 namespace ISLAMU.ReleaseEngineering;
 
 /// <summary>
-/// An offline projection of final-lane authorized releases. This command neither grants publication
-/// authority nor writes a protected ref; the final lane authenticates the complete inventory first.
+/// Projects signed local release records under <c>docs/internal/releases/</c> into
+/// <c>docs/public/changelog/README.md</c> and its atomic <c>publication-manifest.v1.json</c>.
 /// </summary>
 public static class SyncPublicChangelogCommand
 {
@@ -16,19 +16,25 @@ public static class SyncPublicChangelogCommand
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         WriteIndented = true,
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
     };
 
-    public static int Run(string[] args, TextWriter output, string repositoryRoot, IFinalLaneInventoryAuthority? authority) =>
-        Run(args, output, repositoryRoot, authority, null);
+    public static int Run(string[] args, TextWriter output, string repositoryRoot) =>
+        Run(args, output, repositoryRoot, replacementCompleted: null);
 
-    internal static int Run(string[] args, TextWriter output, string repositoryRoot, IFinalLaneInventoryAuthority? authority,
+    internal static int Run(
+        string[] args,
+        TextWriter output,
+        string repositoryRoot,
         Action<string>? replacementCompleted)
     {
-        string? inventoryPath = null;
-        string? evidenceRoot = null;
+        ArgumentNullException.ThrowIfNull(args);
+        ArgumentNullException.ThrowIfNull(output);
+
         Uri? publicationBase = null;
+        string? allowedSignersPath = null;
         bool check = false;
         for (int index = 1; index < args.Length; index++)
         {
@@ -37,11 +43,8 @@ public static class SyncPublicChangelogCommand
                 case "--check" when !check:
                     check = true;
                     break;
-                case "--inventory" when inventoryPath is null && index + 1 < args.Length:
-                    inventoryPath = args[++index];
-                    break;
-                case "--retained-evidence" when evidenceRoot is null && index + 1 < args.Length:
-                    evidenceRoot = args[++index];
+                case "--allowed-signers" when allowedSignersPath is null && index + 1 < args.Length:
+                    allowedSignersPath = args[++index];
                     break;
                 case "--publication-base" when publicationBase is null && index + 1 < args.Length:
                     if (!Uri.TryCreate(args[++index], UriKind.Absolute, out publicationBase))
@@ -49,6 +52,7 @@ public static class SyncPublicChangelogCommand
                         output.WriteLine("changelog_invalid_publication_base");
                         return Program.UsageError;
                     }
+
                     break;
                 default:
                     output.WriteLine("changelog_invalid_arguments");
@@ -56,8 +60,7 @@ public static class SyncPublicChangelogCommand
             }
         }
 
-        if (args.Length < 2 || args[0] != "sync-public-changelog" ||
-            inventoryPath is null || evidenceRoot is null || publicationBase is null)
+        if (args.Length < 2 || args[0] != "sync-public-changelog" || publicationBase is null)
         {
             output.WriteLine("changelog_required_arguments_missing");
             return Program.UsageError;
@@ -66,17 +69,18 @@ public static class SyncPublicChangelogCommand
         try
         {
             string root = Path.GetFullPath(repositoryRoot);
+            string resolvedAllowedSigners = allowedSignersPath is not null
+                ? Path.GetFullPath(allowedSignersPath)
+                : GitTagSignatureVerifier.ResolveDefaultAllowedSignersPath(root);
             string pagePath = Path.Combine(root, "docs", "public", "changelog", "README.md");
             string manifestPath = Path.Combine(root, "docs", "public", "changelog", "publication-manifest.v1.json");
             string transactionPath = Path.Combine(root, "docs", "public", "changelog", ".publication-transaction.v1.json");
             if (!IsSafePath(pagePath) || !IsSafePath(manifestPath) || !IsSafePath(transactionPath) ||
-                !IsSafePath(Path.GetFullPath(inventoryPath)) ||
-                !IsSafePath(Path.GetFullPath(evidenceRoot)))
+                !IsSafePath(resolvedAllowedSigners))
             {
                 return Reject(output, "changelog_path_invalid");
             }
 
-            byte[] inventoryBytes = ReadBounded(inventoryPath);
             byte[] previousPage = File.Exists(pagePath) ? ReadBounded(pagePath) : [];
             byte[] previousManifest = File.Exists(manifestPath) ? ReadBounded(manifestPath) : [];
             PublicationTransaction? transaction = null;
@@ -99,6 +103,7 @@ public static class SyncPublicChangelogCommand
                 previousPage = transaction.OldPage;
                 previousManifest = transaction.OldManifest;
             }
+
             AcceptedPublicationManifest? accepted = previousManifest.Length == 0
                 ? null
                 : JsonSerializer.Deserialize<AcceptedPublicationManifest>(previousManifest, JsonOptions);
@@ -117,28 +122,33 @@ public static class SyncPublicChangelogCommand
                 }
             }
             else if (previousManifest.Length != 0 ||
-                previousPage.Length != 0 &&
-                !previousPage.AsSpan().SequenceEqual(Utf8.GetBytes(
-                    $"{PublicChangelogPolicy.StartMarker}\n{PublicChangelogPolicy.EndMarker}\n")))
+                (previousPage.Length != 0 &&
+                 !previousPage.AsSpan().SequenceEqual(Utf8.GetBytes(
+                     $"{PublicChangelogPolicy.StartMarker}\n{PublicChangelogPolicy.EndMarker}\n"))))
             {
                 return Reject(output, "changelog_accepted_manifest_missing");
             }
 
-            AuthorizedInventoryResult inventory = AuthorizedInventoryPolicy.Verify(
-                root, Utf8.GetString(inventoryBytes), evidenceRoot, authority,
-                accepted?.Releases.Select(release => new AcceptedReleaseIdentity(
-                    release.Version, release.TagObjectId, release.EvidenceSha256)).ToArray() ?? [],
-                PublicationInventoryVerificationBudget.OverallTimeout);
-            if (!inventory.IsValid)
+            if (!TryLoadSignedReleases(root, resolvedAllowedSigners, out List<PublicChangelogRelease> releases, out string? loadDiagnostic))
             {
-                return Reject(output, inventory.Diagnostics.Count == 0
-                    ? "changelog_inventory_invalid" : inventory.Diagnostics[0]);
+                return Reject(output, loadDiagnostic ?? "changelog_releases_invalid");
             }
 
-            PublicChangelogRelease[] entries = inventory.Releases.Select(release => new PublicChangelogRelease(
-                release.Descriptor, release.Context, release.Fragments, release.Summary, release.NotesSha256,
-                release.TagObjectId, release.TargetOid)).ToArray();
-            PublicChangelogResult generated = PublicChangelogPolicy.Generate(entries, publicationBase);
+            if (accepted is not null)
+            {
+                Dictionary<string, PublicChangelogRelease> byVersion = releases.ToDictionary(release => release.Descriptor.Version, StringComparer.Ordinal);
+                foreach (AcceptedPublicationRelease prior in accepted.Releases)
+                {
+                    if (!byVersion.TryGetValue(prior.Version, out PublicChangelogRelease? current) ||
+                        !string.Equals(current.TagObjectId, prior.TagObjectId, StringComparison.Ordinal) ||
+                        !string.Equals(current.NotesSha256, prior.NotesSha256, StringComparison.Ordinal))
+                    {
+                        return Reject(output, "changelog_accepted_history_omitted");
+                    }
+                }
+            }
+
+            PublicChangelogResult generated = PublicChangelogPolicy.Generate(releases, publicationBase);
             if (!generated.IsValid)
             {
                 return Reject(output, generated.Diagnostic ?? "changelog_projection_invalid");
@@ -151,22 +161,26 @@ public static class SyncPublicChangelogCommand
                 return Reject(output, merged.Diagnostic ?? "changelog_projection_invalid");
             }
 
+            AcceptedPublicationRelease[] releaseRecords = releases
+                .OrderBy(release => release.Descriptor.Version, StringComparer.Ordinal)
+                .Select(release => new AcceptedPublicationRelease(
+                    release.Descriptor.Version,
+                    release.TagObjectId,
+                    release.NotesSha256))
+                .ToArray();
+            string inputSetDigest = Digest(JsonSerializer.SerializeToUtf8Bytes(releaseRecords, JsonOptions));
             var manifest = new AcceptedPublicationManifest(
                 "publication-manifest.v1",
-                Digest(inventoryBytes),
+                inputSetDigest,
                 Digest(merged.Page!),
                 generated.HighestStableVersion,
-                inventory.Releases.OrderBy(release => release.Version, StringComparer.Ordinal)
-                    .Select(release => new AcceptedPublicationRelease(
-                        release.Version, release.TagObjectId, release.EvidenceSha256)).ToArray());
+                releaseRecords);
             ArtifactPolicyResult manifestJson = ReleaseArtifactPolicy.NormalizeJson(JsonSerializer.Serialize(manifest, JsonOptions));
             if (!manifestJson.IsValid || manifestJson.Bytes is null || merged.Page!.Length > MaximumInputBytes)
             {
                 return Reject(output, "changelog_manifest_invalid");
             }
 
-            // A journal is not publication authority. Recovery is permitted only when the
-            // supplied, authenticated inventory reproduces the exact pending generation.
             if (transaction is not null &&
                 (!transaction.NewPage.AsSpan().SequenceEqual(merged.Page) ||
                  !transaction.NewManifest.AsSpan().SequenceEqual(manifestJson.Bytes)))
@@ -178,20 +192,29 @@ public static class SyncPublicChangelogCommand
                 previousManifest.AsSpan().SequenceEqual(manifestJson.Bytes);
             if (check)
             {
-                if (transaction is not null) return Reject(output, "changelog_transaction_incomplete");
+                if (transaction is not null)
+                {
+                    return Reject(output, "changelog_transaction_incomplete");
+                }
+
                 output.WriteLine(same ? "changelog_current" : "changelog_stale");
                 return same ? Program.Success : Program.ToolchainRejected;
             }
 
+            Directory.CreateDirectory(Path.GetDirectoryName(pagePath)!);
             if (!same || transaction is not null)
             {
-                transaction ??= new PublicationTransaction("publication-transaction.v1",
-                    previousPage, previousManifest, merged.Page!, manifestJson.Bytes);
+                transaction ??= new PublicationTransaction(
+                    "publication-transaction.v1",
+                    previousPage,
+                    previousManifest,
+                    merged.Page!,
+                    manifestJson.Bytes);
                 if (!File.Exists(transactionPath))
                 {
-                    // Journal members are whole documents, not artifact-policy text fields.
                     WriteAtomic(transactionPath, JsonSerializer.SerializeToUtf8Bytes(transaction, JsonOptions));
                 }
+
                 try
                 {
                     WriteAtomic(manifestPath, transaction.NewManifest);
@@ -202,24 +225,130 @@ public static class SyncPublicChangelogCommand
                 }
                 catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
                 {
-                    // Keep the journal if rollback itself fails, so a later authenticated
-                    // invocation can recover either atomic old/new member combination.
                     Restore(manifestPath, transaction.OldManifest);
                     Restore(pagePath, transaction.OldPage);
-                    File.Delete(transactionPath);
+                    if (File.Exists(transactionPath))
+                    {
+                        File.Delete(transactionPath);
+                    }
+
                     throw;
                 }
             }
 
-            if (generated.Warning is not null) output.WriteLine(generated.Warning);
+            if (generated.Warning is not null)
+            {
+                output.WriteLine(generated.Warning);
+            }
+
             output.WriteLine(same ? "changelog_unchanged" : "changelog_generated");
             return Program.Success;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
-            ArgumentException or JsonException or InvalidOperationException)
+            ArgumentException or JsonException or InvalidOperationException or DecoderFallbackException)
         {
             return Reject(output, "changelog_input_invalid");
         }
+    }
+
+    private static bool TryLoadSignedReleases(
+        string repositoryRoot,
+        string allowedSignersPath,
+        out List<PublicChangelogRelease> releases,
+        out string? diagnostic)
+    {
+        releases = [];
+        diagnostic = null;
+
+        string releasesRoot = Path.Combine(repositoryRoot, "docs", "internal", "releases");
+        if (!Directory.Exists(releasesRoot))
+        {
+            diagnostic = "changelog_releases_missing";
+            return false;
+        }
+
+        string fragmentsRoot = Path.Combine(releasesRoot, "changes");
+        string[] candidateDirs = Directory.EnumerateDirectories(releasesRoot, "*", SearchOption.TopDirectoryOnly)
+            .Where(dir => File.Exists(Path.Combine(dir, "release.yaml")))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        if (candidateDirs.Length == 0)
+        {
+            diagnostic = "changelog_releases_missing";
+            return false;
+        }
+
+        foreach (string releaseDir in candidateDirs)
+        {
+            string releasePath = Path.Combine(releaseDir, "release.yaml");
+            string summaryPath = Path.Combine(releaseDir, "summary.md");
+            string contextPath = Path.Combine(releaseDir, "release-context.v1.json");
+            string notesPath = Path.Combine(releaseDir, "release-notes.md");
+            if (!File.Exists(summaryPath) || !File.Exists(contextPath) || !File.Exists(notesPath))
+            {
+                diagnostic = "changelog_release_files_missing";
+                return false;
+            }
+
+            string releaseYaml = Utf8.GetString(ReadBounded(releasePath));
+            string summaryText = Utf8.GetString(ReadBounded(summaryPath)).TrimEnd('\n');
+            byte[] contextBytes = ReadBounded(contextPath);
+            byte[] notesBytes = ReadBounded(notesPath);
+            ReleaseContext? context = JsonSerializer.Deserialize<ReleaseContext>(contextBytes, JsonOptions);
+            if (context is null)
+            {
+                diagnostic = "changelog_context_invalid";
+                return false;
+            }
+
+            string[] linkedIds = context.Changes
+                .Select(change => change.ChangeId)
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            var fragmentYamls = new List<string>(linkedIds.Length);
+            foreach (string id in linkedIds)
+            {
+                string fragmentPath = Path.Combine(fragmentsRoot, id + ".yaml");
+                if (!File.Exists(fragmentPath))
+                {
+                    diagnostic = $"changelog_fragment_missing:{id}";
+                    return false;
+                }
+
+                fragmentYamls.Add(Utf8.GetString(ReadBounded(fragmentPath)));
+            }
+
+            ReleaseInputValidationResult validated = ReleaseInputPolicy.Validate(releaseYaml, fragmentYamls, []);
+            if (!validated.IsValid || validated.Descriptor is null)
+            {
+                diagnostic = validated.Diagnostics.Count == 0 ? "changelog_release_input_invalid" : validated.Diagnostics[0];
+                return false;
+            }
+
+            GitTagVerificationResult tagVerification = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
+                repositoryRoot,
+                $"v{validated.Descriptor.Version}",
+                allowedSignersPath));
+            if (!tagVerification.IsValid || tagVerification.TagObjectId is null || tagVerification.TargetCommitOid is null)
+            {
+                diagnostic = tagVerification.Diagnostic ?? "changelog_tag_invalid";
+                return false;
+            }
+
+            releases.Add(new PublicChangelogRelease(
+                validated.Descriptor,
+                context,
+                validated.Fragments,
+                summaryText,
+                Digest(notesBytes),
+                tagVerification.TagObjectId,
+                tagVerification.TargetCommitOid));
+        }
+
+        return true;
     }
 
     private static bool IsSafePath(string path)
@@ -227,8 +356,12 @@ public static class SyncPublicChangelogCommand
         for (string? part = path; part is not null; part = Path.GetDirectoryName(part))
         {
             if ((File.Exists(part) || Directory.Exists(part)) &&
-                (File.GetAttributes(part) & FileAttributes.ReparsePoint) != 0) return false;
+                (File.GetAttributes(part) & FileAttributes.ReparsePoint) != 0)
+            {
+                return false;
+            }
         }
+
         return true;
     }
 
@@ -237,14 +370,27 @@ public static class SyncPublicChangelogCommand
 
     private static void Restore(string path, byte[] content)
     {
-        if (content.Length == 0) File.Delete(path);
-        else WriteAtomic(path, content);
+        if (content.Length == 0)
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        else
+        {
+            WriteAtomic(path, content);
+        }
     }
 
     private static byte[] ReadBounded(string path, int maximumBytes = MaximumInputBytes)
     {
         using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (file.Length > maximumBytes) throw new IOException("changelog_input_too_large");
+        if (file.Length > maximumBytes)
+        {
+            throw new IOException("changelog_input_too_large");
+        }
+
         using var memory = new MemoryStream();
         file.CopyTo(memory);
         return memory.ToArray();
@@ -260,11 +406,15 @@ public static class SyncPublicChangelogCommand
                 file.Write(content);
                 file.Flush(flushToDisk: true);
             }
+
             File.Move(temporary, path, overwrite: true);
         }
         finally
         {
-            if (File.Exists(temporary)) File.Delete(temporary);
+            if (File.Exists(temporary))
+            {
+                File.Delete(temporary);
+            }
         }
     }
 
@@ -277,11 +427,18 @@ public static class SyncPublicChangelogCommand
     }
 
     private sealed record AcceptedPublicationManifest(
-        string SchemaVersion, string InputSetSha256, string ProjectionSha256,
-        string? HighestStableVersion, IReadOnlyList<AcceptedPublicationRelease> Releases);
+        string SchemaVersion,
+        string InputSetSha256,
+        string ProjectionSha256,
+        string? HighestStableVersion,
+        IReadOnlyList<AcceptedPublicationRelease> Releases);
 
-    private sealed record AcceptedPublicationRelease(string Version, string TagObjectId, string EvidenceSha256);
+    private sealed record AcceptedPublicationRelease(string Version, string TagObjectId, string NotesSha256);
 
     private sealed record PublicationTransaction(
-        string SchemaVersion, byte[] OldPage, byte[] OldManifest, byte[] NewPage, byte[] NewManifest);
+        string SchemaVersion,
+        byte[] OldPage,
+        byte[] OldManifest,
+        byte[] NewPage,
+        byte[] NewManifest);
 }

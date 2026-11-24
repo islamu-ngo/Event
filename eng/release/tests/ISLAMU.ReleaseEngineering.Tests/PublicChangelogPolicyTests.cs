@@ -152,7 +152,7 @@ public sealed class PublicChangelogPolicyTests
     }
 
     private static PublicChangelogRelease Release(string version, string date) => new(
-        new ReleaseDescriptor(version, "v1.0", DateOnly.Parse(date), "v0.9.0", "v0.9.0",
+        new ReleaseDescriptor(version, "v1.0", DateOnly.Parse(date, System.Globalization.CultureInfo.InvariantCulture), "v0.9.0", "v0.9.0",
             new ReleaseRangeReference("refs/tags/v0.9.0", new string('c', 40), "refs/tags/v0.9.0", new string('c', 40)), [], new Dictionary<string, string>()),
         Context(version, date, [Change("CHG-FEAT", "feat", "events", "publish schedule")]),
         [Fragment("CHG-FEAT", "feat", "events", "publish schedule", new Dictionary<string, FragmentImpact>())],

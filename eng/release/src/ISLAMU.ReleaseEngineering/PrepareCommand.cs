@@ -1,5 +1,5 @@
+using System.Diagnostics;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace ISLAMU.ReleaseEngineering;
 
@@ -9,6 +9,9 @@ public static class PrepareCommand
 
     public static int Run(string[] args, TextWriter output, string repositoryRoot, string platform, TimeSpan timeout)
     {
+        ArgumentNullException.ThrowIfNull(args);
+        ArgumentNullException.ThrowIfNull(output);
+
         if (args.Length != 2)
         {
             output.WriteLine("invalid_arguments: prepare requires release directory");
@@ -46,13 +49,13 @@ public static class PrepareCommand
             }
 
             ReleaseDescriptor descriptor = descriptorOnly.Descriptor;
-            string? pinnedObjectsDiagnostic = ValidatePinnedObjects(root, descriptor);
+            string? pinnedObjectsDiagnostic = ValidatePinnedObjects(root, descriptor, timeout, out GitTagVerificationResult? verifiedBaseline);
             if (pinnedObjectsDiagnostic is not null)
             {
                 return Reject(output, pinnedObjectsDiagnostic);
             }
 
-            ReleaseCommit[] commits = ReadGitRange(root, descriptor.PreviousPublishedTag, "HEAD");
+            IReadOnlyList<ReleaseCommit> commits = GitTagSignatureVerifier.ReadCommitRange(root, descriptor.PreviousPublishedTag, "HEAD", timeout);
             string[] rangeOids = commits.Select(commit => commit.Oid).ToArray();
             ReleasePolicy policy = ReleasePolicy.LoadFromRepositoryRoot(root);
             ChangeIdRenameLoadResult renameResult = ChangeIdRenamePolicy.Load(root);
@@ -80,14 +83,13 @@ public static class PrepareCommand
                 return Reject(output, "prepare_fragment_missing");
             }
 
-            VerifiedBaseline? baseline = TryReadBaseline(root, descriptor);
             ReleaseInputValidationResult input = ReleaseInputPolicy.Validate(releaseYaml, fragments, []);
             ReleaseContextValidationResult context = ReleaseContextPolicy.Build(
                 input,
                 commits,
                 policy,
-                verifiedBaselineRef: baseline?.Ref,
-                verifiedBaselineOid: baseline?.TargetOid,
+                verifiedBaselineRef: verifiedBaseline?.TagName,
+                verifiedBaselineOid: verifiedBaseline?.TargetCommitOid,
                 changeIdRenames: renameResult.Renames);
             if (!context.IsValid || context.Json is null)
             {
@@ -95,15 +97,17 @@ public static class PrepareCommand
             }
 
             string contextJson = context.Json;
-
-            TrustedBundleResult trusted = VerifyBundle(root);
-            if (!trusted.IsValid || trusted.Bundle is null)
-            {
-                return Reject(output, "prepare_trusted_bundle_invalid");
-            }
+            string lockPath = Path.Combine(root, "eng", "release", "toolchain.lock.json");
+            string configPath = Path.Combine(root, "eng", "release", "cliff.toml");
+            string toolDirectory = GitCliffToolchainStore.ResolveConfiguredDirectory(
+                lockPath,
+                Environment.GetEnvironmentVariable(GitCliffToolchainStore.DefaultBundleEnvironmentVariable),
+                platform);
 
             var renderRequest = new GitCliffRenderRequest(
-                trusted.Bundle,
+                lockPath,
+                toolDirectory,
+                configPath,
                 StrictUtf8.GetBytes(contextJson),
                 platform,
                 Path.Combine(Path.GetTempPath(), "islamu-release-renderer"),
@@ -143,22 +147,36 @@ public static class PrepareCommand
         }
     }
 
-    private static string? ValidatePinnedObjects(string repositoryRoot, ReleaseDescriptor descriptor)
+    private static string? ValidatePinnedObjects(
+        string repositoryRoot,
+        ReleaseDescriptor descriptor,
+        TimeSpan timeout,
+        out GitTagVerificationResult? verifiedBaseline)
     {
+        verifiedBaseline = null;
         if (ReleaseInputPolicy.IsBaselineRef(descriptor.BaseStableTag) || ReleaseInputPolicy.IsBaselineRef(descriptor.PreviousPublishedTag))
         {
-            if (!BaselineEvidencePolicy.TryRead(repositoryRoot, descriptor.BaseStableTag, out VerifiedBaseline baseline) ||
-                descriptor.BaseStableTag != descriptor.PreviousPublishedTag ||
+            if (descriptor.BaseStableTag != descriptor.PreviousPublishedTag ||
                 descriptor.ReleaseRange.BaseRef != descriptor.BaseStableTag ||
                 descriptor.ReleaseRange.PreviousRef != descriptor.PreviousPublishedTag ||
-                descriptor.ReleaseRange.BaseOid != baseline.TargetOid ||
-                descriptor.ReleaseRange.PreviousOid != baseline.TargetOid ||
-                RunGit(repositoryRoot, "rev-parse", $"{descriptor.BaseStableTag}^{{commit}}").Trim() != baseline.TargetOid ||
-                RunGit(repositoryRoot, "rev-parse", $"{descriptor.BaseStableTag}^{{object}}").Trim() != baseline.TagObjectId)
+                descriptor.ReleaseRange.BaseOid != descriptor.ReleaseRange.PreviousOid)
             {
                 return "prepare_release_range_moved";
             }
 
+            string allowedSigners = GitTagSignatureVerifier.ResolveDefaultAllowedSignersPath(repositoryRoot);
+            GitTagVerificationResult baselineResult = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
+                repositoryRoot,
+                descriptor.BaseStableTag,
+                allowedSigners,
+                ExpectedTargetOid: descriptor.ReleaseRange.BaseOid,
+                Timeout: timeout));
+            if (!baselineResult.IsValid)
+            {
+                return baselineResult.Diagnostic ?? "prepare_baseline_tag_invalid";
+            }
+
+            verifiedBaseline = baselineResult;
             GitReleaseValidationResult git = GitRepositoryValidator.Validate(new GitReleaseValidationRequest(
                 repositoryRoot,
                 descriptor.Line,
@@ -178,26 +196,6 @@ public static class PrepareCommand
             !string.Equals(headOid, previousOid, StringComparison.Ordinal)
             ? null
             : "prepare_release_range_moved";
-    }
-
-    private static VerifiedBaseline? TryReadBaseline(string repositoryRoot, ReleaseDescriptor descriptor) =>
-        ReleaseInputPolicy.IsBaselineRef(descriptor.BaseStableTag) && BaselineEvidencePolicy.TryRead(repositoryRoot, descriptor.BaseStableTag, out VerifiedBaseline baseline)
-            ? baseline
-            : null;
-
-    private static ReleaseCommit[] ReadGitRange(string repositoryRoot, string previousPublishedTag, string rangeEndRef)
-    {
-        string raw = RunGit(repositoryRoot, "log", "--reverse", "--format=%H%x00%B%x1e", $"{previousPublishedTag}..{rangeEndRef}");
-        return raw.Split('\u001e', StringSplitOptions.RemoveEmptyEntries)
-            .Select(entry => entry.TrimStart('\n'))
-            .Where(entry => entry.Length != 0)
-            .Select(entry =>
-            {
-                int separator = entry.IndexOf('\0');
-                if (separator <= 0) throw new IOException();
-                return new ReleaseCommit(entry[..separator], entry[(separator + 1)..].TrimEnd('\n'));
-            })
-            .ToArray();
     }
 
     private static bool IsValidSummary(byte[] bytes)
@@ -221,9 +219,9 @@ public static class PrepareCommand
 
     private static string RunGit(string repositoryRoot, params string[] arguments)
     {
-        using var process = new System.Diagnostics.Process
+        using var process = new Process
         {
-            StartInfo = new System.Diagnostics.ProcessStartInfo("git")
+            StartInfo = new ProcessStartInfo(ReleaseToolPaths.Git)
             {
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -267,26 +265,6 @@ public static class PrepareCommand
         }
     }
 
-    private static TrustedBundleResult VerifyBundle(string candidateRoot)
-    {
-        string Required(string name) => Environment.GetEnvironmentVariable(name) ?? string.Empty;
-        return TrustedBundlePolicy.Verify(new TrustedBundleVerificationRequest(
-            Required("ISLAMU_RELEASE_TRUSTED_BUNDLE"),
-            candidateRoot,
-            new PromotionAuthorityInput(
-                Required("ISLAMU_RELEASE_PROMOTION_RECEIPT"),
-                Required("ISLAMU_RELEASE_PROMOTION_SIGNATURE"),
-                Required("ISLAMU_RELEASE_PROMOTION_PRINCIPAL")),
-            Required("ISLAMU_RELEASE_BUNDLE_ID"),
-            Required("ISLAMU_RELEASE_BUNDLE_VERSION"),
-            Required("ISLAMU_RELEASE_POLICY_VERSION"),
-            Required("ISLAMU_RELEASE_CONFIG_VERSION"),
-            Required("ISLAMU_RELEASE_TRUST_VERSION"))
-        {
-            ExpectedManifestDigest = Required("ISLAMU_RELEASE_MANIFEST_SHA256"),
-        });
-    }
-
     private static string ReadNormalizedText(string path)
     {
         byte[] bytes = File.ReadAllBytes(path);
@@ -324,9 +302,9 @@ public static class PrepareCommand
         return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 
-    private static bool IsLink(string path) => File.Exists(path) || Directory.Exists(path)
-        ? (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0
-        : false;
+    private static bool IsLink(string path) =>
+        (File.Exists(path) || Directory.Exists(path)) &&
+        (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
 
     private static bool HasLinkInPath(string root, string path)
     {

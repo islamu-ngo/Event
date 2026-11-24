@@ -1,5 +1,0 @@
-# ABOUTME: Intentionally empty verifier-owned SSH trust root for tooling promotion receipts.
-# ABOUTME: Operators must provision reviewed promoter public keys in a previously promoted verifier before activation.
-
-# No production tooling-promotion signer is approved yet.
-# This protected runtime file is never selected or replaced by a verification request.

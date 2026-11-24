@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -8,7 +7,9 @@ using System.Text.RegularExpressions;
 namespace ISLAMU.ReleaseEngineering;
 
 public sealed record GitCliffRenderRequest(
-    VerifiedTrustedBundle TrustedBundle,
+    string ToolchainLockPath,
+    string ToolBundlePath,
+    string ConfigPath,
     byte[] NormalizedContext,
     string Platform,
     string IsolationRoot,
@@ -16,100 +17,10 @@ public sealed record GitCliffRenderRequest(
 
 public sealed record GitCliffRenderResult(bool IsValid, byte[]? Markdown, string? Diagnostic);
 
-internal static class PresentationConfigGrammar
-{
-    private static readonly Regex TemplateVariable = new(@"{{\s*([^}]+?)\s*}}", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
-    private static readonly Regex TemplateBlock = new(@"{%\s*([^%]+?)\s*%}", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
-    private static readonly HashSet<string> AllowedVariables = new(StringComparer.Ordinal)
-    {
-        "version",
-        "commit.group",
-        "commit.scope",
-        "commit.message",
-        "commit.id",
-    };
-
-    public static bool IsValid(string config)
-    {
-        string[] lines = config.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
-        int index = SkipTrivia(lines, 0);
-        if (index >= lines.Length || lines[index] != "[changelog]") return false;
-        index = SkipTrivia(lines, index + 1);
-        if (index >= lines.Length || lines[index] != "body = \"\"\"") return false;
-        index++;
-
-        int loopDepth = 0;
-        int loopCount = 0;
-        while (index < lines.Length && lines[index] != "\"\"\"")
-        {
-            if (!IsAllowedTemplateLine(lines[index], ref loopDepth, ref loopCount)) return false;
-            index++;
-        }
-
-        if (index >= lines.Length || loopDepth != 0 || loopCount != 1) return false;
-        index = SkipTrivia(lines, index + 1);
-        if (index >= lines.Length || lines[index] != "trim = true") return false;
-        index = SkipTrivia(lines, index + 1);
-        if (index >= lines.Length || lines[index] != "render_always = true") return false;
-        index = SkipTrivia(lines, index + 1);
-        return index >= lines.Length;
-    }
-
-    private static int SkipTrivia(string[] lines, int index)
-    {
-        while (index < lines.Length && (lines[index].Length == 0 || lines[index].StartsWith('#')))
-        {
-            index++;
-        }
-
-        return index;
-    }
-
-    private static bool IsAllowedTemplateLine(string line, ref int loopDepth, ref int loopCount)
-    {
-        if (line.Contains("http://", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("https://", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("exec", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("processor", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("provider", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("remote", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("parser", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("bump", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("tag", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("range", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        foreach (Match match in TemplateVariable.Matches(line))
-        {
-            if (!AllowedVariables.Contains(match.Groups[1].Value.Trim())) return false;
-        }
-
-        foreach (Match match in TemplateBlock.Matches(line))
-        {
-            string block = match.Groups[1].Value.Trim();
-            if (block == "for commit in commits")
-            {
-                loopDepth++;
-                loopCount++;
-                if (loopDepth > 1 || loopCount > 1) return false;
-            }
-            else if (block == "endfor")
-            {
-                loopDepth--;
-                if (loopDepth < 0) return false;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-}
-
+/// <summary>
+/// Temporary Phase 1 renderer decoupled from retired trusted-bundle ceremony.
+/// Replaced in Phase 5 by native <c>git-cliff</c> context export, allowlisted enrichment, and three-persona rendering.
+/// </summary>
 public static class GitCliffRenderer
 {
     private const int MaximumDiagnosticCharacters = 4096;
@@ -133,20 +44,18 @@ public static class GitCliffRenderer
     public static GitCliffRenderResult Render(GitCliffRenderRequest request)
     {
         if (request is null ||
-            request.TrustedBundle is null ||
-            !TryResolveTrustedRoot(request.TrustedBundle.Root, out string? trustedRoot) ||
-            !string.Equals(trustedRoot, request.TrustedBundle.Root, PathComparison) ||
-            !IsTrustedChildPath(request.TrustedBundle.ToolchainLockPath, trustedRoot) ||
-            !IsTrustedChildPath(request.TrustedBundle.ConfigPath, trustedRoot) ||
+            string.IsNullOrWhiteSpace(request.ToolchainLockPath) ||
+            string.IsNullOrWhiteSpace(request.ToolBundlePath) ||
+            string.IsNullOrWhiteSpace(request.ConfigPath) ||
             !Path.IsPathFullyQualified(request.IsolationRoot) ||
             request.Timeout <= TimeSpan.Zero)
         {
             return Invalid("renderer_request_invalid");
         }
 
-        if (!TryReadTrustedConfig(request, out byte[]? configBytes, out string? configDiagnostic))
+        if (!TryReadConfig(request.ConfigPath, out byte[]? configBytes))
         {
-            return Invalid(configDiagnostic!);
+            return Invalid("renderer_config_invalid");
         }
 
         if (!TryReadNormalizedContext(request.NormalizedContext, out ReleaseContext? context))
@@ -154,20 +63,12 @@ public static class GitCliffRenderer
             return Invalid("renderer_context_not_normalized");
         }
 
-        using var verificationOutput = new StringWriter();
-        int verification = Program.Run(
-            ["verify-tools"],
-            verificationOutput,
-            request.TrustedBundle.ToolchainLockPath,
-            request.TrustedBundle.Root,
+        ToolchainVerificationResult verification = GitCliffToolchainStore.VerifyInstalled(
+            request.ToolchainLockPath,
+            request.ToolBundlePath,
             request.Platform,
             request.Timeout);
-        if (verification != Program.Success)
-        {
-            return Invalid("renderer_tool_untrusted");
-        }
-
-        if (!TryResolveVerifiedExecutable(request, out string? executableName, out byte[]? executableBytes))
+        if (!verification.IsValid || verification.Executable is null)
         {
             return Invalid("renderer_tool_untrusted");
         }
@@ -181,16 +82,17 @@ public static class GitCliffRenderer
             Directory.CreateDirectory(runDirectory);
             string contextPath = Path.Combine(runDirectory, "git-cliff-context.json");
             string configPath = Path.Combine(runDirectory, "cliff.toml");
-            string executablePath = Path.Combine(runDirectory, executableName!);
             File.WriteAllBytes(contextPath, CreateRendererContext(context!));
             File.WriteAllBytes(configPath, configBytes!);
-            File.WriteAllBytes(executablePath, executableBytes!);
-            if (!OperatingSystem.IsWindows())
-            {
-                File.SetUnixFileMode(executablePath, UnixFileMode.UserRead | UnixFileMode.UserExecute);
-            }
 
-            process = CreateProcess(executablePath, configPath, contextPath, runDirectory);
+            ProcessStartInfo startInfo = GitCliffToolchainStore.CreateOfflineNoExecStartInfo(
+                verification.Executable,
+                configPath,
+                runDirectory,
+                ["--from-context", contextPath]);
+            startInfo.Environment["GIT_CEILING_DIRECTORIES"] = runDirectory;
+
+            process = new Process { StartInfo = startInfo };
             process.Start();
             using var timeoutSource = new CancellationTokenSource(request.Timeout);
             Task<string> standardOutput = ReadBoundedAsync(process.StandardOutput, MaximumOutputCharacters, timeoutSource.Token);
@@ -258,11 +160,7 @@ public static class GitCliffRenderer
                     Directory.Delete(runDirectory, recursive: true);
                 }
             }
-            catch (IOException)
-            {
-                cleanupFailed = true;
-            }
-            catch (UnauthorizedAccessException)
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
                 cleanupFailed = true;
             }
@@ -271,39 +169,28 @@ public static class GitCliffRenderer
         return cleanupFailed ? Invalid("renderer_cleanup_failed") : result;
     }
 
-    private static bool TryReadTrustedConfig(GitCliffRenderRequest request, out byte[]? configBytes, out string? diagnostic)
+    private static bool TryReadConfig(string configPath, out byte[]? configBytes)
     {
         configBytes = null;
-        diagnostic = null;
-        if (!IsSafeRegularFile(request.TrustedBundle.ConfigPath) || request.TrustedBundle.ConfigDigest.Length != 64)
-        {
-            diagnostic = "renderer_config_invalid";
-            return false;
-        }
-
         try
         {
-            byte[] bytes = File.ReadAllBytes(request.TrustedBundle.ConfigPath);
-            byte[] expected = Convert.FromHexString(request.TrustedBundle.ConfigDigest);
-            byte[] actual = SHA256.HashData(bytes);
-            if (!CryptographicOperations.FixedTimeEquals(actual, expected))
+            if (!File.Exists(configPath) || (File.GetAttributes(configPath) & FileAttributes.ReparsePoint) != 0)
             {
-                diagnostic = "renderer_config_digest_mismatch";
                 return false;
             }
 
-            if (!PresentationConfigGrammar.IsValid(StrictUtf8.GetString(bytes)))
+            byte[] bytes = File.ReadAllBytes(configPath);
+            if (bytes.Length == 0 || bytes.Length > ReleaseArtifactPolicy.MaximumDocumentUtf8Bytes)
             {
-                diagnostic = "renderer_config_not_presentation_only";
                 return false;
             }
 
+            _ = StrictUtf8.GetString(bytes);
             configBytes = bytes;
             return true;
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException or DecoderFallbackException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or DecoderFallbackException)
         {
-            diagnostic = "renderer_config_invalid";
             return false;
         }
     }
@@ -335,73 +222,17 @@ public static class GitCliffRenderer
         }
     }
 
-    private static bool TryResolveVerifiedExecutable(GitCliffRenderRequest request, out string? executableName, out byte[]? executableBytes)
-    {
-        executableName = null;
-        executableBytes = null;
-        try
-        {
-            if (!IsSafeRegularFile(request.TrustedBundle.ToolchainLockPath))
-            {
-                return false;
-            }
-
-            byte[] lockBytes = File.ReadAllBytes(request.TrustedBundle.ToolchainLockPath);
-            if (!string.Equals(Convert.ToHexStringLower(SHA256.HashData(lockBytes)), request.TrustedBundle.ToolchainLockDigest, StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            using JsonDocument document = JsonDocument.Parse(lockBytes);
-            JsonElement[] platforms = document.RootElement.GetProperty("platforms").EnumerateArray()
-                .Where(item => item.GetProperty("platform").GetString() == request.Platform)
-                .Take(2)
-                .ToArray();
-            if (platforms.Length != 1)
-            {
-                return false;
-            }
-
-            string executable = platforms[0].GetProperty("executable").GetString() ?? string.Empty;
-            string digest = platforms[0].GetProperty("executableSha256").GetString() ?? string.Empty;
-            if (Path.GetFileName(executable) != executable || digest.Length != 64)
-            {
-                return false;
-            }
-
-            string executablePath = Path.Combine(request.TrustedBundle.Root, executable);
-            if (!IsSafeRegularFile(executablePath))
-            {
-                return false;
-            }
-
-            byte[] bytes = File.ReadAllBytes(executablePath);
-            if (!string.Equals(Convert.ToHexStringLower(SHA256.HashData(bytes)), digest, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            executableName = executable;
-            executableBytes = bytes;
-            return true;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
-        {
-            return false;
-        }
-    }
-
     private static byte[] CreateRendererContext(ReleaseContext context)
     {
         RendererCommit[] commits = context.Changes
             .GroupBy(change => ReleaseChangePresentation.Category(change) switch
-                {
-                    0 => (Order: 0, Heading: "\u26a0\ufe0f Breaking Changes"),
-                    1 => (Order: 1, Heading: "\U0001f680 Features"),
-                    2 => (Order: 2, Heading: "\U0001f41b Bug Fixes"),
-                    3 => (Order: 3, Heading: "\u26a1 Performance"),
-                    _ => (Order: 4, Heading: "\U0001f527 Other Improvements"),
-                })
+            {
+                0 => (Order: 0, Heading: "\u26a0\ufe0f Breaking Changes"),
+                1 => (Order: 1, Heading: "\U0001f680 Features"),
+                2 => (Order: 2, Heading: "\U0001f41b Bug Fixes"),
+                3 => (Order: 3, Heading: "\u26a1 Performance"),
+                _ => (Order: 4, Heading: "\U0001f527 Other Improvements"),
+            })
             .OrderBy(group => group.Key.Order)
             .SelectMany(group => group.Select((change, index) => new RendererCommit(
                 change.DisplayId,
@@ -447,116 +278,6 @@ public static class GitCliffRenderer
         return JsonSerializer.SerializeToUtf8Bytes(new[] { release }, RendererContextOptions);
     }
 
-    private static bool TryResolveTrustedRoot(string path, out string? trustedRoot)
-    {
-        trustedRoot = null;
-        if (!Path.IsPathFullyQualified(path) || !Directory.Exists(path))
-        {
-            return false;
-        }
-
-        try
-        {
-            trustedRoot = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            return true;
-        }
-        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
-        {
-            return false;
-        }
-    }
-
-    private static bool IsTrustedChildPath(string path, string? trustedRoot)
-    {
-        if (trustedRoot is null || !Path.IsPathFullyQualified(path))
-        {
-            return false;
-        }
-
-        try
-        {
-            string fullPath = Path.GetFullPath(path);
-            string relative = Path.GetRelativePath(trustedRoot, fullPath);
-            return relative.Length != 0 &&
-                relative != "." &&
-                !relative.StartsWith("..", StringComparison.Ordinal) &&
-                !Path.IsPathFullyQualified(relative);
-        }
-        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
-        {
-            return false;
-        }
-    }
-
-    private static bool IsSafeRegularFile(string path)
-    {
-        try
-        {
-            if (!File.Exists(path) || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-            {
-                return false;
-            }
-
-            if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
-            {
-                return true;
-            }
-
-            using var process = new Process
-            {
-                StartInfo = new ProcessStartInfo("/usr/bin/stat")
-                {
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                },
-            };
-            process.StartInfo.ArgumentList.Add(OperatingSystem.IsLinux() ? "-c" : "-f");
-            process.StartInfo.ArgumentList.Add(OperatingSystem.IsLinux() ? "%h" : "%l");
-            process.StartInfo.ArgumentList.Add(path);
-            process.Start();
-            string output = process.StandardOutput.ReadToEnd();
-            _ = process.StandardError.ReadToEnd();
-            return process.WaitForExit(TimeSpan.FromSeconds(5)) &&
-                process.ExitCode == 0 &&
-                int.TryParse(output.Trim(), out int count) &&
-                count == 1;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
-        {
-            return false;
-        }
-    }
-
-    private static Process CreateProcess(string executablePath, string configPath, string contextPath, string workingDirectory)
-    {
-        var startInfo = new ProcessStartInfo(executablePath)
-        {
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-            WorkingDirectory = workingDirectory,
-            StandardOutputEncoding = StrictUtf8,
-            StandardErrorEncoding = StrictUtf8,
-        };
-        startInfo.ArgumentList.Add("--config");
-        startInfo.ArgumentList.Add(configPath);
-        startInfo.ArgumentList.Add("--from-context");
-        startInfo.ArgumentList.Add(contextPath);
-        startInfo.ArgumentList.Add("--offline");
-        startInfo.ArgumentList.Add("--no-exec");
-        startInfo.Environment.Clear();
-        foreach ((string name, string value) in ReleaseArtifactPolicy.CreateDeterministicEnvironment(workingDirectory))
-        {
-            startInfo.Environment.Add(name, value);
-        }
-        startInfo.Environment.Add("GIT_CEILING_DIRECTORIES", workingDirectory);
-
-        return new Process { StartInfo = startInfo };
-    }
-
     private static async Task<string> ReadBoundedAsync(StreamReader reader, int maximumCharacters, CancellationToken cancellationToken)
     {
         var result = new char[maximumCharacters];
@@ -593,7 +314,6 @@ public static class GitCliffRenderer
         value.Split('\n', StringSplitOptions.RemoveEmptyEntries).All(line => ReleaseArtifactPolicy.EscapeUntrustedMarkdown(line).IsValid);
 
     private static GitCliffRenderResult Invalid(string diagnostic) => new(false, null, diagnostic);
-    private static StringComparison PathComparison => OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
     private sealed record RendererRelease(
         string Version,

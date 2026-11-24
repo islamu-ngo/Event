@@ -1,17 +1,19 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ISLAMU.ReleaseEngineering;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
 
-[NotInParallel("RuntimePromotionTrustRoot")]
+[NotInParallel("ReleaseToolEnvironment")]
 public sealed class ReleasePreparationTests
 {
-    private static readonly System.Text.Json.JsonSerializerOptions ContextJsonOptions = new()
+    private static readonly JsonSerializerOptions ContextJsonOptions = new()
     {
-        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         WriteIndented = true,
     };
 
@@ -29,8 +31,8 @@ public sealed class ReleasePreparationTests
         byte[] firstBytes = File.ReadAllBytes(fixture.NotesPath);
         ReleasePreparationResult second = fixture.Prepare();
 
-        await Assert.That(first.IsValid).IsTrue();
-        await Assert.That(second.IsValid).IsTrue();
+        await Assert.That(first.IsValid).IsTrue().Because(first.Diagnostic ?? "first prepare");
+        await Assert.That(second.IsValid).IsTrue().Because(second.Diagnostic ?? "second prepare");
         await Assert.That(File.ReadAllBytes(fixture.NotesPath)).IsEquivalentTo(firstBytes);
         await Assert.That(Encoding.UTF8.GetString(firstBytes)).IsEqualTo(
             "# Release 1.1.0\n\n## Maintainer Summary\n\nAttendees can now correct registration details.\n\n## Release-Visible Details\n\n- registration: let attendees correct registration details (cccccccccccc)\n\n### Impact Summary\n\n#### Operator\n\n- `CHG-2026-0001` - documented: Restart registration workers after deployment\\. (Evidence: `docs/RELEASE\\_RUNBOOK\\.md`)\n\n## Complete Commit Range\n\n- `cccccccccccc`\n");
@@ -257,7 +259,7 @@ public sealed class ReleasePreparationTests
     }
 
     [Test]
-    public async Task PrepareCommandReadsReleaseInputsBuildsContextAndRunsTwiceWithoutMutationCommands()
+    public async Task PrepareCommandReadsReleaseInputsBuildsContextAndRunsTwiceIdempotently()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -269,8 +271,8 @@ public sealed class ReleasePreparationTests
         (int firstCode, string firstOutput, byte[] firstNotes) = fixture.RunCommand();
         (int secondCode, string secondOutput, byte[] secondNotes) = fixture.RunCommand();
 
-        await Assert.That(firstCode).IsEqualTo(Program.Success);
-        await Assert.That(secondCode).IsEqualTo(Program.Success);
+        await Assert.That(firstCode).IsEqualTo(Program.Success).Because(firstOutput);
+        await Assert.That(secondCode).IsEqualTo(Program.Success).Because(secondOutput);
         await Assert.That(secondOutput).IsEqualTo(firstOutput);
         await Assert.That(secondNotes).IsEquivalentTo(firstNotes);
         await Assert.That(File.Exists(fixture.CommandContextPath)).IsTrue();
@@ -300,7 +302,7 @@ public sealed class ReleasePreparationTests
     }
 
     [Test]
-    public async Task PrepareCommandRejectsBaselineDescriptorWhenStableSemVerTagIsReachable()
+    public async Task PrepareCommandVerifiesSignedAnnotatedBaselineTagDirectlyAndRejectsUnsignedOrStableReachable()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -308,16 +310,23 @@ public sealed class ReleasePreparationTests
         }
 
         using var accepted = new PreparationFixture();
+        using var unsigned = new PreparationFixture();
         using var rejected = new PreparationFixture();
 
-        (int acceptedCode, string acceptedOutput, byte[] acceptedNotes) = accepted.RunBaselineCommand("0.1.0", includeReachableStableTag: false);
-        (int rejectedCode, string rejectedOutput, byte[] rejectedNotes) = rejected.RunBaselineCommand("0.2.0", includeReachableStableTag: true);
+        (int acceptedCode, string acceptedOutput, byte[] acceptedNotes) = accepted.RunBaselineCommand("0.1.0", signBaseline: true, includeReachableStableTag: false);
+        (int unsignedCode, string unsignedOutput, byte[] unsignedNotes) = unsigned.RunBaselineCommand("0.1.0", signBaseline: false, includeReachableStableTag: false);
+        (int rejectedCode, string rejectedOutput, byte[] rejectedNotes) = rejected.RunBaselineCommand("0.2.0", signBaseline: true, includeReachableStableTag: true);
 
-        await Assert.That(acceptedCode).IsEqualTo(Program.Success);
+        await Assert.That(acceptedCode).IsEqualTo(Program.Success).Because(acceptedOutput);
         await Assert.That(acceptedOutput).IsEqualTo("docs(release): prepare 0.1.0\n\nChangelog: skip\nChangelog-Reason: release metadata commit\n");
         await Assert.That(acceptedNotes).IsNotEmpty();
         await Assert.That(File.Exists(accepted.CommandContextPath)).IsTrue();
         await Assert.That(File.ReadAllText(accepted.CommandContextPath)).Contains("\"version\": \"0.1.0\"");
+
+        await Assert.That(unsignedCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(unsignedOutput).Contains("tag_not_signed");
+        await Assert.That(unsignedNotes).IsEmpty();
+
         await Assert.That(rejectedCode).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(rejectedOutput).IsEqualTo("prepare_failed: git_baseline_stable_tag_exists:v0.1.0\n");
         await Assert.That(rejectedNotes).IsEmpty();
@@ -337,7 +346,7 @@ public sealed class ReleasePreparationTests
     }
 
     [Test]
-    public async Task PrepareExecutableRunsSignedBundlePositiveAndNegativeTwice()
+    public async Task PrepareExecutableRunsPositiveAndNegativeTwiceWithoutPromotionCeremony()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -348,8 +357,8 @@ public sealed class ReleasePreparationTests
         {
             (int firstCode, string firstOutput, byte[] firstNotes) = positive.RunSpawnedCommand("Attendees can now correct registration details.\n");
             (int secondCode, string secondOutput, byte[] secondNotes) = positive.RunSpawnedCommand("Attendees can now correct registration details.\n");
-            await Assert.That(firstCode).IsEqualTo(Program.Success);
-            await Assert.That(secondCode).IsEqualTo(Program.Success);
+            await Assert.That(firstCode).IsEqualTo(Program.Success).Because(firstOutput);
+            await Assert.That(secondCode).IsEqualTo(Program.Success).Because(secondOutput);
             await Assert.That(secondOutput).IsEqualTo(firstOutput);
             await Assert.That(secondNotes).IsEquivalentTo(firstNotes);
             await Assert.That(firstOutput).IsEqualTo(
@@ -380,11 +389,10 @@ public sealed class ReleasePreparationTests
         private readonly string configPath;
         private readonly string executablePath;
         private readonly string candidateRoot;
-        private readonly string authorityRoot;
-        private readonly string privateKeyPath;
-        private readonly string receiptPath;
-        private readonly string signaturePath;
+        private readonly string signerKeyPath;
         private readonly string allowedSignersPath;
+        private int commitSequence;
+
         public PreparationFixture()
         {
             Root = Path.Combine(Path.GetTempPath(), $"islamu-prepare-{Guid.NewGuid():N}");
@@ -392,19 +400,17 @@ public sealed class ReleasePreparationTests
             bundleRoot = Path.Combine(Root, "bundle");
             isolationRoot = Path.Combine(Root, "isolation");
             lockPath = Path.Combine(bundleRoot, "toolchain.lock.json");
-            configPath = Path.Combine(bundleRoot, "config", "cliff.toml");
+            configPath = Path.Combine(bundleRoot, "cliff.toml");
             executablePath = Path.Combine(bundleRoot, "git-cliff");
             candidateRoot = Path.Combine(Root, "candidate");
-            authorityRoot = Path.Combine(Root, "authority");
-            privateKeyPath = Path.Combine(authorityRoot, "promotion-key");
-            receiptPath = Path.Combine(authorityRoot, "promotion-receipt.v1.json");
-            signaturePath = receiptPath + ".sig";
-            allowedSignersPath = Path.Combine(authorityRoot, "allowed-promoters");
+            signerKeyPath = Path.Combine(Root, "release-signer-key");
+            allowedSignersPath = Path.Combine(Root, "allowed-signers");
+
             Directory.CreateDirectory(ReleaseDirectory);
-            Directory.CreateDirectory(Path.GetDirectoryName(configPath)!);
+            Directory.CreateDirectory(bundleRoot);
             Directory.CreateDirectory(isolationRoot);
             Directory.CreateDirectory(candidateRoot);
-            Directory.CreateDirectory(authorityRoot);
+
             ReleasePath = Path.Combine(ReleaseDirectory, "release.yaml");
             SummaryPath = Path.Combine(ReleaseDirectory, "summary.md");
             NotesPath = Path.Combine(ReleaseDirectory, "release-notes.md");
@@ -414,7 +420,7 @@ public sealed class ReleasePreparationTests
                 "[changelog]\nbody = \"\"\"\n# Release {{ version }}\n{% for commit in commits %}\n- {{ commit.group }}: {{ commit.message }} ({{ commit.id }})\n{% endfor %}\n\"\"\"\ntrim = true\nrender_always = true\n");
             Input = ValidInput();
             Context = ValidContext();
-            CreatePromotionAuthority();
+            CreateSigningKey();
             WriteRenderer();
         }
 
@@ -426,7 +432,6 @@ public sealed class ReleasePreparationTests
         public string CommandReleasePath { get; private set; } = string.Empty;
         public string CommandSummaryPath { get; private set; } = string.Empty;
         public string CommandContextPath { get; private set; } = string.Empty;
-        public string CommandRangePath { get; private set; } = string.Empty;
         public string BadNotesPath { get; private set; } = string.Empty;
         public string BadContextPath { get; private set; } = string.Empty;
         public ReleaseInputValidationResult Input { get; }
@@ -449,36 +454,22 @@ public sealed class ReleasePreparationTests
                 summary ?? File.ReadAllBytes(SummaryPath),
                 rangeOids ?? [new string('c', 40)],
                 new GitCliffRenderRequest(
-                    VerifiedBundle(),
+                    lockPath,
+                    bundleRoot,
+                    configPath,
                     Encoding.UTF8.GetBytes(effectiveContext.Json!),
                     "linux-x64",
                     isolationRoot,
-                TimeSpan.FromSeconds(2))));
+                    TimeSpan.FromSeconds(2))));
         }
 
         public (int ExitCode, string Output, byte[] Notes) RunCommand()
         {
             string cliReleaseDirectory = EnsureCommandRepository("Attendees can now correct registration details.\n");
-            RewriteManifestAndReceipt();
+            SyncRepoToolFiles();
 
-            var variables = new Dictionary<string, string>(StringComparer.Ordinal)
+            return WithToolEnvironment(() =>
             {
-                ["ISLAMU_RELEASE_TRUSTED_BUNDLE"] = bundleRoot,
-                ["ISLAMU_RELEASE_PROMOTION_RECEIPT"] = receiptPath,
-                ["ISLAMU_RELEASE_PROMOTION_SIGNATURE"] = signaturePath,
-                ["ISLAMU_RELEASE_PROMOTION_PRINCIPAL"] = "fixture-tooling-promoter",
-                ["ISLAMU_RELEASE_MANIFEST_SHA256"] = Digest(Path.Combine(bundleRoot, "trusted-bundle.manifest.json")),
-                ["ISLAMU_RELEASE_BUNDLE_ID"] = "islamu-release-engineering",
-                ["ISLAMU_RELEASE_BUNDLE_VERSION"] = "1.0.0",
-                ["ISLAMU_RELEASE_POLICY_VERSION"] = "policy-v1",
-                ["ISLAMU_RELEASE_CONFIG_VERSION"] = "config-v1",
-                ["ISLAMU_RELEASE_TRUST_VERSION"] = "trust-v1",
-            };
-            Dictionary<string, string?> originalVariables = variables.Keys.ToDictionary(name => name, Environment.GetEnvironmentVariable, StringComparer.Ordinal);
-            try
-            {
-                foreach ((string name, string value) in variables) Environment.SetEnvironmentVariable(name, value);
-                using RuntimePromotionTrustRootScope trustRoot = RuntimePromotionTrustRootScope.Use(allowedSignersPath);
                 using var output = new StringWriter();
                 int exitCode = PrepareCommand.Run(
                     ["prepare", "docs/internal/releases/1.1.0"],
@@ -488,37 +479,17 @@ public sealed class ReleasePreparationTests
                     TimeSpan.FromSeconds(2));
                 string notesPath = Path.Combine(cliReleaseDirectory, "release-notes.md");
                 return (exitCode, output.ToString(), File.Exists(notesPath) ? File.ReadAllBytes(notesPath) : []);
-            }
-            finally
-            {
-                foreach ((string name, string? value) in originalVariables) Environment.SetEnvironmentVariable(name, value);
-            }
+            });
         }
 
-        public (int ExitCode, string Output, byte[] Notes) RunBaselineCommand(string version, bool includeReachableStableTag)
+        public (int ExitCode, string Output, byte[] Notes) RunBaselineCommand(string version, bool signBaseline, bool includeReachableStableTag)
         {
-            string cliReleaseDirectory = EnsureBaselineCommandRepository(version, includeReachableStableTag);
+            string cliReleaseDirectory = EnsureBaselineCommandRepository(version, signBaseline, includeReachableStableTag);
             WriteRenderer(version);
-            RewriteManifestAndReceipt();
+            SyncRepoToolFiles();
 
-            var variables = new Dictionary<string, string>(StringComparer.Ordinal)
+            return WithToolEnvironment(() =>
             {
-                ["ISLAMU_RELEASE_TRUSTED_BUNDLE"] = bundleRoot,
-                ["ISLAMU_RELEASE_PROMOTION_RECEIPT"] = receiptPath,
-                ["ISLAMU_RELEASE_PROMOTION_SIGNATURE"] = signaturePath,
-                ["ISLAMU_RELEASE_PROMOTION_PRINCIPAL"] = "fixture-tooling-promoter",
-                ["ISLAMU_RELEASE_MANIFEST_SHA256"] = Digest(Path.Combine(bundleRoot, "trusted-bundle.manifest.json")),
-                ["ISLAMU_RELEASE_BUNDLE_ID"] = "islamu-release-engineering",
-                ["ISLAMU_RELEASE_BUNDLE_VERSION"] = "1.0.0",
-                ["ISLAMU_RELEASE_POLICY_VERSION"] = "policy-v1",
-                ["ISLAMU_RELEASE_CONFIG_VERSION"] = "config-v1",
-                ["ISLAMU_RELEASE_TRUST_VERSION"] = "trust-v1",
-            };
-            Dictionary<string, string?> originalVariables = variables.Keys.ToDictionary(name => name, Environment.GetEnvironmentVariable, StringComparer.Ordinal);
-            try
-            {
-                foreach ((string name, string value) in variables) Environment.SetEnvironmentVariable(name, value);
-                using RuntimePromotionTrustRootScope trustRoot = RuntimePromotionTrustRootScope.Use(allowedSignersPath);
                 using var output = new StringWriter();
                 int exitCode = PrepareCommand.Run(
                     ["prepare", $"docs/internal/releases/{version}"],
@@ -528,11 +499,7 @@ public sealed class ReleasePreparationTests
                     TimeSpan.FromSeconds(2));
                 string notesPath = Path.Combine(cliReleaseDirectory, "release-notes.md");
                 return (exitCode, output.ToString(), File.Exists(notesPath) ? File.ReadAllBytes(notesPath) : []);
-            }
-            finally
-            {
-                foreach ((string name, string? value) in originalVariables) Environment.SetEnvironmentVariable(name, value);
-            }
+            });
         }
 
         public (int ExitCode, string Output) RunBadCommand()
@@ -540,122 +507,142 @@ public sealed class ReleasePreparationTests
             string cliReleaseDirectory = EnsureCommandRepository("# generated-region\n");
             BadNotesPath = Path.Combine(cliReleaseDirectory, "release-notes.md");
             BadContextPath = Path.Combine(cliReleaseDirectory, "release-context.v1.json");
-            RewriteManifestAndReceipt();
-            return RunPrepareOnly();
+            SyncRepoToolFiles();
+
+            return WithToolEnvironment(() =>
+            {
+                using var output = new StringWriter();
+                int exitCode = PrepareCommand.Run(["prepare", "docs/internal/releases/1.1.0"], output, candidateRoot, "linux-x64", TimeSpan.FromSeconds(2));
+                return (exitCode, output.ToString());
+            });
         }
 
         public (int ExitCode, string Output, byte[] Notes) RunSpawnedCommand(string summary)
         {
             string cliReleaseDirectory = EnsureCommandRepository(summary);
-            RewriteManifestAndReceipt();
+            BadNotesPath = Path.Combine(cliReleaseDirectory, "release-notes.md");
+            BadContextPath = Path.Combine(cliReleaseDirectory, "release-context.v1.json");
+            SyncRepoToolFiles();
+
             string assemblyPath = typeof(Program).Assembly.Location;
-            using (RuntimePromotionTrustRootScope trustRoot = RuntimePromotionTrustRootScope.Use(allowedSignersPath))
+            var startInfo = new ProcessStartInfo("dotnet")
             {
-                var startInfo = new System.Diagnostics.ProcessStartInfo("dotnet")
-                {
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    WorkingDirectory = candidateRoot,
-                };
-                foreach (string argument in new[] { assemblyPath, "prepare", "docs/internal/releases/1.1.0" })
-                {
-                    startInfo.ArgumentList.Add(argument);
-                }
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                WorkingDirectory = candidateRoot,
+            };
+            startInfo.ArgumentList.Add(assemblyPath);
+            startInfo.ArgumentList.Add("prepare");
+            startInfo.ArgumentList.Add("docs/internal/releases/1.1.0");
+            startInfo.Environment["ISLAMU_RELEASE_TOOL_BUNDLE"] = bundleRoot;
+            startInfo.Environment["ISLAMU_RELEASE_ALLOWED_SIGNERS"] = allowedSignersPath;
 
-                startInfo.Environment["ISLAMU_RELEASE_TRUSTED_BUNDLE"] = bundleRoot;
-                startInfo.Environment["ISLAMU_RELEASE_PROMOTION_RECEIPT"] = receiptPath;
-                startInfo.Environment["ISLAMU_RELEASE_PROMOTION_SIGNATURE"] = signaturePath;
-                startInfo.Environment["ISLAMU_RELEASE_PROMOTION_PRINCIPAL"] = "fixture-tooling-promoter";
-                startInfo.Environment["ISLAMU_RELEASE_MANIFEST_SHA256"] = Digest(Path.Combine(bundleRoot, "trusted-bundle.manifest.json"));
-                startInfo.Environment["ISLAMU_RELEASE_BUNDLE_ID"] = "islamu-release-engineering";
-                startInfo.Environment["ISLAMU_RELEASE_BUNDLE_VERSION"] = "1.0.0";
-                startInfo.Environment["ISLAMU_RELEASE_POLICY_VERSION"] = "policy-v1";
-                startInfo.Environment["ISLAMU_RELEASE_CONFIG_VERSION"] = "config-v1";
-                startInfo.Environment["ISLAMU_RELEASE_TRUST_VERSION"] = "trust-v1";
-                using System.Diagnostics.Process process = System.Diagnostics.Process.Start(startInfo)!;
-                string output = process.StandardOutput.ReadToEnd();
-                string error = process.StandardError.ReadToEnd();
-                if (!process.WaitForExit(TimeSpan.FromSeconds(10)))
-                {
-                    process.Kill(entireProcessTree: true);
-                    throw new TimeoutException("spawned_prepare_timeout");
-                }
-
-                if (error.Length != 0)
-                {
-                    throw new InvalidOperationException("spawned_prepare_stderr");
-                }
-
-                string notesPath = Path.Combine(cliReleaseDirectory, "release-notes.md");
-                return (process.ExitCode, output, File.Exists(notesPath) ? File.ReadAllBytes(notesPath) : []);
+            using Process process = Process.Start(startInfo)!;
+            string output = process.StandardOutput.ReadToEnd();
+            string error = process.StandardError.ReadToEnd();
+            if (!process.WaitForExit(TimeSpan.FromSeconds(10)))
+            {
+                process.Kill(entireProcessTree: true);
+                throw new TimeoutException("spawned_prepare_timeout");
             }
+
+            if (error.Length != 0)
+            {
+                throw new InvalidOperationException($"spawned_prepare_stderr: {error}");
+            }
+
+            string notesPath = Path.Combine(cliReleaseDirectory, "release-notes.md");
+            return (process.ExitCode, output, File.Exists(notesPath) ? File.ReadAllBytes(notesPath) : []);
         }
 
-        private (int ExitCode, string Output) RunPrepareOnly()
+        public ReleaseContextValidationResult WithEvidenceObject(string oid)
         {
-            var variables = new Dictionary<string, string>(StringComparer.Ordinal)
+            ReleaseContext current = Context.Context!;
+            ReleaseContext updated = current with
             {
-                ["ISLAMU_RELEASE_TRUSTED_BUNDLE"] = bundleRoot,
-                ["ISLAMU_RELEASE_PROMOTION_RECEIPT"] = receiptPath,
-                ["ISLAMU_RELEASE_PROMOTION_SIGNATURE"] = signaturePath,
-                ["ISLAMU_RELEASE_PROMOTION_PRINCIPAL"] = "fixture-tooling-promoter",
-                ["ISLAMU_RELEASE_MANIFEST_SHA256"] = Digest(Path.Combine(bundleRoot, "trusted-bundle.manifest.json")),
-                ["ISLAMU_RELEASE_BUNDLE_ID"] = "islamu-release-engineering",
-                ["ISLAMU_RELEASE_BUNDLE_VERSION"] = "1.0.0",
-                ["ISLAMU_RELEASE_POLICY_VERSION"] = "policy-v1",
-                ["ISLAMU_RELEASE_CONFIG_VERSION"] = "config-v1",
-                ["ISLAMU_RELEASE_TRUST_VERSION"] = "trust-v1",
+                Evidence = current.Evidence with
+                {
+                    Objects = current.Evidence.Objects.Append(new ReleaseContextObject(oid[..12], oid)).ToArray(),
+                },
             };
-            Dictionary<string, string?> originalVariables = variables.Keys.ToDictionary(name => name, Environment.GetEnvironmentVariable, StringComparer.Ordinal);
+            return AsValidationResult(updated);
+        }
+
+        public ReleaseContextValidationResult AsValidationResult(ReleaseContext context) =>
+            new(true, context, JsonSerializer.Serialize(context, ContextJsonOptions) + "\n", []);
+
+        private T WithToolEnvironment<T>(Func<T> action)
+        {
+            string? oldBundle = Environment.GetEnvironmentVariable("ISLAMU_RELEASE_TOOL_BUNDLE");
+            string? oldSigners = Environment.GetEnvironmentVariable("ISLAMU_RELEASE_ALLOWED_SIGNERS");
             try
             {
-                foreach ((string name, string value) in variables) Environment.SetEnvironmentVariable(name, value);
-                using RuntimePromotionTrustRootScope trustRoot = RuntimePromotionTrustRootScope.Use(allowedSignersPath);
-                using var output = new StringWriter();
-                int exitCode = PrepareCommand.Run(["prepare", "docs/internal/releases/1.1.0"], output, candidateRoot, "linux-x64", TimeSpan.FromSeconds(2));
-                return (exitCode, output.ToString());
+                Environment.SetEnvironmentVariable("ISLAMU_RELEASE_TOOL_BUNDLE", bundleRoot);
+                Environment.SetEnvironmentVariable("ISLAMU_RELEASE_ALLOWED_SIGNERS", allowedSignersPath);
+                return action();
             }
             finally
             {
-                foreach ((string name, string? value) in originalVariables) Environment.SetEnvironmentVariable(name, value);
+                Environment.SetEnvironmentVariable("ISLAMU_RELEASE_TOOL_BUNDLE", oldBundle);
+                Environment.SetEnvironmentVariable("ISLAMU_RELEASE_ALLOWED_SIGNERS", oldSigners);
             }
+        }
+
+        private void SyncRepoToolFiles()
+        {
+            string engRelease = Path.Combine(candidateRoot, "eng", "release");
+            Directory.CreateDirectory(engRelease);
+            File.Copy(lockPath, Path.Combine(engRelease, "toolchain.lock.json"), overwrite: true);
+            File.Copy(configPath, Path.Combine(engRelease, "cliff.toml"), overwrite: true);
         }
 
         private void WriteRenderer(string version = "1.1.0")
         {
             string body = RendererFails
                 ? "exit 7"
-                : $"if [ \"$1\" = \"--version\" ]; then printf 'git-cliff 2.13.1\\n'; exit 0; fi\nprintf '# Release {version}\\n\\n- registration: let attendees correct registration details (cccccccccccc)\\n'";
+                : $"if [ \"$1\" = \"--version\" ]; then printf 'git-cliff 2.14.2\\n'; exit 0; fi\nprintf '# Release {version}\\n\\n- registration: let attendees correct registration details (cccccccccccc)\\n'";
             File.WriteAllText(executablePath, "#!/bin/sh\n" + body + "\n");
             if (!OperatingSystem.IsWindows())
             {
                 File.SetUnixFileMode(executablePath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
             }
+
             File.WriteAllText(lockPath, $$"""
                 {
                   "schemaVersion": 1,
                   "tool": "git-cliff",
-                  "version": "2.13.1",
-                  "platforms": [{ "platform": "linux-x64", "executable": "git-cliff", "executableSha256": "{{Digest(executablePath)}}" }]
+                  "version": "2.14.2",
+                  "platforms": [
+                    {
+                      "platform": "linux-x64",
+                      "executable": "git-cliff",
+                      "executableSha256": "{{Digest(executablePath)}}",
+                      "archive": "git-cliff-2.14.2-x86_64-unknown-linux-musl.tar.gz",
+                      "archiveSha256": "{{new string('1', 64)}}",
+                      "source": "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-x86_64-unknown-linux-musl.tar.gz"
+                    }
+                  ]
                 }
                 """);
-            RewriteManifestAndReceipt();
+        }
+
+        private void CreateSigningKey()
+        {
+            RunExternal(ReleaseToolPaths.SshKeygen, Root, "-q", "-t", "ed25519", "-N", string.Empty, "-C", "prepare-fixture", "-f", signerKeyPath);
+            string pub = string.Join(' ', File.ReadAllText(signerKeyPath + ".pub").Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2));
+            File.WriteAllText(allowedSignersPath, $"release-operator namespaces=\"git\" {pub}\n");
         }
 
         private string EnsureCommandRepository(string summary)
         {
             if (!Directory.Exists(Path.Combine(candidateRoot, ".git")))
             {
-                Directory.CreateDirectory(Path.Combine(candidateRoot, "eng", "release", "policy"));
-                File.WriteAllText(Path.Combine(candidateRoot, "eng", "release", "policy", "release-policy.yaml"),
-                    "schemaVersion: 1\nmaximumCommitMessageBytes: 8192\nreleaseVisibleTypes:\n  - feat\n  - fix\n  - perf\n  - revert\n  - docs\ninternalTypes:\n  - test\n  - refactor\n  - style\n  - build\n  - ci\n  - chore\nrequiredBreakingSignals:\n  bang: true\n  footer: BREAKING CHANGE\nskipTrailer: Changelog\nskipValue: skip\nskipReasonTrailer: Changelog-Reason\n");
-                File.WriteAllText(Path.Combine(candidateRoot, "eng", "release", "policy", "scope-registry.yaml"),
-                    "schemaVersion: 1\npublicScopes:\n  - events\n  - registration\nengineeringScopes:\n  - release\n");
+                WritePolicyFiles();
                 Git("init", "--initial-branch=main");
                 string previous = Commit("fix(events): preserve published event notes");
                 Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "tag", "-a", "v1.0.0", previous, "-m", "v1.0.0");
-                string feature = Commit("feat(registration): let attendees correct registration details\n\nChange-Id: CHG-2026-0001");
+                Commit("feat(registration): let attendees correct registration details\n\nChange-Id: CHG-2026-0001");
             }
 
             string cliReleaseDirectory = Path.Combine(candidateRoot, "docs", "internal", "releases", "1.1.0");
@@ -664,40 +651,32 @@ public sealed class ReleasePreparationTests
             string previousOid = Git("rev-list", "--max-parents=0", "HEAD").Trim();
             CommandReleasePath = Path.Combine(cliReleaseDirectory, "release.yaml");
             CommandSummaryPath = Path.Combine(cliReleaseDirectory, "summary.md");
-            string featureOid = Git("rev-parse", "HEAD^{commit}").Trim();
             CommandContextPath = Path.Combine(cliReleaseDirectory, "release-context.v1.json");
-            CommandRangePath = Path.Combine(cliReleaseDirectory, "range.txt");
             File.WriteAllText(CommandReleasePath,
                 $"Version: 1.1.0\nLine: v1.1\nRelease-Date: 2026-08-14\nBase-Stable-Tag: v1.0.0\nPrevious-Published-Tag: v1.0.0\nRelease-Range:\n  Base-Ref: v1.0.0\n  Base-Oid: {previousOid}\n  Previous-Ref: v1.0.0\n  Previous-Oid: {previousOid}\nCompatibility:\n  - v1\nImpact-Dispositions:\n  breaking: not-applicable\n  security: not-applicable\n  migration: not-applicable\n  configuration: not-applicable\n  openapi: not-applicable\n  operator: documented\n");
             File.WriteAllText(CommandSummaryPath, summary);
-            File.WriteAllText(Path.Combine(candidateRoot, "context.json"), "caller supplied context must be ignored\n");
-            File.WriteAllText(Path.Combine(candidateRoot, "range.txt"), new string('f', 40) + "\n");
-            File.WriteAllText(Path.Combine(candidateRoot, "docs", "internal", "releases", "changes", "CHG-2026-0001.yaml"),
-                "Change-Id: CHG-2026-0001\nTitle: Registration worker restart\nType: feat\nScope: registration\nSummary: Attendees can now correct registration details.\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/internal/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: docs/SECURITY_OVERVIEW.md\n    Disposition: not-applicable\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: documented\n    Detail: Restart registration workers after deployment.\n");
+            File.WriteAllText(Path.Combine(candidateRoot, "docs", "internal", "releases", "changes", "CHG-2026-0001.yaml"), SampleFragmentYaml);
             return cliReleaseDirectory;
         }
 
-        private string EnsureBaselineCommandRepository(string version, bool includeReachableStableTag)
+        private string EnsureBaselineCommandRepository(string version, bool signBaseline, bool includeReachableStableTag)
         {
             string baselineRef = "changelog-baseline-2026-08-15";
             string line = "v" + string.Join('.', version.Split('.')[0], version.Split('.')[1]);
-            Directory.CreateDirectory(Path.Combine(candidateRoot, "eng", "release", "policy"));
-            File.WriteAllText(Path.Combine(candidateRoot, "eng", "release", "policy", "release-policy.yaml"),
-                "schemaVersion: 1\nmaximumCommitMessageBytes: 8192\nreleaseVisibleTypes:\n  - feat\n  - fix\n  - perf\n  - revert\n  - docs\ninternalTypes:\n  - test\n  - refactor\n  - style\n  - build\n  - ci\n  - chore\nrequiredBreakingSignals:\n  bang: true\n  footer: BREAKING CHANGE\nskipTrailer: Changelog\nskipValue: skip\nskipReasonTrailer: Changelog-Reason\n");
-            File.WriteAllText(Path.Combine(candidateRoot, "eng", "release", "policy", "scope-registry.yaml"),
-                "schemaVersion: 1\npublicScopes:\n  - events\n  - registration\nengineeringScopes:\n  - release\n");
+            WritePolicyFiles();
             Git("init", "--initial-branch=main");
             string baselineOid = Commit("baseline lower bound");
-            Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "tag", "-a", baselineRef, baselineOid, "-m", baselineRef);
-            string baselineTagObjectId = Git("rev-parse", $"refs/tags/{baselineRef}^{{object}}").Trim();
-            Directory.CreateDirectory(Path.Combine(candidateRoot, "docs", "internal", "releases", "baselines"));
-            File.WriteAllBytes(Path.Combine(candidateRoot, "docs", "internal", "releases", "baselines", baselineRef + ".v1.json"), ReleaseArtifactPolicy.NormalizeJson(JsonSerializer.Serialize(new
+            if (signBaseline)
             {
-                schemaVersion = "release-baseline.v1",
-                baselineRef,
-                targetOid = baselineOid,
-                tagObjectId = baselineTagObjectId,
-            })).Bytes!);
+                Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid",
+                    "-c", "gpg.format=ssh", "-c", $"user.signingKey={signerKeyPath}",
+                    "tag", "-s", baselineRef, baselineOid, "-m", baselineRef);
+            }
+            else
+            {
+                Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid",
+                    "tag", "-a", baselineRef, baselineOid, "-m", baselineRef);
+            }
 
             if (includeReachableStableTag)
             {
@@ -705,8 +684,7 @@ public sealed class ReleasePreparationTests
                 Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "tag", "-a", "v0.1.0", stable, "-m", "v0.1.0");
             }
 
-            string feature = Commit("feat(registration): let attendees correct registration details\n\nChange-Id: CHG-2026-0001");
-            Git("branch", "-f", line, feature);
+            Commit("feat(registration): let attendees correct registration details\n\nChange-Id: CHG-2026-0001");
 
             string cliReleaseDirectory = Path.Combine(candidateRoot, "docs", "internal", "releases", version);
             Directory.CreateDirectory(cliReleaseDirectory);
@@ -717,12 +695,65 @@ public sealed class ReleasePreparationTests
             File.WriteAllText(CommandReleasePath,
                 $"Version: {version}\nLine: {line}\nRelease-Date: 2026-08-14\nBase-Stable-Tag: {baselineRef}\nPrevious-Published-Tag: {baselineRef}\nRelease-Range:\n  Base-Ref: {baselineRef}\n  Base-Oid: {baselineOid}\n  Previous-Ref: {baselineRef}\n  Previous-Oid: {baselineOid}\nCompatibility:\n  - v1\nImpact-Dispositions:\n  breaking: not-applicable\n  security: not-applicable\n  migration: not-applicable\n  configuration: not-applicable\n  openapi: not-applicable\n  operator: documented\n");
             File.WriteAllText(CommandSummaryPath, "Attendees can now correct registration details.\n");
-            File.WriteAllText(Path.Combine(candidateRoot, "docs", "internal", "releases", "changes", "CHG-2026-0001.yaml"),
-                "Change-Id: CHG-2026-0001\nTitle: Registration worker restart\nType: feat\nScope: registration\nSummary: Attendees can now correct registration details.\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/internal/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: docs/SECURITY_OVERVIEW.md\n    Disposition: not-applicable\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: documented\n    Detail: Restart registration workers after deployment.\n");
+            File.WriteAllText(Path.Combine(candidateRoot, "docs", "internal", "releases", "changes", "CHG-2026-0001.yaml"), SampleFragmentYaml);
             return cliReleaseDirectory;
         }
 
-        public void Dispose() => Directory.Delete(Root, recursive: true);
+        private void WritePolicyFiles()
+        {
+            Directory.CreateDirectory(Path.Combine(candidateRoot, "eng", "release", "policy"));
+            File.WriteAllText(Path.Combine(candidateRoot, "eng", "release", "policy", "release-policy.yaml"),
+                "schemaVersion: 1\nmaximumCommitMessageBytes: 8192\nreleaseVisibleTypes:\n  - feat\n  - fix\n  - perf\n  - revert\n  - docs\ninternalTypes:\n  - test\n  - refactor\n  - style\n  - build\n  - ci\n  - chore\nrequiredBreakingSignals:\n  bang: true\n  footer: BREAKING CHANGE\nskipTrailer: Changelog\nskipValue: skip\nskipReasonTrailer: Changelog-Reason\n");
+            File.WriteAllText(Path.Combine(candidateRoot, "eng", "release", "policy", "scope-registry.yaml"),
+                "schemaVersion: 1\npublicScopes:\n  - events\n  - registration\nengineeringScopes:\n  - release\n");
+        }
+
+        private string Commit(string message)
+        {
+            commitSequence++;
+            string file = Path.Combine(candidateRoot, $"file-{commitSequence}.txt");
+            File.WriteAllText(file, $"content {commitSequence}\n");
+            Git("add", file);
+            Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "commit", "-q", "-m", message);
+            return Git("rev-parse", "HEAD^{commit}").Trim();
+        }
+
+        private string Git(params string[] arguments) => RunExternal(ReleaseToolPaths.Git, candidateRoot, arguments);
+
+        private static string RunExternal(string executable, string workingDirectory, params string[] arguments)
+        {
+            var startInfo = new ProcessStartInfo(executable)
+            {
+                WorkingDirectory = workingDirectory,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            string nullDevice = OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
+            startInfo.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
+            startInfo.Environment["GIT_CONFIG_GLOBAL"] = nullDevice;
+            foreach (string argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            using Process process = Process.Start(startInfo)!;
+            string stdout = process.StandardOutput.ReadToEnd();
+            string stderr = process.StandardError.ReadToEnd();
+            if (!process.WaitForExit(TimeSpan.FromSeconds(10)) || process.ExitCode != 0)
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                throw new InvalidOperationException($"{executable} failed: {stderr}");
+            }
+
+            return stdout;
+        }
+
+        private static string Digest(string path) => Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));
+
+        private const string SampleFragmentYaml =
+            "Change-Id: CHG-2026-0001\nTitle: Registration worker restart\nType: feat\nScope: registration\nSummary: Attendees can now correct registration details.\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/internal/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: docs/SECURITY_OVERVIEW.md\n    Disposition: not-applicable\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: documented\n    Detail: Restart registration workers after deployment.\n";
 
         private static ReleaseInputValidationResult ValidInput()
         {
@@ -759,153 +790,22 @@ public sealed class ReleasePreparationTests
             var context = new ReleaseContext(
                 1,
                 new ReleaseContextRelease("1.1.0", "v1.1", "2026-08-14", "v1.0.0", "v1.0.0", "minor", "stable", true),
-                [new ReleaseContextChange("cccccccccccc", new string('c', 40), "CHG-2026-0001", "feat", "registration", "Registration worker restart", "Attendees can now correct registration details.", false, false, null)],
-                new ReleaseContextEvidence(new string('a', 40), new string('b', 40),
-                    [new ReleaseContextObject("aaaaaaaaaaaa", new string('a', 40)), new ReleaseContextObject("bbbbbbbbbbbb", new string('b', 40)), new ReleaseContextObject("cccccccccccc", new string('c', 40))]));
-            string json = System.Text.Json.JsonSerializer.Serialize(context, ContextJsonOptions) + "\n";
-            return new ReleaseContextValidationResult(true, context, json, []);
+                [
+                    new ReleaseContextChange(
+                        new string('c', 12), new string('c', 40), "CHG-2026-0001", "feat", "registration",
+                        "Registration worker restart", "Attendees can now correct registration details.", false, false, null),
+                ],
+                new ReleaseContextEvidence(
+                    new string('a', 40),
+                    new string('b', 40),
+                    [
+                        new ReleaseContextObject(new string('a', 12), new string('a', 40)),
+                        new ReleaseContextObject(new string('b', 12), new string('b', 40)),
+                        new ReleaseContextObject(new string('c', 12), new string('c', 40)),
+                    ]));
+            return new ReleaseContextValidationResult(true, context, JsonSerializer.Serialize(context, ContextJsonOptions) + "\n", []);
         }
 
-        public ReleaseContextValidationResult WithEvidenceObject(string oid)
-        {
-            ReleaseContext current = Context.Context!;
-            var objects = current.Evidence.Objects.Append(new ReleaseContextObject(oid[..12], oid)).ToArray();
-            ReleaseContext changed = current with { Evidence = current.Evidence with { Objects = objects } };
-            string json = JsonSerializer.Serialize(changed, ContextJsonOptions) + "\n";
-            return new ReleaseContextValidationResult(true, changed, json, []);
-        }
-
-        public ReleaseContextValidationResult AsValidationResult(ReleaseContext context)
-        {
-            string json = JsonSerializer.Serialize(context, ContextJsonOptions) + "\n";
-            return new ReleaseContextValidationResult(true, context, json, []);
-        }
-
-        private VerifiedTrustedBundle VerifiedBundle()
-        {
-            RewriteManifestAndReceipt();
-            using RuntimePromotionTrustRootScope trustRoot = RuntimePromotionTrustRootScope.Use(allowedSignersPath);
-            var request = new TrustedBundleVerificationRequest(
-                bundleRoot,
-                candidateRoot,
-                new PromotionAuthorityInput(receiptPath, signaturePath, "fixture-tooling-promoter"),
-                "islamu-release-engineering",
-                "1.0.0",
-                "policy-v1",
-                "config-v1",
-                "trust-v1")
-            { ExpectedManifestDigest = Digest(Path.Combine(bundleRoot, "trusted-bundle.manifest.json")) };
-            TrustedBundleResult result = TrustedBundlePolicy.Verify(request);
-            if (!result.IsValid || result.Bundle is null) throw new InvalidOperationException(result.Diagnostic);
-            return result.Bundle;
-        }
-
-        private void RewriteManifestAndReceipt()
-        {
-            EnsureFile("bin/ISLAMU.ReleaseEngineering.dll", "release-engine-binary");
-            EnsureFile("policy/context-version.txt", "context-v1\n");
-            EnsureFile("policy/schema-version.txt", "schema-v1\n");
-            EnsureFile("trust/allowed-signers", "# production signers absent\n");
-            string manifestJson = JsonSerializer.Serialize(new
-            {
-                schemaVersion = "trusted-bundle.v1",
-                bundleId = "islamu-release-engineering",
-                bundleVersion = "1.0.0",
-                policyVersion = "policy-v1",
-                configVersion = "config-v1",
-                trustVersion = "trust-v1",
-                policyDigest = Digest(EnsureFile("policy/release-policy.yaml", "release-policy")),
-                configDigest = Digest(configPath),
-                trustDigest = Digest(EnsureFile("trust/release-signing-policy.yaml", "status: inactive-fixture-only\n")),
-                files = Directory.EnumerateFiles(bundleRoot, "*", SearchOption.AllDirectories)
-                    .Where(path => Path.GetFileName(path) != "trusted-bundle.manifest.json")
-                    .Select(path => new { path = Path.GetRelativePath(bundleRoot, path).Replace(Path.DirectorySeparatorChar, '/'), sha256 = Digest(path) })
-                    .OrderBy(item => item.path, StringComparer.Ordinal)
-                    .ToArray(),
-            });
-            File.WriteAllBytes(Path.Combine(bundleRoot, "trusted-bundle.manifest.json"), ReleaseArtifactPolicy.NormalizeJson(manifestJson).Bytes!);
-            ResignReceipt();
-        }
-
-        private string EnsureFile(string path, string content)
-        {
-            string fullPath = Path.Combine(bundleRoot, path.Replace('/', Path.DirectorySeparatorChar));
-            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-            if (!File.Exists(fullPath)) File.WriteAllText(fullPath, content);
-            return fullPath;
-        }
-
-        private void CreatePromotionAuthority()
-        {
-            Run("/usr/bin/ssh-keygen", "-q", "-t", "ed25519", "-N", string.Empty, "-C", "synthetic-promotion-fixture", "-f", privateKeyPath);
-            string publicKey = string.Join(' ', File.ReadAllText(privateKeyPath + ".pub").Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2));
-            File.WriteAllText(allowedSignersPath, $"fixture-tooling-promoter namespaces=\"islamu-release-promotion\" {publicKey}\n");
-        }
-
-        private void ResignReceipt()
-        {
-            string manifestPath = Path.Combine(bundleRoot, "trusted-bundle.manifest.json");
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(manifestPath));
-            JsonElement root = document.RootElement;
-            string receiptJson = JsonSerializer.Serialize(new
-            {
-                schemaVersion = "trusted-bundle-promotion.v1",
-                receiptId = "promotion-fixture-0001",
-                bundleManifestSha256 = Digest(manifestPath),
-                bundleId = root.GetProperty("bundleId").GetString(),
-                bundleVersion = root.GetProperty("bundleVersion").GetString(),
-                policyVersion = root.GetProperty("policyVersion").GetString(),
-                configVersion = root.GetProperty("configVersion").GetString(),
-                trustVersion = root.GetProperty("trustVersion").GetString(),
-                policyDigest = root.GetProperty("policyDigest").GetString(),
-                configDigest = root.GetProperty("configDigest").GetString(),
-                trustDigest = root.GetProperty("trustDigest").GetString(),
-                promotionPrincipal = "fixture-tooling-promoter",
-            });
-            File.WriteAllBytes(receiptPath, ReleaseArtifactPolicy.NormalizeJson(receiptJson).Bytes!);
-            if (File.Exists(signaturePath)) File.Delete(signaturePath);
-            Run("/usr/bin/ssh-keygen", "-Y", "sign", "-f", privateKeyPath, "-n", "islamu-release-promotion", receiptPath);
-        }
-
-        private static void Run(string executable, params string[] arguments)
-        {
-            var startInfo = new System.Diagnostics.ProcessStartInfo(executable) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-            foreach (string argument in arguments) startInfo.ArgumentList.Add(argument);
-            using System.Diagnostics.Process process = System.Diagnostics.Process.Start(startInfo)!;
-            if (!process.WaitForExit(TimeSpan.FromSeconds(10)))
-            {
-                process.Kill(entireProcessTree: true);
-                throw new TimeoutException("synthetic_fixture_timeout");
-            }
-
-            if (process.ExitCode != 0) throw new InvalidOperationException("synthetic_fixture_failed");
-        }
-
-        private string Commit(string message)
-        {
-            File.AppendAllText(Path.Combine(candidateRoot, "file.txt"), message + Environment.NewLine);
-            Git("add", "file.txt");
-            Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "commit", "-m", message);
-            return Git("rev-parse", "HEAD").Trim();
-        }
-
-        private string Git(params string[] arguments)
-        {
-            var startInfo = new System.Diagnostics.ProcessStartInfo("git") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, WorkingDirectory = candidateRoot };
-            string nullDevice = OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
-            startInfo.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
-            startInfo.Environment["GIT_CONFIG_GLOBAL"] = nullDevice;
-            startInfo.ArgumentList.Add("-c");
-            startInfo.ArgumentList.Add($"core.hooksPath={nullDevice}");
-            foreach (string argument in arguments) startInfo.ArgumentList.Add(argument);
-            using System.Diagnostics.Process process = System.Diagnostics.Process.Start(startInfo)!;
-            string output = process.StandardOutput.ReadToEnd();
-            process.StandardError.ReadToEnd();
-            process.WaitForExit();
-            if (process.ExitCode != 0) throw new InvalidOperationException("synthetic_git_failed");
-            return output;
-        }
-
-        private static string Digest(string path) => Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));
+        public void Dispose() => Directory.Delete(Root, recursive: true);
     }
 }

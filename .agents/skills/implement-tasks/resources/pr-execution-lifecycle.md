@@ -125,8 +125,10 @@ After resolved phase checks, run the exact planned literal-path packet. Inspect
 existing index and ownership first; never commit someone else's hunks. Confirm
 `core.hooksPath` selects `.githooks` (activate it only if unset; preserve custom
 checks). Never bypass hooks. Use actual `Refs: EVENT-N`, required co-author and
-release/changelog trailers. If a packet materially diverges, load conventional-commit
-and record the reason and complete replacement packet before execution.
+any applicable breaking-change, optional `Change-Id:`, or explicit public-scope
+skip trailers (internal types and engineering scopes omit automatically). If a
+packet materially diverges, load conventional-commit and record the reason and
+complete replacement packet before execution.
 Account for residual dirty work; clean status alone does not prove preservation.
 
 ## Review Reconciliation And Handoff

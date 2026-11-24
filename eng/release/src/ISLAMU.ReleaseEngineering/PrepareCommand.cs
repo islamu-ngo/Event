@@ -64,14 +64,9 @@ public static class PrepareCommand
             IReadOnlyList<ReleaseCommit> commits = GitTagSignatureVerifier.ReadCommitRange(root, descriptor.PreviousPublishedTag, "HEAD", timeout);
             string[] rangeOids = commits.Select(commit => commit.Oid).ToArray();
             ReleasePolicy policy = ReleasePolicy.LoadFromRepositoryRoot(root);
-            ChangeIdRenameLoadResult renameResult = ChangeIdRenamePolicy.Load(root);
-            if (!renameResult.IsValid)
-            {
-                return Reject(output, renameResult.Diagnostics[0]);
-            }
 
             string[] linkedChangeIds = commits
-                .Select(commit => ChangeIdRenamePolicy.Evaluate(commit, policy, renameResult.Renames).ChangeId)
+                .Select(commit => policy.EvaluateCommit(commit.Message).ChangeId)
                 .OfType<string>()
                 .Distinct(StringComparer.Ordinal)
                 .Order(StringComparer.Ordinal)
@@ -119,8 +114,7 @@ public static class PrepareCommand
                 policy,
                 gitCliffSuggestedVersion: suggestedVersion,
                 verifiedBaselineRef: verifiedBaseline?.TagName,
-                verifiedBaselineOid: verifiedBaseline?.TargetCommitOid,
-                changeIdRenames: renameResult.Renames);
+                verifiedBaselineOid: verifiedBaseline?.TargetCommitOid);
             if (!context.IsValid || context.Json is null)
             {
                 string diagnostic = context.Diagnostics.Contains("context_git_cliff_bump_disagreement", StringComparer.Ordinal)

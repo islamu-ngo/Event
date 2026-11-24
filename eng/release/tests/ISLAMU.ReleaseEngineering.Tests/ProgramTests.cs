@@ -185,6 +185,7 @@ public sealed class ProgramTests
     [Arguments("execute-security-execution")]
     [Arguments("execute-api-benchmarks")]
     [Arguments("produce-security-execution")]
+    [Arguments("rename-change")]
     public async Task RetiredAndUnknownCommandsReturnUsageErrorWithoutCompatibilityAliases(string command)
     {
         using var output = new StringWriter();
@@ -217,6 +218,7 @@ public sealed class ProgramTests
         await Assert.That(text).DoesNotContain("verify-candidate");
         await Assert.That(text).DoesNotContain("activate-trust");
         await Assert.That(text).DoesNotContain("execute-security-execution");
+        await Assert.That(text).DoesNotContain("rename-change");
     }
 
     [Test]

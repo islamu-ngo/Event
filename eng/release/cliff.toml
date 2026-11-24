@@ -8,3 +8,40 @@ body = """
 """
 trim = true
 render_always = true
+format = true
+
+[git]
+conventional_commits = true
+require_conventional = true
+filter_unconventional = false
+split_commits = false
+protect_breaking_commits = true
+fail_on_unmatched_commit = true
+filter_commits = false
+tag_pattern = "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(?:alpha|beta|rc)\\.[0-9]+)?$"
+commit_parsers = [
+  # Skip auto-generated Git merge commits before conventional validation.
+  { message = "^Merge ", skip = true },
+  # Allow explicit opt-out via terminal Changelog: skip footer only for valid non-breaking commits.
+  { message = "^(feat|fix|perf|revert|docs|test|refactor|style|build|ci|chore)\\((events|registration|ticketing|discovery|notifications|privacy|access|storage|onboarding|federation|webhooks|localization|accessibility|self-hosting|ci|dependencies|architecture|database|observability|documentation|release|testing|build)\\):", footer = "^Changelog:\\s*skip$", skip = true },
+  # Breaking changes on engineering scopes or internal types stay release-visible.
+  { message = "^(feat|fix|perf|revert|docs|test|refactor|style|build|ci|chore)\\((ci|dependencies|architecture|database|observability|documentation|release|testing|build)\\)!:", group = "Breaking Changes" },
+  { message = "^(test|refactor|style|build|ci|chore)\\((events|registration|ticketing|discovery|notifications|privacy|access|storage|onboarding|federation|webhooks|localization|accessibility|self-hosting)\\)!:", group = "Breaking Changes" },
+  # Non-breaking engineering scopes and internal types omit automatically without skip trailers.
+  { message = "^(feat|fix|perf|revert|docs|test|refactor|style|build|ci|chore)\\((ci|dependencies|architecture|database|observability|documentation|release|testing|build)\\):", skip = true },
+  { message = "^(test|refactor|style|build|ci|chore)\\((events|registration|ticketing|discovery|notifications|privacy|access|storage|onboarding|federation|webhooks|localization|accessibility|self-hosting)\\):", skip = true },
+  # Public-scope release-visible commit types (including public breaking changes).
+  { message = "^feat\\((events|registration|ticketing|discovery|notifications|privacy|access|storage|onboarding|federation|webhooks|localization|accessibility|self-hosting)\\)!?:", group = "Features" },
+  { message = "^fix\\((events|registration|ticketing|discovery|notifications|privacy|access|storage|onboarding|federation|webhooks|localization|accessibility|self-hosting)\\)!?:", group = "Bug Fixes" },
+  { message = "^perf\\((events|registration|ticketing|discovery|notifications|privacy|access|storage|onboarding|federation|webhooks|localization|accessibility|self-hosting)\\)!?:", group = "Performance" },
+  { message = "^revert\\((events|registration|ticketing|discovery|notifications|privacy|access|storage|onboarding|federation|webhooks|localization|accessibility|self-hosting)\\)!?:", group = "Reverts" },
+  { message = "^docs\\((events|registration|ticketing|discovery|notifications|privacy|access|storage|onboarding|federation|webhooks|localization|accessibility|self-hosting)\\)!?:", group = "Documentation" },
+]
+
+[bump]
+features_always_bump_minor = true
+breaking_always_bump_major = false
+initial_tag = "0.1.0"
+
+[remote]
+offline = true

@@ -126,73 +126,111 @@ public sealed class ChangeWorkflowCommandTests
         await Assert.That(rangeOutput).Contains($"change_preflight_failed: change_id_target_collision:{collision}");
     }
 
-    /// <summary>Corrects effective provenance through an exact-commit record while preserving the immutable original footer.</summary>
+    /// <summary>Optional high-impact fragments must pass full ReleaseInputPolicy validation across preflight-commit, preflight-staged, and preflight-range.</summary>
     [Test]
-    public async Task ExactCommitRenameMakesRangeValidWithoutRewritingFooter()
+    public async Task PreflightCommandsValidateOptionalFragmentsWithFullReleaseInputPolicy()
     {
         using var repository = ChangeRepositoryFixture.Create();
         repository.CreateBranch("feature");
-        string commit = repository.Commit(
-            "feature.txt",
-            "feature\n",
-            "feat(registration): add another correction flow\n\nChange-Id: CHG-2026-0011");
-        string replacement = ChangeIdPolicy.Create(
+
+        string proseId = ChangeIdPolicy.Create(
             new DateTimeOffset(2026, 8, 27, 12, 0, 0, TimeSpan.Zero),
-            Enumerable.Repeat((byte)7, 10).ToArray());
-        repository.WriteFragment(replacement);
+            Enumerable.Repeat((byte)3, 10).ToArray());
+        string proseYaml = FragmentYaml(proseId)
+            .Replace("Attendees can correct registration details.", "Admin controls are restricted to event organizers.", StringComparison.Ordinal);
+        string prosePath = Path.Combine(repository.Path, "docs", "internal", "releases", "changes", proseId + ".yaml");
+        await File.WriteAllTextAsync(prosePath, proseYaml);
+        repository.Git("add", Path.GetRelativePath(repository.Path, prosePath));
 
-        (int renameCode, string renameOutput) = repository.Run(
-            "rename-change",
-            "--commit", commit,
-            "--from", "CHG-2026-0011",
-            "--to", replacement,
-            "--reason", "Target branch already owns the original identifier.");
-        repository.Git("add", "docs/internal/releases");
-        repository.CommitStaged("chore(release): bind collision correction");
-        (int rangeCode, string rangeOutput) = repository.Run(
-            "preflight-range", TargetOption, TargetBranch, "--head", "HEAD");
-        string message = repository.Git("show", "-s", "--format=%B", commit);
-        string renamePath = Path.Combine(
-            repository.Path,
-            "docs",
-            "internal",
-            "releases",
-            "change-id-renames",
-            commit + ".yaml");
+        (int stagedProseCode, _) = repository.Run("preflight-staged", TargetOption, TargetBranch);
+        string messagePath = Path.Combine(repository.Path, "COMMIT_EDITMSG");
+        await File.WriteAllTextAsync(messagePath, $"feat(registration): clarify organizer limits\n\nChange-Id: {proseId}\n");
+        (int commitProseCode, _) = repository.Run("preflight-commit", messagePath, TargetOption, TargetBranch);
+        repository.CommitStaged($"feat(registration): clarify organizer limits\n\nChange-Id: {proseId}");
+        (int rangeProseCode, _) = repository.Run("preflight-range", TargetOption, TargetBranch, "--head", "HEAD");
 
-        await Assert.That(renameCode).IsEqualTo(Program.Success);
-        await Assert.That(renameOutput).Contains($"change_renamed: commit={commit} from=CHG-2026-0011 to={replacement}");
-        await Assert.That(File.Exists(renamePath)).IsTrue();
-        await Assert.That(File.ReadAllText(renamePath)).Contains($"Commit-Oid: {commit}");
-        await Assert.That(File.ReadAllText(renamePath)).Contains($"New-Change-Id: {replacement}");
-        await Assert.That(message).Contains("Change-Id: CHG-2026-0011");
-        await Assert.That(message).DoesNotContain(replacement);
-        await Assert.That(rangeCode).IsEqualTo(Program.Success);
-        await Assert.That(rangeOutput).Contains("change_range_verified:");
+        await Assert.That(stagedProseCode).IsEqualTo(Program.Success);
+        await Assert.That(commitProseCode).IsEqualTo(Program.Success);
+        await Assert.That(rangeProseCode).IsEqualTo(Program.Success);
+
+        string embargoId = ChangeIdPolicy.Create(
+            new DateTimeOffset(2026, 8, 27, 12, 0, 5, TimeSpan.Zero),
+            Enumerable.Repeat((byte)4, 10).ToArray());
+        string embargoYaml = FragmentYaml(embargoId) + "\nRestricted-Details: private steps\n";
+        string embargoPath = Path.Combine(repository.Path, "docs", "internal", "releases", "changes", embargoId + ".yaml");
+        await File.WriteAllTextAsync(embargoPath, embargoYaml);
+        repository.Git("add", Path.GetRelativePath(repository.Path, embargoPath));
+
+        (int stagedEmbargoCode, string stagedEmbargoOutput) = repository.Run("preflight-staged", TargetOption, TargetBranch);
+        await File.WriteAllTextAsync(messagePath, $"feat(registration): document private issue\n\nChange-Id: {embargoId}\n");
+        (int commitEmbargoCode, string commitEmbargoOutput) = repository.Run("preflight-commit", messagePath, TargetOption, TargetBranch);
+        repository.CommitStaged($"feat(registration): document private issue\n\nChange-Id: {embargoId}");
+        (int rangeEmbargoCode, string rangeEmbargoOutput) = repository.Run("preflight-range", TargetOption, TargetBranch, "--head", "HEAD");
+
+        await Assert.That(stagedEmbargoCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(stagedEmbargoOutput).Contains("fragment_restricted_detail_marker");
+        await Assert.That(commitEmbargoCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(commitEmbargoOutput).Contains("fragment_restricted_detail_marker");
+        await Assert.That(rangeEmbargoCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(rangeEmbargoOutput).Contains("fragment_restricted_detail_marker");
+    }
+
+    /// <summary>The thin commit-msg hook delegates directly to preflight-commit, allowing internal commits without skip trailers and breaking internal commits.</summary>
+    [Test]
+    public async Task ThinCommitMsgHookAllowsInternalCommitsWithoutSkipTrailersAndBreakingInternalCommits()
+    {
+        using var repository = ChangeRepositoryFixture.Create();
+        repository.CreateBranch("feature");
+        repository.Git("config", "core.hooksPath", Path.Join(RepositoryRoot.Find(), ".githooks"));
+
+        repository.CommitStaged("refactor(release): simplify internal release helpers");
+        repository.CommitStaged("test(testing): add release policy coverage");
+        repository.CommitStaged(
+            "refactor(release)!: retire obsolete internal workflow\n\n" +
+            "BREAKING CHANGE: Remove obsolete internal workflow without compatibility aliases.");
+
+        (int rangeCode, string rangeOutput) = repository.Run("preflight-range", TargetOption, TargetBranch, "--head", "HEAD");
+        await Assert.That(rangeCode).IsEqualTo(Program.Success).Because(rangeOutput);
+
+        InvalidOperationException? invalidRejection = null;
+        try
+        {
+            repository.CommitStaged("feat(api): forbidden layer scope");
+        }
+        catch (InvalidOperationException exception)
+        {
+            invalidRejection = exception;
+        }
+
+        await Assert.That(invalidRejection).IsNotNull();
+        await Assert.That(invalidRejection!.Message).Contains("unknown_scope");
     }
 
     [Test]
-    public async Task RenamePolicyLinksReplacementFragmentToUnchangedCommit()
+    public async Task CreateChangeGeneratesDocsInternalReferencesAndPassesReleaseInputPolicy()
     {
-        string oid = new('a', 40);
-        string replacement = ChangeIdPolicy.Create(
-            new DateTimeOffset(2026, 8, 27, 12, 0, 0, TimeSpan.Zero),
-            Enumerable.Repeat((byte)9, 10).ToArray());
-        ChangeIdRename rename = new(oid, "CHG-2026-0011", replacement, "Collision correction.");
-        ReleaseInputValidationResult input = ReleaseInputPolicy.Validate(
-            ReleaseYaml(),
-            [FragmentYaml(replacement)],
-            []);
+        using var repository = ChangeRepositoryFixture.Create();
 
-        ReleaseContextValidationResult result = ReleaseContextPolicy.Build(
-            input,
-            [new ReleaseCommit(oid, "feat(registration): add another correction flow\n\nChange-Id: CHG-2026-0011")],
-            ReleasePolicy.LoadFromRepositoryRoot(RepositoryRoot.Find()),
-            changeIdRenames: [rename]);
+        (int createCode, string createOutput) = repository.Run(
+            "create-change",
+            TargetOption, TargetBranch,
+            "--type", "feat",
+            "--scope", "registration",
+            "--title", "Attendee correction window",
+            "--summary", "Attendees can correct registration details.");
 
-        await Assert.That(result.IsValid).IsTrue();
-        await Assert.That(result.Context?.Changes.Single().ChangeId).IsEqualTo(replacement);
-        await Assert.That(result.Context?.Changes.Single().Oid).IsEqualTo(oid);
+        await Assert.That(createCode).IsEqualTo(Program.Success).Because(createOutput);
+        string created = createOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)[0].Split("id=", StringSplitOptions.None)[1].Split(' ')[0];
+        string fragmentPath = Path.Combine(repository.Path, "docs", "internal", "releases", "changes", created + ".yaml");
+        string yaml = await File.ReadAllTextAsync(fragmentPath);
+
+        await Assert.That(yaml).Contains("docs/internal/API_CHANGELOG.md");
+        await Assert.That(yaml).Contains("docs/internal/SECURITY_OVERVIEW.md");
+        await Assert.That(yaml).Contains("docs/internal/RELEASE_RUNBOOK.md");
+        await Assert.That(yaml).Contains("docs/internal/CONFIGURATION.md");
+        await Assert.That(yaml).Contains("docs/internal/RELEASE_CHECKLIST.md");
+        ReleaseInputValidationResult validated = ReleaseInputPolicy.ValidateFragments([yaml]);
+        await Assert.That(validated.IsValid).IsTrue().Because(string.Join("; ", validated.Diagnostics));
     }
 
     /// <summary>Preserves existing hooks on initial installation and rejects a later unmanaged replacement.</summary>

@@ -73,8 +73,7 @@ public static class ReleaseContextPolicy
         ReleasePolicy policy,
         string? gitCliffSuggestedVersion = null,
         string? verifiedBaselineRef = null,
-        string? verifiedBaselineOid = null,
-        IEnumerable<ChangeIdRename>? changeIdRenames = null)
+        string? verifiedBaselineOid = null)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(commits);
@@ -92,7 +91,6 @@ public static class ReleaseContextPolicy
         List<CommitPolicyResult> evaluatedCommits = EvaluateCommits(
             commitList,
             policy,
-            changeIdRenames,
             diagnostics);
         if (!SemanticVersion.TryParse(descriptor.Version, out SemanticVersion selected))
         {
@@ -202,7 +200,6 @@ public static class ReleaseContextPolicy
     private static List<CommitPolicyResult> EvaluateCommits(
         List<ReleaseCommit> commits,
         ReleasePolicy policy,
-        IEnumerable<ChangeIdRename>? changeIdRenames,
         List<string> diagnostics)
     {
         var results = new List<CommitPolicyResult>(commits.Count);
@@ -213,11 +210,7 @@ public static class ReleaseContextPolicy
                 diagnostics.Add($"context_malformed_full_oid:{commit.Oid}");
             }
 
-            CommitPolicyResult result = ChangeIdRenamePolicy.Evaluate(
-                commit,
-                policy,
-                changeIdRenames,
-                diagnostics);
+            CommitPolicyResult result = policy.EvaluateCommit(commit.Message);
             if (!result.IsValid)
             {
                 diagnostics.AddRange(result.Diagnostics.Select(diagnostic => $"context_commit_invalid:{commit.Oid}:{diagnostic}"));

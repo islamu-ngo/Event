@@ -493,6 +493,55 @@ public sealed class CommitPolicyTests
         await Assert.That(subject.Diagnostics).Contains("commit_subject_too_long");
         await Assert.That(trailer.Diagnostics).Contains("commit_trailer_value_too_long:Changelog-Reason");
     }
+
+    [Test]
+    public async Task MergeCommitIsValidAndOmittedWithoutSkipTrailer()
+    {
+        CommitPolicyResult branchMerge = Policy.EvaluateCommit("Merge branch 'feature/events' into develop");
+        CommitPolicyResult remoteMerge = Policy.EvaluateCommit("Merge remote-tracking branch 'origin/develop' into develop");
+
+        await Assert.That(branchMerge.IsValid).IsTrue();
+        await Assert.That(branchMerge.IsMergeCommit).IsTrue();
+        await Assert.That(branchMerge.ReleaseVisibility).IsEqualTo(ReleaseVisibility.Omitted);
+        await Assert.That(remoteMerge.IsValid).IsTrue();
+        await Assert.That(remoteMerge.IsMergeCommit).IsTrue();
+        await Assert.That(remoteMerge.ReleaseVisibility).IsEqualTo(ReleaseVisibility.Omitted);
+    }
+
+    [Test]
+    public async Task ReleaseGroupMatchesNativeGitCliffGroupClassification()
+    {
+        await Assert.That(Policy.GetReleaseGroup(Policy.EvaluateCommit("feat(events): add event feed"))).IsEqualTo("Features");
+        await Assert.That(Policy.GetReleaseGroup(Policy.EvaluateCommit("fix(registration): fix validation"))).IsEqualTo("Bug Fixes");
+        await Assert.That(Policy.GetReleaseGroup(Policy.EvaluateCommit("perf(discovery): speed up search"))).IsEqualTo("Performance");
+        await Assert.That(Policy.GetReleaseGroup(Policy.EvaluateCommit("revert(events): restore previous behavior"))).IsEqualTo("Reverts");
+        await Assert.That(Policy.GetReleaseGroup(Policy.EvaluateCommit("docs(self-hosting): document env vars"))).IsEqualTo("Documentation");
+        await Assert.That(Policy.GetReleaseGroup(Policy.EvaluateCommit("refactor(release)!: drop legacy cli\n\nBREAKING CHANGE: Removed legacy cli."))).IsEqualTo("Breaking Changes");
+        await Assert.That(Policy.GetReleaseGroup(Policy.EvaluateCommit("feat(events)!: change response\n\nBREAKING CHANGE: Updated response."))).IsEqualTo("Features");
+        await Assert.That(Policy.GetReleaseGroup(Policy.EvaluateCommit("refactor(architecture): internal cleanup"))).IsNull();
+        await Assert.That(Policy.GetReleaseGroup(Policy.EvaluateCommit("feat(release): internal release tool"))).IsNull();
+    }
+
+    [Test]
+    public async Task StripGitCommentsRemovesCommentLinesAndScissorsPayload()
+    {
+        const string raw =
+            "refactor(release): simplify hook dispatch\n" +
+            "\n" +
+            "# Please enter the commit message for your changes.\n" +
+            "Refs: EVENT-6893\n" +
+            "# ------------------------ >8 ------------------------\n" +
+            "diff --git a/file.cs b/file.cs\n" +
+            "+not part of commit message\n";
+
+        string stripped = ReleasePolicy.StripGitComments(raw);
+        CommitPolicyResult evaluated = Policy.EvaluateCommit(stripped);
+
+        await Assert.That(evaluated.IsValid).IsTrue();
+        await Assert.That(stripped).DoesNotContain("Please enter");
+        await Assert.That(stripped).DoesNotContain("diff --git");
+        await Assert.That(stripped).Contains("Refs: EVENT-6893");
+    }
 }
 
 internal static class RepositoryRoot

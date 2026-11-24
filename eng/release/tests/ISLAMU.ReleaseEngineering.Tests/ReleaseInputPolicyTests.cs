@@ -36,25 +36,52 @@ public sealed class ReleaseInputPolicyTests
     }
 
     [Test]
-    public async Task RepositoryChangeFragmentsPassReleaseInputPolicy()
+    public async Task RepositoryOptionalChangeFragmentsPassReleaseInputPolicyWhenEmptyOrPresent()
     {
         string changesDirectory = Path.Combine(FindRepositoryRoot(), "docs", "internal", "releases", "changes");
-        string[] fragments = Directory.GetFiles(changesDirectory, "CHG-*.yaml", SearchOption.TopDirectoryOnly)
-            .Order(StringComparer.Ordinal)
-            .Select(File.ReadAllText)
-            .ToArray();
+        string[] fragments = Directory.Exists(changesDirectory)
+            ? Directory.GetFiles(changesDirectory, "CHG-*.yaml", SearchOption.TopDirectoryOnly)
+                .Order(StringComparer.Ordinal)
+                .Select(File.ReadAllText)
+                .ToArray()
+            : [];
 
         ReleaseInputValidationResult result = ReleaseInputPolicy.Validate(
             ValidReleaseYaml(),
             fragments,
             []);
+        ReleaseInputValidationResult fragmentsOnly = ReleaseInputPolicy.ValidateFragments(fragments);
 
         await Assert.That(result.IsValid).IsTrue()
             .Because(string.Join("; ", result.Diagnostics));
-        await Assert.That(result.Fragments).IsNotEmpty();
-        await Assert.That(result.Fragments.All(fragment => ChangeIdPolicy.IsGenerated(fragment.ChangeId))).IsTrue();
-        await Assert.That(result.Fragments.Select(fragment => fragment.ChangeId)).Contains("CHG-01M1VJ17RD9AT6PNN1X0093958");
-        await Assert.That(result.Fragments.Select(fragment => fragment.ChangeId)).Contains("CHG-01M1VJ199BWSA2Y38S8W4GNN64");
+        await Assert.That(fragmentsOnly.IsValid).IsTrue()
+            .Because(string.Join("; ", fragmentsOnly.Diagnostics));
+        await Assert.That(fragments.Length).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task OrdinaryProseContainingRestrictedPassesWhileStructuralEmbargoAndRestrictedDetailsKeyFailClosed()
+    {
+        string ordinaryProse = ValidFragmentYaml()
+            .Replace("Attendees use a single credential during check-in.", "Admin routes are restricted to authorized event organizers.", StringComparison.Ordinal)
+            .Replace("Check-in integrations must send credential after upgrading.", "Access remains restricted to tenant administrators.", StringComparison.Ordinal);
+        string structuralKey = ValidFragmentYaml() + "\nRestricted-Details: private exploit steps\n";
+        string nestedStructuralKey = ValidFragmentYaml()
+            .Replace("    Disposition: coordinated", "    Disposition: coordinated\n    Restricted-Details: hidden note", StringComparison.Ordinal);
+        string embargoed = ValidFragmentYaml().Replace("Public-Disclosure: coordinated", "Public-Disclosure: embargoed", StringComparison.Ordinal);
+
+        ReleaseInputValidationResult proseResult = ReleaseInputPolicy.ValidateFragments([ordinaryProse]);
+        ReleaseInputValidationResult keyResult = ReleaseInputPolicy.ValidateFragments([structuralKey]);
+        ReleaseInputValidationResult nestedKeyResult = ReleaseInputPolicy.ValidateFragments([nestedStructuralKey]);
+        ReleaseInputValidationResult embargoResult = ReleaseInputPolicy.ValidateFragments([embargoed]);
+
+        await Assert.That(proseResult.IsValid).IsTrue().Because(string.Join("; ", proseResult.Diagnostics));
+        await Assert.That(keyResult.IsValid).IsFalse();
+        await Assert.That(keyResult.Diagnostics).Contains("fragment_restricted_detail_marker:CHG-2026-0001");
+        await Assert.That(nestedKeyResult.IsValid).IsFalse();
+        await Assert.That(nestedKeyResult.Diagnostics).Contains("fragment_restricted_detail_marker:CHG-2026-0001");
+        await Assert.That(embargoResult.IsValid).IsFalse();
+        await Assert.That(embargoResult.Diagnostics).Contains("fragment_embargo_not_public:CHG-2026-0001");
     }
 
     [Test]
@@ -203,7 +230,7 @@ public sealed class ReleaseInputPolicyTests
     public async Task PublicMarkersRejectCaseConfusablesAndBidiWithoutRejectingMultilingualText()
     {
         string embargo = ValidFragmentYaml().Replace("Public-Disclosure: coordinated", "Public-Disclosure: Embargoed", StringComparison.Ordinal);
-        string confusable = Fragment("CHG-2026-0002").Replace("single credential", "re\u0455tricted credential", StringComparison.Ordinal);
+        string confusable = Fragment("CHG-2026-0002") + "\nRe\u0455tricted-Details: private reproduction\n";
         string bidi = Fragment("CHG-2026-0003").Replace("single credential", "single \u202Ecredential", StringComparison.Ordinal);
         string format = Fragment("CHG-2026-0005").Replace("single credential", "single\u200Dcredential", StringComparison.Ordinal);
         string multilingual = Fragment("CHG-2026-0004").Replace("Attendees use a single credential during check-in.", "يمكن للحاضرين استخدام اعتماد واحد عند تسجيل الوصول.", StringComparison.Ordinal);

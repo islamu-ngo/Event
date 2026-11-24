@@ -137,6 +137,17 @@ public static class ReleaseInputPolicy
         return new ReleaseInputValidationResult(diagnostics.Count == 0, descriptor, fragments, diagnostics);
     }
 
+    public static ReleaseInputValidationResult ValidateFragments(IEnumerable<string> fragmentYamls)
+    {
+        var diagnostics = new List<string>();
+        List<PublicChangeFragment> fragments = ParseFragments(fragmentYamls, diagnostics);
+        ValidateDuplicateIds(fragments, diagnostics);
+        ValidateGroups(fragments, diagnostics);
+        ValidateSupersedes(fragments, diagnostics);
+
+        return new ReleaseInputValidationResult(diagnostics.Count == 0, null, fragments, diagnostics);
+    }
+
     private static ReleaseDescriptor? ParseDescriptor(string yaml, List<string> diagnostics)
     {
         YamlMappingNode? root = ParseRoot(yaml, "release", diagnostics);
@@ -289,7 +300,8 @@ public static class ReleaseInputPolicy
                 }
             }
 
-            if (impacts.TryGetValue("security", out FragmentImpact? security) && string.Equals(security.PublicDisclosure, "embargoed", StringComparison.OrdinalIgnoreCase))
+            if (impacts.TryGetValue("security", out FragmentImpact? security) &&
+                string.Equals(NormalizeForMarkerScan(security.PublicDisclosure ?? string.Empty), "embargoed", StringComparison.Ordinal))
             {
                 diagnostics.Add($"fragment_embargo_not_public:{diagnosticId}");
             }
@@ -644,15 +656,23 @@ public static class ReleaseInputPolicy
 
     private static bool ContainsRestrictedMarker(YamlNode node)
     {
-        if (node is YamlScalarNode scalar)
-        {
-            string value = NormalizeForMarkerScan(scalar.Value ?? string.Empty);
-            return value.Contains("restricted", StringComparison.Ordinal) || value.Contains("restricted-detail", StringComparison.Ordinal);
-        }
-
         if (node is YamlMappingNode mapping)
         {
-            return mapping.Children.Any(child => string.Equals(Key(child.Key), "Restricted-Details", StringComparison.OrdinalIgnoreCase) || ContainsRestrictedMarker(child.Value));
+            foreach (KeyValuePair<YamlNode, YamlNode> child in mapping.Children)
+            {
+                string normalizedKey = NormalizeForMarkerScan(Key(child.Key));
+                if (normalizedKey is "restricted-details" or "restricted_details" or "restricted-detail" or "restricted_detail")
+                {
+                    return true;
+                }
+
+                if (ContainsRestrictedMarker(child.Value))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         return node is YamlSequenceNode sequence && sequence.Children.Any(ContainsRestrictedMarker);

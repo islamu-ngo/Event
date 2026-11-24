@@ -51,6 +51,12 @@ dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEng
 
 ## Change Workflow & Commit Preflight
 
+Commit visibility and SemVer bump rules are aligned between C# `ReleasePolicy` (`eng/release/policy/`) and `eng/release/cliff.toml`:
+
+- Non-breaking internal types (`test`, `refactor`, `style`, `build`, `ci`, `chore`) and engineering scopes are omitted automatically without requiring `Changelog: skip` trailers.
+- Breaking changes require both `!` and a non-empty `BREAKING CHANGE:` footer and stay visible regardless of type or scope.
+- `.githooks/commit-msg` is a thin wrapper around `preflight-commit`, which validates commit syntax/policy and runs full `ReleaseInputPolicy` checks on any staged optional high-impact fragment (`docs/internal/releases/changes/CHG-*.yaml`).
+
 ```bash
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- \
   preflight-commit /path/to/commit-msg --target develop
@@ -59,7 +65,7 @@ dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEng
   preflight-range --target develop --head HEAD
 ```
 
-Supporting commands: `allocate-change-id`, `create-change`, `preflight-staged`, `rename-change`, `install-change-hooks`, `select-security-changes`, `select-build-test-changes`, and `verify-security-register`.
+Supporting commands: `allocate-change-id`, `create-change`, `preflight-staged`, `install-change-hooks`, `select-security-changes`, `select-build-test-changes`, and `verify-security-register`.
 
 ## Running Release Tests
 

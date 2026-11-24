@@ -334,6 +334,41 @@ public sealed class ReleasePreparationTests
     }
 
     [Test]
+    public async Task PrepareCommandRejectsGitCliffBumpDisagreementAndExecutorFailureWhileKeepingCSharpAuthority()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var disagreementFixture = new PreparationFixture();
+        var disagreeingExecutor = new InMemoryGitCliffExecutor
+        {
+            OnSuggestBumpedVersion = _ => new GitCliffBumpVersionResult(true, "1.0.1", "v1.0.1", null),
+        };
+        (int disagreeCode, string disagreeOutput, byte[] disagreeNotes) = disagreementFixture.RunCommandWithExecutor(disagreeingExecutor);
+
+        await Assert.That(disagreeCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(disagreeOutput).IsEqualTo("prepare_failed: context_git_cliff_bump_disagreement\n");
+        await Assert.That(disagreeNotes).IsEmpty();
+        await Assert.That(disagreeingExecutor.BumpRequests).Count().IsEqualTo(1);
+        await Assert.That(disagreeingExecutor.BumpRequests[0].CommitRange).IsEqualTo("v1.0.0..HEAD");
+        await Assert.That(File.Exists(disagreementFixture.CommandContextPath)).IsFalse();
+
+        using var failureFixture = new PreparationFixture();
+        var failingExecutor = new InMemoryGitCliffExecutor
+        {
+            OnSuggestBumpedVersion = _ => new GitCliffBumpVersionResult(false, null, null, "git_cliff_tool_untrusted"),
+        };
+        (int failCode, string failOutput, byte[] failNotes) = failureFixture.RunCommandWithExecutor(failingExecutor);
+
+        await Assert.That(failCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(failOutput).IsEqualTo("prepare_failed: git_cliff_tool_untrusted\n");
+        await Assert.That(failNotes).IsEmpty();
+        await Assert.That(File.Exists(failureFixture.CommandContextPath)).IsFalse();
+    }
+
+    [Test]
     public async Task PrepareCommandRejectsMissingReleaseDirectoryOperand()
     {
         using var output = new StringWriter();
@@ -461,6 +496,26 @@ public sealed class ReleasePreparationTests
                     "linux-x64",
                     isolationRoot,
                     TimeSpan.FromSeconds(2))));
+        }
+
+        public (int ExitCode, string Output, byte[] Notes) RunCommandWithExecutor(IGitCliffExecutor executor)
+        {
+            string cliReleaseDirectory = EnsureCommandRepository("Attendees can now correct registration details.\n");
+            SyncRepoToolFiles();
+
+            return WithToolEnvironment(() =>
+            {
+                using var output = new StringWriter();
+                int exitCode = PrepareCommand.Run(
+                    ["prepare", "docs/internal/releases/1.1.0"],
+                    output,
+                    candidateRoot,
+                    "linux-x64",
+                    TimeSpan.FromSeconds(2),
+                    executor);
+                string notesPath = Path.Combine(cliReleaseDirectory, "release-notes.md");
+                return (exitCode, output.ToString(), File.Exists(notesPath) ? File.ReadAllBytes(notesPath) : []);
+            });
         }
 
         public (int ExitCode, string Output, byte[] Notes) RunCommand()
@@ -601,7 +656,7 @@ public sealed class ReleasePreparationTests
         {
             string body = RendererFails
                 ? "exit 7"
-                : $"if [ \"$1\" = \"--version\" ]; then printf 'git-cliff 2.14.2\\n'; exit 0; fi\nprintf '# Release {version}\\n\\n- registration: let attendees correct registration details (cccccccccccc)\\n'";
+                : $"if [ \"$1\" = \"--version\" ]; then printf 'git-cliff 2.14.2\\n'; exit 0; fi\nfor arg in \"$@\"; do if [ \"$arg\" = \"--bumped-version\" ]; then printf 'v{version}\\n'; exit 0; fi; done\nprintf '# Release {version}\\n\\n- registration: let attendees correct registration details (cccccccccccc)\\n'";
             File.WriteAllText(executablePath, "#!/bin/sh\n" + body + "\n");
             if (!OperatingSystem.IsWindows())
             {

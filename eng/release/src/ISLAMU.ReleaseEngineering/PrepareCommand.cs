@@ -7,7 +7,13 @@ public static class PrepareCommand
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
-    public static int Run(string[] args, TextWriter output, string repositoryRoot, string platform, TimeSpan timeout)
+    public static int Run(
+        string[] args,
+        TextWriter output,
+        string repositoryRoot,
+        string platform,
+        TimeSpan timeout,
+        IGitCliffExecutor? gitCliffExecutor = null)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(output);
@@ -83,26 +89,47 @@ public static class PrepareCommand
                 return Reject(output, "prepare_fragment_missing");
             }
 
-            ReleaseInputValidationResult input = ReleaseInputPolicy.Validate(releaseYaml, fragments, []);
-            ReleaseContextValidationResult context = ReleaseContextPolicy.Build(
-                input,
-                commits,
-                policy,
-                verifiedBaselineRef: verifiedBaseline?.TagName,
-                verifiedBaselineOid: verifiedBaseline?.TargetCommitOid,
-                changeIdRenames: renameResult.Renames);
-            if (!context.IsValid || context.Json is null)
-            {
-                return Reject(output, "prepare_context_invalid");
-            }
-
-            string contextJson = context.Json;
             string lockPath = Path.Combine(root, "eng", "release", "toolchain.lock.json");
             string configPath = Path.Combine(root, "eng", "release", "cliff.toml");
             string toolDirectory = GitCliffToolchainStore.ResolveConfiguredDirectory(
                 lockPath,
                 Environment.GetEnvironmentVariable(GitCliffToolchainStore.DefaultBundleEnvironmentVariable),
                 platform);
+
+            IGitCliffExecutor executor = gitCliffExecutor ?? GitCliffProcessExecutor.Default;
+            string? suggestedVersion = null;
+            if (!descriptor.Version.Contains('-', StringComparison.Ordinal))
+            {
+                var toolConfig = new GitCliffToolConfiguration(lockPath, toolDirectory, configPath, platform, timeout);
+                string commitRange = $"{descriptor.PreviousPublishedTag}..HEAD";
+                GitCliffBumpVersionResult bumpResult = executor.SuggestBumpedVersion(
+                    new GitCliffBumpVersionRequest(toolConfig, root, commitRange));
+                if (!bumpResult.IsValid || string.IsNullOrWhiteSpace(bumpResult.SuggestedVersion))
+                {
+                    return Reject(output, bumpResult.Diagnostic ?? "git_cliff_execution_failed");
+                }
+
+                suggestedVersion = bumpResult.SuggestedVersion;
+            }
+
+            ReleaseInputValidationResult input = ReleaseInputPolicy.Validate(releaseYaml, fragments, []);
+            ReleaseContextValidationResult context = ReleaseContextPolicy.Build(
+                input,
+                commits,
+                policy,
+                gitCliffSuggestedVersion: suggestedVersion,
+                verifiedBaselineRef: verifiedBaseline?.TagName,
+                verifiedBaselineOid: verifiedBaseline?.TargetCommitOid,
+                changeIdRenames: renameResult.Renames);
+            if (!context.IsValid || context.Json is null)
+            {
+                string diagnostic = context.Diagnostics.Contains("context_git_cliff_bump_disagreement", StringComparer.Ordinal)
+                    ? "context_git_cliff_bump_disagreement"
+                    : "prepare_context_invalid";
+                return Reject(output, diagnostic);
+            }
+
+            string contextJson = context.Json;
 
             var renderRequest = new GitCliffRenderRequest(
                 lockPath,

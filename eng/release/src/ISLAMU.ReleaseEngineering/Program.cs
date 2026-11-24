@@ -60,6 +60,11 @@ public static class Program
             return GitTagSignatureVerifier.RunCli(args, output, Environment.CurrentDirectory, timeout);
         }
 
+        if (string.Equals(args[0], "diff-contracts", StringComparison.Ordinal))
+        {
+            return ContractDiffCommand.Run(args, output, Environment.CurrentDirectory, timeout);
+        }
+
         if (string.Equals(args[0], "sync-public-changelog", StringComparison.Ordinal))
         {
             return SyncPublicChangelogCommand.Run(args, output, Environment.CurrentDirectory);
@@ -118,7 +123,7 @@ public static class Program
     private static int WriteUsage(TextWriter output)
     {
         output.WriteLine(
-            "usage: release-engine ensure-git-cliff [--output <directory>] | verify-tools | verify-release-tag --tag <tag-name> [--target <oid>] [--event-sha <oid>] [--allowed-signers <path>] [--signer <principal>] [--repository <path>] | prepare <release-directory> | sync-public-changelog --publication-base <https-url> [--allowed-signers <path>] [--check] | select-security-changes <paths-file> | select-build-test-changes <paths-file> | verify-security-register <register-json> | allocate-change-id --target <ref> | create-change --type <type> --scope <scope> --title <title> --summary <summary> [--group <group>] [--target <ref>] | preflight-commit <message-file> [--target <ref>] | preflight-staged [--target <ref>] | preflight-range --target <ref> [--head <ref>] | install-change-hooks [--target <ref>]");
+            "usage: release-engine ensure-git-cliff [--output <directory>] | verify-tools | verify-release-tag --tag <tag-name> [--target <oid>] [--event-sha <oid>] [--allowed-signers <path>] [--signer <principal>] [--repository <path>] | diff-contracts <base-oid> <head-oid> <output-path> | prepare <release-directory> | sync-public-changelog --publication-base <https-url> [--allowed-signers <path>] [--check] | select-security-changes <paths-file> | select-build-test-changes <paths-file> | verify-security-register <register-json> | allocate-change-id --target <ref> | create-change --type <type> --scope <scope> --title <title> --summary <summary> [--group <group>] [--target <ref>] | preflight-commit <message-file> [--target <ref>] | preflight-staged [--target <ref>] | preflight-range --target <ref> [--head <ref>] | install-change-hooks [--target <ref>]");
         return UsageError;
     }
 }

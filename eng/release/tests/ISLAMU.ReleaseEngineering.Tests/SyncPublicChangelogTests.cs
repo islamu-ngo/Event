@@ -170,14 +170,54 @@ public sealed class SyncPublicChangelogTests
         }
 
         using var fixture = new ChangelogFixture();
-        fixture.CreateSignedRelease("1.1.0", "2026-08-14", "Attendees can edit details.");
-        string notesPath = Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", "1.1.0", "release-notes.md");
-        await File.AppendAllTextAsync(notesPath, "\nMaintainer contact: leak@example.org\n");
+        fixture.CreateSignedRelease(
+            "1.1.0",
+            "2026-08-14",
+            "Attendees can edit details.",
+            extraNotesContent: "\nMaintainer contact: leak@example.org\n");
 
         (int code, string output) = fixture.Run();
 
         await Assert.That(code).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(output).Contains("rendered_notes_identity_or_provider");
+    }
+
+    [Test]
+    [Arguments("docs/internal/releases/1.1.0/summary.md")]
+    [Arguments("docs/internal/releases/1.1.0/release-notes.md")]
+    [Arguments("docs/internal/releases/1.1.0/release.yaml")]
+    [Arguments("docs/internal/releases/1.1.0/release-context.v1.json")]
+    [Arguments("docs/internal/releases/changes/CHG-2026-0001.yaml")]
+    public async Task RejectsWorkingTreeEditsAfterSignedTagWithoutPublishingUnsignedText(string tamperedRelativePath)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new ChangelogFixture();
+        fixture.CreateSignedRelease(
+            "1.1.0",
+            "2026-08-14",
+            "Attendees can now correct registration details.",
+            linkedChangeId: "CHG-2026-0001");
+
+        (int initialCode, string initialOutput) = fixture.Run();
+        await Assert.That(initialCode).IsEqualTo(Program.Success).Because(initialOutput);
+        byte[] originalPage = File.ReadAllBytes(fixture.PagePath);
+        byte[] originalManifest = File.ReadAllBytes(fixture.ManifestPath);
+
+        string tamperedFullPath = Path.Combine(
+            fixture.RepositoryPath,
+            tamperedRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        await File.AppendAllTextAsync(tamperedFullPath, "\n# unsigned post-tag edit\n");
+
+        (int rejectedCode, string rejectedOutput) = fixture.Run();
+
+        await Assert.That(rejectedCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(rejectedOutput).Contains($"changelog_signed_artifact_mismatch:{tamperedRelativePath}");
+        await Assert.That(File.ReadAllBytes(fixture.PagePath)).IsEquivalentTo(originalPage);
+        await Assert.That(File.ReadAllBytes(fixture.ManifestPath)).IsEquivalentTo(originalManifest);
     }
 
     private static string Digest(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
@@ -244,23 +284,38 @@ public sealed class SyncPublicChangelogTests
             return (code, output.ToString());
         }
 
-        public void CreateSignedRelease(string version, string releaseDate, string summary, bool signTag = true)
+        public void CreateSignedRelease(
+            string version,
+            string releaseDate,
+            string summary,
+            bool signTag = true,
+            string? extraNotesContent = null,
+            string? linkedChangeId = null)
         {
             string line = "v" + string.Join('.', version.Split('.')[0], version.Split('.')[1]);
             string changeCommit = Commit($"feat(registration): deliver {version}");
             string releaseDir = Path.Combine(RepositoryPath, "docs", "internal", "releases", version);
             Directory.CreateDirectory(releaseDir);
 
+            if (linkedChangeId is not null)
+            {
+                string changesDir = Path.Combine(RepositoryPath, "docs", "internal", "releases", "changes");
+                Directory.CreateDirectory(changesDir);
+                File.WriteAllText(
+                    Path.Combine(changesDir, linkedChangeId + ".yaml"),
+                    $"Change-Id: {linkedChangeId}\nTitle: Registration detail correction\nType: feat\nScope: registration\nSummary: {summary}\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/internal/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: SECURITY-POLICY.md\n    Disposition: not-applicable\n    Public-Disclosure: public\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_CHECKLIST.md\n    Disposition: not-applicable\n");
+            }
+
             File.WriteAllText(
                 Path.Combine(releaseDir, "release.yaml"),
                 $"Version: {version}\nLine: {line}\nRelease-Date: {releaseDate}\nBase-Stable-Tag: v1.0.0\nPrevious-Published-Tag: {previousTag}\nRelease-Range:\n  Base-Ref: v1.0.0\n  Base-Oid: {previousOid}\n  Previous-Ref: {previousTag}\n  Previous-Oid: {previousOid}\nCompatibility:\n  - v1\nImpact-Dispositions:\n  breaking: not-applicable\n  security: not-applicable\n  migration: not-applicable\n  configuration: not-applicable\n  openapi: not-applicable\n  operator: not-applicable\n");
             File.WriteAllText(Path.Combine(releaseDir, "summary.md"), summary + "\n");
-            File.WriteAllText(Path.Combine(releaseDir, "release-notes.md"), $"# Release {version}\n\n{summary}\n");
+            File.WriteAllText(Path.Combine(releaseDir, "release-notes.md"), $"# Release {version}\n\n{summary}\n{extraNotesContent ?? string.Empty}");
 
             var context = new ReleaseContext(
                 1,
                 new ReleaseContextRelease(version, line, releaseDate, "v1.0.0", previousTag!, "minor", "stable", true),
-                [new ReleaseContextChange(changeCommit[..12], changeCommit, null, "feat", "registration", $"deliver {version}", summary, false, false, null)],
+                [new ReleaseContextChange(changeCommit[..12], changeCommit, linkedChangeId, "feat", "registration", $"deliver {version}", summary, false, false, null)],
                 new ReleaseContextEvidence(previousOid!, previousOid!, [
                     new ReleaseContextObject(previousOid![..12], previousOid!),
                     new ReleaseContextObject(changeCommit[..12], changeCommit),

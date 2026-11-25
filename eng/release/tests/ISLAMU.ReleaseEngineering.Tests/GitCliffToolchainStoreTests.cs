@@ -162,7 +162,7 @@ public sealed class GitCliffToolchainStoreTests
 
     [Test]
     [Arguments("../git-cliff", TarEntryType.RegularFile)]
-    [Arguments("/tmp/git-cliff", TarEntryType.RegularFile)]
+    [Arguments("/absolute/git-cliff", TarEntryType.RegularFile)]
     [Arguments("git-cliff-2.14.2/../../escape", TarEntryType.RegularFile)]
     [Arguments("git-cliff-2.14.2/link", TarEntryType.SymbolicLink)]
     public async Task EnsureProvisionedRejectsUnsafeTarArchiveEntries(string entryName, TarEntryType entryType)
@@ -240,12 +240,12 @@ public sealed class GitCliffToolchainStoreTests
         var startInfo = GitCliffToolchainStore.CreateOfflineNoExecStartInfo(
             tool,
             "/repo/eng/release/cliff.toml",
-            "/tmp/work",
+            "/repo/work",
             ["--context"]);
 
         await Assert.That(startInfo.UseShellExecute).IsFalse();
         await Assert.That(startInfo.FileName).IsEqualTo("/opt/verified/git-cliff");
-        await Assert.That(startInfo.WorkingDirectory).IsEqualTo("/tmp/work");
+        await Assert.That(startInfo.WorkingDirectory).IsEqualTo("/repo/work");
         await Assert.That(startInfo.ArgumentList).IsEquivalentTo([
             "--config",
             "/repo/eng/release/cliff.toml",

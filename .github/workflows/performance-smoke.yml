@@ -33,9 +33,12 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          export TMPDIR="$RUNNER_TEMP/islamu-performance-private"
+          mkdir -p "$RUNNER_TEMP/islamu-performance-private"
+          TMPDIR="$(readlink --canonicalize-existing -- "$RUNNER_TEMP/islamu-performance-private")"
           mkdir -p "$TMPDIR/artifacts"
           chmod 700 "$TMPDIR" "$TMPDIR/artifacts"
+          test "$(stat -c %u "$TMPDIR")" = "$(id -u)"
+          test ! -L "$TMPDIR"
           [[ "$DOCKER_HOST" == unix:///* ]]
           socket="$(readlink --canonicalize-existing -- "${DOCKER_HOST#unix://}")"
           test -S "$socket"
@@ -73,9 +76,61 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          umask 077
+
+          ISLAMU_TEST_RUN_ID="$(openssl rand -hex 16)"
+          ISLAMU_TEST_ROOT="$TMPDIR/islamu-assurance/$ISLAMU_TEST_RUN_ID"
+          mkdir -p "$ISLAMU_TEST_ROOT"
+          chmod 700 "$TMPDIR/islamu-assurance" "$ISLAMU_TEST_ROOT"
+          printf '%s' "$ISLAMU_TEST_RUN_ID" > "$ISLAMU_TEST_ROOT/.islamu-test-owner"
+          chmod 600 "$ISLAMU_TEST_ROOT/.islamu-test-owner"
+
+          cleanup() {
+            containers="$(docker --host "$DOCKER_HOST" ps -aq --filter "label=islamu.assurance.owner=$ISLAMU_TEST_RUN_ID" 2>/dev/null || true)"
+            if [[ -n "$containers" ]]; then
+              docker --host "$DOCKER_HOST" rm -f $containers >/dev/null 2>&1 || true
+            fi
+            rm -rf -- "$ISLAMU_TEST_ROOT"
+          }
+          trap cleanup EXIT
+
+          unset DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
+          export ISLAMU_TEST_RUN_ID ISLAMU_TEST_ROOT
+          export SECRET_PROVIDER=Environment
+          export AUTHENTICATION_PROVIDER=Local
+          export AUTHORIZATION_PROVIDER=Local
+          export DEPLOYMENT_MODE=MultiTenant
+          export IDENTITY_DATABASE_TOPOLOGY=colocated
+          export DOTNET_ENVIRONMENT=Testing
+          export ASPNETCORE_ENVIRONMENT=Testing
+
+          for purpose in \
+            RUNTIME MIGRATOR GLOBAL INSTANCE_KEY_READ INSTANCE_KEY_WRITE \
+            INSTANCE_KEY_ISSUANCE PLATFORM_KEY_REPORT \
+            EMAIL_POLICY_INSTANCE_MUTATION EMAIL_POLICY_TENANT_MUTATION \
+            LOCAL_IDENTITY_WRITER; do
+            username="bench_$(openssl rand -hex 12)"
+            password="$(openssl rand -base64 48 | tr -d '\n')"
+            printf '::add-mask::%s\n' "$username"
+            printf '::add-mask::%s\n' "$password"
+            export "DATABASE_${purpose}_USERNAME=$username"
+            export "DATABASE_${purpose}_PASSWORD=$password"
+          done
+
+          for key in \
+            INSTANCE_BOOTSTRAP_LOCAL_PASSWORD \
+            ISLAMU_TEST_REPLACEMENT_PASSWORD \
+            AUTHENTICATION_LOCAL_JWT_KEY; do
+            secret_value="$(openssl rand -base64 48 | tr -d '\n')"
+            printf '::add-mask::%s\n' "$secret_value"
+            export "$key=$secret_value"
+          done
+
           dotnet run --project tests/Event.Benchmarks/Event.Benchmarks.csproj \
             --configuration Release --no-build -- \
-            --filter "*" --job dry --exporters json markdown --artifacts "$TMPDIR/artifacts"
+            --filter "*ApiEndpointPostgreSqlBenchmarks*" "*EfCoreQueryBenchmarks*" \
+            --job Dry --inProcess --stopOnFirstError \
+            --exporters json markdown --artifacts "$TMPDIR/artifacts"
 
       - name: Write Performance Smoke Summary
         if: always()

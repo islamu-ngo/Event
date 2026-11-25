@@ -128,7 +128,7 @@ public sealed class TicketingDeploymentCapabilityMatrixTests
     }
 
     [Test]
-    public async Task OpenApiGeneratedClientAndReleaseFragmentConverge()
+    public async Task OpenApiAndGeneratedClientConverge()
     {
         string openApi = GeneratedContractInputs.Schema;
         await Assert.That(openApi).Contains(
@@ -141,14 +141,5 @@ public sealed class TicketingDeploymentCapabilityMatrixTests
             "GetTicketingDeploymentCapabilitiesAsync");
         await Assert.That(client).DoesNotContain(
             "ProtectedDelayedPayoutAsync");
-
-        await Assert.That(File.Exists(Path.Combine(
-                RepositoryRoot,
-                "docs",
-                "internal",
-                "releases",
-                "changes",
-                "CHG-01M15N7V6Q2K8R4Y9T3W5X0ZAB.yaml")))
-            .IsTrue();
     }
 }

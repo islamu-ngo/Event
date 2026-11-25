@@ -107,4 +107,47 @@ public sealed class ConfigurationManifestDifferTests
         await Assert.That(first.Artifact.Changes.Any(c => c.Kind == "schema_type_narrowed" && c.Severity == ContractChangeSeverity.Breaking && c.Target.Contains("branding", StringComparison.Ordinal))).IsTrue();
         await Assert.That(first.Artifact.Changes.Any(c => c.Kind == "schema_review_required" && c.Severity == ContractChangeSeverity.ReviewRequired && c.Target.Contains("maxItems", StringComparison.Ordinal))).IsTrue();
     }
+
+    [Test]
+    public async Task ConfigurationSchemaDiffDetectsSiblingLimitAddedBesideUnchangedDollarRef()
+    {
+        const string baseSchema = """
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "object",
+              "properties": {
+                "tenantSlug": { "$ref": "#/$defs/identifier" }
+              },
+              "$defs": {
+                "identifier": { "type": "string" }
+              }
+            }
+            """;
+
+        const string headSchema = """
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "object",
+              "properties": {
+                "tenantSlug": { "$ref": "#/$defs/identifier", "maxLength": 48 }
+              },
+              "$defs": {
+                "identifier": { "type": "string" }
+              }
+            }
+            """;
+
+        InMemoryGitObjectReader reader = new InMemoryGitObjectReader()
+            .AddCommit(BaseOid, new Dictionary<string, string> { ["schemas/configuration-manifest-v1alpha2.schema.json"] = baseSchema })
+            .AddCommit(HeadOid, new Dictionary<string, string> { ["schemas/configuration-manifest-v1alpha2.schema.json"] = headSchema });
+
+        ReleaseContractDiffResult result = ReleaseContractDiffPipeline.Default.Execute(reader, BaseOid, HeadOid);
+
+        await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "config ref sibling diff");
+        await Assert.That(result.Artifact!.Changes.Any(c =>
+            c.Kind == "schema_review_required" &&
+            c.Severity == ContractChangeSeverity.ReviewRequired &&
+            c.Target.Contains("tenantSlug", StringComparison.Ordinal) &&
+            c.Summary.Contains("maxLength", StringComparison.Ordinal))).IsTrue();
+    }
 }

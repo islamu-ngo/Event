@@ -14,6 +14,59 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
 {
     private const int MaxJsonDepth = 64;
     private static readonly string[] HttpMethods = ["get", "post", "put", "patch", "delete", "head", "options", "trace"];
+    private static readonly HashSet<string> DocumentHandledKeys = new(StringComparer.Ordinal)
+    {
+        "paths",
+        "components",
+        "$defs",
+        "security",
+        "info",
+        "tags",
+        "externalDocs",
+    };
+    private static readonly HashSet<string> PathItemHandledKeys = new(
+        HttpMethods.Concat(["parameters", "summary", "description"]),
+        StringComparer.Ordinal);
+    private static readonly HashSet<string> OperationHandledKeys = new(StringComparer.Ordinal)
+    {
+        "security",
+        "parameters",
+        "requestBody",
+        "responses",
+        "tags",
+        "summary",
+        "description",
+        "externalDocs",
+        "operationId",
+    };
+    private static readonly HashSet<string> ParameterHandledKeys = new(StringComparer.Ordinal)
+    {
+        "name",
+        "in",
+        "required",
+        "schema",
+        "description",
+        "example",
+        "examples",
+    };
+    private static readonly HashSet<string> RequestBodyHandledKeys = new(StringComparer.Ordinal)
+    {
+        "required",
+        "content",
+        "description",
+    };
+    private static readonly HashSet<string> ResponseHandledKeys = new(StringComparer.Ordinal)
+    {
+        "content",
+        "description",
+        "summary",
+    };
+    private static readonly HashSet<string> MediaTypeHandledKeys = new(StringComparer.Ordinal)
+    {
+        "schema",
+        "example",
+        "examples",
+    };
     private static readonly JsonDocumentOptions ParseOptions = new()
     {
         MaxDepth = MaxJsonDepth,
@@ -129,9 +182,91 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
     private void DiffDocument(JsonElement baseRoot, JsonElement headRoot, string artifactPath, List<ContractDiffChange> changes)
     {
         DiffExtensions(baseRoot, headRoot, "document", artifactPath, changes);
+        DiffSecurity(baseRoot, headRoot, "document", artifactPath, changes);
+        DiffUnhandledFields(baseRoot, headRoot, "document", DocumentHandledKeys, artifactPath, changes);
         DiffPaths(baseRoot, headRoot, artifactPath, changes);
-        DiffNamedSchemas(baseRoot, headRoot, "components", "schemas", "components.schemas", artifactPath, changes);
+        DiffComponents(baseRoot, headRoot, artifactPath, changes);
         DiffNamedSchemas(baseRoot, headRoot, "$defs", null, "$defs", artifactPath, changes);
+    }
+
+    private void DiffComponents(JsonElement baseRoot, JsonElement headRoot, string artifactPath, List<ContractDiffChange> changes)
+    {
+        DiffNamedSchemas(baseRoot, headRoot, "components", "schemas", "components.schemas", artifactPath, changes);
+
+        bool hasBaseComponents = baseRoot.TryGetProperty("components", out JsonElement baseComponents) && baseComponents.ValueKind == JsonValueKind.Object;
+        bool hasHeadComponents = headRoot.TryGetProperty("components", out JsonElement headComponents) && headComponents.ValueKind == JsonValueKind.Object;
+        if (!hasBaseComponents && !hasHeadComponents)
+        {
+            return;
+        }
+
+        if (hasBaseComponents && hasHeadComponents)
+        {
+            DiffExtensions(baseComponents, headComponents, "components", artifactPath, changes);
+        }
+
+        Dictionary<string, JsonElement> baseSections = ReadObjectMap(baseRoot, "components");
+        Dictionary<string, JsonElement> headSections = ReadObjectMap(headRoot, "components");
+
+        foreach (string section in baseSections.Keys.Union(headSections.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal))
+        {
+            if (string.Equals(section, "schemas", StringComparison.Ordinal) ||
+                section.StartsWith("x-", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            bool hasBase = baseSections.TryGetValue(section, out JsonElement baseSection);
+            bool hasHead = headSections.TryGetValue(section, out JsonElement headSection);
+
+            if ((hasBase && baseSection.ValueKind == JsonValueKind.Object) ||
+                (hasHead && headSection.ValueKind == JsonValueKind.Object))
+            {
+                Dictionary<string, JsonElement> baseEntries = hasBase && baseSection.ValueKind == JsonValueKind.Object
+                    ? EnumerateObjectMap(baseSection)
+                    : new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+                Dictionary<string, JsonElement> headEntries = hasHead && headSection.ValueKind == JsonValueKind.Object
+                    ? EnumerateObjectMap(headSection)
+                    : new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+
+                foreach (string entryName in baseEntries.Keys.Union(headEntries.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal))
+                {
+                    bool entryInBase = baseEntries.TryGetValue(entryName, out JsonElement baseEntry);
+                    bool entryInHead = headEntries.TryGetValue(entryName, out JsonElement headEntry);
+                    string target = $"components.{section}.{entryName}";
+
+                    if (!entryInBase || !entryInHead ||
+                        !string.Equals(
+                            ConservativeJsonSchemaDiffer.CanonicalJson(baseEntry),
+                            ConservativeJsonSchemaDiffer.CanonicalJson(headEntry),
+                            StringComparison.Ordinal))
+                    {
+                        changes.Add(new ContractDiffChange(
+                            Family,
+                            ContractChangeSeverity.ReviewRequired,
+                            "openapi_component_changed",
+                            target,
+                            $"OpenAPI component '{target}' changed; manual contract review required.",
+                            artifactPath));
+                    }
+                }
+            }
+            else if (!hasBase || !hasHead ||
+                !string.Equals(
+                    ConservativeJsonSchemaDiffer.CanonicalJson(baseSection),
+                    ConservativeJsonSchemaDiffer.CanonicalJson(headSection),
+                    StringComparison.Ordinal))
+            {
+                string target = $"components.{section}";
+                changes.Add(new ContractDiffChange(
+                    Family,
+                    ContractChangeSeverity.ReviewRequired,
+                    "openapi_component_changed",
+                    target,
+                    $"OpenAPI component section '{target}' changed; manual contract review required.",
+                    artifactPath));
+            }
+        }
     }
 
     private void DiffPaths(JsonElement baseRoot, JsonElement headRoot, string artifactPath, List<ContractDiffChange> changes)
@@ -146,10 +281,12 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
 
             if (hasBase && !hasHead)
             {
+                bool emittedOperation = false;
                 foreach (string method in HttpMethods)
                 {
                     if (basePathItem.TryGetProperty(method, out _))
                     {
+                        emittedOperation = true;
                         string label = $"{method.ToUpperInvariant()} {route}";
                         changes.Add(new ContractDiffChange(
                             Family,
@@ -161,15 +298,28 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
                     }
                 }
 
+                if (!emittedOperation)
+                {
+                    changes.Add(new ContractDiffChange(
+                        Family,
+                        ContractChangeSeverity.ReviewRequired,
+                        "openapi_review_required",
+                        $"path:{route}",
+                        $"Removed path item '{route}' with non-standard or referenced structure; manual review required.",
+                        artifactPath));
+                }
+
                 continue;
             }
 
             if (!hasBase && hasHead)
             {
+                bool emittedOperation = false;
                 foreach (string method in HttpMethods)
                 {
                     if (headPathItem.TryGetProperty(method, out _))
                     {
+                        emittedOperation = true;
                         string label = $"{method.ToUpperInvariant()} {route}";
                         changes.Add(new ContractDiffChange(
                             Family,
@@ -181,6 +331,17 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
                     }
                 }
 
+                if (!emittedOperation)
+                {
+                    changes.Add(new ContractDiffChange(
+                        Family,
+                        ContractChangeSeverity.ReviewRequired,
+                        "openapi_review_required",
+                        $"path:{route}",
+                        $"Added path item '{route}' with non-standard or referenced structure; manual review required.",
+                        artifactPath));
+                }
+
                 continue;
             }
 
@@ -189,7 +350,10 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
                 continue;
             }
 
-            DiffExtensions(basePathItem, headPathItem, $"path:{route}", artifactPath, changes);
+            string pathTarget = $"path:{route}";
+            DiffExtensions(basePathItem, headPathItem, pathTarget, artifactPath, changes);
+            DiffParameters(baseRoot, headRoot, basePathItem, headPathItem, pathTarget, artifactPath, changes);
+            DiffUnhandledFields(basePathItem, headPathItem, pathTarget, PathItemHandledKeys, artifactPath, changes);
             foreach (string method in HttpMethods)
             {
                 bool hasBaseOp = basePathItem.TryGetProperty(method, out JsonElement baseOp) && baseOp.ValueKind == JsonValueKind.Object;
@@ -242,6 +406,7 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
         DiffParameters(baseRoot, headRoot, baseOp, headOp, opLabel, artifactPath, changes);
         DiffRequestBody(baseRoot, headRoot, baseOp, headOp, opLabel, artifactPath, changes);
         DiffResponses(baseRoot, headRoot, baseOp, headOp, opLabel, artifactPath, changes);
+        DiffUnhandledFields(baseOp, headOp, opLabel, OperationHandledKeys, artifactPath, changes);
     }
 
     private void DiffSecurity(JsonElement baseOp, JsonElement headOp, string opLabel, string artifactPath, List<ContractDiffChange> changes)
@@ -402,8 +567,10 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
                     artifactPath));
             }
 
-            if (baseParam.TryGetProperty("schema", out JsonElement baseSchema) &&
-                headParam.TryGetProperty("schema", out JsonElement headSchema))
+            DiffExtensions(baseParam, headParam, target, artifactPath, changes);
+            bool baseHasSchema = baseParam.TryGetProperty("schema", out JsonElement baseSchema);
+            bool headHasSchema = headParam.TryGetProperty("schema", out JsonElement headSchema);
+            if (baseHasSchema && headHasSchema)
             {
                 ConservativeJsonSchemaDiffer.DiffSchema(
                     Family,
@@ -415,6 +582,18 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
                     headSchema,
                     changes);
             }
+            else if (baseHasSchema != headHasSchema)
+            {
+                changes.Add(new ContractDiffChange(
+                    Family,
+                    ContractChangeSeverity.ReviewRequired,
+                    "openapi_review_required",
+                    $"{target}.schema",
+                    $"Schema presence changed on parameter '{key}' of {opLabel}; manual review required.",
+                    artifactPath));
+            }
+
+            DiffUnhandledFields(baseParam, headParam, target, ParameterHandledKeys, artifactPath, changes);
         }
     }
 
@@ -455,12 +634,20 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
             return;
         }
 
-        if (!IsRequiredFlag(baseBody) && IsRequiredFlag(headBody))
+        bool baseRequired = IsRequiredFlag(baseBody);
+        bool headRequired = IsRequiredFlag(headBody);
+        if (!baseRequired && headRequired)
         {
             changes.Add(new ContractDiffChange(Family, ContractChangeSeverity.Breaking, "request_body_narrowed_required", target, $"Request body on {opLabel} became required.", artifactPath));
         }
+        else if (baseRequired && !headRequired)
+        {
+            changes.Add(new ContractDiffChange(Family, ContractChangeSeverity.Additive, "request_body_widened_optional", target, $"Request body on {opLabel} changed from required to optional.", artifactPath));
+        }
 
+        DiffExtensions(baseBody, headBody, target, artifactPath, changes);
         DiffContentMediaTypes(baseRoot, headRoot, baseBody, headBody, target, artifactPath, changes);
+        DiffUnhandledFields(baseBody, headBody, target, RequestBodyHandledKeys, artifactPath, changes);
     }
 
     private void DiffResponses(
@@ -495,7 +682,9 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
 
             if (hasBase && hasHead)
             {
+                DiffExtensions(baseResp, headResp, target, artifactPath, changes);
                 DiffContentMediaTypes(baseRoot, headRoot, baseResp, headResp, target, artifactPath, changes);
+                DiffUnhandledFields(baseResp, headResp, target, ResponseHandledKeys, artifactPath, changes);
             }
         }
     }
@@ -530,19 +719,35 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
                 continue;
             }
 
-            if (hasBase && hasHead &&
-                baseMedia.TryGetProperty("schema", out JsonElement baseSchema) &&
-                headMedia.TryGetProperty("schema", out JsonElement headSchema))
+            if (hasBase && hasHead)
             {
-                ConservativeJsonSchemaDiffer.DiffSchema(
-                    Family,
-                    artifactPath,
-                    target,
-                    baseRoot,
-                    headRoot,
-                    baseSchema,
-                    headSchema,
-                    changes);
+                DiffExtensions(baseMedia, headMedia, target, artifactPath, changes);
+                bool baseHasSchema = baseMedia.TryGetProperty("schema", out JsonElement baseSchema);
+                bool headHasSchema = headMedia.TryGetProperty("schema", out JsonElement headSchema);
+                if (baseHasSchema && headHasSchema)
+                {
+                    ConservativeJsonSchemaDiffer.DiffSchema(
+                        Family,
+                        artifactPath,
+                        target,
+                        baseRoot,
+                        headRoot,
+                        baseSchema,
+                        headSchema,
+                        changes);
+                }
+                else if (baseHasSchema != headHasSchema)
+                {
+                    changes.Add(new ContractDiffChange(
+                        Family,
+                        ContractChangeSeverity.ReviewRequired,
+                        "openapi_review_required",
+                        $"{target}.schema",
+                        $"Schema presence changed on media type '{mediaType}' for {parentTarget}; manual review required.",
+                        artifactPath));
+                }
+
+                DiffUnhandledFields(baseMedia, headMedia, target, MediaTypeHandledKeys, artifactPath, changes);
             }
         }
     }
@@ -630,6 +835,67 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
         return result;
     }
 
+    private void DiffUnhandledFields(
+        JsonElement baseNode,
+        JsonElement headNode,
+        string target,
+        HashSet<string> handledKeys,
+        string artifactPath,
+        List<ContractDiffChange> changes)
+    {
+        Dictionary<string, string> baseExtra = ReadUnhandledFields(baseNode, handledKeys);
+        Dictionary<string, string> headExtra = ReadUnhandledFields(headNode, handledKeys);
+
+        foreach (string key in baseExtra.Keys.Union(headExtra.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal))
+        {
+            baseExtra.TryGetValue(key, out string? baseVal);
+            headExtra.TryGetValue(key, out string? headVal);
+            if (!string.Equals(baseVal, headVal, StringComparison.Ordinal))
+            {
+                changes.Add(new ContractDiffChange(
+                    Family,
+                    ContractChangeSeverity.ReviewRequired,
+                    "openapi_review_required",
+                    $"{target}.{key}",
+                    $"OpenAPI structural field '{key}' changed on {target}; manual contract review required.",
+                    artifactPath));
+            }
+        }
+    }
+
+    private static Dictionary<string, string> ReadUnhandledFields(JsonElement node, HashSet<string> handledKeys)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (node.ValueKind != JsonValueKind.Object)
+        {
+            return result;
+        }
+
+        foreach (JsonProperty prop in node.EnumerateObject())
+        {
+            if (!handledKeys.Contains(prop.Name) && !prop.Name.StartsWith("x-", StringComparison.OrdinalIgnoreCase))
+            {
+                result[prop.Name] = ConservativeJsonSchemaDiffer.CanonicalJson(prop.Value);
+            }
+        }
+
+        return result;
+    }
+
+    private static Dictionary<string, JsonElement> EnumerateObjectMap(JsonElement obj)
+    {
+        var result = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        if (obj.ValueKind == JsonValueKind.Object)
+        {
+            foreach (JsonProperty prop in obj.EnumerateObject())
+            {
+                result[prop.Name] = prop.Value;
+            }
+        }
+
+        return result;
+    }
+
     private static Dictionary<string, JsonElement> ReadParameterMap(JsonElement operation)
     {
         var result = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
@@ -650,6 +916,12 @@ public sealed class OpenApiContractDiffer : IReleaseContractDiffer
             if (name.Length > 0)
             {
                 result[$"{location}:{name}"] = param;
+            }
+            else if (param.TryGetProperty("$ref", out JsonElement refProp) &&
+                refProp.ValueKind == JsonValueKind.String &&
+                refProp.GetString() is { Length: > 0 } reference)
+            {
+                result[$"$ref:{reference}"] = param;
             }
         }
 
@@ -743,7 +1015,16 @@ internal static class ConservativeJsonSchemaDiffer
         "title",
         "description",
         "$comment",
-        "$comment2",
+        "example",
+        "examples",
+    };
+
+    private static readonly HashSet<string> RefNonConstraintMetadataKeywords = new(StringComparer.Ordinal)
+    {
+        "$ref",
+        "title",
+        "description",
+        "$comment",
         "example",
         "examples",
     };
@@ -828,44 +1109,67 @@ internal static class ConservativeJsonSchemaDiffer
                         artifactPath));
                 }
 
-                return;
+                // Do not return early: JSON Schema 2020-12 / OpenAPI 3.1 allow sibling constraints beside $ref.
             }
-
-            JsonElement resolvedBase = baseSchema;
-            JsonElement resolvedHead = headSchema;
-            if (baseHasRef && !TryResolveLocalRef(baseRoot, baseRef!, out resolvedBase))
+            else
             {
-                changes.Add(new ContractDiffChange(
-                    family,
-                    ContractChangeSeverity.ReviewRequired,
-                    "unresolved_ref",
-                    target,
-                    $"Unresolved or external base $ref '{baseRef}' at '{target}'; manual review required.",
-                    artifactPath));
-                return;
-            }
+                JsonElement resolvedBase = baseSchema;
+                JsonElement resolvedHead = headSchema;
+                bool baseResolved = true;
+                bool headResolved = true;
+                if (baseHasRef && !TryResolveLocalRef(baseRoot, baseRef!, out resolvedBase))
+                {
+                    baseResolved = false;
+                    changes.Add(new ContractDiffChange(
+                        family,
+                        ContractChangeSeverity.ReviewRequired,
+                        "unresolved_ref",
+                        target,
+                        $"Unresolved or external base $ref '{baseRef}' at '{target}'; manual review required.",
+                        artifactPath));
+                }
 
-            if (headHasRef && !TryResolveLocalRef(headRoot, headRef!, out resolvedHead))
-            {
-                changes.Add(new ContractDiffChange(
-                    family,
-                    ContractChangeSeverity.ReviewRequired,
-                    "unresolved_ref",
-                    target,
-                    $"Unresolved or external head $ref '{headRef}' at '{target}'; manual review required.",
-                    artifactPath));
-                return;
-            }
+                if (headHasRef && !TryResolveLocalRef(headRoot, headRef!, out resolvedHead))
+                {
+                    headResolved = false;
+                    changes.Add(new ContractDiffChange(
+                        family,
+                        ContractChangeSeverity.ReviewRequired,
+                        "unresolved_ref",
+                        target,
+                        $"Unresolved or external head $ref '{headRef}' at '{target}'; manual review required.",
+                        artifactPath));
+                }
 
-            string cycleKey = $"{baseRef ?? "<inline>"}->{headRef ?? "<inline>"}";
-            if (!visitedRefs.Add(cycleKey))
-            {
-                return;
-            }
+                if (baseResolved && headResolved)
+                {
+                    string cycleKey = $"{baseRef ?? "<inline>"}->{headRef ?? "<inline>"}";
+                    if (visitedRefs.Add(cycleKey))
+                    {
+                        DiffSchemaCore(family, artifactPath, target, baseRoot, headRoot, resolvedBase, resolvedHead, changes, depth + 1, visitedRefs);
+                        visitedRefs.Remove(cycleKey);
+                    }
+                }
 
-            DiffSchemaCore(family, artifactPath, target, baseRoot, headRoot, resolvedBase, resolvedHead, changes, depth + 1, visitedRefs);
-            visitedRefs.Remove(cycleKey);
-            return;
+                if (baseHasRef != headHasRef)
+                {
+                    JsonElement refNode = baseHasRef ? baseSchema : headSchema;
+                    if (HasConstraintSiblingsBesideRef(refNode))
+                    {
+                        changes.Add(new ContractDiffChange(
+                            family,
+                            ContractChangeSeverity.ReviewRequired,
+                            "schema_review_required",
+                            target,
+                            $"Sibling schema constraints beside $ref changed across inline/reference refactor at '{target}'; manual review required.",
+                            artifactPath));
+                    }
+
+                    return;
+                }
+
+                // Both sides carry $ref (different targets): fall through to compare any sibling constraints on the wrapper nodes.
+            }
         }
 
         DiffTypes(family, artifactPath, target, baseSchema, headSchema, changes);
@@ -1110,6 +1414,19 @@ internal static class ConservativeJsonSchemaDiffer
                 $"Structural schema constraints or defaults changed at '{target}' ({string.Join(", ", changedKeys)}); manual review required.",
                 artifactPath));
         }
+    }
+
+    private static bool HasConstraintSiblingsBesideRef(JsonElement schema)
+    {
+        foreach (JsonProperty prop in schema.EnumerateObject())
+        {
+            if (!RefNonConstraintMetadataKeywords.Contains(prop.Name))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryResolveLocalRef(JsonElement root, string reference, out JsonElement resolved)

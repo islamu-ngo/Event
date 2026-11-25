@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ISLAMU.ReleaseEngineering;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
@@ -10,109 +11,82 @@ public sealed class OpenApiContractDifferTests
     [Test]
     public async Task ClassifiesOperationHalLinkRequiredTypeAndSecurityChangesConservatively()
     {
-        const string baseSpec = """
+        string baseSpec = SerializeSpec(new
+        {
+            openapi = "3.1.1",
+            paths = new Dictionary<string, object>
             {
-              "openapi": "3.1.1",
-              "paths": {
-                "/api/events": {
-                  "get": {
-                    "security": [],
-                    "parameters": [
-                      { "name": "page", "in": "query", "required": false, "schema": { "type": "integer" } }
-                    ],
-                    "responses": {
-                      "200": {
-                        "content": {
-                          "application/json": {
-                            "schema": { "$ref": "#/components/schemas/EventResource" }
-                          }
-                        }
-                      }
-                    }
-                  },
-                  "delete": {
-                    "responses": { "204": { "description": "Deleted" } }
-                  }
-                }
-              },
-              "components": {
-                "schemas": {
-                  "EventResource": {
-                    "type": "object",
-                    "required": ["id"],
-                    "properties": {
-                      "id": { "type": "string" },
-                      "title": { "type": ["null", "string"] },
-                      "_links": {
-                        "type": "object",
-                        "properties": {
-                          "self": { "type": "object" },
-                          "edit": { "type": "object" }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            """;
-
-        const string headSpec = """
-            {
-              "openapi": "3.1.1",
-              "paths": {
-                "/api/events": {
-                  "get": {
-                    "security": [{ "bearer": [] }],
-                    "parameters": [
-                      { "name": "page", "in": "query", "required": true, "schema": { "type": "integer" } },
-                      { "name": "cursor", "in": "query", "required": false, "schema": { "type": "string" } }
-                    ],
-                    "responses": {
-                      "200": {
-                        "content": {
-                          "application/json": {
-                            "schema": { "$ref": "#/components/schemas/EventResource" }
-                          }
-                        }
-                      }
-                    }
-                  }
+                ["/api/events"] = new Dictionary<string, object>
+                {
+                    ["get"] = new
+                    {
+                        security = Array.Empty<object>(),
+                        parameters = new object[]
+                        {
+                            new { name = "page", @in = "query", required = false, schema = new { type = "integer" } },
+                        },
+                        responses = JsonResponseRef("#/components/schemas/EventResource"),
+                    },
+                    ["delete"] = new { responses = new Dictionary<string, object> { ["204"] = new { description = "Deleted" } } },
                 },
-                "/api/events/featured": {
-                  "get": {
-                    "responses": { "200": { "description": "OK" } }
-                  }
-                }
-              },
-              "components": {
-                "schemas": {
-                  "EventResource": {
-                    "type": "object",
-                    "required": ["id", "title"],
-                    "properties": {
-                      "id": { "type": "string" },
-                      "title": { "type": "string" },
-                      "subtitle": { "type": ["null", "string"] },
-                      "_links": {
-                        "type": "object",
-                        "properties": {
-                          "self": { "type": "object" },
-                          "publish": { "type": "object" }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            """;
+            },
+            components = new
+            {
+                schemas = new Dictionary<string, object>
+                {
+                    ["EventResource"] = EventResourceSchema(
+                        ["id"],
+                        new Dictionary<string, object>
+                        {
+                            ["id"] = new { type = "string" },
+                            ["title"] = new { type = new[] { "null", "string" } },
+                            ["_links"] = HalLinks("self", "edit"),
+                        }),
+                },
+            },
+        });
 
-        InMemoryGitObjectReader reader = new InMemoryGitObjectReader()
-            .AddCommit(BaseOid, new Dictionary<string, string> { ["schemas/openapi_islamu-event.json"] = baseSpec })
-            .AddCommit(HeadOid, new Dictionary<string, string> { ["schemas/openapi_islamu-event.json"] = headSpec });
+        string headSpec = SerializeSpec(new
+        {
+            openapi = "3.1.1",
+            paths = new Dictionary<string, object>
+            {
+                ["/api/events"] = new Dictionary<string, object>
+                {
+                    ["get"] = new
+                    {
+                        security = new object[] { new Dictionary<string, object> { ["bearer"] = Array.Empty<string>() } },
+                        parameters = new object[]
+                        {
+                            new { name = "page", @in = "query", required = true, schema = new { type = "integer" } },
+                            new { name = "cursor", @in = "query", required = false, schema = new { type = "string" } },
+                        },
+                        responses = JsonResponseRef("#/components/schemas/EventResource"),
+                    },
+                },
+                ["/api/events/featured"] = new Dictionary<string, object>
+                {
+                    ["get"] = new { responses = new Dictionary<string, object> { ["200"] = new { description = "OK" } } },
+                },
+            },
+            components = new
+            {
+                schemas = new Dictionary<string, object>
+                {
+                    ["EventResource"] = EventResourceSchema(
+                        ["id", "title"],
+                        new Dictionary<string, object>
+                        {
+                            ["id"] = new { type = "string" },
+                            ["title"] = new { type = "string" },
+                            ["subtitle"] = new { type = new[] { "null", "string" } },
+                            ["_links"] = HalLinks("self", "publish"),
+                        }),
+                },
+            },
+        });
 
-        ContractDifferResult result = new OpenApiContractDiffer().Diff(reader, BaseOid, HeadOid);
+        ContractDifferResult result = DiffSpecs(baseSpec, headSpec);
 
         await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "openapi diff");
         await Assert.That(result.Changes.Any(c => c.Kind == "operation_removed" && c.Severity == ContractChangeSeverity.Breaking && c.Target.Contains("DELETE /api/events", StringComparison.Ordinal))).IsTrue();
@@ -130,75 +104,67 @@ public sealed class OpenApiContractDifferTests
     [Test]
     public async Task MarksUnresolvedRefsVendorExtensionsAndUnknownStructuralChangesAsReviewRequired()
     {
-        const string baseSpec = """
+        string baseSpec = SerializeSpec(new
+        {
+            openapi = "3.1.1",
+            paths = new Dictionary<string, object>
             {
-              "openapi": "3.1.1",
-              "paths": {
-                "/api/events": {
-                  "get": {
-                    "x-islamu-tier": "public",
-                    "responses": {
-                      "200": {
-                        "content": {
-                          "application/json": {
-                            "schema": { "$ref": "#/components/schemas/MissingExternal" }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              "components": {
-                "schemas": {
-                  "Payload": {
-                    "type": "object",
-                    "properties": {
-                      "status": { "type": "string", "default": "draft", "pattern": "^[a-z]+$" }
-                    }
-                  }
-                }
-              }
-            }
-            """;
-
-        const string headSpec = """
+                ["/api/events"] = new Dictionary<string, object>
+                {
+                    ["get"] = new Dictionary<string, object>
+                    {
+                        ["x-islamu-tier"] = "public",
+                        ["responses"] = JsonResponseRef("#/components/schemas/MissingExternal"),
+                    },
+                },
+            },
+            components = new
             {
-              "openapi": "3.1.1",
-              "paths": {
-                "/api/events": {
-                  "get": {
-                    "x-islamu-tier": "federated",
-                    "responses": {
-                      "200": {
-                        "content": {
-                          "application/json": {
-                            "schema": { "$ref": "https://example.invalid/external.json#/Payload" }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              "components": {
-                "schemas": {
-                  "Payload": {
-                    "type": "object",
-                    "properties": {
-                      "status": { "type": "string", "default": "published", "pattern": "^[a-z0-9-]+$" }
-                    }
-                  }
-                }
-              }
-            }
-            """;
+                schemas = new Dictionary<string, object>
+                {
+                    ["Payload"] = new
+                    {
+                        type = "object",
+                        properties = new Dictionary<string, object>
+                        {
+                            ["status"] = new { type = "string", @default = "draft", pattern = "^[a-z]+$" },
+                        },
+                    },
+                },
+            },
+        });
 
-        InMemoryGitObjectReader reader = new InMemoryGitObjectReader()
-            .AddCommit(BaseOid, new Dictionary<string, string> { ["schemas/openapi_islamu-event.json"] = baseSpec })
-            .AddCommit(HeadOid, new Dictionary<string, string> { ["schemas/openapi_islamu-event.json"] = headSpec });
+        string headSpec = SerializeSpec(new
+        {
+            openapi = "3.1.1",
+            paths = new Dictionary<string, object>
+            {
+                ["/api/events"] = new Dictionary<string, object>
+                {
+                    ["get"] = new Dictionary<string, object>
+                    {
+                        ["x-islamu-tier"] = "federated",
+                        ["responses"] = JsonResponseRef("https://example.invalid/external.json#/Payload"),
+                    },
+                },
+            },
+            components = new
+            {
+                schemas = new Dictionary<string, object>
+                {
+                    ["Payload"] = new
+                    {
+                        type = "object",
+                        properties = new Dictionary<string, object>
+                        {
+                            ["status"] = new { type = "string", @default = "published", pattern = "^[a-z0-9-]+$" },
+                        },
+                    },
+                },
+            },
+        });
 
-        ContractDifferResult result = new OpenApiContractDiffer().Diff(reader, BaseOid, HeadOid);
+        ContractDifferResult result = DiffSpecs(baseSpec, headSpec);
 
         await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "review required");
         await Assert.That(result.Changes.Any(c => c.Kind == "unresolved_ref" && c.Severity == ContractChangeSeverity.ReviewRequired)).IsTrue();
@@ -207,15 +173,209 @@ public sealed class OpenApiContractDifferTests
     }
 
     [Test]
+    public async Task SurfacesChangesToSecuritySchemesRootSecurityServersPathParametersAndOperationMetadata()
+    {
+        string baseSpec = SerializeSpec(new
+        {
+            openapi = "3.1.1",
+            servers = new object[] { new { url = "https://api.example.invalid/v1" } },
+            security = Array.Empty<object>(),
+            paths = new Dictionary<string, object>
+            {
+                ["/api/events/{id}"] = new Dictionary<string, object>
+                {
+                    ["parameters"] = new object[]
+                    {
+                        new { name = "id", @in = "path", required = true, schema = new { type = "string" } },
+                    },
+                    ["get"] = new Dictionary<string, object>
+                    {
+                        ["deprecated"] = false,
+                        ["responses"] = new Dictionary<string, object>
+                        {
+                            ["200"] = new Dictionary<string, object>
+                            {
+                                ["description"] = "OK",
+                                ["headers"] = new Dictionary<string, object>
+                                {
+                                    ["ETag"] = new { schema = new { type = "string" } },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            components = new Dictionary<string, object>
+            {
+                ["securitySchemes"] = new Dictionary<string, object>
+                {
+                    ["bearer"] = new { type = "http", scheme = "bearer", bearerFormat = "JWT" },
+                },
+            },
+        });
+
+        string headSpec = SerializeSpec(new
+        {
+            openapi = "3.1.1",
+            servers = new object[] { new { url = "https://api.example.invalid/v2" } },
+            security = new object[] { new Dictionary<string, object> { ["bearer"] = new[] { "events.read" } } },
+            paths = new Dictionary<string, object>
+            {
+                ["/api/events/{id}"] = new Dictionary<string, object>
+                {
+                    ["parameters"] = new object[]
+                    {
+                        new { name = "id", @in = "path", required = true, schema = new { type = "string" } },
+                        new { name = "X-Tenant-Slug", @in = "header", required = true, schema = new { type = "string" } },
+                    },
+                    ["get"] = new Dictionary<string, object>
+                    {
+                        ["deprecated"] = true,
+                        ["responses"] = new Dictionary<string, object>
+                        {
+                            ["200"] = new Dictionary<string, object>
+                            {
+                                ["description"] = "OK",
+                                ["headers"] = new Dictionary<string, object>
+                                {
+                                    ["ETag"] = new { schema = new { type = "string" } },
+                                    ["X-RateLimit-Remaining"] = new { schema = new { type = "integer" } },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            components = new Dictionary<string, object>
+            {
+                ["securitySchemes"] = new Dictionary<string, object>
+                {
+                    ["bearer"] = new { type = "oauth2", flows = new Dictionary<string, object>() },
+                },
+            },
+        });
+
+        ContractDifferResult result = DiffSpecs(baseSpec, headSpec);
+
+        await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "structural fallback");
+        await Assert.That(result.Changes.Any(c => c.Kind == "openapi_component_changed" && c.Severity == ContractChangeSeverity.ReviewRequired && c.Target == "components.securitySchemes.bearer")).IsTrue();
+        await Assert.That(result.Changes.Any(c => c.Kind == "security_narrowed" && c.Severity == ContractChangeSeverity.Breaking && c.Target == "document")).IsTrue();
+        await Assert.That(result.Changes.Any(c => c.Kind == "openapi_review_required" && c.Severity == ContractChangeSeverity.ReviewRequired && c.Target == "document.servers")).IsTrue();
+        await Assert.That(result.Changes.Any(c => c.Kind == "required_parameter_added" && c.Severity == ContractChangeSeverity.Breaking && c.Target == "path:/api/events/{id} param:header:X-Tenant-Slug")).IsTrue();
+        await Assert.That(result.Changes.Any(c => c.Kind == "openapi_review_required" && c.Severity == ContractChangeSeverity.ReviewRequired && c.Target == "GET /api/events/{id}.deprecated")).IsTrue();
+        await Assert.That(result.Changes.Any(c => c.Kind == "openapi_review_required" && c.Severity == ContractChangeSeverity.ReviewRequired && c.Target == "GET /api/events/{id} response:200.headers")).IsTrue();
+    }
+
+    [Test]
+    public async Task DetectsChangedSiblingConstraintsBesideUnchangedOrChangedDollarRef()
+    {
+        string baseSpec = SerializeSpec(new
+        {
+            openapi = "3.1.1",
+            paths = new Dictionary<string, object>(),
+            components = new
+            {
+                schemas = new Dictionary<string, object>
+                {
+                    ["Slug"] = new { type = "string" },
+                    ["AltSlug"] = new { type = "string" },
+                    ["CreateRequest"] = new
+                    {
+                        type = "object",
+                        properties = new Dictionary<string, object>
+                        {
+                            ["slug"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/Slug" },
+                            ["unchanged"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/Slug" },
+                            ["swapped"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/Slug", ["maxLength"] = 100 },
+                        },
+                    },
+                },
+            },
+        });
+
+        string headSpec = SerializeSpec(new
+        {
+            openapi = "3.1.1",
+            paths = new Dictionary<string, object>(),
+            components = new
+            {
+                schemas = new Dictionary<string, object>
+                {
+                    ["Slug"] = new { type = "string" },
+                    ["AltSlug"] = new { type = "string" },
+                    ["CreateRequest"] = new
+                    {
+                        type = "object",
+                        properties = new Dictionary<string, object>
+                        {
+                            ["slug"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/Slug", ["maxLength"] = 64 },
+                            ["unchanged"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/Slug" },
+                            ["swapped"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/AltSlug", ["maxLength"] = 32 },
+                        },
+                    },
+                },
+            },
+        });
+
+        ContractDifferResult result = DiffSpecs(baseSpec, headSpec);
+
+        await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "ref sibling diff");
+        await Assert.That(result.Changes.Any(c =>
+            c.Kind == "schema_review_required" &&
+            c.Severity == ContractChangeSeverity.ReviewRequired &&
+            c.Target == "components.schemas.CreateRequest.slug" &&
+            c.Summary.Contains("maxLength", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(result.Changes.Any(c =>
+            c.Kind == "schema_review_required" &&
+            c.Severity == ContractChangeSeverity.ReviewRequired &&
+            c.Target == "components.schemas.CreateRequest.swapped" &&
+            c.Summary.Contains("maxLength", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(result.Changes.Any(c => c.Target.Contains("unchanged", StringComparison.Ordinal))).IsFalse();
+    }
+
+    [Test]
     public async Task MalformedOpenApiJsonFailsClosed()
     {
-        InMemoryGitObjectReader reader = new InMemoryGitObjectReader()
-            .AddCommit(BaseOid, new Dictionary<string, string> { ["schemas/openapi_islamu-event.json"] = "{}" })
-            .AddCommit(HeadOid, new Dictionary<string, string> { ["schemas/openapi_islamu-event.json"] = "{ invalid json" });
-
-        ContractDifferResult result = new OpenApiContractDiffer().Diff(reader, BaseOid, HeadOid);
+        ContractDifferResult result = DiffSpecs("{}", "{ invalid json");
 
         await Assert.That(result.IsValid).IsFalse();
         await Assert.That(result.Diagnostic).IsEqualTo("contract_diff_openapi_malformed");
     }
+
+    private static ContractDifferResult DiffSpecs(string baseSpec, string headSpec)
+    {
+        InMemoryGitObjectReader reader = new InMemoryGitObjectReader()
+            .AddCommit(BaseOid, new Dictionary<string, string> { ["schemas/openapi_islamu-event.json"] = baseSpec })
+            .AddCommit(HeadOid, new Dictionary<string, string> { ["schemas/openapi_islamu-event.json"] = headSpec });
+        return new OpenApiContractDiffer().Diff(reader, BaseOid, HeadOid);
+    }
+
+    private static string SerializeSpec(object spec) => JsonSerializer.Serialize(spec);
+
+    private static Dictionary<string, object> JsonResponseRef(string reference) => new()
+    {
+        ["200"] = new
+        {
+            content = new Dictionary<string, object>
+            {
+                ["application/json"] = new
+                {
+                    schema = new Dictionary<string, object> { ["$ref"] = reference },
+                },
+            },
+        },
+    };
+
+    private static object EventResourceSchema(string[] required, Dictionary<string, object> properties) => new
+    {
+        type = "object",
+        required,
+        properties,
+    };
+
+    private static object HalLinks(params string[] relations) => new
+    {
+        type = "object",
+        properties = relations.ToDictionary(relation => relation, _ => (object)new { type = "object" }),
+    };
 }

@@ -267,7 +267,6 @@ public static class SyncPublicChangelogCommand
             return false;
         }
 
-        string fragmentsRoot = Path.Combine(releasesRoot, "changes");
         string[] candidateDirs = Directory.EnumerateDirectories(releasesRoot, "*", SearchOption.TopDirectoryOnly)
             .Where(dir => File.Exists(Path.Combine(dir, "release.yaml")))
             .Order(StringComparer.Ordinal)
@@ -279,22 +278,44 @@ public static class SyncPublicChangelogCommand
             return false;
         }
 
+        var objectReader = new GitProcessObjectReader(repositoryRoot, TimeSpan.FromSeconds(10), MaximumInputBytes);
+
         foreach (string releaseDir in candidateDirs)
         {
-            string releasePath = Path.Combine(releaseDir, "release.yaml");
-            string summaryPath = Path.Combine(releaseDir, "summary.md");
-            string contextPath = Path.Combine(releaseDir, "release-context.v1.json");
-            string notesPath = Path.Combine(releaseDir, "release-notes.md");
-            if (!File.Exists(summaryPath) || !File.Exists(contextPath) || !File.Exists(notesPath))
+            if (!IsSafePath(releaseDir))
             {
-                diagnostic = "changelog_release_files_missing";
+                diagnostic = "changelog_path_invalid";
                 return false;
             }
 
-            string releaseYaml = Utf8.GetString(ReadBounded(releasePath));
-            string summaryText = Utf8.GetString(ReadBounded(summaryPath)).TrimEnd('\n');
-            byte[] contextBytes = ReadBounded(contextPath);
-            byte[] notesBytes = ReadBounded(notesPath);
+            string versionDir = Path.GetFileName(releaseDir);
+            if (string.IsNullOrWhiteSpace(versionDir))
+            {
+                diagnostic = "changelog_path_invalid";
+                return false;
+            }
+
+            GitTagVerificationResult tagVerification = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
+                repositoryRoot,
+                $"v{versionDir}",
+                allowedSignersPath));
+            if (!tagVerification.IsValid || tagVerification.TagObjectId is null || tagVerification.TargetCommitOid is null)
+            {
+                diagnostic = tagVerification.Diagnostic ?? "changelog_tag_invalid";
+                return false;
+            }
+
+            string releasePrefix = $"docs/internal/releases/{versionDir}";
+            if (!TryReadSignedArtifact(objectReader, tagVerification.TargetCommitOid, repositoryRoot, $"{releasePrefix}/release.yaml", "changelog_release_files_missing", out byte[] releaseBytes, out diagnostic) ||
+                !TryReadSignedArtifact(objectReader, tagVerification.TargetCommitOid, repositoryRoot, $"{releasePrefix}/summary.md", "changelog_release_files_missing", out byte[] summaryBytes, out diagnostic) ||
+                !TryReadSignedArtifact(objectReader, tagVerification.TargetCommitOid, repositoryRoot, $"{releasePrefix}/release-context.v1.json", "changelog_release_files_missing", out byte[] contextBytes, out diagnostic) ||
+                !TryReadSignedArtifact(objectReader, tagVerification.TargetCommitOid, repositoryRoot, $"{releasePrefix}/release-notes.md", "changelog_release_files_missing", out byte[] notesBytes, out diagnostic))
+            {
+                return false;
+            }
+
+            string releaseYaml = Utf8.GetString(releaseBytes);
+            string summaryText = Utf8.GetString(summaryBytes).TrimEnd('\n');
             ArtifactPolicyResult notesPolicy = ReleaseArtifactPolicy.ValidateRenderedReleaseNotes(Utf8.GetString(notesBytes));
             if (!notesPolicy.IsValid)
             {
@@ -318,14 +339,20 @@ public static class SyncPublicChangelogCommand
             var fragmentYamls = new List<string>(linkedIds.Length);
             foreach (string id in linkedIds)
             {
-                string fragmentPath = Path.Combine(fragmentsRoot, id + ".yaml");
-                if (!File.Exists(fragmentPath))
+                string fragmentRelativePath = $"docs/internal/releases/changes/{id}.yaml";
+                if (!TryReadSignedArtifact(
+                        objectReader,
+                        tagVerification.TargetCommitOid,
+                        repositoryRoot,
+                        fragmentRelativePath,
+                        $"changelog_fragment_missing:{id}",
+                        out byte[] fragmentBytes,
+                        out diagnostic))
                 {
-                    diagnostic = $"changelog_fragment_missing:{id}";
                     return false;
                 }
 
-                fragmentYamls.Add(Utf8.GetString(ReadBounded(fragmentPath)));
+                fragmentYamls.Add(Utf8.GetString(fragmentBytes));
             }
 
             ReleaseInputValidationResult validated = ReleaseInputPolicy.Validate(releaseYaml, fragmentYamls, []);
@@ -335,13 +362,10 @@ public static class SyncPublicChangelogCommand
                 return false;
             }
 
-            GitTagVerificationResult tagVerification = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
-                repositoryRoot,
-                $"v{validated.Descriptor.Version}",
-                allowedSignersPath));
-            if (!tagVerification.IsValid || tagVerification.TagObjectId is null || tagVerification.TargetCommitOid is null)
+            if (!string.Equals(validated.Descriptor.Version, versionDir, StringComparison.Ordinal) ||
+                !string.Equals(context.Release.Version, validated.Descriptor.Version, StringComparison.Ordinal))
             {
-                diagnostic = tagVerification.Diagnostic ?? "changelog_tag_invalid";
+                diagnostic = "changelog_release_version_mismatch";
                 return false;
             }
 
@@ -355,6 +379,55 @@ public static class SyncPublicChangelogCommand
                 tagVerification.TargetCommitOid));
         }
 
+        return true;
+    }
+
+    private static bool TryReadSignedArtifact(
+        IGitObjectReader objectReader,
+        string targetCommitOid,
+        string repositoryRoot,
+        string repoRelativePath,
+        string missingLocalDiagnostic,
+        out byte[] signedBytes,
+        out string? diagnostic)
+    {
+        signedBytes = [];
+        diagnostic = null;
+
+        string localPath = Path.Combine(repositoryRoot, repoRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        if (!IsSafePath(localPath))
+        {
+            diagnostic = "changelog_path_invalid";
+            return false;
+        }
+
+        if (!File.Exists(localPath))
+        {
+            diagnostic = missingLocalDiagnostic;
+            return false;
+        }
+
+        byte[] workingTreeBytes = ReadBounded(localPath);
+        GitBlobReadResult blob = objectReader.ReadBlob(targetCommitOid, repoRelativePath);
+        if (blob.Diagnostic is not null)
+        {
+            diagnostic = blob.Diagnostic;
+            return false;
+        }
+
+        if (!blob.Found || blob.Bytes is null)
+        {
+            diagnostic = $"changelog_signed_artifact_missing:{repoRelativePath}";
+            return false;
+        }
+
+        if (!workingTreeBytes.AsSpan().SequenceEqual(blob.Bytes))
+        {
+            diagnostic = $"changelog_signed_artifact_mismatch:{repoRelativePath}";
+            return false;
+        }
+
+        signedBytes = blob.Bytes;
         return true;
     }
 

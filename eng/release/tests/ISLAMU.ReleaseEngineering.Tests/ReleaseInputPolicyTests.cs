@@ -38,7 +38,7 @@ public sealed class ReleaseInputPolicyTests
     [Test]
     public async Task RepositoryOptionalChangeFragmentsPassReleaseInputPolicyWhenEmptyOrPresent()
     {
-        string changesDirectory = Path.Combine(FindRepositoryRoot(), "docs", "internal", "releases", "changes");
+        string changesDirectory = Path.Combine(RepositoryRoot.Find(), "docs", "internal", "releases", "changes");
         string[] fragments = Directory.Exists(changesDirectory)
             ? Directory.GetFiles(changesDirectory, "CHG-*.yaml", SearchOption.TopDirectoryOnly)
                 .Order(StringComparer.Ordinal)
@@ -456,22 +456,6 @@ public sealed class ReleaseInputPolicyTests
             .Replace("Supersedes: []", supersedes is null ? "Supersedes: []" : $"Supersedes:\n  - {supersedes}", StringComparison.Ordinal);
 
     private static string FullOid(char value, int length = 40) => new(value, length);
-
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "AGENTS.md")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Repository root was not found.");
-    }
 
     private static string ValidFragmentYaml() =>
         """

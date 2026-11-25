@@ -234,12 +234,24 @@ public sealed class SecurityChangeSelectionTests
     [Arguments("islamic-value-sensitive-design/workstreams/i-vsd-release-engineering-modernization.md")]
     [Arguments(".agents/skills/conventional-commit/SKILL.md")]
     [Arguments(".agents/rules/tests.md")]
-    [Arguments("eng/release/src/ISLAMU.ReleaseEngineering/Program.cs")]
-    [Arguments("eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ProgramTests.cs")]
+    [Arguments("eng/release/README.md")]
     [Arguments("eng/release/cliff.toml")]
-    public async Task KnownDocumentationSkillAndReleaseToolingPathsSkipContainerSecurityTests(string path)
+    public async Task KnownDocumentationSkillAndReleaseProsePathsSkipContainerSecurityTests(string path)
     {
         await Assert.That(SecurityChangeSelection.RequiresExecution([path])).IsFalse();
+    }
+
+    [Test]
+    [Arguments("eng/release/src/ISLAMU.ReleaseEngineering/Program.cs")]
+    [Arguments("eng/release/src/ISLAMU.ReleaseEngineering/SecurityChangeSelection.cs")]
+    [Arguments("eng/release/src/ISLAMU.ReleaseEngineering/SecurityControlRegister.cs")]
+    [Arguments("eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj")]
+    [Arguments("eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ProgramTests.cs")]
+    [Arguments("eng/release/policy/release-policy.yaml")]
+    [Arguments("eng/tools/Event.LoadProcessOwner/LoadProcessOwner.cs")]
+    public async Task ReleaseToolCodeExecutedBySecurityWorkflowSelectsExecution(string path)
+    {
+        await Assert.That(SecurityChangeSelection.RequiresExecution([path])).IsTrue();
     }
 
     [Test]

@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
@@ -375,7 +374,10 @@ public sealed class SecurityControlRegisterTests
         return register;
     }
 
-    private static string RegisterPath([CallerFilePath] string sourcePath = "") =>
-        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(sourcePath) ??
-            throw new InvalidDataException(), "..", "..", "..", "security", "security-control-register.json"));
+    /// <summary>
+    /// Resolves the shipped register from the test output location rather than <c>[CallerFilePath]</c>,
+    /// because deterministic CI builds map source paths to <c>/_/</c>.
+    /// </summary>
+    private static string RegisterPath() =>
+        Path.Combine(RepositoryRoot.Find(), "eng", "security", "security-control-register.json");
 }

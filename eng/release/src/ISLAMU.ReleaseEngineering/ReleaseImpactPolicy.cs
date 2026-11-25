@@ -120,10 +120,7 @@ public static class ReleaseImpactPolicy
                 []);
         }
 
-        if (request.ChangedFiles is null ||
-            request.ExpectedFileCount <= 0 ||
-            request.ChangedFiles.Count != request.ExpectedFileCount ||
-            request.ChangedFiles.Select(file => file.Path).Distinct(StringComparer.Ordinal).Count() != request.ExpectedFileCount)
+        if (!HasCompleteChangedFileMetadata(request))
         {
             return new ReleaseImpactEvaluationResult(
                 false,
@@ -132,18 +129,12 @@ public static class ReleaseImpactPolicy
         }
 
         HashSet<ReleaseImpactCategory> requiredCategories = ClassifyRequiredCategories(
-            request.ChangedFiles.SelectMany(file =>
+            request.ChangedFiles!.SelectMany(file =>
                 file.PreviousPath is { } previousPath
                     ? new[] { file.Path, previousPath }
                     : [file.Path]));
 
-        if (request.IsBot &&
-            string.Equals(request.Author, "imgbot[bot]", StringComparison.Ordinal) &&
-            requiredCategories.Count == 0 &&
-            request.ChangedFiles.All(file =>
-                file.Kind == ReleaseImpactFileChangeKind.Modified &&
-                file.PreviousPath is null &&
-                IsReviewedImagePath(file.Path)))
+        if (IsVerifiedImgBotAssetOnlyChange(request, requiredCategories))
         {
             return new ReleaseImpactEvaluationResult(
                 true,
@@ -151,24 +142,44 @@ public static class ReleaseImpactPolicy
                 []);
         }
 
+        List<string> failures = ValidateReleaseImpactSection(request.PullRequestBody, requiredCategories);
+        return failures.Count > 0
+            ? new ReleaseImpactEvaluationResult(false, "Release impact validation failed.", failures)
+            : new ReleaseImpactEvaluationResult(true, $"Release impact validation passed. Changed files inspected: {request.ChangedFiles!.Count}.", []);
+    }
+
+    private static bool HasCompleteChangedFileMetadata(ReleaseImpactEvaluationRequest request) =>
+        request.ChangedFiles is not null &&
+        request.ExpectedFileCount > 0 &&
+        request.ChangedFiles.Count == request.ExpectedFileCount &&
+        request.ChangedFiles.Select(file => file.Path).Distinct(StringComparer.Ordinal).Count() == request.ExpectedFileCount;
+
+    private static bool IsVerifiedImgBotAssetOnlyChange(
+        ReleaseImpactEvaluationRequest request,
+        HashSet<ReleaseImpactCategory> requiredCategories) =>
+        request.IsBot &&
+        string.Equals(request.Author, "imgbot[bot]", StringComparison.Ordinal) &&
+        requiredCategories.Count == 0 &&
+        request.ChangedFiles!.All(file =>
+            file.Kind == ReleaseImpactFileChangeKind.Modified &&
+            file.PreviousPath is null &&
+            IsReviewedImagePath(file.Path));
+
+    private static List<string> ValidateReleaseImpactSection(string? pullRequestBody, HashSet<ReleaseImpactCategory> requiredCategories)
+    {
         var failures = new List<string>();
-        string releaseImpactSection = ExtractReleaseImpactSection(request.PullRequestBody);
+        string releaseImpactSection = ExtractReleaseImpactSection(pullRequestBody ?? string.Empty);
         if (string.IsNullOrWhiteSpace(releaseImpactSection))
         {
             failures.Add("PR body must include the Release Impact section from the pull request template.");
         }
 
         bool notApplicableChecked = HasCheckedLine(releaseImpactSection, "Not applicable");
-        var checkedCategories = new HashSet<ReleaseImpactCategory>();
-        foreach ((ReleaseImpactCategory category, ReleaseImpactRule rule) in Rules)
-        {
-            if (HasCheckedLine(releaseImpactSection, rule.Label))
-            {
-                checkedCategories.Add(category);
-            }
-        }
+        HashSet<ReleaseImpactCategory> checkedCategories = Rules
+            .Where(pair => HasCheckedLine(releaseImpactSection, pair.Value.Label))
+            .Select(pair => pair.Key)
+            .ToHashSet();
 
-        string details = ExtractDetails(releaseImpactSection);
         if (requiredCategories.Count > 0 && notApplicableChecked)
         {
             failures.Add(
@@ -176,12 +187,9 @@ public static class ReleaseImpactPolicy
                 string.Join(", ", requiredCategories.Order().Select(category => Rules[category].Label)) + ".");
         }
 
-        foreach (ReleaseImpactCategory category in requiredCategories.Order())
+        foreach (ReleaseImpactCategory missing in requiredCategories.Order().Where(category => !checkedCategories.Contains(category)))
         {
-            if (!checkedCategories.Contains(category))
-            {
-                failures.Add("Missing checked Release Impact item: " + Rules[category].Label + ".");
-            }
+            failures.Add("Missing checked Release Impact item: " + Rules[missing].Label + ".");
         }
 
         if (requiredCategories.Count == 0 && !notApplicableChecked && checkedCategories.Count == 0)
@@ -189,23 +197,12 @@ public static class ReleaseImpactPolicy
             failures.Add("Release Impact must either mark Not applicable or check at least one impact category.");
         }
 
-        if ((!notApplicableChecked || checkedCategories.Count > 0) && string.IsNullOrWhiteSpace(details))
+        if ((!notApplicableChecked || checkedCategories.Count > 0) && string.IsNullOrWhiteSpace(ExtractDetails(releaseImpactSection)))
         {
             failures.Add("Release Impact Details must explain the impact, release-note location, or why no release note is needed.");
         }
 
-        if (failures.Count > 0)
-        {
-            return new ReleaseImpactEvaluationResult(
-                false,
-                "Release impact validation failed.",
-                failures);
-        }
-
-        return new ReleaseImpactEvaluationResult(
-            true,
-            $"Release impact validation passed. Changed files inspected: {request.ChangedFiles.Count}.",
-            []);
+        return failures;
     }
 
     public static ReleaseImpactEvaluationResult EvaluateFromJson(string eventJson, string filesJson)

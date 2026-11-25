@@ -14,6 +14,20 @@ namespace ISLAMU.ReleaseEngineering;
 /// </summary>
 public sealed class GitCliffProcessExecutor : IGitCliffExecutor
 {
+    private static class Diagnostics
+    {
+        public const string InputInvalid = "git_cliff_input_invalid";
+        public const string InvalidContextJson = "git_cliff_invalid_context_json";
+        public const string InvalidBumpVersion = "git_cliff_invalid_bump_version";
+        public const string ConfigInvalid = "git_cliff_config_invalid";
+        public const string WorkingDirectoryInvalid = "git_cliff_working_directory_invalid";
+        public const string ToolUntrusted = "git_cliff_tool_untrusted";
+        public const string ExecutionFailed = "git_cliff_execution_failed";
+        public const string OutputLimitExceeded = "git_cliff_output_limit_exceeded";
+        public const string ExitNonZero = "git_cliff_exit_nonzero";
+        public const string Timeout = "git_cliff_timeout";
+    }
+
     private const int DefaultMaximumStdoutBytes = 16 * 1024 * 1024;
     private const int DefaultMaximumStderrBytes = 256 * 1024;
     private const int MaximumBumpStdoutBytes = 256;
@@ -42,14 +56,9 @@ public sealed class GitCliffProcessExecutor : IGitCliffExecutor
     public GitCliffContextExportResult ExportContext(GitCliffContextExportRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (string.IsNullOrWhiteSpace(request.Tag) || request.Tag.Any(char.IsControl))
+        if (string.IsNullOrWhiteSpace(request.Tag) || request.Tag.Any(char.IsControl) || !IsValidOptionalRange(request.CommitRange))
         {
-            return new GitCliffContextExportResult(false, null, "git_cliff_input_invalid");
-        }
-
-        if (request.CommitRange is not null && (string.IsNullOrWhiteSpace(request.CommitRange) || request.CommitRange.Any(char.IsControl)))
-        {
-            return new GitCliffContextExportResult(false, null, "git_cliff_input_invalid");
+            return new GitCliffContextExportResult(false, null, Diagnostics.InputInvalid);
         }
 
         var arguments = new List<string> { "--context", "--tag", request.Tag };
@@ -59,59 +68,40 @@ public sealed class GitCliffProcessExecutor : IGitCliffExecutor
             arguments.Add(request.CommitRange);
         }
 
-        ProcessOutcome outcome = Execute(
-            request.Tool,
-            request.RepositoryRoot,
-            arguments,
-            stdinBytes: null,
-            stdoutLimitBytes: maximumStdoutBytes);
+        ProcessOutcome outcome = Execute(request.Tool, request.RepositoryRoot, arguments, stdinBytes: null, maximumStdoutBytes);
         if (!outcome.IsValid || outcome.Stdout is null)
         {
             return new GitCliffContextExportResult(false, null, outcome.Diagnostic);
         }
 
-        if (!IsJsonArray(outcome.Stdout))
-        {
-            return new GitCliffContextExportResult(false, null, "git_cliff_invalid_context_json");
-        }
-
-        return new GitCliffContextExportResult(true, outcome.Stdout, null);
+        return IsJsonArray(outcome.Stdout)
+            ? new GitCliffContextExportResult(true, outcome.Stdout, null)
+            : new GitCliffContextExportResult(false, null, Diagnostics.InvalidContextJson);
     }
 
     public GitCliffRenderFromContextResult RenderFromContext(GitCliffRenderFromContextRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (string.IsNullOrWhiteSpace(request.RenderingContextJson))
-        {
-            return new GitCliffRenderFromContextResult(false, null, "git_cliff_input_invalid");
-        }
-
-        byte[]? wirePayload = TryBuildWireContextBytes(request.RenderingContextJson);
+        byte[]? wirePayload = string.IsNullOrWhiteSpace(request.RenderingContextJson)
+            ? null
+            : TryBuildWireContextBytes(request.RenderingContextJson);
         if (wirePayload is null)
         {
-            return new GitCliffRenderFromContextResult(false, null, "git_cliff_input_invalid");
+            return new GitCliffRenderFromContextResult(false, null, Diagnostics.InputInvalid);
         }
 
-        ProcessOutcome outcome = Execute(
-            request.Tool,
-            request.WorkingDirectory,
-            ["--from-context", "-"],
-            stdinBytes: wirePayload,
-            stdoutLimitBytes: maximumStdoutBytes);
-        if (!outcome.IsValid || outcome.Stdout is null)
-        {
-            return new GitCliffRenderFromContextResult(false, null, outcome.Diagnostic);
-        }
-
-        return new GitCliffRenderFromContextResult(true, outcome.Stdout, null);
+        ProcessOutcome outcome = Execute(request.Tool, request.WorkingDirectory, ["--from-context", "-"], wirePayload, maximumStdoutBytes);
+        return outcome.IsValid && outcome.Stdout is not null
+            ? new GitCliffRenderFromContextResult(true, outcome.Stdout, null)
+            : new GitCliffRenderFromContextResult(false, null, outcome.Diagnostic);
     }
 
     public GitCliffBumpVersionResult SuggestBumpedVersion(GitCliffBumpVersionRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (request.CommitRange is not null && (string.IsNullOrWhiteSpace(request.CommitRange) || request.CommitRange.Any(char.IsControl)))
+        if (!IsValidOptionalRange(request.CommitRange))
         {
-            return new GitCliffBumpVersionResult(false, null, null, "git_cliff_input_invalid");
+            return new GitCliffBumpVersionResult(false, null, null, Diagnostics.InputInvalid);
         }
 
         var arguments = new List<string> { "--bumped-version" };
@@ -126,22 +116,20 @@ public sealed class GitCliffProcessExecutor : IGitCliffExecutor
             request.RepositoryRoot,
             arguments,
             stdinBytes: null,
-            stdoutLimitBytes: Math.Min(maximumStdoutBytes, MaximumBumpStdoutBytes));
+            Math.Min(maximumStdoutBytes, MaximumBumpStdoutBytes));
         if (!outcome.IsValid || outcome.Stdout is null)
         {
             return new GitCliffBumpVersionResult(false, null, null, outcome.Diagnostic);
         }
 
         string raw = outcome.Stdout.Trim();
-        if (raw.Length == 0 || raw.Contains('\n', StringComparison.Ordinal) || raw.Contains('\r', StringComparison.Ordinal))
-        {
-            return new GitCliffBumpVersionResult(false, null, null, "git_cliff_invalid_bump_version");
-        }
-
         string normalized = raw.StartsWith('v') ? raw[1..] : raw;
-        if (!SemVerPattern.IsMatch(normalized))
+        if (raw.Length == 0 ||
+            raw.Contains('\n', StringComparison.Ordinal) ||
+            raw.Contains('\r', StringComparison.Ordinal) ||
+            !SemVerPattern.IsMatch(normalized))
         {
-            return new GitCliffBumpVersionResult(false, null, null, "git_cliff_invalid_bump_version");
+            return new GitCliffBumpVersionResult(false, null, null, Diagnostics.InvalidBumpVersion);
         }
 
         return new GitCliffBumpVersionResult(true, normalized, raw, null);
@@ -154,19 +142,41 @@ public sealed class GitCliffProcessExecutor : IGitCliffExecutor
         byte[]? stdinBytes,
         int stdoutLimitBytes)
     {
+        string? setupDiagnostic = PrepareVerifiedStartInfo(
+            tool,
+            workingDirectory,
+            additionalArguments,
+            stdinBytes is not null,
+            out ProcessStartInfo? startInfo);
+        if (setupDiagnostic is not null)
+        {
+            return new ProcessOutcome(false, null, setupDiagnostic);
+        }
+
+        return RunProcessBounded(startInfo!, tool.Timeout, stdinBytes, stdoutLimitBytes);
+    }
+
+    private static string? PrepareVerifiedStartInfo(
+        GitCliffToolConfiguration tool,
+        string workingDirectory,
+        IReadOnlyList<string> additionalArguments,
+        bool redirectStdin,
+        out ProcessStartInfo? startInfo)
+    {
+        startInfo = null;
         if (tool is null || tool.Timeout <= TimeSpan.Zero)
         {
-            return new ProcessOutcome(false, null, "git_cliff_input_invalid");
+            return Diagnostics.InputInvalid;
         }
 
         if (string.IsNullOrWhiteSpace(tool.ConfigPath) || !File.Exists(tool.ConfigPath) || IsReparsePoint(tool.ConfigPath))
         {
-            return new ProcessOutcome(false, null, "git_cliff_config_invalid");
+            return Diagnostics.ConfigInvalid;
         }
 
         if (string.IsNullOrWhiteSpace(workingDirectory) || !Directory.Exists(workingDirectory) || IsReparsePoint(workingDirectory))
         {
-            return new ProcessOutcome(false, null, "git_cliff_working_directory_invalid");
+            return Diagnostics.WorkingDirectoryInvalid;
         }
 
         ToolchainVerificationResult verification = GitCliffToolchainStore.VerifyInstalled(
@@ -176,47 +186,41 @@ public sealed class GitCliffProcessExecutor : IGitCliffExecutor
             tool.Timeout);
         if (!verification.IsValid || verification.Executable is null)
         {
-            return new ProcessOutcome(false, null, "git_cliff_tool_untrusted");
+            return Diagnostics.ToolUntrusted;
         }
 
-        ProcessStartInfo startInfo = GitCliffToolchainStore.CreateOfflineNoExecStartInfo(
+        startInfo = GitCliffToolchainStore.CreateOfflineNoExecStartInfo(
             verification.Executable,
             Path.GetFullPath(tool.ConfigPath),
             Path.GetFullPath(workingDirectory),
             additionalArguments);
-        if (stdinBytes is not null)
+        if (redirectStdin)
         {
             startInfo.RedirectStandardInput = true;
             startInfo.StandardInputEncoding = StrictUtf8;
         }
 
+        return null;
+    }
+
+    private ProcessOutcome RunProcessBounded(
+        ProcessStartInfo startInfo,
+        TimeSpan timeout,
+        byte[]? stdinBytes,
+        int stdoutLimitBytes)
+    {
         using var process = new Process { StartInfo = startInfo };
-        try
+        if (!TryStartProcess(process))
         {
-            if (!process.Start())
-            {
-                return new ProcessOutcome(false, null, "git_cliff_execution_failed");
-            }
-        }
-        catch (Exception exception) when (exception is InvalidOperationException or IOException or Win32Exception)
-        {
-            return new ProcessOutcome(false, null, "git_cliff_execution_failed");
+            return new ProcessOutcome(false, null, Diagnostics.ExecutionFailed);
         }
 
-        using var timeoutSource = new CancellationTokenSource(tool.Timeout);
+        using var timeoutSource = new CancellationTokenSource(timeout);
         using var overflowSource = new CancellationTokenSource();
         using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(timeoutSource.Token, overflowSource.Token);
 
-        Task<BoundedReadResult> stdoutTask = ReadBoundedUtf8Async(
-            process.StandardOutput.BaseStream,
-            stdoutLimitBytes,
-            overflowSource,
-            linkedSource.Token);
-        Task<BoundedReadResult> stderrTask = ReadBoundedUtf8Async(
-            process.StandardError.BaseStream,
-            maximumStderrBytes,
-            overflowSource,
-            linkedSource.Token);
+        Task<BoundedReadResult> stdoutTask = ReadBoundedUtf8Async(process.StandardOutput.BaseStream, stdoutLimitBytes, overflowSource, linkedSource.Token);
+        Task<BoundedReadResult> stderrTask = ReadBoundedUtf8Async(process.StandardError.BaseStream, maximumStderrBytes, overflowSource, linkedSource.Token);
 
         try
         {
@@ -226,37 +230,17 @@ public sealed class GitCliffProcessExecutor : IGitCliffExecutor
             }
 
             process.WaitForExitAsync(linkedSource.Token).GetAwaiter().GetResult();
-            BoundedReadResult stdout = stdoutTask.GetAwaiter().GetResult();
-            BoundedReadResult stderr = stderrTask.GetAwaiter().GetResult();
-
-            if (stdout.LimitExceeded || stderr.LimitExceeded || overflowSource.IsCancellationRequested)
-            {
-                return new ProcessOutcome(false, null, "git_cliff_output_limit_exceeded");
-            }
-
-            if (stdout.InvalidEncoding || stderr.InvalidEncoding)
-            {
-                return new ProcessOutcome(false, null, "git_cliff_execution_failed");
-            }
-
-            if (process.ExitCode != 0)
-            {
-                return new ProcessOutcome(false, null, "git_cliff_exit_nonzero");
-            }
-
-            return new ProcessOutcome(true, stdout.Text, null);
+            return EvaluateProcessResults(process.ExitCode, stdoutTask.GetAwaiter().GetResult(), stderrTask.GetAwaiter().GetResult(), overflowSource.IsCancellationRequested);
         }
         catch (OperationCanceledException)
         {
             KillSafely(process);
-            return overflowSource.IsCancellationRequested
-                ? new ProcessOutcome(false, null, "git_cliff_output_limit_exceeded")
-                : new ProcessOutcome(false, null, "git_cliff_timeout");
+            return new ProcessOutcome(false, null, overflowSource.IsCancellationRequested ? Diagnostics.OutputLimitExceeded : Diagnostics.Timeout);
         }
         catch (IOException)
         {
             KillSafely(process);
-            return new ProcessOutcome(false, null, "git_cliff_execution_failed");
+            return new ProcessOutcome(false, null, Diagnostics.ExecutionFailed);
         }
         finally
         {
@@ -266,6 +250,42 @@ public sealed class GitCliffProcessExecutor : IGitCliffExecutor
             }
         }
     }
+
+    private static bool TryStartProcess(Process process)
+    {
+        try
+        {
+            return process.Start();
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or Win32Exception)
+        {
+            return false;
+        }
+    }
+
+    private static ProcessOutcome EvaluateProcessResults(
+        int exitCode,
+        BoundedReadResult stdout,
+        BoundedReadResult stderr,
+        bool overflowed)
+    {
+        if (stdout.LimitExceeded || stderr.LimitExceeded || overflowed)
+        {
+            return new ProcessOutcome(false, null, Diagnostics.OutputLimitExceeded);
+        }
+
+        if (stdout.InvalidEncoding || stderr.InvalidEncoding)
+        {
+            return new ProcessOutcome(false, null, Diagnostics.ExecutionFailed);
+        }
+
+        return exitCode == 0
+            ? new ProcessOutcome(true, stdout.Text, null)
+            : new ProcessOutcome(false, null, Diagnostics.ExitNonZero);
+    }
+
+    private static bool IsValidOptionalRange(string? commitRange) =>
+        commitRange is null || (!string.IsNullOrWhiteSpace(commitRange) && !commitRange.Any(char.IsControl));
 
     private static async Task WriteStdinAsync(Stream stdin, byte[] payload, CancellationToken cancellationToken)
     {
@@ -311,7 +331,7 @@ public sealed class GitCliffProcessExecutor : IGitCliffExecutor
                     return new BoundedReadResult(null, LimitExceeded: true, InvalidEncoding: false);
                 }
 
-                bufferStream.Write(chunk, 0, read);
+                await bufferStream.WriteAsync(chunk.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (overflowSource.IsCancellationRequested)
@@ -384,13 +404,8 @@ public sealed class GitCliffProcessExecutor : IGitCliffExecutor
             return;
         }
 
-        foreach (JsonNode? commitNode in commits)
+        foreach (JsonObject commit in commits.OfType<JsonObject>())
         {
-            if (commitNode is not JsonObject commit)
-            {
-                continue;
-            }
-
             commit["links"] ??= new JsonArray();
             commit["author"] ??= CreateNeutralSignature();
             commit["committer"] ??= CreateNeutralSignature();

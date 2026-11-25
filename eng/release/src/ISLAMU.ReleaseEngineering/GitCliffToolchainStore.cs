@@ -49,6 +49,9 @@ public static class GitCliffToolchainStore
     public const string DefaultBundleEnvironmentVariable = "ISLAMU_RELEASE_TOOL_BUNDLE";
     public const string DefaultCacheEnvironmentVariable = "ISLAMU_RELEASE_TOOL_CACHE";
 
+    private const string ToolName = "git-cliff";
+    private const string CacheNamespace = "islamu-event";
+    private const string CacheToolsDirectory = "tools";
     private const int MaximumProcessOutputCharacters = 4_096;
     private const long MaximumArchiveBytes = 64L * 1024 * 1024;
     private const long MaximumExecutableBytes = 64L * 1024 * 1024;
@@ -56,15 +59,19 @@ public static class GitCliffToolchainStore
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
+    private static class Diagnostics
+    {
+        public const string LockNotConfigured = "toolchain lock is not configured";
+        public const string LockMalformed = "toolchain lock is malformed";
+        public const string BundleDirectoryRequired = "local tool bundle directory is required";
+        public const string UnsafeArchiveStream = "unsafe archive stream";
+        public const string VersionProbeFailed = "version probe failed";
+        public const string VersionProbeTimedOut = "version probe timed out or exceeded output limit";
+    }
+
     public static string GetCurrentPlatform()
     {
-        string os = OperatingSystem.IsLinux()
-            ? "linux"
-            : OperatingSystem.IsMacOS()
-                ? "osx"
-                : OperatingSystem.IsWindows()
-                    ? "windows"
-                    : "unsupported";
+        string os = ResolveCurrentOperatingSystem();
         string arch = RuntimeInformation.ProcessArchitecture switch
         {
             Architecture.X64 => "x64",
@@ -72,6 +79,26 @@ public static class GitCliffToolchainStore
             _ => "unsupported",
         };
         return $"{os}-{arch}";
+    }
+
+    private static string ResolveCurrentOperatingSystem()
+    {
+        if (OperatingSystem.IsLinux())
+        {
+            return "linux";
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return "osx";
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            return "windows";
+        }
+
+        return "unsupported";
     }
 
     public static string GetDefaultStoreDirectory(string version, string platform)
@@ -85,29 +112,28 @@ public static class GitCliffToolchainStore
             return Path.GetFullPath(explicitBundle);
         }
 
+        string cacheRoot = ResolveDefaultCacheRoot();
+        return Path.Combine(cacheRoot, ToolName, version, platform);
+    }
+
+    private static string ResolveDefaultCacheRoot()
+    {
         string? explicitCache = Environment.GetEnvironmentVariable(DefaultCacheEnvironmentVariable);
-        string cacheRoot;
         if (!string.IsNullOrWhiteSpace(explicitCache))
         {
-            cacheRoot = Path.GetFullPath(explicitCache);
-        }
-        else
-        {
-            string? xdgCache = Environment.GetEnvironmentVariable("XDG_CACHE_HOME");
-            if (!string.IsNullOrWhiteSpace(xdgCache))
-            {
-                cacheRoot = Path.Combine(Path.GetFullPath(xdgCache), "islamu-event", "tools");
-            }
-            else
-            {
-                string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                cacheRoot = !string.IsNullOrWhiteSpace(home)
-                    ? Path.Combine(home, ".cache", "islamu-event", "tools")
-                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "islamu-event", "tools");
-            }
+            return Path.GetFullPath(explicitCache);
         }
 
-        return Path.Combine(cacheRoot, "git-cliff", version, platform);
+        string? xdgCache = Environment.GetEnvironmentVariable("XDG_CACHE_HOME");
+        if (!string.IsNullOrWhiteSpace(xdgCache))
+        {
+            return Path.Combine(Path.GetFullPath(xdgCache), CacheNamespace, CacheToolsDirectory);
+        }
+
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return !string.IsNullOrWhiteSpace(home)
+            ? Path.Combine(home, ".cache", CacheNamespace, CacheToolsDirectory)
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), CacheNamespace, CacheToolsDirectory);
     }
 
     public static string ResolveConfiguredDirectory(string lockPath, string? explicitBundlePath, string platform)
@@ -126,12 +152,12 @@ public static class GitCliffToolchainStore
     {
         if (string.IsNullOrWhiteSpace(lockPath) || !File.Exists(lockPath))
         {
-            return new ToolchainLockLoadResult(false, null, "toolchain lock is not configured", IsMissingLock: true);
+            return new ToolchainLockLoadResult(false, null, Diagnostics.LockNotConfigured, IsMissingLock: true);
         }
 
         if (IsReparsePoint(lockPath))
         {
-            return new ToolchainLockLoadResult(false, null, "toolchain lock is malformed");
+            return new ToolchainLockLoadResult(false, null, Diagnostics.LockMalformed);
         }
 
         RawToolchainLock? raw;
@@ -141,22 +167,32 @@ public static class GitCliffToolchainStore
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or DecoderFallbackException)
         {
-            return new ToolchainLockLoadResult(false, null, "toolchain lock is malformed");
+            return new ToolchainLockLoadResult(false, null, Diagnostics.LockMalformed);
         }
 
-        if (raw is null ||
-            raw.SchemaVersion != 1 ||
-            !string.Equals(raw.Tool, "git-cliff", StringComparison.Ordinal) ||
-            string.IsNullOrWhiteSpace(raw.Version) ||
-            raw.Platforms is null ||
-            raw.Platforms.Length == 0)
+        if (raw is not { SchemaVersion: 1, Tool: ToolName, Version: { } version, Platforms: { Length: > 0 } rawPlatforms } ||
+            string.IsNullOrWhiteSpace(version))
         {
-            return new ToolchainLockLoadResult(false, null, "toolchain lock is malformed");
+            return new ToolchainLockLoadResult(false, null, Diagnostics.LockMalformed);
         }
 
-        var entries = new List<ToolchainPlatformEntry>(raw.Platforms.Length);
+        List<ToolchainPlatformEntry>? entries = TryParsePlatformEntries(rawPlatforms);
+        if (entries is null)
+        {
+            return new ToolchainLockLoadResult(false, null, Diagnostics.LockMalformed);
+        }
+
+        return new ToolchainLockLoadResult(
+            true,
+            new ToolchainLockDocument(raw.SchemaVersion, ToolName, version, entries),
+            null);
+    }
+
+    private static List<ToolchainPlatformEntry>? TryParsePlatformEntries(RawToolPlatform[] rawPlatforms)
+    {
+        var entries = new List<ToolchainPlatformEntry>(rawPlatforms.Length);
         var seenPlatforms = new HashSet<string>(StringComparer.Ordinal);
-        foreach (RawToolPlatform candidate in raw.Platforms)
+        foreach (RawToolPlatform candidate in rawPlatforms)
         {
             if (string.IsNullOrWhiteSpace(candidate.Platform) ||
                 !seenPlatforms.Add(candidate.Platform) ||
@@ -166,7 +202,7 @@ public static class GitCliffToolchainStore
                 !IsSha256Hex(candidate.ArchiveSha256) ||
                 !IsHttpsUriWithoutUserInfo(candidate.Source))
             {
-                return new ToolchainLockLoadResult(false, null, "toolchain lock is malformed");
+                return null;
             }
 
             entries.Add(new ToolchainPlatformEntry(
@@ -178,10 +214,7 @@ public static class GitCliffToolchainStore
                 candidate.Source!));
         }
 
-        return new ToolchainLockLoadResult(
-            true,
-            new ToolchainLockDocument(raw.SchemaVersion, raw.Tool!, raw.Version!, entries),
-            null);
+        return entries;
     }
 
     public static ToolchainVerificationResult VerifyInstalled(
@@ -190,52 +223,23 @@ public static class GitCliffToolchainStore
         string platform,
         TimeSpan timeout)
     {
-        ToolchainLockLoadResult loaded = LoadLock(lockPath);
-        if (!loaded.IsValid || loaded.Lock is null)
+        if (!TryResolveApprovedPlatform(lockPath, platform, out ToolchainLockDocument? lockDocument, out ToolchainPlatformEntry? approved, out ToolchainVerificationResult? failure))
         {
-            return new ToolchainVerificationResult(false, null, loaded.Diagnostic, loaded.IsMissingLock);
+            return failure!;
         }
 
         if (string.IsNullOrWhiteSpace(bundleDirectory) || !Directory.Exists(bundleDirectory) || IsReparsePoint(bundleDirectory))
         {
-            return new ToolchainVerificationResult(false, null, "local tool bundle directory is required");
+            return new ToolchainVerificationResult(false, null, Diagnostics.BundleDirectoryRequired);
         }
 
-        ToolchainPlatformEntry? approved = loaded.Lock.Platforms
-            .SingleOrDefault(candidate => string.Equals(candidate.Platform, platform, StringComparison.Ordinal));
-        if (approved is null)
+        string executablePath = Path.Combine(Path.GetFullPath(bundleDirectory), approved!.Executable);
+        if (!TryReadVerifiedExecutable(executablePath, approved, out string? readDiagnostic))
         {
-            return new ToolchainVerificationResult(false, null, $"platform is not approved: {platform}");
+            return new ToolchainVerificationResult(false, null, readDiagnostic);
         }
 
-        string executablePath = Path.Combine(Path.GetFullPath(bundleDirectory), approved.Executable);
-        if (!File.Exists(executablePath) || IsReparsePoint(executablePath))
-        {
-            return new ToolchainVerificationResult(false, null, $"required executable is missing: {approved.Executable}");
-        }
-
-        byte[] executableBytes;
-        try
-        {
-            var info = new FileInfo(executablePath);
-            if (info.Length <= 0 || info.Length > MaximumExecutableBytes)
-            {
-                return new ToolchainVerificationResult(false, null, $"executable digest mismatch: {approved.Executable}");
-            }
-
-            executableBytes = File.ReadAllBytes(executablePath);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return new ToolchainVerificationResult(false, null, $"required executable is missing: {approved.Executable}");
-        }
-
-        if (!MatchesSha256(executableBytes, approved.ExecutableSha256))
-        {
-            return new ToolchainVerificationResult(false, null, $"executable digest mismatch: {approved.Executable}");
-        }
-
-        string? versionDiagnostic = VerifyReportedVersion(executablePath, loaded.Lock.Version, timeout);
+        string? versionDiagnostic = VerifyReportedVersion(executablePath, lockDocument!.Version, timeout);
         if (versionDiagnostic is not null)
         {
             return new ToolchainVerificationResult(false, null, versionDiagnostic);
@@ -243,7 +247,7 @@ public static class GitCliffToolchainStore
 
         return new ToolchainVerificationResult(
             true,
-            new VerifiedGitCliffExecutable(loaded.Lock.Version, platform, executablePath, approved.ExecutableSha256),
+            new VerifiedGitCliffExecutable(lockDocument.Version, platform, executablePath, approved.ExecutableSha256),
             null);
     }
 
@@ -254,21 +258,13 @@ public static class GitCliffToolchainStore
         TimeSpan timeout,
         Func<Uri, byte[]>? archiveFetcher = null)
     {
-        ToolchainLockLoadResult loaded = LoadLock(lockPath);
-        if (!loaded.IsValid || loaded.Lock is null)
+        if (!TryResolveApprovedPlatform(lockPath, platform, out ToolchainLockDocument? lockDocument, out ToolchainPlatformEntry? approved, out ToolchainVerificationResult? failure))
         {
-            return new ToolchainVerificationResult(false, null, loaded.Diagnostic, loaded.IsMissingLock);
-        }
-
-        ToolchainPlatformEntry? approved = loaded.Lock.Platforms
-            .SingleOrDefault(candidate => string.Equals(candidate.Platform, platform, StringComparison.Ordinal));
-        if (approved is null)
-        {
-            return new ToolchainVerificationResult(false, null, $"platform is not approved: {platform}");
+            return failure!;
         }
 
         string installDirectory = string.IsNullOrWhiteSpace(targetDirectory)
-            ? GetDefaultStoreDirectory(loaded.Lock.Version, platform)
+            ? GetDefaultStoreDirectory(lockDocument!.Version, platform)
             : Path.GetFullPath(targetDirectory);
 
         if (Directory.Exists(installDirectory))
@@ -283,8 +279,98 @@ public static class GitCliffToolchainStore
         Directory.CreateDirectory(installDirectory);
         if (IsReparsePoint(installDirectory))
         {
-            return new ToolchainVerificationResult(false, null, "local tool bundle directory is required");
+            return new ToolchainVerificationResult(false, null, Diagnostics.BundleDirectoryRequired);
         }
+
+        if (!TryAcquireVerifiedExecutable(approved!, archiveFetcher, out byte[]? executableBytes, out string? acquisitionDiagnostic))
+        {
+            return new ToolchainVerificationResult(false, null, acquisitionDiagnostic);
+        }
+
+        string? stageDiagnostic = StageAndCommitExecutable(installDirectory, approved!, lockDocument!.Version, executableBytes!, timeout);
+        if (stageDiagnostic is not null)
+        {
+            return new ToolchainVerificationResult(false, null, stageDiagnostic);
+        }
+
+        return VerifyInstalled(lockPath, installDirectory, platform, timeout);
+    }
+
+    private static bool TryResolveApprovedPlatform(
+        string lockPath,
+        string platform,
+        out ToolchainLockDocument? lockDocument,
+        out ToolchainPlatformEntry? approved,
+        out ToolchainVerificationResult? failure)
+    {
+        lockDocument = null;
+        approved = null;
+        failure = null;
+
+        ToolchainLockLoadResult loaded = LoadLock(lockPath);
+        if (!loaded.IsValid || loaded.Lock is null)
+        {
+            failure = new ToolchainVerificationResult(false, null, loaded.Diagnostic, loaded.IsMissingLock);
+            return false;
+        }
+
+        ToolchainPlatformEntry? candidate = loaded.Lock.Platforms
+            .SingleOrDefault(entry => string.Equals(entry.Platform, platform, StringComparison.Ordinal));
+        if (candidate is null)
+        {
+            failure = new ToolchainVerificationResult(false, null, $"platform is not approved: {platform}");
+            return false;
+        }
+
+        lockDocument = loaded.Lock;
+        approved = candidate;
+        return true;
+    }
+
+    private static bool TryReadVerifiedExecutable(string executablePath, ToolchainPlatformEntry approved, out string? diagnostic)
+    {
+        diagnostic = null;
+        if (!File.Exists(executablePath) || IsReparsePoint(executablePath))
+        {
+            diagnostic = $"required executable is missing: {approved.Executable}";
+            return false;
+        }
+
+        byte[] executableBytes;
+        try
+        {
+            var info = new FileInfo(executablePath);
+            if (info.Length <= 0 || info.Length > MaximumExecutableBytes)
+            {
+                diagnostic = $"executable digest mismatch: {approved.Executable}";
+                return false;
+            }
+
+            executableBytes = File.ReadAllBytes(executablePath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            diagnostic = $"required executable is missing: {approved.Executable}";
+            return false;
+        }
+
+        if (!MatchesSha256(executableBytes, approved.ExecutableSha256))
+        {
+            diagnostic = $"executable digest mismatch: {approved.Executable}";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryAcquireVerifiedExecutable(
+        ToolchainPlatformEntry approved,
+        Func<Uri, byte[]>? archiveFetcher,
+        out byte[]? executableBytes,
+        out string? diagnostic)
+    {
+        executableBytes = null;
+        diagnostic = null;
 
         byte[] archiveBytes;
         try
@@ -296,24 +382,35 @@ public static class GitCliffToolchainStore
         }
         catch (Exception exception) when (exception is HttpRequestException or IOException or TaskCanceledException or InvalidOperationException)
         {
-            return new ToolchainVerificationResult(false, null, $"archive download failed: {approved.Archive}");
+            diagnostic = $"archive download failed: {approved.Archive}";
+            return false;
         }
 
         if (archiveBytes.Length == 0 || archiveBytes.LongLength > MaximumArchiveBytes || !MatchesSha256(archiveBytes, approved.ArchiveSha256))
         {
-            return new ToolchainVerificationResult(false, null, $"archive digest mismatch: {approved.Archive}");
+            diagnostic = $"archive digest mismatch: {approved.Archive}";
+            return false;
         }
 
-        byte[] executableBytes;
         try
         {
             executableBytes = ExtractVerifiedExecutableFromArchiveBytes(archiveBytes, approved);
+            return true;
         }
         catch (InvalidDataException exception)
         {
-            return new ToolchainVerificationResult(false, null, exception.Message);
+            diagnostic = exception.Message;
+            return false;
         }
+    }
 
+    private static string? StageAndCommitExecutable(
+        string installDirectory,
+        ToolchainPlatformEntry approved,
+        string expectedVersion,
+        byte[] executableBytes,
+        TimeSpan timeout)
+    {
         string destinationPath = Path.Combine(installDirectory, approved.Executable);
         string stagingPath = Path.Combine(installDirectory, $".{approved.Executable}.{Guid.NewGuid():N}.tmp");
         try
@@ -324,17 +421,18 @@ public static class GitCliffToolchainStore
                 File.SetUnixFileMode(stagingPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
             }
 
-            string? versionDiagnostic = VerifyReportedVersion(stagingPath, loaded.Lock.Version, timeout);
+            string? versionDiagnostic = VerifyReportedVersion(stagingPath, expectedVersion, timeout);
             if (versionDiagnostic is not null)
             {
-                return new ToolchainVerificationResult(false, null, versionDiagnostic);
+                return versionDiagnostic;
             }
 
             File.Move(stagingPath, destinationPath, overwrite: true);
+            return null;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            return new ToolchainVerificationResult(false, null, $"failed to stage verified executable: {approved.Executable}");
+            return $"failed to stage verified executable: {approved.Executable}";
         }
         finally
         {
@@ -343,8 +441,6 @@ public static class GitCliffToolchainStore
                 File.Delete(stagingPath);
             }
         }
-
-        return VerifyInstalled(lockPath, installDirectory, platform, timeout);
     }
 
     public static byte[] ExtractVerifiedExecutableFromArchiveBytes(byte[] archiveBytes, ToolchainPlatformEntry approved)
@@ -357,12 +453,7 @@ public static class GitCliffToolchainStore
             throw new InvalidDataException($"archive digest mismatch: {approved.Archive}");
         }
 
-        byte[]? extracted = approved.Archive.EndsWith(".tar.gz", StringComparison.Ordinal)
-            ? ExtractFromTarGz(archiveBytes, approved.Executable)
-            : approved.Archive.EndsWith(".zip", StringComparison.Ordinal)
-                ? ExtractFromZip(archiveBytes, approved.Executable)
-                : throw new InvalidDataException($"unsupported archive format: {approved.Archive}");
-
+        byte[]? extracted = ExtractArchivePayload(archiveBytes, approved);
         if (extracted is null || extracted.Length == 0 || extracted.LongLength > MaximumExecutableBytes)
         {
             throw new InvalidDataException($"required executable is missing in archive: {approved.Executable}");
@@ -374,6 +465,21 @@ public static class GitCliffToolchainStore
         }
 
         return extracted;
+    }
+
+    private static byte[]? ExtractArchivePayload(byte[] archiveBytes, ToolchainPlatformEntry approved)
+    {
+        if (approved.Archive.EndsWith(".tar.gz", StringComparison.Ordinal))
+        {
+            return ExtractFromTarGz(archiveBytes, approved.Executable);
+        }
+
+        if (approved.Archive.EndsWith(".zip", StringComparison.Ordinal))
+        {
+            return ExtractFromZip(archiveBytes, approved.Executable);
+        }
+
+        throw new InvalidDataException($"unsupported archive format: {approved.Archive}");
     }
 
     public static ProcessStartInfo CreateOfflineNoExecStartInfo(
@@ -426,11 +532,13 @@ public static class GitCliffToolchainStore
         TimeSpan timeout)
     {
         string? targetDirectory = defaultBundlePath;
-        for (int index = 1; index < args.Length; index++)
+        var reader = new CliArgumentReader(args, startIndex: 1);
+        while (reader.TryReadNext(out string option))
         {
-            if (string.Equals(args[index], "--output", StringComparison.Ordinal) && index + 1 < args.Length)
+            if (string.Equals(option, "--output", StringComparison.Ordinal) &&
+                reader.TryReadNext(out string value))
             {
-                targetDirectory = args[++index];
+                targetDirectory = value;
             }
             else
             {
@@ -446,7 +554,7 @@ public static class GitCliffToolchainStore
             return result.IsMissingLock ? Program.ToolchainNotConfigured : Program.ToolchainRejected;
         }
 
-        output.WriteLine($"trusted_tool: git-cliff {result.Executable.Version} ({result.Executable.Platform})");
+        output.WriteLine($"trusted_tool: {ToolName} {result.Executable.Version} ({result.Executable.Platform})");
         return Program.Success;
     }
 
@@ -489,34 +597,11 @@ public static class GitCliffToolchainStore
 
             while (reader.GetNextEntry() is { } entry)
             {
-                if (entry.EntryType is TarEntryType.SymbolicLink or TarEntryType.HardLink)
+                byte[]? extracted = ReadTarExecutableEntry(entry, expectedExecutable, found is not null);
+                if (extracted is not null)
                 {
-                    throw new InvalidDataException($"unsafe archive link entry: {entry.Name}");
+                    found = extracted;
                 }
-
-                ValidateArchiveEntryPath(entry.Name);
-
-                if (entry.EntryType is not (TarEntryType.RegularFile or TarEntryType.V7RegularFile))
-                {
-                    continue;
-                }
-
-                if (!IsMatchingExecutableEntry(entry.Name, expectedExecutable))
-                {
-                    continue;
-                }
-
-                if (found is not null)
-                {
-                    throw new InvalidDataException($"unsafe archive duplicate executable entry: {expectedExecutable}");
-                }
-
-                if (entry.DataStream is null)
-                {
-                    throw new InvalidDataException($"unsafe archive empty executable entry: {expectedExecutable}");
-                }
-
-                found = ReadBoundedBytes(entry.DataStream, MaximumExecutableBytes);
             }
         }
         catch (InvalidDataException)
@@ -525,10 +610,38 @@ public static class GitCliffToolchainStore
         }
         catch (Exception exception) when (exception is IOException or EndOfStreamException)
         {
-            throw new InvalidDataException("unsafe archive stream", exception);
+            throw new InvalidDataException(Diagnostics.UnsafeArchiveStream, exception);
         }
 
         return found;
+    }
+
+    private static byte[]? ReadTarExecutableEntry(TarEntry entry, string expectedExecutable, bool alreadyFound)
+    {
+        if (entry.EntryType is TarEntryType.SymbolicLink or TarEntryType.HardLink)
+        {
+            throw new InvalidDataException($"unsafe archive link entry: {entry.Name}");
+        }
+
+        ValidateArchiveEntryPath(entry.Name);
+
+        if (entry.EntryType is not (TarEntryType.RegularFile or TarEntryType.V7RegularFile) ||
+            !IsMatchingExecutableEntry(entry.Name, expectedExecutable))
+        {
+            return null;
+        }
+
+        if (alreadyFound)
+        {
+            throw new InvalidDataException($"unsafe archive duplicate executable entry: {expectedExecutable}");
+        }
+
+        if (entry.DataStream is null)
+        {
+            throw new InvalidDataException($"unsafe archive empty executable entry: {expectedExecutable}");
+        }
+
+        return ReadBoundedBytes(entry.DataStream, MaximumExecutableBytes);
     }
 
     private static byte[]? ExtractFromZip(byte[] archiveBytes, string expectedExecutable)
@@ -541,36 +654,11 @@ public static class GitCliffToolchainStore
 
             foreach (ZipArchiveEntry entry in zip.Entries)
             {
-                ValidateArchiveEntryPath(entry.FullName);
-
-                int unixMode = (entry.ExternalAttributes >> 16) & 0xF000;
-                if (unixMode == 0xA000)
+                byte[]? extracted = ReadZipExecutableEntry(entry, expectedExecutable, found is not null);
+                if (extracted is not null)
                 {
-                    throw new InvalidDataException($"unsafe archive symlink entry: {entry.FullName}");
+                    found = extracted;
                 }
-
-                if (entry.FullName.EndsWith('/'))
-                {
-                    continue;
-                }
-
-                if (!IsMatchingExecutableEntry(entry.FullName, expectedExecutable))
-                {
-                    continue;
-                }
-
-                if (found is not null)
-                {
-                    throw new InvalidDataException($"unsafe archive duplicate executable entry: {expectedExecutable}");
-                }
-
-                if (entry.Length <= 0 || entry.Length > MaximumExecutableBytes)
-                {
-                    throw new InvalidDataException($"unsafe archive executable size: {entry.FullName}");
-                }
-
-                using Stream stream = entry.Open();
-                found = ReadBoundedBytes(stream, MaximumExecutableBytes);
             }
         }
         catch (InvalidDataException)
@@ -579,10 +667,39 @@ public static class GitCliffToolchainStore
         }
         catch (Exception exception) when (exception is IOException or EndOfStreamException)
         {
-            throw new InvalidDataException("unsafe archive stream", exception);
+            throw new InvalidDataException(Diagnostics.UnsafeArchiveStream, exception);
         }
 
         return found;
+    }
+
+    private static byte[]? ReadZipExecutableEntry(ZipArchiveEntry entry, string expectedExecutable, bool alreadyFound)
+    {
+        ValidateArchiveEntryPath(entry.FullName);
+
+        int unixMode = (entry.ExternalAttributes >> 16) & 0xF000;
+        if (unixMode == 0xA000)
+        {
+            throw new InvalidDataException($"unsafe archive symlink entry: {entry.FullName}");
+        }
+
+        if (entry.FullName.EndsWith('/') || !IsMatchingExecutableEntry(entry.FullName, expectedExecutable))
+        {
+            return null;
+        }
+
+        if (alreadyFound)
+        {
+            throw new InvalidDataException($"unsafe archive duplicate executable entry: {expectedExecutable}");
+        }
+
+        if (entry.Length <= 0 || entry.Length > MaximumExecutableBytes)
+        {
+            throw new InvalidDataException($"unsafe archive executable size: {entry.FullName}");
+        }
+
+        using Stream stream = entry.Open();
+        return ReadBoundedBytes(stream, MaximumExecutableBytes);
     }
 
     private static void ValidateArchiveEntryPath(string entryName)
@@ -603,12 +720,9 @@ public static class GitCliffToolchainStore
         }
 
         string[] segments = trimmed.Split('/');
-        foreach (string segment in segments)
+        if (segments.Any(segment => segment is "" or "." or ".."))
         {
-            if (segment is "" or "." or "..")
-            {
-                throw new InvalidDataException($"unsafe archive entry path: {entryName}");
-            }
+            throw new InvalidDataException($"unsafe archive entry path: {entryName}");
         }
     }
 
@@ -670,12 +784,12 @@ public static class GitCliffToolchainStore
 
             if (process.ExitCode != 0 || errorOutput.Length != 0)
             {
-                return "version probe failed";
+                return Diagnostics.VersionProbeFailed;
             }
 
-            if (!string.Equals(versionOutput, $"git-cliff {expectedVersion}", StringComparison.Ordinal))
+            if (!string.Equals(versionOutput, $"{ToolName} {expectedVersion}", StringComparison.Ordinal))
             {
-                return $"version mismatch: expected git-cliff {expectedVersion}";
+                return $"version mismatch: expected {ToolName} {expectedVersion}";
             }
 
             return null;
@@ -687,11 +801,11 @@ public static class GitCliffToolchainStore
                 process.Kill(entireProcessTree: true);
             }
 
-            return "version probe timed out or exceeded output limit";
+            return Diagnostics.VersionProbeTimedOut;
         }
         catch (Exception exception) when (exception is InvalidOperationException or IOException or System.ComponentModel.Win32Exception)
         {
-            return "version probe failed";
+            return Diagnostics.VersionProbeFailed;
         }
     }
 

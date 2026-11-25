@@ -5,6 +5,10 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class ContractDiffCommandTests
 {
+    private const string DiffContractsCommand = "diff-contracts";
+    private const string ContractDiffFileName = "contract-diff.v1.json";
+    private const string OpenApiSchemaPath = "schemas/openapi_islamu-event.json";
+
     private static readonly string BaseOid = new('a', 40);
     private static readonly string HeadOid = new('b', 40);
 
@@ -12,13 +16,13 @@ public sealed class ContractDiffCommandTests
     public async Task RejectsMissingOrMalformedArgumentsAndShortOids()
     {
         using var dir = new TempDirectory();
-        string outputPath = Path.Combine(dir.Path, "contract-diff.v1.json");
+        string outputPath = Path.Combine(dir.Path, ContractDiffFileName);
         var reader = new InMemoryGitObjectReader().AddCommit(BaseOid).AddCommit(HeadOid);
 
-        (int missingCode, string missingOut) = Run(reader, ["diff-contracts"]);
-        (int shortCode, string shortOut) = Run(reader, ["diff-contracts", "aaaaaaa", HeadOid, outputPath]);
-        (int refCode, string refOut) = Run(reader, ["diff-contracts", "HEAD~1", "HEAD", outputPath]);
-        (int missingCommitCode, string missingCommitOut) = Run(reader, ["diff-contracts", BaseOid, new string('f', 40), outputPath]);
+        (int missingCode, string missingOut) = Run(reader, [DiffContractsCommand]);
+        (int shortCode, string shortOut) = Run(reader, [DiffContractsCommand, "aaaaaaa", HeadOid, outputPath]);
+        (int refCode, string refOut) = Run(reader, [DiffContractsCommand, "HEAD~1", "HEAD", outputPath]);
+        (int missingCommitCode, string missingCommitOut) = Run(reader, [DiffContractsCommand, BaseOid, new string('f', 40), outputPath]);
 
         await Assert.That(missingCode).IsEqualTo(Program.UsageError);
         await Assert.That(missingOut).Contains("invalid_arguments");
@@ -35,24 +39,24 @@ public sealed class ContractDiffCommandTests
     public async Task WritesCanonicalSortedArtifactAtomicallyWithoutClobberingExistingFile()
     {
         using var dir = new TempDirectory();
-        string outputA = Path.Combine(dir.Path, "a", "contract-diff.v1.json");
-        string outputB = Path.Combine(dir.Path, "b", "contract-diff.v1.json");
+        string outputA = Path.Combine(dir.Path, "a", ContractDiffFileName);
+        string outputB = Path.Combine(dir.Path, "b", ContractDiffFileName);
 
         InMemoryGitObjectReader reader = new InMemoryGitObjectReader()
             .AddCommit(BaseOid, new Dictionary<string, string>
             {
                 [".env.example"] = "Z_KEY=old\nA_KEY=old\n",
-                ["schemas/openapi_islamu-event.json"] = """{"openapi":"3.1.1","paths":{"/api/z":{"get":{"responses":{"200":{"description":"OK"}}}},"/api/a":{"delete":{"responses":{"204":{"description":"No Content"}}}}}}""",
+                [OpenApiSchemaPath] = """{"openapi":"3.1.1","paths":{"/api/z":{"get":{"responses":{"200":{"description":"OK"}}}},"/api/a":{"delete":{"responses":{"204":{"description":"No Content"}}}}}}""",
             })
             .AddCommit(HeadOid, new Dictionary<string, string>
             {
                 [".env.example"] = "A_KEY=new\n",
-                ["schemas/openapi_islamu-event.json"] = """{"openapi":"3.1.1","paths":{"/api/b":{"get":{"responses":{"200":{"description":"OK"}}}}}}""",
+                [OpenApiSchemaPath] = """{"openapi":"3.1.1","paths":{"/api/b":{"get":{"responses":{"200":{"description":"OK"}}}}}}""",
             });
 
-        (int firstCode, string firstOut) = Run(reader, ["diff-contracts", BaseOid, HeadOid, outputA]);
-        (int secondCode, string secondOut) = Run(reader, ["diff-contracts", BaseOid, HeadOid, outputB]);
-        (int clobberCode, string clobberOut) = Run(reader, ["diff-contracts", BaseOid, HeadOid, outputA]);
+        (int firstCode, string firstOut) = Run(reader, [DiffContractsCommand, BaseOid, HeadOid, outputA]);
+        (int secondCode, string secondOut) = Run(reader, [DiffContractsCommand, BaseOid, HeadOid, outputB]);
+        (int clobberCode, string clobberOut) = Run(reader, [DiffContractsCommand, BaseOid, HeadOid, outputA]);
 
         await Assert.That(firstCode).IsEqualTo(Program.Success).Because(firstOut);
         await Assert.That(secondCode).IsEqualTo(Program.Success).Because(secondOut);
@@ -78,13 +82,13 @@ public sealed class ContractDiffCommandTests
     public async Task RejectsMalformedJsonWithoutCreatingOutputArtifact()
     {
         using var dir = new TempDirectory();
-        string outputPath = Path.Combine(dir.Path, "contract-diff.v1.json");
+        string outputPath = Path.Combine(dir.Path, ContractDiffFileName);
 
         InMemoryGitObjectReader reader = new InMemoryGitObjectReader()
-            .AddCommit(BaseOid, new Dictionary<string, string> { ["schemas/openapi_islamu-event.json"] = "{}" })
-            .AddCommit(HeadOid, new Dictionary<string, string> { ["schemas/openapi_islamu-event.json"] = "not-json" });
+            .AddCommit(BaseOid, new Dictionary<string, string> { [OpenApiSchemaPath] = "{}" })
+            .AddCommit(HeadOid, new Dictionary<string, string> { [OpenApiSchemaPath] = "not-json" });
 
-        (int code, string output) = Run(reader, ["diff-contracts", BaseOid, HeadOid, outputPath]);
+        (int code, string output) = Run(reader, [DiffContractsCommand, BaseOid, HeadOid, outputPath]);
 
         await Assert.That(code).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(output).Contains("contract_diff_openapi_malformed");
@@ -106,13 +110,13 @@ public sealed class ContractDiffCommandTests
         Directory.CreateSymbolicLink(linkedDir, realDir);
 
         var reader = new InMemoryGitObjectReader().AddCommit(BaseOid).AddCommit(HeadOid);
-        string outputViaLink = Path.Combine(linkedDir, "contract-diff.v1.json");
+        string outputViaLink = Path.Combine(linkedDir, ContractDiffFileName);
 
-        (int code, string output) = Run(reader, ["diff-contracts", BaseOid, HeadOid, outputViaLink]);
+        (int code, string output) = Run(reader, [DiffContractsCommand, BaseOid, HeadOid, outputViaLink]);
 
         await Assert.That(code).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(output).Contains("contract_diff_output_invalid");
-        await Assert.That(File.Exists(Path.Combine(realDir, "contract-diff.v1.json"))).IsFalse();
+        await Assert.That(File.Exists(Path.Combine(realDir, ContractDiffFileName))).IsFalse();
     }
 
     private static (int ExitCode, string Output) Run(IGitObjectReader reader, string[] args)

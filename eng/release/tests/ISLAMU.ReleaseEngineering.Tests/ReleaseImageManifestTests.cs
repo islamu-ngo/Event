@@ -4,6 +4,7 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class ReleaseImageManifestTests
 {
+    private const string SampleVersion = "1.1.0";
     private static readonly string SourceOid = new('a', 40);
 
     [Test]
@@ -11,7 +12,7 @@ public sealed class ReleaseImageManifestTests
     {
         string json = ValidManifestJson();
 
-        ReleaseImageManifestLoadResult result = ReleaseImageManifest.Parse(json, expectedVersion: "1.1.0", expectedCommitOid: SourceOid);
+        ReleaseImageManifestLoadResult result = ReleaseImageManifest.Parse(json, expectedVersion: SampleVersion, expectedCommitOid: SourceOid);
 
         await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "valid manifest");
         await Assert.That(result.Manifest).IsNotNull();
@@ -25,20 +26,20 @@ public sealed class ReleaseImageManifestTests
     public async Task RejectsIncompleteImagesMissingRegistryTagReferencesAndMismatchedVersionOrCommit()
     {
         ReleaseImageManifestLoadResult wrongVersion = ReleaseImageManifest.Parse(ValidManifestJson(), "1.2.0", SourceOid);
-        ReleaseImageManifestLoadResult wrongCommit = ReleaseImageManifest.Parse(ValidManifestJson(), "1.1.0", new string('b', 40));
+        ReleaseImageManifestLoadResult wrongCommit = ReleaseImageManifest.Parse(ValidManifestJson(), SampleVersion, new string('b', 40));
         ReleaseImageManifestLoadResult taggedRef = ReleaseImageManifest.Parse(
             ValidManifestJson().Replace($"@sha256:{new string('1', 64)}", ":v1.1.0", StringComparison.Ordinal),
-            "1.1.0",
+            SampleVersion,
             SourceOid);
         ReleaseImageManifestLoadResult mismatchedDigestRef = ReleaseImageManifest.Parse(
             ValidManifestJson().Replace($"ghcr.io/islamu-ngo/event-api@sha256:{new string('1', 64)}", $"ghcr.io/islamu-ngo/event-api@sha256:{new string('9', 64)}", StringComparison.Ordinal),
-            "1.1.0",
+            SampleVersion,
             SourceOid);
         ReleaseImageManifestLoadResult singleRegistry = ReleaseImageManifest.Parse(
             ValidManifestJson().Replace($"\"atcr.io/islamu-ngo/event-api@sha256:{new string('1', 64)}\",", string.Empty, StringComparison.Ordinal),
-            "1.1.0",
+            SampleVersion,
             SourceOid);
-        ReleaseImageManifestLoadResult malformed = ReleaseImageManifest.Parse("{bad", "1.1.0", SourceOid);
+        ReleaseImageManifestLoadResult malformed = ReleaseImageManifest.Parse("{bad", SampleVersion, SourceOid);
 
         await Assert.That(wrongVersion.Diagnostic).IsEqualTo("image_manifest_version_mismatch");
         await Assert.That(wrongCommit.Diagnostic).IsEqualTo("image_manifest_commit_mismatch");
@@ -65,9 +66,9 @@ public sealed class ReleaseImageManifestTests
             await File.WriteAllTextAsync(realPath, ValidManifestJson());
             File.CreateSymbolicLink(linkedPath, realPath);
 
-            ReleaseImageManifestLoadResult valid = ReleaseImageManifest.LoadFromFile(realPath, "1.1.0", SourceOid);
-            ReleaseImageManifestLoadResult missing = ReleaseImageManifest.LoadFromFile(Path.Combine(tempRoot, "missing.json"), "1.1.0", SourceOid);
-            ReleaseImageManifestLoadResult linked = ReleaseImageManifest.LoadFromFile(linkedPath, "1.1.0", SourceOid);
+            ReleaseImageManifestLoadResult valid = ReleaseImageManifest.LoadFromFile(realPath, SampleVersion, SourceOid);
+            ReleaseImageManifestLoadResult missing = ReleaseImageManifest.LoadFromFile(Path.Combine(tempRoot, "missing.json"), SampleVersion, SourceOid);
+            ReleaseImageManifestLoadResult linked = ReleaseImageManifest.LoadFromFile(linkedPath, SampleVersion, SourceOid);
 
             await Assert.That(valid.IsValid).IsTrue();
             await Assert.That(missing.Diagnostic).IsEqualTo("image_manifest_invalid");
@@ -79,7 +80,7 @@ public sealed class ReleaseImageManifestTests
         }
     }
 
-    internal static string ValidManifestJson(string version = "1.1.0", string? commitOid = null)
+    internal static string ValidManifestJson(string version = SampleVersion, string? commitOid = null)
     {
         string oid = commitOid ?? SourceOid;
         string d1 = new('1', 64);

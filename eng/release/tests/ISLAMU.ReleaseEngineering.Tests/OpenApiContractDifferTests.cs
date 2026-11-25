@@ -5,6 +5,17 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class OpenApiContractDifferTests
 {
+    private const string OpenApiVersion = "3.1.1";
+    private const string EventsPath = "/api/events";
+    private const string StringType = "string";
+    private const string ObjectType = "object";
+    private const string TitleField = "title";
+    private const string BearerScheme = "bearer";
+    private const string ResponsesField = "responses";
+    private const string ParametersField = "parameters";
+    private const string SlugRef = "#/components/schemas/Slug";
+    private const string MaxLengthKeyword = "maxLength";
+
     private static readonly string BaseOid = new('a', 40);
     private static readonly string HeadOid = new('b', 40);
 
@@ -13,10 +24,10 @@ public sealed class OpenApiContractDifferTests
     {
         string baseSpec = SerializeSpec(new
         {
-            openapi = "3.1.1",
+            openapi = OpenApiVersion,
             paths = new Dictionary<string, object>
             {
-                ["/api/events"] = new Dictionary<string, object>
+                [EventsPath] = new Dictionary<string, object>
                 {
                     ["get"] = new
                     {
@@ -38,8 +49,8 @@ public sealed class OpenApiContractDifferTests
                         ["id"],
                         new Dictionary<string, object>
                         {
-                            ["id"] = new { type = "string" },
-                            ["title"] = new { type = new[] { "null", "string" } },
+                            ["id"] = new { type = StringType },
+                            [TitleField] = new { type = new[] { "null", StringType } },
                             ["_links"] = HalLinks("self", "edit"),
                         }),
                 },
@@ -48,18 +59,18 @@ public sealed class OpenApiContractDifferTests
 
         string headSpec = SerializeSpec(new
         {
-            openapi = "3.1.1",
+            openapi = OpenApiVersion,
             paths = new Dictionary<string, object>
             {
-                ["/api/events"] = new Dictionary<string, object>
+                [EventsPath] = new Dictionary<string, object>
                 {
                     ["get"] = new
                     {
-                        security = new object[] { new Dictionary<string, object> { ["bearer"] = Array.Empty<string>() } },
+                        security = new object[] { new Dictionary<string, object> { [BearerScheme] = Array.Empty<string>() } },
                         parameters = new object[]
                         {
                             new { name = "page", @in = "query", required = true, schema = new { type = "integer" } },
-                            new { name = "cursor", @in = "query", required = false, schema = new { type = "string" } },
+                            new { name = "cursor", @in = "query", required = false, schema = new { type = StringType } },
                         },
                         responses = JsonResponseRef("#/components/schemas/EventResource"),
                     },
@@ -74,12 +85,12 @@ public sealed class OpenApiContractDifferTests
                 schemas = new Dictionary<string, object>
                 {
                     ["EventResource"] = EventResourceSchema(
-                        ["id", "title"],
+                        ["id", TitleField],
                         new Dictionary<string, object>
                         {
-                            ["id"] = new { type = "string" },
-                            ["title"] = new { type = "string" },
-                            ["subtitle"] = new { type = new[] { "null", "string" } },
+                            ["id"] = new { type = StringType },
+                            [TitleField] = new { type = StringType },
+                            ["subtitle"] = new { type = new[] { "null", StringType } },
                             ["_links"] = HalLinks("self", "publish"),
                         }),
                 },
@@ -96,8 +107,8 @@ public sealed class OpenApiContractDifferTests
         await Assert.That(result.Changes.Any(c => c.Kind == "optional_parameter_added" && c.Severity == ContractChangeSeverity.Additive)).IsTrue();
         await Assert.That(result.Changes.Any(c => c.Kind == "hal_link_removed" && c.Severity == ContractChangeSeverity.Breaking && c.Target.Contains("edit", StringComparison.Ordinal))).IsTrue();
         await Assert.That(result.Changes.Any(c => c.Kind == "hal_link_added" && c.Severity == ContractChangeSeverity.Additive && c.Target.Contains("publish", StringComparison.Ordinal))).IsTrue();
-        await Assert.That(result.Changes.Any(c => c.Kind == "required_property_added" && c.Severity == ContractChangeSeverity.Breaking && c.Target.Contains("title", StringComparison.Ordinal))).IsTrue();
-        await Assert.That(result.Changes.Any(c => c.Kind == "schema_type_narrowed" && c.Severity == ContractChangeSeverity.Breaking && c.Target.Contains("title", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(result.Changes.Any(c => c.Kind == "required_property_added" && c.Severity == ContractChangeSeverity.Breaking && c.Target.Contains(TitleField, StringComparison.Ordinal))).IsTrue();
+        await Assert.That(result.Changes.Any(c => c.Kind == "schema_type_narrowed" && c.Severity == ContractChangeSeverity.Breaking && c.Target.Contains(TitleField, StringComparison.Ordinal))).IsTrue();
         await Assert.That(result.Changes.Any(c => c.Kind == "optional_property_added" && c.Severity == ContractChangeSeverity.Additive && c.Target.Contains("subtitle", StringComparison.Ordinal))).IsTrue();
     }
 
@@ -106,15 +117,15 @@ public sealed class OpenApiContractDifferTests
     {
         string baseSpec = SerializeSpec(new
         {
-            openapi = "3.1.1",
+            openapi = OpenApiVersion,
             paths = new Dictionary<string, object>
             {
-                ["/api/events"] = new Dictionary<string, object>
+                [EventsPath] = new Dictionary<string, object>
                 {
                     ["get"] = new Dictionary<string, object>
                     {
                         ["x-islamu-tier"] = "public",
-                        ["responses"] = JsonResponseRef("#/components/schemas/MissingExternal"),
+                        [ResponsesField] = JsonResponseRef("#/components/schemas/MissingExternal"),
                     },
                 },
             },
@@ -124,10 +135,10 @@ public sealed class OpenApiContractDifferTests
                 {
                     ["Payload"] = new
                     {
-                        type = "object",
+                        type = ObjectType,
                         properties = new Dictionary<string, object>
                         {
-                            ["status"] = new { type = "string", @default = "draft", pattern = "^[a-z]+$" },
+                            ["status"] = new { type = StringType, @default = "draft", pattern = "^[a-z]+$" },
                         },
                     },
                 },
@@ -136,15 +147,15 @@ public sealed class OpenApiContractDifferTests
 
         string headSpec = SerializeSpec(new
         {
-            openapi = "3.1.1",
+            openapi = OpenApiVersion,
             paths = new Dictionary<string, object>
             {
-                ["/api/events"] = new Dictionary<string, object>
+                [EventsPath] = new Dictionary<string, object>
                 {
                     ["get"] = new Dictionary<string, object>
                     {
                         ["x-islamu-tier"] = "federated",
-                        ["responses"] = JsonResponseRef("https://example.invalid/external.json#/Payload"),
+                        [ResponsesField] = JsonResponseRef("https://example.invalid/external.json#/Payload"),
                     },
                 },
             },
@@ -154,10 +165,10 @@ public sealed class OpenApiContractDifferTests
                 {
                     ["Payload"] = new
                     {
-                        type = "object",
+                        type = ObjectType,
                         properties = new Dictionary<string, object>
                         {
-                            ["status"] = new { type = "string", @default = "published", pattern = "^[a-z0-9-]+$" },
+                            ["status"] = new { type = StringType, @default = "published", pattern = "^[a-z0-9-]+$" },
                         },
                     },
                 },
@@ -177,28 +188,28 @@ public sealed class OpenApiContractDifferTests
     {
         string baseSpec = SerializeSpec(new
         {
-            openapi = "3.1.1",
+            openapi = OpenApiVersion,
             servers = new object[] { new { url = "https://api.example.invalid/v1" } },
             security = Array.Empty<object>(),
             paths = new Dictionary<string, object>
             {
                 ["/api/events/{id}"] = new Dictionary<string, object>
                 {
-                    ["parameters"] = new object[]
+                    [ParametersField] = new object[]
                     {
-                        new { name = "id", @in = "path", required = true, schema = new { type = "string" } },
+                        new { name = "id", @in = "path", required = true, schema = new { type = StringType } },
                     },
                     ["get"] = new Dictionary<string, object>
                     {
                         ["deprecated"] = false,
-                        ["responses"] = new Dictionary<string, object>
+                        [ResponsesField] = new Dictionary<string, object>
                         {
                             ["200"] = new Dictionary<string, object>
                             {
                                 ["description"] = "OK",
                                 ["headers"] = new Dictionary<string, object>
                                 {
-                                    ["ETag"] = new { schema = new { type = "string" } },
+                                    ["ETag"] = new { schema = new { type = StringType } },
                                 },
                             },
                         },
@@ -209,36 +220,36 @@ public sealed class OpenApiContractDifferTests
             {
                 ["securitySchemes"] = new Dictionary<string, object>
                 {
-                    ["bearer"] = new { type = "http", scheme = "bearer", bearerFormat = "JWT" },
+                    [BearerScheme] = new { type = "http", scheme = BearerScheme, bearerFormat = "JWT" },
                 },
             },
         });
 
         string headSpec = SerializeSpec(new
         {
-            openapi = "3.1.1",
+            openapi = OpenApiVersion,
             servers = new object[] { new { url = "https://api.example.invalid/v2" } },
-            security = new object[] { new Dictionary<string, object> { ["bearer"] = new[] { "events.read" } } },
+            security = new object[] { new Dictionary<string, object> { [BearerScheme] = new[] { "events.read" } } },
             paths = new Dictionary<string, object>
             {
                 ["/api/events/{id}"] = new Dictionary<string, object>
                 {
-                    ["parameters"] = new object[]
+                    [ParametersField] = new object[]
                     {
-                        new { name = "id", @in = "path", required = true, schema = new { type = "string" } },
-                        new { name = "X-Tenant-Slug", @in = "header", required = true, schema = new { type = "string" } },
+                        new { name = "id", @in = "path", required = true, schema = new { type = StringType } },
+                        new { name = "X-Tenant-Slug", @in = "header", required = true, schema = new { type = StringType } },
                     },
                     ["get"] = new Dictionary<string, object>
                     {
                         ["deprecated"] = true,
-                        ["responses"] = new Dictionary<string, object>
+                        [ResponsesField] = new Dictionary<string, object>
                         {
                             ["200"] = new Dictionary<string, object>
                             {
                                 ["description"] = "OK",
                                 ["headers"] = new Dictionary<string, object>
                                 {
-                                    ["ETag"] = new { schema = new { type = "string" } },
+                                    ["ETag"] = new { schema = new { type = StringType } },
                                     ["X-RateLimit-Remaining"] = new { schema = new { type = "integer" } },
                                 },
                             },
@@ -250,7 +261,7 @@ public sealed class OpenApiContractDifferTests
             {
                 ["securitySchemes"] = new Dictionary<string, object>
                 {
-                    ["bearer"] = new { type = "oauth2", flows = new Dictionary<string, object>() },
+                    [BearerScheme] = new { type = "oauth2", flows = new Dictionary<string, object>() },
                 },
             },
         });
@@ -271,22 +282,22 @@ public sealed class OpenApiContractDifferTests
     {
         string baseSpec = SerializeSpec(new
         {
-            openapi = "3.1.1",
+            openapi = OpenApiVersion,
             paths = new Dictionary<string, object>(),
             components = new
             {
                 schemas = new Dictionary<string, object>
                 {
-                    ["Slug"] = new { type = "string" },
-                    ["AltSlug"] = new { type = "string" },
+                    ["Slug"] = new { type = StringType },
+                    ["AltSlug"] = new { type = StringType },
                     ["CreateRequest"] = new
                     {
-                        type = "object",
+                        type = ObjectType,
                         properties = new Dictionary<string, object>
                         {
-                            ["slug"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/Slug" },
-                            ["unchanged"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/Slug" },
-                            ["swapped"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/Slug", ["maxLength"] = 100 },
+                            ["slug"] = new Dictionary<string, object> { ["$ref"] = SlugRef },
+                            ["unchanged"] = new Dictionary<string, object> { ["$ref"] = SlugRef },
+                            ["swapped"] = new Dictionary<string, object> { ["$ref"] = SlugRef, [MaxLengthKeyword] = 100 },
                         },
                     },
                 },
@@ -295,22 +306,22 @@ public sealed class OpenApiContractDifferTests
 
         string headSpec = SerializeSpec(new
         {
-            openapi = "3.1.1",
+            openapi = OpenApiVersion,
             paths = new Dictionary<string, object>(),
             components = new
             {
                 schemas = new Dictionary<string, object>
                 {
-                    ["Slug"] = new { type = "string" },
-                    ["AltSlug"] = new { type = "string" },
+                    ["Slug"] = new { type = StringType },
+                    ["AltSlug"] = new { type = StringType },
                     ["CreateRequest"] = new
                     {
-                        type = "object",
+                        type = ObjectType,
                         properties = new Dictionary<string, object>
                         {
-                            ["slug"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/Slug", ["maxLength"] = 64 },
-                            ["unchanged"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/Slug" },
-                            ["swapped"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/AltSlug", ["maxLength"] = 32 },
+                            ["slug"] = new Dictionary<string, object> { ["$ref"] = SlugRef, [MaxLengthKeyword] = 64 },
+                            ["unchanged"] = new Dictionary<string, object> { ["$ref"] = SlugRef },
+                            ["swapped"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/AltSlug", [MaxLengthKeyword] = 32 },
                         },
                     },
                 },
@@ -324,12 +335,12 @@ public sealed class OpenApiContractDifferTests
             c.Kind == "schema_review_required" &&
             c.Severity == ContractChangeSeverity.ReviewRequired &&
             c.Target == "components.schemas.CreateRequest.slug" &&
-            c.Summary.Contains("maxLength", StringComparison.Ordinal))).IsTrue();
+            c.Summary.Contains(MaxLengthKeyword, StringComparison.Ordinal))).IsTrue();
         await Assert.That(result.Changes.Any(c =>
             c.Kind == "schema_review_required" &&
             c.Severity == ContractChangeSeverity.ReviewRequired &&
             c.Target == "components.schemas.CreateRequest.swapped" &&
-            c.Summary.Contains("maxLength", StringComparison.Ordinal))).IsTrue();
+            c.Summary.Contains(MaxLengthKeyword, StringComparison.Ordinal))).IsTrue();
         await Assert.That(result.Changes.Any(c => c.Target.Contains("unchanged", StringComparison.Ordinal))).IsFalse();
     }
 
@@ -338,10 +349,10 @@ public sealed class OpenApiContractDifferTests
     {
         var sharedComponents = new Dictionary<string, object>
         {
-            ["parameters"] = new Dictionary<string, object>
+            [ParametersField] = new Dictionary<string, object>
             {
-                ["TenantId"] = new { name = "X-Tenant-Id", @in = "header", required = true, schema = new { type = "string" } },
-                ["TraceId"] = new { name = "X-Trace-Id", @in = "header", required = false, schema = new { type = "string" } },
+                ["TenantId"] = new { name = "X-Tenant-Id", @in = "header", required = true, schema = new { type = StringType } },
+                ["TraceId"] = new { name = "X-Trace-Id", @in = "header", required = false, schema = new { type = StringType } },
             },
             ["requestBodies"] = new Dictionary<string, object>
             {
@@ -350,7 +361,7 @@ public sealed class OpenApiContractDifferTests
                     required = true,
                     content = new Dictionary<string, object>
                     {
-                        ["application/json"] = new { schema = new { type = "object" } },
+                        ["application/json"] = new { schema = new { type = ObjectType } },
                     },
                 },
             },
@@ -359,10 +370,10 @@ public sealed class OpenApiContractDifferTests
 
         string baseSpec = SerializeSpec(new
         {
-            openapi = "3.1.1",
+            openapi = OpenApiVersion,
             paths = new Dictionary<string, object>
             {
-                ["/api/events"] = new Dictionary<string, object>
+                [EventsPath] = new Dictionary<string, object>
                 {
                     ["post"] = new { parameters = Array.Empty<object>(), responses = createdResponses },
                 },
@@ -372,21 +383,21 @@ public sealed class OpenApiContractDifferTests
 
         string headSpec = SerializeSpec(new
         {
-            openapi = "3.1.1",
+            openapi = OpenApiVersion,
             paths = new Dictionary<string, object>
             {
-                ["/api/events"] = new Dictionary<string, object>
+                [EventsPath] = new Dictionary<string, object>
                 {
                     ["post"] = new Dictionary<string, object>
                     {
-                        ["parameters"] = new object[]
+                        [ParametersField] = new object[]
                         {
                             RefObj("#/components/parameters/TenantId"),
                             RefObj("#/components/parameters/TraceId"),
                             RefObj("#/components/parameters/MissingParam"),
                         },
                         ["requestBody"] = RefObj("#/components/requestBodies/CreateEvent"),
-                        ["responses"] = createdResponses,
+                        [ResponsesField] = createdResponses,
                     },
                 },
             },
@@ -417,21 +428,21 @@ public sealed class OpenApiContractDifferTests
     [Test]
     public async Task EvaluatesCombinedRefTypeConstraintsWithoutFalseBreakingOnRedundantTypeRemoval()
     {
-        object[] rootSecurity = [new Dictionary<string, object> { ["bearer"] = Array.Empty<string>() }];
+        object[] rootSecurity = [new Dictionary<string, object> { [BearerScheme] = Array.Empty<string>() }];
         var okResponses = new Dictionary<string, object> { ["200"] = new { description = "OK" } };
 
         string BuildPayloadSpec(object operation, Dictionary<string, object> payloadProperties) => SerializeSpec(new
         {
-            openapi = "3.1.1",
+            openapi = OpenApiVersion,
             security = rootSecurity,
-            paths = new Dictionary<string, object> { ["/api/events"] = new Dictionary<string, object> { ["get"] = operation } },
+            paths = new Dictionary<string, object> { [EventsPath] = new Dictionary<string, object> { ["get"] = operation } },
             components = new
             {
                 schemas = new Dictionary<string, object>
                 {
-                    ["Slug"] = new { type = "string" },
-                    ["NullableSlug"] = new { type = new[] { "null", "string" } },
-                    ["Payload"] = new { type = "object", properties = payloadProperties },
+                    ["Slug"] = new { type = StringType },
+                    ["NullableSlug"] = new { type = new[] { "null", StringType } },
+                    ["Payload"] = new { type = ObjectType, properties = payloadProperties },
                 },
             },
         });
@@ -440,17 +451,17 @@ public sealed class OpenApiContractDifferTests
             new { responses = okResponses },
             new Dictionary<string, object>
             {
-                ["redundant"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/Slug", ["type"] = "string" },
+                ["redundant"] = new Dictionary<string, object> { ["$ref"] = SlugRef, ["type"] = StringType },
                 ["narrowed"] = RefObj("#/components/schemas/NullableSlug"),
-                ["unconstrained"] = new { type = "string" },
+                ["unconstrained"] = new { type = StringType },
             });
 
         string headSpec = BuildPayloadSpec(
             new { security = Array.Empty<object>(), responses = okResponses },
             new Dictionary<string, object>
             {
-                ["redundant"] = RefObj("#/components/schemas/Slug"),
-                ["narrowed"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/NullableSlug", ["type"] = "string" },
+                ["redundant"] = RefObj(SlugRef),
+                ["narrowed"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/NullableSlug", ["type"] = StringType },
                 ["unconstrained"] = new Dictionary<string, object>(),
             });
 
@@ -470,6 +481,79 @@ public sealed class OpenApiContractDifferTests
             c.Kind == "security_changed" &&
             c.Severity == ContractChangeSeverity.ReviewRequired &&
             c.Target == "GET /api/events")).IsTrue();
+    }
+
+    [Test]
+    public async Task DetectsExtensionsBesideReferencedRequestBodiesAndResponsesAndEquatesEmptySecurityForms()
+    {
+        var sharedComponents = new Dictionary<string, object>
+        {
+            ["requestBodies"] = new Dictionary<string, object>
+            {
+                ["EventPayload"] = new
+                {
+                    required = true,
+                    content = new Dictionary<string, object>
+                    {
+                        ["application/json"] = new { schema = new { type = ObjectType } },
+                    },
+                },
+            },
+            [ResponsesField] = new Dictionary<string, object>
+            {
+                ["OkEvent"] = new { description = "OK" },
+            },
+        };
+
+        string BuildSpec(object getOperation, Dictionary<string, object> postRequestBody, Dictionary<string, object> postResponse) =>
+            SerializeSpec(new
+            {
+                openapi = OpenApiVersion,
+                security = new object[] { new Dictionary<string, object>() },
+                paths = new Dictionary<string, object>
+                {
+                    [EventsPath] = new Dictionary<string, object>
+                    {
+                        ["get"] = getOperation,
+                        ["post"] = new
+                        {
+                            requestBody = postRequestBody,
+                            responses = new Dictionary<string, object> { ["200"] = postResponse },
+                        },
+                    },
+                },
+                components = sharedComponents,
+            });
+
+        string baseSpec = BuildSpec(
+            new
+            {
+                security = Array.Empty<object>(),
+                responses = new Dictionary<string, object> { ["200"] = new { description = "OK" } },
+            },
+            new Dictionary<string, object> { ["$ref"] = "#/components/requestBodies/EventPayload", ["x-islamu-audit"] = "v1" },
+            new Dictionary<string, object> { ["$ref"] = "#/components/responses/OkEvent", ["x-islamu-cache"] = "private" });
+
+        string headSpec = BuildSpec(
+            new
+            {
+                responses = new Dictionary<string, object> { ["200"] = new { description = "OK" } },
+            },
+            new Dictionary<string, object> { ["$ref"] = "#/components/requestBodies/EventPayload", ["x-islamu-audit"] = "v2" },
+            new Dictionary<string, object> { ["$ref"] = "#/components/responses/OkEvent", ["x-islamu-cache"] = "public" });
+
+        ContractDifferResult result = DiffSpecs(baseSpec, headSpec);
+
+        await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "raw ref extensions and anonymous security");
+        await Assert.That(result.Changes.Any(c =>
+            c.Kind == "extension_changed" &&
+            c.Severity == ContractChangeSeverity.ReviewRequired &&
+            c.Target == "POST /api/events requestBody x-islamu-audit")).IsTrue();
+        await Assert.That(result.Changes.Any(c =>
+            c.Kind == "extension_changed" &&
+            c.Severity == ContractChangeSeverity.ReviewRequired &&
+            c.Target == "POST /api/events response:200 x-islamu-cache")).IsTrue();
+        await Assert.That(result.Changes.Any(c => c.Target.Contains("GET /api/events", StringComparison.Ordinal))).IsFalse();
     }
 
     [Test]
@@ -509,14 +593,14 @@ public sealed class OpenApiContractDifferTests
 
     private static object EventResourceSchema(string[] required, Dictionary<string, object> properties) => new
     {
-        type = "object",
+        type = ObjectType,
         required,
         properties,
     };
 
     private static object HalLinks(params string[] relations) => new
     {
-        type = "object",
-        properties = relations.ToDictionary(relation => relation, _ => (object)new { type = "object" }),
+        type = ObjectType,
+        properties = relations.ToDictionary(relation => relation, _ => (object)new { type = ObjectType }),
     };
 }

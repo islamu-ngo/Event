@@ -7,12 +7,14 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class ContractDiffIntegrationTests
 {
+    private const string OpenApiSchemaPath = "schemas/openapi_islamu-event.json";
+
     [Test]
     public async Task ReadsOnlyPinnedGitRevisionsIndependentOfCorruptedWorkingTreeAndRepeatsByteIdentically()
     {
         using var repo = new TemporaryContractRepo();
         repo.WriteFile(".env.example", "DATABASE_PROVIDER=postgres\nLEGACY_SECRET=alpha-secret-value\n");
-        repo.WriteFile("schemas/openapi_islamu-event.json", """
+        repo.WriteFile(OpenApiSchemaPath, """
             {
               "openapi": "3.1.1",
               "paths": {
@@ -36,7 +38,7 @@ public sealed class ContractDiffIntegrationTests
         string baseOid = repo.CommitAll("feat(events): baseline contract");
 
         repo.WriteFile(".env.example", "DATABASE_PROVIDER=postgres\n# NEW_OPT=beta-secret-value\n");
-        repo.WriteFile("schemas/openapi_islamu-event.json", """
+        repo.WriteFile(OpenApiSchemaPath, """
             {
               "openapi": "3.1.1",
               "paths": {
@@ -67,7 +69,7 @@ public sealed class ContractDiffIntegrationTests
         await Assert.That(cleanCode).IsEqualTo(Program.Success).Because(cleanWriter.ToString());
 
         // Corrupt working tree severely: invalid OpenAPI JSON, deleted .env.example, extra untracked migration.
-        repo.WriteFile("schemas/openapi_islamu-event.json", "{{{{ CORRUPTED WORKING TREE");
+        repo.WriteFile(OpenApiSchemaPath, "{{{{ CORRUPTED WORKING TREE");
         File.Delete(Path.Combine(repo.RepoRoot, ".env.example"));
         repo.WriteFile("src/Explore.Persistence/Migrations/20261125000000_UncommittedDirty.cs", "// dirty");
 
@@ -100,9 +102,9 @@ public sealed class ContractDiffIntegrationTests
     public async Task RejectsOversizedPinnedJsonBlobFailClosed()
     {
         using var repo = new TemporaryContractRepo();
-        repo.WriteFile("schemas/openapi_islamu-event.json", """{"openapi":"3.1.1","paths":{}}""");
+        repo.WriteFile(OpenApiSchemaPath, """{"openapi":"3.1.1","paths":{}}""");
         string baseOid = repo.CommitAll("feat(events): small spec");
-        repo.WriteFile("schemas/openapi_islamu-event.json", "{\"openapi\":\"3.1.1\",\"info\":{\"description\":\"" + new string('x', 4096) + "\"},\"paths\":{}}");
+        repo.WriteFile(OpenApiSchemaPath, "{\"openapi\":\"3.1.1\",\"info\":{\"description\":\"" + new string('x', 4096) + "\"},\"paths\":{}}");
         string headOid = repo.CommitAll("feat(events): oversized spec");
 
         var boundedReader = new GitProcessObjectReader(repo.RepoRoot, TimeSpan.FromSeconds(10), maximumBlobBytes: 512);

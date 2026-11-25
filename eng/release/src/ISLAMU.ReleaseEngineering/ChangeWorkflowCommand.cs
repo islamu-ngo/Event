@@ -11,6 +11,7 @@ namespace ISLAMU.ReleaseEngineering;
 public static class ChangeWorkflowCommand
 {
     private const int MaximumGitOutputCharacters = 4_194_304;
+    private const string ChangesDirectoryRelativePath = "docs/internal/releases/changes";
     private const string TargetOption = "--target";
     private const string DefaultTarget = "develop";
     private const string GitRevisionCommand = "rev-parse";
@@ -164,7 +165,7 @@ public static class ChangeWorkflowCommand
                 "--name-only",
                 "--diff-filter=AM",
                 "--",
-                "docs/internal/releases/changes")
+                ChangesDirectoryRelativePath)
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         string[] modified = RunGit(
                 root,
@@ -174,7 +175,7 @@ public static class ChangeWorkflowCommand
                 "--name-only",
                 "--diff-filter=M",
                 "--",
-                "docs/internal/releases/changes")
+                ChangesDirectoryRelativePath)
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (modified.Length != 0)
         {
@@ -252,6 +253,19 @@ public static class ChangeWorkflowCommand
         }
 
         // Also validate any optional fragment files added or modified in target..head even if not linked yet.
+        ValidateRangeFragments(root, target, head, rangeOwners, timeout);
+
+        output.WriteLine($"change_range_verified: target={target} head={head} commits={rangeCommits.Length} change-ids={rangeOwners.Count}");
+        return Program.Success;
+    }
+
+    private static void ValidateRangeFragments(
+        string root,
+        string target,
+        string head,
+        IReadOnlyDictionary<string, string[]> rangeOwners,
+        TimeSpan timeout)
+    {
         string[] rangeFragments = RunGit(
                 root,
                 timeout,
@@ -260,7 +274,7 @@ public static class ChangeWorkflowCommand
                 "--diff-filter=AM",
                 $"{target}..{head}",
                 "--",
-                "docs/internal/releases/changes")
+                ChangesDirectoryRelativePath)
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         foreach (string relative in rangeFragments)
         {
@@ -275,9 +289,6 @@ public static class ChangeWorkflowCommand
                 ValidateFragmentAtRevision(root, head, id, timeout);
             }
         }
-
-        output.WriteLine($"change_range_verified: target={target} head={head} commits={rangeCommits.Length} change-ids={rangeOwners.Count}");
-        return Program.Success;
     }
 
     /// <summary>Installs shared Git preflight hooks while preserving existing checks and refusing ambiguous overwrites.</summary>
@@ -394,7 +405,7 @@ public static class ChangeWorkflowCommand
         string id,
         TimeSpan timeout)
     {
-        string relative = $"docs/internal/releases/changes/{id}.yaml";
+        string relative = $"{ChangesDirectoryRelativePath}/{id}.yaml";
         if (!TryRunGit(root, timeout, out string text, "show", $":{relative}"))
         {
             throw new ChangeWorkflowException(
@@ -410,7 +421,7 @@ public static class ChangeWorkflowCommand
         string id,
         TimeSpan timeout)
     {
-        string relative = $"docs/internal/releases/changes/{id}.yaml";
+        string relative = $"{ChangesDirectoryRelativePath}/{id}.yaml";
         if (!TryRunGit(
                 root,
                 timeout,
@@ -446,9 +457,8 @@ public static class ChangeWorkflowCommand
 
     private static void EnsureReleaseSourcesClean(string root, TimeSpan timeout)
     {
-        const string changesPath = "docs/internal/releases/changes";
-        if (!TryRunGit(root, timeout, out _, "diff", "--quiet", "--", changesPath) ||
-            !TryRunGit(root, timeout, out _, "diff", "--cached", "--quiet", "--", changesPath))
+        if (!TryRunGit(root, timeout, out _, "diff", "--quiet", "--", ChangesDirectoryRelativePath) ||
+            !TryRunGit(root, timeout, out _, "diff", "--cached", "--quiet", "--", ChangesDirectoryRelativePath))
         {
             throw new ChangeWorkflowException("change_release_sources_not_committed");
         }
@@ -460,7 +470,7 @@ public static class ChangeWorkflowCommand
             "--others",
             "--exclude-standard",
             "--",
-            changesPath);
+            ChangesDirectoryRelativePath);
         if (!string.IsNullOrWhiteSpace(untracked))
         {
             throw new ChangeWorkflowException("change_release_sources_not_committed");

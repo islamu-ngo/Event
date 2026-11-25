@@ -12,7 +12,15 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class ChangeWorkflowCommandTests
 {
     private const string TargetOption = "--target";
+    private const string HeadOption = "--head";
     private const string TargetBranch = "develop";
+    private const string FeatureBranch = "feature";
+    private const string ChangesFolderSegment = "changes";
+    private const string YamlExtension = ".yaml";
+    private const string PreflightCommitCommand = "preflight-commit";
+    private const string PreflightRangeCommand = "preflight-range";
+    private const string GitConfigCommand = "config";
+    private const string HooksPathConfigKey = "core.hooksPath";
     private const string GitUserName = "user.name=Release Test";
     private const string GitUserEmail = "user.email=release@example.invalid";
     private const string GitCommitCommand = "commit";
@@ -77,14 +85,14 @@ public sealed class ChangeWorkflowCommandTests
             "--group", "registration-correction");
 
         string created = createOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)[0].Split("id=", StringSplitOptions.None)[1].Split(' ')[0];
-        string fragmentPath = Path.Combine(repository.Path, "docs", "internal", "releases", "changes", created + ".yaml");
+        string fragmentPath = Path.Combine(repository.Path, "docs", "internal", "releases", ChangesFolderSegment, created + YamlExtension);
         repository.Git("add", Path.GetRelativePath(repository.Path, fragmentPath));
         string messagePath = Path.Combine(repository.Path, "COMMIT_EDITMSG");
         await File.WriteAllTextAsync(
             messagePath,
             $"feat(registration): add attendee correction window\n\nChange-Id: {created}\n");
         (int preflightCode, string preflightOutput) = repository.Run(
-            "preflight-commit", messagePath, TargetOption, TargetBranch);
+            PreflightCommitCommand, messagePath, TargetOption, TargetBranch);
 
         await Assert.That(allocationCode).IsEqualTo(Program.Success);
         await Assert.That(GeneratedId.IsMatch(allocated)).IsTrue();
@@ -92,8 +100,9 @@ public sealed class ChangeWorkflowCommandTests
         await Assert.That(GeneratedId.IsMatch(created)).IsTrue();
         await Assert.That(created).IsNotEqualTo(allocated);
         await Assert.That(File.Exists(fragmentPath)).IsTrue();
-        await Assert.That(File.ReadAllText(fragmentPath)).Contains($"Change-Id: {created}");
-        await Assert.That(File.ReadAllText(fragmentPath)).Contains("Group: registration-correction");
+        string fragmentText = await File.ReadAllTextAsync(fragmentPath);
+        await Assert.That(fragmentText).Contains($"Change-Id: {created}");
+        await Assert.That(fragmentText).Contains("Group: registration-correction");
         await Assert.That(createOutput).Contains($"commit_footer: Change-Id: {created}");
         await Assert.That(preflightCode).IsEqualTo(Program.Success);
         await Assert.That(preflightOutput).Contains($"change_commit_verified: change-id={created}");
@@ -110,15 +119,15 @@ public sealed class ChangeWorkflowCommandTests
         repository.WriteFragment(collision);
 
         (int commitCode, string commitOutput) = repository.Run(
-            "preflight-commit", messagePath, TargetOption, TargetBranch);
+            PreflightCommitCommand, messagePath, TargetOption, TargetBranch);
 
-        repository.CreateBranch("feature");
+        repository.CreateBranch(FeatureBranch);
         repository.Commit(
             "feature.txt",
             "feature\n",
             $"feat(registration): add another correction flow\n\nChange-Id: {collision}");
         (int rangeCode, string rangeOutput) = repository.Run(
-            "preflight-range", TargetOption, TargetBranch, "--head", "HEAD");
+            PreflightRangeCommand, TargetOption, TargetBranch, HeadOption, "HEAD");
 
         await Assert.That(commitCode).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(commitOutput).Contains($"change_preflight_failed: change_id_already_reachable:{collision}");
@@ -131,23 +140,23 @@ public sealed class ChangeWorkflowCommandTests
     public async Task PreflightCommandsValidateOptionalFragmentsWithFullReleaseInputPolicy()
     {
         using var repository = ChangeRepositoryFixture.Create();
-        repository.CreateBranch("feature");
+        repository.CreateBranch(FeatureBranch);
 
         string proseId = ChangeIdPolicy.Create(
             new DateTimeOffset(2026, 8, 27, 12, 0, 0, TimeSpan.Zero),
             Enumerable.Repeat((byte)3, 10).ToArray());
         string proseYaml = FragmentYaml(proseId)
             .Replace("Attendees can correct registration details.", "Admin controls are restricted to event organizers.", StringComparison.Ordinal);
-        string prosePath = Path.Combine(repository.Path, "docs", "internal", "releases", "changes", proseId + ".yaml");
+        string prosePath = Path.Combine(repository.Path, "docs", "internal", "releases", ChangesFolderSegment, proseId + YamlExtension);
         await File.WriteAllTextAsync(prosePath, proseYaml);
         repository.Git("add", Path.GetRelativePath(repository.Path, prosePath));
 
         (int stagedProseCode, _) = repository.Run("preflight-staged", TargetOption, TargetBranch);
         string messagePath = Path.Combine(repository.Path, "COMMIT_EDITMSG");
         await File.WriteAllTextAsync(messagePath, $"feat(registration): clarify organizer limits\n\nChange-Id: {proseId}\n");
-        (int commitProseCode, _) = repository.Run("preflight-commit", messagePath, TargetOption, TargetBranch);
+        (int commitProseCode, _) = repository.Run(PreflightCommitCommand, messagePath, TargetOption, TargetBranch);
         repository.CommitStaged($"feat(registration): clarify organizer limits\n\nChange-Id: {proseId}");
-        (int rangeProseCode, _) = repository.Run("preflight-range", TargetOption, TargetBranch, "--head", "HEAD");
+        (int rangeProseCode, _) = repository.Run(PreflightRangeCommand, TargetOption, TargetBranch, HeadOption, "HEAD");
 
         await Assert.That(stagedProseCode).IsEqualTo(Program.Success);
         await Assert.That(commitProseCode).IsEqualTo(Program.Success);
@@ -157,15 +166,15 @@ public sealed class ChangeWorkflowCommandTests
             new DateTimeOffset(2026, 8, 27, 12, 0, 5, TimeSpan.Zero),
             Enumerable.Repeat((byte)4, 10).ToArray());
         string embargoYaml = FragmentYaml(embargoId) + "\nRestricted-Details: private steps\n";
-        string embargoPath = Path.Combine(repository.Path, "docs", "internal", "releases", "changes", embargoId + ".yaml");
+        string embargoPath = Path.Combine(repository.Path, "docs", "internal", "releases", ChangesFolderSegment, embargoId + YamlExtension);
         await File.WriteAllTextAsync(embargoPath, embargoYaml);
         repository.Git("add", Path.GetRelativePath(repository.Path, embargoPath));
 
         (int stagedEmbargoCode, string stagedEmbargoOutput) = repository.Run("preflight-staged", TargetOption, TargetBranch);
         await File.WriteAllTextAsync(messagePath, $"feat(registration): document private issue\n\nChange-Id: {embargoId}\n");
-        (int commitEmbargoCode, string commitEmbargoOutput) = repository.Run("preflight-commit", messagePath, TargetOption, TargetBranch);
+        (int commitEmbargoCode, string commitEmbargoOutput) = repository.Run(PreflightCommitCommand, messagePath, TargetOption, TargetBranch);
         repository.CommitStaged($"feat(registration): document private issue\n\nChange-Id: {embargoId}");
-        (int rangeEmbargoCode, string rangeEmbargoOutput) = repository.Run("preflight-range", TargetOption, TargetBranch, "--head", "HEAD");
+        (int rangeEmbargoCode, string rangeEmbargoOutput) = repository.Run(PreflightRangeCommand, TargetOption, TargetBranch, HeadOption, "HEAD");
 
         await Assert.That(stagedEmbargoCode).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(stagedEmbargoOutput).Contains("fragment_restricted_detail_marker");
@@ -180,8 +189,8 @@ public sealed class ChangeWorkflowCommandTests
     public async Task ThinCommitMsgHookAllowsInternalCommitsWithoutSkipTrailersAndBreakingInternalCommits()
     {
         using var repository = ChangeRepositoryFixture.Create();
-        repository.CreateBranch("feature");
-        repository.Git("config", "core.hooksPath", Path.Join(RepositoryRoot.Find(), ".githooks"));
+        repository.CreateBranch(FeatureBranch);
+        repository.Git(GitConfigCommand, HooksPathConfigKey, Path.Join(RepositoryRoot.Find(), ".githooks"));
 
         repository.CommitStaged("refactor(release): simplify internal release helpers");
         repository.CommitStaged("test(testing): add release policy coverage");
@@ -189,7 +198,7 @@ public sealed class ChangeWorkflowCommandTests
             "refactor(release)!: retire obsolete internal workflow\n\n" +
             "BREAKING CHANGE: Remove obsolete internal workflow without compatibility aliases.");
 
-        (int rangeCode, string rangeOutput) = repository.Run("preflight-range", TargetOption, TargetBranch, "--head", "HEAD");
+        (int rangeCode, string rangeOutput) = repository.Run(PreflightRangeCommand, TargetOption, TargetBranch, HeadOption, "HEAD");
         await Assert.That(rangeCode).IsEqualTo(Program.Success).Because(rangeOutput);
 
         InvalidOperationException? invalidRejection = null;
@@ -221,7 +230,7 @@ public sealed class ChangeWorkflowCommandTests
 
         await Assert.That(createCode).IsEqualTo(Program.Success).Because(createOutput);
         string created = createOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)[0].Split("id=", StringSplitOptions.None)[1].Split(' ')[0];
-        string fragmentPath = Path.Combine(repository.Path, "docs", "internal", "releases", "changes", created + ".yaml");
+        string fragmentPath = Path.Combine(repository.Path, "docs", "internal", "releases", ChangesFolderSegment, created + YamlExtension);
         string yaml = await File.ReadAllTextAsync(fragmentPath);
 
         await Assert.That(yaml).Contains("docs/internal/API_CHANGELOG.md");
@@ -249,7 +258,7 @@ public sealed class ChangeWorkflowCommandTests
         (int firstCode, string firstOutput) = repository.Run(HookInstallCommand, TargetOption, TargetBranch);
         (int secondCode, _) = repository.Run(HookInstallCommand, TargetOption, TargetBranch);
         string backup = preCommit + ".before-islamu-release";
-        string managedPreCommit = File.ReadAllText(preCommit);
+        string managedPreCommit = await File.ReadAllTextAsync(preCommit);
         await File.WriteAllTextAsync(preCommit, "#!/bin/sh\nexit 7\n");
         (int thirdCode, string thirdOutput) = repository.Run(HookInstallCommand, TargetOption, TargetBranch);
 
@@ -258,9 +267,9 @@ public sealed class ChangeWorkflowCommandTests
         await Assert.That(File.Exists(preCommit)).IsTrue();
         await Assert.That(File.Exists(commitMessage)).IsTrue();
         await Assert.That(File.Exists(backup)).IsTrue();
-        await Assert.That(File.ReadAllText(backup)).Contains("exit 0");
+        await Assert.That(await File.ReadAllTextAsync(backup)).Contains("exit 0");
         await Assert.That(managedPreCommit).Contains(backup);
-        await Assert.That(File.ReadAllText(commitMessage)).Contains("preflight-commit");
+        await Assert.That(await File.ReadAllTextAsync(commitMessage)).Contains(PreflightCommitCommand);
         await Assert.That(secondCode).IsEqualTo(Program.Success);
         await Assert.That(thirdCode).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(thirdOutput).Contains("change_hooks_failed: existing_hook_not_managed:pre-commit");
@@ -271,7 +280,7 @@ public sealed class ChangeWorkflowCommandTests
     public async Task HookInstallerUsesConfiguredHooksPath()
     {
         using var repository = ChangeRepositoryFixture.Create();
-        repository.Git("config", "core.hooksPath", ".configured-hooks");
+        repository.Git(GitConfigCommand, HooksPathConfigKey, ".configured-hooks");
 
         (int code, _) = repository.Run(HookInstallCommand, TargetOption, TargetBranch);
 
@@ -289,7 +298,7 @@ public sealed class ChangeWorkflowCommandTests
     public async Task ConfiguredMessageHookRejectsInvalidCommitBeforeRecordingIt(string trailers, string diagnostic)
     {
         using var repository = ChangeRepositoryFixture.Create();
-        repository.Git("config", "core.hooksPath", Path.Join(RepositoryRoot.Find(), ".githooks"));
+        repository.Git(GitConfigCommand, HooksPathConfigKey, Path.Join(RepositoryRoot.Find(), ".githooks"));
         string before = repository.Git(GitRevisionCommand, "HEAD").Trim();
         InvalidOperationException? rejection = null;
         try
@@ -311,8 +320,8 @@ public sealed class ChangeWorkflowCommandTests
     public async Task ConfiguredMessageHookAcceptsWhitespaceSeparatedAgentTrailers()
     {
         using var repository = ChangeRepositoryFixture.Create();
-        repository.CreateBranch("feature");
-        repository.Git("config", "core.hooksPath", Path.Join(RepositoryRoot.Find(), ".githooks"));
+        repository.CreateBranch(FeatureBranch);
+        repository.Git(GitConfigCommand, HooksPathConfigKey, Path.Join(RepositoryRoot.Find(), ".githooks"));
         repository.Git("-c", GitUserName, "-c", GitUserEmail,
             GitCommitCommand, "--allow-empty",
             "-m", "test(access): isolate committed cancellation observation",
@@ -320,7 +329,7 @@ public sealed class ChangeWorkflowCommandTests
             "-m", "Changelog: skip",
             "-m", "Changelog-Reason: Internal test isolation correction.");
 
-        (int code, _) = repository.Run("preflight-range", TargetOption, TargetBranch, "--head", "HEAD");
+        (int code, _) = repository.Run(PreflightRangeCommand, TargetOption, TargetBranch, HeadOption, "HEAD");
 
         await Assert.That(code).IsEqualTo(Program.Success);
     }
@@ -390,7 +399,7 @@ public sealed class ChangeWorkflowCommandTests
             Directory.CreateDirectory(path);
             var fixture = new ChangeRepositoryFixture(path);
             fixture.Git("init", $"--initial-branch={TargetBranch}");
-            Directory.CreateDirectory(System.IO.Path.Combine(path, "docs", "internal", "releases", "changes"));
+            Directory.CreateDirectory(System.IO.Path.Combine(path, "docs", "internal", "releases", ChangesFolderSegment));
             Directory.CreateDirectory(System.IO.Path.Combine(path, "eng", "release", "policy"));
             File.WriteAllText(
                 System.IO.Path.Combine(path, "eng", "release", "policy", "release-policy.yaml"),
@@ -415,7 +424,7 @@ public sealed class ChangeWorkflowCommandTests
 
         public void WriteFragment(string changeId) =>
             File.WriteAllText(
-                System.IO.Path.Combine(Path, "docs", "internal", "releases", "changes", changeId + ".yaml"),
+                System.IO.Path.Combine(Path, "docs", "internal", "releases", ChangesFolderSegment, changeId + YamlExtension),
                 FragmentYaml(changeId));
 
         public void CreateBranch(string name) => Git("switch", "-c", name);

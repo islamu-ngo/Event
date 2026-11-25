@@ -4,6 +4,8 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class ConfigurationManifestDifferTests
 {
+    private const string ConfigurationSchemaPath = "schemas/configuration-manifest-v1alpha2.schema.json";
+
     private static readonly string BaseOid = new('a', 40);
     private static readonly string HeadOid = new('b', 40);
 
@@ -93,8 +95,8 @@ public sealed class ConfigurationManifestDifferTests
             """;
 
         InMemoryGitObjectReader reader = new InMemoryGitObjectReader()
-            .AddCommit(BaseOid, new Dictionary<string, string> { ["schemas/configuration-manifest-v1alpha2.schema.json"] = baseSchema })
-            .AddCommit(HeadOid, new Dictionary<string, string> { ["schemas/configuration-manifest-v1alpha2.schema.json"] = headSchema });
+            .AddCommit(BaseOid, new Dictionary<string, string> { [ConfigurationSchemaPath] = baseSchema })
+            .AddCommit(HeadOid, new Dictionary<string, string> { [ConfigurationSchemaPath] = headSchema });
 
         ReleaseContractDiffResult first = ReleaseContractDiffPipeline.Default.Execute(reader, BaseOid, HeadOid);
         ReleaseContractDiffResult second = ReleaseContractDiffPipeline.Default.Execute(reader, BaseOid, HeadOid);
@@ -138,8 +140,8 @@ public sealed class ConfigurationManifestDifferTests
             """;
 
         InMemoryGitObjectReader reader = new InMemoryGitObjectReader()
-            .AddCommit(BaseOid, new Dictionary<string, string> { ["schemas/configuration-manifest-v1alpha2.schema.json"] = baseSchema })
-            .AddCommit(HeadOid, new Dictionary<string, string> { ["schemas/configuration-manifest-v1alpha2.schema.json"] = headSchema });
+            .AddCommit(BaseOid, new Dictionary<string, string> { [ConfigurationSchemaPath] = baseSchema })
+            .AddCommit(HeadOid, new Dictionary<string, string> { [ConfigurationSchemaPath] = headSchema });
 
         ReleaseContractDiffResult result = ReleaseContractDiffPipeline.Default.Execute(reader, BaseOid, HeadOid);
 

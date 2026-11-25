@@ -5,22 +5,25 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class ReleaseImpactScriptTests
 {
+    private const string BannerAssetPath = "assets/banner.png";
+    private const string ModifiedStatus = "modified";
+
     [Test]
     public async Task ImgBotModifiedAssetsDoNotRequireHumanChecklist()
     {
         ReleaseImpactEvaluationResult result = Evaluate("imgbot[bot]", "Bot", null, 1,
-            new ReleaseImpactChangedFile("assets/banner.png", ReleaseImpactFileChangeKind.Modified, null));
+            new ReleaseImpactChangedFile(BannerAssetPath, ReleaseImpactFileChangeKind.Modified, null));
 
         await Assert.That(result.IsValid).IsTrue();
     }
 
     [Test]
-    [Arguments("imgbot[bot]", "User", "assets/banner.png", "modified")]
-    [Arguments("untrusted[bot]", "Bot", "assets/banner.png", "modified")]
-    [Arguments("imgbot[bot]", "Bot", "src/page.svg", "modified")]
-    [Arguments("imgbot[bot]", "Bot", "assets/banner.png", "added")]
-    [Arguments("imgbot[bot]", "Bot", "assets/banner.png", "renamed")]
-    [Arguments("imgbot[bot]", "Bot", "assets/security.png", "modified")]
+    [Arguments("imgbot[bot]", "User", BannerAssetPath, ModifiedStatus)]
+    [Arguments("untrusted[bot]", "Bot", BannerAssetPath, ModifiedStatus)]
+    [Arguments("imgbot[bot]", "Bot", "src/page.svg", ModifiedStatus)]
+    [Arguments("imgbot[bot]", "Bot", BannerAssetPath, "added")]
+    [Arguments("imgbot[bot]", "Bot", BannerAssetPath, "renamed")]
+    [Arguments("imgbot[bot]", "Bot", "assets/security.png", ModifiedStatus)]
     public async Task AutomaticDispositionRequiresExactIdentityAndSafeModifiedAssets(
         string author, string accountType, string filename, string status)
     {
@@ -36,7 +39,7 @@ public sealed class ReleaseImpactScriptTests
     public async Task MissingOrIncompleteFilesCannotProveNoImpact(int expectedCount)
     {
         ReleaseImpactEvaluationResult result = EvaluateFromJson("contributor", "User", "## Release Impact\n- [x] Not applicable\n",
-            expectedCount, new { filename = "assets/banner.png", status = "modified" });
+            expectedCount, new { filename = BannerAssetPath, status = ModifiedStatus });
 
         await Assert.That(result.IsValid).IsFalse();
     }
@@ -45,7 +48,7 @@ public sealed class ReleaseImpactScriptTests
     public async Task RenameClassifiesBothOriginalAndCurrentPaths()
     {
         ReleaseImpactEvaluationResult result = EvaluateFromJson("contributor", "User", "## Release Impact\n- [x] Not applicable\n", 1,
-            new { filename = "assets/banner.png", status = "renamed", previous_filename = "src/security.cs" });
+            new { filename = BannerAssetPath, status = "renamed", previous_filename = "src/security.cs" });
 
         await Assert.That(result.IsValid).IsFalse();
     }
@@ -54,8 +57,8 @@ public sealed class ReleaseImpactScriptTests
     public async Task ImgBotMixedSourceAndImageChangesCannotReceiveAutomaticDisposition()
     {
         ReleaseImpactEvaluationResult result = EvaluateFromJson("imgbot[bot]", "Bot", null, 2,
-            new { filename = "assets/banner.png", status = "modified" },
-            new { filename = "src/security.cs", status = "modified" });
+            new { filename = BannerAssetPath, status = ModifiedStatus },
+            new { filename = "src/security.cs", status = ModifiedStatus });
 
         await Assert.That(result.IsValid).IsFalse();
     }
@@ -76,7 +79,7 @@ public sealed class ReleaseImpactScriptTests
     [Arguments("docs/OPERATIONS.md", "Operator/self-hosting/release-note impact documented")]
     public async Task EveryImpactCategoryRequiresItsOwnDisposition(string filename, string label)
     {
-        var metadata = new { filename, status = "modified" };
+        var metadata = new { filename, status = ModifiedStatus };
         ReleaseImpactEvaluationResult omitted = EvaluateFromJson("contributor", "User", "## Release Impact\n- [x] Not applicable\n", 1, metadata);
         ReleaseImpactEvaluationResult documented = EvaluateFromJson("contributor", "User",
             $"## Release Impact\n- [x] {label}\nDetails:\nReviewed release impact.\n", 1, metadata);
@@ -89,10 +92,10 @@ public sealed class ReleaseImpactScriptTests
     public async Task HumanNoImpactAndDocumentedSecurityDispositionsRemainValid()
     {
         ReleaseImpactEvaluationResult noImpact = EvaluateFromJson("contributor", "User", "## Release Impact\n- [x] Not applicable\n", 1,
-            new { filename = "assets/banner.png", status = "modified" });
+            new { filename = BannerAssetPath, status = ModifiedStatus });
         ReleaseImpactEvaluationResult security = EvaluateFromJson("contributor", "User",
             "## Release Impact\n- [x] Security/auth impact documented\nDetails:\nReviewed security change.\n", 1,
-            new { filename = "src/security.cs", status = "modified" });
+            new { filename = "src/security.cs", status = ModifiedStatus });
 
         await Assert.That(noImpact.IsValid).IsTrue();
         await Assert.That(security.IsValid).IsTrue();
@@ -107,7 +110,7 @@ public sealed class ReleaseImpactScriptTests
             .Select(index => (object)new
             {
                 filename = $"assets/reviewed-image-with-a-long-enough-name-to-exceed-environment-limits-{index}.png",
-                status = "modified",
+                status = ModifiedStatus,
             }).ToArray();
 
         ReleaseImpactEvaluationResult result = EvaluateFromJson("contributor", "User",

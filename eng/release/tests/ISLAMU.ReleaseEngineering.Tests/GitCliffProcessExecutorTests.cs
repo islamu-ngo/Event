@@ -5,6 +5,9 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class GitCliffProcessExecutorTests
 {
+    private const string SampleVersionTag = "v1.1.0";
+    private const string UntrustedToolDiagnostic = "git_cliff_tool_untrusted";
+
     [Test]
     public async Task RejectsDigestMismatchedExecutableWithoutExecutingIt()
     {
@@ -20,18 +23,18 @@ public sealed class GitCliffProcessExecutorTests
         var executor = new GitCliffProcessExecutor();
 
         GitCliffContextExportResult export = executor.ExportContext(new GitCliffContextExportRequest(
-            fixture.ToolConfiguration, fixture.WorkDir, "v1.1.0", "v1.0.0..HEAD"));
+            fixture.ToolConfiguration, fixture.WorkDir, SampleVersionTag, "v1.0.0..HEAD"));
         GitCliffRenderFromContextResult render = executor.RenderFromContext(new GitCliffRenderFromContextRequest(
             fixture.ToolConfiguration, fixture.WorkDir, "[]"));
         GitCliffBumpVersionResult bump = executor.SuggestBumpedVersion(new GitCliffBumpVersionRequest(
             fixture.ToolConfiguration, fixture.WorkDir, "v1.0.0..HEAD"));
 
         await Assert.That(export.IsValid).IsFalse();
-        await Assert.That(export.Diagnostic).IsEqualTo("git_cliff_tool_untrusted");
+        await Assert.That(export.Diagnostic).IsEqualTo(UntrustedToolDiagnostic);
         await Assert.That(render.IsValid).IsFalse();
-        await Assert.That(render.Diagnostic).IsEqualTo("git_cliff_tool_untrusted");
+        await Assert.That(render.Diagnostic).IsEqualTo(UntrustedToolDiagnostic);
         await Assert.That(bump.IsValid).IsFalse();
-        await Assert.That(bump.Diagnostic).IsEqualTo("git_cliff_tool_untrusted");
+        await Assert.That(bump.Diagnostic).IsEqualTo(UntrustedToolDiagnostic);
         await Assert.That(File.Exists(markerPath)).IsFalse();
     }
 
@@ -50,7 +53,7 @@ public sealed class GitCliffProcessExecutorTests
             new GitCliffBumpVersionRequest(fixture.ToolConfiguration, fixture.WorkDir, null));
 
         await Assert.That(bump.IsValid).IsFalse();
-        await Assert.That(bump.Diagnostic).IsEqualTo("git_cliff_tool_untrusted");
+        await Assert.That(bump.Diagnostic).IsEqualTo(UntrustedToolDiagnostic);
     }
 
     [Test]
@@ -76,20 +79,20 @@ public sealed class GitCliffProcessExecutorTests
 
         string maliciousRange = $"v1.0.0..HEAD;touch {injectionMarker}";
         GitCliffContextExportResult result = new GitCliffProcessExecutor().ExportContext(
-            new GitCliffContextExportRequest(fixture.ToolConfiguration, fixture.WorkDir, "v1.1.0", maliciousRange));
+            new GitCliffContextExportRequest(fixture.ToolConfiguration, fixture.WorkDir, SampleVersionTag, maliciousRange));
 
         await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "export");
         await Assert.That(File.Exists(injectionMarker)).IsFalse();
-        string[] capturedArgs = File.ReadAllLines(argsCapturePath);
+        string[] capturedArgs = await File.ReadAllLinesAsync(argsCapturePath);
         await Assert.That(capturedArgs).IsEquivalentTo([
             "--config", fixture.ConfigPath,
             "--offline",
             "--no-exec",
             "--context",
-            "--tag", "v1.1.0",
+            "--tag", SampleVersionTag,
             "--", maliciousRange,
         ]);
-        await Assert.That(File.ReadAllText(envCapturePath).Trim()).IsEqualTo("1");
+        await Assert.That((await File.ReadAllTextAsync(envCapturePath)).Trim()).IsEqualTo("1");
     }
 
     [Test]
@@ -134,7 +137,7 @@ public sealed class GitCliffProcessExecutorTests
 
         var bounded = new GitCliffProcessExecutor(maximumStdoutBytes: 128, maximumStderrBytes: 128);
         GitCliffContextExportResult stdoutExceeded = bounded.ExportContext(
-            new GitCliffContextExportRequest(fixture.ToolConfiguration, fixture.WorkDir, "v1.1.0", null));
+            new GitCliffContextExportRequest(fixture.ToolConfiguration, fixture.WorkDir, SampleVersionTag, null));
 
         await Assert.That(stdoutExceeded.IsValid).IsFalse();
         await Assert.That(stdoutExceeded.Diagnostic).IsEqualTo("git_cliff_output_limit_exceeded");
@@ -148,7 +151,7 @@ public sealed class GitCliffProcessExecutorTests
             updateLockDigest: true);
 
         GitCliffContextExportResult stderrExceeded = bounded.ExportContext(
-            new GitCliffContextExportRequest(fixture.ToolConfiguration, fixture.WorkDir, "v1.1.0", null));
+            new GitCliffContextExportRequest(fixture.ToolConfiguration, fixture.WorkDir, SampleVersionTag, null));
 
         await Assert.That(stderrExceeded.IsValid).IsFalse();
         await Assert.That(stderrExceeded.Diagnostic).IsEqualTo("git_cliff_output_limit_exceeded");

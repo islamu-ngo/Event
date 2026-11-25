@@ -5,6 +5,9 @@ namespace ISLAMU.ReleaseEngineering;
 
 public static class PrepareCommand
 {
+    private const string UnexpectedGeneratedFileDiagnostic = "prepare_generated_file_unexpected";
+    private const string RangeMovedDiagnostic = "prepare_release_range_moved";
+    private const string GitRevParseCommand = "rev-parse";
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     public static int Run(
@@ -27,163 +30,107 @@ public static class PrepareCommand
 
         try
         {
-            string root = ResolveDirectory(repositoryRoot);
-            if (!string.Equals(RunGit(root, "rev-parse", "--show-toplevel").Trim(), root, PathComparison))
-            {
-                return Reject(output, "prepare_repository_root_invalid");
-            }
+            return ExecutePreparedRelease(
+                output,
+                repositoryRoot,
+                releaseDirectoryArg!,
+                imageManifestPath,
+                platform,
+                timeout,
+                gitCliffExecutor ?? GitCliffProcessExecutor.Default,
+                gitObjectReader);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or DecoderFallbackException)
+        {
+            return Reject(output, "prepare_input_invalid");
+        }
+    }
 
-            string releaseDirectory = ResolveChild(root, releaseDirectoryArg!, mustExist: true);
-            string expectedReleaseParent = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases");
-            if (!string.Equals(Path.GetDirectoryName(releaseDirectory), expectedReleaseParent, PathComparison))
-            {
-                return Reject(output, "prepare_release_path_invalid");
-            }
+    private static int ExecutePreparedRelease(
+        TextWriter output,
+        string repositoryRoot,
+        string releaseDirectoryArg,
+        string? imageManifestPath,
+        string platform,
+        TimeSpan timeout,
+        IGitCliffExecutor executor,
+        IGitObjectReader? gitObjectReader)
+    {
+        string? layoutDiagnostic = ResolveAndLoadInputs(
+            repositoryRoot,
+            releaseDirectoryArg,
+            out string root,
+            out string releaseDirectory,
+            out string releaseYaml,
+            out byte[] summaryBytes,
+            out ReleaseDescriptor? descriptor);
+        if (layoutDiagnostic is not null)
+        {
+            return Reject(output, layoutDiagnostic);
+        }
 
-            string releasePath = ResolveChild(releaseDirectory, "release.yaml", mustExist: true);
-            string summaryPath = ResolveChild(releaseDirectory, "summary.md", mustExist: true);
-            string releaseYaml = ReadNormalizedText(releasePath);
-            byte[] summaryBytes = File.ReadAllBytes(summaryPath);
-            if (!IsValidSummary(summaryBytes))
-            {
-                return Reject(output, "prepare_summary_restricted");
-            }
+        string headOid = RunGit(root, GitRevParseCommand, "HEAD^{commit}").Trim();
+        string? pinnedDiagnostic = ValidatePinnedObjects(root, descriptor!, timeout, out GitTagVerificationResult? verifiedBaseline);
+        if (pinnedDiagnostic is not null)
+        {
+            return Reject(output, pinnedDiagnostic);
+        }
 
-            ReleaseInputValidationResult descriptorOnly = ReleaseInputPolicy.Validate(releaseYaml, [], []);
-            if (!descriptorOnly.IsValid || descriptorOnly.Descriptor is null)
-            {
-                return Reject(output, "prepare_release_input_invalid");
-            }
+        string? imageDiagnostic = LoadOptionalImageManifest(root, imageManifestPath, descriptor!.Version, headOid, out IReadOnlyList<EnrichedImageReference>? verifiedImages);
+        if (imageDiagnostic is not null)
+        {
+            return Reject(output, imageDiagnostic);
+        }
 
-            ReleaseDescriptor descriptor = descriptorOnly.Descriptor;
-            string headOid = RunGit(root, "rev-parse", "HEAD^{commit}").Trim();
-            string? pinnedObjectsDiagnostic = ValidatePinnedObjects(root, descriptor, timeout, out GitTagVerificationResult? verifiedBaseline);
-            if (pinnedObjectsDiagnostic is not null)
-            {
-                return Reject(output, pinnedObjectsDiagnostic);
-            }
+        string? rangeDiagnostic = LoadRangeAndFragments(
+            root,
+            descriptor,
+            timeout,
+            out IReadOnlyList<ReleaseCommit> commits,
+            out ReleasePolicy policy,
+            out string[] rangeOids,
+            out string[] omittedRangeOids,
+            out string[] fragments);
+        if (rangeDiagnostic is not null)
+        {
+            return Reject(output, rangeDiagnostic);
+        }
 
-            IReadOnlyList<EnrichedImageReference>? verifiedImages = null;
-            if (imageManifestPath is not null)
-            {
-                string resolvedManifest = Path.IsPathFullyQualified(imageManifestPath)
-                    ? imageManifestPath
-                    : Path.Combine(root, imageManifestPath);
-                ReleaseImageManifestLoadResult manifestResult = ReleaseImageManifest.LoadFromFile(
-                    resolvedManifest,
-                    descriptor.Version,
-                    expectedCommitOid: headOid);
-                if (!manifestResult.IsValid || manifestResult.Manifest is null)
-                {
-                    return Reject(output, manifestResult.Diagnostic ?? "image_manifest_invalid");
-                }
+        GitCliffToolConfiguration toolConfig = BuildToolConfiguration(root, platform, timeout);
+        string commitRange = $"{descriptor.PreviousPublishedTag}..HEAD";
+        string? bumpDiagnostic = RequestOptionalBumpEvidence(executor, toolConfig, root, descriptor, commitRange, out string? suggestedVersion);
+        if (bumpDiagnostic is not null)
+        {
+            return Reject(output, bumpDiagnostic);
+        }
 
-                verifiedImages = manifestResult.Manifest.Images;
-            }
+        ReleaseInputValidationResult input = ReleaseInputPolicy.Validate(releaseYaml, fragments, []);
+        ReleaseContextValidationResult context = ReleaseContextPolicy.Build(
+            input,
+            commits,
+            policy,
+            gitCliffSuggestedVersion: suggestedVersion,
+            verifiedBaselineRef: verifiedBaseline?.TagName,
+            verifiedBaselineOid: verifiedBaseline?.TargetCommitOid);
+        if (!context.IsValid || context.Json is null)
+        {
+            string contextDiagnostic = context.Diagnostics.Contains("context_git_cliff_bump_disagreement", StringComparer.Ordinal)
+                ? "context_git_cliff_bump_disagreement"
+                : "prepare_context_invalid";
+            return Reject(output, contextDiagnostic);
+        }
 
-            IReadOnlyList<ReleaseCommit> commits = GitTagSignatureVerifier.ReadCommitRange(root, descriptor.PreviousPublishedTag, "HEAD", timeout);
-            string[] rangeOids = commits.Select(commit => commit.Oid).ToArray();
-            ReleasePolicy policy = ReleasePolicy.LoadFromRepositoryRoot(root);
+        string? diffDiagnostic = ExecuteContractDiff(root, descriptor, headOid, timeout, gitObjectReader, out ReleaseContractDiffResult? contractDiff);
+        if (diffDiagnostic is not null)
+        {
+            return Reject(output, diffDiagnostic);
+        }
 
-            var evaluatedCommits = new List<(ReleaseCommit Commit, CommitPolicyResult Result)>(commits.Count);
-            foreach (ReleaseCommit commit in commits)
-            {
-                evaluatedCommits.Add((commit, policy.EvaluateCommit(commit.Message)));
-            }
-
-            string[] omittedRangeOids = evaluatedCommits
-                .Where(item => item.Result.IsValid && item.Result.ReleaseVisibility != ReleaseVisibility.Visible)
-                .Select(item => item.Commit.Oid)
-                .ToArray();
-
-            string[] linkedChangeIds = evaluatedCommits
-                .Select(item => item.Result.ChangeId)
-                .OfType<string>()
-                .Distinct(StringComparer.Ordinal)
-                .Order(StringComparer.Ordinal)
-                .ToArray();
-            string fragmentDirectory = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases", "changes");
-            string[] fragments = Directory.Exists(fragmentDirectory)
-                ? Directory.EnumerateFiles(fragmentDirectory, "*.yaml", SearchOption.TopDirectoryOnly)
-                    .Where(path => linkedChangeIds.Contains(Path.GetFileNameWithoutExtension(path), StringComparer.Ordinal))
-                    .Order(StringComparer.Ordinal)
-                    .Select(ReadNormalizedText)
-                    .ToArray()
-                : [];
-            if (fragments.Length != linkedChangeIds.Length)
-            {
-                return Reject(output, "prepare_fragment_missing");
-            }
-
-            string lockPath = Path.Combine(root, "eng", "release", "toolchain.lock.json");
-            string configPath = Path.Combine(root, "eng", "release", "cliff.toml");
-            string toolDirectory = GitCliffToolchainStore.ResolveConfiguredDirectory(
-                lockPath,
-                Environment.GetEnvironmentVariable(GitCliffToolchainStore.DefaultBundleEnvironmentVariable),
-                platform);
-            var toolConfig = new GitCliffToolConfiguration(lockPath, toolDirectory, configPath, platform, timeout);
-            string commitRange = $"{descriptor.PreviousPublishedTag}..HEAD";
-
-            IGitCliffExecutor executor = gitCliffExecutor ?? GitCliffProcessExecutor.Default;
-            string? suggestedVersion = null;
-            if (!descriptor.Version.Contains('-', StringComparison.Ordinal))
-            {
-                GitCliffBumpVersionResult bumpResult = executor.SuggestBumpedVersion(
-                    new GitCliffBumpVersionRequest(toolConfig, root, commitRange));
-                if (!bumpResult.IsValid || string.IsNullOrWhiteSpace(bumpResult.SuggestedVersion))
-                {
-                    return Reject(output, bumpResult.Diagnostic ?? "git_cliff_execution_failed");
-                }
-
-                suggestedVersion = bumpResult.SuggestedVersion;
-            }
-
-            ReleaseInputValidationResult input = ReleaseInputPolicy.Validate(releaseYaml, fragments, []);
-            ReleaseContextValidationResult context = ReleaseContextPolicy.Build(
-                input,
-                commits,
-                policy,
-                gitCliffSuggestedVersion: suggestedVersion,
-                verifiedBaselineRef: verifiedBaseline?.TagName,
-                verifiedBaselineOid: verifiedBaseline?.TargetCommitOid);
-            if (!context.IsValid || context.Json is null)
-            {
-                string diagnostic = context.Diagnostics.Contains("context_git_cliff_bump_disagreement", StringComparer.Ordinal)
-                    ? "context_git_cliff_bump_disagreement"
-                    : "prepare_context_invalid";
-                return Reject(output, diagnostic);
-            }
-
-            TimeSpan diffTimeout = timeout < TimeSpan.FromSeconds(15) ? TimeSpan.FromSeconds(15) : timeout;
-            IGitObjectReader objectReader = gitObjectReader ?? new GitProcessObjectReader(root, diffTimeout);
-            ReleaseContractDiffResult contractDiff = ReleaseContractDiffPipeline.Default.Execute(
-                objectReader,
-                descriptor.ReleaseRange.PreviousOid,
-                headOid);
-            if (!contractDiff.IsValid || contractDiff.Artifact is null || contractDiff.Json is null)
-            {
-                return Reject(output, contractDiff.Diagnostic ?? "prepare_contract_diff_failed");
-            }
-
-            string contextJson = context.Json;
-            byte[] contextBytes = StrictUtf8.GetBytes(contextJson);
-            byte[] contractDiffBytes = StrictUtf8.GetBytes(contractDiff.Json);
-            string contextPath = Path.Combine(releaseDirectory, "release-context.v1.json");
-            string contractDiffPath = Path.Combine(releaseDirectory, "contract-diff.v1.json");
-
-            if (File.Exists(contextPath) && !File.ReadAllBytes(contextPath).AsSpan().SequenceEqual(contextBytes))
-            {
-                return Reject(output, "prepare_generated_file_unexpected");
-            }
-
-            if (File.Exists(contractDiffPath) && !File.ReadAllBytes(contractDiffPath).AsSpan().SequenceEqual(contractDiffBytes))
-            {
-                return Reject(output, "prepare_generated_file_unexpected");
-            }
-
-            ReleasePreparationResult result = ReleasePreparation.Prepare(new ReleasePreparationRequest(
-                releaseDirectory,
+        return FinalizeAndWriteArtifacts(
+            output,
+            new FinalizationInputs(
                 root,
+                releaseDirectory,
                 input,
                 context,
                 summaryBytes,
@@ -192,29 +139,237 @@ public static class PrepareCommand
                 toolConfig,
                 executor,
                 commitRange,
-                contractDiff.Artifact,
+                contractDiff!,
                 verifiedImages));
-            if (!result.IsValid)
-            {
-                return Reject(output, result.Diagnostic!);
-            }
+    }
 
-            if (!File.Exists(contextPath))
-            {
-                WriteAtomic(contextPath, contextBytes);
-            }
+    private sealed record FinalizationInputs(
+        string Root,
+        string ReleaseDirectory,
+        ReleaseInputValidationResult Input,
+        ReleaseContextValidationResult Context,
+        byte[] SummaryBytes,
+        string[] RangeOids,
+        string[] OmittedRangeOids,
+        GitCliffToolConfiguration ToolConfig,
+        IGitCliffExecutor Executor,
+        string CommitRange,
+        ReleaseContractDiffResult ContractDiff,
+        IReadOnlyList<EnrichedImageReference>? VerifiedImages);
 
-            if (!File.Exists(contractDiffPath))
-            {
-                WriteAtomic(contractDiffPath, contractDiffBytes);
-            }
+    private static string? ResolveAndLoadInputs(
+        string repositoryRoot,
+        string releaseDirectoryArg,
+        out string root,
+        out string releaseDirectory,
+        out string releaseYaml,
+        out byte[] summaryBytes,
+        out ReleaseDescriptor? descriptor)
+    {
+        releaseDirectory = string.Empty;
+        releaseYaml = string.Empty;
+        summaryBytes = [];
+        descriptor = null;
 
-            output.Write(result.CommitMessage);
-            return Program.Success;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or DecoderFallbackException)
+        root = ResolveDirectory(repositoryRoot);
+        if (!string.Equals(RunGit(root, GitRevParseCommand, "--show-toplevel").Trim(), root, PathComparison))
         {
-            return Reject(output, "prepare_input_invalid");
+            return "prepare_repository_root_invalid";
+        }
+
+        releaseDirectory = ResolveChild(root, releaseDirectoryArg, mustExist: true);
+        string expectedReleaseParent = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases");
+        if (!string.Equals(Path.GetDirectoryName(releaseDirectory), expectedReleaseParent, PathComparison))
+        {
+            return "prepare_release_path_invalid";
+        }
+
+        releaseYaml = ReadNormalizedText(ResolveChild(releaseDirectory, "release.yaml", mustExist: true));
+        summaryBytes = File.ReadAllBytes(ResolveChild(releaseDirectory, "summary.md", mustExist: true));
+        if (!IsValidSummary(summaryBytes))
+        {
+            return "prepare_summary_restricted";
+        }
+
+        ReleaseInputValidationResult descriptorOnly = ReleaseInputPolicy.Validate(releaseYaml, [], []);
+        if (!descriptorOnly.IsValid || descriptorOnly.Descriptor is null)
+        {
+            return "prepare_release_input_invalid";
+        }
+
+        descriptor = descriptorOnly.Descriptor;
+        return null;
+    }
+
+    private static string? LoadOptionalImageManifest(
+        string root,
+        string? imageManifestPath,
+        string expectedVersion,
+        string headOid,
+        out IReadOnlyList<EnrichedImageReference>? verifiedImages)
+    {
+        verifiedImages = null;
+        if (imageManifestPath is null)
+        {
+            return null;
+        }
+
+        string resolvedManifest = Path.IsPathFullyQualified(imageManifestPath)
+            ? imageManifestPath
+            : Path.Combine(root, imageManifestPath);
+        ReleaseImageManifestLoadResult manifestResult = ReleaseImageManifest.LoadFromFile(
+            resolvedManifest,
+            expectedVersion,
+            expectedCommitOid: headOid);
+        if (!manifestResult.IsValid || manifestResult.Manifest is null)
+        {
+            return manifestResult.Diagnostic ?? "image_manifest_invalid";
+        }
+
+        verifiedImages = manifestResult.Manifest.Images;
+        return null;
+    }
+
+    private static string? LoadRangeAndFragments(
+        string root,
+        ReleaseDescriptor descriptor,
+        TimeSpan timeout,
+        out IReadOnlyList<ReleaseCommit> commits,
+        out ReleasePolicy policy,
+        out string[] rangeOids,
+        out string[] omittedRangeOids,
+        out string[] fragments)
+    {
+        commits = GitTagSignatureVerifier.ReadCommitRange(root, descriptor.PreviousPublishedTag, "HEAD", timeout);
+        rangeOids = commits.Select(commit => commit.Oid).ToArray();
+        ReleasePolicy loadedPolicy = ReleasePolicy.LoadFromRepositoryRoot(root);
+        policy = loadedPolicy;
+
+        (ReleaseCommit Commit, CommitPolicyResult Result)[] evaluatedCommits = commits
+            .Select(commit => (commit, loadedPolicy.EvaluateCommit(commit.Message)))
+            .ToArray();
+
+        omittedRangeOids = evaluatedCommits
+            .Where(item => item.Result.IsValid && item.Result.ReleaseVisibility != ReleaseVisibility.Visible)
+            .Select(item => item.Commit.Oid)
+            .ToArray();
+
+        string[] linkedChangeIds = evaluatedCommits
+            .Select(item => item.Result.ChangeId)
+            .OfType<string>()
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        string fragmentDirectory = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases", "changes");
+        fragments = Directory.Exists(fragmentDirectory)
+            ? Directory.EnumerateFiles(fragmentDirectory, "*.yaml", SearchOption.TopDirectoryOnly)
+                .Where(path => linkedChangeIds.Contains(Path.GetFileNameWithoutExtension(path), StringComparer.Ordinal))
+                .Order(StringComparer.Ordinal)
+                .Select(ReadNormalizedText)
+                .ToArray()
+            : [];
+
+        return fragments.Length == linkedChangeIds.Length ? null : "prepare_fragment_missing";
+    }
+
+    private static GitCliffToolConfiguration BuildToolConfiguration(string root, string platform, TimeSpan timeout)
+    {
+        string lockPath = Path.Combine(root, "eng", "release", "toolchain.lock.json");
+        string configPath = Path.Combine(root, "eng", "release", "cliff.toml");
+        string toolDirectory = GitCliffToolchainStore.ResolveConfiguredDirectory(
+            lockPath,
+            Environment.GetEnvironmentVariable(GitCliffToolchainStore.DefaultBundleEnvironmentVariable),
+            platform);
+        return new GitCliffToolConfiguration(lockPath, toolDirectory, configPath, platform, timeout);
+    }
+
+    private static string? RequestOptionalBumpEvidence(
+        IGitCliffExecutor executor,
+        GitCliffToolConfiguration toolConfig,
+        string root,
+        ReleaseDescriptor descriptor,
+        string commitRange,
+        out string? suggestedVersion)
+    {
+        suggestedVersion = null;
+        if (descriptor.Version.Contains('-', StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        GitCliffBumpVersionResult bumpResult = executor.SuggestBumpedVersion(
+            new GitCliffBumpVersionRequest(toolConfig, root, commitRange));
+        if (!bumpResult.IsValid || string.IsNullOrWhiteSpace(bumpResult.SuggestedVersion))
+        {
+            return bumpResult.Diagnostic ?? "git_cliff_execution_failed";
+        }
+
+        suggestedVersion = bumpResult.SuggestedVersion;
+        return null;
+    }
+
+    private static string? ExecuteContractDiff(
+        string root,
+        ReleaseDescriptor descriptor,
+        string headOid,
+        TimeSpan timeout,
+        IGitObjectReader? gitObjectReader,
+        out ReleaseContractDiffResult? contractDiff)
+    {
+        TimeSpan diffTimeout = timeout < TimeSpan.FromSeconds(15) ? TimeSpan.FromSeconds(15) : timeout;
+        IGitObjectReader objectReader = gitObjectReader ?? new GitProcessObjectReader(root, diffTimeout);
+        contractDiff = ReleaseContractDiffPipeline.Default.Execute(objectReader, descriptor.ReleaseRange.PreviousOid, headOid);
+        return !contractDiff.IsValid || contractDiff.Artifact is null || contractDiff.Json is null
+            ? contractDiff.Diagnostic ?? "prepare_contract_diff_failed"
+            : null;
+    }
+
+    private static int FinalizeAndWriteArtifacts(TextWriter output, FinalizationInputs inputs)
+    {
+        byte[] contextBytes = StrictUtf8.GetBytes(inputs.Context.Json!);
+        byte[] contractDiffBytes = StrictUtf8.GetBytes(inputs.ContractDiff.Json!);
+        string contextPath = Path.Combine(inputs.ReleaseDirectory, "release-context.v1.json");
+        string contractDiffPath = Path.Combine(inputs.ReleaseDirectory, "contract-diff.v1.json");
+
+        if (HasUnexpectedExistingContent(contextPath, contextBytes) ||
+            HasUnexpectedExistingContent(contractDiffPath, contractDiffBytes))
+        {
+            return Reject(output, UnexpectedGeneratedFileDiagnostic);
+        }
+
+        ReleasePreparationResult result = ReleasePreparation.Prepare(new ReleasePreparationRequest(
+            inputs.ReleaseDirectory,
+            inputs.Root,
+            inputs.Input,
+            inputs.Context,
+            inputs.SummaryBytes,
+            inputs.RangeOids,
+            inputs.OmittedRangeOids,
+            inputs.ToolConfig,
+            inputs.Executor,
+            inputs.CommitRange,
+            inputs.ContractDiff.Artifact,
+            inputs.VerifiedImages));
+        if (!result.IsValid)
+        {
+            return Reject(output, result.Diagnostic!);
+        }
+
+        WriteIfMissing(contextPath, contextBytes);
+        WriteIfMissing(contractDiffPath, contractDiffBytes);
+        output.Write(result.CommitMessage);
+        return Program.Success;
+    }
+
+    private static bool HasUnexpectedExistingContent(string path, byte[] expectedBytes) =>
+        File.Exists(path) && !File.ReadAllBytes(path).AsSpan().SequenceEqual(expectedBytes);
+
+    private static void WriteIfMissing(string path, byte[] bytes)
+    {
+        if (!File.Exists(path))
+        {
+            WriteAtomic(path, bytes);
         }
     }
 
@@ -256,46 +411,61 @@ public static class PrepareCommand
         verifiedBaseline = null;
         if (ReleaseInputPolicy.IsBaselineRef(descriptor.BaseStableTag) || ReleaseInputPolicy.IsBaselineRef(descriptor.PreviousPublishedTag))
         {
-            if (descriptor.BaseStableTag != descriptor.PreviousPublishedTag ||
-                descriptor.ReleaseRange.BaseRef != descriptor.BaseStableTag ||
-                descriptor.ReleaseRange.PreviousRef != descriptor.PreviousPublishedTag ||
-                descriptor.ReleaseRange.BaseOid != descriptor.ReleaseRange.PreviousOid)
-            {
-                return "prepare_release_range_moved";
-            }
-
-            string allowedSigners = GitTagSignatureVerifier.ResolveDefaultAllowedSignersPath(repositoryRoot);
-            GitTagVerificationResult baselineResult = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
-                repositoryRoot,
-                descriptor.BaseStableTag,
-                allowedSigners,
-                ExpectedTargetOid: descriptor.ReleaseRange.BaseOid,
-                Timeout: timeout));
-            if (!baselineResult.IsValid)
-            {
-                return baselineResult.Diagnostic ?? "prepare_baseline_tag_invalid";
-            }
-
-            verifiedBaseline = baselineResult;
-            GitReleaseValidationResult git = GitRepositoryValidator.Validate(new GitReleaseValidationRequest(
-                repositoryRoot,
-                descriptor.Line,
-                descriptor.Version,
-                $"refs/tags/{descriptor.BaseStableTag}",
-                $"refs/tags/{descriptor.PreviousPublishedTag}",
-                RunGit(repositoryRoot, "rev-parse", "HEAD^{commit}").Trim()));
-            return git.IsValid ? null : git.Diagnostics.Count == 0 ? "prepare_release_range_moved" : git.Diagnostics[0];
+            return ValidateSignedBaselineTag(repositoryRoot, descriptor, timeout, out verifiedBaseline);
         }
 
-        string baseOid = RunGit(repositoryRoot, "rev-parse", $"{descriptor.BaseStableTag}^{{commit}}").Trim();
-        string previousOid = RunGit(repositoryRoot, "rev-parse", $"{descriptor.PreviousPublishedTag}^{{commit}}").Trim();
-        string headOid = RunGit(repositoryRoot, "rev-parse", "HEAD^{commit}").Trim();
+        string baseOid = RunGit(repositoryRoot, GitRevParseCommand, $"{descriptor.BaseStableTag}^{{commit}}").Trim();
+        string previousOid = RunGit(repositoryRoot, GitRevParseCommand, $"{descriptor.PreviousPublishedTag}^{{commit}}").Trim();
+        string headOid = RunGit(repositoryRoot, GitRevParseCommand, "HEAD^{commit}").Trim();
 
         return string.Equals(descriptor.ReleaseRange.BaseOid, baseOid, StringComparison.Ordinal) &&
             string.Equals(descriptor.ReleaseRange.PreviousOid, previousOid, StringComparison.Ordinal) &&
             !string.Equals(headOid, previousOid, StringComparison.Ordinal)
             ? null
-            : "prepare_release_range_moved";
+            : RangeMovedDiagnostic;
+    }
+
+    private static string? ValidateSignedBaselineTag(
+        string repositoryRoot,
+        ReleaseDescriptor descriptor,
+        TimeSpan timeout,
+        out GitTagVerificationResult? verifiedBaseline)
+    {
+        verifiedBaseline = null;
+        if (descriptor.BaseStableTag != descriptor.PreviousPublishedTag ||
+            descriptor.ReleaseRange.BaseRef != descriptor.BaseStableTag ||
+            descriptor.ReleaseRange.PreviousRef != descriptor.PreviousPublishedTag ||
+            descriptor.ReleaseRange.BaseOid != descriptor.ReleaseRange.PreviousOid)
+        {
+            return RangeMovedDiagnostic;
+        }
+
+        string allowedSigners = GitTagSignatureVerifier.ResolveDefaultAllowedSignersPath(repositoryRoot);
+        GitTagVerificationResult baselineResult = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
+            repositoryRoot,
+            descriptor.BaseStableTag,
+            allowedSigners,
+            ExpectedTargetOid: descriptor.ReleaseRange.BaseOid,
+            Timeout: timeout));
+        if (!baselineResult.IsValid)
+        {
+            return baselineResult.Diagnostic ?? "prepare_baseline_tag_invalid";
+        }
+
+        verifiedBaseline = baselineResult;
+        GitReleaseValidationResult git = GitRepositoryValidator.Validate(new GitReleaseValidationRequest(
+            repositoryRoot,
+            descriptor.Line,
+            descriptor.Version,
+            $"refs/tags/{descriptor.BaseStableTag}",
+            $"refs/tags/{descriptor.PreviousPublishedTag}",
+            RunGit(repositoryRoot, GitRevParseCommand, "HEAD^{commit}").Trim()));
+        if (git.IsValid)
+        {
+            return null;
+        }
+
+        return git.Diagnostics.Count == 0 ? RangeMovedDiagnostic : git.Diagnostics[0];
     }
 
     private static bool IsValidSummary(byte[] bytes)

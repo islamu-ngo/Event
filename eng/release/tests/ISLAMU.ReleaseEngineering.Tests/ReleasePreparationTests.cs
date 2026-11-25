@@ -9,6 +9,10 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 [NotInParallel("ReleaseToolEnvironment")]
 public sealed class ReleasePreparationTests
 {
+    private const string SampleSummaryLine = "Attendees can now correct registration details.\n";
+    private const string SampleReleaseRelativePath = "docs/internal/releases/1.1.0";
+    private const string ReleaseFolderSegment = "release";
+
     private static readonly JsonSerializerOptions ContextJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -22,14 +26,14 @@ public sealed class ReleasePreparationTests
         using var fixture = new PreparationFixture();
 
         ReleasePreparationResult first = fixture.Prepare();
-        byte[] firstNotes = File.ReadAllBytes(fixture.NotesPath);
-        byte[] firstRenderContext = File.ReadAllBytes(fixture.RenderingContextPath);
+        byte[] firstNotes = await File.ReadAllBytesAsync(fixture.NotesPath);
+        byte[] firstRenderContext = await File.ReadAllBytesAsync(fixture.RenderingContextPath);
         ReleasePreparationResult second = fixture.Prepare();
 
         await Assert.That(first.IsValid).IsTrue().Because(first.Diagnostic ?? "first prepare");
         await Assert.That(second.IsValid).IsTrue().Because(second.Diagnostic ?? "second prepare");
-        await Assert.That(File.ReadAllBytes(fixture.NotesPath)).IsEquivalentTo(firstNotes);
-        await Assert.That(File.ReadAllBytes(fixture.RenderingContextPath)).IsEquivalentTo(firstRenderContext);
+        await Assert.That(await File.ReadAllBytesAsync(fixture.NotesPath)).IsEquivalentTo(firstNotes);
+        await Assert.That(await File.ReadAllBytesAsync(fixture.RenderingContextPath)).IsEquivalentTo(firstRenderContext);
         await Assert.That(Encoding.UTF8.GetString(firstNotes)).Contains("# Release 1.1.0");
         await Assert.That(Encoding.UTF8.GetString(firstNotes)).Contains("## Community Admin");
         await Assert.That(Encoding.UTF8.GetString(firstNotes)).Contains("## Self-Hoster / Operator");
@@ -72,10 +76,10 @@ public sealed class ReleasePreparationTests
         await Assert.That(File.Exists(fixture.RenderingContextPath)).IsFalse();
 
         fixture.RenderedMarkdownOverride = null;
-        File.WriteAllText(fixture.NotesPath, "unexpected\n");
+        await File.WriteAllTextAsync(fixture.NotesPath, "unexpected\n");
         ReleasePreparationResult collision = fixture.Prepare();
         await Assert.That(collision.Diagnostic).IsEqualTo("prepare_generated_file_unexpected");
-        await Assert.That(File.ReadAllText(fixture.NotesPath)).IsEqualTo("unexpected\n");
+        await Assert.That(await File.ReadAllTextAsync(fixture.NotesPath)).IsEqualTo("unexpected\n");
     }
 
     [Test]
@@ -133,7 +137,7 @@ public sealed class ReleasePreparationTests
                     .Append(new ReleaseContextObject(new string('c', 12), new string('c', 40))).ToArray(),
             },
         };
-        ReleaseContextValidationResult context = fixture.AsValidationResult(ordered);
+        ReleaseContextValidationResult context = PreparationFixture.AsValidationResult(ordered);
 
         ReleasePreparationResult result = fixture.Prepare(context: context, rangeOids: [new string('c', 40), secondOid]);
 
@@ -184,18 +188,18 @@ public sealed class ReleasePreparationTests
         using var fixture = new PreparationFixture();
 
         (int firstCode, string firstOutput, byte[] firstNotes) = fixture.RunCommand();
-        byte[] firstContext = File.ReadAllBytes(fixture.CommandContextPath);
-        byte[] firstRenderContext = File.ReadAllBytes(fixture.CommandRenderingContextPath);
-        byte[] firstContractDiff = File.ReadAllBytes(fixture.CommandContractDiffPath);
+        byte[] firstContext = await File.ReadAllBytesAsync(fixture.CommandContextPath);
+        byte[] firstRenderContext = await File.ReadAllBytesAsync(fixture.CommandRenderingContextPath);
+        byte[] firstContractDiff = await File.ReadAllBytesAsync(fixture.CommandContractDiffPath);
         (int secondCode, string secondOutput, byte[] secondNotes) = fixture.RunCommand();
 
         await Assert.That(firstCode).IsEqualTo(Program.Success).Because(firstOutput);
         await Assert.That(secondCode).IsEqualTo(Program.Success).Because(secondOutput);
         await Assert.That(secondOutput).IsEqualTo(firstOutput);
         await Assert.That(secondNotes).IsEquivalentTo(firstNotes);
-        await Assert.That(File.ReadAllBytes(fixture.CommandContextPath)).IsEquivalentTo(firstContext);
-        await Assert.That(File.ReadAllBytes(fixture.CommandRenderingContextPath)).IsEquivalentTo(firstRenderContext);
-        await Assert.That(File.ReadAllBytes(fixture.CommandContractDiffPath)).IsEquivalentTo(firstContractDiff);
+        await Assert.That(await File.ReadAllBytesAsync(fixture.CommandContextPath)).IsEquivalentTo(firstContext);
+        await Assert.That(await File.ReadAllBytesAsync(fixture.CommandRenderingContextPath)).IsEquivalentTo(firstRenderContext);
+        await Assert.That(await File.ReadAllBytesAsync(fixture.CommandContractDiffPath)).IsEquivalentTo(firstContractDiff);
         string notesText = Encoding.UTF8.GetString(firstNotes);
         await Assert.That(notesText).Contains("# Release 1.1.0");
         await Assert.That(notesText).Contains("## Community Admin");
@@ -252,7 +256,7 @@ public sealed class ReleasePreparationTests
         await Assert.That(acceptedNotes).IsNotEmpty();
         await Assert.That(File.Exists(accepted.CommandContextPath)).IsTrue();
         await Assert.That(File.Exists(accepted.CommandRenderingContextPath)).IsTrue();
-        await Assert.That(File.ReadAllText(accepted.CommandContextPath)).Contains("\"version\": \"0.1.0\"");
+        await Assert.That(await File.ReadAllTextAsync(accepted.CommandContextPath)).Contains("\"version\": \"0.1.0\"");
 
         await Assert.That(unsignedCode).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(unsignedOutput).Contains("tag_not_signed");
@@ -334,7 +338,7 @@ public sealed class ReleasePreparationTests
             NotesPath = Path.Combine(ReleaseDirectory, "release-notes.md");
             RenderingContextPath = Path.Combine(ReleaseDirectory, "release-rendering-context.v1.json");
             File.WriteAllText(ReleasePath, "Version: 1.1.0\n");
-            File.WriteAllText(SummaryPath, "Attendees can now correct registration details.\n");
+            File.WriteAllText(SummaryPath, SampleSummaryLine);
 
             Input = ValidInput();
             Context = ValidContext();
@@ -414,14 +418,14 @@ public sealed class ReleasePreparationTests
 
         public (int ExitCode, string Output, byte[] Notes) RunCommandWithExecutor(IGitCliffExecutor executor)
         {
-            string cliReleaseDirectory = EnsureCommandRepository("Attendees can now correct registration details.\n");
+            string cliReleaseDirectory = EnsureCommandRepository(SampleSummaryLine);
             SyncRepoToolFiles();
 
             return WithToolEnvironment(() =>
             {
                 using var output = new StringWriter();
                 int exitCode = PrepareCommand.Run(
-                    ["prepare", "docs/internal/releases/1.1.0"],
+                    ["prepare", SampleReleaseRelativePath],
                     output,
                     candidateRoot,
                     GitCliffToolchainStore.GetCurrentPlatform(),
@@ -434,15 +438,15 @@ public sealed class ReleasePreparationTests
 
         public (int ExitCode, string Output, byte[] Notes) RunCommand(string? imageManifestPath = null)
         {
-            string cliReleaseDirectory = EnsureCommandRepository("Attendees can now correct registration details.\n");
+            string cliReleaseDirectory = EnsureCommandRepository(SampleSummaryLine);
             SyncRepoToolFiles();
 
             return WithToolEnvironment(() =>
             {
                 using var output = new StringWriter();
                 string[] args = imageManifestPath is null
-                    ? ["prepare", "docs/internal/releases/1.1.0"]
-                    : ["prepare", "docs/internal/releases/1.1.0", "--image-manifest", imageManifestPath];
+                    ? ["prepare", SampleReleaseRelativePath]
+                    : ["prepare", SampleReleaseRelativePath, "--image-manifest", imageManifestPath];
                 int exitCode = PrepareCommand.Run(
                     args,
                     output,
@@ -483,7 +487,7 @@ public sealed class ReleasePreparationTests
             {
                 using var output = new StringWriter();
                 int exitCode = PrepareCommand.Run(
-                    ["prepare", "docs/internal/releases/1.1.0"],
+                    ["prepare", SampleReleaseRelativePath],
                     output,
                     candidateRoot,
                     GitCliffToolchainStore.GetCurrentPlatform(),
@@ -505,7 +509,7 @@ public sealed class ReleasePreparationTests
             return AsValidationResult(updated);
         }
 
-        public ReleaseContextValidationResult AsValidationResult(ReleaseContext context) =>
+        public static ReleaseContextValidationResult AsValidationResult(ReleaseContext context) =>
             new(true, context, JsonSerializer.Serialize(context, ContextJsonOptions) + "\n", []);
 
         private T WithToolEnvironment<T>(Func<T> action)
@@ -525,10 +529,10 @@ public sealed class ReleasePreparationTests
         private void SyncRepoToolFiles()
         {
             string sourceRoot = RepositoryRoot.Find();
-            string engRelease = Path.Combine(candidateRoot, "eng", "release");
+            string engRelease = Path.Combine(candidateRoot, "eng", ReleaseFolderSegment);
             Directory.CreateDirectory(engRelease);
-            File.Copy(Path.Combine(sourceRoot, "eng", "release", "toolchain.lock.json"), Path.Combine(engRelease, "toolchain.lock.json"), overwrite: true);
-            File.Copy(Path.Combine(sourceRoot, "eng", "release", "cliff.toml"), Path.Combine(engRelease, "cliff.toml"), overwrite: true);
+            File.Copy(Path.Combine(sourceRoot, "eng", ReleaseFolderSegment, "toolchain.lock.json"), Path.Combine(engRelease, "toolchain.lock.json"), overwrite: true);
+            File.Copy(Path.Combine(sourceRoot, "eng", ReleaseFolderSegment, "cliff.toml"), Path.Combine(engRelease, "cliff.toml"), overwrite: true);
         }
 
         private void CreateSigningKey()
@@ -598,7 +602,7 @@ public sealed class ReleasePreparationTests
             CommandContractDiffPath = Path.Combine(cliReleaseDirectory, "contract-diff.v1.json");
             File.WriteAllText(Path.Combine(cliReleaseDirectory, "release.yaml"),
                 $"Version: {version}\nLine: {line}\nRelease-Date: 2026-08-14\nBase-Stable-Tag: {baselineRef}\nPrevious-Published-Tag: {baselineRef}\nRelease-Range:\n  Base-Ref: {baselineRef}\n  Base-Oid: {baselineOid}\n  Previous-Ref: {baselineRef}\n  Previous-Oid: {baselineOid}\nCompatibility:\n  - v1\nImpact-Dispositions:\n  breaking: not-applicable\n  security: not-applicable\n  migration: not-applicable\n  configuration: not-applicable\n  openapi: not-applicable\n  operator: documented\n");
-            File.WriteAllText(Path.Combine(cliReleaseDirectory, "summary.md"), "Attendees can now correct registration details.\n");
+            File.WriteAllText(Path.Combine(cliReleaseDirectory, "summary.md"), SampleSummaryLine);
             File.WriteAllText(Path.Combine(candidateRoot, "docs", "internal", "releases", "changes", "CHG-2026-0001.yaml"), SampleFragmentYaml);
             return cliReleaseDirectory;
         }
@@ -606,14 +610,14 @@ public sealed class ReleasePreparationTests
         private void WritePolicyFiles()
         {
             string sourceRoot = RepositoryRoot.Find();
-            Directory.CreateDirectory(Path.Combine(candidateRoot, "eng", "release", "policy"));
+            Directory.CreateDirectory(Path.Combine(candidateRoot, "eng", ReleaseFolderSegment, "policy"));
             File.Copy(
-                Path.Combine(sourceRoot, "eng", "release", "policy", "release-policy.yaml"),
-                Path.Combine(candidateRoot, "eng", "release", "policy", "release-policy.yaml"),
+                Path.Combine(sourceRoot, "eng", ReleaseFolderSegment, "policy", "release-policy.yaml"),
+                Path.Combine(candidateRoot, "eng", ReleaseFolderSegment, "policy", "release-policy.yaml"),
                 overwrite: true);
             File.Copy(
-                Path.Combine(sourceRoot, "eng", "release", "policy", "scope-registry.yaml"),
-                Path.Combine(candidateRoot, "eng", "release", "policy", "scope-registry.yaml"),
+                Path.Combine(sourceRoot, "eng", ReleaseFolderSegment, "policy", "scope-registry.yaml"),
+                Path.Combine(candidateRoot, "eng", ReleaseFolderSegment, "policy", "scope-registry.yaml"),
                 overwrite: true);
         }
 

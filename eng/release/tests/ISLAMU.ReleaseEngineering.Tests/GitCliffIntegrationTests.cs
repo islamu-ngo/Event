@@ -6,6 +6,13 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class GitCliffIntegrationTests
 {
+    private const string InitialTag = "v0.1.0";
+    private const string CommitsField = "commits";
+    private const string CliffConfigFileName = "cliff.toml";
+    private const string ReleaseFolderSegment = "release";
+    private const string GitUserNameConfig = "user.name=Release Test";
+    private const string GitUserEmailConfig = "user.email=release@example.invalid";
+
     [Test]
     public async Task RealBinaryExportsContextAndSuggestsInitialTagForRootInclusiveFirstRelease()
     {
@@ -17,7 +24,7 @@ public sealed class GitCliffIntegrationTests
         var executor = new GitCliffProcessExecutor();
 
         GitCliffContextExportResult exported = executor.ExportContext(
-            new GitCliffContextExportRequest(tool, repo.Root, "v0.1.0", CommitRange: null));
+            new GitCliffContextExportRequest(tool, repo.Root, InitialTag, CommitRange: null));
         GitCliffBumpVersionResult bumped = executor.SuggestBumpedVersion(
             new GitCliffBumpVersionRequest(tool, repo.Root, CommitRange: null));
 
@@ -26,9 +33,9 @@ public sealed class GitCliffIntegrationTests
         await Assert.That(doc.RootElement.ValueKind).IsEqualTo(JsonValueKind.Array);
         await Assert.That(doc.RootElement.GetArrayLength()).IsEqualTo(1);
         JsonElement release = doc.RootElement[0];
-        await Assert.That(release.GetProperty("version").GetString()).IsEqualTo("v0.1.0");
-        await Assert.That(release.GetProperty("commits").GetArrayLength()).IsEqualTo(1);
-        await Assert.That(release.GetProperty("commits")[0].GetProperty("id").GetString()).IsEqualTo(firstOid);
+        await Assert.That(release.GetProperty("version").GetString()).IsEqualTo(InitialTag);
+        await Assert.That(release.GetProperty(CommitsField).GetArrayLength()).IsEqualTo(1);
+        await Assert.That(release.GetProperty(CommitsField)[0].GetProperty("id").GetString()).IsEqualTo(firstOid);
 
         await Assert.That(bumped.IsValid).IsTrue().Because(bumped.Diagnostic ?? "bump");
         await Assert.That(bumped.SuggestedVersion).IsEqualTo("0.1.0");
@@ -54,7 +61,7 @@ public sealed class GitCliffIntegrationTests
         await Assert.That(exported.IsValid).IsTrue().Because(exported.Diagnostic ?? "export");
         using JsonDocument doc = JsonDocument.Parse(exported.RawContextJson!);
         await Assert.That(doc.RootElement.GetArrayLength()).IsEqualTo(1);
-        JsonElement commits = doc.RootElement[0].GetProperty("commits");
+        JsonElement commits = doc.RootElement[0].GetProperty(CommitsField);
         await Assert.That(commits.GetArrayLength()).IsEqualTo(1);
         await Assert.That(commits[0].GetProperty("id").GetString()).IsEqualTo(headOid);
 
@@ -115,7 +122,7 @@ public sealed class GitCliffIntegrationTests
     public async Task SharedCommitCorpusMatchesCSharpCommitPolicyAndRealGitCliffBinary()
     {
         ReleasePolicy policy = ReleasePolicy.LoadFromRepositoryRoot(RepositoryRoot.Find());
-        string repoCliffConfig = Path.Combine(RepositoryRoot.Find(), "eng", "release", "cliff.toml");
+        string repoCliffConfig = Path.Combine(RepositoryRoot.Find(), "eng", ReleaseFolderSegment, CliffConfigFileName);
         GitCliffToolConfiguration tool = CreateVerifiedToolConfiguration(repoCliffConfig);
         var executor = new GitCliffProcessExecutor();
 
@@ -170,12 +177,12 @@ public sealed class GitCliffIntegrationTests
         expectedOmittedOrSkipped.Add(mergeOid);
 
         GitCliffContextExportResult exported = executor.ExportContext(
-            new GitCliffContextExportRequest(tool, repo.Root, "v0.1.0", CommitRange: null));
+            new GitCliffContextExportRequest(tool, repo.Root, InitialTag, CommitRange: null));
         await Assert.That(exported.IsValid).IsTrue().Because(exported.Diagnostic ?? "export");
 
         using JsonDocument doc = JsonDocument.Parse(exported.RawContextJson!);
         await Assert.That(doc.RootElement.GetArrayLength()).IsEqualTo(1);
-        JsonElement commits = doc.RootElement[0].GetProperty("commits");
+        JsonElement commits = doc.RootElement[0].GetProperty(CommitsField);
 
         var actualVisible = new Dictionary<string, (string Group, bool Breaking, string Scope)>(StringComparer.Ordinal);
         foreach (JsonElement commit in commits.EnumerateArray())
@@ -208,7 +215,7 @@ public sealed class GitCliffIntegrationTests
     public async Task InvalidOrUnmatchedCommitsAreRejectedByBothCSharpPolicyAndRealGitCliff(string invalidMessage)
     {
         ReleasePolicy policy = ReleasePolicy.LoadFromRepositoryRoot(RepositoryRoot.Find());
-        string repoCliffConfig = Path.Combine(RepositoryRoot.Find(), "eng", "release", "cliff.toml");
+        string repoCliffConfig = Path.Combine(RepositoryRoot.Find(), "eng", ReleaseFolderSegment, CliffConfigFileName);
         GitCliffToolConfiguration tool = CreateVerifiedToolConfiguration(repoCliffConfig);
 
         CommitPolicyResult csharp = policy.EvaluateCommit(invalidMessage);
@@ -217,7 +224,7 @@ public sealed class GitCliffIntegrationTests
         using var repo = new TemporaryGitRepository();
         repo.Commit(invalidMessage);
         GitCliffContextExportResult cliff = new GitCliffProcessExecutor().ExportContext(
-            new GitCliffContextExportRequest(tool, repo.Root, "v0.1.0", CommitRange: null));
+            new GitCliffContextExportRequest(tool, repo.Root, InitialTag, CommitRange: null));
 
         await Assert.That(cliff.IsValid).IsFalse();
         await Assert.That(cliff.Diagnostic).IsEqualTo("git_cliff_exit_nonzero");
@@ -226,7 +233,7 @@ public sealed class GitCliffIntegrationTests
     [Test]
     public async Task RealBinaryMatchesCSharpSemVerBumpRulesAcrossZeroXPostOneAndInternalOnlyRanges()
     {
-        string repoCliffConfig = Path.Combine(RepositoryRoot.Find(), "eng", "release", "cliff.toml");
+        string repoCliffConfig = Path.Combine(RepositoryRoot.Find(), "eng", ReleaseFolderSegment, CliffConfigFileName);
         GitCliffToolConfiguration tool = CreateVerifiedToolConfiguration(repoCliffConfig);
         var executor = new GitCliffProcessExecutor();
 
@@ -288,13 +295,13 @@ public sealed class GitCliffIntegrationTests
 
         string releaseDir = Path.Combine(repo.Root, "docs", "internal", "releases", "1.1.0");
         Directory.CreateDirectory(releaseDir);
-        File.WriteAllText(
+        await File.WriteAllTextAsync(
             Path.Combine(releaseDir, "release.yaml"),
             $"Version: 1.1.0\nLine: v1.1\nRelease-Date: 2026-11-24\nBase-Stable-Tag: v1.0.0\nPrevious-Published-Tag: v1.0.0\nRelease-Range:\n  Base-Ref: v1.0.0\n  Base-Oid: {baseOid}\n  Previous-Ref: v1.0.0\n  Previous-Oid: {baseOid}\nCompatibility:\n  - v1\nImpact-Dispositions:\n  breaking: not-applicable\n  security: not-applicable\n  migration: not-applicable\n  configuration: not-applicable\n  openapi: not-applicable\n  operator: not-applicable\n");
-        File.WriteAllText(Path.Combine(releaseDir, "summary.md"), "Featured events are now highlighted across discovery surfaces.\n");
+        await File.WriteAllTextAsync(Path.Combine(releaseDir, "summary.md"), "Featured events are now highlighted across discovery surfaces.\n");
 
         string imageManifestPath = Path.Combine(repo.Root, "release-images.v1.json");
-        File.WriteAllText(imageManifestPath, ReleaseImageManifestTests.ValidManifestJson("1.1.0", headOid));
+        await File.WriteAllTextAsync(imageManifestPath, ReleaseImageManifestTests.ValidManifestJson("1.1.0", headOid));
 
         using var out1 = new StringWriter();
         int firstCode = PrepareCommand.Run(
@@ -349,7 +356,7 @@ public sealed class GitCliffIntegrationTests
     private static GitCliffToolConfiguration CreateVerifiedToolConfiguration(string configPath)
     {
         string repoRoot = RepositoryRoot.Find();
-        string lockPath = Path.Combine(repoRoot, "eng", "release", "toolchain.lock.json");
+        string lockPath = Path.Combine(repoRoot, "eng", ReleaseFolderSegment, "toolchain.lock.json");
         string platform = GitCliffToolchainStore.GetCurrentPlatform();
         string toolDirectory = GitCliffToolchainStore.ResolveConfiguredDirectory(
             lockPath,
@@ -416,7 +423,7 @@ public sealed class GitCliffIntegrationTests
 
         public string WriteCliffConfig(string toml)
         {
-            string path = Path.Combine(Root, "cliff.toml");
+            string path = Path.Combine(Root, CliffConfigFileName);
             File.WriteAllText(path, toml);
             return path;
         }
@@ -427,7 +434,7 @@ public sealed class GitCliffIntegrationTests
             string file = Path.Combine(Root, $"change-{sequence}.txt");
             File.WriteAllText(file, $"change {sequence}\n");
             Git("add", file);
-            Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "commit", "-q", "-m", message);
+            Git("-c", GitUserNameConfig, "-c", GitUserEmailConfig, "commit", "-q", "-m", message);
             return Git("rev-parse", "HEAD^{commit}").Trim();
         }
 
@@ -449,12 +456,12 @@ public sealed class GitCliffIntegrationTests
         public string CommitAll(string message)
         {
             Git("add", "-A");
-            Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "commit", "-q", "-m", message);
+            Git("-c", GitUserNameConfig, "-c", GitUserEmailConfig, "commit", "-q", "-m", message);
             return Git("rev-parse", "HEAD^{commit}").Trim();
         }
 
         public void TagAnnotated(string name, string target) =>
-            Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "tag", "-a", name, target, "-m", name);
+            Git("-c", GitUserNameConfig, "-c", GitUserEmailConfig, "tag", "-a", name, target, "-m", name);
 
         public string HeadOid() => Git("rev-parse", "HEAD^{commit}").Trim();
 
@@ -463,7 +470,7 @@ public sealed class GitCliffIntegrationTests
             Git("checkout", "-q", "-b", "side-branch");
             string sideOid = Commit(sideMessage);
             Git("checkout", "-q", "main");
-            Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "merge", "-q", "--no-ff", "side-branch", "-m", mergeMessage);
+            Git("-c", GitUserNameConfig, "-c", GitUserEmailConfig, "merge", "-q", "--no-ff", "side-branch", "-m", mergeMessage);
             return sideOid;
         }
 

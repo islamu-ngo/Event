@@ -236,7 +236,7 @@ public sealed class GitProcessObjectReader : IGitObjectReader
                     return new StreamReadResult(null, LimitExceeded: true);
                 }
 
-                buffer.Write(chunk, 0, read);
+                await buffer.WriteAsync(chunk.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (overflowSource.IsCancellationRequested)
@@ -247,27 +247,13 @@ public sealed class GitProcessObjectReader : IGitObjectReader
         return new StreamReadResult(buffer.ToArray(), LimitExceeded: false);
     }
 
-    private static bool IsSafeRepositoryPath(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path) ||
-            path.StartsWith('/') ||
-            path.StartsWith('-') ||
-            path.Contains('\\', StringComparison.Ordinal) ||
-            path.Any(char.IsControl))
-        {
-            return false;
-        }
-
-        foreach (string segment in path.Split('/'))
-        {
-            if (segment is "" or "." or "..")
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
+    private static bool IsSafeRepositoryPath(string path) =>
+        !string.IsNullOrWhiteSpace(path) &&
+        !path.StartsWith('/') &&
+        !path.StartsWith('-') &&
+        !path.Contains('\\', StringComparison.Ordinal) &&
+        !path.Any(char.IsControl) &&
+        path.Split('/').All(segment => segment is not ("" or "." or ".."));
 
     private static void KillSafely(Process process)
     {

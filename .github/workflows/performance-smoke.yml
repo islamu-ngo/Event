@@ -105,26 +105,27 @@ jobs:
           export DOTNET_ENVIRONMENT=Testing
           export ASPNETCORE_ENVIRONMENT=Testing
 
+          export_ephemeral_var() {
+            local var_name="$1"
+            local var_value="$2"
+            printf '::add-mask::%s\n' "$var_value"
+            export "$var_name=$var_value"
+          }
+
           for purpose in \
             RUNTIME MIGRATOR GLOBAL INSTANCE_KEY_READ INSTANCE_KEY_WRITE \
             INSTANCE_KEY_ISSUANCE PLATFORM_KEY_REPORT \
             EMAIL_POLICY_INSTANCE_MUTATION EMAIL_POLICY_TENANT_MUTATION \
             LOCAL_IDENTITY_WRITER; do
-            username="bench_$(openssl rand -hex 12)"
-            password="$(openssl rand -base64 48 | tr -d '\n')"
-            printf '::add-mask::%s\n' "$username"
-            printf '::add-mask::%s\n' "$password"
-            export "DATABASE_${purpose}_USERNAME=$username"
-            export "DATABASE_${purpose}_PASSWORD=$password"
+            export_ephemeral_var "DATABASE_${purpose}_USERNAME" "bench_$(openssl rand -hex 12)"
+            export_ephemeral_var "DATABASE_${purpose}_PASSWORD" "$(openssl rand -base64 48 | tr -d '\n')"
           done
 
           for key in \
             INSTANCE_BOOTSTRAP_LOCAL_PASSWORD \
             ISLAMU_TEST_REPLACEMENT_PASSWORD \
             AUTHENTICATION_LOCAL_JWT_KEY; do
-            secret_value="$(openssl rand -base64 48 | tr -d '\n')"
-            printf '::add-mask::%s\n' "$secret_value"
-            export "$key=$secret_value"
+            export_ephemeral_var "$key" "$(openssl rand -base64 48 | tr -d '\n')"
           done
 
           dotnet run --project tests/Event.Benchmarks/Event.Benchmarks.csproj \

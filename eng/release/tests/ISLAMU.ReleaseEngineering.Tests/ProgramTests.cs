@@ -6,6 +6,8 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class ProgramTests
 {
+    private const string ExpectedGitCliffVersionBanner = "git-cliff 2.14.2";
+
     [Test]
     public async Task VerifyToolsRejectsMissingLock()
     {
@@ -21,7 +23,7 @@ public sealed class ProgramTests
     public async Task VerifyToolsRejectsMalformedLock()
     {
         using var fixture = new ToolFixture();
-        File.WriteAllText(fixture.LockPath, "{");
+        await File.WriteAllTextAsync(fixture.LockPath, "{");
 
         (int exitCode, string output) = fixture.Run();
 
@@ -33,7 +35,7 @@ public sealed class ProgramTests
     public async Task VerifyToolsRejectsUnsupportedSchema()
     {
         using var fixture = new ToolFixture();
-        fixture.WriteExecutable("git-cliff 2.14.2");
+        fixture.WriteExecutable(ExpectedGitCliffVersionBanner);
         fixture.WriteLock(schemaVersion: 2);
 
         (int exitCode, string output) = fixture.Run();
@@ -82,7 +84,7 @@ public sealed class ProgramTests
     public async Task VerifyToolsRejectsWrongDigest()
     {
         using var fixture = new ToolFixture();
-        fixture.WriteExecutable("git-cliff 2.14.2");
+        fixture.WriteExecutable(ExpectedGitCliffVersionBanner);
         fixture.WriteLock(new string('0', 64));
 
         (int exitCode, string output) = fixture.Run();
@@ -126,7 +128,7 @@ public sealed class ProgramTests
         }
 
         using var fixture = new ToolFixture();
-        string digest = fixture.WriteExecutable("git-cliff 2.14.2", delaySeconds: 10);
+        string digest = fixture.WriteExecutable(ExpectedGitCliffVersionBanner, delaySeconds: 10);
         fixture.WriteLock(digest);
 
         (int exitCode, string output) = fixture.Run(timeout: TimeSpan.FromMilliseconds(100));
@@ -162,7 +164,7 @@ public sealed class ProgramTests
         }
 
         using var fixture = new ToolFixture();
-        string digest = fixture.WriteExecutable("git-cliff 2.14.2");
+        string digest = fixture.WriteExecutable(ExpectedGitCliffVersionBanner);
         fixture.WriteLock(digest);
 
         (int exitCode, string output) = fixture.Run();
@@ -239,10 +241,10 @@ public sealed class ProgramTests
         try
         {
             RunProcess(ReleaseToolPaths.SshKeygen, tempRoot, "-q", "-t", "ed25519", "-N", string.Empty, "-C", "cli-test", "-f", keyPath);
-            string pub = string.Join(' ', File.ReadAllText(keyPath + ".pub").Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2));
-            File.WriteAllText(allowedSigners, $"release-operator namespaces=\"git\" {pub}\n");
+            string pub = string.Join(' ', (await File.ReadAllTextAsync(keyPath + ".pub")).Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2));
+            await File.WriteAllTextAsync(allowedSigners, $"release-operator namespaces=\"git\" {pub}\n");
             RunProcess(ReleaseToolPaths.Git, repoRoot, "init", "--initial-branch=main");
-            File.WriteAllText(Path.Combine(repoRoot, "README.md"), "hello\n");
+            await File.WriteAllTextAsync(Path.Combine(repoRoot, "README.md"), "hello\n");
             RunProcess(ReleaseToolPaths.Git, repoRoot, "add", "README.md");
             RunProcess(ReleaseToolPaths.Git, repoRoot, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", "feat(events): init");
             string commit = RunProcess(ReleaseToolPaths.Git, repoRoot, "rev-parse", "HEAD^{commit}").Trim();

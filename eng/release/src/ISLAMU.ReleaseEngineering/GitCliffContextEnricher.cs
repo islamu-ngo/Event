@@ -93,6 +93,24 @@ public sealed record AllowlistedReleaseExtra(
 /// </summary>
 public static class GitCliffContextEnricher
 {
+    private static class Diagnostics
+    {
+        public const string ReleaseInputInvalid = "enricher_release_input_invalid";
+        public const string AuthorityContextInvalid = "enricher_authority_context_invalid";
+        public const string NativeContextInvalid = "enricher_native_context_invalid";
+        public const string FragmentRestricted = "enricher_fragment_embargo_or_restricted";
+        public const string SummaryRestricted = "enricher_summary_restricted";
+        public const string VersionMismatch = "enricher_version_mismatch";
+        public const string RangeMismatch = "enricher_range_mismatch";
+        public const string PreviousVersionMismatch = "enricher_previous_version_mismatch";
+        public const string DuplicateNativeCommit = "enricher_duplicate_native_commit";
+        public const string VisibleCommitSetMismatch = "enricher_visible_commit_set_mismatch";
+        public const string BreakingFlagMismatch = "enricher_breaking_flag_mismatch";
+        public const string CommitTextRestricted = "enricher_commit_text_restricted";
+        public const string OmittedCommitSetMismatch = "enricher_omitted_commit_set_mismatch";
+        public const string ImageManifestInvalid = "enricher_image_manifest_invalid";
+    }
+
     private static readonly string[] ImpactCategoryOrder =
     [
         "breaking",
@@ -119,362 +137,419 @@ public static class GitCliffContextEnricher
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (request.Input is null || !request.Input.IsValid || request.Input.Descriptor is null)
+        string? preconditionError = ValidatePreconditions(request, out string sanitizedSummary);
+        if (preconditionError is not null)
         {
-            return Invalid("enricher_release_input_invalid");
+            return Invalid(preconditionError);
         }
 
-        if (request.AuthorityContext is null || !request.AuthorityContext.IsValid || request.AuthorityContext.Context is null)
+        if (!TryParseSingleNativeRelease(request.RawNativeContextJson, out JsonDocument? document, out JsonElement nativeRelease, out JsonElement nativeCommitsEl))
         {
-            return Invalid("enricher_authority_context_invalid");
+            return Invalid(Diagnostics.NativeContextInvalid);
         }
 
-        if (string.IsNullOrWhiteSpace(request.RawNativeContextJson))
+        using (document!)
         {
-            return Invalid("enricher_native_context_invalid");
-        }
-
-        ReleaseDescriptor descriptor = request.Input.Descriptor;
-        ReleaseContext authority = request.AuthorityContext.Context;
-
-        if (!ValidateFragmentsArePublicSafe(request.Input.Fragments))
-        {
-            return Invalid("enricher_fragment_embargo_or_restricted");
-        }
-
-        if (!TrySanitizeText(request.MaintainerSummary, allowMultiline: true, out string sanitizedSummary))
-        {
-            return Invalid("enricher_summary_restricted");
-        }
-
-        JsonDocument doc;
-        try
-        {
-            doc = JsonDocument.Parse(request.RawNativeContextJson, new JsonDocumentOptions { MaxDepth = 64 });
-        }
-        catch (JsonException)
-        {
-            return Invalid("enricher_native_context_invalid");
-        }
-
-        using (doc)
-        {
-            if (doc.RootElement.ValueKind != JsonValueKind.Array || doc.RootElement.GetArrayLength() != 1)
-            {
-                return Invalid("enricher_native_context_invalid");
-            }
-
-            JsonElement nativeRelease = doc.RootElement[0];
-            if (nativeRelease.ValueKind != JsonValueKind.Object)
-            {
-                return Invalid("enricher_native_context_invalid");
-            }
-
-            if (!TryGetString(nativeRelease, "version", out string? nativeVersion) || string.IsNullOrWhiteSpace(nativeVersion))
-            {
-                return Invalid("enricher_version_mismatch");
-            }
-
-            string normalizedNativeVersion = nativeVersion.StartsWith('v') ? nativeVersion[1..] : nativeVersion;
-            if (!string.Equals(normalizedNativeVersion, authority.Release.Version, StringComparison.Ordinal))
-            {
-                return Invalid("enricher_version_mismatch");
-            }
-
-            if (!nativeRelease.TryGetProperty("commits", out JsonElement nativeCommitsEl) ||
-                nativeCommitsEl.ValueKind != JsonValueKind.Array)
-            {
-                return Invalid("enricher_native_context_invalid");
-            }
-
+            ReleaseContext authority = request.AuthorityContext.Context!;
             HashSet<string> rangeSet = request.RangeOids.ToHashSet(StringComparer.Ordinal);
-            if (rangeSet.Count != request.RangeOids.Count)
+            string? metadataError = ValidateNativeReleaseMetadata(nativeRelease, authority, request.RangeOids, rangeSet);
+            if (metadataError is not null)
             {
-                return Invalid("enricher_range_mismatch");
+                return Invalid(metadataError);
             }
 
-            if (TryGetString(nativeRelease, "commit_id", out string? nativeCommitId) &&
-                !string.IsNullOrEmpty(nativeCommitId) &&
-                !rangeSet.Contains(nativeCommitId))
+            string? commitsError = TryProjectCommits(nativeCommitsEl, authority, request.Input.Fragments, out Dictionary<string, AllowlistedNativeCommit> nativeCommitsById);
+            if (commitsError is not null)
             {
-                return Invalid("enricher_range_mismatch");
+                return Invalid(commitsError);
             }
 
-            if (nativeRelease.TryGetProperty("commit_range", out JsonElement nativeRangeEl) &&
-                nativeRangeEl.ValueKind == JsonValueKind.Object)
+            if (!VerifyOmittedRangePartition(request.OmittedRangeOids, nativeCommitsById, rangeSet))
             {
-                if (TryGetString(nativeRangeEl, "from", out string? rangeFrom) && !string.IsNullOrEmpty(rangeFrom) && !rangeSet.Contains(rangeFrom))
-                {
-                    return Invalid("enricher_range_mismatch");
-                }
-
-                if (TryGetString(nativeRangeEl, "to", out string? rangeTo) && !string.IsNullOrEmpty(rangeTo) && !rangeSet.Contains(rangeTo))
-                {
-                    return Invalid("enricher_range_mismatch");
-                }
+                return Invalid(Diagnostics.OmittedCommitSetMismatch);
             }
-
-            if (nativeRelease.TryGetProperty("previous", out JsonElement nativePrevEl) &&
-                nativePrevEl.ValueKind == JsonValueKind.Object &&
-                TryGetString(nativePrevEl, "version", out string? nativePrevVersion) &&
-                !string.IsNullOrEmpty(nativePrevVersion) &&
-                !ReleaseInputPolicy.IsBaselineRef(authority.Release.PreviousPublishedTag))
-            {
-                string expectedPrev = authority.Release.PreviousPublishedTag;
-                string expectedBase = authority.Release.BaseStableTag;
-                if (!VersionsMatch(nativePrevVersion, expectedPrev) && !VersionsMatch(nativePrevVersion, expectedBase))
-                {
-                    return Invalid("enricher_previous_version_mismatch");
-                }
-            }
-
-            // Correlate visible commits independently with C# authority.
-            Dictionary<string, ReleaseContextChange> authorityChangesByOid = authority.Changes
-                .ToDictionary(c => c.Oid, StringComparer.Ordinal);
-            Dictionary<string, PublicChangeFragment> fragmentsByChangeId = request.Input.Fragments
-                .ToDictionary(f => f.ChangeId, StringComparer.Ordinal);
-            Dictionary<string, string> displayIdByOid = authority.Evidence.Objects
-                .ToDictionary(o => o.Oid, o => o.DisplayId, StringComparer.Ordinal);
-
-            var nativeCommitsById = new Dictionary<string, AllowlistedNativeCommit>(StringComparer.Ordinal);
-            foreach (JsonElement nativeCommit in nativeCommitsEl.EnumerateArray())
-            {
-                if (nativeCommit.ValueKind != JsonValueKind.Object ||
-                    !TryGetString(nativeCommit, "id", out string? id) ||
-                    string.IsNullOrWhiteSpace(id))
-                {
-                    return Invalid("enricher_native_context_invalid");
-                }
-
-                if (nativeCommitsById.ContainsKey(id))
-                {
-                    return Invalid("enricher_duplicate_native_commit");
-                }
-
-                if (!authorityChangesByOid.TryGetValue(id, out ReleaseContextChange? authorityChange))
-                {
-                    return Invalid("enricher_visible_commit_set_mismatch");
-                }
-
-                if (!TryGetString(nativeCommit, "group", out string? group) || string.IsNullOrWhiteSpace(group))
-                {
-                    return Invalid("enricher_native_context_invalid");
-                }
-
-                if (!TryGetString(nativeCommit, "message", out string? message) || string.IsNullOrWhiteSpace(message))
-                {
-                    return Invalid("enricher_native_context_invalid");
-                }
-
-                bool nativeBreaking = nativeCommit.TryGetProperty("breaking", out JsonElement breakingEl) &&
-                    breakingEl.ValueKind == JsonValueKind.True;
-                if (nativeBreaking != authorityChange.Breaking)
-                {
-                    return Invalid("enricher_breaking_flag_mismatch");
-                }
-
-                bool conventional = !nativeCommit.TryGetProperty("conventional", out JsonElement convEl) ||
-                    convEl.ValueKind != JsonValueKind.False;
-                bool mergeCommit = nativeCommit.TryGetProperty("merge_commit", out JsonElement mergeEl) &&
-                    mergeEl.ValueKind == JsonValueKind.True;
-
-                string? scope = TryGetString(nativeCommit, "scope", out string? nativeScope) && !string.IsNullOrWhiteSpace(nativeScope)
-                    ? nativeScope
-                    : authorityChange.Scope;
-
-                string? breakingDescription = null;
-                if (nativeBreaking &&
-                    TryGetString(nativeCommit, "breaking_description", out string? rawBreaking) &&
-                    !string.IsNullOrWhiteSpace(rawBreaking))
-                {
-                    if (!TrySanitizeText(rawBreaking, allowMultiline: true, out string safeBreaking))
-                    {
-                        return Invalid("enricher_commit_text_restricted");
-                    }
-
-                    breakingDescription = safeBreaking;
-                }
-
-                if (!TrySanitizeText(message, allowMultiline: false, out string safeMessage))
-                {
-                    return Invalid("enricher_commit_text_restricted");
-                }
-
-                PublicChangeFragment? linkedFragment = authorityChange.ChangeId is not null &&
-                    fragmentsByChangeId.TryGetValue(authorityChange.ChangeId, out PublicChangeFragment? f)
-                    ? f
-                    : null;
-                AllowlistedImpactEntry[]? commitImpacts = linkedFragment is not null
-                    ? BuildFragmentImpactEntries(linkedFragment)
-                    : null;
-
-                var commitExtra = new AllowlistedCommitExtra(
-                    DisplayId: authorityChange.DisplayId,
-                    ChangeId: authorityChange.ChangeId,
-                    Title: linkedFragment is not null ? authorityChange.Title : null,
-                    Summary: linkedFragment is not null ? authorityChange.Summary : null,
-                    Backport: authorityChange.Backport,
-                    BackportOf: authorityChange.BackportOf,
-                    Impacts: commitImpacts is { Length: > 0 } ? commitImpacts : null);
-
-                nativeCommitsById[id] = new AllowlistedNativeCommit(
-                    Id: id,
-                    Group: group,
-                    Scope: scope,
-                    Message: safeMessage,
-                    Breaking: nativeBreaking,
-                    BreakingDescription: breakingDescription,
-                    Conventional: conventional,
-                    MergeCommit: mergeCommit,
-                    Extra: commitExtra);
-            }
-
-            if (nativeCommitsById.Count != authorityChangesByOid.Count)
-            {
-                return Invalid("enricher_visible_commit_set_mismatch");
-            }
-
-            // Correlate omitted/skipped commits independently against bounded range.
-            HashSet<string> omittedSet = request.OmittedRangeOids.ToHashSet(StringComparer.Ordinal);
-            var combinedSet = new HashSet<string>(omittedSet, StringComparer.Ordinal);
-            combinedSet.UnionWith(nativeCommitsById.Keys);
-            if (omittedSet.Count != request.OmittedRangeOids.Count ||
-                omittedSet.Overlaps(nativeCommitsById.Keys) ||
-                omittedSet.Count + nativeCommitsById.Count != rangeSet.Count ||
-                !combinedSet.SetEquals(rangeSet))
-            {
-                return Invalid("enricher_omitted_commit_set_mismatch");
-            }
-
-            // Deterministic ordering by chronological RangeOids index, then OID.
-            var rangeIndex = new Dictionary<string, int>(request.RangeOids.Count, StringComparer.Ordinal);
-            for (int index = 0; index < request.RangeOids.Count; index++)
-            {
-                rangeIndex[request.RangeOids[index]] = index;
-            }
-
-            AllowlistedNativeCommit[] orderedCommits = nativeCommitsById.Values
-                .OrderBy(c => rangeIndex.TryGetValue(c.Id, out int idx) ? idx : int.MaxValue)
-                .ThenBy(c => c.Id, StringComparer.Ordinal)
-                .ToArray();
-
-            string[] rangeDisplayIds = request.RangeOids
-                .Select(oid => displayIdByOid.TryGetValue(oid, out string? displayId) ? displayId : oid[..Math.Min(12, oid.Length)])
-                .ToArray();
-
-            var orderedDispositions = new SortedDictionary<string, string>(StringComparer.Ordinal);
-            foreach ((string key, string value) in descriptor.ImpactDispositions)
-            {
-                orderedDispositions[key] = value;
-            }
-
-            AllowlistedImpactEntry[] allImpactEntries = request.Input.Fragments
-                .SelectMany(BuildFragmentImpactEntries)
-                .OrderBy(entry => Array.IndexOf(ImpactCategoryOrder, entry.Category))
-                .ThenBy(entry => entry.ChangeId, StringComparer.Ordinal)
-                .ThenBy(entry => entry.Reference, StringComparer.Ordinal)
-                .ToArray();
-
-            AllowlistedCommitRange? commitRange = request.RangeOids.Count > 0
-                ? new AllowlistedCommitRange(request.RangeOids[0], request.RangeOids[^1])
-                : null;
-            AllowlistedPreviousRelease previousRelease = new(
-                Version: ReleaseInputPolicy.IsBaselineRef(authority.Release.PreviousPublishedTag)
-                    ? null
-                    : authority.Release.PreviousPublishedTag,
-                CommitId: authority.Evidence.PreviousPublishedOid);
 
             IReadOnlyList<EnrichedImageReference>? validatedImages = ValidateImages(request.ImageReferences, out bool imagesValid);
             if (!imagesValid)
             {
-                return Invalid("enricher_image_manifest_invalid");
+                return Invalid(Diagnostics.ImageManifestInvalid);
             }
 
-            var extra = new AllowlistedReleaseExtra(
-                SchemaVersion: 1,
-                Version: authority.Release.Version,
-                Line: authority.Release.Line,
-                ReleaseDate: authority.Release.ReleaseDate,
-                Channel: authority.Release.Channel,
-                MinimumBump: authority.Release.MinimumBump,
-                BaseStableTag: authority.Release.BaseStableTag,
-                PreviousPublishedTag: authority.Release.PreviousPublishedTag,
-                AdvancesMain: authority.Release.AdvancesMain,
-                MaintainerSummary: sanitizedSummary,
-                RangeDisplayIds: rangeDisplayIds,
-                ImpactDispositions: orderedDispositions,
-                ImpactEntries: allImpactEntries,
-                ContractDiff: request.ContractDiff,
-                Images: validatedImages);
-
-            var projectedRelease = new AllowlistedNativeRelease(
-                Version: $"v{authority.Release.Version}",
-                CommitId: request.RangeOids.Count > 0 ? request.RangeOids[^1] : null,
-                CommitRange: commitRange,
-                Previous: previousRelease,
-                Commits: orderedCommits,
-                Extra: extra);
-
-            AllowlistedNativeRelease[] releases = [projectedRelease];
+            AllowlistedNativeRelease projected = BuildProjectedRelease(request, authority, sanitizedSummary, nativeCommitsById, validatedImages);
+            AllowlistedNativeRelease[] releases = [projected];
             string json = JsonSerializer.Serialize(releases, JsonOptions) + "\n";
             return new GitCliffContextEnrichmentResult(true, releases, json, null);
         }
     }
 
-    private static bool ValidateFragmentsArePublicSafe(IReadOnlyList<PublicChangeFragment> fragments)
+    private static string? ValidatePreconditions(GitCliffContextEnrichmentRequest request, out string sanitizedSummary)
     {
-        foreach (PublicChangeFragment fragment in fragments)
+        sanitizedSummary = string.Empty;
+        if (request.Input is null || !request.Input.IsValid || request.Input.Descriptor is null)
         {
-            if (!TrySanitizeText(fragment.Title, allowMultiline: false, out _) ||
-                !TrySanitizeText(fragment.Summary, allowMultiline: true, out _))
+            return Diagnostics.ReleaseInputInvalid;
+        }
+
+        if (request.AuthorityContext is null || !request.AuthorityContext.IsValid || request.AuthorityContext.Context is null)
+        {
+            return Diagnostics.AuthorityContextInvalid;
+        }
+
+        if (string.IsNullOrWhiteSpace(request.RawNativeContextJson))
+        {
+            return Diagnostics.NativeContextInvalid;
+        }
+
+        if (!ValidateFragmentsArePublicSafe(request.Input.Fragments))
+        {
+            return Diagnostics.FragmentRestricted;
+        }
+
+        return TrySanitizeText(request.MaintainerSummary, allowMultiline: true, out sanitizedSummary)
+            ? null
+            : Diagnostics.SummaryRestricted;
+    }
+
+    private static bool TryParseSingleNativeRelease(
+        string rawJson,
+        out JsonDocument? document,
+        out JsonElement nativeRelease,
+        out JsonElement nativeCommitsEl)
+    {
+        document = null;
+        nativeRelease = default;
+        nativeCommitsEl = default;
+
+        try
+        {
+            document = JsonDocument.Parse(rawJson, new JsonDocumentOptions { MaxDepth = 64 });
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+
+        if (document.RootElement.ValueKind != JsonValueKind.Array ||
+            document.RootElement.GetArrayLength() != 1 ||
+            document.RootElement[0].ValueKind != JsonValueKind.Object ||
+            !document.RootElement[0].TryGetProperty("commits", out nativeCommitsEl) ||
+            nativeCommitsEl.ValueKind != JsonValueKind.Array)
+        {
+            document.Dispose();
+            document = null;
+            return false;
+        }
+
+        nativeRelease = document.RootElement[0];
+        return true;
+    }
+
+    private static string? ValidateNativeReleaseMetadata(
+        JsonElement nativeRelease,
+        ReleaseContext authority,
+        IReadOnlyList<string> rangeOids,
+        HashSet<string> rangeSet)
+    {
+        if (!TryGetString(nativeRelease, "version", out string? nativeVersion) ||
+            string.IsNullOrWhiteSpace(nativeVersion) ||
+            !VersionsMatch(nativeVersion, authority.Release.Version))
+        {
+            return Diagnostics.VersionMismatch;
+        }
+
+        if (rangeSet.Count != rangeOids.Count || !IsNativeRangeWithinAuthority(nativeRelease, rangeSet))
+        {
+            return Diagnostics.RangeMismatch;
+        }
+
+        return IsPreviousVersionConsistent(nativeRelease, authority)
+            ? null
+            : Diagnostics.PreviousVersionMismatch;
+    }
+
+    private static bool IsNativeRangeWithinAuthority(JsonElement nativeRelease, HashSet<string> rangeSet)
+    {
+        if (TryGetString(nativeRelease, "commit_id", out string? nativeCommitId) &&
+            !string.IsNullOrEmpty(nativeCommitId) &&
+            !rangeSet.Contains(nativeCommitId))
+        {
+            return false;
+        }
+
+        if (nativeRelease.TryGetProperty("commit_range", out JsonElement nativeRangeEl) &&
+            nativeRangeEl.ValueKind == JsonValueKind.Object)
+        {
+            if (TryGetString(nativeRangeEl, "from", out string? rangeFrom) && !string.IsNullOrEmpty(rangeFrom) && !rangeSet.Contains(rangeFrom))
             {
                 return false;
             }
 
-            foreach ((_, FragmentImpact impact) in fragment.Impacts)
+            if (TryGetString(nativeRangeEl, "to", out string? rangeTo) && !string.IsNullOrEmpty(rangeTo) && !rangeSet.Contains(rangeTo))
             {
-                if (string.Equals(impact.PublicDisclosure, "embargoed", StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-
-                if (!string.IsNullOrWhiteSpace(impact.Detail) &&
-                    !TrySanitizeText(impact.Detail, allowMultiline: true, out _))
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
         return true;
     }
 
-    private static AllowlistedImpactEntry[] BuildFragmentImpactEntries(PublicChangeFragment fragment)
+    private static bool IsPreviousVersionConsistent(JsonElement nativeRelease, ReleaseContext authority)
     {
-        var entries = new List<AllowlistedImpactEntry>();
-        foreach (string category in ImpactCategoryOrder)
+        if (!nativeRelease.TryGetProperty("previous", out JsonElement nativePrevEl) ||
+            nativePrevEl.ValueKind != JsonValueKind.Object ||
+            !TryGetString(nativePrevEl, "version", out string? nativePrevVersion) ||
+            string.IsNullOrEmpty(nativePrevVersion) ||
+            ReleaseInputPolicy.IsBaselineRef(authority.Release.PreviousPublishedTag))
         {
-            if (!fragment.Impacts.TryGetValue(category, out FragmentImpact? impact) ||
-                string.Equals(impact.Disposition, "not-applicable", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(impact.Detail))
-            {
-                continue;
-            }
-
-            entries.Add(new AllowlistedImpactEntry(
-                Category: category,
-                ChangeId: fragment.ChangeId,
-                Disposition: impact.Disposition,
-                Detail: impact.Detail.Trim(),
-                Reference: impact.Reference));
+            return true;
         }
 
-        return entries.ToArray();
+        return VersionsMatch(nativePrevVersion, authority.Release.PreviousPublishedTag) ||
+            VersionsMatch(nativePrevVersion, authority.Release.BaseStableTag);
     }
+
+    private static string? TryProjectCommits(
+        JsonElement nativeCommitsEl,
+        ReleaseContext authority,
+        IReadOnlyList<PublicChangeFragment> fragments,
+        out Dictionary<string, AllowlistedNativeCommit> nativeCommitsById)
+    {
+        Dictionary<string, ReleaseContextChange> authorityChangesByOid = authority.Changes
+            .ToDictionary(c => c.Oid, StringComparer.Ordinal);
+        Dictionary<string, PublicChangeFragment> fragmentsByChangeId = fragments
+            .ToDictionary(f => f.ChangeId, StringComparer.Ordinal);
+        nativeCommitsById = new Dictionary<string, AllowlistedNativeCommit>(StringComparer.Ordinal);
+
+        foreach (JsonElement nativeCommit in nativeCommitsEl.EnumerateArray())
+        {
+            string? commitError = TryProjectSingleCommit(nativeCommit, authorityChangesByOid, fragmentsByChangeId, nativeCommitsById);
+            if (commitError is not null)
+            {
+                return commitError;
+            }
+        }
+
+        return nativeCommitsById.Count == authorityChangesByOid.Count
+            ? null
+            : Diagnostics.VisibleCommitSetMismatch;
+    }
+
+    private static string? TryProjectSingleCommit(
+        JsonElement nativeCommit,
+        Dictionary<string, ReleaseContextChange> authorityChangesByOid,
+        Dictionary<string, PublicChangeFragment> fragmentsByChangeId,
+        Dictionary<string, AllowlistedNativeCommit> nativeCommitsById)
+    {
+        if (nativeCommit.ValueKind != JsonValueKind.Object ||
+            !TryGetString(nativeCommit, "id", out string? id) ||
+            string.IsNullOrWhiteSpace(id))
+        {
+            return Diagnostics.NativeContextInvalid;
+        }
+
+        if (nativeCommitsById.ContainsKey(id))
+        {
+            return Diagnostics.DuplicateNativeCommit;
+        }
+
+        if (!authorityChangesByOid.TryGetValue(id, out ReleaseContextChange? authorityChange))
+        {
+            return Diagnostics.VisibleCommitSetMismatch;
+        }
+
+        if (!TryGetString(nativeCommit, "group", out string? group) || string.IsNullOrWhiteSpace(group) ||
+            !TryGetString(nativeCommit, "message", out string? message) || string.IsNullOrWhiteSpace(message))
+        {
+            return Diagnostics.NativeContextInvalid;
+        }
+
+        bool nativeBreaking = ReadBoolProperty(nativeCommit, "breaking", defaultValue: false);
+        if (nativeBreaking != authorityChange.Breaking)
+        {
+            return Diagnostics.BreakingFlagMismatch;
+        }
+
+        if (!TrySanitizeText(message, allowMultiline: false, out string safeMessage) ||
+            !TryReadSafeBreakingDescription(nativeCommit, nativeBreaking, out string? breakingDescription))
+        {
+            return Diagnostics.CommitTextRestricted;
+        }
+
+        AllowlistedCommitExtra commitExtra = BuildCommitExtra(authorityChange, fragmentsByChangeId);
+        string? scope = TryGetString(nativeCommit, "scope", out string? nativeScope) && !string.IsNullOrWhiteSpace(nativeScope)
+            ? nativeScope
+            : authorityChange.Scope;
+
+        nativeCommitsById[id] = new AllowlistedNativeCommit(
+            Id: id,
+            Group: group,
+            Scope: scope,
+            Message: safeMessage,
+            Breaking: nativeBreaking,
+            BreakingDescription: breakingDescription,
+            Conventional: ReadBoolProperty(nativeCommit, "conventional", defaultValue: true),
+            MergeCommit: ReadBoolProperty(nativeCommit, "merge_commit", defaultValue: false),
+            Extra: commitExtra);
+        return null;
+    }
+
+    private static bool TryReadSafeBreakingDescription(JsonElement nativeCommit, bool isBreaking, out string? breakingDescription)
+    {
+        breakingDescription = null;
+        if (!isBreaking ||
+            !TryGetString(nativeCommit, "breaking_description", out string? rawBreaking) ||
+            string.IsNullOrWhiteSpace(rawBreaking))
+        {
+            return true;
+        }
+
+        if (!TrySanitizeText(rawBreaking, allowMultiline: true, out string safeBreaking))
+        {
+            return false;
+        }
+
+        breakingDescription = safeBreaking;
+        return true;
+    }
+
+    private static AllowlistedCommitExtra BuildCommitExtra(
+        ReleaseContextChange authorityChange,
+        Dictionary<string, PublicChangeFragment> fragmentsByChangeId)
+    {
+        PublicChangeFragment? linkedFragment = authorityChange.ChangeId is not null &&
+            fragmentsByChangeId.TryGetValue(authorityChange.ChangeId, out PublicChangeFragment? found)
+            ? found
+            : null;
+        AllowlistedImpactEntry[]? commitImpacts = linkedFragment is not null
+            ? BuildFragmentImpactEntries(linkedFragment)
+            : null;
+
+        return new AllowlistedCommitExtra(
+            DisplayId: authorityChange.DisplayId,
+            ChangeId: authorityChange.ChangeId,
+            Title: linkedFragment is not null ? authorityChange.Title : null,
+            Summary: linkedFragment is not null ? authorityChange.Summary : null,
+            Backport: authorityChange.Backport,
+            BackportOf: authorityChange.BackportOf,
+            Impacts: commitImpacts is { Length: > 0 } ? commitImpacts : null);
+    }
+
+    private static bool VerifyOmittedRangePartition(
+        IReadOnlyList<string> omittedRangeOids,
+        Dictionary<string, AllowlistedNativeCommit> nativeCommitsById,
+        HashSet<string> rangeSet)
+    {
+        HashSet<string> omittedSet = omittedRangeOids.ToHashSet(StringComparer.Ordinal);
+        var combinedSet = new HashSet<string>(omittedSet, StringComparer.Ordinal);
+        combinedSet.UnionWith(nativeCommitsById.Keys);
+        return omittedSet.Count == omittedRangeOids.Count &&
+            !omittedSet.Overlaps(nativeCommitsById.Keys) &&
+            omittedSet.Count + nativeCommitsById.Count == rangeSet.Count &&
+            combinedSet.SetEquals(rangeSet);
+    }
+
+    private static AllowlistedNativeRelease BuildProjectedRelease(
+        GitCliffContextEnrichmentRequest request,
+        ReleaseContext authority,
+        string sanitizedSummary,
+        Dictionary<string, AllowlistedNativeCommit> nativeCommitsById,
+        IReadOnlyList<EnrichedImageReference>? validatedImages)
+    {
+        var rangeIndex = new Dictionary<string, int>(request.RangeOids.Count, StringComparer.Ordinal);
+        for (int index = 0; index < request.RangeOids.Count; index++)
+        {
+            rangeIndex[request.RangeOids[index]] = index;
+        }
+
+        AllowlistedNativeCommit[] orderedCommits = nativeCommitsById.Values
+            .OrderBy(c => rangeIndex.TryGetValue(c.Id, out int idx) ? idx : int.MaxValue)
+            .ThenBy(c => c.Id, StringComparer.Ordinal)
+            .ToArray();
+
+        Dictionary<string, string> displayIdByOid = authority.Evidence.Objects
+            .ToDictionary(o => o.Oid, o => o.DisplayId, StringComparer.Ordinal);
+        string[] rangeDisplayIds = request.RangeOids
+            .Select(oid => displayIdByOid.TryGetValue(oid, out string? displayId) ? displayId : oid[..Math.Min(12, oid.Length)])
+            .ToArray();
+
+        var orderedDispositions = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        foreach ((string key, string value) in request.Input.Descriptor!.ImpactDispositions)
+        {
+            orderedDispositions[key] = value;
+        }
+        AllowlistedImpactEntry[] allImpactEntries = request.Input.Fragments
+            .SelectMany(BuildFragmentImpactEntries)
+            .OrderBy(entry => Array.IndexOf(ImpactCategoryOrder, entry.Category))
+            .ThenBy(entry => entry.ChangeId, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Reference, StringComparer.Ordinal)
+            .ToArray();
+
+        AllowlistedCommitRange? commitRange = request.RangeOids.Count > 0
+            ? new AllowlistedCommitRange(request.RangeOids[0], request.RangeOids[^1])
+            : null;
+        AllowlistedPreviousRelease previousRelease = new(
+            Version: ReleaseInputPolicy.IsBaselineRef(authority.Release.PreviousPublishedTag) ? null : authority.Release.PreviousPublishedTag,
+            CommitId: authority.Evidence.PreviousPublishedOid);
+
+        var extra = new AllowlistedReleaseExtra(
+            SchemaVersion: 1,
+            Version: authority.Release.Version,
+            Line: authority.Release.Line,
+            ReleaseDate: authority.Release.ReleaseDate,
+            Channel: authority.Release.Channel,
+            MinimumBump: authority.Release.MinimumBump,
+            BaseStableTag: authority.Release.BaseStableTag,
+            PreviousPublishedTag: authority.Release.PreviousPublishedTag,
+            AdvancesMain: authority.Release.AdvancesMain,
+            MaintainerSummary: sanitizedSummary,
+            RangeDisplayIds: rangeDisplayIds,
+            ImpactDispositions: orderedDispositions,
+            ImpactEntries: allImpactEntries,
+            ContractDiff: request.ContractDiff,
+            Images: validatedImages);
+
+        return new AllowlistedNativeRelease(
+            Version: $"v{authority.Release.Version}",
+            CommitId: request.RangeOids.Count > 0 ? request.RangeOids[^1] : null,
+            CommitRange: commitRange,
+            Previous: previousRelease,
+            Commits: orderedCommits,
+            Extra: extra);
+    }
+
+    private static bool ValidateFragmentsArePublicSafe(IReadOnlyList<PublicChangeFragment> fragments) =>
+        fragments.All(IsFragmentPublicSafe);
+
+    private static bool IsFragmentPublicSafe(PublicChangeFragment fragment)
+    {
+        if (!TrySanitizeText(fragment.Title, allowMultiline: false, out _) ||
+            !TrySanitizeText(fragment.Summary, allowMultiline: true, out _))
+        {
+            return false;
+        }
+
+        return fragment.Impacts.Values.All(impact =>
+            !string.Equals(impact.PublicDisclosure, "embargoed", StringComparison.OrdinalIgnoreCase) &&
+            (string.IsNullOrWhiteSpace(impact.Detail) || TrySanitizeText(impact.Detail, allowMultiline: true, out _)));
+    }
+
+    private static AllowlistedImpactEntry[] BuildFragmentImpactEntries(PublicChangeFragment fragment) =>
+        ImpactCategoryOrder
+            .Where(category =>
+                fragment.Impacts.TryGetValue(category, out FragmentImpact? impact) &&
+                !string.Equals(impact.Disposition, "not-applicable", StringComparison.Ordinal) &&
+                !string.IsNullOrWhiteSpace(impact.Detail))
+            .Select(category =>
+            {
+                FragmentImpact impact = fragment.Impacts[category];
+                return new AllowlistedImpactEntry(
+                    Category: category,
+                    ChangeId: fragment.ChangeId,
+                    Disposition: impact.Disposition,
+                    Detail: impact.Detail!.Trim(),
+                    Reference: impact.Reference);
+            })
+            .ToArray();
 
     private static IReadOnlyList<EnrichedImageReference>? ValidateImages(
         IReadOnlyList<EnrichedImageReference>? images,
@@ -518,27 +593,28 @@ public static class GitCliffContextEnricher
         }
 
         string candidate = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Trim();
-        if (!allowMultiline && candidate.Contains('\n', StringComparison.Ordinal))
+        if ((!allowMultiline && candidate.Contains('\n', StringComparison.Ordinal)) ||
+            IdentityOrProviderPattern.IsMatch(candidate) ||
+            candidate.Contains("restricted-details", StringComparison.OrdinalIgnoreCase) ||
+            candidate.Split('\n').Any(line => !ReleaseArtifactPolicy.EscapeUntrustedMarkdown(line).IsValid))
         {
             return false;
-        }
-
-        if (IdentityOrProviderPattern.IsMatch(candidate) ||
-            candidate.Contains("restricted-details", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        foreach (string line in candidate.Split('\n'))
-        {
-            if (!ReleaseArtifactPolicy.EscapeUntrustedMarkdown(line).IsValid)
-            {
-                return false;
-            }
         }
 
         normalized = candidate;
         return true;
+    }
+
+    private static bool ReadBoolProperty(JsonElement obj, string property, bool defaultValue)
+    {
+        if (!obj.TryGetProperty(property, out JsonElement element))
+        {
+            return defaultValue;
+        }
+
+        return defaultValue
+            ? element.ValueKind != JsonValueKind.False
+            : element.ValueKind == JsonValueKind.True;
     }
 
     private static bool VersionsMatch(string left, string right)

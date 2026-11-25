@@ -6,6 +6,24 @@ namespace ISLAMU.ReleaseEngineering;
 public static class SecurityControlRegister
 {
     private const int MaximumBytes = 1_048_576;
+    private const string ApplicationSourcePrefix = "src/Explore.Application/";
+    private const string PendingStatus = "pending";
+
+    private static class JsonFields
+    {
+        public const string Id = "id";
+        public const string Scenarios = "scenarios";
+        public const string VerificationStatus = "verificationStatus";
+        public const string ReferenceIds = "referenceIds";
+        public const string OwningPhases = "owningPhases";
+        public const string PrerequisiteProfiles = "prerequisiteProfiles";
+        public const string CreateOwner = "createOwner";
+        public const string UpdateOwner = "updateOwner";
+        public const string ClassName = "className";
+        public const string MethodName = "methodName";
+        public const string TestName = "testName";
+    }
+
     private static readonly JsonDocumentOptions DocumentOptions = new() { MaxDepth = 32 };
     private static readonly Regex ScenarioIdPattern = new("^S[0-9]{2,}$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     private static readonly Regex FamilyIdPattern = new("^FAMILY-[0-9]{3,}$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
@@ -94,216 +112,24 @@ public static class SecurityControlRegister
                 return false;
             }
 
-            HashSet<string> scenarios = UniqueMatchingIdentities(root.GetProperty("scenarios"), ScenarioIdPattern);
+            HashSet<string> scenarios = UniqueMatchingIdentities(root.GetProperty(JsonFields.Scenarios), ScenarioIdPattern);
             _ = ReadExecutionRequirements(root);
             HashSet<string> families = UniqueMatchingIdentities(root.GetProperty("families"), FamilyIdPattern);
 
-            JsonElement dimensions = root.GetProperty("executionDimensions");
-            string[] hosts = dimensions.GetProperty("runtimeHosts").EnumerateArray()
-                .Select(host => host.GetProperty("id").GetString() ?? string.Empty).ToArray();
-            if (hosts.Length != SupportedHosts.Count || !new HashSet<string>(hosts, StringComparer.Ordinal).SetEquals(SupportedHosts))
+            if (!TryValidateExecutionDimensions(root, out string[] hosts))
             {
                 return false;
             }
 
-            string[] providers = dimensions.GetProperty("databaseProviders").GetProperty("values").EnumerateArray()
-                .Select(provider => provider.GetString() ?? string.Empty).ToArray();
-            if (providers.Length == 0 ||
-                providers.Distinct(StringComparer.Ordinal).Count() != providers.Length ||
-                providers.Any(provider => !SupportedProviders.Contains(provider)))
+            if (!ValidateProviderPairs(root, scenarios) ||
+                !ValidateTypedContractInventory(root) ||
+                !ValidateExecutionOwnerInventory(root, scenarios))
             {
                 return false;
             }
 
-            JsonElement providerPairs = root.GetProperty("qualifiedMappings").GetProperty("providerPairs");
-            var qualifiedIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (JsonElement pair in providerPairs.EnumerateArray())
-            {
-                string finding = pair.GetProperty("findingId").GetString() ?? string.Empty;
-                Match match = ProviderFindingPattern.Match(finding);
-                if (!match.Success ||
-                    !qualifiedIds.Add(finding) ||
-                    pair.GetProperty("mitigationId").GetString() != "PC:IVSD-M" + match.Groups["num"].Value ||
-                    !IsValidGeneralStatus(pair.GetProperty("verificationStatus").GetString()) ||
-                    pair.GetProperty("owningPhases").GetArrayLength() == 0 ||
-                    pair.GetProperty("scenarios").GetArrayLength() == 0)
-                {
-                    return false;
-                }
-
-                if (!ValidatePhasesAndScenarios(pair, scenarios))
-                {
-                    return false;
-                }
-            }
-
-            if (qualifiedIds.Count == 0)
-            {
-                return false;
-            }
-
-            JsonElement typedInventory = root.GetProperty("typedContractInventory");
-            JsonElement dtoPairs = typedInventory.GetProperty("dtoPairs");
-            if (dtoPairs.GetArrayLength() == 0 ||
-                !IsValidGeneralStatus(typedInventory.GetProperty("verificationStatus").GetString()))
-            {
-                return false;
-            }
-
-            var contractOwners = new HashSet<string>(StringComparer.Ordinal);
-            foreach (JsonElement pair in dtoPairs.EnumerateArray())
-            {
-                string createOwner = pair.GetProperty("createOwner").GetString() ?? string.Empty;
-                string updateOwner = pair.GetProperty("updateOwner").GetString() ?? string.Empty;
-                if (!createOwner.StartsWith("src/Explore.Application/", StringComparison.Ordinal) ||
-                    !updateOwner.StartsWith("src/Explore.Application/", StringComparison.Ordinal) ||
-                    !contractOwners.Add(createOwner) ||
-                    !contractOwners.Add(updateOwner))
-                {
-                    return false;
-                }
-            }
-
-            JsonElement nativePairs = typedInventory.GetProperty("nativePairs");
-            if (nativePairs.GetArrayLength() == 0)
-            {
-                return false;
-            }
-
-            var nativeTypes = new HashSet<string>(StringComparer.Ordinal);
-            foreach (JsonElement pair in nativePairs.EnumerateArray())
-            {
-                string createType = pair.GetProperty("createType").GetString() ?? string.Empty;
-                string updateType = pair.GetProperty("updateType").GetString() ?? string.Empty;
-                if ((!createType.StartsWith("Create", StringComparison.Ordinal) &&
-                     !createType.StartsWith("Add", StringComparison.Ordinal)) ||
-                    !updateType.StartsWith("Update", StringComparison.Ordinal) ||
-                    !nativeTypes.Add(createType) ||
-                    !nativeTypes.Add(updateType) ||
-                    !(pair.GetProperty("createOwner").GetString() ?? string.Empty)
-                        .StartsWith("src/Explore.Application/", StringComparison.Ordinal) ||
-                    !(pair.GetProperty("updateOwner").GetString() ?? string.Empty)
-                        .StartsWith("src/Explore.Application/", StringComparison.Ordinal))
-                {
-                    return false;
-                }
-            }
-
-            JsonElement executionOwners = root.GetProperty("executionOwnerInventory");
-            var entryIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (JsonElement entry in executionOwners.EnumerateArray())
-            {
-                string id = entry.GetProperty("id").GetString() ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(id) ||
-                    !entryIds.Add(id) ||
-                    entry.GetProperty("owners").GetArrayLength() == 0 ||
-                    string.IsNullOrWhiteSpace(entry.GetProperty("requiredEvidence").GetString()) ||
-                    string.IsNullOrWhiteSpace(entry.GetProperty("refreshTrigger").GetString()) ||
-                    !IsValidGeneralStatus(entry.GetProperty("verificationStatus").GetString()) ||
-                    entry.GetProperty("owningPhases").GetArrayLength() == 0 ||
-                    entry.GetProperty("scenarios").GetArrayLength() == 0 ||
-                    !ValidatePhasesAndScenarios(entry, scenarios))
-                {
-                    return false;
-                }
-            }
-
-            if (entryIds.Count == 0)
-            {
-                return false;
-            }
-
-            JsonElement asvs = root.GetProperty("asvs");
-            if (asvs.GetProperty("version").GetString() != "5.0.0")
-            {
-                return false;
-            }
-
-            var requirementIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (JsonElement requirement in asvs.GetProperty("requirements").EnumerateArray())
-            {
-                string id = requirement.GetProperty("id").GetString() ?? string.Empty;
-                string status = requirement.GetProperty("verificationStatus").GetString() ?? string.Empty;
-                if (!id.StartsWith("v5.0.0-", StringComparison.Ordinal) ||
-                    !requirementIds.Add(id) ||
-                    requirement.GetProperty("level").GetInt32() is < 1 or > 3 ||
-                    string.IsNullOrWhiteSpace(requirement.GetProperty("applicability").GetString()) ||
-                    requirement.GetProperty("prerequisiteProfiles").GetArrayLength() == 0 ||
-                    (status != "unverified" && !ResolvedStatuses.Contains(status)))
-                {
-                    diagnostic = "invalid_standard_requirement";
-                    return false;
-                }
-
-                var prerequisiteHosts = new HashSet<string>(StringComparer.Ordinal);
-                foreach (JsonElement profile in requirement.GetProperty("prerequisiteProfiles").EnumerateArray())
-                {
-                    string host = profile.GetString() ?? string.Empty;
-                    if (!hosts.Contains(host, StringComparer.Ordinal) || !prerequisiteHosts.Add(host))
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            if (requirementIds.Count == 0)
-            {
-                return false;
-            }
-
-            JsonElement pairs = root.GetProperty("apiFindingMitigationPairs");
-            var findingIds = new HashSet<string>(StringComparer.Ordinal);
-            var mitigationIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (JsonElement pair in pairs.EnumerateArray())
-            {
-                string finding = pair.GetProperty("findingId").GetString() ?? string.Empty;
-                string mitigation = pair.GetProperty("mitigationId").GetString() ?? string.Empty;
-                Match match = ApiFindingPattern.Match(finding);
-                if (!match.Success ||
-                    !findingIds.Add(finding) ||
-                    !mitigationIds.Add(mitigation) ||
-                    mitigation != "IVSD-M" + match.Groups["num"].Value)
-                {
-                    diagnostic = "invalid_finding_mapping";
-                    return false;
-                }
-
-                foreach (JsonElement scenario in pair.GetProperty("scenarios").EnumerateArray())
-                {
-                    if (!scenarios.Contains(scenario.GetString() ?? string.Empty))
-                    {
-                        return false;
-                    }
-                }
-
-                JsonElement tasks = pair.GetProperty("owningTasks");
-                bool hasDeliveredReceipt = pair.TryGetProperty("deliveredReceipt", out JsonElement receiptElement) &&
-                    !string.IsNullOrWhiteSpace(receiptElement.GetString());
-                if (!IsValidGeneralStatus(pair.GetProperty("verificationStatus").GetString()) ||
-                    pair.GetProperty("scenarios").GetArrayLength() == 0 ||
-                    (tasks.GetArrayLength() == 0 && !hasDeliveredReceipt))
-                {
-                    return false;
-                }
-
-                var taskIds = new HashSet<string>(StringComparer.Ordinal);
-                foreach (JsonElement task in tasks.EnumerateArray())
-                {
-                    string value = task.GetString() ?? string.Empty;
-                    string[] parts = value.Split('.');
-                    if (parts.Length != 2 ||
-                        !int.TryParse(parts[0], System.Globalization.CultureInfo.InvariantCulture, out int phase) ||
-                        phase is < 1 or > 29 ||
-                        !int.TryParse(parts[1], System.Globalization.CultureInfo.InvariantCulture, out int item) ||
-                        item < 1 ||
-                        !taskIds.Add(value))
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            if (findingIds.Count == 0)
+            if (!ValidateAsvsRequirements(root, hosts, ref diagnostic) ||
+                !ValidateApiFindingMitigationPairs(root, scenarios, ref diagnostic))
             {
                 return false;
             }
@@ -311,138 +137,11 @@ public static class SecurityControlRegister
             JsonElement references = root.GetProperty("references");
             HashSet<string> referenceIds = UniqueMatchingIdentities(references, ReferenceIdPattern);
 
-            JsonElement classes = root.GetProperty("classes");
-            var classIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (JsonElement entry in classes.EnumerateArray())
-            {
-                string id = entry.GetProperty("id").GetString() ?? string.Empty;
-                if (!classIds.Add(id) ||
-                    !ClassIdPattern.IsMatch(id) ||
-                    !IsValidGeneralStatus(entry.GetProperty("verificationStatus").GetString()) ||
-                    entry.GetProperty("owningPhases").GetArrayLength() == 0 ||
-                    string.IsNullOrWhiteSpace(entry.GetProperty("refreshTrigger").GetString()) ||
-                    !ValidatePhasesAndScenarios(entry, scenarios))
-                {
-                    diagnostic = "invalid_class_inventory";
-                    return false;
-                }
-            }
-
-            if (classIds.Count == 0)
-            {
-                diagnostic = "missing_class";
-                return false;
-            }
-
-            var assignedReferences = new HashSet<string>(StringComparer.Ordinal);
-            foreach (JsonElement family in root.GetProperty("families").EnumerateArray())
-            {
-                if (family.GetProperty("referenceIds").GetArrayLength() == 0)
-                {
-                    return false;
-                }
-
-                foreach (JsonElement reference in family.GetProperty("referenceIds").EnumerateArray())
-                {
-                    string id = reference.GetString() ?? string.Empty;
-                    if (!referenceIds.Contains(id))
-                    {
-                        return false;
-                    }
-
-                    assignedReferences.Add(id);
-                }
-            }
-
-            JsonElement supplements = root.GetProperty("supplementaryMechanisms");
-            _ = UniqueMatchingIdentities(supplements, SupplementaryIdPattern);
-            foreach (JsonElement supplement in supplements.EnumerateArray())
-            {
-                if (supplement.GetProperty("referenceIds").GetArrayLength() == 0 ||
-                    !IsValidGeneralStatus(supplement.GetProperty("verificationStatus").GetString()))
-                {
-                    return false;
-                }
-
-                foreach (JsonElement reference in supplement.GetProperty("referenceIds").EnumerateArray())
-                {
-                    string id = reference.GetString() ?? string.Empty;
-                    if (!referenceIds.Contains(id))
-                    {
-                        return false;
-                    }
-
-                    assignedReferences.Add(id);
-                }
-            }
-
-            if (families.Count == 0 || !assignedReferences.SetEquals(referenceIds))
+            if (!ValidateClassInventory(root, scenarios, ref diagnostic) ||
+                !ValidateReferenceCoverage(root, families, referenceIds) ||
+                !ValidateReferences(references, hosts, scenarios, ref diagnostic))
             {
                 return false;
-            }
-
-            foreach (JsonElement reference in references.EnumerateArray())
-            {
-                if (string.IsNullOrWhiteSpace(reference.GetProperty("functionalName").GetString()) ||
-                    !Dispositions.Contains(reference.GetProperty("initialDisposition").GetString() ?? string.Empty))
-                {
-                    diagnostic = "invalid_reference";
-                    return false;
-                }
-
-                JsonElement prerequisiteProfiles = reference.GetProperty("prerequisiteProfiles");
-                if (prerequisiteProfiles.GetArrayLength() == 0 ||
-                    string.IsNullOrWhiteSpace(reference.GetProperty("profileQualification").GetString()))
-                {
-                    return false;
-                }
-
-                var profileIds = new HashSet<string>(StringComparer.Ordinal);
-                foreach (JsonElement profile in prerequisiteProfiles.EnumerateArray())
-                {
-                    string host = profile.GetString() ?? string.Empty;
-                    if (!hosts.Contains(host, StringComparer.Ordinal) || !profileIds.Add(host))
-                    {
-                        return false;
-                    }
-                }
-
-                JsonElement phases = reference.GetProperty("owningPhases");
-                bool delivered = reference.GetProperty("deliveredIssuance").GetBoolean();
-                if (phases.GetArrayLength() == 0 && !delivered)
-                {
-                    return false;
-                }
-
-                var owners = new HashSet<int>();
-                foreach (JsonElement phase in phases.EnumerateArray())
-                {
-                    int value = phase.GetInt32();
-                    if (value is < 1 or > 29 || !owners.Add(value))
-                    {
-                        return false;
-                    }
-                }
-
-                JsonElement ownedScenarios = reference.GetProperty("scenarios");
-                if (ownedScenarios.GetArrayLength() == 0)
-                {
-                    return false;
-                }
-
-                foreach (JsonElement scenario in ownedScenarios.EnumerateArray())
-                {
-                    if (!scenarios.Contains(scenario.GetString() ?? string.Empty))
-                    {
-                        return false;
-                    }
-                }
-
-                if (!ValidateControlLifecycle(reference))
-                {
-                    diagnostic = "invalid_control_lifecycle";
-                    return false;
-                }
             }
 
             diagnostic = string.Empty;
@@ -454,6 +153,375 @@ public static class SecurityControlRegister
             diagnostic = "invalid_register";
             return false;
         }
+    }
+
+    private static bool TryValidateExecutionDimensions(JsonElement root, out string[] hosts)
+    {
+        JsonElement dimensions = root.GetProperty("executionDimensions");
+        hosts = dimensions.GetProperty("runtimeHosts").EnumerateArray()
+            .Select(host => host.GetProperty(JsonFields.Id).GetString() ?? string.Empty).ToArray();
+        if (hosts.Length != SupportedHosts.Count || !new HashSet<string>(hosts, StringComparer.Ordinal).SetEquals(SupportedHosts))
+        {
+            return false;
+        }
+
+        string[] providers = dimensions.GetProperty("databaseProviders").GetProperty("values").EnumerateArray()
+            .Select(provider => provider.GetString() ?? string.Empty).ToArray();
+        return providers.Length > 0 &&
+            providers.Distinct(StringComparer.Ordinal).Count() == providers.Length &&
+            providers.All(SupportedProviders.Contains);
+    }
+
+    private static bool ValidateProviderPairs(JsonElement root, HashSet<string> scenarios)
+    {
+        JsonElement providerPairs = root.GetProperty("qualifiedMappings").GetProperty("providerPairs");
+        var qualifiedIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement pair in providerPairs.EnumerateArray())
+        {
+            string finding = pair.GetProperty("findingId").GetString() ?? string.Empty;
+            Match match = ProviderFindingPattern.Match(finding);
+            if (!match.Success ||
+                !qualifiedIds.Add(finding) ||
+                pair.GetProperty("mitigationId").GetString() != "PC:IVSD-M" + match.Groups["num"].Value ||
+                !IsValidGeneralStatus(pair.GetProperty(JsonFields.VerificationStatus).GetString()) ||
+                pair.GetProperty(JsonFields.OwningPhases).GetArrayLength() == 0 ||
+                pair.GetProperty(JsonFields.Scenarios).GetArrayLength() == 0 ||
+                !ValidatePhasesAndScenarios(pair, scenarios))
+            {
+                return false;
+            }
+        }
+
+        return qualifiedIds.Count > 0;
+    }
+
+    private static bool ValidateTypedContractInventory(JsonElement root)
+    {
+        JsonElement typedInventory = root.GetProperty("typedContractInventory");
+        JsonElement dtoPairs = typedInventory.GetProperty("dtoPairs");
+        if (dtoPairs.GetArrayLength() == 0 ||
+            !IsValidGeneralStatus(typedInventory.GetProperty(JsonFields.VerificationStatus).GetString()))
+        {
+            return false;
+        }
+
+        var contractOwners = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement pair in dtoPairs.EnumerateArray())
+        {
+            string createOwner = pair.GetProperty(JsonFields.CreateOwner).GetString() ?? string.Empty;
+            string updateOwner = pair.GetProperty(JsonFields.UpdateOwner).GetString() ?? string.Empty;
+            if (!createOwner.StartsWith(ApplicationSourcePrefix, StringComparison.Ordinal) ||
+                !updateOwner.StartsWith(ApplicationSourcePrefix, StringComparison.Ordinal) ||
+                !contractOwners.Add(createOwner) ||
+                !contractOwners.Add(updateOwner))
+            {
+                return false;
+            }
+        }
+
+        JsonElement nativePairs = typedInventory.GetProperty("nativePairs");
+        if (nativePairs.GetArrayLength() == 0)
+        {
+            return false;
+        }
+
+        var nativeTypes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement pair in nativePairs.EnumerateArray())
+        {
+            string createType = pair.GetProperty("createType").GetString() ?? string.Empty;
+            string updateType = pair.GetProperty("updateType").GetString() ?? string.Empty;
+            if ((!createType.StartsWith("Create", StringComparison.Ordinal) &&
+                 !createType.StartsWith("Add", StringComparison.Ordinal)) ||
+                !updateType.StartsWith("Update", StringComparison.Ordinal) ||
+                !nativeTypes.Add(createType) ||
+                !nativeTypes.Add(updateType) ||
+                !(pair.GetProperty(JsonFields.CreateOwner).GetString() ?? string.Empty)
+                    .StartsWith(ApplicationSourcePrefix, StringComparison.Ordinal) ||
+                !(pair.GetProperty(JsonFields.UpdateOwner).GetString() ?? string.Empty)
+                    .StartsWith(ApplicationSourcePrefix, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ValidateExecutionOwnerInventory(JsonElement root, HashSet<string> scenarios)
+    {
+        JsonElement executionOwners = root.GetProperty("executionOwnerInventory");
+        var entryIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement entry in executionOwners.EnumerateArray())
+        {
+            string id = entry.GetProperty(JsonFields.Id).GetString() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(id) ||
+                !entryIds.Add(id) ||
+                entry.GetProperty("owners").GetArrayLength() == 0 ||
+                string.IsNullOrWhiteSpace(entry.GetProperty("requiredEvidence").GetString()) ||
+                string.IsNullOrWhiteSpace(entry.GetProperty("refreshTrigger").GetString()) ||
+                !IsValidGeneralStatus(entry.GetProperty(JsonFields.VerificationStatus).GetString()) ||
+                entry.GetProperty(JsonFields.OwningPhases).GetArrayLength() == 0 ||
+                entry.GetProperty(JsonFields.Scenarios).GetArrayLength() == 0 ||
+                !ValidatePhasesAndScenarios(entry, scenarios))
+            {
+                return false;
+            }
+        }
+
+        return entryIds.Count > 0;
+    }
+
+    private static bool ValidateAsvsRequirements(JsonElement root, string[] hosts, ref string diagnostic)
+    {
+        JsonElement asvs = root.GetProperty("asvs");
+        if (asvs.GetProperty("version").GetString() != "5.0.0")
+        {
+            return false;
+        }
+
+        var requirementIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement requirement in asvs.GetProperty("requirements").EnumerateArray())
+        {
+            string id = requirement.GetProperty(JsonFields.Id).GetString() ?? string.Empty;
+            string status = requirement.GetProperty(JsonFields.VerificationStatus).GetString() ?? string.Empty;
+            if (!id.StartsWith("v5.0.0-", StringComparison.Ordinal) ||
+                !requirementIds.Add(id) ||
+                requirement.GetProperty("level").GetInt32() is < 1 or > 3 ||
+                string.IsNullOrWhiteSpace(requirement.GetProperty("applicability").GetString()) ||
+                requirement.GetProperty(JsonFields.PrerequisiteProfiles).GetArrayLength() == 0 ||
+                (status != "unverified" && !ResolvedStatuses.Contains(status)))
+            {
+                diagnostic = "invalid_standard_requirement";
+                return false;
+            }
+
+            if (!ValidateHostProfiles(requirement.GetProperty(JsonFields.PrerequisiteProfiles), hosts))
+            {
+                return false;
+            }
+        }
+
+        return requirementIds.Count > 0;
+    }
+
+    private static bool ValidateApiFindingMitigationPairs(JsonElement root, HashSet<string> scenarios, ref string diagnostic)
+    {
+        JsonElement pairs = root.GetProperty("apiFindingMitigationPairs");
+        var findingIds = new HashSet<string>(StringComparer.Ordinal);
+        var mitigationIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement pair in pairs.EnumerateArray())
+        {
+            string finding = pair.GetProperty("findingId").GetString() ?? string.Empty;
+            string mitigation = pair.GetProperty("mitigationId").GetString() ?? string.Empty;
+            Match match = ApiFindingPattern.Match(finding);
+            if (!match.Success ||
+                !findingIds.Add(finding) ||
+                !mitigationIds.Add(mitigation) ||
+                mitigation != "IVSD-M" + match.Groups["num"].Value)
+            {
+                diagnostic = "invalid_finding_mapping";
+                return false;
+            }
+
+            JsonElement pairScenarios = pair.GetProperty(JsonFields.Scenarios);
+            if (pairScenarios.GetArrayLength() == 0 ||
+                !pairScenarios.EnumerateArray().All(scenario => scenarios.Contains(scenario.GetString() ?? string.Empty)))
+            {
+                return false;
+            }
+
+            JsonElement tasks = pair.GetProperty("owningTasks");
+            bool hasDeliveredReceipt = pair.TryGetProperty("deliveredReceipt", out JsonElement receiptElement) &&
+                !string.IsNullOrWhiteSpace(receiptElement.GetString());
+            if (!IsValidGeneralStatus(pair.GetProperty(JsonFields.VerificationStatus).GetString()) ||
+                (tasks.GetArrayLength() == 0 && !hasDeliveredReceipt) ||
+                !ValidateOwningTasks(tasks))
+            {
+                return false;
+            }
+        }
+
+        return findingIds.Count > 0;
+    }
+
+    private static bool ValidateOwningTasks(JsonElement tasks)
+    {
+        var taskIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement task in tasks.EnumerateArray())
+        {
+            string value = task.GetString() ?? string.Empty;
+            string[] parts = value.Split('.');
+            if (parts.Length != 2 ||
+                !int.TryParse(parts[0], System.Globalization.CultureInfo.InvariantCulture, out int phase) ||
+                phase is < 1 or > 29 ||
+                !int.TryParse(parts[1], System.Globalization.CultureInfo.InvariantCulture, out int item) ||
+                item < 1 ||
+                !taskIds.Add(value))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ValidateClassInventory(JsonElement root, HashSet<string> scenarios, ref string diagnostic)
+    {
+        JsonElement classes = root.GetProperty("classes");
+        var classIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement entry in classes.EnumerateArray())
+        {
+            string id = entry.GetProperty(JsonFields.Id).GetString() ?? string.Empty;
+            if (!classIds.Add(id) ||
+                !ClassIdPattern.IsMatch(id) ||
+                !IsValidGeneralStatus(entry.GetProperty(JsonFields.VerificationStatus).GetString()) ||
+                entry.GetProperty(JsonFields.OwningPhases).GetArrayLength() == 0 ||
+                string.IsNullOrWhiteSpace(entry.GetProperty("refreshTrigger").GetString()) ||
+                !ValidatePhasesAndScenarios(entry, scenarios))
+            {
+                diagnostic = "invalid_class_inventory";
+                return false;
+            }
+        }
+
+        if (classIds.Count == 0)
+        {
+            diagnostic = "missing_class";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool ValidateReferenceCoverage(JsonElement root, HashSet<string> families, HashSet<string> referenceIds)
+    {
+        var assignedReferences = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement family in root.GetProperty("families").EnumerateArray())
+        {
+            if (!TryCollectAssignedReferences(family.GetProperty(JsonFields.ReferenceIds), referenceIds, assignedReferences))
+            {
+                return false;
+            }
+        }
+
+        JsonElement supplements = root.GetProperty("supplementaryMechanisms");
+        _ = UniqueMatchingIdentities(supplements, SupplementaryIdPattern);
+        foreach (JsonElement supplement in supplements.EnumerateArray())
+        {
+            if (!IsValidGeneralStatus(supplement.GetProperty(JsonFields.VerificationStatus).GetString()) ||
+                !TryCollectAssignedReferences(supplement.GetProperty(JsonFields.ReferenceIds), referenceIds, assignedReferences))
+            {
+                return false;
+            }
+        }
+
+        return families.Count > 0 && assignedReferences.SetEquals(referenceIds);
+    }
+
+    private static bool TryCollectAssignedReferences(
+        JsonElement referenceIdElements,
+        HashSet<string> validReferenceIds,
+        HashSet<string> assignedReferences)
+    {
+        if (referenceIdElements.GetArrayLength() == 0)
+        {
+            return false;
+        }
+
+        foreach (JsonElement reference in referenceIdElements.EnumerateArray())
+        {
+            string id = reference.GetString() ?? string.Empty;
+            if (!validReferenceIds.Contains(id))
+            {
+                return false;
+            }
+
+            assignedReferences.Add(id);
+        }
+
+        return true;
+    }
+
+    private static bool ValidateReferences(
+        JsonElement references,
+        string[] hosts,
+        HashSet<string> scenarios,
+        ref string diagnostic)
+    {
+        foreach (JsonElement reference in references.EnumerateArray())
+        {
+            if (string.IsNullOrWhiteSpace(reference.GetProperty("functionalName").GetString()) ||
+                !Dispositions.Contains(reference.GetProperty("initialDisposition").GetString() ?? string.Empty))
+            {
+                diagnostic = "invalid_reference";
+                return false;
+            }
+
+            if (!ValidateReferenceScope(reference, hosts, scenarios))
+            {
+                return false;
+            }
+
+            if (!ValidateControlLifecycle(reference))
+            {
+                diagnostic = "invalid_control_lifecycle";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ValidateReferenceScope(JsonElement reference, string[] hosts, HashSet<string> scenarios)
+    {
+        JsonElement prerequisiteProfiles = reference.GetProperty(JsonFields.PrerequisiteProfiles);
+        if (prerequisiteProfiles.GetArrayLength() == 0 ||
+            string.IsNullOrWhiteSpace(reference.GetProperty("profileQualification").GetString()) ||
+            !ValidateHostProfiles(prerequisiteProfiles, hosts))
+        {
+            return false;
+        }
+
+        JsonElement phases = reference.GetProperty(JsonFields.OwningPhases);
+        bool delivered = reference.GetProperty("deliveredIssuance").GetBoolean();
+        if ((phases.GetArrayLength() == 0 && !delivered) || !ValidateUniquePhases(phases))
+        {
+            return false;
+        }
+
+        JsonElement ownedScenarios = reference.GetProperty(JsonFields.Scenarios);
+        return ownedScenarios.GetArrayLength() > 0 &&
+            ownedScenarios.EnumerateArray().All(scenario => scenarios.Contains(scenario.GetString() ?? string.Empty));
+    }
+
+    private static bool ValidateHostProfiles(JsonElement prerequisiteProfiles, string[] hosts)
+    {
+        var profileIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement profile in prerequisiteProfiles.EnumerateArray())
+        {
+            string host = profile.GetString() ?? string.Empty;
+            if (!hosts.Contains(host, StringComparer.Ordinal) || !profileIds.Add(host))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ValidateUniquePhases(JsonElement phases)
+    {
+        var owners = new HashSet<int>();
+        foreach (JsonElement phase in phases.EnumerateArray())
+        {
+            int value = phase.GetInt32();
+            if (value is < 1 or > 29 || !owners.Add(value))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     internal static IReadOnlyDictionary<string, ExecutionRequirement> ReadExecutionRequirements(string path)
@@ -469,7 +537,7 @@ public static class SecurityControlRegister
 
     private static bool ValidateControlLifecycle(JsonElement reference)
     {
-        string status = reference.GetProperty("verificationStatus").GetString() ?? string.Empty;
+        string status = reference.GetProperty(JsonFields.VerificationStatus).GetString() ?? string.Empty;
         JsonElement finalDisposition = reference.GetProperty("finalDisposition");
         JsonElement evidence = reference.GetProperty("executionEvidence");
         JsonElement artifactIdentity = reference.GetProperty("codeArtifactIdentity");
@@ -479,7 +547,7 @@ public static class SecurityControlRegister
             return false;
         }
 
-        if (string.Equals(status, "pending", StringComparison.Ordinal))
+        if (string.Equals(status, PendingStatus, StringComparison.Ordinal))
         {
             return finalDisposition.ValueKind == JsonValueKind.Null &&
                 evidence.GetArrayLength() == 0 &&
@@ -498,64 +566,39 @@ public static class SecurityControlRegister
         }
 
         if (artifactIdentity.ValueKind != JsonValueKind.String ||
-            string.IsNullOrWhiteSpace(artifactIdentity.GetString()))
+            string.IsNullOrWhiteSpace(artifactIdentity.GetString()) ||
+            evidence.GetArrayLength() == 0)
         {
             return false;
         }
 
-        if (evidence.GetArrayLength() == 0)
-        {
-            return false;
-        }
-
-        foreach (JsonElement entry in evidence.EnumerateArray())
-        {
-            bool validEntry = entry.ValueKind switch
-            {
-                JsonValueKind.String => !string.IsNullOrWhiteSpace(entry.GetString()),
-                JsonValueKind.Object => entry.EnumerateObject().Any(),
-                _ => false,
-            };
-            if (!validEntry)
-            {
-                return false;
-            }
-        }
-
-        return true;
+        return evidence.EnumerateArray().All(IsValidEvidenceEntry);
     }
+
+    private static bool IsValidEvidenceEntry(JsonElement entry) =>
+        entry.ValueKind switch
+        {
+            JsonValueKind.String => !string.IsNullOrWhiteSpace(entry.GetString()),
+            JsonValueKind.Object => entry.EnumerateObject().Any(),
+            _ => false,
+        };
 
     private static bool IsValidGeneralStatus(string? status) =>
-        string.Equals(status, "pending", StringComparison.Ordinal) ||
+        string.Equals(status, PendingStatus, StringComparison.Ordinal) ||
         (status is not null && ResolvedStatuses.Contains(status));
 
-    private static bool ValidatePhasesAndScenarios(JsonElement element, HashSet<string> scenarios)
-    {
-        foreach (JsonElement phase in element.GetProperty("owningPhases").EnumerateArray())
-        {
-            if (phase.GetInt32() is < 1 or > 29)
-            {
-                return false;
-            }
-        }
-
-        foreach (JsonElement scenario in element.GetProperty("scenarios").EnumerateArray())
-        {
-            if (!scenarios.Contains(scenario.GetString() ?? string.Empty))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
+    private static bool ValidatePhasesAndScenarios(JsonElement element, HashSet<string> scenarios) =>
+        !element.GetProperty(JsonFields.OwningPhases).EnumerateArray()
+            .Any(phase => phase.GetInt32() is < 1 or > 29) &&
+        element.GetProperty(JsonFields.Scenarios).EnumerateArray()
+            .All(scenario => scenarios.Contains(scenario.GetString() ?? string.Empty));
 
     private static HashSet<string> UniqueMatchingIdentities(JsonElement entries, Regex pattern)
     {
         var actual = new HashSet<string>(StringComparer.Ordinal);
         foreach (JsonElement entry in entries.EnumerateArray())
         {
-            string id = entry.GetProperty("id").GetString() ?? string.Empty;
+            string id = entry.GetProperty(JsonFields.Id).GetString() ?? string.Empty;
             if (!pattern.IsMatch(id) || !actual.Add(id))
             {
                 throw new InvalidDataException();
@@ -601,18 +644,20 @@ public static class SecurityControlRegister
             var loadPurposes = new Dictionary<RequiredTest, LoadPurpose>();
             foreach (JsonElement test in requirement.GetProperty("requiredTests").EnumerateArray())
             {
-                string[] fields = lane == "owned-runtime"
-                    ? ["className", "methodName", "testName", "lifecycle"]
-                    : lane == "owned-load-correctness" ? ["className", "methodName", "testName", "loadPurpose"]
-                    : ["className", "methodName", "testName"];
+                string[] fields = lane switch
+                {
+                    "owned-runtime" => [JsonFields.ClassName, JsonFields.MethodName, JsonFields.TestName, "lifecycle"],
+                    "owned-load-correctness" => [JsonFields.ClassName, JsonFields.MethodName, JsonFields.TestName, "loadPurpose"],
+                    _ => [JsonFields.ClassName, JsonFields.MethodName, JsonFields.TestName],
+                };
                 if (!ClosedFields(test, fields))
                 {
                     throw new InvalidDataException();
                 }
 
-                string className = test.GetProperty("className").GetString() ?? string.Empty;
-                string methodName = test.GetProperty("methodName").GetString() ?? string.Empty;
-                string testName = test.GetProperty("testName").GetString() ?? string.Empty;
+                string className = test.GetProperty(JsonFields.ClassName).GetString() ?? string.Empty;
+                string methodName = test.GetProperty(JsonFields.MethodName).GetString() ?? string.Empty;
+                string testName = test.GetProperty(JsonFields.TestName).GetString() ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(className) || string.IsNullOrWhiteSpace(methodName) ||
                     string.IsNullOrWhiteSpace(testName) || !tests.Add(new RequiredTest(className, methodName, testName)))
                 {

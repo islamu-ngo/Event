@@ -4,6 +4,11 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class MigrationLedgerExtractorTests
 {
+    private const string PostgresSnapshotPath = "src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs";
+    private const string PostgresInitMigrationPath = "src/Explore.Persistence/Migrations/20260929055408_Init.cs";
+    private const string InitStubComment = "// init";
+    private const string DesignerStubComment = "// designer";
+
     private static readonly string BaseOid = new('a', 40);
     private static readonly string HeadOid = new('b', 40);
 
@@ -12,22 +17,22 @@ public sealed class MigrationLedgerExtractorTests
     {
         var baseFiles = new Dictionary<string, string>
         {
-            ["src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs"] = "// snapshot v1",
-            ["src/Explore.Persistence/Migrations/20260929055408_Init.cs"] = "// init",
-            ["src/Explore.Persistence/Migrations/20260929055408_Init.Designer.cs"] = "// designer",
+            [PostgresSnapshotPath] = "// snapshot v1",
+            [PostgresInitMigrationPath] = InitStubComment,
+            ["src/Explore.Persistence/Migrations/20260929055408_Init.Designer.cs"] = DesignerStubComment,
             ["src/Explore.Persistence.Migrations.Sqlite/Migrations/ExploreDbContextModelSnapshot.cs"] = "// sqlite snapshot v1",
-            ["src/Explore.Persistence.Migrations.Sqlite/Migrations/20260929055409_Init.cs"] = "// init",
-            ["src/Explore.Persistence.Migrations.Sqlite/Migrations/20260929055409_Init.Designer.cs"] = "// designer",
+            ["src/Explore.Persistence.Migrations.Sqlite/Migrations/20260929055409_Init.cs"] = InitStubComment,
+            ["src/Explore.Persistence.Migrations.Sqlite/Migrations/20260929055409_Init.Designer.cs"] = DesignerStubComment,
         };
 
         var headFiles = new Dictionary<string, string>(baseFiles)
         {
-            ["src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs"] = "// snapshot v2",
+            [PostgresSnapshotPath] = "// snapshot v2",
             ["src/Explore.Persistence/Migrations/20261124120000_AddEventTags.cs"] = "// add tags",
-            ["src/Explore.Persistence/Migrations/20261124120000_AddEventTags.Designer.cs"] = "// designer",
+            ["src/Explore.Persistence/Migrations/20261124120000_AddEventTags.Designer.cs"] = DesignerStubComment,
             ["src/Explore.Persistence.Migrations.Sqlite/Migrations/ExploreDbContextModelSnapshot.cs"] = "// sqlite snapshot v2",
             ["src/Explore.Persistence.Migrations.Sqlite/Migrations/20261124120001_AddEventTags.cs"] = "// add tags",
-            ["src/Explore.Persistence.Migrations.Sqlite/Migrations/20261124120001_AddEventTags.Designer.cs"] = "// designer",
+            ["src/Explore.Persistence.Migrations.Sqlite/Migrations/20261124120001_AddEventTags.Designer.cs"] = DesignerStubComment,
         };
 
         InMemoryGitObjectReader reader = new InMemoryGitObjectReader()
@@ -50,21 +55,21 @@ public sealed class MigrationLedgerExtractorTests
     {
         var baseFiles = new Dictionary<string, string>
         {
-            ["src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs"] = "// pg v1",
-            ["src/Explore.Persistence/Migrations/20260929055408_Init.cs"] = "// init",
+            [PostgresSnapshotPath] = "// pg v1",
+            [PostgresInitMigrationPath] = InitStubComment,
             ["src/Explore.Persistence/Migrations/20261001010101_OldStep.cs"] = "// old",
             ["src/Explore.Persistence.Migrations.MySql/Migrations/ExploreDbContextModelSnapshot.cs"] = "// mysql v1",
-            ["src/Explore.Persistence.Migrations.MySql/Migrations/20260929055408_Init.cs"] = "// init",
+            ["src/Explore.Persistence.Migrations.MySql/Migrations/20260929055408_Init.cs"] = InitStubComment,
             ["src/Explore.Persistence.Migrations.MySql/Migrations/20261001010101_OldStep.cs"] = "// old",
         };
 
         var headFiles = new Dictionary<string, string>
         {
-            ["src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs"] = "// pg v2",
-            ["src/Explore.Persistence/Migrations/20260929055408_Init.cs"] = "// init",
+            [PostgresSnapshotPath] = "// pg v2",
+            [PostgresInitMigrationPath] = InitStubComment,
             ["src/Explore.Persistence/Migrations/20261124120000_PostgresOnlyFeature.cs"] = "// new",
             ["src/Explore.Persistence.Migrations.MySql/Migrations/ExploreDbContextModelSnapshot.cs"] = "// mysql v1",
-            ["src/Explore.Persistence.Migrations.MySql/Migrations/20260929055408_Init.cs"] = "// init",
+            ["src/Explore.Persistence.Migrations.MySql/Migrations/20260929055408_Init.cs"] = InitStubComment,
             ["src/Explore.Persistence.Migrations.MySql/Migrations/20261001010101_OldStep.cs"] = "// old",
         };
 
@@ -88,13 +93,13 @@ public sealed class MigrationLedgerExtractorTests
     {
         var baseFiles = new Dictionary<string, string>
         {
-            ["src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs"] = "// pg v1",
-            ["src/Explore.Persistence/Migrations/20260929055408_Init.cs"] = "// init",
+            [PostgresSnapshotPath] = "// pg v1",
+            [PostgresInitMigrationPath] = InitStubComment,
         };
         var headFiles = new Dictionary<string, string>
         {
-            ["src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs"] = "// pg modified directly",
-            ["src/Explore.Persistence/Migrations/20260929055408_Init.cs"] = "// init",
+            [PostgresSnapshotPath] = "// pg modified directly",
+            [PostgresInitMigrationPath] = InitStubComment,
         };
 
         InMemoryGitObjectReader reader = new InMemoryGitObjectReader()

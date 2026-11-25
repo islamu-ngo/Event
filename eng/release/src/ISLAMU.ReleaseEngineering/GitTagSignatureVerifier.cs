@@ -38,6 +38,8 @@ public static class GitTagSignatureVerifier
     private static readonly Regex BaselineTagPattern = new("^changelog-baseline-[0-9]{4}-[0-9]{2}-[0-9]{2}$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     private static readonly Regex GoodSignaturePattern = new("Good \\\"git\\\" signature for (?<principal>[^\\s]+)", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
 
+    private sealed record TagObjectMetadata(string TagObjectId, string TargetCommitOid, string TagObjectBody);
+
     public static string ResolveDefaultAllowedSignersPath(string repositoryRoot)
     {
         string? overridePath = Environment.GetEnvironmentVariable(AllowedSignersEnvironmentVariable);
@@ -51,150 +53,38 @@ public static class GitTagSignatureVerifier
         ArgumentNullException.ThrowIfNull(request);
 
         TimeSpan timeout = request.Timeout ?? DefaultTimeout;
-        if (timeout <= TimeSpan.Zero || timeout > MaximumTimeout)
+        string? requestError = ValidateRequest(request, timeout, out string allowedSignersPath);
+        if (requestError is not null)
         {
-            return Invalid("tag_timeout_invalid");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.RepositoryRoot) ||
-            !Directory.Exists(request.RepositoryRoot) ||
-            IsReparsePoint(request.RepositoryRoot))
-        {
-            return Invalid("tag_repository_invalid");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.TagName) ||
-            (!ReleaseTagPattern.IsMatch(request.TagName) && !BaselineTagPattern.IsMatch(request.TagName)))
-        {
-            return Invalid("tag_name_malformed");
-        }
-
-        if (request.ExpectedTargetOid is not null && !FullOidPattern.IsMatch(request.ExpectedTargetOid))
-        {
-            return Invalid("tag_expected_target_invalid");
-        }
-
-        if (request.ExpectedEventSha is not null && !FullOidPattern.IsMatch(request.ExpectedEventSha))
-        {
-            return Invalid("tag_expected_event_sha_invalid");
-        }
-
-        string allowedSignersPath;
-        try
-        {
-            allowedSignersPath = Path.GetFullPath(request.AllowedSignersPath);
-            if (!File.Exists(allowedSignersPath) || IsReparsePoint(allowedSignersPath))
-            {
-                return Invalid("tag_allowed_signers_missing");
-            }
-
-            bool hasActiveSigner = File.ReadLines(allowedSignersPath, StrictUtf8)
-                .Select(line => line.Trim())
-                .Any(line => line.Length > 0 && !line.StartsWith('#'));
-            if (!hasActiveSigner)
-            {
-                return Invalid("tag_allowed_signers_empty");
-            }
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or DecoderFallbackException)
-        {
-            return Invalid("tag_allowed_signers_invalid");
+            return Invalid(requestError);
         }
 
         string repoRoot = Path.GetFullPath(request.RepositoryRoot);
         string tagRef = $"refs/tags/{request.TagName}";
 
-        if (!TryRunGit(repoRoot, timeout, out string objectType, out _, "cat-file", "-t", tagRef))
+        string? tagError = ReadAndValidateTagObject(repoRoot, tagRef, request, timeout, out TagObjectMetadata? tagMetadata);
+        if (tagError is not null)
         {
-            return Invalid("tag_missing");
+            return Invalid(tagError);
         }
 
-        if (!string.Equals(objectType.Trim(), "tag", StringComparison.Ordinal))
-        {
-            return Invalid("tag_not_annotated");
-        }
-
-        if (!TryRunGit(repoRoot, timeout, out string tagObjectIdRaw, out _, "rev-parse", "--verify", "--end-of-options", $"{tagRef}^{{object}}") ||
-            !TryRunGit(repoRoot, timeout, out string targetCommitOidRaw, out _, "rev-parse", "--verify", "--end-of-options", $"{tagRef}^{{commit}}") ||
-            !TryRunGit(repoRoot, timeout, out string tagObjectBody, out _, "cat-file", "-p", tagRef))
-        {
-            return Invalid("tag_object_unreadable");
-        }
-
-        string tagObjectId = tagObjectIdRaw.Trim();
-        string targetCommitOid = targetCommitOidRaw.Trim();
-        if (!FullOidPattern.IsMatch(tagObjectId) || !FullOidPattern.IsMatch(targetCommitOid))
-        {
-            return Invalid("tag_object_invalid");
-        }
-
-        if (!TryParseTagHeader(tagObjectBody, out string headerObjectOid, out string headerType, out string headerTagName))
-        {
-            return Invalid("tag_object_malformed");
-        }
-
-        if (!string.Equals(headerType, "commit", StringComparison.Ordinal) ||
-            !string.Equals(headerObjectOid, targetCommitOid, StringComparison.Ordinal))
-        {
-            return Invalid("tag_target_mismatch");
-        }
-
-        if (!string.Equals(headerTagName, request.TagName, StringComparison.Ordinal))
-        {
-            return Invalid("tag_name_mismatch");
-        }
-
-        if (request.ExpectedTargetOid is not null &&
-            !string.Equals(targetCommitOid, request.ExpectedTargetOid, StringComparison.Ordinal))
-        {
-            return Invalid("tag_target_mismatch");
-        }
-
-        if (request.ExpectedEventSha is not null &&
-            !string.Equals(targetCommitOid, request.ExpectedEventSha, StringComparison.Ordinal))
-        {
-            return Invalid("tag_event_sha_mismatch");
-        }
-
-        if (!tagObjectBody.Contains("-----BEGIN SSH SIGNATURE-----", StringComparison.Ordinal))
-        {
-            return Invalid("tag_not_signed");
-        }
-
-        bool verified = TryRunGit(
+        string? signatureError = VerifySshSignature(
             repoRoot,
+            tagRef,
+            allowedSignersPath,
+            request.ExpectedSignerPrincipal,
             timeout,
-            out string verifyStdout,
-            out string verifyStderr,
-            "-c", "gpg.format=ssh",
-            "-c", $"gpg.ssh.allowedSignersFile={allowedSignersPath}",
-            "verify-tag",
-            tagRef);
-
-        if (!verified)
+            out string principal);
+        if (signatureError is not null)
         {
-            return Invalid("tag_signature_invalid");
-        }
-
-        string combined = verifyStdout + "\n" + verifyStderr;
-        Match principalMatch = GoodSignaturePattern.Match(combined);
-        if (!principalMatch.Success)
-        {
-            return Invalid("tag_signature_invalid");
-        }
-
-        string principal = principalMatch.Groups["principal"].Value;
-        if (request.ExpectedSignerPrincipal is not null &&
-            !string.Equals(principal, request.ExpectedSignerPrincipal, StringComparison.Ordinal))
-        {
-            return Invalid("tag_signer_unauthorized");
+            return Invalid(signatureError);
         }
 
         return new GitTagVerificationResult(
             true,
             request.TagName,
-            tagObjectId,
-            targetCommitOid,
+            tagMetadata!.TagObjectId,
+            tagMetadata.TargetCommitOid,
             principal,
             null);
     }
@@ -228,72 +118,18 @@ public static class GitTagSignatureVerifier
         return raw.Split('\u001e', StringSplitOptions.RemoveEmptyEntries)
             .Select(entry => entry.TrimStart('\n'))
             .Where(entry => entry.Length != 0)
-            .Select(entry =>
-            {
-                int separator = entry.IndexOf('\0', StringComparison.Ordinal);
-                if (separator <= 0)
-                {
-                    throw new IOException("Malformed Git log entry.");
-                }
-
-                return new ReleaseCommit(entry[..separator], entry[(separator + 1)..].TrimEnd('\n'));
-            })
+            .Select(ParseCommitEntry)
             .ToArray();
     }
 
     public static int RunCli(string[] args, TextWriter output, string defaultRepositoryRoot, TimeSpan timeout)
     {
-        string repositoryRoot = defaultRepositoryRoot;
-        string? tagName = null;
-        string? expectedTarget = null;
-        string? expectedEventSha = null;
-        string? allowedSigners = null;
-        string? expectedSigner = null;
-
-        for (int index = 1; index < args.Length; index++)
+        if (!TryParseCliArguments(args, defaultRepositoryRoot, output, out GitTagVerificationRequest? request))
         {
-            switch (args[index])
-            {
-                case "--repository" when index + 1 < args.Length:
-                    repositoryRoot = args[++index];
-                    break;
-                case "--tag" when index + 1 < args.Length:
-                    tagName = args[++index];
-                    break;
-                case "--target" when index + 1 < args.Length:
-                    expectedTarget = args[++index];
-                    break;
-                case "--event-sha" when index + 1 < args.Length:
-                    expectedEventSha = args[++index];
-                    break;
-                case "--allowed-signers" when index + 1 < args.Length:
-                    allowedSigners = args[++index];
-                    break;
-                case "--signer" when index + 1 < args.Length:
-                    expectedSigner = args[++index];
-                    break;
-                default:
-                    output.WriteLine("invalid_arguments: verify-release-tag requires --tag <tag-name> [--target <oid>] [--event-sha <oid>] [--allowed-signers <path>] [--signer <principal>] [--repository <path>]");
-                    return Program.UsageError;
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(tagName))
-        {
-            output.WriteLine("invalid_arguments: verify-release-tag requires --tag <tag-name>");
             return Program.UsageError;
         }
 
-        string resolvedAllowedSigners = allowedSigners ?? ResolveDefaultAllowedSignersPath(repositoryRoot);
-        GitTagVerificationResult result = Verify(new GitTagVerificationRequest(
-            repositoryRoot,
-            tagName,
-            resolvedAllowedSigners,
-            expectedTarget,
-            expectedEventSha,
-            expectedSigner,
-            timeout));
-
+        GitTagVerificationResult result = Verify(request! with { Timeout = timeout });
         if (!result.IsValid)
         {
             output.WriteLine($"verify_release_tag_failed: {result.Diagnostic}");
@@ -302,6 +138,244 @@ public static class GitTagSignatureVerifier
 
         output.WriteLine($"verified_release_tag: {result.TagName} target={result.TargetCommitOid} tag_object={result.TagObjectId} signer={result.SignerPrincipal}");
         return Program.Success;
+    }
+
+    private static string? ValidateRequest(GitTagVerificationRequest request, TimeSpan timeout, out string allowedSignersPath)
+    {
+        allowedSignersPath = string.Empty;
+        if (timeout <= TimeSpan.Zero || timeout > MaximumTimeout)
+        {
+            return "tag_timeout_invalid";
+        }
+
+        if (string.IsNullOrWhiteSpace(request.RepositoryRoot) ||
+            !Directory.Exists(request.RepositoryRoot) ||
+            IsReparsePoint(request.RepositoryRoot))
+        {
+            return "tag_repository_invalid";
+        }
+
+        if (string.IsNullOrWhiteSpace(request.TagName) ||
+            (!ReleaseTagPattern.IsMatch(request.TagName) && !BaselineTagPattern.IsMatch(request.TagName)))
+        {
+            return "tag_name_malformed";
+        }
+
+        if (request.ExpectedTargetOid is not null && !FullOidPattern.IsMatch(request.ExpectedTargetOid))
+        {
+            return "tag_expected_target_invalid";
+        }
+
+        if (request.ExpectedEventSha is not null && !FullOidPattern.IsMatch(request.ExpectedEventSha))
+        {
+            return "tag_expected_event_sha_invalid";
+        }
+
+        return ValidateAllowedSignersFile(request.AllowedSignersPath, out allowedSignersPath);
+    }
+
+    private static string? ValidateAllowedSignersFile(string path, out string allowedSignersPath)
+    {
+        allowedSignersPath = string.Empty;
+        try
+        {
+            allowedSignersPath = Path.GetFullPath(path);
+            if (!File.Exists(allowedSignersPath) || IsReparsePoint(allowedSignersPath))
+            {
+                return "tag_allowed_signers_missing";
+            }
+
+            bool hasActiveSigner = File.ReadLines(allowedSignersPath, StrictUtf8)
+                .Select(line => line.Trim())
+                .Any(line => line.Length > 0 && !line.StartsWith('#'));
+            return hasActiveSigner ? null : "tag_allowed_signers_empty";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or DecoderFallbackException)
+        {
+            return "tag_allowed_signers_invalid";
+        }
+    }
+
+    private static string? ReadAndValidateTagObject(
+        string repoRoot,
+        string tagRef,
+        GitTagVerificationRequest request,
+        TimeSpan timeout,
+        out TagObjectMetadata? metadata)
+    {
+        metadata = null;
+        if (!TryRunGit(repoRoot, timeout, out string objectType, out _, "cat-file", "-t", tagRef))
+        {
+            return "tag_missing";
+        }
+
+        if (!string.Equals(objectType.Trim(), "tag", StringComparison.Ordinal))
+        {
+            return "tag_not_annotated";
+        }
+
+        if (!TryRunGit(repoRoot, timeout, out string tagObjectIdRaw, out _, "rev-parse", "--verify", "--end-of-options", $"{tagRef}^{{object}}") ||
+            !TryRunGit(repoRoot, timeout, out string targetCommitOidRaw, out _, "rev-parse", "--verify", "--end-of-options", $"{tagRef}^{{commit}}") ||
+            !TryRunGit(repoRoot, timeout, out string tagObjectBody, out _, "cat-file", "-p", tagRef))
+        {
+            return "tag_object_unreadable";
+        }
+
+        string tagObjectId = tagObjectIdRaw.Trim();
+        string targetCommitOid = targetCommitOidRaw.Trim();
+        if (!FullOidPattern.IsMatch(tagObjectId) || !FullOidPattern.IsMatch(targetCommitOid))
+        {
+            return "tag_object_invalid";
+        }
+
+        string? headerError = ValidateTagHeaderBindings(tagObjectBody, targetCommitOid, request);
+        if (headerError is not null)
+        {
+            return headerError;
+        }
+
+        metadata = new TagObjectMetadata(tagObjectId, targetCommitOid, tagObjectBody);
+        return null;
+    }
+
+    private static string? ValidateTagHeaderBindings(string tagObjectBody, string targetCommitOid, GitTagVerificationRequest request)
+    {
+        if (!TryParseTagHeader(tagObjectBody, out string headerObjectOid, out string headerType, out string headerTagName))
+        {
+            return "tag_object_malformed";
+        }
+
+        if (!string.Equals(headerType, "commit", StringComparison.Ordinal) ||
+            !string.Equals(headerObjectOid, targetCommitOid, StringComparison.Ordinal) ||
+            (request.ExpectedTargetOid is not null && !string.Equals(targetCommitOid, request.ExpectedTargetOid, StringComparison.Ordinal)))
+        {
+            return "tag_target_mismatch";
+        }
+
+        if (!string.Equals(headerTagName, request.TagName, StringComparison.Ordinal))
+        {
+            return "tag_name_mismatch";
+        }
+
+        if (request.ExpectedEventSha is not null &&
+            !string.Equals(targetCommitOid, request.ExpectedEventSha, StringComparison.Ordinal))
+        {
+            return "tag_event_sha_mismatch";
+        }
+
+        return tagObjectBody.Contains("-----BEGIN SSH SIGNATURE-----", StringComparison.Ordinal)
+            ? null
+            : "tag_not_signed";
+    }
+
+    private static string? VerifySshSignature(
+        string repoRoot,
+        string tagRef,
+        string allowedSignersPath,
+        string? expectedSignerPrincipal,
+        TimeSpan timeout,
+        out string principal)
+    {
+        principal = string.Empty;
+        bool verified = TryRunGit(
+            repoRoot,
+            timeout,
+            out string verifyStdout,
+            out string verifyStderr,
+            "-c", "gpg.format=ssh",
+            "-c", $"gpg.ssh.allowedSignersFile={allowedSignersPath}",
+            "verify-tag",
+            tagRef);
+        if (!verified)
+        {
+            return "tag_signature_invalid";
+        }
+
+        Match principalMatch = GoodSignaturePattern.Match(verifyStdout + "\n" + verifyStderr);
+        if (!principalMatch.Success)
+        {
+            return "tag_signature_invalid";
+        }
+
+        principal = principalMatch.Groups["principal"].Value;
+        return expectedSignerPrincipal is not null && !string.Equals(principal, expectedSignerPrincipal, StringComparison.Ordinal)
+            ? "tag_signer_unauthorized"
+            : null;
+    }
+
+    private static bool TryParseCliArguments(
+        string[] args,
+        string defaultRepositoryRoot,
+        TextWriter output,
+        out GitTagVerificationRequest? request)
+    {
+        request = null;
+        string repositoryRoot = defaultRepositoryRoot;
+        string? tagName = null;
+        string? expectedTarget = null;
+        string? expectedEventSha = null;
+        string? allowedSigners = null;
+        string? expectedSigner = null;
+
+        var reader = new CliArgumentReader(args);
+        while (reader.TryReadNext(out string token))
+        {
+            if (token == "--repository" && reader.TryReadNext(out string repo))
+            {
+                repositoryRoot = repo;
+            }
+            else if (token == "--tag" && reader.TryReadNext(out string tag))
+            {
+                tagName = tag;
+            }
+            else if (token == "--target" && reader.TryReadNext(out string target))
+            {
+                expectedTarget = target;
+            }
+            else if (token == "--event-sha" && reader.TryReadNext(out string sha))
+            {
+                expectedEventSha = sha;
+            }
+            else if (token == "--allowed-signers" && reader.TryReadNext(out string signers))
+            {
+                allowedSigners = signers;
+            }
+            else if (token == "--signer" && reader.TryReadNext(out string signer))
+            {
+                expectedSigner = signer;
+            }
+            else
+            {
+                output.WriteLine("invalid_arguments: verify-release-tag requires --tag <tag-name> [--target <oid>] [--event-sha <oid>] [--allowed-signers <path>] [--signer <principal>] [--repository <path>]");
+                return false;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(tagName))
+        {
+            output.WriteLine("invalid_arguments: verify-release-tag requires --tag <tag-name>");
+            return false;
+        }
+
+        request = new GitTagVerificationRequest(
+            repositoryRoot,
+            tagName,
+            allowedSigners ?? ResolveDefaultAllowedSignersPath(repositoryRoot),
+            expectedTarget,
+            expectedEventSha,
+            expectedSigner);
+        return true;
+    }
+
+    private static ReleaseCommit ParseCommitEntry(string entry)
+    {
+        int separator = entry.IndexOf('\0', StringComparison.Ordinal);
+        if (separator <= 0)
+        {
+            throw new IOException("Malformed Git log entry.");
+        }
+
+        return new ReleaseCommit(entry[..separator], entry[(separator + 1)..].TrimEnd('\n'));
     }
 
     private static bool TryParseTagHeader(
@@ -314,8 +388,7 @@ public static class GitTagSignatureVerifier
         targetType = string.Empty;
         tagName = string.Empty;
 
-        string normalized = body.Replace("\r\n", "\n", StringComparison.Ordinal);
-        foreach (string line in normalized.Split('\n'))
+        foreach (string line in body.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
         {
             if (line.Length == 0)
             {

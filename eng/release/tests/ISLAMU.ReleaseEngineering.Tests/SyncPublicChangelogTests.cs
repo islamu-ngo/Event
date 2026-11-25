@@ -9,6 +9,13 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class SyncPublicChangelogTests
 {
+    private const string SampleVersion = "1.1.0";
+    private const string SampleReleaseDate = "2026-08-14";
+    private const string SampleSummary = "Attendees can now correct registration details.";
+    private const string BaselineTag = "v1.0.0";
+    private const string GitUserNameConfig = "user.name=Release Test";
+    private const string GitUserEmailConfig = "user.email=release@example.invalid";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -25,12 +32,12 @@ public sealed class SyncPublicChangelogTests
         }
 
         using var fixture = new ChangelogFixture();
-        fixture.CreateSignedRelease("1.1.0", "2026-08-14", "Attendees can now correct registration details.");
+        fixture.CreateSignedRelease(SampleVersion, SampleReleaseDate, SampleSummary);
 
         (int staleCode, string staleOutput) = fixture.Run(check: true);
         (int writeCode, string writeOutput) = fixture.Run();
-        byte[] firstPage = File.ReadAllBytes(fixture.PagePath);
-        byte[] firstManifest = File.ReadAllBytes(fixture.ManifestPath);
+        byte[] firstPage = await File.ReadAllBytesAsync(fixture.PagePath);
+        byte[] firstManifest = await File.ReadAllBytesAsync(fixture.ManifestPath);
         (int currentCode, string currentOutput) = fixture.Run(check: true);
         (int repeatedCode, string repeatedOutput) = fixture.Run();
 
@@ -41,22 +48,22 @@ public sealed class SyncPublicChangelogTests
         await Assert.That(currentCode).IsEqualTo(Program.Success).Because(currentOutput);
         await Assert.That(repeatedCode).IsEqualTo(Program.Success).Because(repeatedOutput);
         await Assert.That(repeatedOutput).Contains("changelog_unchanged");
-        await Assert.That(File.ReadAllBytes(fixture.PagePath)).IsEquivalentTo(firstPage);
-        await Assert.That(File.ReadAllBytes(fixture.ManifestPath)).IsEquivalentTo(firstManifest);
+        await Assert.That(await File.ReadAllBytesAsync(fixture.PagePath)).IsEquivalentTo(firstPage);
+        await Assert.That(await File.ReadAllBytesAsync(fixture.ManifestPath)).IsEquivalentTo(firstManifest);
 
         fixture.CreateSignedRelease("1.1.1", "2026-08-15", "Registration email validation is stricter.");
         (int newStale, _) = fixture.Run(check: true);
         (int unionCode, string unionOutput) = fixture.Run();
-        string union = File.ReadAllText(fixture.PagePath);
+        string union = await File.ReadAllTextAsync(fixture.PagePath);
 
         await Assert.That(newStale).IsNotEqualTo(Program.Success);
         await Assert.That(unionCode).IsEqualTo(Program.Success).Because(unionOutput);
         await Assert.That(union).Contains("## v1.1.0");
         await Assert.That(union).Contains("## v1.1.1");
         await Assert.That(union.IndexOf("## v1.1.1", StringComparison.Ordinal)).IsLessThan(union.IndexOf("## v1.1.0", StringComparison.Ordinal));
-        using JsonDocument manifest = JsonDocument.Parse(File.ReadAllBytes(fixture.ManifestPath));
+        using JsonDocument manifest = JsonDocument.Parse(await File.ReadAllBytesAsync(fixture.ManifestPath));
         await Assert.That(manifest.RootElement.GetProperty("releases").GetArrayLength()).IsEqualTo(2);
-        await Assert.That(manifest.RootElement.GetProperty("projectionSha256").GetString()).IsEqualTo(Digest(File.ReadAllBytes(fixture.PagePath)));
+        await Assert.That(manifest.RootElement.GetProperty("projectionSha256").GetString()).IsEqualTo(Digest(await File.ReadAllBytesAsync(fixture.PagePath)));
     }
 
     [Test]
@@ -68,23 +75,23 @@ public sealed class SyncPublicChangelogTests
         }
 
         using var fixture = new ChangelogFixture();
-        fixture.CreateSignedRelease("1.1.0", "2026-08-14", "Attendees can now correct registration details.", signTag: false);
+        fixture.CreateSignedRelease(SampleVersion, SampleReleaseDate, SampleSummary, signTag: false);
         (int unsignedCode, string unsignedOutput) = fixture.Run();
         await Assert.That(unsignedCode).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(unsignedOutput).Contains("tag_not_signed");
 
         using var signedFixture = new ChangelogFixture();
-        signedFixture.CreateSignedRelease("1.1.0", "2026-08-14", "Attendees can now correct registration details.");
+        signedFixture.CreateSignedRelease(SampleVersion, SampleReleaseDate, SampleSummary);
         (int generated, string generatedOutput) = signedFixture.Run();
         await Assert.That(generated).IsEqualTo(Program.Success).Because(generatedOutput);
 
-        File.AppendAllText(signedFixture.PagePath, "unauthorized mutation\n");
-        byte[] mutated = File.ReadAllBytes(signedFixture.PagePath);
+        await File.AppendAllTextAsync(signedFixture.PagePath, "unauthorized mutation\n");
+        byte[] mutated = await File.ReadAllBytesAsync(signedFixture.PagePath);
         (int rejected, string diagnostic) = signedFixture.Run();
 
         await Assert.That(rejected).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(diagnostic).Contains("changelog_accepted_projection_drift");
-        await Assert.That(File.ReadAllBytes(signedFixture.PagePath)).IsEquivalentTo(mutated);
+        await Assert.That(await File.ReadAllBytesAsync(signedFixture.PagePath)).IsEquivalentTo(mutated);
     }
 
     [Test]
@@ -100,11 +107,11 @@ public sealed class SyncPublicChangelogTests
         }
 
         using var fixture = new ChangelogFixture();
-        fixture.CreateSignedRelease("1.1.0", "2026-08-14", "Attendees can now correct registration details.");
+        fixture.CreateSignedRelease(SampleVersion, SampleReleaseDate, SampleSummary);
         (int initial, string initialOutput) = fixture.Run();
         await Assert.That(initial).IsEqualTo(Program.Success).Because(initialOutput);
-        byte[] oldPage = File.ReadAllBytes(fixture.PagePath);
-        byte[] oldManifest = File.ReadAllBytes(fixture.ManifestPath);
+        byte[] oldPage = await File.ReadAllBytesAsync(fixture.PagePath);
+        byte[] oldManifest = await File.ReadAllBytesAsync(fixture.ManifestPath);
 
         fixture.CreateSignedRelease("1.1.1", "2026-08-15", "Registration email validation is stricter.");
         bool injected = false;
@@ -132,8 +139,8 @@ public sealed class SyncPublicChangelogTests
         if (ioFailure)
         {
             await Assert.That(failedCode).IsEqualTo(Program.ToolchainRejected);
-            await Assert.That(File.ReadAllBytes(fixture.PagePath)).IsEquivalentTo(oldPage);
-            await Assert.That(File.ReadAllBytes(fixture.ManifestPath)).IsEquivalentTo(oldManifest);
+            await Assert.That(await File.ReadAllBytesAsync(fixture.PagePath)).IsEquivalentTo(oldPage);
+            await Assert.That(await File.ReadAllBytesAsync(fixture.ManifestPath)).IsEquivalentTo(oldManifest);
             await Assert.That(File.Exists(fixture.TransactionPath)).IsFalse();
         }
         else
@@ -148,7 +155,7 @@ public sealed class SyncPublicChangelogTests
         (int recovered, string recoveredOutput) = fixture.Run();
         await Assert.That(recovered).IsEqualTo(Program.Success).Because(recoveredOutput);
         await Assert.That(File.Exists(fixture.TransactionPath)).IsFalse();
-        await Assert.That(File.ReadAllText(fixture.PagePath)).Contains("## v1.1.1");
+        await Assert.That(await File.ReadAllTextAsync(fixture.PagePath)).Contains("## v1.1.1");
     }
 
     [Test]
@@ -171,8 +178,8 @@ public sealed class SyncPublicChangelogTests
 
         using var fixture = new ChangelogFixture();
         fixture.CreateSignedRelease(
-            "1.1.0",
-            "2026-08-14",
+            SampleVersion,
+            SampleReleaseDate,
             "Attendees can edit details.",
             extraNotesContent: "\nMaintainer contact: leak@example.org\n");
 
@@ -197,15 +204,15 @@ public sealed class SyncPublicChangelogTests
 
         using var fixture = new ChangelogFixture();
         fixture.CreateSignedRelease(
-            "1.1.0",
-            "2026-08-14",
-            "Attendees can now correct registration details.",
+            SampleVersion,
+            SampleReleaseDate,
+            SampleSummary,
             linkedChangeId: "CHG-2026-0001");
 
         (int initialCode, string initialOutput) = fixture.Run();
         await Assert.That(initialCode).IsEqualTo(Program.Success).Because(initialOutput);
-        byte[] originalPage = File.ReadAllBytes(fixture.PagePath);
-        byte[] originalManifest = File.ReadAllBytes(fixture.ManifestPath);
+        byte[] originalPage = await File.ReadAllBytesAsync(fixture.PagePath);
+        byte[] originalManifest = await File.ReadAllBytesAsync(fixture.ManifestPath);
 
         string tamperedFullPath = Path.Combine(
             fixture.RepositoryPath,
@@ -216,8 +223,8 @@ public sealed class SyncPublicChangelogTests
 
         await Assert.That(rejectedCode).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(rejectedOutput).Contains($"changelog_signed_artifact_mismatch:{tamperedRelativePath}");
-        await Assert.That(File.ReadAllBytes(fixture.PagePath)).IsEquivalentTo(originalPage);
-        await Assert.That(File.ReadAllBytes(fixture.ManifestPath)).IsEquivalentTo(originalManifest);
+        await Assert.That(await File.ReadAllBytesAsync(fixture.PagePath)).IsEquivalentTo(originalPage);
+        await Assert.That(await File.ReadAllBytesAsync(fixture.ManifestPath)).IsEquivalentTo(originalManifest);
     }
 
     private static string Digest(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
@@ -227,8 +234,8 @@ public sealed class SyncPublicChangelogTests
     private sealed class ChangelogFixture : IDisposable
     {
         private readonly string keyPath;
-        private string? previousTag;
-        private string? previousOid;
+        private string previousTag;
+        private string previousOid;
         private int sequence;
 
         public ChangelogFixture()
@@ -252,10 +259,10 @@ public sealed class SyncPublicChangelogTests
 
             Git("init", "--initial-branch=main");
             string initialOid = Commit("fix(events): establish repository baseline");
-            Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid",
+            Git("-c", GitUserNameConfig, "-c", GitUserEmailConfig,
                 "-c", "gpg.format=ssh", "-c", $"user.signingKey={keyPath}",
-                "tag", "-s", "v1.0.0", initialOid, "-m", "v1.0.0");
-            previousTag = "v1.0.0";
+                "tag", "-s", BaselineTag, initialOid, "-m", BaselineTag);
+            previousTag = BaselineTag;
             previousOid = initialOid;
         }
 
@@ -308,16 +315,16 @@ public sealed class SyncPublicChangelogTests
 
             File.WriteAllText(
                 Path.Combine(releaseDir, "release.yaml"),
-                $"Version: {version}\nLine: {line}\nRelease-Date: {releaseDate}\nBase-Stable-Tag: v1.0.0\nPrevious-Published-Tag: {previousTag}\nRelease-Range:\n  Base-Ref: v1.0.0\n  Base-Oid: {previousOid}\n  Previous-Ref: {previousTag}\n  Previous-Oid: {previousOid}\nCompatibility:\n  - v1\nImpact-Dispositions:\n  breaking: not-applicable\n  security: not-applicable\n  migration: not-applicable\n  configuration: not-applicable\n  openapi: not-applicable\n  operator: not-applicable\n");
+                $"Version: {version}\nLine: {line}\nRelease-Date: {releaseDate}\nBase-Stable-Tag: {BaselineTag}\nPrevious-Published-Tag: {previousTag}\nRelease-Range:\n  Base-Ref: {BaselineTag}\n  Base-Oid: {previousOid}\n  Previous-Ref: {previousTag}\n  Previous-Oid: {previousOid}\nCompatibility:\n  - v1\nImpact-Dispositions:\n  breaking: not-applicable\n  security: not-applicable\n  migration: not-applicable\n  configuration: not-applicable\n  openapi: not-applicable\n  operator: not-applicable\n");
             File.WriteAllText(Path.Combine(releaseDir, "summary.md"), summary + "\n");
             File.WriteAllText(Path.Combine(releaseDir, "release-notes.md"), $"# Release {version}\n\n{summary}\n{extraNotesContent ?? string.Empty}");
 
             var context = new ReleaseContext(
                 1,
-                new ReleaseContextRelease(version, line, releaseDate, "v1.0.0", previousTag!, "minor", "stable", true),
+                new ReleaseContextRelease(version, line, releaseDate, BaselineTag, previousTag, "minor", "stable", true),
                 [new ReleaseContextChange(changeCommit[..12], changeCommit, linkedChangeId, "feat", "registration", $"deliver {version}", summary, false, false, null)],
-                new ReleaseContextEvidence(previousOid!, previousOid!, [
-                    new ReleaseContextObject(previousOid![..12], previousOid!),
+                new ReleaseContextEvidence(previousOid, previousOid, [
+                    new ReleaseContextObject(previousOid[..12], previousOid),
                     new ReleaseContextObject(changeCommit[..12], changeCommit),
                 ]));
             File.WriteAllText(Path.Combine(releaseDir, "release-context.v1.json"), JsonSerializer.Serialize(context, JsonOptions) + "\n");
@@ -325,13 +332,13 @@ public sealed class SyncPublicChangelogTests
             string prepOid = Commit($"docs(release): prepare {version}");
             if (signTag)
             {
-                Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid",
+                Git("-c", GitUserNameConfig, "-c", GitUserEmailConfig,
                     "-c", "gpg.format=ssh", "-c", $"user.signingKey={keyPath}",
                     "tag", "-s", $"v{version}", prepOid, "-m", $"Release v{version}");
             }
             else
             {
-                Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid",
+                Git("-c", GitUserNameConfig, "-c", GitUserEmailConfig,
                     "tag", "-a", $"v{version}", prepOid, "-m", $"Release v{version}");
             }
 
@@ -345,7 +352,7 @@ public sealed class SyncPublicChangelogTests
             string file = Path.Combine(RepositoryPath, $"change-{sequence}.txt");
             File.WriteAllText(file, $"value {sequence}\n");
             Git("add", "-A");
-            Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "commit", "-q", "-m", message);
+            Git("-c", GitUserNameConfig, "-c", GitUserEmailConfig, "commit", "-q", "-m", message);
             return Git("rev-parse", "HEAD^{commit}").Trim();
         }
 

@@ -5,6 +5,8 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class GitCliffContextEnricherTests
 {
+    private const string ExtraField = "extra";
+
     private static readonly ReleasePolicy Policy = ReleasePolicy.LoadFromRepositoryRoot(RepositoryRoot.Find());
     private static readonly string BaseOid = new('a', 40);
     private static readonly string VisibleOid = new('c', 40);
@@ -17,7 +19,7 @@ public sealed class GitCliffContextEnricherTests
         "commit_range",
         "previous",
         "commits",
-        "extra",
+        ExtraField,
     };
 
     private static readonly HashSet<string> AllowedCommitKeys = new(StringComparer.Ordinal)
@@ -30,7 +32,7 @@ public sealed class GitCliffContextEnricherTests
         "breaking_description",
         "conventional",
         "merge_commit",
-        "extra",
+        ExtraField,
     };
 
     [Test]
@@ -117,24 +119,24 @@ public sealed class GitCliffContextEnricherTests
         await Assert.That(doc.RootElement.GetArrayLength()).IsEqualTo(1);
 
         JsonElement release = doc.RootElement[0];
-        foreach (JsonProperty prop in release.EnumerateObject())
+        foreach (string key in release.EnumerateObject().Select(prop => prop.Name))
         {
-            await Assert.That(AllowedReleaseKeys.Contains(prop.Name)).IsTrue().Because($"Unexpected release key: {prop.Name}");
+            await Assert.That(AllowedReleaseKeys.Contains(key)).IsTrue().Because($"Unexpected release key: {key}");
         }
 
         JsonElement commit = release.GetProperty("commits")[0];
-        foreach (JsonProperty prop in commit.EnumerateObject())
+        foreach (string key in commit.EnumerateObject().Select(prop => prop.Name))
         {
-            await Assert.That(AllowedCommitKeys.Contains(prop.Name)).IsTrue().Because($"Unexpected commit key: {prop.Name}");
+            await Assert.That(AllowedCommitKeys.Contains(key)).IsTrue().Because($"Unexpected commit key: {key}");
         }
 
         // Curated extra is present, and images is absent when no manifest was supplied.
-        JsonElement releaseExtra = release.GetProperty("extra");
+        JsonElement releaseExtra = release.GetProperty(ExtraField);
         await Assert.That(releaseExtra.GetProperty("version").GetString()).IsEqualTo("1.1.0");
         await Assert.That(releaseExtra.GetProperty("maintainerSummary").GetString()).IsEqualTo("Attendees can now correct registration details.");
         await Assert.That(releaseExtra.TryGetProperty("images", out _)).IsFalse();
 
-        JsonElement commitExtra = commit.GetProperty("extra");
+        JsonElement commitExtra = commit.GetProperty(ExtraField);
         await Assert.That(commitExtra.GetProperty("changeId").GetString()).IsEqualTo("CHG-2026-0001");
         await Assert.That(commitExtra.GetProperty("displayId").GetString()).IsEqualTo(VisibleOid[..12]);
     }

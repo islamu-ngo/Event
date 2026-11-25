@@ -5,6 +5,11 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class ReleaseInputPolicyTests
 {
+    private const string SampleSummarySentence = "Attendees use a single credential during check-in.";
+    private const string CoordinatedDisclosureLine = "Public-Disclosure: coordinated";
+    private const string RestrictedDetailDiagnostic = "fragment_restricted_detail_marker:CHG-2026-0001";
+    private const string EmbargoNotPublicDiagnostic = "fragment_embargo_not_public:CHG-2026-0001";
+
     private static readonly string[] DuplicateFragmentDiagnostics = ["fragment_duplicate_change_id:CHG-2026-0001"];
     private static readonly string[] IncompatibleGroupDiagnostics = ["fragment_incompatible_group:registration-upgrade"];
 
@@ -63,12 +68,12 @@ public sealed class ReleaseInputPolicyTests
     public async Task OrdinaryProseContainingRestrictedPassesWhileStructuralEmbargoAndRestrictedDetailsKeyFailClosed()
     {
         string ordinaryProse = ValidFragmentYaml()
-            .Replace("Attendees use a single credential during check-in.", "Admin routes are restricted to authorized event organizers.", StringComparison.Ordinal)
+            .Replace(SampleSummarySentence, "Admin routes are restricted to authorized event organizers.", StringComparison.Ordinal)
             .Replace("Check-in integrations must send credential after upgrading.", "Access remains restricted to tenant administrators.", StringComparison.Ordinal);
         string structuralKey = ValidFragmentYaml() + "\nRestricted-Details: private exploit steps\n";
         string nestedStructuralKey = ValidFragmentYaml()
             .Replace("    Disposition: coordinated", "    Disposition: coordinated\n    Restricted-Details: hidden note", StringComparison.Ordinal);
-        string embargoed = ValidFragmentYaml().Replace("Public-Disclosure: coordinated", "Public-Disclosure: embargoed", StringComparison.Ordinal);
+        string embargoed = ValidFragmentYaml().Replace(CoordinatedDisclosureLine, "Public-Disclosure: embargoed", StringComparison.Ordinal);
 
         ReleaseInputValidationResult proseResult = ReleaseInputPolicy.ValidateFragments([ordinaryProse]);
         ReleaseInputValidationResult keyResult = ReleaseInputPolicy.ValidateFragments([structuralKey]);
@@ -77,11 +82,11 @@ public sealed class ReleaseInputPolicyTests
 
         await Assert.That(proseResult.IsValid).IsTrue().Because(string.Join("; ", proseResult.Diagnostics));
         await Assert.That(keyResult.IsValid).IsFalse();
-        await Assert.That(keyResult.Diagnostics).Contains("fragment_restricted_detail_marker:CHG-2026-0001");
+        await Assert.That(keyResult.Diagnostics).Contains(RestrictedDetailDiagnostic);
         await Assert.That(nestedKeyResult.IsValid).IsFalse();
-        await Assert.That(nestedKeyResult.Diagnostics).Contains("fragment_restricted_detail_marker:CHG-2026-0001");
+        await Assert.That(nestedKeyResult.Diagnostics).Contains(RestrictedDetailDiagnostic);
         await Assert.That(embargoResult.IsValid).IsFalse();
-        await Assert.That(embargoResult.Diagnostics).Contains("fragment_embargo_not_public:CHG-2026-0001");
+        await Assert.That(embargoResult.Diagnostics).Contains(EmbargoNotPublicDiagnostic);
     }
 
     [Test]
@@ -219,26 +224,26 @@ public sealed class ReleaseInputPolicyTests
     {
         ReleaseInputValidationResult result = ReleaseInputPolicy.Validate(
             ValidReleaseYaml(),
-            [ValidFragmentYaml().Replace("Public-Disclosure: coordinated", "Public-Disclosure: embargoed", StringComparison.Ordinal) + "\nRestricted-Details: private reproduction\n"],
+            [ValidFragmentYaml().Replace(CoordinatedDisclosureLine, "Public-Disclosure: embargoed", StringComparison.Ordinal) + "\nRestricted-Details: private reproduction\n"],
             []);
 
-        await Assert.That(result.Diagnostics).Contains("fragment_embargo_not_public:CHG-2026-0001");
-        await Assert.That(result.Diagnostics).Contains("fragment_restricted_detail_marker:CHG-2026-0001");
+        await Assert.That(result.Diagnostics).Contains(EmbargoNotPublicDiagnostic);
+        await Assert.That(result.Diagnostics).Contains(RestrictedDetailDiagnostic);
     }
 
     [Test]
     public async Task PublicMarkersRejectCaseConfusablesAndBidiWithoutRejectingMultilingualText()
     {
-        string embargo = ValidFragmentYaml().Replace("Public-Disclosure: coordinated", "Public-Disclosure: Embargoed", StringComparison.Ordinal);
+        string embargo = ValidFragmentYaml().Replace(CoordinatedDisclosureLine, "Public-Disclosure: Embargoed", StringComparison.Ordinal);
         string confusable = Fragment("CHG-2026-0002") + "\nRe\u0455tricted-Details: private reproduction\n";
         string bidi = Fragment("CHG-2026-0003").Replace("single credential", "single \u202Ecredential", StringComparison.Ordinal);
         string format = Fragment("CHG-2026-0005").Replace("single credential", "single\u200Dcredential", StringComparison.Ordinal);
-        string multilingual = Fragment("CHG-2026-0004").Replace("Attendees use a single credential during check-in.", "يمكن للحاضرين استخدام اعتماد واحد عند تسجيل الوصول.", StringComparison.Ordinal);
+        string multilingual = Fragment("CHG-2026-0004").Replace(SampleSummarySentence, "يمكن للحاضرين استخدام اعتماد واحد عند تسجيل الوصول.", StringComparison.Ordinal);
 
         ReleaseInputValidationResult invalid = ReleaseInputPolicy.Validate(ValidReleaseYaml(), [embargo, confusable, bidi, format], []);
         ReleaseInputValidationResult valid = ReleaseInputPolicy.Validate(ValidReleaseYaml(), [multilingual], []);
 
-        await Assert.That(invalid.Diagnostics).Contains("fragment_embargo_not_public:CHG-2026-0001");
+        await Assert.That(invalid.Diagnostics).Contains(EmbargoNotPublicDiagnostic);
         await Assert.That(invalid.Diagnostics).Contains("fragment_restricted_detail_marker:CHG-2026-0002");
         await Assert.That(invalid.Diagnostics).Contains("fragment_ambiguous_unicode:CHG-2026-0003");
         await Assert.That(invalid.Diagnostics).Contains("fragment_ambiguous_unicode:CHG-2026-0005");
@@ -328,8 +333,8 @@ public sealed class ReleaseInputPolicyTests
         string pullRequest = Fragment("CHG-2026-0007").Replace("single credential", "https://codeberg.org/team/app/pulls/42", StringComparison.Ordinal);
         string handle = Fragment("CHG-2026-0008").Replace("single credential", "approved by @release-admin", StringComparison.Ordinal);
         string runId = Fragment("CHG-2026-0009").Replace("single credential", "workflow run id=123456", StringComparison.Ordinal);
-        string productNames = Fragment("CHG-2026-0010").Replace("Attendees use a single credential during check-in.", "GitHub and GitLab users receive clearer release notes.", StringComparison.Ordinal);
-        string emailProse = Fragment("CHG-2026-0014").Replace("Attendees use a single credential during check-in.", "Contact support@example.org for migration help.", StringComparison.Ordinal);
+        string productNames = Fragment("CHG-2026-0010").Replace(SampleSummarySentence, "GitHub and GitLab users receive clearer release notes.", StringComparison.Ordinal);
+        string emailProse = Fragment("CHG-2026-0014").Replace(SampleSummarySentence, "Contact support@example.org for migration help.", StringComparison.Ordinal);
 
         ReleaseInputValidationResult secrets = ReleaseInputPolicy.Validate(ValidReleaseYaml(), [privateKey, bearer, credential, tokenPrefix, password, lowercaseBearer], []);
         ReleaseInputValidationResult providers = ReleaseInputPolicy.Validate(ValidReleaseYaml(), [profile, commit, pullRequest, handle, runId], []);
@@ -396,10 +401,10 @@ public sealed class ReleaseInputPolicyTests
         {
             ReleaseInputValidationResult result = ReleaseInputPolicy.Validate(
                 ValidReleaseYaml(),
-                [ValidFragmentYaml().Replace("Public-Disclosure: coordinated", $"Public-Disclosure: {disclosure}", StringComparison.Ordinal)],
+                [ValidFragmentYaml().Replace(CoordinatedDisclosureLine, $"Public-Disclosure: {disclosure}", StringComparison.Ordinal)],
                 []);
 
-            await Assert.That(result.Diagnostics).Contains("fragment_embargo_not_public:CHG-2026-0001");
+            await Assert.That(result.Diagnostics).Contains(EmbargoNotPublicDiagnostic);
         }
     }
 
@@ -413,7 +418,7 @@ public sealed class ReleaseInputPolicyTests
                 [ValidFragmentYaml() + $"\n{marker}: private reproduction\n"],
                 []);
 
-            await Assert.That(result.Diagnostics).Contains("fragment_restricted_detail_marker:CHG-2026-0001");
+            await Assert.That(result.Diagnostics).Contains(RestrictedDetailDiagnostic);
         }
     }
 

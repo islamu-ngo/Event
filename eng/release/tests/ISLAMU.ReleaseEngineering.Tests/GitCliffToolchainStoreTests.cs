@@ -9,6 +9,12 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class GitCliffToolchainStoreTests
 {
+    private const string ToolName = "git-cliff";
+    private const string LinuxX64Platform = "linux-x64";
+    private const string WindowsX64Platform = "windows-x64";
+    private const string ExpectedVersionBanner = "git-cliff 2.14.2";
+    private const string TarExecutableEntry = "git-cliff-2.14.2/git-cliff";
+
     [Test]
     public async Task RepositoryLockPinsGitCliff2142AcrossFourPlatformsWithFreshDigests()
     {
@@ -16,11 +22,11 @@ public sealed class GitCliffToolchainStoreTests
         ToolchainLockLoadResult loaded = GitCliffToolchainStore.LoadLock(lockPath);
 
         await Assert.That(loaded.IsValid).IsTrue().Because(loaded.Diagnostic ?? "valid repository toolchain lock");
-        await Assert.That(loaded.Lock!.Tool).IsEqualTo("git-cliff");
+        await Assert.That(loaded.Lock!.Tool).IsEqualTo(ToolName);
         await Assert.That(loaded.Lock.Version).IsEqualTo("2.14.2");
 
         string[] platforms = loaded.Lock.Platforms.Select(entry => entry.Platform).Order(StringComparer.Ordinal).ToArray();
-        await Assert.That(platforms).IsEquivalentTo(["linux-arm64", "linux-x64", "osx-arm64", "windows-x64"]);
+        await Assert.That(platforms).IsEquivalentTo(["linux-arm64", LinuxX64Platform, "osx-arm64", WindowsX64Platform]);
 
         string[] retired2131Digests =
         [
@@ -49,39 +55,39 @@ public sealed class GitCliffToolchainStoreTests
         }
 
         using var fixture = new StoreFixture();
-        byte[] binary = fixture.BuildFakeExecutableBytes("git-cliff 2.14.2");
-        byte[] archive = StoreFixture.BuildTarGz([("git-cliff-2.14.2/git-cliff", binary, TarEntryType.RegularFile)]);
+        byte[] binary = StoreFixture.BuildFakeExecutableBytes(ExpectedVersionBanner);
+        byte[] archive = StoreFixture.BuildTarGz([(TarExecutableEntry, binary, TarEntryType.RegularFile)]);
         fixture.WriteLock(archive, binary);
 
         ToolchainVerificationResult missing = GitCliffToolchainStore.VerifyInstalled(
             fixture.LockPath,
             fixture.InstallDirectory,
-            "linux-x64",
+            LinuxX64Platform,
             TimeSpan.FromSeconds(2));
         await Assert.That(missing.IsValid).IsFalse();
         await Assert.That(missing.Diagnostic).IsEqualTo("required executable is missing: git-cliff");
 
-        string executablePath = Path.Combine(fixture.InstallDirectory, "git-cliff");
-        await File.WriteAllBytesAsync(executablePath, fixture.BuildFakeExecutableBytes("git-cliff 2.14.2 tampered"));
+        string executablePath = Path.Combine(fixture.InstallDirectory, ToolName);
+        await File.WriteAllBytesAsync(executablePath, StoreFixture.BuildFakeExecutableBytes("git-cliff 2.14.2 tampered"));
         File.SetUnixFileMode(executablePath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
 
         ToolchainVerificationResult wrongDigest = GitCliffToolchainStore.VerifyInstalled(
             fixture.LockPath,
             fixture.InstallDirectory,
-            "linux-x64",
+            LinuxX64Platform,
             TimeSpan.FromSeconds(2));
         await Assert.That(wrongDigest.IsValid).IsFalse();
         await Assert.That(wrongDigest.Diagnostic).IsEqualTo("executable digest mismatch: git-cliff");
 
-        byte[] wrongVersionBinary = fixture.BuildFakeExecutableBytes("git-cliff 2.13.1");
-        byte[] wrongVersionArchive = StoreFixture.BuildTarGz([("git-cliff-2.14.2/git-cliff", wrongVersionBinary, TarEntryType.RegularFile)]);
+        byte[] wrongVersionBinary = StoreFixture.BuildFakeExecutableBytes("git-cliff 2.13.1");
+        byte[] wrongVersionArchive = StoreFixture.BuildTarGz([(TarExecutableEntry, wrongVersionBinary, TarEntryType.RegularFile)]);
         fixture.WriteLock(wrongVersionArchive, wrongVersionBinary);
         await File.WriteAllBytesAsync(executablePath, wrongVersionBinary);
 
         ToolchainVerificationResult wrongVersion = GitCliffToolchainStore.VerifyInstalled(
             fixture.LockPath,
             fixture.InstallDirectory,
-            "linux-x64",
+            LinuxX64Platform,
             TimeSpan.FromSeconds(2));
         await Assert.That(wrongVersion.IsValid).IsFalse();
         await Assert.That(wrongVersion.Diagnostic).IsEqualTo("version mismatch: expected git-cliff 2.14.2");
@@ -96,10 +102,10 @@ public sealed class GitCliffToolchainStoreTests
         }
 
         using var fixture = new StoreFixture();
-        byte[] binary = fixture.BuildFakeExecutableBytes("git-cliff 2.14.2");
+        byte[] binary = StoreFixture.BuildFakeExecutableBytes(ExpectedVersionBanner);
         byte[] archive = StoreFixture.BuildTarGz([
             ("git-cliff-2.14.2/LICENSE-MIT", "MIT"u8.ToArray(), TarEntryType.RegularFile),
-            ("git-cliff-2.14.2/git-cliff", binary, TarEntryType.RegularFile),
+            (TarExecutableEntry, binary, TarEntryType.RegularFile),
         ]);
         fixture.WriteLock(archive, binary);
 
@@ -107,7 +113,7 @@ public sealed class GitCliffToolchainStoreTests
         ToolchainVerificationResult provisioned = GitCliffToolchainStore.EnsureProvisioned(
             fixture.LockPath,
             fixture.InstallDirectory,
-            "linux-x64",
+            LinuxX64Platform,
             TimeSpan.FromSeconds(2),
             _ =>
             {
@@ -122,7 +128,7 @@ public sealed class GitCliffToolchainStoreTests
         ToolchainVerificationResult reused = GitCliffToolchainStore.EnsureProvisioned(
             fixture.LockPath,
             fixture.InstallDirectory,
-            "linux-x64",
+            LinuxX64Platform,
             TimeSpan.FromSeconds(2),
             _ =>
             {
@@ -143,21 +149,21 @@ public sealed class GitCliffToolchainStoreTests
         }
 
         using var fixture = new StoreFixture();
-        byte[] binary = fixture.BuildFakeExecutableBytes("git-cliff 2.14.2");
-        byte[] expectedArchive = StoreFixture.BuildTarGz([("git-cliff-2.14.2/git-cliff", binary, TarEntryType.RegularFile)]);
-        byte[] tamperedArchive = StoreFixture.BuildTarGz([("git-cliff-2.14.2/git-cliff", binary.Concat("\n"u8.ToArray()).ToArray(), TarEntryType.RegularFile)]);
+        byte[] binary = StoreFixture.BuildFakeExecutableBytes(ExpectedVersionBanner);
+        byte[] expectedArchive = StoreFixture.BuildTarGz([(TarExecutableEntry, binary, TarEntryType.RegularFile)]);
+        byte[] tamperedArchive = StoreFixture.BuildTarGz([(TarExecutableEntry, binary.Concat("\n"u8.ToArray()).ToArray(), TarEntryType.RegularFile)]);
         fixture.WriteLock(expectedArchive, binary);
 
         ToolchainVerificationResult result = GitCliffToolchainStore.EnsureProvisioned(
             fixture.LockPath,
             fixture.InstallDirectory,
-            "linux-x64",
+            LinuxX64Platform,
             TimeSpan.FromSeconds(2),
             _ => tamperedArchive);
 
         await Assert.That(result.IsValid).IsFalse();
         await Assert.That(result.Diagnostic).IsEqualTo("archive digest mismatch: git-cliff-2.14.2-x86_64-unknown-linux-musl.tar.gz");
-        await Assert.That(File.Exists(Path.Combine(fixture.InstallDirectory, "git-cliff"))).IsFalse();
+        await Assert.That(File.Exists(Path.Combine(fixture.InstallDirectory, ToolName))).IsFalse();
     }
 
     [Test]
@@ -173,23 +179,23 @@ public sealed class GitCliffToolchainStoreTests
         }
 
         using var fixture = new StoreFixture();
-        byte[] binary = fixture.BuildFakeExecutableBytes("git-cliff 2.14.2");
+        byte[] binary = StoreFixture.BuildFakeExecutableBytes(ExpectedVersionBanner);
         byte[] archive = StoreFixture.BuildTarGz([
             (entryName, entryType == TarEntryType.RegularFile ? binary : [], entryType),
-            ("git-cliff-2.14.2/git-cliff", binary, TarEntryType.RegularFile),
+            (TarExecutableEntry, binary, TarEntryType.RegularFile),
         ]);
         fixture.WriteLock(archive, binary);
 
         ToolchainVerificationResult result = GitCliffToolchainStore.EnsureProvisioned(
             fixture.LockPath,
             fixture.InstallDirectory,
-            "linux-x64",
+            LinuxX64Platform,
             TimeSpan.FromSeconds(2),
             _ => archive);
 
         await Assert.That(result.IsValid).IsFalse();
         await Assert.That(result.Diagnostic).Contains("unsafe archive");
-        await Assert.That(File.Exists(Path.Combine(fixture.InstallDirectory, "git-cliff"))).IsFalse();
+        await Assert.That(File.Exists(Path.Combine(fixture.InstallDirectory, ToolName))).IsFalse();
     }
 
     [Test]
@@ -201,12 +207,12 @@ public sealed class GitCliffToolchainStoreTests
             ("../evil.exe", binary),
             ("git-cliff-2.14.2/git-cliff.exe", binary),
         ]);
-        fixture.WriteLock(traversalZip, binary, platform: "windows-x64", executable: "git-cliff.exe", archiveName: "git-cliff-2.14.2-x86_64-pc-windows-msvc.zip");
+        fixture.WriteLock(traversalZip, binary, platform: WindowsX64Platform, executable: "git-cliff.exe", archiveName: "git-cliff-2.14.2-x86_64-pc-windows-msvc.zip");
 
         ToolchainVerificationResult rejected = GitCliffToolchainStore.EnsureProvisioned(
             fixture.LockPath,
             fixture.InstallDirectory,
-            "windows-x64",
+            WindowsX64Platform,
             TimeSpan.FromSeconds(2),
             _ => traversalZip);
 
@@ -219,7 +225,7 @@ public sealed class GitCliffToolchainStoreTests
         byte[] extracted = GitCliffToolchainStore.ExtractVerifiedExecutableFromArchiveBytes(
             safeZip,
             new ToolchainPlatformEntry(
-                "windows-x64",
+                WindowsX64Platform,
                 "git-cliff.exe",
                 StoreFixture.Sha256(binary),
                 "git-cliff-2.14.2-x86_64-pc-windows-msvc.zip",
@@ -233,7 +239,7 @@ public sealed class GitCliffToolchainStoreTests
     {
         var tool = new VerifiedGitCliffExecutable(
             "2.14.2",
-            "linux-x64",
+            LinuxX64Platform,
             "/opt/verified/git-cliff",
             new string('a', 64));
 
@@ -274,20 +280,20 @@ public sealed class GitCliffToolchainStoreTests
         public string InstallDirectory { get; }
         public string LockPath { get; }
 
-        public byte[] BuildFakeExecutableBytes(string versionLine) =>
+        public static byte[] BuildFakeExecutableBytes(string versionLine) =>
             Encoding.UTF8.GetBytes($"#!/bin/sh\nprintf '%s\\n' '{versionLine}'\n");
 
         public void WriteLock(
             byte[] archiveBytes,
             byte[] executableBytes,
-            string platform = "linux-x64",
-            string executable = "git-cliff",
+            string platform = LinuxX64Platform,
+            string executable = ToolName,
             string archiveName = "git-cliff-2.14.2-x86_64-unknown-linux-musl.tar.gz")
         {
             string json = JsonSerializer.Serialize(new
             {
                 schemaVersion = 1,
-                tool = "git-cliff",
+                tool = ToolName,
                 version = "2.14.2",
                 platforms = new[]
                 {

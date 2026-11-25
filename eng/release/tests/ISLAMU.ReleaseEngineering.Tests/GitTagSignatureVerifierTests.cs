@@ -5,6 +5,8 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class GitTagSignatureVerifierTests
 {
+    private const string FirstReleaseTag = "v0.1.0";
+
     [Test]
     public async Task RepositoryDefaultAllowedSignersFailsClosedUntilProductionSignerIsEnrolled()
     {
@@ -15,12 +17,12 @@ public sealed class GitTagSignatureVerifierTests
 
         using var fixture = new SignedTagFixture();
         string commit = fixture.Commit("feat(events): publish first release");
-        fixture.CreateSignedTag("v0.1.0", commit, fixture.AuthorizedKeyPath);
+        fixture.CreateSignedTag(FirstReleaseTag, commit, fixture.AuthorizedKeyPath);
         string repoAllowedSigners = Path.Combine(RepositoryRoot.Find(), "eng", "release", "trust", "allowed-signers");
 
         GitTagVerificationResult result = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
             fixture.RepositoryRoot,
-            "v0.1.0",
+            FirstReleaseTag,
             repoAllowedSigners,
             ExpectedTargetOid: commit));
 
@@ -39,25 +41,25 @@ public sealed class GitTagSignatureVerifierTests
         using var fixture = new SignedTagFixture();
         string firstCommit = fixture.Commit("feat(events): publish first release");
         string secondCommit = fixture.Commit("fix(events): correct schedule alignment");
-        fixture.CreateSignedTag("v0.1.0", secondCommit, fixture.AuthorizedKeyPath);
+        fixture.CreateSignedTag(FirstReleaseTag, secondCommit, fixture.AuthorizedKeyPath);
 
         GitTagVerificationResult valid = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
             fixture.RepositoryRoot,
-            "v0.1.0",
+            FirstReleaseTag,
             fixture.AllowedSignersPath,
             ExpectedTargetOid: secondCommit,
             ExpectedEventSha: secondCommit,
             ExpectedSignerPrincipal: "release-operator"));
 
         await Assert.That(valid.IsValid).IsTrue().Because(valid.Diagnostic ?? "valid SSH signed tag");
-        await Assert.That(valid.TagName).IsEqualTo("v0.1.0");
+        await Assert.That(valid.TagName).IsEqualTo(FirstReleaseTag);
         await Assert.That(valid.TargetCommitOid).IsEqualTo(secondCommit);
         await Assert.That(valid.SignerPrincipal).IsEqualTo("release-operator");
         await Assert.That(valid.TagObjectId).IsNotNull();
 
         GitTagVerificationResult wrongTarget = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
             fixture.RepositoryRoot,
-            "v0.1.0",
+            FirstReleaseTag,
             fixture.AllowedSignersPath,
             ExpectedTargetOid: firstCommit));
         await Assert.That(wrongTarget.IsValid).IsFalse();
@@ -65,7 +67,7 @@ public sealed class GitTagSignatureVerifierTests
 
         GitTagVerificationResult wrongEventSha = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
             fixture.RepositoryRoot,
-            "v0.1.0",
+            FirstReleaseTag,
             fixture.AllowedSignersPath,
             ExpectedTargetOid: secondCommit,
             ExpectedEventSha: firstCommit));
@@ -74,7 +76,7 @@ public sealed class GitTagSignatureVerifierTests
 
         GitTagVerificationResult wrongPrincipal = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
             fixture.RepositoryRoot,
-            "v0.1.0",
+            FirstReleaseTag,
             fixture.AllowedSignersPath,
             ExpectedTargetOid: secondCommit,
             ExpectedSignerPrincipal: "other-operator"));
@@ -117,7 +119,7 @@ public sealed class GitTagSignatureVerifierTests
         await Assert.That(unauthorized.IsValid).IsFalse();
         await Assert.That(unauthorized.Diagnostic).IsEqualTo("tag_signature_invalid");
 
-        fixture.CreateSignedTag("v0.1.0", commit, fixture.AuthorizedKeyPath);
+        fixture.CreateSignedTag(FirstReleaseTag, commit, fixture.AuthorizedKeyPath);
         string signedTagObjectId = fixture.Git("rev-parse", "refs/tags/v0.1.0^{object}").Trim();
         fixture.Git("update-ref", "refs/tags/v0.2.0", signedTagObjectId);
         GitTagVerificationResult renamed = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
@@ -212,7 +214,7 @@ public sealed class GitTagSignatureVerifierTests
 
         public void Dispose() => Directory.Delete(Root, recursive: true);
 
-        private static string Run(string executable, params string[] arguments) => RunIn(executable, Path.GetTempPath(), arguments);
+        private static void Run(string executable, params string[] arguments) => _ = RunIn(executable, Path.GetTempPath(), arguments);
 
         private static string RunIn(string executable, string workingDirectory, params string[] arguments)
         {

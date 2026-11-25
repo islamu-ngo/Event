@@ -44,12 +44,14 @@ public sealed class ReleaseInputPolicyTests
     public async Task RepositoryOptionalChangeFragmentsPassReleaseInputPolicyWhenEmptyOrPresent()
     {
         string changesDirectory = Path.Combine(RepositoryRoot.Find(), "docs", "internal", "releases", "changes");
-        string[] fragments = Directory.Exists(changesDirectory)
-            ? Directory.GetFiles(changesDirectory, "CHG-*.yaml", SearchOption.TopDirectoryOnly)
-                .Order(StringComparer.Ordinal)
-                .Select(File.ReadAllText)
-                .ToArray()
-            : [];
+        var fragments = new List<string>();
+        if (Directory.Exists(changesDirectory))
+        {
+            foreach (string path in Directory.GetFiles(changesDirectory, "CHG-*.yaml", SearchOption.TopDirectoryOnly).Order(StringComparer.Ordinal))
+            {
+                fragments.Add(await File.ReadAllTextAsync(path));
+            }
+        }
 
         ReleaseInputValidationResult result = ReleaseInputPolicy.Validate(
             ValidReleaseYaml(),
@@ -61,7 +63,7 @@ public sealed class ReleaseInputPolicyTests
             .Because(string.Join("; ", result.Diagnostics));
         await Assert.That(fragmentsOnly.IsValid).IsTrue()
             .Because(string.Join("; ", fragmentsOnly.Diagnostics));
-        await Assert.That(fragments.Length).IsEqualTo(0);
+        await Assert.That(fragmentsOnly.Fragments.Count).IsEqualTo(fragments.Count);
     }
 
     [Test]

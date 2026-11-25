@@ -86,9 +86,10 @@ jobs:
           chmod 600 "$ISLAMU_TEST_ROOT/.islamu-test-owner"
 
           cleanup() {
-            containers="$(docker --host "$DOCKER_HOST" ps -aq --filter "label=islamu.assurance.owner=$ISLAMU_TEST_RUN_ID" 2>/dev/null || true)"
-            if [[ -n "$containers" ]]; then
-              docker --host "$DOCKER_HOST" rm -f $containers >/dev/null 2>&1 || true
+            local -a containers=()
+            mapfile -t containers < <(docker --host "$DOCKER_HOST" ps -aq --filter "label=islamu.assurance.owner=$ISLAMU_TEST_RUN_ID" 2>/dev/null || true)
+            if (( ${#containers[@]} > 0 )); then
+              docker --host "$DOCKER_HOST" rm -f -- "${containers[@]}" >/dev/null 2>&1 || true
             fi
             rm -rf -- "$ISLAMU_TEST_ROOT"
           }

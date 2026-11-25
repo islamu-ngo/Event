@@ -334,6 +334,145 @@ public sealed class OpenApiContractDifferTests
     }
 
     [Test]
+    public async Task ResolvesReferencedParametersAndRequestBodiesConservatively()
+    {
+        var sharedComponents = new Dictionary<string, object>
+        {
+            ["parameters"] = new Dictionary<string, object>
+            {
+                ["TenantId"] = new { name = "X-Tenant-Id", @in = "header", required = true, schema = new { type = "string" } },
+                ["TraceId"] = new { name = "X-Trace-Id", @in = "header", required = false, schema = new { type = "string" } },
+            },
+            ["requestBodies"] = new Dictionary<string, object>
+            {
+                ["CreateEvent"] = new
+                {
+                    required = true,
+                    content = new Dictionary<string, object>
+                    {
+                        ["application/json"] = new { schema = new { type = "object" } },
+                    },
+                },
+            },
+        };
+        var createdResponses = new Dictionary<string, object> { ["201"] = new { description = "Created" } };
+
+        string baseSpec = SerializeSpec(new
+        {
+            openapi = "3.1.1",
+            paths = new Dictionary<string, object>
+            {
+                ["/api/events"] = new Dictionary<string, object>
+                {
+                    ["post"] = new { parameters = Array.Empty<object>(), responses = createdResponses },
+                },
+            },
+            components = sharedComponents,
+        });
+
+        string headSpec = SerializeSpec(new
+        {
+            openapi = "3.1.1",
+            paths = new Dictionary<string, object>
+            {
+                ["/api/events"] = new Dictionary<string, object>
+                {
+                    ["post"] = new Dictionary<string, object>
+                    {
+                        ["parameters"] = new object[]
+                        {
+                            RefObj("#/components/parameters/TenantId"),
+                            RefObj("#/components/parameters/TraceId"),
+                            RefObj("#/components/parameters/MissingParam"),
+                        },
+                        ["requestBody"] = RefObj("#/components/requestBodies/CreateEvent"),
+                        ["responses"] = createdResponses,
+                    },
+                },
+            },
+            components = sharedComponents,
+        });
+
+        ContractDifferResult result = DiffSpecs(baseSpec, headSpec);
+
+        await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "referenced parameter/body diff");
+        await Assert.That(result.Changes.Any(c =>
+            c.Kind == "required_parameter_added" &&
+            c.Severity == ContractChangeSeverity.Breaking &&
+            c.Target == "POST /api/events param:header:X-Tenant-Id")).IsTrue();
+        await Assert.That(result.Changes.Any(c =>
+            c.Kind == "optional_parameter_added" &&
+            c.Severity == ContractChangeSeverity.Additive &&
+            c.Target == "POST /api/events param:header:X-Trace-Id")).IsTrue();
+        await Assert.That(result.Changes.Any(c =>
+            c.Kind == "unresolved_ref" &&
+            c.Severity == ContractChangeSeverity.ReviewRequired &&
+            c.Target.Contains("MissingParam", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(result.Changes.Any(c =>
+            c.Kind == "required_request_body_added" &&
+            c.Severity == ContractChangeSeverity.Breaking &&
+            c.Target == "POST /api/events requestBody")).IsTrue();
+    }
+
+    [Test]
+    public async Task EvaluatesCombinedRefTypeConstraintsWithoutFalseBreakingOnRedundantTypeRemoval()
+    {
+        object[] rootSecurity = [new Dictionary<string, object> { ["bearer"] = Array.Empty<string>() }];
+        var okResponses = new Dictionary<string, object> { ["200"] = new { description = "OK" } };
+
+        string BuildPayloadSpec(object operation, Dictionary<string, object> payloadProperties) => SerializeSpec(new
+        {
+            openapi = "3.1.1",
+            security = rootSecurity,
+            paths = new Dictionary<string, object> { ["/api/events"] = new Dictionary<string, object> { ["get"] = operation } },
+            components = new
+            {
+                schemas = new Dictionary<string, object>
+                {
+                    ["Slug"] = new { type = "string" },
+                    ["NullableSlug"] = new { type = new[] { "null", "string" } },
+                    ["Payload"] = new { type = "object", properties = payloadProperties },
+                },
+            },
+        });
+
+        string baseSpec = BuildPayloadSpec(
+            new { responses = okResponses },
+            new Dictionary<string, object>
+            {
+                ["redundant"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/Slug", ["type"] = "string" },
+                ["narrowed"] = RefObj("#/components/schemas/NullableSlug"),
+                ["unconstrained"] = new { type = "string" },
+            });
+
+        string headSpec = BuildPayloadSpec(
+            new { security = Array.Empty<object>(), responses = okResponses },
+            new Dictionary<string, object>
+            {
+                ["redundant"] = RefObj("#/components/schemas/Slug"),
+                ["narrowed"] = new Dictionary<string, object> { ["$ref"] = "#/components/schemas/NullableSlug", ["type"] = "string" },
+                ["unconstrained"] = new Dictionary<string, object>(),
+            });
+
+        ContractDifferResult result = DiffSpecs(baseSpec, headSpec);
+
+        await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "combined ref type diff");
+        await Assert.That(result.Changes.Any(c => c.Target.Contains("redundant", StringComparison.Ordinal))).IsFalse();
+        await Assert.That(result.Changes.Any(c =>
+            c.Kind == "schema_type_narrowed" &&
+            c.Severity == ContractChangeSeverity.Breaking &&
+            c.Target == "components.schemas.Payload.narrowed")).IsTrue();
+        await Assert.That(result.Changes.Any(c =>
+            c.Kind == "schema_type_changed" &&
+            c.Severity == ContractChangeSeverity.ReviewRequired &&
+            c.Target == "components.schemas.Payload.unconstrained")).IsTrue();
+        await Assert.That(result.Changes.Any(c =>
+            c.Kind == "security_changed" &&
+            c.Severity == ContractChangeSeverity.ReviewRequired &&
+            c.Target == "GET /api/events")).IsTrue();
+    }
+
+    [Test]
     public async Task MalformedOpenApiJsonFailsClosed()
     {
         ContractDifferResult result = DiffSpecs("{}", "{ invalid json");
@@ -351,6 +490,8 @@ public sealed class OpenApiContractDifferTests
     }
 
     private static string SerializeSpec(object spec) => JsonSerializer.Serialize(spec);
+
+    private static Dictionary<string, object> RefObj(string reference) => new() { ["$ref"] = reference };
 
     private static Dictionary<string, object> JsonResponseRef(string reference) => new()
     {

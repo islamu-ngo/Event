@@ -44,7 +44,7 @@ Use one eligible published session for both date/location filtering
 and the event card, rather than combining matches from different sessions.
 ```
 
-Use the internal-work examples only when that is the actual change. Add `!`, `BREAKING CHANGE:`, `Change-Id:`, or changelog-skip trailers when the classification requires them. A breaking-change footer names what consumers/operators must change, not merely "contract replaced."
+Use the internal-work examples only when that is the actual change. Non-breaking internal types and engineering scopes omit automatically from public release notes without requiring `Changelog: skip`. Add `!` and `BREAKING CHANGE:` for breaking work, optional `Change-Id:` when an optional high-impact fragment is attached, or `Changelog: skip` + `Changelog-Reason:` when explicitly opting a public-scope commit out of release notes. A breaking-change footer names what consumers/operators must change, not merely "contract replaced."
 
 ## Pull Request Descriptions
 

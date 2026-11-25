@@ -1542,7 +1542,7 @@ internal static class K6LoadRunner
         TimeSpan timeout, int captureLimit, CancellationToken cancellationToken, ProcessStartInfo? ownerStart = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var start = ownerStart ?? StartInfo(Path.Combine(AppContext.BaseDirectory, "LoadProcessOwner", "ISLAMU.ReleaseEngineering"));
+        var start = ownerStart ?? StartInfo(Path.Combine(AppContext.BaseDirectory, "LoadProcessOwner", "Event.LoadProcessOwner"));
         start.RedirectStandardInput = true;
         if (ownerStart is null) start.ArgumentList.Add("own-load-process");
         using var owner = new Process { StartInfo = start };

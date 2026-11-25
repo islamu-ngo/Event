@@ -1,8 +1,3 @@
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Text.Json;
-
 namespace ISLAMU.ReleaseEngineering;
 
 public static class Program
@@ -12,25 +7,16 @@ public static class Program
     public const int ToolchainRejected = 2;
     public const int UsageError = 64;
 
-    private const int MaximumProcessOutput = 4096;
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromSeconds(5);
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public static int Main(string[] args)
-    {
-        if (args.Length > 0 && string.Equals(args[0], LoadProcessOwner.CommandName, StringComparison.Ordinal))
-        {
-            return LoadProcessOwner.Run(args);
-        }
-
-        return Run(args, Console.Out);
-    }
+    public static int Main(string[] args) => Run(args, Console.Out);
 
     public static int Run(string[] args, TextWriter output)
     {
         string lockPath = Path.Combine(Environment.CurrentDirectory, "eng", "release", "toolchain.lock.json");
-        string? bundlePath = Environment.GetEnvironmentVariable("ISLAMU_RELEASE_TOOL_BUNDLE");
-        return Run(args, output, lockPath, bundlePath, GetPlatform(), ProcessTimeout);
+        string? bundlePath = Environment.GetEnvironmentVariable(GitCliffToolchainStore.DefaultBundleEnvironmentVariable);
+        string platform = GitCliffToolchainStore.GetCurrentPlatform();
+        return Run(args, output, lockPath, bundlePath, platform, ProcessTimeout);
     }
 
     public static int Run(
@@ -41,6 +27,9 @@ public static class Program
         string platform,
         TimeSpan timeout)
     {
+        ArgumentNullException.ThrowIfNull(args);
+        ArgumentNullException.ThrowIfNull(output);
+
         if (args.Length == 0)
         {
             return WriteUsage(output);
@@ -61,103 +50,29 @@ public static class Program
             return SecurityControlRegister.Run(args, output);
         }
 
-        if (string.Equals(args[0], SecurityExecutionEvidence.ExecutionCommandName, StringComparison.Ordinal))
+        if (string.Equals(args[0], "ensure-git-cliff", StringComparison.Ordinal))
         {
-            return SecurityExecutionEvidence.Execute(args, output, Environment.CurrentDirectory);
+            return GitCliffToolchainStore.RunEnsureCommand(args, output, lockPath, bundlePath, platform, timeout);
         }
 
-        if (string.Equals(args[0], "execute-api-benchmarks", StringComparison.Ordinal))
+        if (string.Equals(args[0], "verify-release-tag", StringComparison.Ordinal))
         {
-            return SecurityExecutionEvidence.ExecuteApiBenchmarks(args, output, Environment.CurrentDirectory);
+            return GitTagSignatureVerifier.RunCli(args, output, Environment.CurrentDirectory, timeout);
         }
 
-        if (string.Equals(args[0], "produce-security-execution", StringComparison.Ordinal))
+        if (string.Equals(args[0], "diff-contracts", StringComparison.Ordinal))
         {
-            return SecurityExecutionEvidence.Run(args, output, Environment.CurrentDirectory);
-        }
-
-        if (string.Equals(args[0], "run-promoted", StringComparison.Ordinal))
-        {
-            return PromotedReleaseCommand.Run(args, output, Environment.CurrentDirectory);
-        }
-
-        if (string.Equals(args[0], "prepare-publication-inventory", StringComparison.Ordinal))
-        {
-            return PublicationInventoryCommand.Run(args, output, Environment.CurrentDirectory);
+            return ContractDiffCommand.Run(args, output, Environment.CurrentDirectory, timeout);
         }
 
         if (string.Equals(args[0], "sync-public-changelog", StringComparison.Ordinal))
         {
-            string Required(string name) => Environment.GetEnvironmentVariable(name) ?? string.Empty;
-            TrustedBundleResult trusted = TrustedBundlePolicy.Verify(new TrustedBundleVerificationRequest(
-                Required("ISLAMU_RELEASE_TRUSTED_BUNDLE"),
-                Environment.CurrentDirectory,
-                new PromotionAuthorityInput(
-                    Required("ISLAMU_RELEASE_PROMOTION_RECEIPT"),
-                    Required("ISLAMU_RELEASE_PROMOTION_SIGNATURE"),
-                    Required("ISLAMU_RELEASE_PROMOTION_PRINCIPAL")),
-                Required("ISLAMU_RELEASE_BUNDLE_ID"),
-                Required("ISLAMU_RELEASE_BUNDLE_VERSION"),
-                Required("ISLAMU_RELEASE_POLICY_VERSION"),
-                Required("ISLAMU_RELEASE_CONFIG_VERSION"),
-                Required("ISLAMU_RELEASE_TRUST_VERSION"))
-            { ExpectedManifestDigest = Required("ISLAMU_RELEASE_MANIFEST_SHA256") });
-            if (!trusted.IsValid || trusted.Bundle is null)
-            {
-                output.WriteLine("changelog_trusted_bundle_invalid");
-                return ToolchainRejected;
-            }
-
-            string? inventoryPath = null;
-            string? retainedRoot = null;
-            for (int index = 1; index + 1 < args.Length; index++)
-            {
-                if (args[index] == "--inventory") inventoryPath = args[index + 1];
-                if (args[index] == "--retained-evidence") retainedRoot = args[index + 1];
-            }
-
-            IFinalLaneInventoryAuthority? authority = inventoryPath is not null && retainedRoot is not null
-                ? new SignedPublicationInventoryAuthority(
-                    inventoryPath, retainedRoot,
-                    Path.Join(trusted.Bundle.Root, "trust", "publication-allowed-signers"),
-                    Environment.CurrentDirectory, trusted.Bundle.Root)
-                : null;
-            return SyncPublicChangelogCommand.Run(args, output, Environment.CurrentDirectory, authority);
+            return SyncPublicChangelogCommand.Run(args, output, Environment.CurrentDirectory);
         }
 
         if (string.Equals(args[0], "prepare", StringComparison.Ordinal))
         {
-            return PrepareCommand.Run(args, output, Environment.CurrentDirectory, GetPlatform(), ProcessTimeout);
-        }
-
-        if (string.Equals(args[0], "verify-candidate", StringComparison.Ordinal))
-        {
-            return CandidateCommand.Run(args, output, Environment.CurrentDirectory, GetPlatform(), ProcessTimeout);
-        }
-
-        if (string.Equals(args[0], "verify-tag", StringComparison.Ordinal) || string.Equals(args[0], "tag-message", StringComparison.Ordinal))
-        {
-            return TagCommand.Run(args, output, Environment.CurrentDirectory, GetPlatform(), ProcessTimeout);
-        }
-
-        if (string.Equals(args[0], "verify-main", StringComparison.Ordinal))
-        {
-            return MainCommand.Run(args, output, Environment.CurrentDirectory, ProcessTimeout);
-        }
-
-        if (string.Equals(args[0], "verify-baseline", StringComparison.Ordinal))
-        {
-            return BaselineCommand.Run(args, output, Environment.CurrentDirectory, ProcessTimeout);
-        }
-
-        if (string.Equals(args[0], "open-maintenance-line", StringComparison.Ordinal))
-        {
-            return MaintenanceLineCommand.Run(args, output, Environment.CurrentDirectory, GetPlatform(), ProcessTimeout);
-        }
-
-        if (string.Equals(args[0], "activate-trust", StringComparison.Ordinal))
-        {
-            return TrustActivationCommand.Run(args, output, Environment.CurrentDirectory);
+            return PrepareCommand.Run(args, output, Environment.CurrentDirectory, platform, timeout);
         }
 
         if (args[0] is "allocate-change-id" or
@@ -165,14 +80,13 @@ public static class Program
             "preflight-commit" or
             "preflight-staged" or
             "preflight-range" or
-            "rename-change" or
             "install-change-hooks")
         {
             return ChangeWorkflowCommand.Run(
                 args,
                 output,
                 Environment.CurrentDirectory,
-                ProcessTimeout);
+                timeout);
         }
 
         if (!string.Equals(args[0], "verify-tools", StringComparison.Ordinal))
@@ -187,168 +101,29 @@ public static class Program
             return WriteUsage(output);
         }
 
-        if (!File.Exists(lockPath))
+        string effectiveBundlePath = bundlePath is not null
+            ? bundlePath
+            : GitCliffToolchainStore.ResolveConfiguredDirectory(lockPath, null, platform);
+
+        ToolchainVerificationResult verification = GitCliffToolchainStore.VerifyInstalled(
+            lockPath,
+            effectiveBundlePath,
+            platform,
+            timeout);
+        if (!verification.IsValid || verification.Executable is null)
         {
-            output.WriteLine("untrusted_tool: toolchain lock is not configured");
-            return ToolchainNotConfigured;
+            output.WriteLine($"untrusted_tool: {verification.Diagnostic}");
+            return verification.IsMissingLock ? ToolchainNotConfigured : ToolchainRejected;
         }
 
-        if (string.IsNullOrWhiteSpace(bundlePath) || !Directory.Exists(bundlePath))
-        {
-            return Reject(output, "local tool bundle directory is required");
-        }
-
-        ToolchainLock toolchain;
-        try
-        {
-            toolchain = JsonSerializer.Deserialize<ToolchainLock>(
-                File.ReadAllText(lockPath),
-                JsonOptions)
-                ?? throw new JsonException();
-        }
-        catch (Exception exception) when (exception is IOException or JsonException)
-        {
-            return Reject(output, "toolchain lock is malformed");
-        }
-
-        if (toolchain.SchemaVersion != 1 ||
-            !string.Equals(toolchain.Tool, "git-cliff", StringComparison.Ordinal) ||
-            string.IsNullOrWhiteSpace(toolchain.Version) ||
-            toolchain.Platforms is null)
-        {
-            return Reject(output, "toolchain lock is malformed");
-        }
-
-        ToolPlatform[] matches = toolchain.Platforms
-            .Where(candidate => string.Equals(candidate.Platform, platform, StringComparison.Ordinal))
-            .Take(2)
-            .ToArray();
-        if (matches.Length > 1)
-        {
-            return Reject(output, "toolchain lock is malformed");
-        }
-
-        ToolPlatform? approved = matches.SingleOrDefault();
-        if (approved is null)
-        {
-            return Reject(output, $"platform is not approved: {platform}");
-        }
-
-        if (string.IsNullOrWhiteSpace(approved.Executable) ||
-            Path.GetFileName(approved.Executable) != approved.Executable ||
-            approved.ExecutableSha256?.Length != 64)
-        {
-            return Reject(output, "toolchain lock is malformed");
-        }
-
-        string executablePath = Path.Combine(bundlePath, approved.Executable);
-        if (!File.Exists(executablePath))
-        {
-            return Reject(output, $"required executable is missing: {approved.Executable}");
-        }
-
-        string actualDigest = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(executablePath)));
-        if (!string.Equals(actualDigest, approved.ExecutableSha256, StringComparison.OrdinalIgnoreCase))
-        {
-            return Reject(output, $"executable digest mismatch: {approved.Executable}");
-        }
-
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo(executablePath)
-            {
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-            },
-        };
-        try
-        {
-            process.StartInfo.ArgumentList.Add("--version");
-            process.Start();
-
-            using var timeoutSource = new CancellationTokenSource(timeout);
-            Task<string> standardOutput = ReadBoundedAsync(process.StandardOutput, timeoutSource.Token);
-            Task<string> standardError = ReadBoundedAsync(process.StandardError, timeoutSource.Token);
-            process.WaitForExitAsync(timeoutSource.Token).GetAwaiter().GetResult();
-            string versionOutput = standardOutput.GetAwaiter().GetResult().Trim();
-            string errorOutput = standardError.GetAwaiter().GetResult().Trim();
-
-            if (process.ExitCode != 0 || errorOutput.Length != 0)
-            {
-                return Reject(output, "version probe failed");
-            }
-
-            if (!string.Equals(versionOutput, $"git-cliff {toolchain.Version}", StringComparison.Ordinal))
-            {
-                return Reject(output, $"version mismatch: expected git-cliff {toolchain.Version}");
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-            }
-
-            return Reject(output, "version probe timed out or exceeded output limit");
-        }
-        catch (Exception exception) when (exception is InvalidOperationException or IOException or System.ComponentModel.Win32Exception)
-        {
-            return Reject(output, "version probe failed");
-        }
-
-        output.WriteLine($"trusted_tool: git-cliff {toolchain.Version} ({platform})");
+        output.WriteLine($"trusted_tool: git-cliff {verification.Executable.Version} ({verification.Executable.Platform})");
         return Success;
-    }
-
-    private static async Task<string> ReadBoundedAsync(StreamReader reader, CancellationToken cancellationToken)
-    {
-        var result = new char[MaximumProcessOutput];
-        int count = 0;
-        while (count < result.Length)
-        {
-            int read = await reader.ReadAsync(result.AsMemory(count, result.Length - count), cancellationToken);
-            if (read == 0)
-            {
-                return new string(result, 0, count);
-            }
-
-            count += read;
-        }
-
-        if (await reader.ReadAsync(new char[1], cancellationToken) != 0)
-        {
-            throw new OperationCanceledException("Process output exceeded the configured limit.");
-        }
-
-        return new string(result);
-    }
-
-    private static string GetPlatform()
-    {
-        string architecture = RuntimeInformation.ProcessArchitecture == Architecture.X64 ? "x64" : "unsupported";
-        string operatingSystem = OperatingSystem.IsLinux() ? "linux" : OperatingSystem.IsWindows() ? "windows" : "unsupported";
-        return $"{operatingSystem}-{architecture}";
-    }
-
-    private static int Reject(TextWriter output, string reason)
-    {
-        output.WriteLine($"untrusted_tool: {reason}");
-        return ToolchainRejected;
     }
 
     private static int WriteUsage(TextWriter output)
     {
-        output.WriteLine("usage: release-engine allocate-change-id --target <ref> | create-change --type <type> --scope <scope> --title <title> --summary <summary> [--group <group>] [--target <ref>] | preflight-commit <message-file> [--target <ref>] | preflight-staged [--target <ref>] | preflight-range --target <ref> [--head <ref>] | rename-change --commit <oid> --from <id> [--to <id>] --reason <reason> | install-change-hooks [--target <ref>] | verify-tools | prepare <release-directory> | verify-candidate <release-directory> <candidate-oid> | tag-message <release-directory> | verify-tag <release-directory> <tag-name> | verify-main <release-directory> <expected-old-origin-main-oid> <tag-object-oid> | verify-baseline <baseline-ref> <target-oid> <tag-object-oid> | open-maintenance-line <release-directory> <tag-object-oid> | sync-public-changelog --inventory <signed-inventory> --retained-evidence <directory> --publication-base <https-url> [--check] | activate-trust --release-principal <name> --release-key <public-key> --promotion-principal <name> --promotion-key <public-key> --valid-from <yyyy-MM-dd> --valid-until <yyyy-MM-dd> --output <trust-directory> [--replace]");
-        output.WriteLine("trusted launcher: run-promoted <sync-public-changelog|prepare-publication-inventory> <command-arguments>");
-        output.WriteLine("security execution: execute-security-execution <new-output-directory> <candidate-oid> <run-id> <run-attempt> <event-name>");
-        output.WriteLine("benchmark execution: execute-api-benchmarks <new-output-directory> <candidate-oid> <run-id> <run-attempt> <event-name> <smoke|baseline>");
-        output.WriteLine("publication preparation: prepare-publication-inventory --inventory <existing-inventory> --retained-evidence <directory> --release-evidence <relative-path> --release-directory <repository-relative-path> --disclosure-approved <version> --output-directory <new-directory>");
+        output.WriteLine(
+            "usage: release-engine ensure-git-cliff [--output <directory>] | verify-tools | verify-release-tag --tag <tag-name> [--target <oid>] [--event-sha <oid>] [--allowed-signers <path>] [--signer <principal>] [--repository <path>] | diff-contracts <base-oid> <head-oid> <output-path> | prepare <release-directory> [--image-manifest <path>] | sync-public-changelog --publication-base <https-url> [--allowed-signers <path>] [--check] | select-security-changes <paths-file> | select-build-test-changes <paths-file> | verify-security-register <register-json> | allocate-change-id --target <ref> | create-change --type <type> --scope <scope> --title <title> --summary <summary> [--group <group>] [--target <ref>] | preflight-commit <message-file> [--target <ref>] | preflight-staged [--target <ref>] | preflight-range --target <ref> [--head <ref>] | install-change-hooks [--target <ref>]");
         return UsageError;
     }
-
-    private sealed record ToolchainLock(int SchemaVersion, string? Tool, string? Version, ToolPlatform[]? Platforms);
-    private sealed record ToolPlatform(string? Platform, string? Executable, string? ExecutableSha256);
 }

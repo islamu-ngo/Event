@@ -214,14 +214,30 @@ public sealed class ReleaseContextPolicyTests
     public async Task GitCliffBumpDisagreementIsReviewFailureEvidenceOnly()
     {
         ReleaseInputValidationResult input = ReleaseInputPolicy.Validate(ReleaseYaml("1.1.0", "v1.1", "v1.0.0", "v1.0.0", FullOid('a'), FullOid('b')), [], []);
+        ReleaseCommit[] commits = [new(FullOid('c'), "feat(registration): let attendees correct registration details")];
 
-        ReleaseContextValidationResult result = ReleaseContextPolicy.Build(
+        ReleaseContextValidationResult disagreement = ReleaseContextPolicy.Build(
             input,
-            [new ReleaseCommit(FullOid('c'), "feat(registration): let attendees correct registration details")],
+            commits,
             Policy,
             gitCliffSuggestedVersion: "1.0.1");
+        ReleaseContextValidationResult agreement = ReleaseContextPolicy.Build(
+            input,
+            commits,
+            Policy,
+            gitCliffSuggestedVersion: "1.1.0");
+        ReleaseContextValidationResult vPrefixedDisagreement = ReleaseContextPolicy.Build(
+            input,
+            commits,
+            Policy,
+            gitCliffSuggestedVersion: "v2.0.0");
 
-        await Assert.That(result.Diagnostics).Contains("context_git_cliff_bump_disagreement");
+        await Assert.That(disagreement.IsValid).IsFalse();
+        await Assert.That(disagreement.Diagnostics).Contains("context_git_cliff_bump_disagreement");
+        await Assert.That(agreement.IsValid).IsTrue();
+        await Assert.That(agreement.Context?.Release.Version).IsEqualTo("1.1.0");
+        await Assert.That(vPrefixedDisagreement.IsValid).IsFalse();
+        await Assert.That(vPrefixedDisagreement.Diagnostics).Contains("context_git_cliff_bump_disagreement");
     }
 
     [Test]

@@ -56,6 +56,7 @@
   </Folder>
   <Folder Name="/Tooling/">
     <Project Path="eng/configuration-manifest-schema/src/ISLAMU.ConfigurationManifest.SchemaGenerator/ISLAMU.ConfigurationManifest.SchemaGenerator.csproj" />
+    <Project Path="eng/tools/Event.LoadProcessOwner/Event.LoadProcessOwner.csproj" />
     <Project Path="eng/tools/Explore.ApiContractInventory/Explore.ApiContractInventory.csproj" />
     <Project Path="eng/tools/Explore.AssuranceAudit/Explore.AssuranceAudit.csproj" />
     <Project Path="src/Explore.Diagnostic/Explore.Diagnostic.csproj" />

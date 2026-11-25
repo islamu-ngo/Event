@@ -225,7 +225,7 @@ While writing or updating the workstream, the planning agent MUST load `conventi
 - **Type & Scope:** `type(scope)`
 - **Title:** `concrete changed behavior or engineering outcome`
 - **Description:** Exact problem and reader-visible consequence, followed by the relevant technical mechanism, data/control flow, and constraints.
-- **Changelog treatment:** Public feature/fix | Change fragment `CHG-YYYY-NNNN` | `Changelog: skip`
+- **Changelog treatment:** Public feature/fix | Optional high-impact fragment `CHG-...` | Automatic internal omission (or explicit `Changelog: skip` for public-scope opt-out)
 - **Required trailers:** Exact terminal trailer lines, or `None`
 - **Commit paths:** Exact ordered list of wholly phase-owned files for this commit.
 - **Message override:** Not overridden
@@ -270,13 +270,14 @@ Name the exact docs, schemas, generated artifacts, settings, environment variabl
 Every implementation plan MUST classify its procedural changelog approach across the 3-tier release model. Planning pre-authors each phase's exact message metadata, commit paths, and executable Git command packet in `tasks.md`. When a phase touches dozens or hundreds of files across multiple concerns, planning sequences an ordered series of atomic commits instead of an oversized umbrella commit. Every phase then closes with that approved self-sufficient contract; release artifacts are created in the owning phase rather than deferred to one catch-all commit:
 
 1. **Tier 1 — Standard Feature or Fix (Conventional Commits):**
-   - Use public capability scopes from `eng/release/policy/scope-registry.yaml` (e.g. `feat(event): ...`, `fix(auth): ...`).
-   - The release engine automatically aggregates these into `What's Changed` at release time.
-2. **Tier 2 — High-Impact / Breaking / Migration / Security / Operator Impact (Change Fragment):**
-   - The owning phase MUST include a task creating an append-only change fragment under `docs/internal/releases/changes/CHG-YYYY-NNNN.yaml`.
-   - The task acceptance criteria must enforce valid YAML structure, `ReleaseInputPolicy` validation, and terminal commit footer `Change-Id: CHG-YYYY-NNNN` (plus `BREAKING CHANGE:` where applicable).
-3. **Tier 3 — Internal Architecture / DevOps / Refactoring (Explicit Skip):**
-   - The plan must specify terminal trailers: `Changelog: skip` and `Changelog-Reason: <clear-reason>` to prevent internal plumbing noise from leaking into public release notes.
+   - Use public capability scopes from `eng/release/policy/scope-registry.yaml` (e.g. `feat(events): ...`, `fix(access): ...`).
+   - The release engine and native `git-cliff` automatically aggregate these into release notes at release time.
+2. **Tier 2 — Optional High-Impact / Breaking / Coordinated Security / Migration / Operator Fragment:**
+   - When structured multi-category impact metadata or grouping is needed beyond Conventional Commit subjects and `BREAKING CHANGE:` footers, the owning phase creates an optional fragment under `docs/internal/releases/changes/CHG-<id>.yaml` with `create-change`.
+   - When a fragment is created or referenced, acceptance criteria enforce full `ReleaseInputPolicy` validation (including structural embargo checks) and matching `Change-Id: CHG-<id>` footer (plus `!` and `BREAKING CHANGE:` where breaking).
+3. **Tier 3 — Internal Architecture / DevOps / Refactoring / Testing (Automatic Omission):**
+   - Non-breaking internal types (`test`, `refactor`, `style`, `build`, `ci`, `chore`) and engineering scopes (`ci`, `dependencies`, `architecture`, `database`, `observability`, `documentation`, `release`, `testing`, `build`) are omitted automatically by both `CommitPolicy` and `eng/release/cliff.toml`; `Changelog: skip` trailers are not required.
+   - Reserve terminal `Changelog: skip` + `Changelog-Reason: <clear-reason>` trailers for explicitly opting a non-breaking public-scope commit out of public release notes.
 
 ## 9. Islamic Value-Sensitive Design (I-VSD) & Moral Boundaries
 

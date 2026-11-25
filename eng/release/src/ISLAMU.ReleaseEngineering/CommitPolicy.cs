@@ -28,7 +28,8 @@ public sealed record CommitPolicyResult(
     string? Description,
     string? SkipReason,
     string? ChangeId,
-    IReadOnlyList<string> Diagnostics);
+    IReadOnlyList<string> Diagnostics,
+    bool IsMergeCommit = false);
 
 public sealed class ReleasePolicy
 {
@@ -82,6 +83,54 @@ public sealed class ReleasePolicy
         return new ReleasePolicy(policy, scopes);
     }
 
+    public static string StripGitComments(string commitMessage)
+    {
+        ArgumentNullException.ThrowIfNull(commitMessage);
+        string normalized = commitMessage.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+        string[] lines = normalized.Split('\n');
+        var kept = new List<string>(lines.Length);
+        foreach (string line in lines)
+        {
+            if (line.StartsWith("# ------------------------ >8 ------------------------", StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            if (line.StartsWith('#'))
+            {
+                continue;
+            }
+
+            kept.Add(line);
+        }
+
+        return string.Join('\n', kept).TrimEnd();
+    }
+
+    public string? GetReleaseGroup(CommitPolicyResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        if (!result.IsValid || result.ReleaseVisibility != ReleaseVisibility.Visible || string.IsNullOrWhiteSpace(result.Type))
+        {
+            return null;
+        }
+
+        if (result.IsBreaking && (result.ScopeKind != ScopeKind.Public || !releaseVisibleTypes.Contains(result.Type)))
+        {
+            return "Breaking Changes";
+        }
+
+        return result.Type switch
+        {
+            "feat" => "Features",
+            "fix" => "Bug Fixes",
+            "perf" => "Performance",
+            "revert" => "Reverts",
+            "docs" => "Documentation",
+            _ => null,
+        };
+    }
+
     public CommitPolicyResult EvaluateCommit(string? commitMessage)
     {
         var diagnostics = new List<string>();
@@ -97,6 +146,22 @@ public sealed class ReleasePolicy
 
         string normalized = commitMessage.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
         string[] lines = normalized.Split('\n');
+        if (lines[0].StartsWith("Merge ", StringComparison.Ordinal))
+        {
+            return new CommitPolicyResult(
+                IsValid: true,
+                ReleaseVisibility: ReleaseVisibility.Omitted,
+                ScopeKind: ScopeKind.Engineering,
+                IsBreaking: false,
+                Type: "merge",
+                Scope: null,
+                Description: lines[0],
+                SkipReason: null,
+                ChangeId: null,
+                Diagnostics: [],
+                IsMergeCommit: true);
+        }
+
         Match header = HeaderPattern.Match(lines[0]);
         if (!header.Success)
         {

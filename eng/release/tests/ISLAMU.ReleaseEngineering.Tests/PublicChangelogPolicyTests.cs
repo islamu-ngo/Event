@@ -5,6 +5,12 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class PublicChangelogPolicyTests
 {
+    private const string PriorTag = "v0.9.0";
+    private static readonly Uri PublicationBaseUri = new UriBuilder(Uri.UriSchemeHttps, "example.org")
+    {
+        Path = "/releases/",
+    }.Uri;
+
     [Test]
     public async Task OrdersByDateThenSemVerAndPreservesOlderMaintenanceAndPrereleases()
     {
@@ -17,7 +23,7 @@ public sealed class PublicChangelogPolicyTests
             Release("2.0.0", "2026-08-02"),
         ];
 
-        PublicChangelogResult result = PublicChangelogPolicy.Generate(releases, new Uri("https://example.org/releases/"));
+        PublicChangelogResult result = PublicChangelogPolicy.Generate(releases, PublicationBaseUri);
         string markdown = Encoding.UTF8.GetString(result.Page!);
 
         await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "valid releases");
@@ -46,7 +52,7 @@ public sealed class PublicChangelogPolicyTests
             ],
         };
 
-        PublicChangelogResult result = PublicChangelogPolicy.Generate([release], new Uri("https://example.org/releases/"));
+        PublicChangelogResult result = PublicChangelogPolicy.Generate([release], PublicationBaseUri);
         string markdown = Encoding.UTF8.GetString(result.Page!);
 
         await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "valid impacts");
@@ -54,7 +60,7 @@ public sealed class PublicChangelogPolicyTests
         await Assert.That(markdown).Contains("display \\[schedule\\]\\(bad\\)");
         await Assert.That(markdown.IndexOf("### Breaking Changes", StringComparison.Ordinal)).IsLessThan(markdown.IndexOf("### Features", StringComparison.Ordinal));
         await Assert.That(markdown).Contains("Update callers before deployment");
-        await Assert.That(markdown).Contains($"https://example.org/releases/{new string('e', 40)}/docs/api-upgrade.md#governance-report");
+        await Assert.That(markdown).Contains($"{PublicationBaseUri.AbsoluteUri}{new string('e', 40)}/docs/api-upgrade.md#governance-report");
         await Assert.That(markdown).Contains("### Verify this release");
         await Assert.That(markdown).Contains(new string('a', 64));
         await Assert.That(markdown).DoesNotContain("### Performance");
@@ -70,8 +76,8 @@ public sealed class PublicChangelogPolicyTests
         };
         PublicChangelogRelease html = Release("1.2.0", "2026-09-01") with { Summary = "<script>unsafe</script>" };
 
-        await Assert.That(PublicChangelogPolicy.Generate([breaking], new Uri("https://example.org/releases/")).IsValid).IsFalse();
-        await Assert.That(PublicChangelogPolicy.Generate([html], new Uri("https://example.org/releases/")).IsValid).IsFalse();
+        await Assert.That(PublicChangelogPolicy.Generate([breaking], PublicationBaseUri).IsValid).IsFalse();
+        await Assert.That(PublicChangelogPolicy.Generate([html], PublicationBaseUri).IsValid).IsFalse();
     }
 
     [Test]
@@ -93,7 +99,7 @@ public sealed class PublicChangelogPolicyTests
             ],
         };
 
-        await Assert.That(PublicChangelogPolicy.Generate([release], new Uri("https://example.org/releases/")).IsValid).IsFalse();
+        await Assert.That(PublicChangelogPolicy.Generate([release], PublicationBaseUri).IsValid).IsFalse();
     }
 
     [Test]
@@ -107,7 +113,7 @@ public sealed class PublicChangelogPolicyTests
                 Context = item.Context with { Release = item.Context.Release with { Version = $"1.2.{index}" } },
                 Summary = new string('x', 4000),
             }).ToArray(),
-            new Uri("https://example.org/releases/"));
+            PublicationBaseUri);
 
         await Assert.That(tooLarge.IsValid).IsFalse();
         await Assert.That(tooLarge.Page).IsNull();
@@ -124,7 +130,7 @@ public sealed class PublicChangelogPolicyTests
             Summary = new string('x', 3450),
         }).ToArray();
 
-        PublicChangelogResult result = PublicChangelogPolicy.Generate(nearLimit, new Uri("https://example.org/releases/"));
+        PublicChangelogResult result = PublicChangelogPolicy.Generate(nearLimit, PublicationBaseUri);
 
         await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "near-limit page");
         await Assert.That(result.Warning).IsEqualTo("changelog_page_near_limit");
@@ -134,7 +140,7 @@ public sealed class PublicChangelogPolicyTests
     [Test]
     public async Task SentinelReplacementPreservesMetadataAndRejectsCorruption()
     {
-        byte[] generated = PublicChangelogPolicy.Generate([Release("1.0.0", "2026-09-01")], new Uri("https://example.org/releases/")).Page!;
+        byte[] generated = PublicChangelogPolicy.Generate([Release("1.0.0", "2026-09-01")], PublicationBaseUri).Page!;
         byte[] accepted = Encoding.UTF8.GetBytes("---\nlayout: changelog\n---\n" + Encoding.UTF8.GetString(generated));
         PublicChangelogResult replaced = PublicChangelogPolicy.ReplaceRegion(accepted, generated, bootstrap: false);
         PublicChangelogResult missing = PublicChangelogPolicy.ReplaceRegion("no markers"u8.ToArray(), generated, bootstrap: false);
@@ -151,8 +157,34 @@ public sealed class PublicChangelogPolicyTests
         await Assert.That(PublicChangelogPolicy.ReplaceRegion([], generated, bootstrap: false).IsValid).IsFalse();
     }
 
+    [Test]
+    public async Task IncludesVerifiedContainerDigestsOnlyWhenImageReferencesArePresent()
+    {
+        PublicChangelogRelease withoutImages = Release("1.1.0", "2026-09-01");
+        PublicChangelogRelease withImages = withoutImages with
+        {
+            Images =
+            [
+                new EnrichedImageReference(
+                    "api",
+                    "sha256:" + new string('1', 64),
+                    [
+                        "atcr.io/islamu-ngo/event-api@sha256:" + new string('1', 64),
+                        "ghcr.io/islamu-ngo/event-api@sha256:" + new string('1', 64),
+                    ]),
+            ],
+        };
+
+        string withoutText = Encoding.UTF8.GetString(PublicChangelogPolicy.Generate([withoutImages], PublicationBaseUri).Page!);
+        string withText = Encoding.UTF8.GetString(PublicChangelogPolicy.Generate([withImages], PublicationBaseUri).Page!);
+
+        await Assert.That(withoutText).DoesNotContain("@sha256:");
+        await Assert.That(withText).Contains("atcr.io/islamu-ngo/event-api@sha256:" + new string('1', 64));
+        await Assert.That(withText).Contains("ghcr.io/islamu-ngo/event-api@sha256:" + new string('1', 64));
+    }
+
     private static PublicChangelogRelease Release(string version, string date) => new(
-        new ReleaseDescriptor(version, "v1.0", DateOnly.Parse(date), "v0.9.0", "v0.9.0",
+        new ReleaseDescriptor(version, "v1.0", DateOnly.Parse(date, System.Globalization.CultureInfo.InvariantCulture), PriorTag, PriorTag,
             new ReleaseRangeReference("refs/tags/v0.9.0", new string('c', 40), "refs/tags/v0.9.0", new string('c', 40)), [], new Dictionary<string, string>()),
         Context(version, date, [Change("CHG-FEAT", "feat", "events", "publish schedule")]),
         [Fragment("CHG-FEAT", "feat", "events", "publish schedule", new Dictionary<string, FragmentImpact>())],
@@ -162,7 +194,7 @@ public sealed class PublicChangelogPolicyTests
         new string('e', 40));
 
     private static ReleaseContext Context(string version, string date, IReadOnlyList<ReleaseContextChange> changes) =>
-        new(1, new ReleaseContextRelease(version, "v1.0", date, "v0.9.0", "v0.9.0", "minor", "stable", false),
+        new(1, new ReleaseContextRelease(version, "v1.0", date, PriorTag, PriorTag, "minor", "stable", false),
             changes, new ReleaseContextEvidence(new string('c', 40), new string('c', 40), []));
 
     private static ReleaseContextChange Change(string id, string type, string scope, string title, bool breaking = false) =>

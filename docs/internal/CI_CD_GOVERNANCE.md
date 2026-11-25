@@ -11,7 +11,7 @@ ABOUTME: Separates repository settings from workflow YAML so required gates stay
 
 This page is the source of truth for CI/CD governance. `.ci/` owns shared CI/CD implementation such as reusable scripts, policy validators, evidence writers, the OpenAPI Spectral ruleset, local composite actions, and mirror-provider CI/CD definitions. GitHub-native workflow discovery files stay in `.github/workflows/` because GitHub Actions requires that path.
 
-GitHub remains the authoritative deployment surface for production and staging because the current release evidence model depends on GitHub environments, retained artifacts, GHCR/GitHub attestation verification, and Coolify deployment evidence. Codeberg and other mirrors should be configured provider-side to read CI/CD definitions from `.ci/`; root-level provider adapter folders remain forbidden because the reviewed release adapter contract lives under `.ci/release/` and `.ci/providers/`.
+GitHub remains the authoritative deployment surface for production and staging because the current release evidence model depends on GitHub environments, retained artifacts, GHCR/GitHub attestation verification, and Coolify deployment evidence. Codeberg and other mirrors should be configured provider-side to read CI/CD definitions from `.ci/`; root-level provider adapter folders remain forbidden.
 
 Do not symlink `.github` to `.ci`. GitHub discovers workflows from `.github/workflows`, local reusable workflow calls require `.github/workflows/{filename}`, and reusable workflow subdirectories are not supported.
 
@@ -52,112 +52,19 @@ Workflow architecture checks verify the native command wiring, read-only
 authority, fork-safe secret handling and serial Setup execution. They do not
 require the retired inline path-glob list to remain in the workflow shell script.
 
-## Security integration fixture execution
+## Security integration and benchmark execution
 
-The security workflow observes the fixed system `/usr/bin/stat` link chain,
-resolved target, version line and entry mode before execution. These finite
-infrastructure diagnostics contain no candidate paths, configuration or secrets.
-They do not select or admit the utility: native non-link, regular-file and
-fingerprint checks remain authoritative, including when the observation succeeds.
+`security-tests.yml` uses `select-security-changes` from `ISLAMU.ReleaseEngineering` to decide whether container-backed security integration tests must run. Documentation-only Markdown changes (`README.md`, `AGENTS.md`, `PROJECTS.md`, `docs/public/**/*.md`, `docs/internal/**/*.md`, `dev/**/*.md`, `islamic-value-sensitive-design/**/*.md`), agent skills/rules (`.agents/**`), and isolated release tooling (`eng/release/**`) skip container security tests, while any runtime, security (`eng/security/**`), build, workflow, schema, or unknown/malformed path fails safe to `run-tests=true`.
 
-Native security execution selects the fixed system stat entry once per process.
-Only that infrastructure leaf alias may resolve; its entry ancestors and selected
-target ancestors must remain nonlinked, and the final basename must stay `stat`.
-Capture and both metadata invocations use the same selected executable.
-Candidate files, assemblies, manifests and policy inputs never receive alias resolution.
-Selector failures use the existing owned-execution rejection path with fixed
-`stat_tool_*` codes. Missing or inaccessible filesystem targets produce
-`stat_tool_selection_unavailable`; underlying exception messages and paths are
-not part of the diagnostic.
+`verify-security-register` validates `eng/security/security-control-register.json` structurally, supporting lifecycle progression from `pending` to `verified`/`mitigated`/`accepted` when valid `finalDisposition`, non-empty `executionEvidence`, and non-empty `codeArtifactIdentity` are present.
 
-Native discovery may render a simple fixture constructor in `typeName`.
-The shared parser accepts only the complete `ClassName(SimpleFixtureName)` form
-and joins its CLR class, unchanged method and display name to the register and
-TRX. Opaque UIDs remain execution selectors; canonical identity collisions fail.
+When selected, `security-tests.yml` invokes TUnit directly against `tests/Event.API.IntegrationTests` (`Category=Security`, `Category=PolicyContract`) and `tests/Event.Distributed.IntegrationTests` (`Category=Distributed`, `BrowserJourneyTests`, `BrowserSecurityVectorTests`, `Category=LoadControl`, `Category=Load`), publishing TRX reports as `security-test-evidence`. `performance-smoke.yml` invokes BenchmarkDotNet directly against `tests/Event.Benchmarks` in dry mode.
 
-The browser prerequisite uses `eng/tools/InstallAssuranceBrowser.cs` with its
-own generated lock at `eng/tools/InstallAssuranceBrowser/packages.lock.json`.
-The installer requires locked restore and retains the approved Playwright
-version. It must not reuse or overwrite `eng/tools/packages.lock.json`, which
-belongs to other tools: disabling lock generation does not bypass an existing
-lock and causes `NU1005`. Verify the ordinary installer command against its
-committed lock before interpreting a prerequisite failure as a browser or
-runtime regression. Installation alone is not browser execution evidence.
+`_build-test.yml` and `workflow-security.yml` run `eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj` directly in required CI, and PR release-impact checks execute `.ci/scripts/validate-release-impact-pr.cs` as a thin adapter over in-process `ReleaseImpactPolicy`.
 
-The selected SDK servicing baseline is recorded in
-[Operations](OPERATIONS.md#sdk-and-runtime-servicing). This branch provisions
-Chromium through the file-based `eng/tools/InstallAssuranceBrowser.cs` entrypoint.
-Its dedicated `eng/tools/InstallAssuranceBrowser/packages.lock.json` owns the
-installer's package graph without colliding with the neighboring tools lock.
-The provisioner runs as a framework-dependent tool with `PublishAot=false`;
-its lock must not require a native compiler for one developer host architecture.
-Regenerate it with the selected SDK, then verify locked restore and the portable
-package graph. Tools that use native AOT still require a serviced compiler for
-[GHSA-p3jp-9v83-76w9](https://github.com/advisories/GHSA-p3jp-9v83-76w9).
-Playwright remains at its separately approved version; auditing stays enabled.
+The browser prerequisite uses `eng/tools/InstallAssuranceBrowser.cs` with its own generated lock at `eng/tools/InstallAssuranceBrowser/packages.lock.json`. The installer requires locked restore and retains the approved Playwright version without colliding with `eng/tools/packages.lock.json`.
 
-Release-impact validation executes the trusted base checkout. A patched SDK
-on the pull-request head does not upgrade that checkout: its SDK pin must
-receive the reviewed servicing change before the protected job can use it.
-Do not switch this job to untrusted head code or suppress an advisory to
-make the check pass.
-
-The existing `security-execution.v1.json` packet is governed by the embedded
-`executionRequirements` in `eng/security/security-control-register.json`.
-Producer and validator derive each registered lane's project, closed host
-profile, environment, selector and required identities from the same validated
-requirements. The owning verb is `execute-security-execution`. Admission requires
-every registered lane and its exact native result variants, with no
-missing/skipped results or reused report/execution identities. Candidate,
-run/attempt and retained artifact byte hashes must agree.
-Provider, database role and authentication remain `not-attested`.
-
-The daemon control client excludes ambient trace headers and baggage through its
-own handler. Wire-level context-isolation checks and the explicit read-only
-daemon probe remain prerequisite diagnostics, not registered-lane admission.
-
-Establish uncached engine readiness on the selected socket before bounded
-assurance requests; cached Desktop proxy responses do not prove a running VM.
-Retain the asynchronous client's five-second request budget and separate
-readiness evidence. A canceled DELETE with no accepted response has an unknown
-outcome, not successful cleanup.
-
-The API lanes require their registered key witnesses within the complete
-category report. Owned lanes require equality between registered and observed
-named variants, so adding an unregistered passing case also rejects admission
-until the registration is refreshed against its compiled candidate.
-
-The local integration registration declares the two dedicated API test-host
-lanes and the existing owned runtime, browser journeys, browser security vectors,
-native load control and load correctness lanes. Owned named variants are source
-expectations until the final compiled candidate's discovery independently
-confirms their exact names, uniqueness and counts. Partial or contradictory
-registration fails; missing, skipped, extra or stale owned results cannot be
-substituted. Synthetic parser fixtures and isolated browser-module controls
-never certify a healthy owned host.
-
-The owning producer has bounded compiler and helper verification, with remote
-workflow activation held. Clean committed-candidate API execution, its fresh
-successor against copied old reports, live managed-entry/served-input witnesses
-and final seven-profile source/evidence admission remain pending. The earlier
-owning-executor source commit retained two lanes; the local workflow/register
-integration does not turn authored scenarios into passing runtime evidence.
-Rebuilding must bind the actual committed candidate revision; any later candidate source,
-input, registration or workflow change invalidates the final execution proof.
-
-The always-present required security job uses the existing conservative native
-change router and accepts only its exact true/false result. Unknown routing
-output fails. Selected runs build the registered API and distributed hosts with
-the exact candidate SourceRevisionId, provision external prerequisites, and call
-the existing owning verb once for all registered lanes. It uploads only the
-newly admitted public directory after successful execution; raw reports, private
-run roots and provisioning diagnostics are excluded, including on failure.
-The workflow has no separate Bash test/harvesting path. Missing managed launch
-evidence still rejects execution; the local integration does not bypass it.
-
-The native runner's timeout covers its entire serial batch. API batches retain
-600 seconds; each isolated load UID retains 1500 seconds for its twenty-minute
-regime and lifecycle allowance. For N actual selected UIDs, runtime uses `720*N`
+The selected SDK servicing baseline is recorded in [Operations](OPERATIONS.md#sdk-and-runtime-servicing). Release-impact validation executes the trusted base checkout so PR-head code cannot run with elevated context.
 seconds, journeys `1200*N`, and browser security `240*N+1020`. Each owned batch is
 capped at 19800 seconds (330 minutes), with the parent process deadline fifteen
 seconds later. The existing closed lane and matching registered host profile
@@ -347,122 +254,16 @@ commit-OID-bound `change-id-rename.v1` record plus a generated replacement
 fragment. The record is governed release input; it does not alter the old
 footer or weaken target uniqueness.
 
-### Prospective release provider adapters
+### Offline release toolchain and signed tag verification
 
-The provider adapter contract is defined in `.ci/release/adapter-contract.md` and
-machine-checked by `.ci/release/provider-definition.schema.json` plus
-`.ci/scripts/validate-release-provider-adapters.cs`. Provider manifests live under
-`.ci/providers/<provider-id>/provider-definition.v1.json`; discovery workflows stay
-beside the manifest unless the forge requires a fixed discovery path such as
-`.github/workflows/`.
+Retired placeholder release provider adapters (`.ci/providers/`, `.ci/release/`, `validate-release-provider-adapters.cs`, `generate-release-evidence-bundle.cs`, `report-publication-drift.cs`, `release-adapter-preview.yml`, `release-adapter-final.yml`, and `release-publish.yml`) and custom promotion-bundle ceremony have been removed.
 
-The first reviewed provider set is:
+Authoritative release preparation and verification use `ISLAMU.ReleaseEngineering` (`AllowUnsafeBlocks=false`, `RunAnalyzersDuringBuild=true`, zero warnings):
 
-| Provider | Definition | Discovery surface | Current status |
-|---|---|---|---|
-| Forgejo / Codeberg | `.ci/providers/forgejo-codeberg/provider-definition.v1.json` | `.ci/providers/forgejo-codeberg/release-adapter-preview.yml`, `.ci/providers/forgejo-codeberg/release-adapter-final.yml` | No-checkout discovery-only; protected final actions require a trusted self-hosted runner, default-branch proof, and separate activation evidence. |
-| Tangled | `.ci/providers/tangled/provider-definition.v1.json` | `.ci/providers/tangled/release-adapter-preview.yml`, `.ci/providers/tangled/release-adapter-final.yml` | No-checkout discovery-only; protected-ref CAS and release publication are unsupported without external operator evidence and future default-branch proof. |
-| GitHub | `.ci/providers/github/provider-definition.v1.json` | `.github/workflows/release-adapter-preview.yml`, `.github/workflows/release-adapter-final.yml` | Discovery-only; PR preview is read-only and final discovery is `workflow_dispatch` behind the `production` environment. |
-
-All provider definitions must keep `release-adapter-preview` and
-`release-adapter-final` as always-present required check surfaces. Preview lanes are
-read-only `contents:read` only and must not receive secrets, write permissions, or
-OIDC token authority. Final lanes must run only trusted default-branch code after
-candidate code has stopped unless they are transport-only no-checkout discovery jobs.
-GitHub discovery checks out `${{ github.event.repository.default_branch }}`, not the
-event SHA. Forgejo/Codeberg and Tangled final discovery jobs currently perform no
-checkout and declare `trustedRef = "no-checkout-discovery"`; the validator permits that
-mode only while the final workflow contains no checkout, candidate ref/path, external
-command, mutable action/image, or nonliteral execution. Any activated release execution
-must migrate to default-branch proof before running release logic. Provider plans may
-transport full Git object IDs, immutable bundle paths and hashes, artifact retention
-details, required checks, and protected-ref compare-and-swap inputs; they must not
-enrich or replace governed release identity. Provider manifests cannot self-assert
-external operator evidence for unsupported capabilities; Tangled protected-ref or
-release publication planning requires a separate bounded external-control evidence
-input to the validator.
-
-Final events are allowlisted per provider. GitHub is `workflow_dispatch` only.
-Forgejo/Codeberg is the reviewed trusted `workflow_dispatch` lane only. Tangled is
-`manual` or reviewed `tag_push` only. Pull-request-origin final events, including
-`pull_request_target`, are forbidden even when other final-lane flags claim trusted
-code.
-
-The validator compares each manifest's declared discovery workflow files against the
-manifest: declared actions must be the external actions actually used, final
-environment approval must be backed by an environment in the final workflow, GitHub
-final checkout must use `${{ github.event.repository.default_branch }}`, transport-only
-`no-checkout-discovery` final workflows must stay literal no-op jobs, and preview
-workflows must not also expose final events.
-
-### Prospective trust-lane separation
-
-The candidate lane may compile and test candidate release-engine source but has no
-signing, protected-ref, publication, deployment, registry-write, OIDC, or promoted
-artifact-store credentials. The final lane starts from an independently promoted
-bundle plus a separately supplied immutable authoritative promotion receipt and detached
-SSH signature. The previously promoted verifier resolves the promoter trust root only
-from its fixed protected application directory; requests and candidate sibling files
-cannot select, replace, or reset promotion authority. The verifier checks the receipt
-before reading candidate data and never resolves policy, configuration, tool locks,
-signer roots, or promotion authority from the checkout under release. The signed
-  receipt binds the authoritative manifest digest plus bundle, policy, configuration, and
-  trust versions and digests. Reusing it for the same immutable bundle is idempotent;
-  using it for any different bundle fails without relying on a verifier-side replay
-  registry. Wrong signers or roots, self-created receipts, root aliases, hardlinked
-  bundle files, bounded-input violations, normalized or case-insensitive path
-  collisions, tampered bundle files, and candidate-local overrides fail before authoritative
-  candidate data is trusted. Exact receipt reuse for the exact bound manifest adds no
-  authority, so the public request has no caller-resettable replay set.
-
-Restricted security input is a separate access-controlled input, not a candidate or
-release artifact. It is mounted only where candidate executables cannot run. Public
-logs and artifacts receive only stable diagnostic codes until disclosure is approved;
-after approval, only a reviewed public disposition and advisory reference may cross,
-and neither may exactly alias restricted fields after Unicode and whitespace
-normalization. The storage provider remains intentionally undecided and cannot affect
-stable identity. Final jobs must reverify the promoted bundle immediately before
-use from immutable promoted storage.
-
-Task 5 must derive release-signer booleans, dates, principal, fingerprint, and tag
-object identity from local Git and OpenSSH evidence. Forge badges or hosted release
-metadata cannot satisfy the signer policy.
-
-Task 5.3 binds the existing durable evidence bundle to that final local evidence.
-Release-mode bundle generation MUST find exactly one `release-evidence.v1.json` in
-the retained artifact tree, parse it as the authoritative final identity, and reject
-missing, duplicate, malformed, stale, tampered, or disagreeing manifests. The bundle
-MUST verify the final manifest's version, tag name, tag object ID, final `B`,
-candidate-manifest digest, release descriptor/summary/context/notes hashes, and
-trusted bundle/tool/policy/config/trust hashes against explicit inputs and retained
-artifacts. Workflow run IDs, provider URLs, collection time, CLA status, and artifact
-transport fields are non-authoritative metadata only and MUST NOT change release identity.
-Authoritative ingestion rejects unknown/duplicate fields, invalid UTF-8, non-NFC or
-non-authoritative JSON, case/NFC/path aliases, symlinks, oversized trees/files, and
-malformed metadata with bounded stable diagnostics. Validation finishes before the
-bundle output is published, so rejected input cannot leave a partial final bundle.
-The durable checksum manifest MUST be produced through `.ci/scripts/write-artifact-checksums.cs`
-and include the final/candidate manifests, release.yaml, summary, generated context
-and notes, trusted tool promotion receipt/signature/manifest, signer/tag evidence,
-governance policy/config/trust files, and the existing evidence categories.
-
-### Prospective changelog acceptance and GitBook mirror
-
-The approved publication topology is not activated by workflow YAML alone.
-Retain actual operator settings and observed delivery evidence using the
-[publication checklist](RELEASE_CHECKLIST.md#prospective-changelog-publication-activation).
-Until then, public/internal documentation calls publication prospective and
-unverified.
-
-The trusted final lane records complete finally verified disclosure-authorized
-inventory before dispatch. The offline publisher consumes it read-only; the
-adapter owns transport and protected mutations. Reconcile all authorized
-records, including absent/coalesced dispatches, from durable evidence rather
-than one version directory. Preserve full tag-object IDs, bundle evidence and
-manifest/receipt digests beyond ordinary artifact retention.
-
-`docs/publication` contains the full public tree and is protected by independent
-review and required checks. No GitBook or publisher bypass is allowed there.
+- `ensure-git-cliff` is the sole network-capable provisioning command and downloads only the pinned `git-cliff` `2.14.2` release archive in `eng/release/toolchain.lock.json`, verifying archive SHA-256, safe archive extraction, extracted executable SHA-256, and `--version` output before staging.
+- `verify-tools` verifies the locally provisioned `git-cliff` executable strictly offline. Authoritative tool executions always pass `--config`, `--offline`, and `--no-exec` with `GIT_CLIFF_OFFLINE=1` under a scrubbed environment.
+- `verify-release-tag` verifies annotated SSH-signed Git release and baseline tags directly against `eng/release/trust/allowed-signers` (or `--allowed-signers <path>`), binding tag name, target commit OID, optional event SHA, and signer principal. `eng/release/trust/allowed-signers` remains comment-only and fails closed until Project Steward enrollment.
+- `sync-public-changelog` projects signed local release records under `docs/internal/releases/` into `docs/public/changelog/README.md` with atomic manifest/transaction updates and `--check` drift verification.
 `docs/gitbook-sync` is a separate mutable mirror with explicitly approved
 mirror-only app rights. No automatic reverse merge is allowed. Live GitBook
 settings must prove repository, mirror branch, Project directory `docs/public`,
@@ -625,7 +426,7 @@ The repository should expose only two CI/CD directories by default:
 - `.github/` for GitHub-required metadata, GitHub Actions discovery, issue templates, PR templates, CODEOWNERS, and Dependabot.
 - `.ci/` for shared CI/CD implementation and mirror-provider CI/CD definitions.
 
-Provider-specific root directories such as `.forgejo/`, `.woodpecker/`, or `.tangled/` are intentionally not used. Configure Codeberg or other mirrors to load CI/CD from `.ci/` when the provider supports a custom pipeline path. Do not add deploy secrets, registry publish credentials, Coolify webhooks, or environment promotion behavior to non-GitHub mirrors until this document defines equivalent secret isolation, artifact retention, immutable image evidence, smoke-check evidence, and rollback evidence for that provider. Release-adapter definitions are the only approved provider-specific CI/CD folders today, and they stay under `.ci/providers/`.
+Provider-specific root directories such as `.forgejo/`, `.woodpecker/`, or `.tangled/` are intentionally not used. Configure Codeberg or other mirrors to load CI/CD from `.ci/` when the provider supports a custom pipeline path. Do not add deploy secrets, registry publish credentials, Coolify webhooks, or environment promotion behavior to non-GitHub mirrors until this document defines equivalent secret isolation, artifact retention, immutable image evidence, smoke-check evidence, and rollback evidence for that provider.
 
 ### Workflow Static Analysis Policy
 
@@ -1118,17 +919,7 @@ the check; a longer limit is not evidence that tests passed. Use the retained
 progress file and completed test results to evaluate fixture improvements rather
 than treating cancellation as a successful security run.
 
-For manual releases, generate the durable release evidence manifest after downloading retained CI/CD artifacts:
-
-```bash
-dotnet run .ci/scripts/generate-release-evidence-bundle.cs -- artifacts release-evidence
-```
-
-The output path must be fresh and absent before invocation. Bundle generation stages
-all four outputs beside that path and publishes them with one directory rename; it
-fails closed instead of replacing or merging an existing bundle.
-
-The generated JSON, markdown summary, release-notes evidence section, and SHA-256 checksum manifest are the bridge between expiring GitHub Actions artifacts and the manually authored GitHub Release. Attach them to the release or copy them to durable release storage. Paste `release-evidence-release-notes.md` into the GitHub Release body so the release keeps durable evidence pointers even after workflow artifacts expire.
+For manual checksum generation over retained artifacts, run `.ci/scripts/write-artifact-checksums.cs` against the artifact directory. Automated tag-driven release sealing, Cosign signatures, and GitHub attestations are scheduled in the release-pipeline follow-up PR.
 
 ## Artifact Triage Guide
 

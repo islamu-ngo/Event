@@ -1345,7 +1345,7 @@ internal static class K6LoadHarnessChild
             control.Bind(new UnixDomainSocketEndPoint(System.IO.Path.Combine(root, "controller.control")));
             control.Listen(1);
             var ownerStart = K6LoadRunner.StartInfo(System.IO.Path.Combine(
-                AppContext.BaseDirectory, "LoadProcessOwner", "ISLAMU.ReleaseEngineering"));
+                AppContext.BaseDirectory, "LoadProcessOwner", "Event.LoadProcessOwner"));
             ownerStart.RedirectStandardInput = true;
             ownerStart.ArgumentList.Add("own-load-process");
             using var owner = Process.Start(ownerStart)

@@ -25,8 +25,10 @@ priority: high
    information and account for local work before any user-authorized deletion.
    Approval, merge, acceptance and cleanup are distinct; approval is not merge.
 6. Preserve local overrides, secret authority, task namespace isolation, literal
-   owned commit paths and native tracking. No new controller, lock, manifest,
-   custom REST client or source-wording test implements this workflow.
+   owned commit paths and native tracking. Keep `.githooks/commit-msg` active
+   (delegating to `preflight-commit`, where internal commits omit automatically
+   without skip trailers). No new controller, lock, manifest, custom REST client
+   or source-wording test implements this workflow.
 7. Tier 4 Markdown changes use metadata, links, scenario review and diff checks;
    no product build/test. Product verification remains proportional and mandatory
    per PR, distinct from final programme acceptance. Keep explicit user overrides

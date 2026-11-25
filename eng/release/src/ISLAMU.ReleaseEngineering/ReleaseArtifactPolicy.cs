@@ -140,6 +140,59 @@ public static class ReleaseArtifactPolicy
 
     public static UntrustedTextResult EscapeUntrustedMarkdown(string value) => EscapeUntrustedMarkdown(value, rejectRawHtml: true);
 
+    /// <summary>
+    /// Post-render security and privacy gate applied to rendered Markdown release notes before writing
+    /// or publishing. Rejects leaked contributor identities, forge URLs, secrets, raw HTML, embargo
+    /// markers, and control/bidi characters while permitting canonical OCI <c>@sha256:</c> references.
+    /// </summary>
+    public static ArtifactPolicyResult ValidateRenderedReleaseNotes(string markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown) || !TryNormalize(markdown, out string? normalized))
+        {
+            return Invalid("rendered_notes_invalid_unicode");
+        }
+
+        if (normalized.EnumerateRunes().Any(rune =>
+            Rune.GetUnicodeCategory(rune) is UnicodeCategory.Control or UnicodeCategory.Format &&
+            rune.Value is not '\r' and not '\n' and not '\t'))
+        {
+            return Invalid("rendered_notes_invalid_unicode");
+        }
+
+        var diagnostics = new List<string>();
+        if (SecretPattern.IsMatch(normalized))
+        {
+            diagnostics.Add("rendered_notes_secret_material");
+        }
+
+        if (IdentityOrProviderPattern.IsMatch(normalized))
+        {
+            diagnostics.Add("rendered_notes_identity_or_provider");
+        }
+
+        if (normalized.Contains("restricted-details", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("public-disclosure: embargoed", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("generated-region", StringComparison.OrdinalIgnoreCase))
+        {
+            diagnostics.Add("rendered_notes_embargo_or_restricted");
+        }
+
+        if (RawHtmlPattern.IsMatch(normalized))
+        {
+            diagnostics.Add("rendered_notes_raw_html");
+        }
+
+        if (diagnostics.Count != 0)
+        {
+            return new ArtifactPolicyResult(false, null, diagnostics);
+        }
+
+        ArtifactPolicyResult textResult = NormalizeText(normalized);
+        return textResult.IsValid
+            ? textResult
+            : Invalid("rendered_notes_too_large");
+    }
+
     public static IReadOnlyDictionary<string, string> CreateDeterministicEnvironment(string isolationDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(isolationDirectory);

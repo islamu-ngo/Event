@@ -1,15 +1,20 @@
-using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class SecurityControlRegisterTests
 {
+    private const string RegisterFileName = "register.json";
+    private const string HostProfileField = "hostProfile";
+    private const string ProjectField = "project";
+    private const string OwnedRuntimeLane = "owned-runtime";
+    private const string OwnedLoadCorrectnessLane = "owned-load-correctness";
+
     [Test]
     public async Task TwoApiLanesCannotReplaceTheCompleteSevenProfileRegistration()
     {
         await Assert.That(SecurityControlRegister.TryValidate(RegisterPath(), out _)).IsTrue();
-        JsonObject register = JsonNode.Parse(File.ReadAllBytes(RegisterPath()))!.AsObject();
+        JsonObject register = JsonNode.Parse(await File.ReadAllBytesAsync(RegisterPath()))!.AsObject();
         JsonArray requirements = register["executionRequirements"]!.AsArray();
         await Assert.That(requirements.Count).IsEqualTo(7);
         for (int index = requirements.Count - 1; index >= 0; index--)
@@ -19,8 +24,8 @@ public sealed class SecurityControlRegisterTests
         string directory = Directory.CreateTempSubdirectory("native-seven-register-").FullName;
         try
         {
-            string path = Path.Combine(directory, "register.json");
-            File.WriteAllText(path, register.ToJsonString());
+            string path = Path.Combine(directory, RegisterFileName);
+            await File.WriteAllTextAsync(path, register.ToJsonString());
             await Assert.That(SecurityControlRegister.TryValidate(path, out _)).IsFalse();
         }
         finally { Directory.Delete(directory, recursive: true); }
@@ -37,16 +42,16 @@ public sealed class SecurityControlRegisterTests
     [Arguments("duplicate-variant", false)]
     public async Task OwnedProfilesRequireACompleteClosedRegistration(string variant, bool expected)
     {
-        JsonObject register = SecurityExecutionEvidenceFixture.OwnedRegister(RegisterPath());
+        JsonObject register = OwnedRegister(RegisterPath());
         JsonArray requirements = register["executionRequirements"]!.AsArray();
         JsonObject runtime = requirements[2]!.AsObject();
         switch (variant)
         {
             case "partial-group": requirements.RemoveAt(requirements.Count - 1); break;
             case "unknown-lane": runtime["laneId"] = "future-unreviewed-profile"; break;
-            case "unknown-profile": runtime["hostProfile"] = "production"; break;
-            case "contradictory-profile": runtime["hostProfile"] = "owned-browser-assurance"; break;
-            case "wrong-project": runtime["project"] = requirements[0]!["project"]!.GetValue<string>(); break;
+            case "unknown-profile": runtime[HostProfileField] = "production"; break;
+            case "contradictory-profile": runtime[HostProfileField] = "owned-browser-assurance"; break;
+            case "wrong-project": runtime[ProjectField] = requirements[0]![ProjectField]!.GetValue<string>(); break;
             case "empty-tests": runtime["requiredTests"] = new JsonArray(); break;
             case "duplicate-variant": runtime["requiredTests"]![1] = runtime["requiredTests"]![0]!.DeepClone(); break;
         }
@@ -55,14 +60,14 @@ public sealed class SecurityControlRegisterTests
         Directory.CreateDirectory(directory);
         try
         {
-            string path = Path.Combine(directory, "register.json");
+            string path = Path.Combine(directory, RegisterFileName);
             await File.WriteAllTextAsync(path, register.ToJsonString());
             bool accepted = SecurityControlRegister.TryValidate(path, out _);
             await Assert.That(accepted).IsEqualTo(expected);
             if (variant == "complete")
             {
                 var parsed = SecurityControlRegister.ReadExecutionRequirements(path);
-                var runtimeRequirement = parsed["owned-runtime"];
+                var runtimeRequirement = parsed[OwnedRuntimeLane];
                 await Assert.That(runtimeRequirement.Lifecycles.Keys.ToHashSet().SetEquals(runtimeRequirement.Tests)).IsTrue();
                 foreach (var lifecycle in runtimeRequirement.Lifecycles.Values)
                 {
@@ -73,18 +78,18 @@ public sealed class SecurityControlRegisterTests
                     await Assert.That(lifecycle.Signals.Count).IsEqualTo(0);
                     await Assert.That(lifecycle.RootDisposition).IsEqualTo(SecurityControlRegister.RuntimeRootDisposition.NotApplicable);
                 }
-                await Assert.That(parsed.Where(lane => lane.Key != "owned-runtime")
+                await Assert.That(parsed.Where(lane => lane.Key != OwnedRuntimeLane)
                     .All(lane => lane.Value.Lifecycles.Count == 0)).IsTrue();
-                var load = parsed["owned-load-correctness"];
+                var load = parsed[OwnedLoadCorrectnessLane];
                 await Assert.That(load.LoadPurposes.Keys.ToHashSet().SetEquals(load.Tests)).IsTrue();
                 await Assert.That(load.LoadPurposes.Values.ToHashSet().SetEquals(new[]
                     { SecurityControlRegister.LoadPurpose.Foundation, SecurityControlRegister.LoadPurpose.Programme })).IsTrue();
-                await Assert.That(parsed.Where(lane => lane.Key != "owned-load-correctness").All(lane => lane.Value.LoadPurposes.Count == 0)).IsTrue();
+                await Assert.That(parsed.Where(lane => lane.Key != OwnedLoadCorrectnessLane).All(lane => lane.Value.LoadPurposes.Count == 0)).IsTrue();
                 foreach (string invalidPurpose in new[] { "missing", "null", "unknown", "other-lane" })
                 {
                     JsonObject malformed = register.DeepClone().AsObject();
                     JsonArray lanes = malformed["executionRequirements"]!.AsArray();
-                    JsonObject loadRow = lanes.Single(lane => lane!["laneId"]!.GetValue<string>() == "owned-load-correctness")!["requiredTests"]![0]!.AsObject();
+                    JsonObject loadRow = lanes.Single(lane => lane!["laneId"]!.GetValue<string>() == OwnedLoadCorrectnessLane)!["requiredTests"]![0]!.AsObject();
                     switch (invalidPurpose)
                     {
                         case "missing": loadRow.Remove("loadPurpose"); break;
@@ -135,10 +140,50 @@ public sealed class SecurityControlRegisterTests
     }
 
     [Test]
-    [Arguments("missing-reference")]
+    [Arguments("verified", "Protected", "ci-run-123", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", true)]
+    [Arguments("mitigated", "Improvable", "pr-88-evidence", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", true)]
+    [Arguments("accepted", "Not applicable", "steward-review-2026-11", "cccccccccccccccccccccccccccccccccccccccc", true)]
+    [Arguments("verified", "Protected", "", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false)]
+    [Arguments("verified", null, "ci-run-123", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false)]
+    [Arguments("verified", "Protected", "ci-run-123", null, false)]
+    [Arguments("mitigated", "UnknownDisposition", "ci-run-123", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false)]
+    [Arguments("pending", "Protected", "ci-run-123", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false)]
+    [Arguments("closed", "Protected", "ci-run-123", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false)]
+    public async Task ControlLifecycleProgressionRequiresStructuralEvidenceAndValidDisposition(
+        string verificationStatus,
+        string? finalDisposition,
+        string evidenceEntry,
+        string? codeArtifactIdentity,
+        bool expected)
+    {
+        JsonObject register = JsonNode.Parse(await File.ReadAllBytesAsync(RegisterPath()))!.AsObject();
+        JsonObject first = register["references"]!.AsArray()[0]!.AsObject();
+        first["verificationStatus"] = verificationStatus;
+        first["finalDisposition"] = finalDisposition is null ? null : JsonValue.Create(finalDisposition);
+        first["executionEvidence"] = string.IsNullOrEmpty(evidenceEntry) ? new JsonArray() : new JsonArray(evidenceEntry);
+        first["codeArtifactIdentity"] = codeArtifactIdentity is null ? null : JsonValue.Create(codeArtifactIdentity);
+
+        string directory = Path.Combine(Path.GetTempPath(), "security-register-lifecycle-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string path = Path.Combine(directory, RegisterFileName);
+        try
+        {
+            await File.WriteAllTextAsync(path, register.ToJsonString());
+            bool accepted = SecurityControlRegister.TryValidate(path, out string diagnostic);
+
+            await Assert.That(accepted).IsEqualTo(expected).Because(diagnostic);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    [Arguments("empty-references")]
     [Arguments("duplicate-reference")]
     [Arguments("unknown-owner")]
-    [Arguments("missing-scenario")]
+    [Arguments("unknown-scenario-reference")]
     [Arguments("unknown-family-reference")]
     [Arguments("unassigned-reference")]
     [Arguments("duplicate-supplementary-mechanism")]
@@ -146,12 +191,12 @@ public sealed class SecurityControlRegisterTests
     [Arguments("missing-runtime-host")]
     [Arguments("test-provider-as-supported-engine")]
     [Arguments("unqualified-provider-finding")]
-    [Arguments("missing-typed-pair")]
+    [Arguments("empty-typed-pairs")]
     [Arguments("missing-execution-owner-evidence")]
     [Arguments("unknown-standard-profile")]
-    [Arguments("missing-native-pair")]
-    [Arguments("missing-class")]
-    [Arguments("missing-mitigation")]
+    [Arguments("empty-native-pairs")]
+    [Arguments("empty-classes")]
+    [Arguments("empty-mitigations")]
     [Arguments("mixed-standard-version")]
     [Arguments("unearned-closure")]
     [Arguments("missing-execution-requirements")]
@@ -162,7 +207,7 @@ public sealed class SecurityControlRegisterTests
     [Arguments("wrong-required-project")]
     public async Task IncompleteOrMisleadingCatalogueIsRejected(string failure)
     {
-        JsonObject register = JsonNode.Parse(File.ReadAllBytes(RegisterPath()))?.AsObject() ??
+        JsonObject register = JsonNode.Parse(await File.ReadAllBytesAsync(RegisterPath()))?.AsObject() ??
             throw new InvalidDataException();
         JsonArray references = register["references"]?.AsArray() ?? throw new InvalidDataException();
         JsonObject first = references[0]?.AsObject() ?? throw new InvalidDataException();
@@ -182,13 +227,13 @@ public sealed class SecurityControlRegisterTests
                 requiredTests.Add(requiredTests[0]!.DeepClone());
                 break;
             case "wrong-required-profile":
-                register["executionRequirements"]![0]!["hostProfile"] = "combined-standalone";
+                register["executionRequirements"]![0]![HostProfileField] = "combined-standalone";
                 break;
             case "wrong-required-project":
-                register["executionRequirements"]![0]!["project"] = "unrelated.csproj";
+                register["executionRequirements"]![0]![ProjectField] = "unrelated.csproj";
                 break;
-            case "missing-reference":
-                references.RemoveAt(0);
+            case "empty-references":
+                references.Clear();
                 break;
             case "duplicate-reference":
                 first["id"] = "REF-209";
@@ -196,8 +241,8 @@ public sealed class SecurityControlRegisterTests
             case "unknown-owner":
                 first["owningPhases"] = new JsonArray(30);
                 break;
-            case "missing-scenario":
-                (register["scenarios"]?.AsArray() ?? throw new InvalidDataException()).RemoveAt(49);
+            case "unknown-scenario-reference":
+                first["scenarios"] = new JsonArray("S99");
                 break;
             case "unknown-family-reference":
                 JsonObject family = register["families"]?[0]?.AsObject() ?? throw new InvalidDataException();
@@ -230,8 +275,8 @@ public sealed class SecurityControlRegisterTests
             case "unqualified-provider-finding":
                 register["qualifiedMappings"]!["providerPairs"]![0]!["findingId"] = "IVSD-F001";
                 break;
-            case "missing-typed-pair":
-                register["typedContractInventory"]!["dtoPairs"]!.AsArray().RemoveAt(0);
+            case "empty-typed-pairs":
+                register["typedContractInventory"]!["dtoPairs"]!.AsArray().Clear();
                 break;
             case "missing-execution-owner-evidence":
                 register["executionOwnerInventory"]![0]!["requiredEvidence"] = "";
@@ -239,14 +284,14 @@ public sealed class SecurityControlRegisterTests
             case "unknown-standard-profile":
                 register["asvs"]!["requirements"]![0]!["prerequisiteProfiles"] = new JsonArray("test-only");
                 break;
-            case "missing-native-pair":
-                register["typedContractInventory"]!["nativePairs"]!.AsArray().RemoveAt(0);
+            case "empty-native-pairs":
+                register["typedContractInventory"]!["nativePairs"]!.AsArray().Clear();
                 break;
-            case "missing-class":
-                (register["classes"]?.AsArray() ?? throw new InvalidDataException()).RemoveAt(0);
+            case "empty-classes":
+                (register["classes"]?.AsArray() ?? throw new InvalidDataException()).Clear();
                 break;
-            case "missing-mitigation":
-                (register["apiFindingMitigationPairs"]?.AsArray() ?? throw new InvalidDataException()).RemoveAt(0);
+            case "empty-mitigations":
+                (register["apiFindingMitigationPairs"]?.AsArray() ?? throw new InvalidDataException()).Clear();
                 break;
             case "mixed-standard-version":
                 JsonObject asvs = register["asvs"]?.AsObject() ?? throw new InvalidDataException();
@@ -262,10 +307,10 @@ public sealed class SecurityControlRegisterTests
 
         string directory = Path.Combine(Path.GetTempPath(), "security-register-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
-        string path = Path.Combine(directory, "register.json");
+        string path = Path.Combine(directory, RegisterFileName);
         try
         {
-            File.WriteAllText(path, register.ToJsonString());
+            await File.WriteAllTextAsync(path, register.ToJsonString());
             bool accepted = SecurityControlRegister.TryValidate(path, out string diagnostic);
 
             await Assert.That(accepted).IsFalse();
@@ -277,7 +322,68 @@ public sealed class SecurityControlRegisterTests
         }
     }
 
-    private static string RegisterPath([CallerFilePath] string sourcePath = "") =>
-        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(sourcePath) ??
-            throw new InvalidDataException(), "..", "..", "..", "security", "security-control-register.json"));
+    private static JsonObject OwnedRegister(string shippedRegister)
+    {
+        var register = JsonNode.Parse(File.ReadAllBytes(shippedRegister))!.AsObject();
+        JsonArray requirements = register["executionRequirements"]!.AsArray();
+        foreach ((string id, string profile) in new[]
+        {
+            (OwnedRuntimeLane, "owned-apphost-assurance"),
+            ("owned-browser-journeys", "owned-browser-assurance"),
+            ("owned-browser-security", "owned-browser-assurance"),
+            ("owned-load-control", "owned-apphost-load-assurance"),
+            (OwnedLoadCorrectnessLane, "owned-apphost-load-assurance"),
+        })
+        {
+            foreach (JsonNode? previous in requirements.Where(requirement =>
+                requirement?["laneId"]?.GetValue<string>() == id).ToArray())
+            {
+                requirements.Remove(previous);
+            }
+
+            requirements.Add(new JsonObject
+            {
+                ["laneId"] = id,
+                [ProjectField] = "tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj",
+                [HostProfileField] = profile,
+                ["requiredTests"] = new JsonArray(new[] { "alpha", "beta" }.Select(variant =>
+                {
+                    var test = new JsonObject
+                    {
+                        ["className"] = "Synthetic.OwnedProfile",
+                        ["methodName"] = "SyntheticWitness",
+                        ["testName"] = $"SyntheticWitness({id}, {variant})",
+                    };
+                    if (id == OwnedRuntimeLane)
+                    {
+                        test["lifecycle"] = new JsonObject
+                        {
+                            ["stage"] = "none",
+                            ["completion"] = "success",
+                            ["directContainers"] = false,
+                            ["resource"] = null,
+                            ["signals"] = new JsonArray(),
+                            ["rootDisposition"] = "not-applicable",
+                        };
+                    }
+
+                    if (id == OwnedLoadCorrectnessLane)
+                    {
+                        test["loadPurpose"] = variant == "alpha" ? "foundation" : "programme";
+                    }
+
+                    return (JsonNode)test;
+                }).ToArray()),
+            });
+        }
+
+        return register;
+    }
+
+    /// <summary>
+    /// Resolves the shipped register from the test output location rather than <c>[CallerFilePath]</c>,
+    /// because deterministic CI builds map source paths to <c>/_/</c>.
+    /// </summary>
+    private static string RegisterPath() =>
+        Path.Combine(RepositoryRoot.Find(), "eng", "security", "security-control-register.json");
 }

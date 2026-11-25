@@ -22,14 +22,34 @@ public static class SecurityChangeSelection
         || (path.StartsWith("docs/public/", StringComparison.Ordinal)
             && path.EndsWith(".md", StringComparison.Ordinal));
 
+    /// <summary>
+    /// Prose and render-only release configuration that no security workflow builds, loads, or executes.
+    /// Release-tool source, tests, policy, and project files stay selected because the security workflow
+    /// runs the release binary to verify the control register and to select security changes.
+    /// </summary>
+    private static bool IsReleaseProseOrRenderConfiguration(string path) =>
+        path.StartsWith("eng/release/", StringComparison.Ordinal)
+        && (path.EndsWith(".md", StringComparison.Ordinal) || path == "eng/release/cliff.toml");
+
+    private static bool IsNonSecurityDocumentationSkillOrReleasePath(string path) =>
+        path is "README.md" or "CONTRIBUTING.md" or "CHANGELOG.md" or "AGENTS.md" or "AI_REVIEW.md" or "PROJECTS.md"
+        || ((path.StartsWith("docs/public/", StringComparison.Ordinal)
+                || path.StartsWith("docs/internal/", StringComparison.Ordinal)
+                || path.StartsWith("dev/", StringComparison.Ordinal)
+                || path.StartsWith("islamic-value-sensitive-design/", StringComparison.Ordinal))
+            && path.EndsWith(".md", StringComparison.Ordinal))
+        || path.StartsWith(".agents/", StringComparison.Ordinal)
+        || IsReleaseProseOrRenderConfiguration(path);
+
     public static bool RequiresExecution(IEnumerable<string> changedPaths)
     {
         bool anyPath = false;
         foreach (string path in changedPaths)
         {
             anyPath = true;
-            // Only known public prose can skip; new or ambiguous paths must run.
-            if (!IsValidPath(path) || !IsPublicDocumentation(path))
+            // Only known documentation, agent skills, or release prose/render configuration can skip;
+            // runtime, security, build, release-tool code, and unknown paths fail safe to run-tests=true.
+            if (!IsValidPath(path) || !IsNonSecurityDocumentationSkillOrReleasePath(path))
             {
                 return true;
             }

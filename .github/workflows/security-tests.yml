@@ -40,8 +40,8 @@ jobs:
           set -euo pipefail
           umask 077
           export TMPDIR="$RUNNER_TEMP/islamu-security-private"
-          mkdir -p "$TMPDIR" "$RUNNER_TEMP/islamu-security-tools"
-          chmod 700 "$TMPDIR" "$RUNNER_TEMP/islamu-security-tools"
+          mkdir -p "$TMPDIR" "$TMPDIR/trx" "$RUNNER_TEMP/islamu-security-tools"
+          chmod 700 "$TMPDIR" "$TMPDIR/trx" "$RUNNER_TEMP/islamu-security-tools"
           [[ "$DOCKER_HOST" == unix:///* ]]
           selected_socket="$(readlink --canonicalize-existing -- "${DOCKER_HOST#unix://}")"
           test -S "$selected_socket"
@@ -51,20 +51,6 @@ jobs:
             printf 'ISLAMU_K6_PATH=%s/islamu-security-tools/k6\n' "$RUNNER_TEMP"
             printf 'DOCKER_HOST=unix://%s\n' "$selected_socket"
           } >> "$GITHUB_ENV"
-
-      - name: Observe System Stat Selection
-        shell: bash
-        run: |
-          set -euo pipefail
-          export LC_ALL=C TZ=UTC
-          namei --long -- /usr/bin/stat
-          selected_stat="$(readlink --canonicalize-existing -- /usr/bin/stat)"
-          test -f "$selected_stat"
-          printf 'System stat target: %s\n' "$selected_stat"
-          stat_version="$(/usr/bin/stat --version)"
-          printf '%s\n' "${stat_version%%$'\n'*}"
-          /usr/bin/stat --format='System stat entry mode: %f' -- /usr/bin/stat
-          /usr/bin/stat --dereference --format='%f|%u|%h|%d|%i|%s|%y|%w|%Hd|%Ld' -- /usr/bin/stat
 
       - name: Setup .NET
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
@@ -169,8 +155,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          dotnet build tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-restore --verbosity normal -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
-          dotnet build tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-restore --verbosity quiet -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
+          dotnet build tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-restore --verbosity minimal -m:1 -nr:false -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
+          dotnet build tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-restore --verbosity quiet -m:1 -nr:false -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
 
       - name: Prepare Private Execution Prerequisites
         if: ${{ steps.changes.outputs.run-tests == 'true' }}
@@ -209,21 +195,55 @@ jobs:
           printf '%s  %s\n' e001bbf39ba67424a85c9c8516440ba5c73ecf7a6021be96c76194380c15f260 "$ISLAMU_K6_PATH" | sha256sum --check --status
           printf 'Prerequisite %s ended: exit=0\n' "$stage"
 
-      - name: Execute Registered Security Profiles
+      - name: Run API Security and Policy Contract Tests
         if: ${{ steps.changes.outputs.run-tests == 'true' }}
-        id: security_execution_evidence
+        id: api_security_tests
         shell: bash
         run: |
           set -euo pipefail
-          dotnet eng/release/src/ISLAMU.ReleaseEngineering/bin/Release/net10.0/ISLAMU.ReleaseEngineering.dll execute-security-execution "$TMPDIR/public" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_EVENT_NAME"
+          dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj \
+            --configuration Release --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/*/*[Category=Security]" --minimum-expected-tests 1 \
+            --results-directory "$TMPDIR/trx" --report-trx --report-trx-filename security-integration-tests.trx
+          dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj \
+            --configuration Release --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/*/*[Category=PolicyContract]" --minimum-expected-tests 1 \
+            --results-directory "$TMPDIR/trx" --report-trx --report-trx-filename cerbos-policy-contract-tests.trx
 
-      - name: Upload Admitted Public Security Evidence
-        if: ${{ success() && steps.changes.outputs.run-tests == 'true' && steps.security_execution_evidence.outcome == 'success' }}
+      - name: Run Distributed Runtime, Browser, and Load Security Tests
+        if: ${{ steps.changes.outputs.run-tests == 'true' }}
+        id: distributed_security_tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet test --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj \
+            --configuration Release --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/*/*[Category=Distributed]" --minimum-expected-tests 1 --maximum-parallel-tests 1 \
+            --results-directory "$TMPDIR/trx" --report-trx --report-trx-filename owned-runtime-tests.trx
+          dotnet test --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj \
+            --configuration Release --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/BrowserJourneyTests/*" --minimum-expected-tests 1 --maximum-parallel-tests 1 \
+            --results-directory "$TMPDIR/trx" --report-trx --report-trx-filename owned-browser-journeys-tests.trx
+          dotnet test --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj \
+            --configuration Release --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/BrowserSecurityVectorTests/*" --minimum-expected-tests 1 --maximum-parallel-tests 1 \
+            --results-directory "$TMPDIR/trx" --report-trx --report-trx-filename owned-browser-security-tests.trx
+          dotnet test --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj \
+            --configuration Release --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/*/*[Category=LoadControl]" --minimum-expected-tests 1 --maximum-parallel-tests 1 \
+            --results-directory "$TMPDIR/trx" --report-trx --report-trx-filename owned-load-control-tests.trx
+          dotnet test --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj \
+            --configuration Release --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/*/*[Category=Load]" --minimum-expected-tests 1 --maximum-parallel-tests 1 \
+            --results-directory "$TMPDIR/trx" --report-trx --report-trx-filename owned-load-correctness-tests.trx
+
+      - name: Upload Security Test TRX Results
+        if: ${{ always() && steps.changes.outputs.run-tests == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: security-test-evidence
-          path: ${{ runner.temp }}/islamu-security-private/public/
-          if-no-files-found: error
+          path: ${{ runner.temp }}/islamu-security-private/trx/*.trx
+          if-no-files-found: warn
           retention-days: 30
 
       - name: Write Security Test Evidence Summary
@@ -232,28 +252,21 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           REF_NAME: ${{ github.ref_name }}
           COMMIT_SHA: ${{ github.sha }}
-          PACKET_OUTCOME: ${{ steps.security_execution_evidence.outcome }}
+          API_OUTCOME: ${{ steps.api_security_tests.outcome }}
+          DISTRIBUTED_OUTCOME: ${{ steps.distributed_security_tests.outcome }}
         shell: bash
         run: |
           {
             echo "## Security Test Evidence"
             echo
-            echo "Artifact: \`security-test-evidence\`"
+            echo "Artifact: \`security-test-evidence\` (direct TUnit TRX reports)"
             echo
             echo "| Field | Value |"
             echo "|---|---|"
             echo "| Trigger | ${EVENT_NAME} |"
             echo "| Ref | ${REF_NAME} |"
             echo "| Commit | ${COMMIT_SHA} |"
-            echo "| Execution packet production | ${PACKET_OUTCOME:-not-run} |"
-            echo "| Execution scope | Registered API, runtime, browser and load profiles; provider, role and authentication remain not-attested unless independently measured |"
-            echo "| Execution packet | \`security-execution.v1.json\` in the admitted public artifact, only after every registered profile and owned cleanup pass |"
+            echo "| API Security & Cerbos Policy Contract | ${API_OUTCOME:-not-run} |"
+            echo "| Distributed Runtime, Browser & Load | ${DISTRIBUTED_OUTCOME:-not-run} |"
             echo "| Reliability inventory | docs/TEST_RELIABILITY.md |"
-            echo
-            echo "Raw test identities, TRX, configuration and process diagnostics stay private and are never uploaded by this workflow. Failure produces no public artifact."
-            echo
-            echo "The packet identifies the exact tested GITHUB_SHA, including the PR merge SHA when applicable; it does not relabel that object as a release candidate or attest live operational controls."
-            echo "Public validation checks structure and digests under the trusted operator/default-branch boundary. Workflow/run metadata does not authenticate CI origin; required GitHub checks remain separate for the exact final candidate."
-            echo
-            echo "Repeated scheduled failures require an owner/date entry in docs/TEST_RELIABILITY.md before they are treated as accepted baseline noise."
           } >> "$GITHUB_STEP_SUMMARY"

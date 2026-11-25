@@ -28,17 +28,17 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Prepare private execution parent
+      - name: Prepare private execution directory
         shell: bash
         run: |
           set -euo pipefail
           umask 077
-          export TMPDIR="$RUNNER_TEMP/islamu-performance-private"
-          mkdir -p "$TMPDIR"
+          mkdir -p "$RUNNER_TEMP/islamu-performance-private"
+          TMPDIR="$(readlink --canonicalize-existing -- "$RUNNER_TEMP/islamu-performance-private")"
+          mkdir -p "$TMPDIR/artifacts"
+          chmod 700 "$TMPDIR" "$TMPDIR/artifacts"
           test "$(stat -c %u "$TMPDIR")" = "$(id -u)"
           test ! -L "$TMPDIR"
-          chmod 700 "$TMPDIR"
-          test ! -e "$TMPDIR/public"
           [[ "$DOCKER_HOST" == unix:///* ]]
           socket="$(readlink --canonicalize-existing -- "${DOCKER_HOST#unix://}")"
           test -S "$socket"
@@ -55,19 +55,14 @@ jobs:
           cache-dependency-path: "**/packages.lock.json"
 
       - name: Restore dependencies
-        run: |
-          dotnet restore --locked-mode
-          dotnet restore eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --locked-mode
+        run: dotnet restore --locked-mode
 
-      - name: Build native admission and benchmarks
+      - name: Build benchmarks
         shell: bash
         run: |
           set -euo pipefail
-          dotnet build eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj \
-            --configuration Release --no-restore --verbosity quiet --nologo -m:1 \
-            -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
           dotnet build tests/Event.Benchmarks/Event.Benchmarks.csproj \
-            --configuration Release --no-restore --verbosity quiet --nologo -m:1 \
+            --configuration Release --no-restore --verbosity quiet --nologo -m:1 -nr:false \
             -p:SourceRevisionId="$GITHUB_SHA" -p:ContinuousIntegrationBuild=true
 
       - name: Cache the declared PostgreSQL image
@@ -76,16 +71,68 @@ jobs:
           set -euo pipefail
           docker --host "$DOCKER_HOST" pull postgres:18-alpine > "$TMPDIR/postgres-provision.log" 2>&1
 
-      - name: Admit six native PostgreSQL functional cases
+      - name: Run BenchmarkDotNet dry smoke suite
         id: performance_smoke
         shell: bash
         run: |
           set -euo pipefail
           umask 077
-          dotnet eng/release/src/ISLAMU.ReleaseEngineering/bin/Release/net10.0/ISLAMU.ReleaseEngineering.dll \
-            execute-api-benchmarks "$TMPDIR/public" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_EVENT_NAME" smoke \
-            > "$TMPDIR/benchmark-parent.log" 2>&1
-          test -s "$TMPDIR/public/benchmark-summary.json"
+
+          ISLAMU_TEST_RUN_ID="$(openssl rand -hex 16)"
+          ISLAMU_TEST_ROOT="$TMPDIR/islamu-assurance/$ISLAMU_TEST_RUN_ID"
+          mkdir -p "$ISLAMU_TEST_ROOT"
+          chmod 700 "$TMPDIR/islamu-assurance" "$ISLAMU_TEST_ROOT"
+          printf '%s' "$ISLAMU_TEST_RUN_ID" > "$ISLAMU_TEST_ROOT/.islamu-test-owner"
+          chmod 600 "$ISLAMU_TEST_ROOT/.islamu-test-owner"
+
+          cleanup() {
+            local -a containers=()
+            mapfile -t containers < <(docker --host "$DOCKER_HOST" ps -aq --filter "label=islamu.assurance.owner=$ISLAMU_TEST_RUN_ID" 2>/dev/null || true)
+            if (( ${#containers[@]} > 0 )); then
+              docker --host "$DOCKER_HOST" rm -f -- "${containers[@]}" >/dev/null 2>&1 || true
+            fi
+            rm -rf -- "$ISLAMU_TEST_ROOT"
+          }
+          trap cleanup EXIT
+
+          unset DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
+          export ISLAMU_TEST_RUN_ID ISLAMU_TEST_ROOT
+          export SECRET_PROVIDER=Environment
+          export AUTHENTICATION_PROVIDER=Local
+          export AUTHORIZATION_PROVIDER=Local
+          export DEPLOYMENT_MODE=MultiTenant
+          export IDENTITY_DATABASE_TOPOLOGY=colocated
+          export DOTNET_ENVIRONMENT=Testing
+          export ASPNETCORE_ENVIRONMENT=Testing
+
+          export_ephemeral_var() {
+            local var_name="$1"
+            local var_value="$2"
+            printf '::add-mask::%s\n' "$var_value"
+            export "$var_name=$var_value"
+          }
+
+          for purpose in \
+            RUNTIME MIGRATOR GLOBAL INSTANCE_KEY_READ INSTANCE_KEY_WRITE \
+            INSTANCE_KEY_ISSUANCE PLATFORM_KEY_REPORT \
+            EMAIL_POLICY_INSTANCE_MUTATION EMAIL_POLICY_TENANT_MUTATION \
+            LOCAL_IDENTITY_WRITER; do
+            export_ephemeral_var "DATABASE_${purpose}_USERNAME" "bench_$(openssl rand -hex 12)"
+            export_ephemeral_var "DATABASE_${purpose}_PASSWORD" "$(openssl rand -base64 48 | tr -d '\n')"
+          done
+
+          for key in \
+            INSTANCE_BOOTSTRAP_LOCAL_PASSWORD \
+            ISLAMU_TEST_REPLACEMENT_PASSWORD \
+            AUTHENTICATION_LOCAL_JWT_KEY; do
+            export_ephemeral_var "$key" "$(openssl rand -base64 48 | tr -d '\n')"
+          done
+
+          dotnet run --project tests/Event.Benchmarks/Event.Benchmarks.csproj \
+            --configuration Release --no-build -- \
+            --filter "*ApiEndpointPostgreSqlBenchmarks*" "*EfCoreQueryBenchmarks*" \
+            --job Dry --inProcess --stopOnFirstError \
+            --exporters json markdown --artifacts "$TMPDIR/artifacts"
 
       - name: Write Performance Smoke Summary
         if: always()
@@ -96,17 +143,15 @@ jobs:
           {
             echo "## Performance Smoke Evidence"
             echo
-            echo "Native PostgreSQL whole-six Dry functional admission: ${PERFORMANCE_OUTCOME}."
-            echo "Only the shared native parent's admitted benchmark-summary.json is published."
-            echo "Private credentials, custody records, logs and full BenchmarkDotNet results are withheld."
-            echo "Dry is not a statistical baseline or production capacity claim."
+            echo "Direct BenchmarkDotNet dry smoke execution: ${PERFORMANCE_OUTCOME}."
+            echo "Dry execution validates benchmark wiring and functional execution; it is not a statistical capacity baseline."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Admitted Performance Evidence
-        if: ${{ success() && steps.performance_smoke.outcome == 'success' }}
+      - name: Upload Performance Smoke Results
+        if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: performance-smoke-evidence
-          path: ${{ env.TMPDIR }}/public/benchmark-summary.json
-          if-no-files-found: error
+          path: ${{ env.TMPDIR }}/artifacts/results/
+          if-no-files-found: warn
           retention-days: 30

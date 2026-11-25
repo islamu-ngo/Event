@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using ISLAMU.ReleaseEngineering;
 
@@ -5,6 +6,8 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class ProgramTests
 {
+    private const string ExpectedGitCliffVersionBanner = "git-cliff 2.14.2";
+
     [Test]
     public async Task VerifyToolsRejectsMissingLock()
     {
@@ -20,7 +23,7 @@ public sealed class ProgramTests
     public async Task VerifyToolsRejectsMalformedLock()
     {
         using var fixture = new ToolFixture();
-        File.WriteAllText(fixture.LockPath, "{");
+        await File.WriteAllTextAsync(fixture.LockPath, "{");
 
         (int exitCode, string output) = fixture.Run();
 
@@ -32,7 +35,7 @@ public sealed class ProgramTests
     public async Task VerifyToolsRejectsUnsupportedSchema()
     {
         using var fixture = new ToolFixture();
-        fixture.WriteExecutable("git-cliff 2.13.1");
+        fixture.WriteExecutable(ExpectedGitCliffVersionBanner);
         fixture.WriteLock(schemaVersion: 2);
 
         (int exitCode, string output) = fixture.Run();
@@ -45,7 +48,7 @@ public sealed class ProgramTests
     public async Task VerifyToolsRejectsMissingBundleDirectory()
     {
         using var fixture = new ToolFixture();
-        fixture.WriteLock("00");
+        fixture.WriteLock(new string('0', 64));
 
         (int exitCode, string output) = fixture.Run(bundlePath: Path.Combine(fixture.Root, "missing"));
 
@@ -57,12 +60,12 @@ public sealed class ProgramTests
     public async Task VerifyToolsRejectsUnapprovedPlatform()
     {
         using var fixture = new ToolFixture();
-        fixture.WriteLock("00");
+        fixture.WriteLock(new string('0', 64));
 
-        (int exitCode, string output) = fixture.Run(platform: "macos-arm64");
+        (int exitCode, string output) = fixture.Run(platform: "freebsd-x64");
 
         await Assert.That(exitCode).IsEqualTo(Program.ToolchainRejected);
-        await Assert.That(output).IsEqualTo("untrusted_tool: platform is not approved: macos-arm64" + Environment.NewLine);
+        await Assert.That(output).IsEqualTo("untrusted_tool: platform is not approved: freebsd-x64" + Environment.NewLine);
     }
 
     [Test]
@@ -81,7 +84,7 @@ public sealed class ProgramTests
     public async Task VerifyToolsRejectsWrongDigest()
     {
         using var fixture = new ToolFixture();
-        fixture.WriteExecutable("git-cliff 2.13.1");
+        fixture.WriteExecutable(ExpectedGitCliffVersionBanner);
         fixture.WriteLock(new string('0', 64));
 
         (int exitCode, string output) = fixture.Run();
@@ -94,13 +97,13 @@ public sealed class ProgramTests
     public async Task VerifyToolsRejectsWrongVersion()
     {
         using var fixture = new ToolFixture();
-        string digest = fixture.WriteExecutable("git-cliff 2.13.0");
+        string digest = fixture.WriteExecutable("git-cliff 2.13.1");
         fixture.WriteLock(digest);
 
         (int exitCode, string output) = fixture.Run();
 
         await Assert.That(exitCode).IsEqualTo(Program.ToolchainRejected);
-        await Assert.That(output).IsEqualTo("untrusted_tool: version mismatch: expected git-cliff 2.13.1" + Environment.NewLine);
+        await Assert.That(output).IsEqualTo("untrusted_tool: version mismatch: expected git-cliff 2.14.2" + Environment.NewLine);
     }
 
     [Test]
@@ -125,7 +128,7 @@ public sealed class ProgramTests
         }
 
         using var fixture = new ToolFixture();
-        string digest = fixture.WriteExecutable("git-cliff 2.13.1", delaySeconds: 10);
+        string digest = fixture.WriteExecutable(ExpectedGitCliffVersionBanner, delaySeconds: 10);
         fixture.WriteLock(digest);
 
         (int exitCode, string output) = fixture.Run(timeout: TimeSpan.FromMilliseconds(100));
@@ -161,21 +164,35 @@ public sealed class ProgramTests
         }
 
         using var fixture = new ToolFixture();
-        string digest = fixture.WriteExecutable("git-cliff 2.13.1");
+        string digest = fixture.WriteExecutable(ExpectedGitCliffVersionBanner);
         fixture.WriteLock(digest);
 
         (int exitCode, string output) = fixture.Run();
 
         await Assert.That(exitCode).IsEqualTo(Program.Success);
-        await Assert.That(output).IsEqualTo("trusted_tool: git-cliff 2.13.1 (linux-x64)" + Environment.NewLine);
+        await Assert.That(output).IsEqualTo("trusted_tool: git-cliff 2.14.2 (linux-x64)" + Environment.NewLine);
     }
 
     [Test]
-    public async Task UnknownCommandReturnsStableBoundedUsageError()
+    [Arguments("unexpected-command")]
+    [Arguments("run-promoted")]
+    [Arguments("verify-candidate")]
+    [Arguments("verify-tag")]
+    [Arguments("tag-message")]
+    [Arguments("verify-main")]
+    [Arguments("verify-baseline")]
+    [Arguments("open-maintenance-line")]
+    [Arguments("activate-trust")]
+    [Arguments("prepare-publication-inventory")]
+    [Arguments("execute-security-execution")]
+    [Arguments("execute-api-benchmarks")]
+    [Arguments("produce-security-execution")]
+    [Arguments("rename-change")]
+    public async Task RetiredAndUnknownCommandsReturnUsageErrorWithoutCompatibilityAliases(string command)
     {
         using var output = new StringWriter();
 
-        int exitCode = Program.Run(["unexpected-command"], output);
+        int exitCode = Program.Run([command], output);
 
         await Assert.That(exitCode).IsEqualTo(Program.UsageError);
         await Assert.That(output.ToString()).IsEqualTo(
@@ -184,19 +201,104 @@ public sealed class ProgramTests
     }
 
     [Test]
-    public async Task VerifyToolsArgumentsReturnStableUsageError()
+    public async Task VerifyToolsArgumentsReturnStreamlinedUsageError()
     {
         using var output = new StringWriter();
 
         int exitCode = Program.Run(["verify-tools", "extra"], output);
 
         await Assert.That(exitCode).IsEqualTo(Program.UsageError);
-        await Assert.That(output.ToString()).StartsWith(
+        string text = output.ToString();
+        await Assert.That(text).StartsWith(
             "invalid_arguments: verify-tools accepts no arguments" +
             Environment.NewLine +
-            "usage: release-engine allocate-change-id");
-        await Assert.That(output.ToString()).Contains("preflight-range");
-        await Assert.That(output.ToString()).Contains("rename-change");
+            "usage: release-engine ");
+        await Assert.That(text).Contains("ensure-git-cliff");
+        await Assert.That(text).Contains("verify-release-tag");
+        await Assert.That(text).Contains("diff-contracts");
+        await Assert.That(text).Contains("--image-manifest");
+        await Assert.That(text).Contains("preflight-range");
+        await Assert.That(text).DoesNotContain("run-promoted");
+        await Assert.That(text).DoesNotContain("verify-candidate");
+        await Assert.That(text).DoesNotContain("activate-trust");
+        await Assert.That(text).DoesNotContain("execute-security-execution");
+        await Assert.That(text).DoesNotContain("rename-change");
+    }
+
+    [Test]
+    public async Task VerifyReleaseTagCliAcceptsValidSignedTagAndRejectsTamperedTarget()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string tempRoot = Path.Combine(Path.GetTempPath(), $"islamu-cli-tag-{Guid.NewGuid():N}");
+        string repoRoot = Path.Combine(tempRoot, "repo");
+        string keyPath = Path.Combine(tempRoot, "signer");
+        string allowedSigners = Path.Combine(tempRoot, "allowed-signers");
+        Directory.CreateDirectory(repoRoot);
+        try
+        {
+            RunProcess(ReleaseToolPaths.SshKeygen, tempRoot, "-q", "-t", "ed25519", "-N", string.Empty, "-C", "cli-test", "-f", keyPath);
+            string pub = string.Join(' ', (await File.ReadAllTextAsync(keyPath + ".pub")).Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2));
+            await File.WriteAllTextAsync(allowedSigners, $"release-operator namespaces=\"git\" {pub}\n");
+            RunProcess(ReleaseToolPaths.Git, repoRoot, "init", "--initial-branch=main");
+            await File.WriteAllTextAsync(Path.Combine(repoRoot, "README.md"), "hello\n");
+            RunProcess(ReleaseToolPaths.Git, repoRoot, "add", "README.md");
+            RunProcess(ReleaseToolPaths.Git, repoRoot, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", "feat(events): init");
+            string commit = RunProcess(ReleaseToolPaths.Git, repoRoot, "rev-parse", "HEAD^{commit}").Trim();
+            RunProcess(ReleaseToolPaths.Git, repoRoot, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "gpg.format=ssh", "-c", $"user.signingKey={keyPath}", "tag", "-s", "v0.1.0", commit, "-m", "Release v0.1.0");
+
+            using var okOutput = new StringWriter();
+            int okCode = Program.Run(
+                ["verify-release-tag", "--repository", repoRoot, "--tag", "v0.1.0", "--target", commit, "--event-sha", commit, "--allowed-signers", allowedSigners],
+                okOutput);
+            await Assert.That(okCode).IsEqualTo(Program.Success).Because(okOutput.ToString());
+            await Assert.That(okOutput.ToString()).Contains("verified_release_tag: v0.1.0");
+            await Assert.That(okOutput.ToString()).Contains("signer=release-operator");
+
+            using var badOutput = new StringWriter();
+            int badCode = Program.Run(
+                ["verify-release-tag", "--repository", repoRoot, "--tag", "v0.1.0", "--event-sha", new string('a', 40), "--allowed-signers", allowedSigners],
+                badOutput);
+            await Assert.That(badCode).IsEqualTo(Program.ToolchainRejected);
+            await Assert.That(badOutput.ToString()).Contains("tag_event_sha_mismatch");
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    private static string RunProcess(string executable, string workingDirectory, params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo(executable)
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        string nullDevice = OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
+        startInfo.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
+        startInfo.Environment["GIT_CONFIG_GLOBAL"] = nullDevice;
+        foreach (string argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using Process process = Process.Start(startInfo)!;
+        string stdout = process.StandardOutput.ReadToEnd();
+        string stderr = process.StandardError.ReadToEnd();
+        if (!process.WaitForExit(TimeSpan.FromSeconds(10)) || process.ExitCode != 0)
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+            throw new InvalidOperationException($"{executable} failed: {stderr}");
+        }
+
+        return stdout;
     }
 
     private sealed class ToolFixture : IDisposable
@@ -251,12 +353,15 @@ public sealed class ProgramTests
                 {
                   "schemaVersion": {{schemaVersion}},
                   "tool": "git-cliff",
-                  "version": "2.13.1",
+                  "version": "2.14.2",
                   "platforms": [
                     {
                       "platform": "linux-x64",
                       "executable": "git-cliff",
-                      "executableSha256": "{{executableDigest}}"
+                      "executableSha256": "{{executableDigest}}",
+                      "archive": "git-cliff-2.14.2-x86_64-unknown-linux-musl.tar.gz",
+                      "archiveSha256": "{{new string('1', 64)}}",
+                      "source": "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-x86_64-unknown-linux-musl.tar.gz"
                     }
                   ]
                 }

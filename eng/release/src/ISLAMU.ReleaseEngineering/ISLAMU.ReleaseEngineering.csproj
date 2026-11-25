@@ -4,16 +4,13 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <RunAnalyzersDuringBuild>false</RunAnalyzersDuringBuild>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="ISLAMU.ReleaseEngineering.Tests" />
     <EmbeddedResource Include="../../../security/security-control-register.json"
                       LogicalName="ISLAMU.ReleaseEngineering.SecurityControlRegister.json" />
     <PackageReference Include="YamlDotNet" />
-    <None Include="../../trust/promotion-allowed-signers"
-          Link="ISLAMU.ReleaseEngineering.promotion-allowed-signers"
-          CopyToOutputDirectory="Always" />
   </ItemGroup>
 </Project>

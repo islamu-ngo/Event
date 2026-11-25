@@ -13,25 +13,27 @@ database schema, authentication, bootstrap or backend configuration authority.
 
 Supply `configurator/definitions/islamu-event/definition.json` from the matching
 Event release. Check its family, revision and digest against `release.json`.
-The stable Event family is `a4bcfaa6-9979-43e5-b1f5-00d552618cdf`; native and
-browser definitions have the same identity. Reference answers are fictional
+The unified `0.0.1` Event family is `f79259e8-af23-49b0-8d8d-6e371cc96080`
+(revision `8`); native, browser, and Store definitions share the exact same
+canonical identity and digest. Reference answers are fictional
 interoperability vectors, not production credentials or approved legal templates.
 
-Event maintains one handwritten public `configurator.yaml`, reviewed against its
-catalogue, secret policy and host contracts. Maintainers use Configurator's portable
-`configurator-integrate` skill and standalone CLI to check, revise and build
-canonical JSON; clients consume the selected compiled `definition.json`.
-The YAML is not automatically generated or kept fresh. `release.json` records
-the selected release metadata; retained receipts do not prove edited source was
-compiled. Digests enable comparison, not publisher authentication, legal approval
-or release promotion. Selected revision 8 includes the optional application and
-external Identity LocalIdentityWriter username/password fields and removes the
-obsolete shared Identity connection-string field. External Identity uses discrete
-endpoint and purpose-specific credentials. It retains revision 6's
-semantic paths in place of traversal field numbers; real answer workspaces are
-not migrated implicitly. The delivery directory contains
-only this YAML source, `definition.json` and `release.json`. Synthetic inputs,
-answers and expected artifacts live under
+Event maintains one handwritten public `configurator.yaml` (`$schema: urn:islamu:configurator:authoring:v0.0.1`),
+reviewed against its catalogue, secret policy and host contracts. Maintainers use
+Configurator's portable `configurator-integrate` skill and standalone `0.0.1` CLI
+to check, lint (`definition lint --quality --strict`), revise, diff, test, and
+build canonical JSON; clients consume the selected compiled `definition.json`.
+`release.json` is an unsigned local delivery verification receipt emitted and
+checked by Configurator's `DefinitionDelivery.cs` (`trustBoundary: "unsigned-local-verification-only"`,
+`signatureStatus: "unsigned"`). Digests enable canonical comparison, not publisher
+authentication, legal approval or release promotion. Revision `8` uses nested
+object paths, deployment-aware environment artifacts (`environment-standalone`,
+`environment-api`, `environment-blazor`, `environment-compose`,
+`environment-compose-api`, `environment-compose-blazor`), complete English/Arabic
+guidance, and local CSPRNG generation strictly on first-party operator passwords
+while keeping third-party issuer credentials manual (`existing`). The delivery
+directory contains only `configurator.yaml`, `definition.json` and `release.json`.
+Synthetic inputs, answers and expected artifacts live under
 `tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/islamu-event/`;
 they are test data, not deployment defaults. Event still accepts JSON/dotenv
 artifacts; YAML is only the authoring format.
@@ -45,9 +47,9 @@ Linux and a filesystem where owner-only, create-only protection can be proved.
 Windows/macOS output fails closed; desktop packaging supports Linux x64 only.
 
 The [CLI guide](https://github.com/islamu-ngo/Configurator/blob/HEAD/docs/public/cli.md)
-owns executable grammar and the `islamu-configurator-command/v2` result envelope.
-Authoring and runtime definition schemas remain v1.
-For native interactive preparation:
+owns canonical executable grammar and the `islamu-configurator-command/v0.0.1`
+result envelope. Authoring, runtime, answer, and fixture contracts all use `0.0.1`
+(`bounded-v0.0.1`). For native interactive preparation:
 
 ```bash
 islamu-configurator-terminal --definition configurator/definitions/islamu-event/definition.json
@@ -55,7 +57,7 @@ islamu-configurator-desktop --definition configurator/definitions/islamu-event/d
 ```
 
 On the origin where you deploy Configurator, open
-`/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf`. This selects installed metadata
+`/launch/f79259e8-af23-49b0-8d8d-6e371cc96080`. This selects installed metadata
 without contacting Event. Optional `appVersion`, `entry`, `locale` and `digest`
 selectors must match the installed definition. No public origin is prescribed.
 The browser transfers only declared public enum/boolean choices. Never upload
@@ -63,13 +65,16 @@ secrets, environment files, manifests, tenant packages or personal identity data
 
 ## Command migration
 
-Old `event-setup` families are not aliases. Replace bundled tooling commands with
-the generic CLI, an explicit local definition and a declared artifact ID.
+Old `event-setup` families and legacy CLI routes (`env`, `catalogue show`,
+`artifact open|format|export|preview`, `definition schema`) are removed without
+aliases. Use the canonical `0.0.1` CLI with an explicit local definition and
+declared artifact ID.
 
 | Previous workflow | External preparation |
 |---|---|
-| Catalogue inspection | `catalogue list/show/describe` with `--definition` |
-| Dotenv preparation | `env validate/render` with `--artifact environment` |
+| Discovery & schemas | `info`, `schema list`, `schema export --kind <KIND>` |
+| Catalogue inspection | `catalogue list/describe` with `--definition` |
+| Dotenv preparation | `artifact validate/create` with `--artifact environment-standalone` (or `environment-api`, `environment-blazor`, `environment-compose`) and optional `--format dotenv` |
 | Configuration manifest | `artifact` operations with `--artifact configuration-manifest` |
 | Tenant package | `artifact` operations with `--artifact tenant-package` |
 | Operator identity portability | `operator-identity` artifact; Event still owns integrity and target import acceptance |
@@ -77,9 +82,10 @@ the generic CLI, an explicit local definition and a declared artifact ID.
 | Bundled release targets | Separately packaged Configurator surfaces |
 
 ```bash
-islamu-configurator doctor --machine
+islamu-configurator info --machine
+islamu-configurator doctor --require protected-write --machine
 islamu-configurator catalogue list --definition configurator/definitions/islamu-event/definition.json --machine --dry-run
-islamu-configurator env render --definition configurator/definitions/islamu-event/definition.json --artifact environment --input environment-answers.json --output deployment.env --machine
+islamu-configurator artifact create --definition configurator/definitions/islamu-event/definition.json --artifact environment-standalone --format dotenv --input environment-answers.json --output deployment.env --machine
 islamu-configurator artifact validate --definition configurator/definitions/islamu-event/definition.json --artifact configuration-manifest --input manifest-answers.json --machine
 ```
 
@@ -99,7 +105,9 @@ authorized import workflow for promotion.
 
 ## Event shapes, identity and legal drafts
 
-The checked definition declares five generation-only artifacts and a bounded
+The checked definition declares ten generation-only artifacts (six deployment-aware
+environment artifacts plus configuration-manifest, tenant-package, operator-identity,
+and legal-drafts) and a bounded
 reference shape. Tenant row edits within its declared list change answers, not
 the definition revision. Changed document vocabulary, bounds, nullability or
 output policy requires a reviewed source edit and a new canonical revision.
@@ -111,13 +119,14 @@ Maintainers install the standalone CLI and copy the complete
 [repository](https://github.com/islamu-ngo/Configurator/blob/HEAD/skills/configurator-integrate/SKILL.md)
 into their agent's supported skill location. The agent reads Event's public
 configuration code/contracts and authors the supported compact source; it does
-not inspect private answers or launch Event. Confirm the installed v2 command
-result contract and v1 authoring/runtime schemas, then use native commands:
+not inspect private answers or launch Event. Confirm the installed `0.0.1` command
+result contract and `0.0.1` authoring/runtime schemas, then use native commands:
 
 ```bash
-islamu-configurator --help
-islamu-configurator definition --help
+islamu-configurator info --machine
+islamu-configurator schema export --kind authoring --text
 islamu-configurator definition check --source configurator/definitions/islamu-event/configurator.yaml --machine
+islamu-configurator definition lint --source configurator/definitions/islamu-event/configurator.yaml --quality --strict --machine
 ```
 
 For a new integration, `definition init` allocates identity once and requires an

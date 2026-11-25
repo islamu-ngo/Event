@@ -16,8 +16,15 @@ public sealed class ConfiguratorDefinitionArtifactTests
         byte[] nativeBytes = File.ReadAllBytes(Path.Combine(directory, "definition.json"));
         using JsonDocument native = JsonDocument.Parse(nativeBytes);
         using JsonDocument release = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(directory, "release.json")));
+        await Assert.That(native.RootElement.GetProperty("schemaVersion").GetString()).IsEqualTo("0.0.1");
+        await Assert.That(native.RootElement.GetProperty("profile").GetString()).IsEqualTo("bounded-v0.0.1");
         await Assert.That(native.RootElement.GetProperty("familyId").GetGuid())
-            .IsEqualTo(Guid.Parse("a4bcfaa6-9979-43e5-b1f5-00d552618cdf"));
+            .IsEqualTo(Guid.Parse("f79259e8-af23-49b0-8d8d-6e371cc96080"));
+        await Assert.That(native.RootElement.GetProperty("revision").GetInt64()).IsEqualTo(8);
+        await Assert.That(release.RootElement.GetProperty("receiptContractVersion").GetString()).IsEqualTo("0.0.1");
+        await Assert.That(release.RootElement.GetProperty("trustBoundary").GetString())
+            .IsEqualTo("unsigned-local-verification-only");
+        await Assert.That(release.RootElement.GetProperty("signatureStatus").GetString()).IsEqualTo("unsigned");
         await Assert.That(release.RootElement.GetProperty("revision").GetInt64())
             .IsEqualTo(native.RootElement.GetProperty("revision").GetInt64());
         await Assert.That(release.RootElement.GetProperty("definitionDigest").GetString())
@@ -30,27 +37,60 @@ public sealed class ConfiguratorDefinitionArtifactTests
                 StringComparer.Ordinal);
         await Assert.That(selectors.Keys).IsEquivalentTo(["src", "digest", "appVersion", "entry", "locale"]);
         await Assert.That(selectors["digest"]).IsEqualTo(release.RootElement.GetProperty("definitionDigest").GetString());
-        await Assert.That(selectors["src"]).IsEqualTo(release.RootElement.GetProperty("definitionSource").GetString());
+        await Assert.That(selectors["src"]).IsEqualTo(release.RootElement.GetProperty("sourceUrl").GetString());
         await Assert.That(selectors["appVersion"]).IsEqualTo("0.0.0-development");
         await Assert.That(selectors["entry"]).IsEqualTo("configuration-manifest");
         await Assert.That(selectors["locale"]).IsEqualTo("en");
-        await Assert.That(native.RootElement.GetProperty("artifacts").GetArrayLength()).IsEqualTo(5);
-        await Assert.That(native.RootElement.GetProperty("fields").GetArrayLength() > 1).IsTrue();
-        await Assert.That(native.RootElement.GetProperty("fields").EnumerateArray()
-            .Any(field => field.GetProperty("id").GetString() == "env.IDENTITY_DATABASE_CONNECTION_STRING")).IsFalse();
-        JsonElement environment = native.RootElement.GetProperty("artifacts").EnumerateArray()
-            .Single(artifact => artifact.GetProperty("id").GetString() == "environment");
-        await Assert.That(environment.GetProperty("projection").GetProperty("members")
-            .TryGetProperty("IDENTITY_DATABASE_CONNECTION_STRING", out _)).IsFalse();
-        foreach (JsonElement field in native.RootElement.GetProperty("fields").EnumerateArray())
+        JsonElement artifacts = native.RootElement.GetProperty("artifacts");
+        await Assert.That(artifacts.GetArrayLength()).IsEqualTo(10);
+        foreach (string processEnvId in new[] { "environment-standalone", "environment-api", "environment-blazor" })
         {
-            if (field.GetProperty("sensitivity").GetString() is not "public")
+            JsonElement processEnv = artifacts.EnumerateArray()
+                .Single(artifact => artifact.GetProperty("id").GetString() == processEnvId);
+            await Assert.That(processEnv.GetProperty("projection").GetProperty("members")
+                .TryGetProperty("IDENTITY_DATABASE_CONNECTION_STRING", out _)).IsFalse();
+        }
+        await AssertNoProtectedDefaultsAsync(native.RootElement.GetProperty("configuration"), inheritedProtected: false);
+        await Assert.That(native.RootElement.TryGetProperty("answers", out _)).IsFalse();
+    }
+
+    private static async Task AssertNoProtectedDefaultsAsync(JsonElement node, bool inheritedProtected)
+    {
+        if (node.ValueKind != JsonValueKind.Object) return;
+        bool isProtected = inheritedProtected;
+        if (node.TryGetProperty("x-configurator", out JsonElement ext) && ext.ValueKind == JsonValueKind.Object)
+        {
+            if (ext.TryGetProperty("sensitivity", out JsonElement sens)
+                && sens.ValueKind == JsonValueKind.String
+                && sens.GetString() is "sensitive" or "secret")
             {
-                await Assert.That(field.TryGetProperty("default", out _)).IsFalse();
-                await Assert.That(field.TryGetProperty("recommendation", out _)).IsFalse();
+                isProtected = true;
+            }
+            if (isProtected)
+            {
+                await Assert.That(ext.TryGetProperty("initialValue", out _)).IsFalse();
+                await Assert.That(ext.TryGetProperty("suggestedValue", out _)).IsFalse();
             }
         }
-        await Assert.That(native.RootElement.TryGetProperty("answers", out _)).IsFalse();
+        if (isProtected)
+        {
+            await Assert.That(node.TryGetProperty("default", out _)).IsFalse();
+            await Assert.That(node.TryGetProperty("examples", out _)).IsFalse();
+        }
+        if (node.TryGetProperty("properties", out JsonElement properties) && properties.ValueKind == JsonValueKind.Object)
+        {
+            foreach (JsonProperty child in properties.EnumerateObject())
+                await AssertNoProtectedDefaultsAsync(child.Value, isProtected);
+        }
+        if (node.TryGetProperty("items", out JsonElement items) && items.ValueKind == JsonValueKind.Object)
+            await AssertNoProtectedDefaultsAsync(items, isProtected);
+        if (node.TryGetProperty("additionalProperties", out JsonElement map) && map.ValueKind == JsonValueKind.Object)
+            await AssertNoProtectedDefaultsAsync(map, isProtected);
+        if (node.TryGetProperty("oneOf", out JsonElement variants) && variants.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement variant in variants.EnumerateArray())
+                await AssertNoProtectedDefaultsAsync(variant, isProtected);
+        }
     }
 
     [Test]
@@ -58,17 +98,22 @@ public sealed class ConfiguratorDefinitionArtifactTests
     {
         using JsonDocument definition = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(
             Root(), "configurator", "definitions", "islamu-event", "definition.json")));
-        JsonElement tenants = definition.RootElement.GetProperty("fields").EnumerateArray()
-            .Single(field => field.GetProperty("id").GetString() == "configuration-manifest.tenants");
-        await Assert.That(tenants.GetProperty("type").GetString()).IsEqualTo("list");
-        await Assert.That(tenants.GetProperty("itemType").GetString()).IsEqualTo("object");
+        JsonElement tenants = definition.RootElement
+            .GetProperty("configuration")
+            .GetProperty("properties")
+            .GetProperty("configurationManifest")
+            .GetProperty("properties")
+            .GetProperty("tenants");
+        await Assert.That(tenants.GetProperty("type").GetString()).IsEqualTo("array");
         await Assert.That(tenants.GetProperty("maxItems").GetInt32()).IsEqualTo(256);
-        await Assert.That(tenants.GetProperty("uniqueBy").EnumerateArray().Select(item => item.GetString()!))
-            .IsEquivalentTo(["metadata", "name"]);
-        JsonElement metadata = tenants.GetProperty("properties").EnumerateArray()
-            .Single(field => field.GetProperty("id").GetString() == "metadata");
-        JsonElement name = metadata.GetProperty("properties")[0];
-        await Assert.That(name.GetProperty("required").GetBoolean()).IsTrue();
+        await Assert.That(tenants.GetProperty("x-configurator").GetProperty("uniqueBy").GetString())
+            .IsEqualTo("/metadata/name");
+        JsonElement itemSchema = tenants.GetProperty("items");
+        await Assert.That(itemSchema.GetProperty("type").GetString()).IsEqualTo("object");
+        JsonElement metadata = itemSchema.GetProperty("properties").GetProperty("metadata");
+        await Assert.That(metadata.GetProperty("required").EnumerateArray().Select(item => item.GetString()!))
+            .Contains("name");
+        JsonElement name = metadata.GetProperty("properties").GetProperty("name");
         await Assert.That(name.GetProperty("minLength").GetInt32()).IsEqualTo(1);
         await Assert.That(name.GetProperty("maxLength").GetInt32()).IsEqualTo(100);
     }

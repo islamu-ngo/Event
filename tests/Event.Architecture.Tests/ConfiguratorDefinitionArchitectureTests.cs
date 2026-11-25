@@ -25,8 +25,14 @@ public sealed class ConfiguratorDefinitionArchitectureTests
 
         await Assert.That(release.GetProperty("familyId").GetString())
             .IsEqualTo(identity.GetProperty("familyId").GetString());
+        await Assert.That(identity.GetProperty("familyId").GetString())
+            .IsEqualTo("f79259e8-af23-49b0-8d8d-6e371cc96080");
+        await Assert.That(identity.GetProperty("schemaVersion").GetString()).IsEqualTo("0.0.1");
         await Assert.That(release.GetProperty("revision").GetInt64())
             .IsEqualTo(identity.GetProperty("revision").GetInt64());
+        await Assert.That(release.GetProperty("trustBoundary").GetString())
+            .IsEqualTo("unsigned-local-verification-only");
+        await Assert.That(release.GetProperty("signatureStatus").GetString()).IsEqualTo("unsigned");
         byte[] bytes = await File.ReadAllBytesAsync(Path.Combine(directory, "definition.json"));
         string digest = Convert.ToHexStringLower(SHA256.HashData(bytes));
         await Assert.That(digest).IsEqualTo(release.GetProperty("definitionDigest").GetString());

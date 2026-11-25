@@ -1,0 +1,30 @@
+Change-Id: CHG-01M875RJWSKMQ5P7MKBEJQ10DT
+Title: "Migrate Event configuration definition to Configurator 0.0.1"
+Type: feat
+Scope: self-hosting
+Summary: "Replace legacy v1 revision 9 Event configuration files with handwritten 0.0.1 revision 8 YAML under unified family f79259e8-af23-49b0-8d8d-6e371cc96080, regenerate canonical definition.json and unsigned release.json matching Configurator byte-for-byte, align deployment-aware .env expected vectors, update wire and architecture tests, and refresh setup-assistant.md."
+Group: configurator-v001-migration
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: "Replaced legacy v1 Event definition (family a4bcfaa6-9979-43e5-b1f5-00d552618cdf rev 9) with Configurator 0.0.1 revision 8 (unified family f79259e8-af23-49b0-8d8d-6e371cc96080) and deployment-aware environment artifacts (environment-standalone, environment-api, environment-blazor, environment-compose)."
+  Security:
+    Reference: docs/internal/CONFIGURATOR_DEFINITION_EXPORT.md
+    Disposition: documented
+    Detail: "Preserves strict protected-default prohibition across the entire recursive configuration tree, enables local CSPRNG generation strictly on first-party operator passwords while keeping third-party issuer credentials manual (existing), and marks release.json explicitly as unsigned-local-verification-only."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: "Migrates configurator/definitions/islamu-event/{configurator.yaml,definition.json,release.json} to bounded-v0.0.1 revision 8 matching Configurator's examples/islamu-event/definition.json and store/islamu-event/releases/8.json byte-for-byte."
+  OpenAPI:
+    Reference: docs/internal/CONFIGURATOR_DEFINITION_EXPORT.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: "Operators use the standalone 0.0.1 Configurator CLI with deployment-aware environment artifact IDs (environment-standalone, environment-api, environment-blazor, environment-compose) and unified launch family f79259e8-af23-49b0-8d8d-6e371cc96080."

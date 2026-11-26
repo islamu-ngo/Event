@@ -2,6 +2,9 @@
 
 > Audience: maintainers of the AppHost and runtime tests.
 
+For fresh migration, actual-role readiness, original-work recovery and evidence
+interpretation, use [native runtime qualification](NATIVE_RUNTIME_QUALIFICATION.md).
+
 `Event.Distributed.IntegrationTests` executes the real AppHost using
 `Aspire.Hosting.Testing` 13.4.6 and TUnit. `Harness` tests exercise admission,
 directory ownership, concurrent disposal, and cryptographic separation;

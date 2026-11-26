@@ -17,6 +17,15 @@ service before starting the application; the application does not repeat
 migration or require its Migrator password. Configuration-manifest validation and
 privacy replay remain startup gates in either deployment.
 
+Treat a failed migration or privacy-replay gate as a failed startup, even if a
+different diagnostic endpoint responds. Preserve the first failure and the
+selected provider/version for diagnosis; do not disable foreign-key checks or
+borrow migration credentials for the application. Recreate storage only for a
+disposable development instance that you own. Restarting a container must retain
+its mounted database and, where configured, its selected persistent Data
+Protection authority. Never include passwords, cookies or key-ring contents in
+a diagnostic report.
+
 For an instance whose bootstrap is not completed, startup validates bootstrap
 configuration before exposing setup or HTTP authority. Interactive mode does not
 provision a configured administrator; invalid mode values block startup.

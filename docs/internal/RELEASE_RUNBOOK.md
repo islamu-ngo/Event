@@ -63,10 +63,10 @@ Generate the existing durable evidence bundle only as the checklist directs:
 dotnet run .ci/scripts/generate-release-evidence-bundle.cs -- artifacts release-evidence
 ```
 
-## PR 79 native authority changes (2026-11-20)
+## Native authority provisioning and recovery
 
-This candidate changes native authorization and read paths. Existing development
-databases must be reprovisioned through the normal migrator/provisioning path;
+Native authorization and read paths require a database provisioned through the
+matching migrator/provisioning path. Disposable development databases can be recreated;
 do not hand-edit roles, grants, functions or RLS policies to imitate the expected
 state.
 
@@ -94,8 +94,9 @@ This pre-release development scope uses freshly provisioned databases; it does
 not provide an in-place database downgrade or old-data compatibility path.
 To return to an earlier candidate, provision fresh databases with that candidate's
 migrator and re-run its native attestations before starting the matching binary.
-Never widen a runtime role to make an older binary start. The B22 cleanup-fixture
-repair is test infrastructure only and has no operator action.
+Never widen a runtime role to make an older binary start. See
+[native runtime qualification](testing/NATIVE_RUNTIME_QUALIFICATION.md) for fresh
+migration, actual-role readiness and original-operation recovery evidence.
 
 ## Future governed release flow
 

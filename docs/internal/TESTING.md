@@ -816,6 +816,10 @@ dotnet test --project <ProjectPath> --configuration Release -- --report-trx --re
 
 ## Persistence Hardening Verification
 
+Use [native runtime qualification](testing/NATIVE_RUNTIME_QUALIFICATION.md) to
+distinguish fresh migrations from `EnsureCreated`, interpret setup failures,
+and qualify original-operation recovery without repeating broad suites.
+
 ### Fresh PostgreSQL settings contract bootstrap
 
 Native privilege checks evaluate `MAINTAIN` and its grant option only on

@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5153.512999999999 241.8" width="5153.512999999999" height="241.8" style="--bg:#18181B;--fg:#F4F4F5;--line:#71717A;--muted:#A1A1AA;--surface:#27272A;--border:#3F3F46;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="GitCliffStage1" data-label="Stage 1: git-cliff --context (Rust)">
+  <rect x="40" y="72.45" width="1571.9259999999995" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="40" y="72.45" width="1571.9259999999995" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="52" y="86.45" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Stage 1: git-cliff --context (Rust)</text>
+</g>
+<g class="subgraph" data-id="CSharpStage2" data-label="Stage 2: ISLAMU.ReleaseEngineering (C# .NET 10)">
+  <rect x="1671.9259999999995" y="72.45" width="2791.611999999999" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="1671.9259999999995" y="72.45" width="2791.611999999999" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="1683.9259999999995" y="86.45" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Stage 2: ISLAMU.ReleaseEngineering (C# .NET 10)</text>
+</g>
+<g class="subgraph" data-id="GitCliffStage3" data-label="Stage 3: git-cliff --from-context (Tera Engine)">
+  <rect x="4523.537999999999" y="40" width="589.9749999999999" height="161.8" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="4523.537999999999" y="40" width="589.9749999999999" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="4535.537999999999" y="54" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Stage 3: git-cliff --from-context (Tera Engine)</text>
+</g>
+<polyline class="edge" data-from="RawContext" data-to="IvsdGate" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1595.9259999999995,134.9 1687.9259999999995,134.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="EnrichedContext" data-to="TeraRender" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="4447.537999999999,134.9 4539.537999999999,134.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="GitLog" data-to="ParseCC" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="255.04199999999994,134.9 303.0419999999999,134.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="ParseCC" data-to="FilterSkip" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="570.2559999999999,134.9 618.2559999999999,134.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="FilterSkip" data-to="SemVerBump" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1084.7989999999998,134.9 1132.7989999999998,134.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SemVerBump" data-to="RawContext" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1357.7759999999996,134.9 1405.7759999999996,134.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="IvsdGate" data-to="OpenApiDiff" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="2201.892999999999,134.9 2249.892999999999,134.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="OpenApiDiff" data-to="ConfigDiff" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="2788.312999999999,134.9 2836.312999999999,134.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="ConfigDiff" data-to="MigrationDiff" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="3379.919999999999,134.9 3427.919999999999,134.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="MigrationDiff" data-to="EnrichedContext" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="3973.0089999999987,134.9 4021.0089999999987,134.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="TeraRender" data-to="ReleaseNotes" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="4794.154999999999,134.9 4818.154999999999,134.9 4818.154999999999,102.45 4842.154999999999,102.45" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="TeraRender" data-to="PublicChangelog" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="4794.154999999999,134.9 4818.154999999999,134.9 4818.154999999999,167.35000000000002 4842.154999999999,167.35000000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="node" data-id="GitLog" data-label="Git Range &lt;base&gt;..&lt;target&gt;" data-shape="rectangle">
+  <rect x="56" y="116.45" width="199.04199999999994" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="155.52099999999996" y="134.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Git Range &lt;base&gt;..&lt;target&gt;</text>
+</g>
+<g class="node" data-id="ParseCC" data-label="Parse Conventional Commits &amp; Footers" data-shape="rectangle">
+  <rect x="303.0419999999999" y="116.45" width="267.21399999999994" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="436.6489999999999" y="134.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Parse Conventional Commits &amp; Footers</text>
+</g>
+<g class="node" data-id="FilterSkip" data-label="Auto-Skip Internal Types &amp; Eng Scopes (protect_breaking_commits=true)" data-shape="rectangle">
+  <rect x="618.2559999999999" y="116.45" width="466.5429999999999" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="851.5274999999998" y="134.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Auto-Skip Internal Types &amp; Eng Scopes (protect_breaking_commits=true)</text>
+</g>
+<g class="node" data-id="SemVerBump" data-label="Compute SemVer Bump ([bump])" data-shape="rectangle">
+  <rect x="1132.7989999999998" y="116.45" width="224.97699999999995" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1245.2874999999997" y="134.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Compute SemVer Bump ([bump])</text>
+</g>
+<g class="node" data-id="RawContext" data-label="Raw git-cliff Context JSON" data-shape="rectangle">
+  <rect x="1405.7759999999996" y="116.45" width="190.14999999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1500.8509999999997" y="134.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Raw git-cliff Context JSON</text>
+</g>
+<g class="node" data-id="IvsdGate" data-label="1. I-VSD Gate: Strip Author/Committer PII &amp; Validate Optional CHG-*.yaml Embargoes" data-shape="rectangle">
+  <rect x="1687.9259999999995" y="116.45" width="513.9669999999999" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1944.9094999999993" y="134.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">1. I-VSD Gate: Strip Author/Committer PII &amp; Validate Optional CHG-*.yaml Embargoes</text>
+</g>
+<g class="node" data-id="OpenApiDiff" data-label="2. OpenApiContractDiffer (openapi_islamu-event.json + HAL _links + x-endpoint-class)" data-shape="rectangle">
+  <rect x="2249.892999999999" y="116.45" width="538.4199999999997" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="2519.102999999999" y="134.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">2. OpenApiContractDiffer (openapi_islamu-event.json + HAL _links + x-endpoint-class)</text>
+</g>
+<g class="node" data-id="ConfigDiff" data-label="3. ConfigurationManifestDiffer (configuration-manifest + tenant-package + .env.example)" data-shape="rectangle">
+  <rect x="2836.312999999999" y="116.45" width="543.6069999999997" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="3108.116499999999" y="134.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">3. ConfigurationManifestDiffer (configuration-manifest + tenant-package + .env.example)</text>
+</g>
+<g class="node" data-id="MigrationDiff" data-label="4. MigrationLedgerExtractor (8 Projects / 15 DbContext Trees + Provider Parity Check)" data-shape="rectangle">
+  <rect x="3427.919999999999" y="116.45" width="545.0889999999997" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="3700.464499999999" y="134.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">4. MigrationLedgerExtractor (8 Projects / 15 DbContext Trees + Provider Parity Check)</text>
+</g>
+<g class="node" data-id="EnrichedContext" data-label="Enriched Context JSON (Injected into release.extra &amp; commit.extra)" data-shape="rectangle">
+  <rect x="4021.0089999999987" y="116.45" width="426.52899999999977" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="4234.273499999998" y="134.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Enriched Context JSON (Injected into release.extra &amp; commit.extra)</text>
+</g>
+<g class="node" data-id="TeraRender" data-label="cliff.toml Tera Template (format = true)" data-shape="rectangle">
+  <rect x="4539.537999999999" y="116.45" width="254.61699999999996" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="4666.846499999999" y="134.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">cliff.toml Tera Template (format = true)</text>
+</g>
+<g class="node" data-id="ReleaseNotes" data-label="release-notes.md (3 Persona Views)" data-shape="rectangle">
+  <rect x="4842.154999999999" y="84" width="252.39399999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="4968.351999999999" y="102.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">release-notes.md (3 Persona Views)</text>
+</g>
+<g class="node" data-id="PublicChangelog" data-label="docs/public/changelog/README.md" data-shape="rectangle">
+  <rect x="4842.154999999999" y="148.9" width="255.35799999999992" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="4969.833999999999" y="167.35000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">docs/public/changelog/README.md</text>
+</g>
+</svg>

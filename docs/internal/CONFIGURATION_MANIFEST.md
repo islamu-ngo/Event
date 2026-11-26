@@ -1712,6 +1712,21 @@ Tenant-scoped portability uses the distinct `TenantConfigurationPackage`
 contract; do not weaken a whole-instance manifest into a caller-selected
 partial instance export.
 
+Read-only single-tenant package exports verify caller authority through a
+dedicated tenantless `Global` owner rather than reading `platform_user_roles`
+or ungranted `tenant_user_role_grants` columns on the `Runtime` tenant context,
+adding a `Runtime` barrier view over identity, or taking `FOR UPDATE` row
+locks. Run separate fresh `Global` authority checks before and after buffering
+the `Serializable` `Runtime` tenant snapshot (plus original credential and
+lifetime checks), staying within `Global`'s existing column allowlist
+(`TenantUserRoleGrant` columns `TenantId`, `TenantUserId`, `RoleId`,
+`RevokedAt` joined with `Role.RoleScopeId`), and keep tenant-export moderation
+reads off `PlatformUserRoles` on `Runtime` contexts (including shared
+`ReadTenantInCurrentTransactionAsync` callers). See
+[Read-only authority verification across Runtime and Global](adr/ADR-application-owned-persistence.md#read-only-authority-verification-across-runtime-and-global).
+*(Design standard accepted; single-tenant package export cutover and PostgreSQL
+provider verification remain pending active implementation acceptance.)*
+
 ## Implementation Map
 
 | Layer | Responsibility | Primary sources |

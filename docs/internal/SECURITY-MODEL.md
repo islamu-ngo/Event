@@ -33,6 +33,16 @@ business logic into privileged SQL. Native routine descriptions below record
 existing mechanisms, not a requirement to preserve database business authority;
 replace them through verified C# workflows rather than silently bypassing controls.
 
+Read-only tenant-scoped operations that must verify platform-admin or
+tenant-admin authority (such as single-tenant configuration package exports)
+follow the [read-only Runtime/Global authority pattern](adr/ADR-application-owned-persistence.md#read-only-authority-verification-across-runtime-and-global):
+they never grant `Runtime` direct or barrier-view reads over platform identity
+or role tables (`platform_user_roles`), and they never take write-privileged
+`FOR UPDATE` row fences on read-only paths. Instead, a dedicated tenantless
+`Global` owner runs separate fresh EF authority checks before and after
+buffering the `Serializable` `Runtime` tenant snapshot—together with live
+credential and lifetime checks—reusing `Global`'s fixed column allowlist.
+
 ## Existing PostgreSQL capability support
 
 `PostgresPrivilegeGuard` generates read-only PostgreSQL assertions from a trusted,

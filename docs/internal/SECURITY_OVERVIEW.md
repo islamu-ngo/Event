@@ -261,6 +261,18 @@ credential can read the declared metadata across tenants; C# selects the exact
 subject and owns human authorization. This is the existing shared-credential
 trust boundary, not a human authorization claim granted by storage permissions.
 
+For `TenantUserRoleGrant`, `PostgresAdministrativeAuthorityReadPermissions`
+intentionally exposes only `(TenantId, TenantUserId, RoleId, RevokedAt)` to
+`Global`; storage constraint `ck_tenant_user_role_grants_role_scope` enforces
+tenant scope on the row and `Role.RoleScopeId` is verified through `roles`.
+Read-only tenant-scoped authority owners (such as buffered single-tenant
+configuration package exports) reuse these fixed `Global` columns via separate
+fresh pre- and post-buffer reads—never selecting ungranted
+`TenantUserRoleGrant.Id` or `RoleScopeId`, never exposing platform admin roles
+to `Runtime` through a barrier view, and never taking `FOR UPDATE` row locks on
+read-only exports. See the
+[read-only Runtime/Global authority standard](adr/ADR-application-owned-persistence.md#read-only-authority-verification-across-runtime-and-global).
+
 Native qualification covers 25 administrative behavior cases, eight installation
 drift controls and the original actual-Global repository witness. That witness
 bounds only its dedicated Migrator seed commands with `MaxBatchSize(1)` after

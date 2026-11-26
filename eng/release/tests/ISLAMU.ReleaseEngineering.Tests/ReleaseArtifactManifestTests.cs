@@ -123,33 +123,23 @@ public sealed class ReleaseArtifactManifestTests
             SampleCommitOid));
         await Assert.That(sealedResult.IsValid).IsTrue().Because(sealedResult.Diagnostic ?? "valid OCI separators");
 
-        ReleaseArtifactVerificationResult verifiedWithoutBundle = ReleaseArtifactManifest.VerifySealedDirectory(
+        ReleaseArtifactVerificationResult verifiedWithoutSignature = ReleaseArtifactManifest.VerifySealedDirectory(
             fixture.ArtifactDirectory,
             SampleVersion,
             SampleTag,
-            SampleCommitOid,
-            requireSigstoreBundle: false);
-        await Assert.That(verifiedWithoutBundle.IsValid).IsTrue().Because(verifiedWithoutBundle.Diagnostic ?? "valid sealed directory");
+            SampleCommitOid);
+        await Assert.That(verifiedWithoutSignature.IsValid).IsTrue().Because(verifiedWithoutSignature.Diagnostic ?? "valid sealed directory");
 
-        ReleaseArtifactVerificationResult missingBundle = ReleaseArtifactManifest.VerifySealedDirectory(
+        string emptySigners = Path.Combine(fixture.Root, "empty-allowed-signers");
+        await File.WriteAllTextAsync(emptySigners, "# comment only\n");
+        ReleaseArtifactVerificationResult emptySignersResult = ReleaseArtifactManifest.VerifySealedDirectory(
             fixture.ArtifactDirectory,
             SampleVersion,
             SampleTag,
             SampleCommitOid,
-            requireSigstoreBundle: true);
-        await Assert.That(missingBundle.IsValid).IsFalse();
-        await Assert.That(missingBundle.Diagnostic).IsEqualTo($"artifact_manifest_missing_file:{ReleaseArtifactManifest.SigstoreBundleFileName}");
-
-        await File.WriteAllTextAsync(
-            Path.Combine(fixture.ArtifactDirectory, ReleaseArtifactManifest.SigstoreBundleFileName),
-            """{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json"}""" + "\n");
-        ReleaseArtifactVerificationResult verifiedWithBundle = ReleaseArtifactManifest.VerifySealedDirectory(
-            fixture.ArtifactDirectory,
-            SampleVersion,
-            SampleTag,
-            SampleCommitOid,
-            requireSigstoreBundle: true);
-        await Assert.That(verifiedWithBundle.IsValid).IsTrue().Because(verifiedWithBundle.Diagnostic ?? "valid with bundle");
+            allowedSignersPath: emptySigners);
+        await Assert.That(emptySignersResult.IsValid).IsFalse();
+        await Assert.That(emptySignersResult.Diagnostic).IsEqualTo("artifact_manifest_allowed_signers_empty");
 
         await File.AppendAllTextAsync(
             Path.Combine(fixture.ArtifactDirectory, ReleaseArtifactManifest.ReleaseNotesFileName),
@@ -158,8 +148,7 @@ public sealed class ReleaseArtifactManifestTests
             fixture.ArtifactDirectory,
             SampleVersion,
             SampleTag,
-            SampleCommitOid,
-            requireSigstoreBundle: true);
+            SampleCommitOid);
         await Assert.That(tampered.IsValid).IsFalse();
         await Assert.That(tampered.Diagnostic).IsEqualTo("artifact_manifest_verification_mismatch");
     }

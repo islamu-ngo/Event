@@ -51,6 +51,7 @@ public sealed record ReleaseArtifactVerificationResult(
 public static class ReleaseArtifactManifest
 {
     public const string ChecksumsFileName = "SHA256SUMS";
+    public const string ChecksumsSignatureFileName = "SHA256SUMS.sig";
     public const string SigstoreBundleFileName = "SHA256SUMS.sigstore.json";
     public const string ManifestFileName = "release-artifact-manifest.v1.json";
     public const string ContractDiffFileName = "contract-diff.v1.json";
@@ -61,7 +62,6 @@ public static class ReleaseArtifactManifest
 
     private const int ExpectedSchemaVersion = 1;
     private const long MaximumArtifactFileBytes = 16L * 1024 * 1024;
-    private const long MaximumSigstoreBundleBytes = 1024L * 1024;
 
     private static class Diagnostics
     {
@@ -80,7 +80,6 @@ public static class ReleaseArtifactManifest
         public const string NormalizationFailed = "artifact_manifest_normalization_failed";
         public const string WriteFailed = "artifact_manifest_write_failed";
         public const string VerificationMismatch = "artifact_manifest_verification_mismatch";
-        public const string SigstoreBundleInvalid = "artifact_manifest_sigstore_bundle_invalid";
     }
 
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
@@ -174,16 +173,17 @@ public static class ReleaseArtifactManifest
 
     /// <summary>
     /// Verifies an existing sealed artifact directory against <c>release-artifact-manifest.v1.json</c>
-    /// and <c>SHA256SUMS</c> without modifying any files. Used by post-tag release consumers such as
-    /// <see cref="SyncPublicChangelogCommand"/> where human-owned inputs (<c>release.yaml</c>,
-    /// <c>summary.md</c>) may coexist alongside sealed post-build release artifacts.
+    /// and <c>SHA256SUMS</c> without modifying any files. When <paramref name="allowedSignersPath"/> is
+    /// provided, cryptographically authenticates the exact <c>SHA256SUMS</c> bytes via
+    /// <c>SHA256SUMS.sig</c> under the <c>islamu-release-checksums</c> OpenSSH namespace so unsigned or
+    /// re-sealed working-tree edits cannot bypass verification.
     /// </summary>
     public static ReleaseArtifactVerificationResult VerifySealedDirectory(
         string directory,
         string expectedVersion,
         string expectedTag,
         string expectedCommitOid,
-        bool requireSigstoreBundle = false)
+        string? allowedSignersPath = null)
     {
         var request = new ReleaseArtifactSealRequest(directory, expectedVersion, expectedTag, expectedCommitOid);
         string? requestError = ValidateIdentityAndDirectory(request, out string resolvedDir);
@@ -232,7 +232,7 @@ public static class ReleaseArtifactManifest
             resolvedDir,
             expectedManifestBytes,
             expectedChecksumBytes,
-            requireSigstoreBundle);
+            allowedSignersPath);
         if (matchError is not null)
         {
             return VerificationFailed(matchError);
@@ -327,21 +327,33 @@ public static class ReleaseArtifactManifest
     private static string? CollectSealedDirectoryFiles(string directory, out Dictionary<string, string> filesByName)
     {
         filesByName = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (string required in RequiredArtifactFiles)
+        try
         {
-            string fullPath = Path.Combine(directory, required);
-            if (!File.Exists(fullPath))
+            foreach (string required in RequiredArtifactFiles)
             {
-                return $"artifact_manifest_missing_file:{required}";
-            }
+                string fullPath = Path.Combine(directory, required);
+                if (!File.Exists(fullPath))
+                {
+                    return $"artifact_manifest_missing_file:{required}";
+                }
 
-            FileAttributes attributes = File.GetAttributes(fullPath);
-            if ((attributes & FileAttributes.ReparsePoint) != 0)
-            {
-                return Diagnostics.SymlinkRejected;
-            }
+                FileAttributes attributes = File.GetAttributes(fullPath);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    return Diagnostics.SymlinkRejected;
+                }
 
-            filesByName[required] = fullPath;
+                if (new FileInfo(fullPath).Length > MaximumArtifactFileBytes)
+                {
+                    return Diagnostics.FileSizeInvalid;
+                }
+
+                filesByName[required] = fullPath;
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return Diagnostics.DirectoryInvalid;
         }
 
         return null;
@@ -351,7 +363,7 @@ public static class ReleaseArtifactManifest
         string directory,
         byte[] expectedManifestBytes,
         byte[] expectedChecksumBytes,
-        bool requireSigstoreBundle)
+        string? allowedSignersPath)
     {
         string manifestPath = Path.Combine(directory, ManifestFileName);
         string checksumsPath = Path.Combine(directory, ChecksumsFileName);
@@ -391,29 +403,18 @@ public static class ReleaseArtifactManifest
             return Diagnostics.DirectoryInvalid;
         }
 
-        return requireSigstoreBundle ? ValidateSigstoreBundleFile(Path.Combine(directory, SigstoreBundleFileName)) : null;
-    }
-
-    private static string? ValidateSigstoreBundleFile(string bundlePath)
-    {
-        if (!File.Exists(bundlePath))
+        if (allowedSignersPath is null)
         {
-            return $"artifact_manifest_missing_file:{SigstoreBundleFileName}";
+            return null;
         }
 
-        if (HasReparsePointInExistingPath(bundlePath))
-        {
-            return Diagnostics.SymlinkRejected;
-        }
-
-        var info = new FileInfo(bundlePath);
-        if (info.Length <= 0 || info.Length > MaximumSigstoreBundleBytes ||
-            !IsValidJsonFile(bundlePath, JsonValueKind.Object))
-        {
-            return Diagnostics.SigstoreBundleInvalid;
-        }
-
-        return null;
+        string signaturePath = Path.Combine(directory, ChecksumsSignatureFileName);
+        SshBlobSignatureVerificationResult signatureResult = SshBlobSignatureVerifier.Verify(
+            expectedChecksumBytes,
+            signaturePath,
+            allowedSignersPath,
+            SshBlobSignatureVerifier.ReleaseChecksumsNamespace);
+        return signatureResult.IsValid ? null : signatureResult.Diagnostic ?? "artifact_manifest_checksums_signature_invalid";
     }
 
     private static string? ResolveOutputDirectory(

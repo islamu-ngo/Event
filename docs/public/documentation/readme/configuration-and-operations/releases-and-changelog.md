@@ -73,7 +73,7 @@ cosign verify-blob \
 sha256sum --check SHA256SUMS
 ```
 
-In air-gapped environments where Cosign online verification is not available on the target host, run Step A on an online verification station (or compare `SHA256SUMS` against an out-of-band authenticated copy) before transferring the assets and running `sha256sum --check SHA256SUMS` offline.
+In air-gapped environments where Cosign online verification is not available on the target host, either run Step A on an online verification station before transferring the assets, or verify the release operator's offline OpenSSH detached signature `SHA256SUMS.sig` against your independently trusted `allowed-signers` file under namespace `islamu-release-checksums` (`ssh-keygen -Y verify -f /path/to/trusted-allowed-signers -I <principal> -n islamu-release-checksums -s SHA256SUMS.sig < SHA256SUMS`) before running `sha256sum --check SHA256SUMS`.
 
 ### 3. Verify container image signatures and GitHub SLSA attestations (online)
 

@@ -57,6 +57,7 @@ public static class SyncPublicChangelogCommand
 
     private sealed record SignedReleaseLookup(
         string RepositoryRoot,
+        string AllowedSignersPath,
         string? SealedArtifactsRoot,
         string ReleaseDir,
         string VersionDir,
@@ -96,52 +97,67 @@ public static class SyncPublicChangelogCommand
         }
     }
 
+    private sealed class OptionAccumulator
+    {
+        public Uri? PublicationBase { get; set; }
+        public string? AllowedSignersPath { get; set; }
+        public string? SealedArtifactsRoot { get; set; }
+        public bool Check { get; set; }
+    }
+
     private static bool TryParseArguments(string[] args, TextWriter output, out ParsedOptions? parsed)
     {
         parsed = null;
-        Uri? publicationBase = null;
-        string? allowedSignersPath = null;
-        string? sealedArtifactsRoot = null;
-        bool check = false;
-
+        var options = new OptionAccumulator();
         var reader = new CliArgumentReader(args);
         while (reader.TryReadNext(out string token))
         {
-            if (token == "--check" && !check)
+            if (!TryApplyOption(token, ref reader, options, output))
             {
-                check = true;
-            }
-            else if (token == "--allowed-signers" && reader.TryReadOptionValue(allowedSignersPath, out string signers))
-            {
-                allowedSignersPath = signers;
-            }
-            else if (token == "--sealed-artifacts-root" && reader.TryReadOptionValue(sealedArtifactsRoot, out string sealedRoot))
-            {
-                sealedArtifactsRoot = sealedRoot;
-            }
-            else if (token == "--publication-base" && reader.TryReadOptionValue(publicationBase?.ToString(), out string baseText))
-            {
-                if (!Uri.TryCreate(baseText, UriKind.Absolute, out publicationBase))
-                {
-                    output.WriteLine("changelog_invalid_publication_base");
-                    return false;
-                }
-            }
-            else
-            {
-                output.WriteLine("changelog_invalid_arguments");
                 return false;
             }
         }
 
-        if (args.Length < 2 || args[0] != "sync-public-changelog" || publicationBase is null)
+        if (args.Length < 2 || args[0] != "sync-public-changelog" || options.PublicationBase is null)
         {
             output.WriteLine("changelog_required_arguments_missing");
             return false;
         }
 
-        parsed = new ParsedOptions(publicationBase, allowedSignersPath, sealedArtifactsRoot, check);
+        parsed = new ParsedOptions(options.PublicationBase, options.AllowedSignersPath, options.SealedArtifactsRoot, options.Check);
         return true;
+    }
+
+    private static bool TryApplyOption(
+        string token,
+        ref CliArgumentReader reader,
+        OptionAccumulator options,
+        TextWriter output)
+    {
+        switch (token)
+        {
+            case "--check" when !options.Check:
+                options.Check = true;
+                return true;
+            case "--allowed-signers" when reader.TryReadOptionValue(options.AllowedSignersPath, out string signers):
+                options.AllowedSignersPath = signers;
+                return true;
+            case "--sealed-artifacts-root" when reader.TryReadOptionValue(options.SealedArtifactsRoot, out string sealedRoot):
+                options.SealedArtifactsRoot = sealedRoot;
+                return true;
+            case "--publication-base" when reader.TryReadOptionValue(options.PublicationBase?.ToString(), out string baseText):
+                if (!Uri.TryCreate(baseText, UriKind.Absolute, out Uri? parsedBase))
+                {
+                    output.WriteLine("changelog_invalid_publication_base");
+                    return false;
+                }
+
+                options.PublicationBase = parsedBase;
+                return true;
+            default:
+                output.WriteLine("changelog_invalid_arguments");
+                return false;
+        }
     }
 
     private static int ExecuteSync(
@@ -497,7 +513,7 @@ public static class SyncPublicChangelogCommand
             return false;
         }
 
-        var lookup = new SignedReleaseLookup(paths.Root, paths.SealedArtifactsRoot, releaseDir, versionDir, tagVerification.TargetCommitOid);
+        var lookup = new SignedReleaseLookup(paths.Root, paths.AllowedSignersPath, paths.SealedArtifactsRoot, releaseDir, versionDir, tagVerification.TargetCommitOid);
         string prefix = $"docs/internal/releases/{versionDir}";
         if (!TryReadSignedArtifact(objectReader, lookup.TargetCommitOid, lookup.RepositoryRoot, $"{prefix}/release.yaml", Diagnostics.ReleaseFilesMissing, out byte[] releaseBytes, out diagnostic) ||
             !TryReadSignedArtifact(objectReader, lookup.TargetCommitOid, lookup.RepositoryRoot, $"{prefix}/summary.md", Diagnostics.ReleaseFilesMissing, out byte[] summaryBytes, out diagnostic))
@@ -620,7 +636,7 @@ public static class SyncPublicChangelogCommand
             lookup.VersionDir,
             $"v{lookup.VersionDir}",
             lookup.TargetCommitOid,
-            requireSigstoreBundle: true);
+            allowedSignersPath: lookup.AllowedSignersPath);
         if (!verified.IsValid || verified.Manifest is null || verified.ContextBytes is null || verified.NotesBytes is null)
         {
             diagnostic = verified.Diagnostic ?? Diagnostics.ReleaseFilesMissing;

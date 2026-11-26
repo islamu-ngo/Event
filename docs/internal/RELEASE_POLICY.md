@@ -234,7 +234,10 @@ guidance lives separately in
 [Releases and Changelog](../public/documentation/readme/configuration-and-operations/releases-and-changelog.md).
 `sync-public-changelog` cryptographically verifies every release's signed annotated tag
 (`release.yaml`, `summary.md`, and linked `CHG-*.yaml` fragments MUST byte-match the signed tag
-tree) and supports both pre-tag committed artifacts and post-tag sealed archives from
-`release.yml` (verifying `release-artifact-manifest.v1.json`, `SHA256SUMS`, `SHA256SUMS.sigstore.json`,
-and `release-images.v1.json` against the signed tag's exact `sourceCommitOid` without moving the tag),
-failing closed on post-tag tampering or accepted-page drift.
+tree under OpenSSH namespace `git`) and supports both pre-tag committed artifacts and post-tag
+sealed archives from `release.yml` (requiring an enrolled operator's OpenSSH detached signature
+`SHA256SUMS.sig` verified via `ssh-keygen -Y verify` under dedicated namespace
+`islamu-release-checksums` against `allowed-signers`, binding exact `SHA256SUMS`,
+`release-artifact-manifest.v1.json` with `sourceCommitOid == targetCommitOid`, and all five sealed
+artifacts without moving the tag), failing closed on unsigned re-seals, unauthorized signers,
+wrong namespaces, post-tag tampering, or accepted-page drift.

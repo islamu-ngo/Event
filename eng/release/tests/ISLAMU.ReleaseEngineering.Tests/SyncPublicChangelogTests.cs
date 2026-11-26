@@ -10,11 +10,16 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class SyncPublicChangelogTests
 {
     private const string SampleVersion = "1.1.0";
+    private const string SampleHeading = "## v1.1.0";
     private const string SampleReleaseDate = "2026-08-14";
     private const string SampleSummary = "Attendees can now correct registration details.";
     private const string BaselineTag = "v1.0.0";
+    private const string DocsSegment = "docs";
+    private const string InternalSegment = "internal";
+    private const string ReleasesSegment = "releases";
     private const string GitUserNameConfig = "user.name=Release Test";
     private const string GitUserEmailConfig = "user.email=release@example.invalid";
+    private const string ChecksumsSignatureInvalidDiagnostic = "artifact_manifest_checksums_signature_invalid";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -44,7 +49,7 @@ public sealed class SyncPublicChangelogTests
         await Assert.That(staleCode).IsNotEqualTo(Program.Success);
         await Assert.That(staleOutput).Contains("changelog_stale");
         await Assert.That(writeCode).IsEqualTo(Program.Success).Because(writeOutput);
-        await Assert.That(Encoding.UTF8.GetString(firstPage)).Contains("## v1.1.0");
+        await Assert.That(Encoding.UTF8.GetString(firstPage)).Contains(SampleHeading);
         await Assert.That(currentCode).IsEqualTo(Program.Success).Because(currentOutput);
         await Assert.That(repeatedCode).IsEqualTo(Program.Success).Because(repeatedOutput);
         await Assert.That(repeatedOutput).Contains("changelog_unchanged");
@@ -58,11 +63,11 @@ public sealed class SyncPublicChangelogTests
 
         await Assert.That(newStale).IsNotEqualTo(Program.Success);
         await Assert.That(unionCode).IsEqualTo(Program.Success).Because(unionOutput);
-        await Assert.That(union).Contains("## v1.1.0");
+        await Assert.That(union).Contains(SampleHeading);
         await Assert.That(union).Contains("## v1.1.1");
-        await Assert.That(union.IndexOf("## v1.1.1", StringComparison.Ordinal)).IsLessThan(union.IndexOf("## v1.1.0", StringComparison.Ordinal));
+        await Assert.That(union.IndexOf("## v1.1.1", StringComparison.Ordinal)).IsLessThan(union.IndexOf(SampleHeading, StringComparison.Ordinal));
         using JsonDocument manifest = JsonDocument.Parse(await File.ReadAllBytesAsync(fixture.ManifestPath));
-        await Assert.That(manifest.RootElement.GetProperty("releases").GetArrayLength()).IsEqualTo(2);
+        await Assert.That(manifest.RootElement.GetProperty(ReleasesSegment).GetArrayLength()).IsEqualTo(2);
         await Assert.That(manifest.RootElement.GetProperty("projectionSha256").GetString()).IsEqualTo(Digest(await File.ReadAllBytesAsync(fixture.PagePath)));
     }
 
@@ -243,7 +248,7 @@ public sealed class SyncPublicChangelogTests
         await Assert.That(writeCode).IsEqualTo(Program.Success).Because(writeOutput);
         string page = await File.ReadAllTextAsync(fixture.PagePath);
         await Assert.That(page).StartsWith("---\ndescription: \"Entries-only chronological release ledger for ISLAMU Event.\"\n---\n");
-        await Assert.That(page).Contains("## v1.1.0");
+        await Assert.That(page).Contains(SampleHeading);
         await Assert.That(page).Contains($"Target commit: `{targetOid}`");
         await Assert.That(page).Contains("ghcr.io/islamu-ngo/event-api@sha256:");
         await Assert.That(page).DoesNotContain($"blob/{targetOid}/docs/internal/releases/1.1.0/release-notes.md");
@@ -252,16 +257,37 @@ public sealed class SyncPublicChangelogTests
         await Assert.That(checkCode).IsEqualTo(Program.Success).Because(checkOutput);
         await Assert.That(checkOutput).Contains("changelog_current");
 
-        // Tampering with post-tag sealed notes fails closed against SHA256SUMS/manifest.
-        string notesPath = Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", SampleVersion, ReleaseArtifactManifest.ReleaseNotesFileName);
-        await File.AppendAllTextAsync(notesPath, "\nUnauthorized post-tag edit.\n");
-        (int tamperedCode, string tamperedOutput) = fixture.Run();
-        await Assert.That(tamperedCode).IsEqualTo(Program.ToolchainRejected);
-        await Assert.That(tamperedOutput).Contains("artifact_manifest_verification_mismatch");
+        // Adversarial attack: edit notes AND re-run seal-artifacts to regenerate self-consistent
+        // release-artifact-manifest.v1.json and SHA256SUMS without possessing the operator's signing key.
+        string releaseDir = Path.Combine(fixture.RepositoryPath, DocsSegment, InternalSegment, ReleasesSegment, SampleVersion);
+        string resealDir = Path.Combine(fixture.Root, "attacker-reseal");
+        Directory.CreateDirectory(resealDir);
+        foreach (string required in ReleaseArtifactManifest.RequiredArtifactFiles)
+        {
+            File.Copy(Path.Combine(releaseDir, required), Path.Combine(resealDir, required), overwrite: true);
+        }
+
+        await File.AppendAllTextAsync(
+            Path.Combine(resealDir, ReleaseArtifactManifest.ReleaseNotesFileName),
+            "\nInjected attacker note.\n");
+        ReleaseArtifactSealResult attackerReseal = ReleaseArtifactManifest.Seal(new ReleaseArtifactSealRequest(
+            resealDir,
+            SampleVersion,
+            $"v{SampleVersion}",
+            targetOid));
+        await Assert.That(attackerReseal.IsValid).IsTrue().Because(attackerReseal.Diagnostic ?? "attacker re-seal");
+        foreach (string file in Directory.EnumerateFiles(resealDir))
+        {
+            File.Copy(file, Path.Combine(releaseDir, Path.GetFileName(file)), overwrite: true);
+        }
+
+        (int resealedTamperCode, string resealedTamperOutput) = fixture.Run();
+        await Assert.That(resealedTamperCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(resealedTamperOutput).Contains(ChecksumsSignatureInvalidDiagnostic);
     }
 
     [Test]
-    public async Task SupportsExternalSealedArtifactsRootAndRejectsMissingSigstoreBundle()
+    public async Task SupportsExternalSealedArtifactsRootAndRejectsMissingUnauthorizedOrWrongNamespaceSignatures()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -279,11 +305,40 @@ public sealed class SyncPublicChangelogTests
         (int okCode, string okOutput) = fixture.Run(sealedArtifactsRoot: externalSealedRoot);
         await Assert.That(okCode).IsEqualTo(Program.Success).Because(okOutput);
 
-        string bundlePath = Path.Combine(externalSealedRoot, SampleVersion, ReleaseArtifactManifest.SigstoreBundleFileName);
-        File.Delete(bundlePath);
-        (int noBundleCode, string noBundleOutput) = fixture.Run(sealedArtifactsRoot: externalSealedRoot);
-        await Assert.That(noBundleCode).IsEqualTo(Program.ToolchainRejected);
-        await Assert.That(noBundleOutput).Contains($"artifact_manifest_missing_file:{ReleaseArtifactManifest.SigstoreBundleFileName}");
+        string versionSealedDir = Path.Combine(externalSealedRoot, SampleVersion);
+        string checksumsPath = Path.Combine(versionSealedDir, ReleaseArtifactManifest.ChecksumsFileName);
+        string sigPath = Path.Combine(versionSealedDir, ReleaseArtifactManifest.ChecksumsSignatureFileName);
+
+        // Wrong OpenSSH signature namespace ("git" instead of "islamu-release-checksums") must fail closed.
+        File.Delete(sigPath);
+        fixture.SignChecksums(checksumsPath, authorizedKey: true, signatureNamespace: "git");
+        (int wrongNsCode, string wrongNsOutput) = fixture.Run(sealedArtifactsRoot: externalSealedRoot);
+        await Assert.That(wrongNsCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(wrongNsOutput).Contains(ChecksumsSignatureInvalidDiagnostic);
+
+        // Unauthorized SSH key signing the exact checksums must fail closed.
+        File.Delete(sigPath);
+        fixture.SignChecksums(checksumsPath, authorizedKey: false, signatureNamespace: SshBlobSignatureVerifier.ReleaseChecksumsNamespace);
+        (int unauthorizedCode, string unauthorizedOutput) = fixture.Run(sealedArtifactsRoot: externalSealedRoot);
+        await Assert.That(unauthorizedCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(unauthorizedOutput).Contains(ChecksumsSignatureInvalidDiagnostic);
+
+        // Missing SHA256SUMS.sig must fail closed even if SHA256SUMS.sigstore.json is present.
+        File.Delete(sigPath);
+        (int missingSigCode, string missingSigOutput) = fixture.Run(sealedArtifactsRoot: externalSealedRoot);
+        await Assert.That(missingSigCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(missingSigOutput).Contains($"artifact_manifest_missing_file:{ReleaseArtifactManifest.ChecksumsSignatureFileName}");
+
+        // Symlinked SHA256SUMS.sig must fail closed even if the target is a valid signature.
+        string externalSigDir = Path.Combine(fixture.Root, "external-sig");
+        Directory.CreateDirectory(externalSigDir);
+        string copiedChecksums = Path.Combine(externalSigDir, ReleaseArtifactManifest.ChecksumsFileName);
+        File.Copy(checksumsPath, copiedChecksums, overwrite: true);
+        fixture.SignChecksums(copiedChecksums, authorizedKey: true, signatureNamespace: SshBlobSignatureVerifier.ReleaseChecksumsNamespace);
+        File.CreateSymbolicLink(sigPath, Path.Combine(externalSigDir, ReleaseArtifactManifest.ChecksumsSignatureFileName));
+        (int symlinkSigCode, string symlinkSigOutput) = fixture.Run(sealedArtifactsRoot: externalSealedRoot);
+        await Assert.That(symlinkSigCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(symlinkSigOutput).Contains("artifact_manifest_symlink_rejected");
     }
 
     private static string Digest(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
@@ -293,6 +348,7 @@ public sealed class SyncPublicChangelogTests
     private sealed class ChangelogFixture : IDisposable
     {
         private readonly string keyPath;
+        private readonly string unauthorizedKeyPath;
         private string previousTag;
         private string previousOid;
         private int sequence;
@@ -302,10 +358,11 @@ public sealed class SyncPublicChangelogTests
             Root = Path.Combine(Path.GetTempPath(), $"islamu-sync-changelog-{Guid.NewGuid():N}");
             RepositoryPath = Path.Combine(Root, "repo");
             keyPath = Path.Combine(Root, "signer-key");
+            unauthorizedKeyPath = Path.Combine(Root, "unauthorized-key");
             AllowedSignersPath = Path.Combine(Root, "allowed-signers");
             Directory.CreateDirectory(RepositoryPath);
 
-            string changelogDir = Path.Combine(RepositoryPath, "docs", "public", "changelog");
+            string changelogDir = Path.Combine(RepositoryPath, DocsSegment, "public", "changelog");
             Directory.CreateDirectory(changelogDir);
             PagePath = Path.Combine(changelogDir, "README.md");
             ManifestPath = Path.Combine(changelogDir, "publication-manifest.v1.json");
@@ -313,8 +370,9 @@ public sealed class SyncPublicChangelogTests
             File.WriteAllText(PagePath, $"{frontmatter ?? string.Empty}{PublicChangelogPolicy.StartMarker}\n{PublicChangelogPolicy.EndMarker}\n");
 
             RunExternal(ReleaseToolPaths.SshKeygen, Root, "-q", "-t", "ed25519", "-N", string.Empty, "-C", "changelog-fixture", "-f", keyPath);
+            RunExternal(ReleaseToolPaths.SshKeygen, Root, "-q", "-t", "ed25519", "-N", string.Empty, "-C", "unauthorized-fixture", "-f", unauthorizedKeyPath);
             string pub = string.Join(' ', File.ReadAllText(keyPath + ".pub").Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2));
-            File.WriteAllText(AllowedSignersPath, $"release-operator namespaces=\"git\" {pub}\n");
+            File.WriteAllText(AllowedSignersPath, $"release-operator namespaces=\"git,{SshBlobSignatureVerifier.ReleaseChecksumsNamespace}\" {pub}\n");
 
             Git("init", "--initial-branch=main");
             string initialOid = Commit("fix(events): establish repository baseline");
@@ -369,7 +427,7 @@ public sealed class SyncPublicChangelogTests
         {
             string line = "v" + string.Join('.', version.Split('.')[0], version.Split('.')[1]);
             string changeCommit = Commit($"feat(registration): deliver {version}");
-            string releaseDir = Path.Combine(RepositoryPath, "docs", "internal", "releases", version);
+            string releaseDir = Path.Combine(RepositoryPath, DocsSegment, InternalSegment, ReleasesSegment, version);
             Directory.CreateDirectory(releaseDir);
 
             // Commit ONLY human-owned inputs before signing the tag (matches release.yml contract).
@@ -423,6 +481,10 @@ public sealed class SyncPublicChangelogTests
             File.WriteAllText(
                 Path.Combine(stagingDir, ReleaseArtifactManifest.SigstoreBundleFileName),
                 """{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json"}""" + "\n");
+            SignChecksums(
+                Path.Combine(stagingDir, ReleaseArtifactManifest.ChecksumsFileName),
+                authorizedKey: true,
+                signatureNamespace: SshBlobSignatureVerifier.ReleaseChecksumsNamespace);
 
             string targetSealedDir = externalSealedRoot is not null
                 ? Path.Combine(externalSealedRoot, version)
@@ -438,6 +500,17 @@ public sealed class SyncPublicChangelogTests
             return prepOid;
         }
 
+        public void SignChecksums(string checksumsPath, bool authorizedKey, string signatureNamespace)
+        {
+            RunExternal(
+                ReleaseToolPaths.SshKeygen,
+                Root,
+                "-Y", "sign",
+                "-f", authorizedKey ? keyPath : unauthorizedKeyPath,
+                "-n", signatureNamespace,
+                checksumsPath);
+        }
+
         public void CreateSignedRelease(
             string version,
             string releaseDate,
@@ -448,12 +521,12 @@ public sealed class SyncPublicChangelogTests
         {
             string line = "v" + string.Join('.', version.Split('.')[0], version.Split('.')[1]);
             string changeCommit = Commit($"feat(registration): deliver {version}");
-            string releaseDir = Path.Combine(RepositoryPath, "docs", "internal", "releases", version);
+            string releaseDir = Path.Combine(RepositoryPath, DocsSegment, InternalSegment, ReleasesSegment, version);
             Directory.CreateDirectory(releaseDir);
 
             if (linkedChangeId is not null)
             {
-                string changesDir = Path.Combine(RepositoryPath, "docs", "internal", "releases", "changes");
+                string changesDir = Path.Combine(RepositoryPath, DocsSegment, InternalSegment, ReleasesSegment, "changes");
                 Directory.CreateDirectory(changesDir);
                 File.WriteAllText(
                     Path.Combine(changesDir, linkedChangeId + ".yaml"),

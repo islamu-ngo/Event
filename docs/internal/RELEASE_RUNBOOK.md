@@ -121,7 +121,7 @@ When the Project Steward authorizes enrollment:
    ```bash
    ssh-keygen -t ed25519 -C "islamu-release-operator"
    ```
-2. Add the reviewed principal line (`<principal> namespaces="git" ssh-ed25519 <base64-key>`) to `eng/release/trust/allowed-signers`, record the rotation/enrollment in `eng/release/trust/rotation-history.md`, and merge through protected review.
+2. Add the reviewed principal line (`<principal> namespaces="git,islamu-release-checksums" ssh-ed25519 <base64-key>`) to `eng/release/trust/allowed-signers` (enabling domain-separated Git tag verification under `git` and post-tag `SHA256SUMS.sig` verification under `islamu-release-checksums`), record the rotation/enrollment in `eng/release/trust/rotation-history.md`, and merge through protected review.
 3. Configure the GitHub `release` environment (required reviewers, tag protection `v*` only), a GitHub **tag ruleset** restricting updates and deletions on `v*` (with reviewed minimal bypass actors), and optional container registry settings in GitHub Repository or Environment (`release` / `production` / `staging`) **Settings → Secrets and variables → Actions** (zero registry hosts or personal handles are hardcoded in workflow YAML):
 
    | Setting | Kind | Required | Purpose |
@@ -186,13 +186,21 @@ The workflow executes six least-privilege jobs under per-tag concurrency (`cance
 5. **`publish-release` (`contents: write` only):** re-verifies `SHA256SUMS` and `SHA256SUMS.sigstore.json`, verifies remote tag-object binding (`refs/tags/<tag>` object type `tag`, SHA `== tag-object-id`, target commit `== target-commit`), creates or resumes a single draft GitHub Release by numeric ID without `--clobber` (refusing any published release, multiple drafts, wrong target commit, unexpected assets, or differing deterministic asset bytes; preserving an existing draft `SHA256SUMS.sigstore.json` only if it independently verifies `SHA256SUMS` via Cosign), downloads all 8 draft assets to verify byte-for-byte equality + `sha256sum --check SHA256SUMS` + `cosign verify-blob`, re-verifies tag binding and exact draft asset identities `(id, name, size, updated_at, digest)` immediately before publishing once (`PATCH /releases/<draft-id>` `draft=false`), and immediately runs a post-publish round-trip verification (failing loudly and blocking `append-contributors` if any mutation occurred in the publish window).
 6. **`append-contributors` (`contents: write`, `continue-on-error: true`):** runs AFTER sealed publication and post-publish verification using verified `git-cliff` `2.14.2` with `eng/release/cliff-github-contributors.toml` and `--no-exec` (the sole online exception). Rejects any email address pattern, degrades cleanly to unchanged identity-free signed notes if remote metadata is absent or fails, and appends `@handle` / PR links exclusively to the mutable GitHub Release body.
 
-### Step 5 — Synchronize the public changelog ledger (post-tag sealed archive)
+### Step 5 — Synchronize the public changelog ledger (post-tag signed sealed archive)
 
 Because generated release artifacts are built and sealed **after** tagging (so they include real built OCI image digests), synchronize `docs/public/changelog/README.md` in a normal post-release PR without ever moving the signed tag:
 
 1. Download the published eight release assets for `v<version>` into `docs/internal/releases/<version>/` (leaving committed `release.yaml` and `summary.md` untouched) — or into a staging root `<dir>/<version>/` passed via `--sealed-artifacts-root <dir>`.
-2. Authenticate `SHA256SUMS` with `cosign verify-blob` (`SHA256SUMS.sigstore.json`) and `gh attestation verify` against `.github/workflows/release.yml@refs/tags/v<version>` before trusting the downloaded files.
-3. Run `sync-public-changelog` (and verify with `--check`):
+2. Authenticate `SHA256SUMS` online with `cosign verify-blob` (`SHA256SUMS.sigstore.json`) and `gh attestation verify` against `.github/workflows/release.yml@refs/tags/v<version>` before trusting the downloaded files.
+3. Countersign the verified `SHA256SUMS` offline with your enrolled release signing key under the dedicated `islamu-release-checksums` namespace (producing `SHA256SUMS.sig` so offline `sync-public-changelog --check` cryptographically rejects any unsigned or re-sealed working-tree edits):
+
+```bash
+ssh-keygen -Y sign -f /path/to/release-signing-key \
+  -n islamu-release-checksums \
+  "docs/internal/releases/<version>/SHA256SUMS"
+```
+
+4. Run `sync-public-changelog` (and verify with `--check`):
 
 ```bash
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- \
@@ -202,7 +210,7 @@ dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEng
   sync-public-changelog --publication-base https://github.com/islamu-ngo/Event/blob/ --check
 ```
 
-`sync-public-changelog` cryptographically verifies the SSH-signed annotated tag `v<version>`, confirms `release.yaml`, `summary.md`, and every linked `CHG-*.yaml` byte-match the signed tag's target commit tree, verifies the sealed post-tag archive (`release-artifact-manifest.v1.json`, `SHA256SUMS`, `SHA256SUMS.sigstore.json`, `release-images.v1.json`, `release-context.v1.json`, `release-notes.md`) against that exact `sourceCommitOid`, writes the updated entries-only projection and `publication-manifest.v1.json` (preserving YAML frontmatter), and fails closed on any tamper or accepted-page drift. Commit the verified sealed release archive plus `docs/public/changelog/README.md` and `docs/public/changelog/publication-manifest.v1.json` via PR so future CI `--check` runs and subsequent releases verify 100% offline.
+`sync-public-changelog` cryptographically verifies both the SSH-signed annotated tag `v<version>` (`git` namespace, confirming `release.yaml`, `summary.md`, and every linked `CHG-*.yaml` byte-match the signed tag's target commit tree) AND the OpenSSH detached signature `SHA256SUMS.sig` (`islamu-release-checksums` namespace against `allowed-signers`, binding exact `SHA256SUMS`, `release-artifact-manifest.v1.json` with `sourceCommitOid == targetCommitOid`, `release-images.v1.json`, `release-context.v1.json`, `release-notes.md`, `contract-diff.v1.json`, and `release-rendering-context.v1.json`), writes the updated entries-only projection and `publication-manifest.v1.json` (preserving YAML frontmatter), and fails closed on any tamper, unauthorized key, wrong namespace, or re-sealed unsigned working-tree edit. Commit the signed sealed release archive (including `SHA256SUMS.sig`) plus `docs/public/changelog/README.md` and `docs/public/changelog/publication-manifest.v1.json` via PR so future CI `--check` runs and subsequent releases verify 100% offline.
 
 ## Failure recovery and non-atomicity rules
 

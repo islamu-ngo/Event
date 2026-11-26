@@ -285,9 +285,9 @@ public static class PublicChangelogPolicy
                 builder.Append("- Sealed artifact manifest SHA-256: `").Append(release.ManifestSha256).Append("`\n");
             }
 
-            builder.Append("- Sealed release assets: download `release-notes.md`, `SHA256SUMS`, and `SHA256SUMS.sigstore.json` for `")
+            builder.Append("- Sealed release assets: download `release-notes.md`, `SHA256SUMS`, and `SHA256SUMS.sigstore.json` (or `SHA256SUMS.sig` offline under namespace `islamu-release-checksums`) for `")
                 .Append(tagName)
-                .Append("` and authenticate `SHA256SUMS` with Cosign before verifying checksums.\n");
+                .Append("` and authenticate `SHA256SUMS` before verifying checksums.\n");
         }
 
         if (release.Images is { Count: > 0 })

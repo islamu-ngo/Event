@@ -112,6 +112,26 @@ public sealed class ReleaseImageManifestTests
     }
 
     [Test]
+    public async Task ParseRejectsTrailingNewlineInCanonicalReferenceAndDigest()
+    {
+        string validJson = ValidSingleRegistryManifestJson();
+        string d1 = new('1', 64);
+        string reference = $"ghcr.io/{DefaultOwner}/event-api@sha256:{d1}";
+        string trailingNewlineRefJson = validJson.Replace(reference, reference + "\\n", StringComparison.Ordinal);
+        string trailingNewlineDigestJson = validJson.Replace($"\"sha256:{d1}\"", $"\"sha256:{d1}\\n\"", StringComparison.Ordinal);
+
+        ReleaseImageManifestLoadResult valid = ReleaseImageManifest.Parse(validJson, SampleVersion, SourceOid);
+        ReleaseImageManifestLoadResult refWithNewline = ReleaseImageManifest.Parse(trailingNewlineRefJson, SampleVersion, SourceOid);
+        ReleaseImageManifestLoadResult digestWithNewline = ReleaseImageManifest.Parse(trailingNewlineDigestJson, SampleVersion, SourceOid);
+
+        await Assert.That(valid.IsValid).IsTrue().Because(valid.Diagnostic ?? "valid baseline manifest");
+        await Assert.That(refWithNewline.IsValid).IsFalse();
+        await Assert.That(refWithNewline.Diagnostic).IsEqualTo(ReferenceInvalidDiagnostic);
+        await Assert.That(digestWithNewline.IsValid).IsFalse();
+        await Assert.That(digestWithNewline.Diagnostic).IsEqualTo(ReferenceInvalidDiagnostic);
+    }
+
+    [Test]
     public async Task LoadFromFileRejectsMissingAndSymlinkedManifestFiles()
     {
         if (OperatingSystem.IsWindows())

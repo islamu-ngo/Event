@@ -740,21 +740,71 @@ jobs:
             | jq --arg tag "${TAG_NAME}" '[.[][] | select(.tag_name == $tag)]' \
             | tee "${releases_json}"
 
+          expected_prerelease="false"
+          prerelease_args=()
+          if [[ "${TAG_NAME}" == *-* ]]; then
+            expected_prerelease="true"
+            prerelease_args+=(--prerelease)
+          fi
+
           published_count="$(jq '[.[] | select(.draft == false)] | length' "${releases_json}")"
-          if [[ "${published_count}" -ne 0 ]]; then
-            echo "Published release already exists for ${TAG_NAME}; refusing to replace sealed release." >&2
+          draft_count="$(jq '[.[] | select(.draft == true)] | length' "${releases_json}")"
+
+          if [[ "${published_count}" -gt 1 ]] || [[ "${published_count}" -eq 1 && "${draft_count}" -gt 0 ]]; then
+            echo "Found ambiguous releases for ${TAG_NAME} (published=${published_count}, draft=${draft_count}); failing closed." >&2
             exit 1
           fi
 
-          draft_count="$(jq '[.[] | select(.draft == true)] | length' "${releases_json}")"
+          if [[ "${published_count}" -eq 1 ]]; then
+            # On a failed-job retry after PATCH draft=false succeeded (for example if the immediate
+            # post-publish API call timed out), preflight outputs stay cached with should-publish=true.
+            # Never edit or replace the published release; verify every tag, flag, inventory, byte,
+            # checksum, and Cosign OIDC signature read-only and fail closed on any mismatch.
+            published_id="$(jq -r '[.[] | select(.draft == false)][0].id' "${releases_json}")"
+            existing_pub_json="$(mktemp "${RUNNER_TEMP}/published-retry-verify.XXXXXX.json")"
+            gh api "repos/${GITHUB_REPOSITORY}/releases/${published_id}" | tee "${existing_pub_json}" >/dev/null
+
+            if [[ "$(jq -r '.draft' "${existing_pub_json}")" != "false" || "$(jq -r '.tag_name' "${existing_pub_json}")" != "${TAG_NAME}" || "$(jq -r '.prerelease' "${existing_pub_json}")" != "${expected_prerelease}" ]]; then
+              echo "Existing published release ID ${published_id} metadata does not match governed tag ${TAG_NAME} (expected prerelease=${expected_prerelease}); failing closed." >&2
+              exit 1
+            fi
+
+            actual_pub_assets="$(jq -r '.assets[].name' "${existing_pub_json}" | LC_ALL=C sort)"
+            if [[ "${actual_pub_assets}" != "${expected_sorted}" ]]; then
+              echo "Existing published release ${TAG_NAME} asset inventory mismatch; refusing to proceed." >&2
+              exit 1
+            fi
+
+            retry_verify_dir="$(mktemp -d "${RUNNER_TEMP}/published-retry-assets.XXXXXX")"
+            gh release download "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" --dir "${retry_verify_dir}"
+            for asset in "${expected_assets[@]}"; do
+              if [[ "${asset}" == "SHA256SUMS.sigstore.json" ]]; then
+                continue
+              fi
+              if ! cmp -s -- "${retry_verify_dir}/${asset}" "artifacts/release-signed/${asset}"; then
+                echo "Existing published release asset '${asset}' differs from sealed bytes; failing closed." >&2
+                exit 1
+              fi
+            done
+            (cd "${retry_verify_dir}" && sha256sum --check SHA256SUMS)
+            cosign verify-blob \
+              --bundle "${retry_verify_dir}/SHA256SUMS.sigstore.json" \
+              --certificate-identity "${expected_identity}" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              "${retry_verify_dir}/SHA256SUMS"
+            verify_remote_tag_binding
+
+            {
+              echo "## GitHub Release Verified (Already Published)"
+              echo
+              echo "Verified existing published release \`${TAG_NAME}\` (ID \`${published_id}\`, tag object \`${TAG_OBJECT_ID}\`, commit \`${TARGET_COMMIT}\`, prerelease \`${expected_prerelease}\`) read-only without modifying sealed assets."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
           if [[ "${draft_count}" -gt 1 ]]; then
             echo "Found ${draft_count} ambiguous draft releases for ${TAG_NAME}; failing closed." >&2
             exit 1
-          fi
-
-          prerelease_args=()
-          if [[ "${TAG_NAME}" == *-* ]]; then
-            prerelease_args+=(--prerelease)
           fi
 
           expected_bundle_path="artifacts/release-signed/SHA256SUMS.sigstore.json"
@@ -788,8 +838,13 @@ jobs:
           else
             draft_id="$(jq -r '.[0].id' "${releases_json}")"
             draft_target="$(jq -r '.[0].target_commitish' "${releases_json}")"
+            draft_prerelease="$(jq -r '.[0].prerelease' "${releases_json}")"
             if [[ "${draft_target}" != "${TARGET_COMMIT}" ]]; then
               echo "Existing draft target_commitish '${draft_target}' does not match verified commit '${TARGET_COMMIT}'; refusing to reuse draft." >&2
+              exit 1
+            fi
+            if [[ "${draft_prerelease}" != "${expected_prerelease}" ]]; then
+              echo "Existing draft prerelease='${draft_prerelease}' does not match governed tag '${TAG_NAME}' (expected '${expected_prerelease}'); refusing to reuse draft." >&2
               exit 1
             fi
 
@@ -850,8 +905,8 @@ jobs:
           draft_state_json="$(mktemp "${RUNNER_TEMP}/draft-before-publish.XXXXXX.json")"
           gh api "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" | tee "${draft_state_json}"
 
-          if [[ "$(jq -r '.draft' "${draft_state_json}")" != "true" || "$(jq -r '.tag_name' "${draft_state_json}")" != "${TAG_NAME}" ]]; then
-            echo "Expected release ID ${draft_id} (${TAG_NAME}) to remain a matching draft prior to final publication." >&2
+          if [[ "$(jq -r '.draft' "${draft_state_json}")" != "true" || "$(jq -r '.tag_name' "${draft_state_json}")" != "${TAG_NAME}" || "$(jq -r '.prerelease' "${draft_state_json}")" != "${expected_prerelease}" ]]; then
+            echo "Expected release ID ${draft_id} (${TAG_NAME}) to remain a matching draft (prerelease=${expected_prerelease}) prior to final publication." >&2
             exit 1
           fi
 
@@ -882,24 +937,26 @@ jobs:
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "${roundtrip_dir}/SHA256SUMS"
 
-          # Re-verify tag object binding and exact draft asset identities immediately before publishing.
+          # Re-verify tag object binding, draft tag/prerelease metadata, and exact draft asset identities immediately before publishing.
           verify_remote_tag_binding
           pre_publish_check_json="$(mktemp "${RUNNER_TEMP}/draft-pre-publish-check.XXXXXX.json")"
-          gh api "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" | tee "${pre_publish_check_json}"
-          if [[ "$(jq -r '.draft' "${pre_publish_check_json}")" != "true" || "$(snapshot_release_assets "${pre_publish_check_json}")" != "${verified_asset_snapshot}" ]]; then
-            echo "Draft release ID ${draft_id} state or asset identities changed after round-trip verification; refusing to publish." >&2
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" | tee "${pre_publish_check_json}" >/dev/null
+          if [[ "$(jq -r '.draft' "${pre_publish_check_json}")" != "true" || "$(jq -r '.tag_name' "${pre_publish_check_json}")" != "${TAG_NAME}" || "$(jq -r '.prerelease' "${pre_publish_check_json}")" != "${expected_prerelease}" || "$(snapshot_release_assets "${pre_publish_check_json}")" != "${verified_asset_snapshot}" ]]; then
+            echo "Draft release ID ${draft_id} state, tag/prerelease metadata, or asset identities changed after round-trip verification; refusing to publish." >&2
             exit 1
           fi
 
-          # Publish once by exact numeric release ID after every asset, tag object, and signature is verified.
-          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" -F draft=false
+          # Publish once by exact numeric release ID with explicit prerelease flag after every asset, tag object, and signature is verified.
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" \
+            -F draft=false \
+            -F prerelease="${expected_prerelease}"
 
           # Immediate post-publish verification to detect any race or authorized-editor mutation during the publish call.
           verify_remote_tag_binding
           post_publish_json="$(mktemp "${RUNNER_TEMP}/published-post-verify.XXXXXX.json")"
-          gh api "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" | tee "${post_publish_json}"
-          if [[ "$(jq -r '.draft' "${post_publish_json}")" != "false" || "$(jq -r '.tag_name' "${post_publish_json}")" != "${TAG_NAME}" || "$(snapshot_release_assets "${post_publish_json}")" != "${verified_asset_snapshot}" ]]; then
-            echo "SECURITY ALERT: Published release ID ${draft_id} (${TAG_NAME}) asset identities or tag binding diverged from the pre-publish verified snapshot." >&2
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" | tee "${post_publish_json}" >/dev/null
+          if [[ "$(jq -r '.draft' "${post_publish_json}")" != "false" || "$(jq -r '.tag_name' "${post_publish_json}")" != "${TAG_NAME}" || "$(jq -r '.prerelease' "${post_publish_json}")" != "${expected_prerelease}" || "$(snapshot_release_assets "${post_publish_json}")" != "${verified_asset_snapshot}" ]]; then
+            echo "SECURITY ALERT: Published release ID ${draft_id} (${TAG_NAME}) asset identities, prerelease flag, or tag binding diverged from the pre-publish verified snapshot." >&2
             exit 1
           fi
 
@@ -993,7 +1050,8 @@ jobs:
             --no-exec \
             --github-repo "${GITHUB_REPOSITORY}" \
             --tag "${TAG_NAME}" \
-            -- "${commit_range}" | tee "${contributors_file}"; then
+            --output "${contributors_file}" \
+            -- "${commit_range}"; then
             echo "Online contributor projection failed; keeping signed identity-free release body unchanged."
             exit 0
           fi
@@ -1018,7 +1076,7 @@ jobs:
             cat "${contributors_file}"
             echo
             echo "_Contributor acknowledgements appear only on this mutable GitHub Release page and are excluded from signed \`release-notes.md\` and \`SHA256SUMS\`. Contributors may request edits or removal at any time without invalidating release verification._"
-          } | tee "${mutable_body}"
+          } | tee "${mutable_body}" >/dev/null
 
           gh release edit "${TAG_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \

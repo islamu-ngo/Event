@@ -91,7 +91,7 @@ public static class ReleaseArtifactManifest
     };
 
     private static readonly Regex SemVerPattern = new(
-        "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:alpha|beta|rc)\\.(?:[1-9][0-9]*))?$",
+        "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:alpha|beta|rc)\\.(?:[1-9][0-9]*))?\\z",
         RegexOptions.CultureInvariant,
         TimeSpan.FromMilliseconds(100));
 
@@ -198,17 +198,19 @@ public static class ReleaseArtifactManifest
             return VerificationFailed(filesError);
         }
 
-        string? contentError = ValidateArtifactContents(filesByName, request, out IReadOnlyList<EnrichedImageReference>? images);
+        string? readError = ReadArtifactSnapshots(filesByName, out Dictionary<string, byte[]> artifactBytes);
+        if (readError is not null)
+        {
+            return VerificationFailed(readError);
+        }
+
+        string? contentError = ValidateArtifactContents(artifactBytes, request, out IReadOnlyList<EnrichedImageReference>? images);
         if (contentError is not null)
         {
             return VerificationFailed(contentError);
         }
 
-        string? hashError = HashArtifacts(filesByName, out SealedArtifactFileEntry[] fileEntries);
-        if (hashError is not null)
-        {
-            return VerificationFailed(hashError);
-        }
+        SealedArtifactFileEntry[] fileEntries = HashArtifacts(artifactBytes);
 
         var expectedManifest = new ReleaseArtifactManifestDocument(
             ExpectedSchemaVersion,
@@ -238,17 +240,14 @@ public static class ReleaseArtifactManifest
             return VerificationFailed(matchError);
         }
 
-        try
-        {
-            byte[] contextBytes = File.ReadAllBytes(filesByName[ReleaseContextFileName]);
-            byte[] notesBytes = File.ReadAllBytes(filesByName[ReleaseNotesFileName]);
-            string manifestHash = Convert.ToHexStringLower(SHA256.HashData(expectedManifestBytes));
-            return new ReleaseArtifactVerificationResult(true, expectedManifest, contextBytes, notesBytes, manifestHash, null);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return VerificationFailed(Diagnostics.DirectoryInvalid);
-        }
+        string manifestHash = Convert.ToHexStringLower(SHA256.HashData(expectedManifestBytes));
+        return new ReleaseArtifactVerificationResult(
+            true,
+            expectedManifest,
+            artifactBytes[ReleaseContextFileName],
+            artifactBytes[ReleaseNotesFileName],
+            manifestHash,
+            null);
     }
 
     public static int RunCli(string[] args, TextWriter output, string defaultBaseDirectory)
@@ -465,13 +464,20 @@ public static class ReleaseArtifactManifest
             return scanError;
         }
 
-        string? contentError = ValidateArtifactContents(filesByName, request, out images);
+        string? readError = ReadArtifactSnapshots(filesByName, out Dictionary<string, byte[]> artifactBytes);
+        if (readError is not null)
+        {
+            return readError;
+        }
+
+        string? contentError = ValidateArtifactContents(artifactBytes, request, out images);
         if (contentError is not null)
         {
             return contentError;
         }
 
-        return HashArtifacts(filesByName, out fileEntries);
+        fileEntries = HashArtifacts(artifactBytes);
+        return null;
     }
 
     private static bool ExistingSealedOutputPresent(string outputDirectory)
@@ -548,45 +554,69 @@ public static class ReleaseArtifactManifest
         return null;
     }
 
-    private static string? ValidateArtifactContents(
+    private static string? ReadArtifactSnapshots(
         Dictionary<string, string> filesByName,
+        out Dictionary<string, byte[]> artifactBytes)
+    {
+        artifactBytes = new Dictionary<string, byte[]>(RequiredArtifactFiles.Count, StringComparer.Ordinal);
+        try
+        {
+            foreach (string required in RequiredArtifactFiles)
+            {
+                string fullPath = filesByName[required];
+                var info = new FileInfo(fullPath);
+                if (info.Length <= 0 || info.Length > MaximumArtifactFileBytes)
+                {
+                    return Diagnostics.FileSizeInvalid;
+                }
+
+                byte[] bytes = File.ReadAllBytes(fullPath);
+                if (bytes.Length == 0 || bytes.LongLength > MaximumArtifactFileBytes)
+                {
+                    return Diagnostics.FileSizeInvalid;
+                }
+
+                artifactBytes[required] = bytes;
+            }
+
+            return null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return Diagnostics.DirectoryInvalid;
+        }
+    }
+
+    private static string? ValidateArtifactContents(
+        Dictionary<string, byte[]> artifactBytes,
         ReleaseArtifactSealRequest request,
         out IReadOnlyList<EnrichedImageReference>? images)
     {
         images = null;
 
-        foreach (string required in RequiredArtifactFiles)
-        {
-            var info = new FileInfo(filesByName[required]);
-            if (info.Length <= 0 || info.Length > MaximumArtifactFileBytes)
-            {
-                return Diagnostics.FileSizeInvalid;
-            }
-        }
-
-        ReleaseImageManifestLoadResult imageResult = ReleaseImageManifest.LoadFromFile(
-            filesByName[ReleaseImagesFileName],
+        ReleaseImageManifestLoadResult imageResult = ParseImageManifestBytes(
+            artifactBytes[ReleaseImagesFileName],
             request.Version,
-            expectedCommitOid: request.SourceCommitOid);
+            request.SourceCommitOid);
         if (!imageResult.IsValid || imageResult.Manifest is null)
         {
             return imageResult.Diagnostic ?? "image_manifest_invalid";
         }
 
-        string? notesError = ValidateNotesFile(filesByName[ReleaseNotesFileName]);
+        string? notesError = ValidateNotesBytes(artifactBytes[ReleaseNotesFileName]);
         if (notesError is not null)
         {
             return notesError;
         }
 
-        string? contextError = ValidateReleaseContextFile(filesByName[ReleaseContextFileName], request.Version);
+        string? contextError = ValidateReleaseContextBytes(artifactBytes[ReleaseContextFileName], request.Version);
         if (contextError is not null)
         {
             return contextError;
         }
 
-        if (!IsValidJsonFile(filesByName[ContractDiffFileName], JsonValueKind.Object) ||
-            !IsValidJsonFile(filesByName[RenderingContextFileName], JsonValueKind.Array))
+        if (!IsValidJsonBytes(artifactBytes[ContractDiffFileName], JsonValueKind.Object) ||
+            !IsValidJsonBytes(artifactBytes[RenderingContextFileName], JsonValueKind.Array))
         {
             return Diagnostics.JsonInvalid;
         }
@@ -595,11 +625,27 @@ public static class ReleaseArtifactManifest
         return null;
     }
 
-    private static string? ValidateNotesFile(string notesPath)
+    private static ReleaseImageManifestLoadResult ParseImageManifestBytes(
+        byte[] bytes,
+        string expectedVersion,
+        string expectedCommitOid)
     {
         try
         {
-            string markdown = StrictUtf8.GetString(File.ReadAllBytes(notesPath));
+            string json = StrictUtf8.GetString(bytes);
+            return ReleaseImageManifest.Parse(json, expectedVersion, expectedCommitOid: expectedCommitOid);
+        }
+        catch (DecoderFallbackException)
+        {
+            return new ReleaseImageManifestLoadResult(false, null, "image_manifest_invalid");
+        }
+    }
+
+    private static string? ValidateNotesBytes(byte[] notesBytes)
+    {
+        try
+        {
+            string markdown = StrictUtf8.GetString(notesBytes);
             ArtifactPolicyResult validation = ReleaseArtifactPolicy.ValidateRenderedReleaseNotes(markdown);
             if (!validation.IsValid)
             {
@@ -608,18 +654,17 @@ public static class ReleaseArtifactManifest
 
             return null;
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or DecoderFallbackException)
+        catch (DecoderFallbackException)
         {
             return "rendered_notes_invalid_unicode";
         }
     }
 
-    private static string? ValidateReleaseContextFile(string contextPath, string expectedVersion)
+    private static string? ValidateReleaseContextBytes(byte[] contextBytes, string expectedVersion)
     {
         try
         {
-            byte[] bytes = File.ReadAllBytes(contextPath);
-            string json = StrictUtf8.GetString(bytes);
+            string json = StrictUtf8.GetString(contextBytes);
             using JsonDocument doc = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 32 });
             JsonElement root = doc.RootElement;
             if (root.ValueKind != JsonValueKind.Object ||
@@ -634,48 +679,37 @@ public static class ReleaseArtifactManifest
 
             return null;
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or DecoderFallbackException)
+        catch (Exception exception) when (exception is JsonException or DecoderFallbackException)
         {
             return Diagnostics.ContextInvalid;
         }
     }
 
-    private static bool IsValidJsonFile(string filePath, JsonValueKind expectedKind)
+    private static bool IsValidJsonBytes(byte[] fileBytes, JsonValueKind expectedKind)
     {
         try
         {
-            string json = StrictUtf8.GetString(File.ReadAllBytes(filePath));
+            string json = StrictUtf8.GetString(fileBytes);
             using JsonDocument doc = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 32 });
             return doc.RootElement.ValueKind == expectedKind;
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or DecoderFallbackException)
+        catch (Exception exception) when (exception is JsonException or DecoderFallbackException)
         {
             return false;
         }
     }
 
-    private static string? HashArtifacts(
-        Dictionary<string, string> filesByName,
-        out SealedArtifactFileEntry[] fileEntries)
+    private static SealedArtifactFileEntry[] HashArtifacts(Dictionary<string, byte[]> artifactBytes)
     {
-        var entries = new List<SealedArtifactFileEntry>(RequiredArtifactFiles.Count);
-        try
-        {
-            foreach (string name in RequiredArtifactFiles)
+        return RequiredArtifactFiles
+            .Select(name =>
             {
-                byte[] bytes = File.ReadAllBytes(filesByName[name]);
+                byte[] bytes = artifactBytes[name];
                 string hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
-                entries.Add(new SealedArtifactFileEntry(name, hash, bytes.LongLength));
-            }
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            fileEntries = [];
-            return Diagnostics.DirectoryInvalid;
-        }
-
-        fileEntries = entries.OrderBy(entry => entry.RelativePath, StringComparer.Ordinal).ToArray();
-        return null;
+                return new SealedArtifactFileEntry(name, hash, bytes.LongLength);
+            })
+            .OrderBy(entry => entry.RelativePath, StringComparer.Ordinal)
+            .ToArray();
     }
 
     private static string? BuildCanonicalOutputs(

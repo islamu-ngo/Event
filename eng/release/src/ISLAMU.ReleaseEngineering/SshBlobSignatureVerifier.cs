@@ -24,7 +24,7 @@ public static class SshBlobSignatureVerifier
     private static readonly TimeSpan MaximumTimeout = TimeSpan.FromSeconds(30);
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
     private static readonly Regex NamespacePattern = new(
-        "^[a-z0-9][a-z0-9._-]{0,63}$",
+        "^[a-z0-9][a-z0-9._-]{0,63}\\z",
         RegexOptions.CultureInvariant,
         TimeSpan.FromMilliseconds(100));
 

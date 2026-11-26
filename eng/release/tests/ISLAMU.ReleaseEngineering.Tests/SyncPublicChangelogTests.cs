@@ -250,6 +250,7 @@ public sealed class SyncPublicChangelogTests
         await Assert.That(page).StartsWith("---\ndescription: \"Entries-only chronological release ledger for ISLAMU Event.\"\n---\n");
         await Assert.That(page).Contains(SampleHeading);
         await Assert.That(page).Contains($"Target commit: `{targetOid}`");
+        await Assert.That(page).Contains($"docs/internal/releases/{SampleVersion}/SHA256SUMS.sig");
         await Assert.That(page).Contains("ghcr.io/islamu-ngo/event-api@sha256:");
         await Assert.That(page).DoesNotContain($"blob/{targetOid}/docs/internal/releases/1.1.0/release-notes.md");
 

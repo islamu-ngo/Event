@@ -4,6 +4,7 @@ using Explore.API.Hosting;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.Hosting;
 using Explore.Blazor.Services;
+using Explore.Blazor.Services.Auth;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
@@ -30,6 +31,20 @@ public static class StandaloneHostApplicationExtensions
             schedulerPath);
 
         app.UseEffectiveHostAuthority();
+        app.Use(async (context, next) =>
+        {
+            try
+            {
+                await next(context);
+            }
+            catch (BffSessionAuthorityUnavailableException) when (!context.Response.HasStarted)
+            {
+                context.Response.Headers.CacheControl = "no-store";
+                await Results.Problem(
+                    title: "Browser session unavailable",
+                    statusCode: StatusCodes.Status503ServiceUnavailable).ExecuteAsync(context);
+            }
+        });
         var schemeInitializer = app.Services.GetRequiredService<DynamicAuthSchemeInitializer>();
         app.Use(async (context, next) =>
         {
@@ -40,6 +55,7 @@ public static class StandaloneHostApplicationExtensions
 
             await next(context);
         });
+        app.UsePublicStaticAssetAuthenticationBoundary();
         app.UseCombinedApiBridge();
         // Explicit top-level registration prevents automatic authorization from
         // running before the browser cookie has become a trusted API request.

@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
 using Explore.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -14,7 +15,32 @@ public static class HumanSettingsMutationPreparationServicesRegistration
     public static IServiceCollection AddHumanSettingsMutationPreparation(this IServiceCollection services)
     {
         services.TryAddScoped<IHumanSettingsMutationPreparation, HumanSettingsMutationPreparation>();
+        services.TryAddScoped<Explore.Application.Features.Announcements.AnnouncementEditionResolver>();
         services.TryAddScoped<IHumanTenantPreferencePreparation, HumanTenantPreferencePreparation>();
+        services.TryAddScoped<IHumanLearningMutationPreparation, HumanLearningMutationPreparation>();
+        services.TryAddScoped<ILearningGuidancePolicyReader, LearningGuidancePolicyReader>();
+        services.TryAddScoped<IHumanLearningPolicyMutationPreparation, HumanLearningPolicyMutationPreparation>();
+        services.TryAddScoped<IHumanLearningContextReader>(provider => new HumanLearningContextReader(
+            provider.GetRequiredService<Explore.Application.Contracts.Operations.IHumanCommitScopePreparation>(),
+            provider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
+            provider.GetRequiredService<Explore.Application.Authentication.IHumanAuthenticationLifetimeObserver>(),
+            provider.GetRequiredService<Explore.Application.Contracts.Identity.IMachinePrincipalAccessor>(),
+            provider.GetRequiredService<Explore.Application.Contracts.Infrastructure.ITenantContext>(),
+            provider.GetRequiredService<TimeProvider>(),
+            () => provider.GetRequiredService<IHumanOriginalCredentialCustody>(),
+            () => provider.GetRequiredService<IHumanPrincipalSourceFence>(),
+            () => provider.GetRequiredService<IHumanSupportAccessSourceFactory>(),
+            () => provider.GetRequiredService<IHumanEventAssignmentSourceFactory>(),
+            () => provider.GetRequiredService<IPolicySourceSetFence>(),
+            () => provider.GetRequiredService<ISerializableAttemptOwner>(),
+            () => provider.GetRequiredService<IHumanActionCommitFinalizer>(),
+            () => provider.GetRequiredService<ILearningRepository>(),
+            () => provider.GetRequiredService<IActorRepository>(),
+            () => provider.GetRequiredService<IAiActorContextRepository>(),
+            () => provider.GetRequiredService<ITenantAdministratorCommitAuthority>(),
+            () => provider.GetRequiredService<ILearningSourceRetention>(),
+            () => provider.GetRequiredService<Explore.Application.Contracts.Infrastructure.Ai.IAiProviderCapabilityResolver>(),
+            () => provider.GetRequiredService<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>()));
         return services;
     }
 }

@@ -4,6 +4,7 @@ using System.IdentityModel.Tokens.Jwt;
 using Event.Web.BffHosting.Authentication;
 using Event.Web.BffHosting.Security;
 using Explore.Blazor.Client.Clients;
+using Explore.Blazor.Services.Auth;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -267,6 +268,12 @@ public sealed class BffAdminClaimsTransformation
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
+            }
+            catch (Exception failure) when (failure is HttpRequestException
+                or OperationCanceledException or Polly.CircuitBreaker.BrokenCircuitException
+                || failure is ApiException { StatusCode: 429 or >= 500 })
+            {
+                throw new BffSessionAuthorityUnavailableException();
             }
             catch (Exception)
             {

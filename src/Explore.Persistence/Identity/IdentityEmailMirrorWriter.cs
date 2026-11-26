@@ -162,12 +162,7 @@ public sealed class IdentityEmailMirrorWriter(ExploreDbContext context, IUserRep
             RequireOriginalEntries();
 
             User user = account!.Entity;
-            if (replacementEmail is not null)
-                user.Email = replacementEmail;
-            if (emailVerified.HasValue)
-                user.EmailVerified = emailVerified;
-
-            await users.SaveIdentityProfileAsync(user, cancellationToken);
+            await users.SaveIdentityProfileAsync(user, replacementEmail, emailVerified, cancellationToken);
             RequireCurrent();
         }
 

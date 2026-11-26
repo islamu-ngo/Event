@@ -1,0 +1,55 @@
+Change-Id: CHG-01M68KW51NAQD03CASCJCKFEPN
+Title: "keep announcement dismissal in its current tenant and edition"
+Type: fix
+Scope: notifications
+Summary: "Replace ambiguous revision markers with server-issued material editions, atomic inheritance and tenant-qualified browser state with truthful save results."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Retired scalar publication fields and integer dismissal revisions are
+      replaced by coordinated source publications and opaque material editions.
+      Regenerate clients and explicitly republish legacy announcements; no
+      integer/hash backfill or browser-to-account history merge is performed.
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Publication and dismissal use acquired original settings owners and
+      source/marker expectations. Native import ownership cannot be supplied by
+      a public self-attesting factory. Generic writes and resets cannot replace
+      coordinated publications or erase the private account marker.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: >-
+      Existing settings/preference entities hold the new values. The approved
+      PostgreSQL migrator installs native storage contracts and first-owner RLS
+      policies without disabling protection or repairing later drift silently.
+      No legacy-row deletion or persisted-state backfill is included.
+  Configuration:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      Administrative edits and configuration imports use semantic coordinated
+      announcement changes. Exported artifacts do not carry reusable runtime
+      editions, source epochs or private dismissal evidence.
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: >-
+      Eight named source/publication/self-dismissal operations use strict
+      requests, private no-store HAL resources and typed receipts. Required
+      nullable expectations remain explicit in generated request serialization.
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      Content changes and explicit redisplay create new editions; visibility
+      changes retain them. A disabled tenant publication suppresses fallback,
+      while removing its override restores inheritance. Conflicts and uncertain
+      saves require fresh reads before another deliberate action.

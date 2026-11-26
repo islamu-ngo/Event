@@ -23,6 +23,9 @@
 
     protected override void OnInitialized()
     {
+        _languageContext = global::Explore.Blazor.Client.Models.LanguageContext.ForLanguage(
+            System.Globalization.CultureInfo.CurrentUICulture.Name);
+
         // Keep a single delegate reference so Dispose unsubscribes the exact same handler.
         // Async work is marshalled onto the render thread via InvokeAsync inside the shim itself.
         _languageChangedShim = code => _ = InvokeAsync(() => HandleLanguageChangedAsync(code));
@@ -44,6 +47,8 @@
 
         try
         {
+            var initialContext = _languageContext;
+
             // Try persisted state first (WASM picking up server prerender value)
             string? lang = null;
             if (PersistentState.TryTakeFromJson<string>(PersistenceKey, out var persisted) && !string.IsNullOrWhiteSpace(persisted))
@@ -63,6 +68,10 @@
                 lang, cookieDir ?? "auto");
 
             await TranslationService.PreloadAsync(lang);
+
+            // A language change replaces the context while initialization is awaiting.
+            if (!ReferenceEquals(initialContext, _languageContext))
+                return;
 
             _languageContext = global::Explore.Blazor.Client.Models.LanguageContext.ForLanguage(lang);
             _languageContext.DirectionOverride = cookieDir is "ltr" or "rtl" ? cookieDir : "auto";

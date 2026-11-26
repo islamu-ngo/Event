@@ -10,6 +10,7 @@ public static class SettingsDocumentKeys
         public const string Branding = "tenant.branding";
         public const string DirectoryOperatorIdentity = "tenant.directory_operator_identity";
         public const string EventDefaults = "tenant.event_defaults";
+        public const string LearningGuidance = "tenant.learning_guidance";
 
         public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -19,6 +20,7 @@ public static class SettingsDocumentKeys
             Branding,
             DirectoryOperatorIdentity,
             EventDefaults,
+            LearningGuidance,
         };
     }
 }

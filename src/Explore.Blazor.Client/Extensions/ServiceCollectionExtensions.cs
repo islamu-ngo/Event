@@ -13,6 +13,8 @@ using Explore.Blazor.Client.Contracts.Services.PaidEventPolicies;
 using Explore.Blazor.Client.Contracts.Services.Footer;
 using Explore.Blazor.Client.Contracts.Services.Lookup;
 using Explore.Blazor.Client.Contracts.Services.LegalDocuments;
+using Explore.Blazor.Client.Contracts.Services.Learning;
+using GuideFlow.Services;
 using Explore.Blazor.Client.Contracts.Services.Notifications;
 using Explore.Blazor.Client.Contracts.Services.Organizations;
 using Explore.Blazor.Client.Contracts.Services.Reporting;
@@ -32,6 +34,7 @@ using Explore.Blazor.Client.Services.EventSessionTemplateSync;
 using Explore.Blazor.Client.Services.EventTemplateSync;
 using Explore.Blazor.Client.Services.Http;
 using Explore.Blazor.Client.Services.Interop;
+using Explore.Blazor.Client.Services.Learning;
 using Explore.Blazor.Client.Contracts.Services.Scheduling;
 using Explore.Blazor.Client.Services.Lookup;
 using Explore.Blazor.Client.Services.Scheduling;
@@ -62,6 +65,20 @@ public static class ServiceCollectionExtensions
 
         // Domain services backed by specific NSwag per-tag clients
         services.AddScoped<IApiClientExecutor, ApiClientExecutor>();
+        services.AddScoped<ILearningClientService, LearningClientService>();
+        services.AddGuideFlow();
+        services.AddScoped<LearningTargetRegistry>();
+        services.AddScoped<ILearningTargetRegistry>(provider =>
+            provider.GetRequiredService<LearningTargetRegistry>());
+        services.AddScoped<GuideFlowLearningTourRenderer>();
+        services.AddScoped<ILearningTourHost>(provider =>
+            provider.GetRequiredService<GuideFlowLearningTourRenderer>());
+        services.AddScoped<ILearningTourRenderer>(provider =>
+            provider.GetRequiredService<GuideFlowLearningTourRenderer>());
+        services.AddScoped<LearningOnboardingCoordinator>();
+        services.AddScoped<ILearningOnboardingCoordinator>(provider =>
+            provider.GetRequiredService<LearningOnboardingCoordinator>());
+        services.AddScoped<IAnnouncementClientService, AnnouncementClientService>();
         services.AddScoped<AdmissionScannerCapabilityState>();
         services.AddScoped<IAdmissionScannerCapabilityState>(provider =>
             provider.GetRequiredService<AdmissionScannerCapabilityState>());
@@ -227,8 +244,7 @@ public static class ServiceCollectionExtensions
 
         // Localization
         services.AddScoped<ITranslationService, TranslationService>();
-        services.AddBffRefitClient<ILanguagePreferenceApi>(configureBffRefitClient)
-            .ConfigureBffRefitClient(configureBffRefitClientBuilder);
+        services.AddScoped<ILanguagePreferenceCookieInterop, LanguagePreferenceCookieInterop>();
         services.AddScoped<ILanguagePreferenceService, LanguagePreferenceService>();
         services.AddTransient<MudBlazor.MudLocalizer, MudBlazorLocalizer>();
 

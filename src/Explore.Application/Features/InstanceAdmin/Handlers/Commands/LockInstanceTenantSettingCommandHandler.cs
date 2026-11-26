@@ -34,6 +34,9 @@ public sealed class LockInstanceTenantSettingCommandHandler(
         LockInstanceTenantSettingCommand request,
         CancellationToken cancellationToken)
     {
+        if (AnnouncementSettingMutationGuard.Handles(request.Key))
+            return BaseCommandResponse.Validation<Guid>(
+                [AnnouncementSettingMutationGuard.FailureCode], AnnouncementSettingMutationGuard.FailureCode);
         await humanCommitScope.PrepareAsync(cancellationToken);
         Guid? actorUserId = currentUserService.UserId;
         if (actorUserId is null)

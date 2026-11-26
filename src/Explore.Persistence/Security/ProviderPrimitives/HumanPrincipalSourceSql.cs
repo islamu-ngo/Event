@@ -29,9 +29,9 @@ internal sealed class HumanPrincipalSourceSql(ExploreDbContext context, bool cur
         (typeof(Permission), ["Id", "MasterCode", "IsActive"]),
         (typeof(Tenant), ["Id", "TenantStatusId"]),
         (typeof(TenantStatus), ["Id", "IsActiveState"]),
-        (typeof(OrganizationTenant), ["Id", "TenantId", "OrganizationId", "IsDeleted", "ApprovalStatusId"]),
+        (typeof(OrganizationTenant), ["Id", "TenantId", "OrganizationId", "IsDeleted", "IsSuspended", "ApprovalStatusId"]),
         (typeof(Organization), ["Id", "IsDeleted"]),
-        (typeof(GroupTenant), ["Id", "TenantId", "GroupId", "IsDeleted", "ApprovalStatusId"]),
+        (typeof(GroupTenant), ["Id", "TenantId", "GroupId", "IsDeleted", "IsSuspended", "ApprovalStatusId"]),
         (typeof(Group), ["Id", "IsDeleted"])
     ];
 
@@ -231,7 +231,7 @@ internal sealed class HumanPrincipalSourceSql(ExploreDbContext context, bool cur
             SELECT {A(M("Id"), "Id")}, {A(M("TenantId"), "TenantId")}, {A(P("Id"), "PlacementId")},
                 {A(P(ownerKey), "OwnerId")}, {A(M("RoleId"), "RoleId")}, {A(M("IsDeleted"), "IsDeleted")},
                 {A(P("IsDeleted"), "PlacementIsDeleted")}, {A($"o.{Column(owner, "IsDeleted")}", "OwnerIsDeleted")},
-                {A(P("ApprovalStatusId"), "ApprovalStatusId")}
+                {A(P("ApprovalStatusId"), "ApprovalStatusId")}, {A(P("IsSuspended"), "PlacementIsSuspended")}
             FROM {Table(member)} m JOIN {Table(placement)} p ON {P("Id")} = {M(placementKey)} AND {P("TenantId")} = {M("TenantId")}
                 JOIN {Table(owner)} o ON o.{Column(owner, "Id")} = {P(ownerKey)}
             WHERE {M("UserId")} = @actor

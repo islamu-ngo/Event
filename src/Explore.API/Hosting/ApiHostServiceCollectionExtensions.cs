@@ -377,6 +377,8 @@ public static class ApiHostServiceCollectionExtensions
         builder.Services.AddSingleton<RecyclableMemoryStreamManager>();
 
         builder.Services.AddControllers()
+            // Controllers belong to the API, not runtime dependencies that may contain design-time types.
+            .ConfigureApplicationPartManager(parts => parts.ApplicationParts.Clear())
             .AddApplicationPart(typeof(ApiHostServiceCollectionExtensions).Assembly)
             .AddJsonOptions(options =>
             {
@@ -454,6 +456,7 @@ public static class ApiHostServiceCollectionExtensions
             options.AddSchemaTransformer<ExternalApiKeyIssuanceSchemaTransformer>();
             options.AddSchemaTransformer<ModerationIntentSchemaTransformer>();
             options.AddSchemaTransformer<LocalizationImportSchemaTransformer>();
+            options.AddSchemaTransformer<LearningRequestSchemaTransformer>();
             options.AddDocumentTransformer<QuotaExceededDetailsOpenApiTransformer>();
             options.AddDocumentTransformer<OpenApiStringEnumDocumentTransformer>();
             options.AddDocumentTransformer<ModerationIntentSchemaTransformer>();

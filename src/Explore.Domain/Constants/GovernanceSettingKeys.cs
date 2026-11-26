@@ -396,6 +396,11 @@ public static class GovernanceSettingKeys
         public const string LockMcpLegacySse = "governance.lock_tenant_mcp_legacy_sse";
     }
 
+    public static class LearningGuidance
+    {
+        public const string AllowTenantEdits = "learning.guidance.allow_tenant_edits";
+    }
+
     public static class Policies
     {
         public const string CommunityGuidelinesContent = "policies.community_guidelines_content";
@@ -461,11 +466,13 @@ public static class GovernanceSettingKeys
         public const string AnnouncementBarLinkText = "public_experience.announcement_bar.link_text";
         public const string AnnouncementBarLinkUrl = "public_experience.announcement_bar.link_url";
         public const string AnnouncementBarRevision = "public_experience.announcement_bar.revision";
+        public const string AnnouncementBarPublication = "public_experience.announcement_bar.publication";
     }
 
     public static class PublicExperiencePreferences
     {
         public const string AnnouncementBarDismissedRevision = "public_experience_preferences.announcement_bar.dismissed_revision";
+        public const string AnnouncementBarDismissedEdition = "public_experience_preferences.announcement_bar.dismissed_edition";
     }
 
     public static class HomeDiscoveryPreferences

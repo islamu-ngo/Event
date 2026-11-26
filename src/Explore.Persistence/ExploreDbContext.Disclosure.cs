@@ -71,7 +71,7 @@ public partial class ExploreDbContext
         return result;
     }
 
-    private static async Task<Exception?> ReleaseOwnedDisclosureGatesAsync(
+    internal static async Task<Exception?> ReleaseOwnedDisclosureGatesAsync(
         IAsyncDisposable? discovery, IAsyncDisposable? human, Exception? primary, bool settled)
     {
         List<Exception> cleanup = [];
@@ -97,6 +97,8 @@ public partial class ExploreDbContext
         }
         if (primary is HumanMutationOutcomeUnknownException)
             return cleanup.Count == 0 ? primary : new HumanMutationOutcomeUnknownException(failure!);
+        if (primary is TransactionCommittedCleanupException)
+            return cleanup.Count == 0 ? primary : new TransactionCommittedCleanupException(failure!);
         if (failure is not null && settled)
             return new InvalidOperationException("discovery_committed_gate_cleanup_failed", failure);
         return failure;

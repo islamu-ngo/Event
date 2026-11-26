@@ -1,0 +1,36 @@
+Change-Id: CHG-01M82KQXN8E6X392HAFNJP023J
+Title: "preserve SQLite relationships across merged rebuilds"
+Type: fix
+Scope: storage
+Summary: "Keep historical SQLite rebuild batches inside one foreign-key enforcement window and reject invalid relationships before startup completes."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: >-
+      Keep deferred SQLite table copies and merged-resource rebuild batches inside
+      one connection-local foreign-key-off window. Validate existing relationships
+      before the foreign-key-on command commits the batch. Invalid relationships
+      block startup; generated migrations and snapshots remain unchanged.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      Use normal startup migrations and selected-provider acceptance. Do not forge
+      migration history, replace migration with EnsureCreated, or serve a store
+      whose copied relationships fail integrity checks. Current development
+      acceptance does not certify retained-store upgrades or server providers.

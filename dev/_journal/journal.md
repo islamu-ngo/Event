@@ -3497,6 +3497,156 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 
 ---
 
+[2026-10-28 Europe/Brussels] — Wire namespaces can shadow the Domain Event type
+
+**Context**: While implementing the contextual-learning `add-cqrs-handler` and
+`openapi-contract-change` contracts, new immutable records were added to the
+`Event.Wire.Contracts` project.
+
+**Symptom / Observation**: A fresh Persistence integration-project build failed
+through existing Application mappings with `error RMG072: The source type Event?
+of the referenced mapping EventTitle does not match the expected type
+Explore.Domain.Event`. The affected mappings had not changed.
+
+**Root Cause**: The new files explicitly declared the root namespace
+`Event.Wire.Contracts.Learning`. A C# namespace rooted at `Event` shadows the
+existing unqualified Domain `Event` type throughout consumers. The project
+assembly name is not its namespace contract; its configured root is `ISLAMU`.
+
+**Resolution**: Use `ISLAMU.Wire.Contracts.Learning` in the six new wire files
+and their two consumers. Do not add aliases or rewrite unrelated mappers to
+compensate. Fresh `dotnet build tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-restore --verbosity quiet`
+then exited 0. The fresh Domain learning slice passed 27/27 and the SQLite
+storage slice passed 9/9. Application unit execution remains separately blocked
+by a reproduced pre-existing duplicate import, not by this namespace issue.
+
+**Why This Matters for Future Work**: Follow the actual native namespace
+convention when adding contracts to an existing assembly. A seemingly local
+namespace addition can produce misleading source-generator failures across
+otherwise unchanged Domain consumers.
+
+**References**:
+- `src/Event.Wire.Contracts/Event.Wire.Contracts.csproj:4`
+- `src/Event.Wire.Contracts/Learning/LearningContextDto.cs:5`
+- `src/Explore.Application/Features/Learning/LearningLessonCatalog.cs`
+- `src/Explore.Application/Mappings/EventMapper.Agenda.cs:28`
+- `docs/internal/CONTEXTUAL_LEARNING.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the existing project namespace convention suffices.
+
+---
+
+[2026-10-28 Europe/Brussels] — Register deferred human admission before dependent native reads
+
+**Context**: The closed learning writer acquired its original physical owner and
+then called its preparation's current-source validator. That validator also
+enumerated currently available actors through the existing native repository.
+
+**Symptom / Observation**: A fresh Release build succeeded and five private HTTP
+contract cases passed, but all nine valid operation cases returned 401. A bounded
+test-only FirstChance probe against those original compiled dependencies captured
+`UnauthorizedAccessException: A held original human admission is required.`
+The probe was removed after diagnosis.
+
+**Root Cause**: `AiActorContextRepository` requires registered original-human
+admission even for its private read. The learning store registered the deferred
+finalizer only after initial source validation and the effect. Physical owner
+selection alone does not satisfy this separate admission contract.
+
+**Resolution**: Register the real deferred completion/source/time callbacks
+immediately after binding the original physical owner, before initial
+`RequireCurrentAsync`. The callbacks still run against the completed persisted
+image and held current sources at the actual commit; they are not a no-op grant.
+The repaired fresh API run passed 6 contract, 9 operation and 7 final-admission
+cases, including whole rollback after saved-image, membership, credential,
+principal and save-inventory changes. Later actor/lifecycle/provider assurance
+has its own receipts and is not implied by those 22 cases.
+
+**Why This Matters for Future Work**: When composing a new closed human operation,
+check admission prerequisites on dependent reads as well as writes. Keep the
+native repository guard and correct the issuer's lifecycle order instead of
+loosening the guard or adding a temporary admission.
+
+**References**:
+- `src/Explore.Persistence/Security/HumanLearningMutationStore.cs`
+- `src/Explore.Persistence/Repositories/AiActorContextRepository.cs`
+- `src/Explore.Persistence/ExploreDbContext.HumanCommitAdmission.cs`
+- `tests/Event.API.IntegrationTests/Learning/LearningOperationTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; reuse the existing original-human admission contract.
+
+---
+
+[2026-10-28 Europe/Brussels] — Observe actual request-scope return before testing pooled human cleanup
+
+**Context**: A learning regression must reuse the actual context that held a
+refused original human write, not a different factory or a new context.
+
+**Symptom / Observation**: Renting immediately after the HTTP response returned a
+different object. The Local admission fixture normally uses an unpooled factory;
+even after opt-in pooling, the response did not prove request-scope disposal.
+
+**Resolution**: The test-only opt-in pool uses its actual factory. A scoped
+observer is resolved before the context, so reverse disposal signals after the
+context returns. It records the captured `DbContextId` as well as object identity,
+avoiding a signal from an older use of the same pooled object. An idle slot is
+held while the intercepted original write settles, making the tested original
+return/re-rental deterministic without sleeps or polling.
+
+**Evidence**: `RefusedOriginalWriteReturnsACleanReusedTenantPoolLease` passed
+against fresh compiled test source. It verifies the same object/new lease, no
+transaction, tracked rows, original human admission or audit subject, no
+cross-tenant access to a positively seeded private root, and a successful next
+authorized write.
+
+**Why This Matters for Future Work**: HTTP completion is not a context-lifetime
+signal. Subscribe to actual scope disposal before the request, then test the
+security state of the proven reused original lease.
+
+**References**:
+- `tests/Event.API.IntegrationTests/Learning/LearningRaceTests.cs`
+- `tests/Event.API.IntegrationTests/Fixtures/LocalAdmissionWebApplicationFactory.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; this is a bounded test-fixture lifetime pattern.
+
+---
+
+[2026-10-28 Europe/Brussels] — Enroll fixed Global storage rights without weakening native policy attestation
+
+**Context**: The protected PostgreSQL subject-erasure login needs to delete
+private learning roots across tenants while retaining no practice-detail or
+insert authority.
+
+**Observation**: The declared Global login is `NOINHERIT`; granting its purpose
+role root-table rights alone did not authorize the real C# purge. Granting the
+declared login fixed SELECT/DELETE rights and a purpose-membership RLS policy
+then correctly triggered the existing exact policy-readiness guard.
+
+**Resolution**: Keep the direct login rights limited to the learner root. Target
+the policy only at that declared login, require its existing erasure-purpose
+membership and reject inserts with `WITH CHECK(false)`. Extend readiness by an
+exact recognized component: login, schema, relation, policy name, command,
+permissive mode, singleton role and canonical PostgreSQL expressions. Do not
+allow every policy with a familiar name or bypass readiness.
+
+**Evidence**: The actual Runtime/Global role slice passed all three cases,
+including retained-fact cross-tenant purge and denied child-detail/insert
+authority. PostgreSQL supplied the canonical expression through a rolled-back
+temporary probe; the expected deparse was not guessed.
+
+**References**:
+- `src/Explore.Persistence/Schema/ProviderPrimitives/PostgresLearningPermissions.cs`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresTenantRuntimeReadiness.cs`
+- `tests/Event.Persistence.IntegrationTests/Learning/LearningPostgresPermissionsTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; this preserves the existing native purpose boundary.
+
+---
+
 [2026-10-28 Europe/Brussels] — Managed launch calibration needs an absolute DLL entry
 
 **Context**: While resuming PR79's testing-assurance modernization, a host-free process-custody regression inspected its own native launch inputs before exercising identity replacement.
@@ -3517,6 +3667,94 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 **Promotion Consideration**:
 - [x] Stays in journal only; bounded launch-calibration lesson, not a new general test-runner policy.
 
+---
+
+[2026-10-30 Europe/Brussels] — Diagnose login reads under their actual database purpose
+
+**Context**: Contextual onboarding needed genuine original-human PostgreSQL
+source admission. An explicit external privacy-authority test profile passed
+host composition but failed real Local login before learning assertions.
+
+**Symptom / Observation**: The targeted Persistence Release build succeeded.
+The single `OriginalRuntimeHumanRetainsSourcesWithDedicatedExternalAuthority`
+case failed during login with HTTP503 and Npgsql SQLSTATE42501. A bounded,
+test-only EF command-error observer identified the actual command connection
+as `LocalIdentityWriter` and confirmed that its generated SELECT requested
+`DeclaredBirthDate`, `BirthDateCollectionReceiptId` and `BirthDateRevision`.
+Only fixed purpose/property labels and booleans were reported; no SQL,
+parameters, credentials or exception messages were retained by that observer.
+
+**Root Cause**: `IdentityAccountResolver.ResolveAsync` calls generic
+`UserRepository.GetById`, whose `Include(user => user.Pii)` loads the full PII
+entity. `LocalIdentityWriterInventory` deliberately permits SELECT of only
+UserId, Email, FirstName and LastName on UserPii, excluding the three private
+birth fields. The actual failed query and the declared purpose therefore
+disagree. The synchronization handler catches the exception and returns a
+controlled failure, so middleware exception observation alone missed it.
+
+**Resolution**: Unresolved and quarantined from the learning packet. Separate
+identity-lookup correction scope was requested; no production repository,
+authorization, authentication or grant was changed. The recommended correction
+is an identity-purpose read consistent with its admitted data, not expanded
+birth-data access. The new external-profile case was not executed against an
+untouched baseline; this is not an invented baseline reproduction or a learning
+invariant Red result.
+
+**Why This Matters for Future Work**: Establish the physical command's purpose
+and requested fields before changing a fixture or widening permissions. An
+independent authority topology does not change the login's identity purpose,
+and a caught login failure can prevent every downstream feature assertion.
+Keep these setup failures separate from feature test results.
+
+**References**:
+- `src/Explore.Persistence/Repositories/UserRepository.cs:16`
+- `src/Explore.Application/Services/IdentityAccountResolver.cs`
+- `src/Explore.Persistence/Identity/LocalIdentityWriterInventory.cs`
+- `src/Explore.Application/Features/Users/Handlers/Commands/SyncUserCommandHandler.cs`
+- `tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.cs`
+- `dev/active/contextual-tenant-onboarding/contextual-tenant-onboarding-context.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the correction and its regression proof remain open.
+
+[2026-11-01 Europe/Brussels] — Shared privacy transactions have a different commit observer
+
+**Context**: While repairing SQLite Studio and initial draft creation during
+contextual onboarding, a real HTTP draft-save test needed to inject connector
+loss immediately after the physical commit without substituting authority.
+
+**Symptom / Observation**: Draft creation succeeded while the event-context
+commit interceptor observed zero commits. Matching EF diagnostic commit events
+to the event-writing `ExploreDbContext` also missed the commit. Matching the
+physical transaction reproduced a lost-outcome classification after a real save.
+
+**Root Cause**: Co-located privacy enrollment starts the transaction on
+`EmbeddedPrivacyErasureAuthorityDbContext` and enlists `ExploreDbContext` into
+that transaction. The authority context commits it. Consequently, the context
+that writes the event differs from the context in the commit diagnostic, even
+though both use the same physical `DbTransaction`. Separately constructed tenant
+factories also bypass interceptor options applied to the ordinary DI context.
+
+**Resolution**: The HTTP test captures the physical transaction from the exact
+fixture-owned draft write and matches that reference at commit. Initial event
+creation now acquires source/discovery custody before its transaction and retains
+original transport plus reconciliation evidence when custody is lost. The real
+commit-loss case proves explicit outcome classification and exactly one stored
+event. The complete native HTTP slice passed five cases with:
+`dotnet run --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/LocalEventManagementHttpTests/*" --minimum-expected-tests 5 --progress off --maximum-parallel-tests 1`.
+
+**Why This Matters for Future Work**: Identify the physical transaction owner
+before injecting commit failures. A test whose injector never fires is setup
+evidence, not a passing failure-path test. Lost original custody must not silently
+authorize a new connector or replay a possibly committed operation.
+
+**References**:
+- `src/Explore.Persistence/Privacy/ErasureAuthority/Repositories/EmbeddedPrivacyErasureAuthorityRepository.IdentityFence.cs:98`
+- `src/Explore.Persistence/Services/EventRoleAssignmentMutationBoundary.InitialCreation.cs`
+- `tests/Event.API.IntegrationTests/Features/LocalEventManagementHttpTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; reusable fault-injection lesson, no new authority policy.
 ---
 
 [2026-11-06 Europe/Brussels] — Tenant scalar commands need explicit native owner selection
@@ -3646,3 +3884,46 @@ that the entire registered security lane or product runtime passed.
 
 **Promotion Consideration**:
 - [x] Stays in journal; the delivered API cleanup boundary is documented in TESTING.md.
+
+[2026-11-23 Europe/Brussels] — Bind ownership before opening scoped refresh consumers
+
+**Context**: While reconciling contextual guidance after actor changes and private
+learning invalidation, the real scoped facade correctly rejected stale responses
+but the mounted shell did not consistently request replacement state.
+
+**Symptom / Observation**: A delayed former-actor read left guidance unavailable
+for the replacement actor. Adding the missing refresh consumer then exposed a
+second defect: initial loading could issue three reads where only the original
+and replacement requests were expected.
+
+**Root Cause**: `MainLayout` originally loaded private learning only during its
+first render. The facade could later invalidate its owner and publish
+`RequiresContextRefresh`, but nothing consumed that signal. Opening the new
+consumer before tenant binding was complete allowed synchronous ownership
+notifications to reenter loading during shell hydration.
+
+**Resolution**: Bind the tenant before dock hydration opens the consumer, then
+consume the facade signal after preference and dock hydration. The facade
+consumes its signal before transport, so failed reads remain consumed across
+ordinary renders and navigation until another explicit invalidation. The complete
+mounted layout class passed 40/40 with
+`dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --no-build --verbosity quiet -- --treenode-filter '/*/*/*MainLayoutTests/*' --maximum-parallel-tests 2`.
+Both adjacent mounted Help cases passed using the existing real facade with
+`dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --no-build --verbosity quiet -- --treenode-filter '/*/*/*LearningContextHelpTests/ActualMainLayout_ForwardsServerScopesAndLoadsTheInteractiveLearner*' --maximum-parallel-tests 2`.
+No automatic retry, duplicate actor cache or production renderer workaround was
+introduced.
+
+**Why This Matters for Future Work**: Rejecting stale work does not itself make a
+replacement owner live. A scoped invalidation signal needs a consumer, and that
+consumer must remain closed until ownership inputs are bound. Treat notifications
+as potentially synchronous; an awaited initializer does not prevent reentrancy.
+
+**References**:
+- `src/Explore.Blazor.Client/Layout/MainLayout.razor.cs`
+- `src/Explore.Blazor.Client/Services/Learning/LearningClientService.cs`
+- `tests/Explore.Blazor.Client.Tests/Layout/MainLayoutTests.cs`
+- `tests/Explore.Blazor.Client.Tests/Learning/LearningContextHelpTests.cs`
+- `docs/internal/CONTEXTUAL_LEARNING.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal; the feature's refresh lifecycle is documented in CONTEXTUAL_LEARNING.md.

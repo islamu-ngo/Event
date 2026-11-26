@@ -225,11 +225,11 @@
 
 
 
-            @if (_eventsLoaded && _recoveryCode is null && _pagedEvents.Count == 0 && _traversal?.Truncated != true)
+            @if (HasCompletedSearch && _pagedEvents.Count == 0)
 
             {
 
-                <div class="d-flex flex-column align-center justify-center py-16">
+                <div class="d-flex flex-column align-center justify-center py-16" data-discovery-state="@EmptyStateKind">
 
                     <MudIcon Icon="@Icons.Material.Filled.EventBusy" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
 
@@ -241,8 +241,26 @@
 
                     </MudText>
 
+                    @if (EmptyStateView is TemporalView.UpcomingAndOngoing or TemporalView.Upcoming or TemporalView.Ongoing)
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-4"
+                                   data-discovery-action="past"
+                                   OnClick="@(() => ChangeTemporalViewAsync(TemporalView.Past))">
+                            @T("ui.discovery.empty.show_past", "Explore past events")
+                        </MudButton>
+                    }
+
                 </div>
 
+            }
+
+            @if (HasCompletedSearch && EmptyStateView == TemporalView.Past)
+            {
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                           data-discovery-action="upcoming"
+                           OnClick="@(() => ChangeTemporalViewAsync(TemporalView.UpcomingAndOngoing))">
+                    @T("ui.discovery.empty.show_upcoming", "Return to upcoming and ongoing events")
+                </MudButton>
             }
 
 

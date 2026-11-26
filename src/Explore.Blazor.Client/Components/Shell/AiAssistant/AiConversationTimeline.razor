@@ -27,6 +27,9 @@
                 {
                     <AiProposedActionCard @key="item.Key"
                                           Action="item.Action"
+                                          Mode="Mode"
+                                          Presentation="@(ActionPresentation?.Invoke(item.Action))"
+                                          OnOpenResult="OnOpenResult"
                                           IsBusy="@IsBusy(item.Action.Id)"
                                           ActionsEnabled="ActionsEnabled"
                                           OnConfirm="OnConfirm"
@@ -46,6 +49,10 @@
 @code {
     [Parameter, EditorRequired]
     public HalResourceOfAiConversationDto? Conversation { get; set; }
+
+    [Parameter] public AiPresentationMode Mode { get; set; }
+    [Parameter] public Func<ProposedActions2, AiActionPresentation?>? ActionPresentation { get; set; }
+    [Parameter] public EventCallback<AiActionResultPresentation> OnOpenResult { get; set; }
 
     [Parameter]
     public Func<Guid?, bool>? IsActionBusy { get; set; }

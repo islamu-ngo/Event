@@ -2,9 +2,12 @@ using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.Shell;
+using Explore.Blazor.Client.Contracts.Services.Learning;
+using Explore.Blazor.Client.Pages.Studio;
 using Explore.Blazor.Client.Services;
 using Explore.Blazor.Client.Services.Docking;
 using Explore.Blazor.Client.Services.Shell;
+using Explore.Blazor.Client.Services.Learning;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Rendering;
@@ -42,6 +45,151 @@ public partial class MainLayout : LayoutComponentBase, IDisposable
     private CancellationTokenSource? _shellSelectionAutosaveCts;
     private UiShellContextDto? _shellContext;
     private bool _shellPreferencesHydrated;
+    private readonly CancellationTokenSource _tourLifetime = new();
+    private readonly HashSet<IDialogReference> _tourDialogs = [];
+    private ElementReference _tourNavigation;
+    private ElementReference _tourWorkspaces;
+    private ElementReference _tourHelp;
+    private long _tourLocationGeneration;
+    private bool _tourContentInteraction;
+    private string? _tourEditedPath;
+    private bool _tourDisposed;
+
+    [Inject] protected ILearningClientService Learning { get; set; } = null!;
+    [Inject] protected ILearningTargetRegistry TourTargets { get; set; } = null!;
+    [Inject] protected ILearningOnboardingCoordinator TourCoordinator { get; set; } = null!;
+    [Inject] protected StudioEventContextState StudioEventContext { get; set; } = null!;
+    [Inject] protected IDialogService TourDialogService { get; set; } = null!;
+
+    private LearningPresentationContext? TourPresentation
+    {
+        get
+        {
+            if (_hideChrome || IsAuthenticationEntryRoute
+                || Learning.Scope is not { } scope || Learning.Context is not { } context
+                || context.TenantId != scope.TenantId || context.UserId != scope.UserId
+                || context.ContextKey != scope.ContextKey)
+                return null;
+
+            var segments = NavigationManager.ToBaseRelativePath(NavigationManager.Uri)
+                .Split('?', '#')[0].Split('/', StringSplitOptions.RemoveEmptyEntries);
+            Guid? eventId = segments.Length >= 3
+                && segments[0].Equals("studio", StringComparison.OrdinalIgnoreCase)
+                && segments[1].Equals("events", StringComparison.OrdinalIgnoreCase)
+                && Guid.TryParse(segments[2], out var selectedEventId)
+                    ? selectedEventId : null;
+            var family = AiAssistantState.IsAvailable && (IsAiWorkspace || AiAssistantState.IsOpen)
+                ? LearningTourFamily.NormalAi
+                : eventId.HasValue ? LearningTourFamily.EventManagement
+                : segments.FirstOrDefault()?.Equals("studio", StringComparison.OrdinalIgnoreCase) == true
+                    ? LearningTourFamily.Studio
+                : segments.FirstOrDefault()?.Equals("ai", StringComparison.OrdinalIgnoreCase) == true
+                    ? LearningTourFamily.NormalAi
+                : LearningTourFamily.Shell;
+            var generation = $"{_tourLocationGeneration}:{scope.TenantId:N}:{scope.UserId:N}:{scope.ContextKey}"
+                + $":{UiShellState.ActiveActorId}:{StudioEventContext.Generation}";
+            return new(family, generation,
+                family == LearningTourFamily.EventManagement ? eventId : null);
+        }
+    }
+
+    private void PublishTourLayout()
+    {
+        if (_tourDisposed || TourPresentation is not { } presentation)
+        {
+            TourTargets.Remove(this);
+            return;
+        }
+
+        var blocked = _tourContentInteraction || _tourDialogs.Count > 0
+            || Learning.IsBusy || Learning.IsSaving || Learning.RequiresContextRefresh
+            || presentation.Family is LearningTourFamily.Studio or LearningTourFamily.EventManagement
+                && DockLayoutState.GetPanel(ShellDockPanels.WorkspaceNavId)?.State.IsOpen != true
+            || presentation.Family == LearningTourFamily.Studio
+                && !GetCurrentRoute().Split('?', '#')[0].TrimEnd('/')
+                    .Equals("/studio/events", StringComparison.OrdinalIgnoreCase)
+            || presentation.EventId is Guid eventId
+                && (StudioEventContext.EventId != eventId || StudioEventContext.Event is null
+                    || StudioEventContext.IsLoading);
+        if (presentation.Family != LearningTourFamily.Shell && !blocked)
+        {
+            TourTargets.Remove(this);
+            return;
+        }
+        var targets = new List<LearningTarget>();
+        if (presentation.Family == LearningTourFamily.Shell && !_hideChrome)
+        {
+            if (!string.IsNullOrWhiteSpace(_tourNavigation.Id))
+                targets.Add(new("shell.navigation", "learning-shell-navigation", _tourNavigation));
+            if (_shellContext?.Workspaces?.Studio == true && !string.IsNullOrWhiteSpace(_tourWorkspaces.Id))
+                targets.Add(new("shell.studio", "learning-shell-workspaces", _tourWorkspaces));
+            if (!string.IsNullOrWhiteSpace(_tourHelp.Id))
+                targets.Add(new("shell.help", "learning-shell-help", _tourHelp));
+        }
+        TourTargets.Publish(this, presentation with { Family = LearningTourFamily.Shell, EventId = null },
+            blocked, targets.ToArray());
+    }
+
+    private void SuspendTourForContentInteraction()
+    {
+        // No child editor exposes a common saved/clean receipt. Remain suspended
+        // until navigation rather than guessing that an edit or save is complete.
+        _tourContentInteraction = true;
+        _tourEditedPath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('?', '#')[0];
+        PublishTourLayout();
+    }
+
+    private bool CanReplayGuidance => !_tourDisposed && TourPresentation is not null
+        && Learning.Context?._links?.ContainsKey("tour-plan") == true
+        && !Learning.IsBusy && !Learning.IsSaving && !Learning.RequiresContextRefresh
+        && !_tourContentInteraction && _tourDialogs.Count == 0 && !TourCoordinator.IsBusy;
+
+    private async Task ReplayGuidanceAsync()
+    {
+        if (!CanReplayGuidance || TourTargets.IsBlocked)
+            return;
+        var scope = Learning.Scope;
+        var presentation = TourTargets.Current;
+        if (presentation is null)
+            return;
+        await TourCoordinator.OfferAsync();
+        if (!_tourDisposed && scope == Learning.Scope && presentation == TourTargets.Current
+            && TourCoordinator.CanStart)
+            await TourCoordinator.StartAsync();
+    }
+
+    private void OnTourContextChanged()
+    {
+        if (_tourDisposed) return;
+        _ = InvokeAsync(() =>
+        {
+            if (_tourDisposed) return;
+            PublishTourLayout();
+            StateHasChanged();
+        });
+    }
+
+    private Task OnTourDialogAddedAsync(IDialogReference dialog)
+    {
+        if (_tourDisposed) return Task.CompletedTask;
+        _tourDialogs.Add(dialog);
+        PublishTourLayout();
+        _ = ObserveTourDialogAsync(dialog);
+        return Task.CompletedTask;
+    }
+
+    private async Task ObserveTourDialogAsync(IDialogReference dialog)
+    {
+        await dialog.Result;
+        if (_tourDisposed) return;
+        await InvokeAsync(() =>
+        {
+            if (_tourDisposed) return;
+            _tourDialogs.Remove(dialog);
+            PublishTourLayout();
+            StateHasChanged();
+        });
+    }
 
     [Inject]
     protected IUserService UserService { get; set; } = null!;
@@ -130,6 +278,9 @@ public partial class MainLayout : LayoutComponentBase, IDisposable
         RegisterShellDockPanels();
 
         NavigationManager.LocationChanged += OnLocationChanged;
+        Learning.Changed += OnTourContextChanged;
+        StudioEventContext.Changed += OnTourContextChanged;
+        TourDialogService.DialogInstanceAddedAsync += OnTourDialogAddedAsync;
         MainContentAppearanceState.Changed += OnMainContentAppearanceChanged;
         AiAssistantState.OnChange += OnAiAssistantStateChanged;
         TenantNavLinksState.OnChange += OnTenantNavLinksChanged;
@@ -175,7 +326,11 @@ public partial class MainLayout : LayoutComponentBase, IDisposable
             }
 
             await HydrateShellPreferencesAsync();
+            if (_shellContext?.TenantId is { } learningTenantId && learningTenantId != Guid.Empty)
+                Learning.SetTenantContext(learningTenantId);
             await HydrateShellDockLayoutAsync();
+            if (isAuthenticated)
+                await LoadLearningContextIfRequiredAsync();
 
             try
             {
@@ -240,6 +395,22 @@ public partial class MainLayout : LayoutComponentBase, IDisposable
 
             _isInitialized = true;
         }
+        else
+        {
+            await LoadLearningContextIfRequiredAsync();
+        }
+        PublishTourLayout();
+    }
+
+    private async Task LoadLearningContextIfRequiredAsync()
+    {
+        if (_tourDisposed || !_shellPreferencesHydrated || !_shellDockLayoutHydrated
+            || !Learning.RequiresContextRefresh || Learning.IsBusy
+            || _hideChrome || IsAuthenticationEntryRoute
+            || _shellContext?.TenantId is not { } tenantId || tenantId == Guid.Empty)
+            return;
+
+        await Learning.LoadContextAsync(_tourLifetime.Token);
     }
 
     private async Task DarkModeToggle()
@@ -265,10 +436,19 @@ public partial class MainLayout : LayoutComponentBase, IDisposable
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
+        ++_tourLocationGeneration;
+        var path = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('?', '#')[0];
+        if (!string.Equals(path, _tourEditedPath, StringComparison.OrdinalIgnoreCase))
+        {
+            _tourContentInteraction = false;
+            _tourEditedPath = null;
+        }
+        TourTargets.Remove(this);
         UpdateChromeVisibility();
         SyncWorkspaceNavigationPanel();
         _ = InvokeAsync(async () =>
         {
+            await TourCoordinator.CancelAsync();
             StateHasChanged();
             await AccessibilityFocusService.FocusOnNavigateAsync();
         });
@@ -811,6 +991,13 @@ public partial class MainLayout : LayoutComponentBase, IDisposable
 
     public void Dispose()
     {
+        _tourDisposed = true;
+        _tourLifetime.Cancel();
+        _tourLifetime.Dispose();
+        Learning.Changed -= OnTourContextChanged;
+        StudioEventContext.Changed -= OnTourContextChanged;
+        TourDialogService.DialogInstanceAddedAsync -= OnTourDialogAddedAsync;
+        TourTargets.Remove(this);
         _shellDockLayoutAutosaveCts?.Cancel();
         _shellDockLayoutAutosaveCts?.Dispose();
         _shellSelectionAutosaveCts?.Cancel();

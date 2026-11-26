@@ -15,7 +15,8 @@ public static partial class PostgresOrdinarySettingsContract
         var sql = new HumanPrincipalSourceSql(context);
         return new(sql.Schema, Roles,
             Routines.Select(routine => new PostgresPrivilegeGuard.Routine(Prefix + routine.Name, routine.Signature,
-                OwnerRole, routine.Result == "trigger" ? [OwnerRole] : [RuntimeRole, GlobalRole])).ToArray(),
+                OwnerRole, routine.Result == "trigger" ? [OwnerRole]
+                    : routine.Name == "learning_retain" ? [RuntimeRole] : [RuntimeRole, GlobalRole])).ToArray(),
             [
                 .. Sources.Select(type => new PostgresPrivilegeGuard.Relation(context.Model.FindEntityType(type)!.GetTableName()!,
                     OwnerRole, type == typeof(SystemSetting) ? ["UPDATE"] : ["UPDATE", "DELETE"],

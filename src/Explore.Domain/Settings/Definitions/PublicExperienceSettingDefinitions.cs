@@ -54,42 +54,24 @@ public static class PublicExperienceSettingDefinitions
         defaultValue: "{\"schemaVersion\":1,\"areas\":[]}",
         description: "Versioned public discovery-area configuration with stable IDs and coarse centroids");
 
-    public static readonly SettingDefinition AnnouncementBarEnabled = PublicExperienceDefinition(
-        key: GovernanceSettingKeys.PublicExperience.AnnouncementBarEnabled,
-        valueType: SettingValueType.Boolean,
-        defaultValue: "false",
-        description: "Controls whether the tenant announcement bar is displayed above public navigation");
+    public static readonly SettingDefinition AnnouncementBarPublication = new(
+        Key: GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication,
+        ValueType: SettingValueType.Json,
+        DefaultValue: "null",
+        Category: "PublicExperience",
+        Description: "Complete owner announcement publication, changed only through its typed original",
+        MinScope: SettingScope.Instance,
+        MaxScope: SettingScope.Tenant)
+    {
+        RequiresCoordinatedMutation = true
+    };
 
-    public static readonly SettingDefinition AnnouncementBarMessage = PublicExperienceDefinition(
-        key: GovernanceSettingKeys.PublicExperience.AnnouncementBarMessage,
-        valueType: SettingValueType.String,
-        defaultValue: "\"\"",
-        description: "Tenant announcement bar message text");
-
-    public static readonly SettingDefinition AnnouncementBarLinkText = PublicExperienceDefinition(
-        key: GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkText,
-        valueType: SettingValueType.String,
-        defaultValue: "\"\"",
-        description: "Optional tenant announcement bar link label");
-
-    public static readonly SettingDefinition AnnouncementBarLinkUrl = PublicExperienceDefinition(
-        key: GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkUrl,
-        valueType: SettingValueType.String,
-        defaultValue: "\"\"",
-        description: "Optional tenant announcement bar link URL");
-
-    public static readonly SettingDefinition AnnouncementBarRevision = PublicExperienceDefinition(
-        key: GovernanceSettingKeys.PublicExperience.AnnouncementBarRevision,
-        valueType: SettingValueType.Integer,
-        defaultValue: "0",
-        description: "Tenant announcement bar revision used to reset user dismissals");
-
-    public static readonly SettingDefinition AnnouncementBarDismissedRevision = new(
-        Key: GovernanceSettingKeys.PublicExperiencePreferences.AnnouncementBarDismissedRevision,
-        ValueType: SettingValueType.Integer,
-        DefaultValue: "-1",
+    public static readonly SettingDefinition AnnouncementBarDismissedEdition = new(
+        Key: GovernanceSettingKeys.PublicExperiencePreferences.AnnouncementBarDismissedEdition,
+        ValueType: SettingValueType.Json,
+        DefaultValue: "null",
         Category: "PublicExperiencePreferences",
-        Description: "Latest announcement bar revision dismissed by the current user",
+        Description: "Current user's source-bound announcement dismissal, changed only through typed dismissal",
         MinScope: SettingScope.User,
         MaxScope: SettingScope.User,
         IsLockable: false);
@@ -125,12 +107,8 @@ public static class PublicExperienceSettingDefinitions
         Ctas,
         EventSectionPresets,
         DiscoveryAreas,
-        AnnouncementBarEnabled,
-        AnnouncementBarMessage,
-        AnnouncementBarLinkText,
-        AnnouncementBarLinkUrl,
-        AnnouncementBarRevision,
-        AnnouncementBarDismissedRevision,
+        AnnouncementBarPublication,
+        AnnouncementBarDismissedEdition,
         HomeDiscoveryAreaId,
         HomeDiscoveryMode
     ];

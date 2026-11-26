@@ -481,9 +481,13 @@ internal static class ConfigurableSchemaMigrationOperations
         IReadOnlyList<MigrationOperation> operations,
         MigrationsSqlGeneratorDependencies dependencies)
     {
-        // An integer-only preflight guard has no dependents; rejection must precede FK-state changes.
-        if (!operations.Any(operation => operation is DropTableOperation drop
-            && drop[RegistrationProviderPublicationTransfer.GuardDropAnnotation] is not true))
+        // Deferred rebuilds copy into their final FK shape before SQLite emits its own
+        // drop/rename pragmas. The principal's new alternate key may not exist yet.
+        // Keep all copies and both merged-history batches in one FK-off window.
+        // An integer-only preflight guard still runs before this window.
+        if (!commands.Any(IsSqliteForeignKeyPragma)
+            && !operations.Any(operation => operation is DropTableOperation drop
+                && drop[RegistrationProviderPublicationTransfer.GuardDropAnnotation] is not true))
         {
             return commands;
         }
@@ -494,11 +498,38 @@ internal static class ConfigurableSchemaMigrationOperations
                 "PRAGMA foreign_keys = OFF;",
                 dependencies)
         };
-        wrapped.AddRange(commands);
+        wrapped.AddRange(commands.Where(command => !IsSqliteForeignKeyPragma(command)));
+        // Re-enabling enforcement does not validate existing rows. Reject invalid
+        // copied relationships before the suppressed ON command commits this batch.
+        var integrityCheck = dependencies.CommandBuilderFactory.Create()
+            .Append("""
+                CREATE TEMP TABLE "__islamu_migration_fk_guard" (
+                    "violation" INTEGER NOT NULL,
+                    CONSTRAINT "ck_islamu_migration_foreign_keys" CHECK ("violation" = 0));
+                INSERT INTO "__islamu_migration_fk_guard" ("violation")
+                SELECT 1 WHERE EXISTS (SELECT 1 FROM pragma_foreign_key_check);
+                DROP TABLE "__islamu_migration_fk_guard";
+                """)
+            .AppendLine()
+            .Build();
+        wrapped.Add(new MigrationCommand(
+            integrityCheck,
+            dependencies.CurrentContext.Context,
+            dependencies.Logger,
+            transactionSuppressed: false));
         wrapped.Add(CreateSqlitePragmaCommand(
             "PRAGMA foreign_keys = ON;",
             dependencies));
         return wrapped;
+    }
+
+    private static bool IsSqliteForeignKeyPragma(MigrationCommand command)
+    {
+        string sql = command.CommandText.Trim();
+        return sql.Equals("PRAGMA foreign_keys = 0;", StringComparison.OrdinalIgnoreCase)
+            || sql.Equals("PRAGMA foreign_keys = 1;", StringComparison.OrdinalIgnoreCase)
+            || sql.Equals("PRAGMA foreign_keys = OFF;", StringComparison.OrdinalIgnoreCase)
+            || sql.Equals("PRAGMA foreign_keys = ON;", StringComparison.OrdinalIgnoreCase);
     }
 
     private static MigrationCommand CreateSqlitePragmaCommand(

@@ -228,6 +228,10 @@ public sealed class TokenCircuitHandler : CircuitHandler, IDisposable
                 RevokeCircuit();
                 return;
             }
+            catch (BffSessionAuthorityUnavailableException)
+            {
+                return;
+            }
         }
 
         if (Volatile.Read(ref _revoked) != 0 || _lifetimeToken.IsCancellationRequested)

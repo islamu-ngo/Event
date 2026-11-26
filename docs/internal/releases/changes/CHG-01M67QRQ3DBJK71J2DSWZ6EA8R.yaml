@@ -1,0 +1,30 @@
+Change-Id: CHG-01M67QRQ3DBJK71J2DSWZ6EA8R
+Title: "offer past queries when upcoming searches are empty"
+Type: fix
+Scope: discovery
+Summary: "Distinguish real temporal empty searches and preserve filters when moving between past and upcoming events through the existing public discovery endpoint."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      Empty results describe the completed query, not all event history. Past and
+      upcoming actions retain search and filters. Loading, errors and truncated
+      traversal remain distinct; curated links are preserved. No archive
+      endpoint, synthetic event or new permission is introduced.

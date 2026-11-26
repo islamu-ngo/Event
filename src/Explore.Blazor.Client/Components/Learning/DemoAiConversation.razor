@@ -1,0 +1,268 @@
+@using Explore.Blazor.Client.Components.Shell.AiAssistant
+@using Explore.Blazor.Client.Contracts.Services.Learning
+@using Explore.Blazor.Client.Services.Learning
+@implements IDisposable
+@inject ILearningClientService Learning
+@inject ITranslationService Translation
+@inject NavigationManager Navigation
+
+<section class="demo-ai" data-testid="demo-ai-conversation" aria-label="@T("ui.learning.ai.title", "Authored conversation exercise")">
+    <p class="demo-ai__status" role="status" aria-live="polite" aria-atomic="true">
+        @T("ui.learning.ai.simulation", "Simulation: prewritten examples only. No AI provider, real conversation, event draft, or production action is used.")
+        @if (_unsupported)
+        {
+            @T("ui.learning.ai.unsupported", "That input is not an authored example. Choose Accept example or Reject example, or enter accept-example or reject-example.")
+        }
+        @if (_refused)
+        {
+            @T("ui.learning.ai.refused", "The exercise did not advance. Reload the current learning context before trying again.")
+        }
+    </p>
+
+    @if (CurrentPractice is { } practice && _conversation is not null)
+    {
+        <h3 id="@ResultAnchor" @ref="_resultHeading" tabindex="-1" class="demo-ai__result-heading">
+            @(practice.Simulation.Receipt is not null
+                ? T("ui.learning.ai.result", "Private simulation result")
+                : T("ui.learning.ai.review", "Review the authored example"))
+        </h3>
+        <AiConversationTimeline Conversation="_conversation"
+                                Mode="AiPresentationMode.Simulation"
+                                ActionPresentation="PresentAction"
+                                ActionsEnabled="@Learning.CanSubmit"
+                                IsActionBusy="@(_ => Learning.IsSaving)"
+                                OnConfirm="ConfirmAsync"
+                                OnReject="RejectAsync"
+                                OnOpenResult="OpenResultAsync" />
+
+        <AiConversationComposer @key="practice"
+                                Mode="AiPresentationMode.Simulation"
+                                IdPrefix="@($"demo-ai-{practice.Id:N}")"
+                                PromptLabel="@T("ui.learning.ai.prompt", "Choose an authored example")"
+                                PromptHelp="@T("ui.learning.ai.input_help", "Enter accept-example or reject-example. Input is temporary and is never sent to AI or saved as conversation history.")"
+                                SendLabel="@T("ui.learning.ai.choose", "Choose example")"
+                                PromptText="@_prompt"
+                                OnPromptInput="SetPrompt"
+                                OnPromptChange="SetPrompt"
+                                OnSend="ChoosePromptAsync"
+                                IsSendDisabled="@(!CanChoose || string.IsNullOrWhiteSpace(_prompt))" />
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public HalResourceOfLearningPracticeDto Practice { get; set; } = null!;
+    [Parameter] public LearningLessonDto? Lesson { get; set; }
+
+    private readonly CancellationTokenSource _lifetime = new();
+    private HalResourceOfLearningPracticeDto? _displayPractice;
+    private LearningClientScope? _displayScope;
+    private HalResourceOfAiConversationDto? _conversation;
+    private ProposedActions2? _proposal;
+    private string _prompt = string.Empty;
+    private bool _unsupported;
+    private bool _refused;
+    private bool _disposed;
+    private bool _focusResult;
+    private ElementReference _resultHeading;
+
+    private HalResourceOfLearningPracticeDto? CurrentPractice =>
+        !_disposed && ReferenceEquals(Practice, Learning.Practice)
+        && ReferenceEquals(_displayPractice, Practice)
+        && ReferenceEquals(_displayScope, Learning.Scope)
+        && Learning.Scope is { } scope && Practice.ContextKey == scope.ContextKey
+        && Practice.ScopeStamp == Learning.Context?.ScopeStamp
+        && Practice.RecipeKey == "ai-example-review"
+            ? Practice : null;
+
+    private LearningLessonDto? CurrentLesson => CurrentPractice is { } practice
+        ? Learning.Lessons.FirstOrDefault(lesson => lesson.RecipeKey == practice.RecipeKey
+            && lesson.MaterialVersion == practice.MaterialVersion)
+        : null;
+
+    private string ResultAnchor => $"demo-ai-result-{Practice.Id:N}";
+    private string ResultDestination => new Uri(new Uri(Navigation.BaseUri),
+        $"learning/demo/{Practice.Id:D}").AbsolutePath + $"#{ResultAnchor}";
+    private bool CanChoose => CanApply(LearningPracticeAction.Choose, "simulate-choice", "accept-example")
+        || CanApply(LearningPracticeAction.Choose, "simulate-choice", "reject-example");
+
+    protected override void OnInitialized() => Learning.Changed += OnLearningChanged;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_displayPractice, Practice) && ReferenceEquals(_displayScope, Learning.Scope))
+            return;
+
+        bool changedStep = ReferenceEquals(_displayScope, Learning.Scope)
+            && _displayPractice is { } previous && previous.Id == Practice.Id
+            && previous.Revision != Practice.Revision;
+        ClearEphemeral();
+        _displayPractice = Practice;
+        _displayScope = Learning.Scope;
+        _proposal = null;
+        _conversation = null;
+        if (CurrentPractice is null)
+            return;
+        _focusResult = changedStep;
+
+        // These DTOs carry presentation only: no live IDs, HAL grants or provider payload.
+        _proposal = new ProposedActions2 { Kind = "AuthoredExample", Status = "Proposed" };
+        _conversation = new HalResourceOfAiConversationDto
+        {
+            Messages =
+            [
+                new Messages2
+                {
+                    Role = "User", Sequence = 1,
+                    Content = T("ui.learning.ai.authored_prompt", "Show a welcome-session suggestion for the fictional practice programme.")
+                },
+                new Messages2
+                {
+                    Role = "Assistant", Sequence = 2,
+                    Content = T("ui.learning.ai.authored_reply", "Authored example: add a short welcome before the fictional practice session. Review it, then accept or reject it in simulation.")
+                }
+            ],
+            ProposedActions = [_proposal]
+        };
+    }
+
+    private bool CanApply(LearningPracticeAction action, string relation, string? choiceKey = null) =>
+        CurrentPractice is { } practice && CurrentLesson is { } lesson && Learning.CanSubmit
+        && Learning.HasPracticeAction(relation)
+        && lesson.Transitions?.Any(transition => transition.FromStepKey == practice.Simulation.StepKey
+            && transition.Action == action && transition.ChoiceKey == choiceKey) == true
+        && (choiceKey is null || lesson.Choices?.Any(choice => choice.Key == choiceKey) == true);
+
+    private AiActionPresentation? PresentAction(ProposedActions2 action)
+    {
+        if (!ReferenceEquals(action, _proposal) || CurrentPractice is not { } practice)
+            return null;
+
+        var result = practice.Simulation.Receipt is null ? null : new AiActionResultPresentation(
+            Display(practice.Simulation.Presentation.Heading),
+            Display(practice.Simulation.Presentation.Description),
+            ResultDestination,
+            T("ui.learning.ai.open_result", "Review private simulation result"));
+        bool choosing = practice.Simulation.StepKey == "choose";
+        return new(
+            T("ui.learning.ai.proposal", "Review the authored welcome-session example"),
+            choosing
+                ? T("ui.learning.ai.choice_help", "Accept or reject this fixed suggestion. You will confirm that exercise choice before seeing a result.")
+                : result is not null ? result.Description
+                : $"{Display(CurrentLesson?.Choices?.FirstOrDefault(choice => choice.Key == practice.Simulation.ChoiceKey)?.Label)}. "
+                    + T("ui.learning.ai.confirm_help", "This choice is not yet confirmed. Confirm simulation to record only the private exercise result."),
+            CanConfirm: choosing
+                ? CanApply(LearningPracticeAction.Choose, "simulate-choice", "accept-example")
+                : CanApply(LearningPracticeAction.Confirm, "simulate-confirm"),
+            CanReject: choosing && CanApply(LearningPracticeAction.Choose, "simulate-choice", "reject-example"),
+            ConfirmLabel: choosing ? T("ui.learning.ai.accept", "Accept example")
+                : T("ui.learning.ai.confirm", "Confirm simulation"),
+            RejectLabel: T("ui.learning.ai.reject", "Reject example"),
+            Result: result);
+    }
+
+    private void SetPrompt(string value)
+    {
+        if (CurrentPractice is null)
+            return;
+        _prompt = value.Length <= 2000 ? value : value[..2000];
+        _unsupported = false;
+    }
+
+    private Task ChoosePromptAsync()
+    {
+        if (!CanChoose)
+            return Task.CompletedTask;
+        string? choice = _prompt.Trim().ToLowerInvariant() switch
+        {
+            "accept" or "accept-example" => "accept-example",
+            "reject" or "reject-example" => "reject-example",
+            _ => null
+        };
+        _prompt = string.Empty;
+        _unsupported = choice is null;
+        return choice is null ? Task.CompletedTask
+            : ApplyAsync(LearningPracticeAction.Choose, "simulate-choice", choice);
+    }
+
+    private Task ConfirmAsync(ProposedActions2 action)
+    {
+        if (!ReferenceEquals(action, _proposal) || CurrentPractice is not { } practice)
+            return Task.CompletedTask;
+        return practice.Simulation.StepKey == "choose"
+            ? ApplyAsync(LearningPracticeAction.Choose, "simulate-choice", "accept-example")
+            : ApplyAsync(LearningPracticeAction.Confirm, "simulate-confirm");
+    }
+
+    private Task RejectAsync(ProposedActions2 action) => ReferenceEquals(action, _proposal)
+        ? ApplyAsync(LearningPracticeAction.Choose, "simulate-choice", "reject-example")
+        : Task.CompletedTask;
+
+    private async Task ApplyAsync(LearningPracticeAction action, string relation, string? choiceKey = null)
+    {
+        if (!CanApply(action, relation, choiceKey) || CurrentPractice is not { } before)
+            return;
+        var scope = Learning.Scope;
+        bool applied = await Learning.ApplyPracticeActionAsync(action, choiceKey, _lifetime.Token);
+        if (_disposed || !ReferenceEquals(scope, Learning.Scope)
+            || CurrentPractice is not { } current || current.Id != before.Id
+            || current.Revision < before.Revision)
+            return;
+        _prompt = string.Empty;
+        _refused = !applied && Learning.Failure == LearningClientFailure.None;
+        _focusResult = applied;
+    }
+
+    private Task OpenResultAsync(AiActionResultPresentation result)
+    {
+        if (CurrentPractice is not { Simulation.Receipt: not null } || _proposal is null
+            || PresentAction(_proposal)?.Result != result)
+            return Task.CompletedTask;
+        Navigation.NavigateTo(result.Destination!);
+        _focusResult = true;
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusResult || CurrentPractice is null)
+            return;
+        _focusResult = false;
+        await _resultHeading.FocusAsync();
+    }
+
+    private void OnLearningChanged()
+    {
+        if (_disposed)
+            return;
+        if (!ReferenceEquals(_displayScope, Learning.Scope)
+            || !ReferenceEquals(_displayPractice, Learning.Practice))
+            ClearEphemeral();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void ClearEphemeral()
+    {
+        _prompt = string.Empty;
+        _unsupported = false;
+        _refused = false;
+        _focusResult = false;
+    }
+
+    private string T(string key, string fallback) => Translation.T(key, fallback);
+    private string Display(LearningDisplayTextDto? text) => text is null ? string.Empty : T(text.Key, text.Fallback);
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+        _disposed = true;
+        Learning.Changed -= OnLearningChanged;
+        ClearEphemeral();
+        _conversation = null;
+        _proposal = null;
+        _displayPractice = null;
+        _displayScope = null;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+    }
+}

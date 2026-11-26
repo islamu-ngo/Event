@@ -1,6 +1,8 @@
 using Explore.Application.DTOs.Onboarding;
 using Explore.Domain;
 using Explore.Domain.Constants;
+using Explore.Domain.Settings;
+using Explore.Application.Features.Announcements;
 
 namespace Explore.Application.Services;
 
@@ -8,6 +10,15 @@ public partial class TenantPolicySettingService
 {
     public async Task<TenantPolicySettingsDto> ReadEffectiveTenantSettingsAsync(Guid tenantId)
     {
+        var announcementRows = await _announcementSettingsReader.ReadPublicAsync(tenantId, CancellationToken.None);
+        var instanceAnnouncement = new AnnouncementSourceSnapshot(AnnouncementOwner.Instance,
+            AnnouncementSettingValueCodec.DeserializeGroup(announcementRows.Instance?.Value),
+            announcementRows.Instance?.IsLocked ?? false);
+        var tenantAnnouncement = new AnnouncementSourceSnapshot(AnnouncementOwner.ForTenant(tenantId),
+            AnnouncementSettingValueCodec.DeserializeGroup(announcementRows.Tenant?.Value),
+            announcementRows.Tenant?.IsLocked ?? false);
+        var effectiveAnnouncement = AnnouncementPublicationPolicy.Resolve(
+            tenantId, instanceAnnouncement, tenantAnnouncement);
         var systemSettings = (await _systemSettingRepository.GetAllSettings())
             .ToDictionary(setting => setting.SettingKey, StringComparer.Ordinal);
         var tenantSettings = (await _tenantSettingRepository.GetAllForTenant(tenantId))
@@ -82,11 +93,6 @@ public partial class TenantPolicySettingService
         var tenantBrandLogoUrl = GetTenant(GovernanceSettingKeys.Branding.LogoUrl);
         var tenantBrandFaviconUrl = GetTenant(GovernanceSettingKeys.Branding.FaviconUrl);
         var tenantBrandCustomCssUrl = GetTenant(GovernanceSettingKeys.Branding.CustomCssUrl);
-        var tenantAnnouncementEnabled = GetTenant(GovernanceSettingKeys.PublicExperience.AnnouncementBarEnabled);
-        var tenantAnnouncementMessage = GetTenant(GovernanceSettingKeys.PublicExperience.AnnouncementBarMessage);
-        var tenantAnnouncementLinkText = GetTenant(GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkText);
-        var tenantAnnouncementLinkUrl = GetTenant(GovernanceSettingKeys.PublicExperience.AnnouncementBarLinkUrl);
-        var tenantAnnouncementRevision = GetTenant(GovernanceSettingKeys.PublicExperience.AnnouncementBarRevision);
         var tenantAiAssistantEnabled = GetTenant(GovernanceSettingKeys.AiAssistant.Enabled);
         var tenantAiAssistantProvider = GetTenant(GovernanceSettingKeys.AiAssistant.Provider);
         var tenantAiAssistantEndpointUrl = GetTenant(GovernanceSettingKeys.AiAssistant.EndpointUrl);
@@ -212,11 +218,8 @@ public partial class TenantPolicySettingService
                 systemBrandCustomCssUrl?.Value,
                 string.Empty,
                 isTenantWhiteLabelingEnabled && systemBrandCustomCssUrl?.IsLocked != true),
-            AnnouncementBarEnabled = DeserializeBoolean(tenantAnnouncementEnabled?.Value, false),
-            AnnouncementBarMessage = DeserializeString(tenantAnnouncementMessage?.Value, string.Empty),
-            AnnouncementBarLinkText = DeserializeString(tenantAnnouncementLinkText?.Value, string.Empty),
-            AnnouncementBarLinkUrl = DeserializeString(tenantAnnouncementLinkUrl?.Value, string.Empty),
-            AnnouncementBarRevision = DeserializeInteger(tenantAnnouncementRevision?.Value, 0),
+            AnnouncementOriginal = AnnouncementTransportMapper.ToDto(tenantAnnouncement),
+            EffectiveAnnouncement = AnnouncementTransportMapper.ToDto(effectiveAnnouncement, tenantId),
             CanOverrideHomePagePreference = canOverrideHomePage,
             CanOverrideSubdomain = canOverrideSubdomain,
             CanOverrideCustomDomain = canOverrideCustomDomain,

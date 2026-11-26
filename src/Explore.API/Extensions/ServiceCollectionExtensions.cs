@@ -24,6 +24,7 @@ internal static class ServiceCollectionExtensions
             options.SchemaFilter<HalSchemaFilter>();
             options.SchemaFilter<OpenApiStringEnumSchemaFilter>();
             options.SchemaFilter<ModerationIntentSchemaTransformer>();
+            options.SchemaFilter<LearningRequestSchemaTransformer>();
             options.DocumentFilter<HalSchemaDocumentFilter>();
 
             // Swashbuckle remains as a transition baseline until native OpenAPI parity is proven.

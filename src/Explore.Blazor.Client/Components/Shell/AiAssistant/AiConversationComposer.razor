@@ -1,9 +1,10 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.JSInterop
 @using Explore.Blazor.Client.Services
+@implements IDisposable
 
-<div class="ai-rail__composer" role="form" aria-label="Send an AI assistant message">
-    @if (IsReferenceAutocompleteVisible)
+<div class="ai-rail__composer" role="form" aria-label="@PromptLabel">
+    @if (Mode == AiPresentationMode.Live && IsReferenceAutocompleteVisible)
     {
         <div id="@ReferenceResultsId"
              class="ai-rail__reference-autocomplete"
@@ -32,7 +33,7 @@
                             aria-selected="@(index == ActiveReferenceIndex)"
                             data-testid="ai-rail-reference-result"
                             @onmousedown:preventDefault="true"
-                            @onclick="() => OnReferenceSelected.InvokeAsync(reference)">
+                            @onclick="() => SelectReferenceAsync(reference)">
                         <MudIcon Icon="@GetReferenceIcon(reference)" Size="Size.Small" Class="ai-rail__reference-option-icon" />
                         <span class="ai-rail__reference-option-text">@reference.DisplayName</span>
                         <span class="ai-rail__reference-option-kind">@GetReferenceKindLabel(reference)</span>
@@ -42,6 +43,8 @@
         </div>
     }
     <div class="ai-rail__composer-card">
+        @if (Mode == AiPresentationMode.Live)
+        {
         <div class="ai-rail__composer-context">
             <label class="ai-rail__actor-label" for="@ActorSelectorId">Acting as</label>
             <select id="@ActorSelectorId"
@@ -68,7 +71,8 @@
                 }
             </select>
         </div>
-        @if (SelectedImages.Count > 0)
+        }
+        @if (Mode == AiPresentationMode.Live && SelectedImages.Count > 0)
         {
             <div class="ai-rail__image-chip-list" role="list" aria-label="Selected image attachments">
                 @foreach (var image in SelectedImages)
@@ -80,23 +84,27 @@
                         <button type="button"
                                 class="ai-rail__image-chip-remove"
                                 aria-label="@($"Remove image {image.FileName}")"
-                                @onclick="() => OnImageRemoved.InvokeAsync(image.Id)">
+                                @onclick="() => RemoveImageAsync(image.Id)">
                             <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" />
                         </button>
                     </div>
                 }
             </div>
         }
+        @if (Mode == AiPresentationMode.Live)
+        {
         <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                        @ref="_imageFileUpload"
-                       FilesChanged="OnFilesSelected"
+                       FilesChanged="SelectFilesAsync"
                        Accept="@ImageUploadClientPolicy.DefaultAcceptedImageFormats"
                        MaximumFileCount="MaximumFileCount">
             <CustomContent Context="fileUpload"></CustomContent>
             <SelectedTemplate Context="files"></SelectedTemplate>
         </MudFileUpload>
+        }
         <div class="ai-rail__prompt-shell">
-            @if (HasPromptReferenceHighlights)
+            <label class="sr-only" for="@PromptId">@PromptLabel</label>
+            @if (Mode == AiPresentationMode.Live && HasPromptReferenceHighlights)
             {
                 <div class="ai-rail__prompt-highlights"
                      aria-hidden="true"
@@ -106,20 +114,25 @@
                       class="@PromptTextAreaClass"
                       @ref="_promptTextArea"
                       rows="1"
+                      maxlength="@(Mode == AiPresentationMode.Simulation ? "2000" : null)"
+                      disabled="@(Mode is not (AiPresentationMode.Live or AiPresentationMode.Simulation))"
+                      aria-describedby="@($"{EffectiveIdPrefix}-help")"
                       value="@PromptText"
                       @oninput="HandlePromptInputAsync"
                       @onchange="HandlePromptChangeAsync"
                       placeholder="How can I help you today?"
                       data-testid="ai-rail-prompt"
-                      data-reference-autocomplete-open="@ReferenceAutocompleteOpenData"
-                      data-reference-autocomplete-selectable="@ReferenceAutocompleteSelectableData"
-                      data-reference-mention-tokens="@ReferenceMentionTokensData"
-                      aria-controls="@ReferenceResultsId"
-                      aria-expanded="@ReferenceAutocompleteOpenData"
-                      aria-autocomplete="list"
+                      data-reference-autocomplete-open="@(Mode == AiPresentationMode.Live ? ReferenceAutocompleteOpenData : "false")"
+                      data-reference-autocomplete-selectable="@(Mode == AiPresentationMode.Live ? ReferenceAutocompleteSelectableData : "false")"
+                      data-reference-mention-tokens="@(Mode == AiPresentationMode.Live ? ReferenceMentionTokensData : "[]")"
+                      aria-controls="@(Mode == AiPresentationMode.Live && IsReferenceAutocompleteVisible ? ReferenceResultsId : null)"
+                      aria-expanded="@(Mode == AiPresentationMode.Live ? ReferenceAutocompleteOpenData : null)"
+                      aria-autocomplete="@(Mode == AiPresentationMode.Live ? "list" : null)"
                       aria-activedescendant="@ActiveReferenceOptionId"></textarea>
         </div>
         <div class="ai-rail__composer-toolbar">
+            @if (Mode == AiPresentationMode.Live)
+            {
             <MudMenu @bind-Open="_referencesMenuOpen" Dense="true" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
                 <ActivatorContent>
                     <button type="button"
@@ -152,19 +165,22 @@
                     <MudMenuItem OnClick='() => SelectCapabilityAsync("Ask")'>Ask</MudMenuItem>
                 </ChildContent>
             </MudMenu>
+            }
             <div class="ai-rail__toolbar-spacer"></div>
             <button type="button"
                     class="ai-rail__send-btn"
-                    disabled="@IsSendDisabled"
-                    @onclick="OnSend"
+                    disabled="@(IsSendDisabled || Mode is not (AiPresentationMode.Live or AiPresentationMode.Simulation))"
+                    @onclick="SendAsync"
                     data-testid="ai-rail-send"
-                    aria-label="Send message"
-                    title="Send message">
+                    aria-label="@SendLabel"
+                    title="@SendLabel">
                 <MudIcon Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" />
             </button>
         </div>
     </div>
-    <span class="ai-rail__disclaimer">AI can make mistakes, please double-check responses.</span>
+    <span id="@($"{EffectiveIdPrefix}-help")" class="ai-rail__disclaimer">@(string.IsNullOrWhiteSpace(PromptHelp)
+        ? Mode == AiPresentationMode.Live ? "AI can make mistakes, please double-check responses." : "No live AI request will be sent."
+        : PromptHelp)</span>
 </div>
 
 @code {
@@ -174,6 +190,12 @@
     private ElementReference _promptTextArea;
     private bool _referencesMenuOpen;
     private bool _capabilitiesMenuOpen;
+    private bool _disposed;
+
+    [Parameter] public AiPresentationMode Mode { get; set; }
+    [Parameter] public string PromptLabel { get; set; } = "Message";
+    [Parameter] public string PromptHelp { get; set; } = "";
+    [Parameter] public string SendLabel { get; set; } = "Send message";
 
     [Parameter] public IReadOnlyList<ActorOption> ActorOptions { get; set; } = [];
     [Parameter] public string? IdPrefix { get; set; }
@@ -209,7 +231,7 @@
     private string ActorSelectorId => $"{EffectiveIdPrefix}-actor-selector";
     private string PromptId => $"{EffectiveIdPrefix}-prompt";
     private string? ActiveReferenceOptionId =>
-        IsReferenceAutocompleteVisible && ReferenceResults.Count > 0
+        Mode == AiPresentationMode.Live && IsReferenceAutocompleteVisible && ReferenceResults.Count > 0
             ? GetReferenceOptionId(ActiveReferenceIndex)
             : null;
 
@@ -224,21 +246,39 @@
 
     public async Task OpenFilePickerAsync()
     {
-        if (_imageFileUpload is not null)
+        if (!_disposed && Mode == AiPresentationMode.Live && _imageFileUpload is not null)
         {
             await _imageFileUpload.OpenFilePickerAsync();
         }
         _referencesMenuOpen = false;
     }
 
+    private Task SelectFilesAsync(IReadOnlyList<IBrowserFile> files) =>
+        !_disposed && Mode == AiPresentationMode.Live
+            ? OnFilesSelected.InvokeAsync(files) : Task.CompletedTask;
+
+    private Task SelectReferenceAsync(HalResourceOfAiReferenceSearchResultDto reference) =>
+        !_disposed && Mode == AiPresentationMode.Live
+            ? OnReferenceSelected.InvokeAsync(reference) : Task.CompletedTask;
+
+    private Task RemoveImageAsync(Guid imageId) => !_disposed && Mode == AiPresentationMode.Live
+        ? OnImageRemoved.InvokeAsync(imageId) : Task.CompletedTask;
+
+    private Task SendAsync() => !_disposed && !IsSendDisabled && Mode is AiPresentationMode.Live or AiPresentationMode.Simulation
+        ? OnSend.InvokeAsync() : Task.CompletedTask;
+
     private Task HandlePromptInputAsync(ChangeEventArgs args) =>
-        OnPromptInput.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+        !_disposed && Mode is AiPresentationMode.Live or AiPresentationMode.Simulation
+            ? OnPromptInput.InvokeAsync(args.Value?.ToString() ?? string.Empty) : Task.CompletedTask;
 
     private Task HandlePromptChangeAsync(ChangeEventArgs args) =>
-        OnPromptChange.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+        !_disposed && Mode is AiPresentationMode.Live or AiPresentationMode.Simulation
+            ? OnPromptChange.InvokeAsync(args.Value?.ToString() ?? string.Empty) : Task.CompletedTask;
 
     private Task HandleActorSelectionChangedAsync(ChangeEventArgs args)
     {
+        if (_disposed || Mode != AiPresentationMode.Live)
+            return Task.CompletedTask;
         var actorId = Guid.TryParse(args.Value?.ToString(), out var parsed)
             && ActorOptions.Any(actor => actor.ActorId == parsed)
                 ? parsed
@@ -246,17 +286,30 @@
         return SelectedActorIdChanged.InvokeAsync(actorId);
     }
 
-    private void ToggleReferencesMenu() => _referencesMenuOpen = !_referencesMenuOpen;
-    private void ToggleCapabilitiesMenu() => _capabilitiesMenuOpen = !_capabilitiesMenuOpen;
+    private void ToggleReferencesMenu()
+    {
+        if (!_disposed && Mode == AiPresentationMode.Live)
+            _referencesMenuOpen = !_referencesMenuOpen;
+    }
+
+    private void ToggleCapabilitiesMenu()
+    {
+        if (!_disposed && Mode == AiPresentationMode.Live)
+            _capabilitiesMenuOpen = !_capabilitiesMenuOpen;
+    }
 
     private async Task OpenReferenceSearchAsync()
     {
+        if (_disposed || Mode != AiPresentationMode.Live)
+            return;
         _referencesMenuOpen = false;
         await OnReferenceSearchOpened.InvokeAsync();
     }
 
     private async Task SelectCapabilityAsync(string capability)
     {
+        if (_disposed || Mode != AiPresentationMode.Live)
+            return;
         _capabilitiesMenuOpen = false;
         await SelectedCapabilityChanged.InvokeAsync(capability);
     }
@@ -318,4 +371,6 @@
 
     public sealed record ActorOption(Guid ActorId, string ActorType, string ActorDisplayName);
     public sealed record ImageAttachment(Guid Id, string FileName, string MediaType, long SizeBytes, string Data);
+
+    public void Dispose() => _disposed = true;
 }

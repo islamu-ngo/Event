@@ -1,4 +1,6 @@
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Announcements.Requests.Commands;
+using Explore.Application.Features.Appearance.Requests.Commands;
 using Explore.Application.Features.Authentication.Continuation.Requests.Commands;
 using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Features.Localization.Requests.Commands;
@@ -14,6 +16,7 @@ using Explore.Application.Features.TenantOnboarding.Requests.Commands;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.ManagedProviderProvisioning.Requests.Commands;
 using Explore.Application.Features.Tenants.Requests.Commands;
+using Explore.Application.Features.Learning.Requests.Commands;
 using Explore.Domain.Settings;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -23,6 +26,12 @@ internal static class PolicyMutationCommandScope
 {
     internal static bool Handles(Type request) =>
         FooterOperationScope.Handles(request)
+        || HandlesLearning(request)
+        || request == typeof(UpdateInstanceAnnouncementCommand)
+        || request == typeof(UpdateTenantAnnouncementCommand)
+        || request == typeof(UpdateManagedTenantAnnouncementCommand)
+        || request == typeof(DismissAnnouncementCommand)
+        || request == typeof(UpdateCurrentUserAppearancePreferencesCommand)
         || request == typeof(JoinVerifiedTenantCommand)
         || request == typeof(UpdateLocalizationGovernanceCommand)
         || request == typeof(UpdateUserLastActiveTenantCommand)
@@ -46,10 +55,20 @@ internal static class PolicyMutationCommandScope
         || request == typeof(UpdateEventPolicyCommand)
         || request == typeof(EnsureManagedProviderClientProvisionedCommand)
         || request == typeof(CreateTenantCommand)
+        || request == typeof(SaveInstanceOnboardingProfileCommand)
         || request == typeof(CompleteInstanceOnboardingCommand)
         || request == typeof(CompleteLocalInstanceOnboardingCommand)
         || request == typeof(CompleteTenantOnboardingCommand)
         || request == typeof(UpdateTenantReportingIntakePolicyCommand);
+
+    internal static bool HandlesLearning(Type request) =>
+        request == typeof(ClaimLearningTourCommand)
+        || request == typeof(UpdateLearningGuidancePolicyCommand)
+        || request == typeof(AcknowledgeLearningRequirementCommand)
+        || request == typeof(RecordLearningTourOutcomeCommand)
+        || request == typeof(UpdateLearningPreferencesCommand)
+        || request == typeof(ApplyLearningPracticeActionCommand)
+        || request == typeof(ManageTenantLearningSpaceCommand);
 
     internal static ValueTask<PolicyMutationScope?> SelectAsync(
         object request, IServiceProvider services, CancellationToken cancellationToken)
@@ -57,6 +76,14 @@ internal static class PolicyMutationCommandScope
         if (FooterOperationScope.Handles(request.GetType()))
             return ValueTask.FromResult<PolicyMutationScope?>(FooterOperationScope.Select(request, services.GetService<ITenantContextAccessor>()));
         cancellationToken.ThrowIfCancellationRequested();
+        if (HandlesLearning(request.GetType()))
+        {
+            if (services.GetRequiredService<IMachinePrincipalAccessor>().IsMachineCaller
+                || services.GetService<ITenantContextAccessor>() is not { IsResolved: true, TenantId: { } tenant }
+                || tenant == Guid.Empty)
+                throw new UnauthorizedAccessException("Learning requires the original authenticated tenant selection.");
+            return ValueTask.FromResult<PolicyMutationScope?>(new(tenant));
+        }
         if (request is CreateTenantCommand)
         {
             if (services.GetRequiredService<IMachinePrincipalAccessor>().IsMachineCaller)
@@ -80,10 +107,25 @@ internal static class PolicyMutationCommandScope
 
     private static PolicyMutationScope? Select(object request, ITenantContextAccessor? tenantContext) => request switch
     {
+        UpdateCurrentUserAppearancePreferencesCommand when tenantContext is { IsResolved: true, TenantId: var tenant }
+            && tenant != Guid.Empty => new(tenant),
+        UpdateCurrentUserAppearancePreferencesCommand =>
+            throw new UnauthorizedAccessException("Appearance preferences require the authenticated tenant."),
         JoinVerifiedTenantCommand command when command.TenantId != Guid.Empty => new(command.TenantId),
         JoinVerifiedTenantCommand => throw new UnauthorizedAccessException("Tenant joining requires an explicit target."),
+        UpdateInstanceAnnouncementCommand => PolicyMutationScope.MixedSettingsInstance,
+        UpdateTenantAnnouncementCommand command when command.TenantId == tenantContext?.TenantId =>
+            PolicyMutationScope.MixedSettingsTenant(command.TenantId),
+        UpdateTenantAnnouncementCommand =>
+            throw new UnauthorizedAccessException("Announcement publication requires the authenticated tenant."),
+        UpdateManagedTenantAnnouncementCommand command => PolicyMutationScope.ForManagedAnnouncement(command),
+        DismissAnnouncementCommand command when command.Observed.TenantId == tenantContext?.TenantId =>
+            new(command.Observed.TenantId),
+        DismissAnnouncementCommand =>
+            throw new UnauthorizedAccessException("Announcement dismissal requires the authenticated tenant."),
         UpdateLocalizationGovernanceCommand => PolicyMutationScope.Instance,
         UpdateUserLastActiveTenantCommand => PolicyMutationScope.Instance,
+        SaveInstanceOnboardingProfileCommand => PolicyMutationScope.Instance,
         CompleteInstanceOnboardingCommand => PolicyMutationScope.Instance,
         CompleteLocalInstanceOnboardingCommand => PolicyMutationScope.Instance,
         UpdateEventPolicyCommand => PolicyMutationScope.MixedSettingsInstance,

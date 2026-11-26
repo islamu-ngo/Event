@@ -30,6 +30,7 @@ internal static class PostgresLocalIdentitySystemSettingPolicies
         new(PostgresOperatorIdentityEditorContract.OwnerRole, ["SELECT", "INSERT", "UPDATE"]),
         new(PostgresResolverConfigurationContract.OwnerRole, ["SELECT", "INSERT", "UPDATE"]),
         new(PostgresConfigurationImportScalarSettingContract.OwnerRole, ["SELECT", "INSERT", "UPDATE"]),
+        new(PostgresConfigurationImportAnnouncementContract.OwnerRole, ["SELECT", "INSERT", "UPDATE"]),
         new(PostgresConfigurationImportTenantSettingContract.OwnerRole, ["SELECT"]),
         new(PostgresConfigurationImportEventResourceContract.OwnerRole, ["SELECT", "INSERT", "UPDATE"]),
         new(PostgresConfigurationImportPublicationPolicyContract.OwnerRole, ["SELECT", "INSERT", "UPDATE", "DELETE"]),
@@ -92,6 +93,17 @@ internal static class PostgresLocalIdentitySystemSettingPolicies
                 AND {(operation == "INSERT" ? "p.polqual IS NULL" : "pg_catalog.pg_get_expr(p.polqual,p.polrelid)='true'")}
                 AND {(operation is "INSERT" or "UPDATE" ? "pg_catalog.pg_get_expr(p.polwithcheck,p.polrelid)='true'" : "p.polwithcheck IS NULL")})
             """));
+
+    /// <summary>Creates only the declared owner's policies when its installer first creates that role under existing RLS.</summary>
+    internal static string CreateOwnerPoliciesSql(DbContext context, string relation, string ownerRole)
+    {
+        var names = context.GetService<ISqlGenerationHelper>();
+        var owner = Owners.Single(value => value.Role == ownerRole);
+        return string.Join("\n", owner.Operations.Select(operation =>
+            $"CREATE POLICY {names.DelimitIdentifier(Name(owner, operation))} ON {relation} FOR {operation} TO {names.DelimitIdentifier(owner.Role)} "
+            + (operation != "INSERT" ? "USING (true) " : "")
+            + (operation is "INSERT" or "UPDATE" ? "WITH CHECK (true)" : "") + ";"));
+    }
 
     internal static async Task InstallAsync(DbContext context, string relation, string migratorLogin,
         CancellationToken token)

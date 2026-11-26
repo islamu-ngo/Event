@@ -56,7 +56,7 @@ public sealed class HumanConfigurationImportAdmission(
             if (!parent.Active)
                 throw new UnauthorizedAccessException("The original import callback has ended.");
             await parent.ValidateOwner(token);
-        });
+        }, parent.AnnouncementOwnership);
         current.Value = child;
         try { return await mutation(child, cancellationToken); }
         finally { child.Active = false; current.Value = parent; }
@@ -118,6 +118,23 @@ public sealed class HumanConfigurationImportAdmission(
         return ValidateActiveAsync(proof, cancellationToken);
     }
 
+    public Task RequireAnnouncementAsync(HumanConfigurationImportAnnouncement announcement,
+        CancellationToken cancellationToken = default)
+    {
+        var proof = RequireActive(CurrentProof);
+        (proof.AnnouncementOwnership
+            ?? throw new UnauthorizedAccessException("The original import has no native announcement ownership."))
+            .RequireCurrent(announcement.Store);
+        if (!proof.Apply.Announcements.Any(item => ReferenceEquals(item, announcement))
+            || !ReferenceEquals(announcement.Subject, proof.Apply.Subject)
+            || announcement.OperationId != proof.Apply.OperationId || announcement.Target != proof.Apply.Target
+            || announcement.ArtifactDigest != proof.Apply.ArtifactDigest
+            || !ReferenceEquals(announcement.Store, proof.Apply.AnnouncementStore)
+            || proof.Apply.Target.TenantId is { } tenant && announcement.Intent.Owner.TenantId != tenant)
+            throw new UnauthorizedAccessException("Announcement import requires its original accepted slice.");
+        return ValidateActiveAsync(proof, cancellationToken);
+    }
+
     private EffectProof RequireActive(IHumanConfigurationImportEffectProof? proof) =>
         proof is EffectProof issued && ReferenceEquals(issued.Issuer, this) && issued.Active
             && ReferenceEquals(current.Value, issued)
@@ -132,13 +149,15 @@ public sealed class HumanConfigurationImportAdmission(
     }
 
     private sealed class EffectProof(HumanConfigurationImportAdmission issuer, HumanConfigurationImportApply apply,
-        ImmutableArray<HumanConfigurationImportSettingEffect> effects, Func<CancellationToken, Task> validateOwner)
+        ImmutableArray<HumanConfigurationImportSettingEffect> effects, Func<CancellationToken, Task> validateOwner,
+        HumanConfigurationImportAnnouncementOwnership? announcementOwnership)
         : IHumanConfigurationImportEffectProof
     {
         internal HumanConfigurationImportAdmission Issuer => issuer;
         internal HumanConfigurationImportApply Apply => apply;
         internal ImmutableArray<HumanConfigurationImportSettingEffect> Effects => effects;
         internal Func<CancellationToken, Task> ValidateOwner => validateOwner;
+        internal HumanConfigurationImportAnnouncementOwnership? AnnouncementOwnership => announcementOwnership;
         internal volatile bool Active = true;
     }
 
@@ -385,6 +404,7 @@ public sealed class HumanConfigurationImportAdmission(
             if (evidenceOnly || validateOwner is null || Interlocked.Exchange(ref applied, 1) != 0
                 || !ReferenceEquals(apply.Subject, authority.Subject) || apply.Target != authority.Target
                 || apply.OperationId == Guid.Empty || string.IsNullOrWhiteSpace(apply.ArtifactDigest)
+                || apply.Announcements.IsEmpty != (apply.AnnouncementStore is null)
                 || issuer.CurrentProof is not null)
                 throw new UnauthorizedAccessException("An import effect requires its original acquired apply attempt.");
             async Task ValidateApplyAsync(CancellationToken token)
@@ -394,11 +414,31 @@ public sealed class HumanConfigurationImportAdmission(
                 token.ThrowIfCancellationRequested();
                 validateTime!(clock.GetUtcNow());
             }
+            var announcementOwnership = apply.AnnouncementStore is { } originalAnnouncements
+                ? HumanConfigurationImportAnnouncementOwnership.Require(originalAnnouncements, issuer, authority)
+                : null;
             await ValidateApplyAsync(cancellationToken);
-            var proof = new EffectProof(issuer, apply, apply.Effects, ValidateApplyAsync);
+            var proof = new EffectProof(issuer, apply, apply.Effects, ValidateApplyAsync, announcementOwnership);
             issuer.current.Value = proof;
             try
             {
+                if (apply.AnnouncementStore is { } announcements)
+                {
+                    var nativeOwnership = announcementOwnership
+                        ?? throw new UnauthorizedAccessException("Announcement import has no retained native owner.");
+                    var derived = await announcements.CompileAsync(apply, apply.Announcements, cancellationToken);
+                    proof.Active = false;
+                    proof = new EffectProof(issuer, apply, apply.Effects.AddRange(derived), ValidateApplyAsync,
+                        announcementOwnership);
+                    issuer.current.Value = proof;
+                    services.GetRequiredService<IHumanActionCommitFinalizer>().Register(async token =>
+                    {
+                        nativeOwnership.RequireCurrent(announcements);
+                        await validateOwner(token);
+                        await apply.ValidateSourcesAsync(token);
+                        await nativeOwnership.RequireCompletedAsync(token);
+                    }, instant => validateTime!(instant));
+                }
                 if (apply.PublicationStore is { } store)
                 {
                     await store.CompileAsync(apply.Publications, cancellationToken);
@@ -412,6 +452,8 @@ public sealed class HumanConfigurationImportAdmission(
                 var result = await apply.ApplyAsync(cancellationToken);
                 if (apply.PublicationStore is { } completed)
                     await completed.RequireCompletedAsync(cancellationToken);
+                if (announcementOwnership is not null)
+                    await announcementOwnership.RequireCompletedAsync(cancellationToken);
                 await ValidateApplyAsync(cancellationToken);
                 return result;
             }

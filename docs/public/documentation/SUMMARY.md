@@ -5,6 +5,7 @@
     * [Why ISLAMU Event?](readme/getting-started/why-islamu-event.md)
     * [5-Minute Quickstart](readme/getting-started/5-minute-quickstart.md)
     * [Architecture & Request Flows](readme/getting-started/architecture-and-request-flows.md)
+    * [Private Learning Backend](readme/getting-started/contextual-learning.md)
   * [Self-Hosting](readme/self-hosting/README.md)
     * [Setup Assistant](../self-hosting/setup-assistant.md)
     * [External Configurator Handoff](../self-hosting/setup-assistant.md#external-configurator-handoff)

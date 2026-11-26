@@ -2179,6 +2179,98 @@
         "organizations.verification_required": {
           "type": "boolean"
         },
+        "public_experience.announcement_bar.publication": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "enabled",
+                "linkText",
+                "linkUrl",
+                "message",
+                "operation",
+                "redisplay"
+              ],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "linkText": {
+                  "type": "string"
+                },
+                "linkUrl": {
+                  "type": "string"
+                },
+                "redisplay": {
+                  "type": "boolean"
+                },
+                "operation": {
+                  "type": "string",
+                  "const": "publish"
+                },
+                "currentLock": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operation"
+              ],
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "const": "disable"
+                },
+                "currentLock": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "isLocked",
+                "operation"
+              ],
+              "properties": {
+                "isLocked": {
+                  "type": "boolean"
+                },
+                "operation": {
+                  "type": "string",
+                  "const": "setLock"
+                },
+                "currentLock": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operation"
+              ],
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "const": "inherit"
+                },
+                "currentLock": {
+                  "type": "boolean"
+                }
+              }
+            }
+          ]
+        },
         "public_experience.event_catalog_label": {
           "type": "string",
           "maxLength": 100

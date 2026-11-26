@@ -42,6 +42,15 @@
         "resolved": "12.1.1",
         "contentHash": "EPpkIe1yh1a0OXyC100oOA8WMbZvqUu5plwhvYcb7oSELfyUZzfxV48BLhvs3kKo4NwG7MGLNgy1RJiYtT8Dpw=="
       },
+      "GuideFlow": {
+        "type": "Direct",
+        "requested": "[1.0.1, 1.0.1]",
+        "resolved": "1.0.1",
+        "contentHash": "cKlgbz6FwNYHzWSCOQiQqRSGZb9Cj9+kbKOCVlSJaz2hctTqNCGJWxBQ9+xBo9qtOL9+U9YlY7IdYBpFGuDD9w==",
+        "dependencies": {
+          "Microsoft.AspNetCore.Components.Web": "8.0.27"
+        }
+      },
       "Microsoft.AspNetCore.App.Internal.Assets": {
         "type": "Direct",
         "requested": "[10.0.14, )",

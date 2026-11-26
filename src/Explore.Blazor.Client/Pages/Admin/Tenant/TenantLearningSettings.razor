@@ -1,0 +1,368 @@
+@page "/settings/admin/learning"
+@using Explore.Blazor.Client.Contracts.Services.Learning
+@using Explore.Blazor.Client.Components.Learning
+@using Explore.Blazor.Client.Services.Learning
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@rendermode InteractiveAuto
+@implements IDisposable
+@inject ILearningClientService Learning
+@inject ITranslationService Translation
+@inject NavigationManager Navigation
+
+<PageTitle>@T("ui.learning.settings.title", "Tenant learning guidance")</PageTitle>
+<HeadContent>
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="referrer" content="no-referrer" />
+</HeadContent>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-6">
+    <section class="learning-settings" aria-busy="@(Learning.IsBusy ? "true" : "false")">
+        <header>
+            <MudText Typo="Typo.h4" HtmlTag="h1">@T("ui.learning.settings.title", "Tenant learning guidance")</MudText>
+            <p>@T("ui.learning.settings.introduction", "Configure optional guidance for this tenant. These choices do not change real event permissions, commerce readiness, or another person's private progress.")</p>
+            <AppButton Href="@Navigation.ToAbsoluteUri("settings/admin").PathAndQuery" Variant="Variant.Text">
+                @T("ui.learning.settings.back", "Back to tenant administration")
+            </AppButton>
+        </header>
+
+        @if (!_interactiveReady || Learning.IsBusy && _draft is null)
+        {
+            <p role="status">@T("ui.learning.settings.loading", "Loading private tenant guidance settings...")</p>
+        }
+        else
+        {
+            @if (Learning.Failure != LearningClientFailure.None)
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" role="alert">
+                    @FailureText
+                </MudAlert>
+            }
+            @if (_validationError)
+            {
+                <p id="learning-settings-error" role="alert">
+                    @T("ui.learning.settings.disabled_requirement", "Enable learning or make orientation optional before saving. Disabled learning cannot require acknowledgement.")
+                </p>
+            }
+            @if (_saved)
+            {
+                <p role="status">@T("ui.learning.settings.saved", "The server confirmed these tenant guidance settings.")</p>
+            }
+            @if (Learning.IsSaving)
+            {
+                <p role="status">@T("ui.learning.settings.saving", "Waiting for the server to confirm the guidance change...")</p>
+            }
+
+            @if (Learning.Context is { } context && IsRequirementContextCurrent(context))
+            {
+                <LearningRequirementNotice Context="context" IsCurrentContext="IsRequirementContextCurrent"
+                                           CancellationToken="_lifetime.Token" HeadingLevel="2" />
+            }
+
+            @if (_draft is { } draft && _source is { } source)
+            {
+                <p>@(source.ConcurrencyStamp is null
+                    ? T("ui.learning.settings.defaults", "This tenant currently uses the built-in guidance defaults. Saving creates a tenant override.")
+                    : T("ui.learning.settings.override", "These settings are a tenant guidance override."))</p>
+                @if (!Learning.HasGuidancePolicyAction("edit"))
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" data-learning-state="policy-read-only">
+                        @T("ui.learning.settings.locked", "Read-only: the server has not advertised editing. Inherited instance governance or your current administrator authority may prevent changes.")
+                    </MudAlert>
+                }
+                <form @onsubmit="SaveAsync" @onsubmit:preventDefault @onchange="OnDraftChanged">
+                    <fieldset disabled="@(!CanEdit || Learning.IsBusy || !Learning.CanSubmit)"
+                              class="learning-settings__fields" aria-describedby="learning-settings-purpose">
+                        <legend>@T("ui.learning.settings.availability", "Availability and audiences")</legend>
+                        <p id="learning-settings-purpose">
+                            @T("ui.learning.settings.availability_help", "Disabling guidance preserves private history and static Help. Turning off automatic invitations keeps authorized manual access. Invitation and manual audiences are independent.")
+                        </p>
+                        <label class="learning-settings__toggle">
+                            <input type="checkbox" @bind="draft.Enabled" />
+                            <span>@T("ui.learning.settings.enabled", "Enable learning guidance")</span>
+                        </label>
+                        <label class="learning-settings__toggle">
+                            <input type="checkbox" @bind="draft.AutomaticInvitations" />
+                            <span>@T("ui.learning.settings.invitations", "Allow automatic invitations")</span>
+                        </label>
+                        <div class="learning-settings__field">
+                            <label for="learning-invitation-audience">@T("ui.learning.settings.invitation_audience", "Invitation audience")</label>
+                            <select id="learning-invitation-audience" @bind="draft.InvitationAudience">
+                                <option value="@LearningGuidanceAudience.ActiveMembers">@T("ui.learning.settings.members", "Active members")</option>
+                                <option value="@LearningGuidanceAudience.TenantAdministrators">@T("ui.learning.settings.administrators", "Tenant administrators")</option>
+                            </select>
+                        </div>
+                        <div class="learning-settings__field">
+                            <label for="learning-manual-audience">@T("ui.learning.settings.manual_audience", "Manual access audience")</label>
+                            <select id="learning-manual-audience" @bind="draft.ManualAccessAudience">
+                                <option value="@LearningGuidanceAudience.ActiveMembers">@T("ui.learning.settings.members", "Active members")</option>
+                                <option value="@LearningGuidanceAudience.TenantAdministrators">@T("ui.learning.settings.administrators", "Tenant administrators")</option>
+                            </select>
+                        </div>
+                        <div class="learning-settings__field">
+                            <label for="learning-requirement-policy">@T("ui.learning.settings.requirement", "Administrator orientation")</label>
+                            <select id="learning-requirement-policy" @bind="draft.RequirementPolicy"
+                                    aria-describedby="learning-requirement-help">
+                                <option value="@LearningRequirementPolicy.Optional">@T("ui.learning.settings.optional", "Optional")</option>
+                                <option value="@LearningRequirementPolicy.TenantAdminOrientationAcknowledgement">@T("ui.learning.settings.acknowledgement", "Require personal administrator acknowledgement")</option>
+                            </select>
+                            <p id="learning-requirement-help">
+                                @T("ui.learning.settings.requirement_help", "Acknowledgement records only that the current administrator explicitly acknowledged the current notice. It is not competence, course completion, readiness, or permission to publish or take payments. Suppressing invitations does not hide a pending notice.")
+                            </p>
+                        </div>
+                    </fieldset>
+
+                    <fieldset disabled="@(!CanEdit || Learning.IsBusy || !Learning.CanSubmit)" class="learning-settings__fields">
+                        <legend>@T("ui.learning.settings.families", "Guidance families")</legend>
+                        <p>@T("ui.learning.settings.families_help", "Leave a family override off to inherit the tenant choices above. These settings do not install a tour renderer or start a tour.")</p>
+                        @foreach (var family in _families)
+                        {
+                            <div class="learning-settings__family" @key="family.Family">
+                                <label class="learning-settings__toggle">
+                                    <input type="checkbox" @bind="family.Override" />
+                                    <span>@FamilyLabel(family.Family) - @T("ui.learning.settings.family_override", "override tenant defaults")</span>
+                                </label>
+                                <fieldset disabled="@(!family.Override)" class="learning-settings__family-fields">
+                                    <legend>@FamilyLabel(family.Family)</legend>
+                                    <label class="learning-settings__toggle">
+                                        <input type="checkbox" @bind="family.Enabled" />
+                                        <span>@T("ui.learning.settings.family_enabled", "Enable this family")</span>
+                                    </label>
+                                    <label class="learning-settings__toggle">
+                                        <input type="checkbox" @bind="family.AutomaticInvitations" />
+                                        <span>@T("ui.learning.settings.invitations", "Allow automatic invitations")</span>
+                                    </label>
+                                    <div class="learning-settings__field">
+                                        <label for="@($"learning-family-invitation-{family.Family}")">@T("ui.learning.settings.invitation_audience", "Invitation audience")</label>
+                                        <select id="@($"learning-family-invitation-{family.Family}")" @bind="family.InvitationAudience">
+                                            <option value="">@T("ui.learning.settings.inherit", "Inherit tenant audience")</option>
+                                            <option value="@LearningGuidanceAudience.ActiveMembers">@T("ui.learning.settings.members", "Active members")</option>
+                                            <option value="@LearningGuidanceAudience.TenantAdministrators">@T("ui.learning.settings.administrators", "Tenant administrators")</option>
+                                        </select>
+                                    </div>
+                                    <div class="learning-settings__field">
+                                        <label for="@($"learning-family-manual-{family.Family}")">@T("ui.learning.settings.manual_audience", "Manual access audience")</label>
+                                        <select id="@($"learning-family-manual-{family.Family}")" @bind="family.ManualAccessAudience">
+                                            <option value="">@T("ui.learning.settings.inherit", "Inherit tenant audience")</option>
+                                            <option value="@LearningGuidanceAudience.ActiveMembers">@T("ui.learning.settings.members", "Active members")</option>
+                                            <option value="@LearningGuidanceAudience.TenantAdministrators">@T("ui.learning.settings.administrators", "Tenant administrators")</option>
+                                        </select>
+                                    </div>
+                                </fieldset>
+                            </div>
+                        }
+                    </fieldset>
+                    @if (Learning.HasGuidancePolicyAction("edit"))
+                    {
+                        <button type="submit" class="learning-settings__button"
+                                disabled="@(!CanEdit || !Learning.CanSubmit)">
+                            @T("ui.learning.settings.save", "Save tenant guidance")
+                        </button>
+                    }
+                </form>
+                <p>@T("ui.learning.settings.reload_help", "If saving conflicts or cannot be confirmed, your unsaved draft remains here. Reload explicitly to discard it and read the server's current settings; no save is automatically replayed.")</p>
+            }
+            else if (Learning.Failure == LearningClientFailure.None)
+            {
+                <p>@T("ui.learning.settings.unavailable", "Guidance settings are unavailable in the current tenant and account context.")</p>
+            }
+            <AppButton OnClick="ReloadAsync" Variant="Variant.Outlined" Disabled="@Learning.IsBusy">
+                @T("ui.learning.settings.reload", "Discard draft and reload")
+            </AppButton>
+        }
+    </section>
+</MudContainer>
+
+@code {
+    [CascadingParameter(Name = "TenantContext")] private TenantContext? TenantContext { get; set; }
+    private readonly CancellationTokenSource _lifetime = new();
+    private HalResourceOfLearningGuidancePolicyDto? _source;
+    private LearningGuidancePolicyPayload? _draft;
+    private LearningClientScope? _draftScope;
+    private FamilyDraft[] _families = [];
+    private bool _interactiveReady;
+    private bool _loadRequested = true;
+    private bool _validationError;
+    private bool _saved;
+    private bool _disposed;
+
+    private bool CanEdit => _source is not null && ReferenceEquals(_source, Learning.GuidancePolicy)
+        && _draftScope == Learning.Scope && Learning.HasGuidancePolicyAction("edit");
+
+    private bool IsRequirementContextCurrent(HalResourceOfLearningContextDto source) =>
+        !_disposed && _interactiveReady && !Learning.RequiresContextRefresh
+        && ReferenceEquals(source, Learning.Context)
+        && Learning.Scope is { } scope && scope.TenantId == TenantContext?.TenantId
+        && source.TenantId == scope.TenantId && source.UserId == scope.UserId
+        && source.ContextKey == scope.ContextKey;
+
+    protected override void OnInitialized()
+    {
+        Learning.Clear();
+        Learning.Changed += OnLearningChanged;
+        Translation.OnLanguageChanged += OnLanguageChanged;
+    }
+
+    protected override void OnParametersSet() => Learning.SetTenantContext(TenantContext?.TenantId);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _interactiveReady = true;
+        if (!_disposed && !Learning.IsBusy && (_loadRequested || Learning.RequiresContextRefresh))
+        {
+            _loadRequested = false;
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        ClearDraft();
+        await Learning.LoadGuidancePolicyAsync(_lifetime.Token);
+        if (!_disposed && Learning.Failure == LearningClientFailure.None)
+            AdoptPolicy();
+        if (!_disposed)
+            await InvokeAsync(StateHasChanged);
+    }
+
+    private void AdoptPolicy()
+    {
+        if (Learning.GuidancePolicy is not { } source || Learning.Scope is not { } scope)
+            return;
+        _source = source;
+        _draftScope = scope;
+        _draft = new()
+        {
+            Enabled = source.Policy.Enabled,
+            AutomaticInvitations = source.Policy.AutomaticInvitations,
+            InvitationAudience = source.Policy.InvitationAudience,
+            ManualAccessAudience = source.Policy.ManualAccessAudience,
+            RequirementPolicy = source.Policy.RequirementPolicy
+        };
+        _families = new[]
+        {
+            LearningTourFamily.Shell, LearningTourFamily.Studio,
+            LearningTourFamily.EventManagement, LearningTourFamily.NormalAi
+        }.Select(family =>
+        {
+            var existing = source.Policy.FamilyOverrides.FirstOrDefault(item => item.Family == family);
+            return new FamilyDraft
+            {
+                Family = family,
+                Override = existing is not null,
+                Enabled = existing?.Enabled ?? true,
+                AutomaticInvitations = existing?.AutomaticInvitations ?? true,
+                InvitationAudience = existing?.InvitationAudience,
+                ManualAccessAudience = existing?.ManualAccessAudience
+            };
+        }).ToArray();
+    }
+
+    private async Task SaveAsync()
+    {
+        _saved = false;
+        if (!CanEdit || !Learning.CanSubmit || _source is not { } source || _draft is not { } draft)
+            return;
+        _validationError = !draft.Enabled
+            && draft.RequirementPolicy == LearningRequirementPolicy.TenantAdminOrientationAcknowledgement;
+        if (_validationError)
+            return;
+
+        var scope = _draftScope;
+        var submitted = new LearningGuidancePolicyPayload
+        {
+            Enabled = draft.Enabled,
+            AutomaticInvitations = draft.AutomaticInvitations,
+            InvitationAudience = draft.InvitationAudience,
+            ManualAccessAudience = draft.ManualAccessAudience,
+            RequirementPolicy = draft.RequirementPolicy,
+            FamilyOverrides = _families.Where(family => family.Override)
+                .Select(family => new LearningGuidanceFamilyOverrideDto
+                {
+                    Family = family.Family,
+                    Enabled = family.Enabled,
+                    AutomaticInvitations = family.AutomaticInvitations,
+                    InvitationAudience = family.InvitationAudience,
+                    ManualAccessAudience = family.ManualAccessAudience
+                }).ToArray()
+        };
+        if (await Learning.UpdateGuidancePolicyAsync(source, submitted, _lifetime.Token)
+            && !_disposed && scope == Learning.Scope && !Learning.RequiresContextRefresh)
+        {
+            AdoptPolicy();
+            _saved = true;
+        }
+    }
+
+    private void OnLearningChanged()
+    {
+        if (Learning.RequiresContextRefresh || _draftScope is not null && _draftScope != Learning.Scope)
+            ClearDraft();
+        if (!_disposed)
+            _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnDraftChanged()
+    {
+        _saved = false;
+        _validationError = false;
+    }
+
+    private void ClearDraft()
+    {
+        _source = null;
+        _draft = null;
+        _draftScope = null;
+        _families = [];
+        _validationError = false;
+        _saved = false;
+    }
+
+    private string FamilyLabel(LearningTourFamily family) => family switch
+    {
+        LearningTourFamily.Shell => T("ui.learning.settings.family.shell", "Workspace shell"),
+        LearningTourFamily.Studio => T("ui.learning.settings.family.studio", "Studio"),
+        LearningTourFamily.EventManagement => T("ui.learning.settings.family.event", "Event management"),
+        _ => T("ui.learning.settings.family.ai", "AI workspace")
+    };
+
+    private string FailureText => Learning.Failure switch
+    {
+        LearningClientFailure.SignInRequired => T("ui.learning.settings.sign_in", "Sign in again before reading private tenant settings."),
+        LearningClientFailure.Unavailable => T("ui.learning.settings.denied", "These tenant guidance settings are unavailable for your current account."),
+        LearningClientFailure.Conflict => T("ui.learning.settings.conflict", "The server settings changed, so this save could not be confirmed. Your draft is retained. Reload explicitly before another save."),
+        LearningClientFailure.SaveNotApplied => T("ui.learning.settings.not_applied", "The server did not confirm the submitted settings. Your draft is retained; reload before another save."),
+        _ => T("ui.learning.settings.failed", "The request could not be confirmed. A save may have reached the server. Your draft is retained; reload to check before trying again.")
+    };
+
+    private string T(string key, string fallback) => Translation.T(key, fallback);
+
+    private void OnLanguageChanged(string language)
+    {
+        if (!_disposed)
+            _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+        _disposed = true;
+        Learning.Changed -= OnLearningChanged;
+        Translation.OnLanguageChanged -= OnLanguageChanged;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+        ClearDraft();
+        Learning.Clear();
+    }
+
+    private sealed class FamilyDraft
+    {
+        public LearningTourFamily Family { get; init; }
+        public bool Override { get; set; }
+        public bool Enabled { get; set; }
+        public bool AutomaticInvitations { get; set; }
+        public LearningGuidanceAudience? InvitationAudience { get; set; }
+        public LearningGuidanceAudience? ManualAccessAudience { get; set; }
+    }
+}

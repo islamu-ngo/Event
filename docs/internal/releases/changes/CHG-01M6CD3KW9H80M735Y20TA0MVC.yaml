@@ -1,0 +1,28 @@
+Change-Id: CHG-01M6CD3KW9H80M735Y20TA0MVC
+Title: "complete private learning saves with separate authority storage"
+Type: fix
+Scope: onboarding
+Summary: "Private learning saves finish normally when the privacy-erasure authority uses a separate embedded database, while preserving original identity and precommit source checks."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Source authorization remains bound to the original Serializable primary commit. Only consumption of its exact committed receipt permits the separate authority's completion check to validate original mutation, request, principal, tenant and credential-lifetime custody without demanding ended transaction locks.
+  Migration:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: No configuration or migration change is needed. Reconcile any earlier unconfirmed action from current private learning state before submitting a new choice; failures after a committed primary receipt remain unknown outcomes and are never replayed automatically.

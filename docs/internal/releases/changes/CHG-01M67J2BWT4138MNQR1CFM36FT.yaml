@@ -1,0 +1,29 @@
+Change-Id: CHG-01M67J2BWT4138MNQR1CFM36FT
+Title: "route directory management to instance administration"
+Type: fix
+Scope: onboarding
+Summary: "Open the registered instance directory administration route from Getting started when the server advertises directory management."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      Manage directories opens /admin/instance/tenants rather than the obsolete
+      /admin/tenants address. The existing server HAL relation still controls
+      whether the action appears. No route alias or new authority is added.

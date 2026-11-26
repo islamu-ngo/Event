@@ -7,6 +7,7 @@ using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Ingestion;
 using Explore.Application.Features.ConfigurationManifest.Validation;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
 
@@ -42,6 +43,10 @@ public static class ConfigurationManifestCompiler
         {
             throw new ConfigurationManifestCompilationException(validation.Errors);
         }
+        if (source.Manifest.Spec.Instance.Settings.ContainsKey(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)
+            || source.Manifest.Spec.Tenants.Any(tenant =>
+                tenant.Spec.Settings.ContainsKey(GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)))
+            throw new InvalidOperationException("announcement_original_import_required");
 
         ValidateSourceIdentity(source);
         ConfigurationManifestPaidEventPolicyPayloadV1Alpha2?

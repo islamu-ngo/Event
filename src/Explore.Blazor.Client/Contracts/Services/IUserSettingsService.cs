@@ -35,4 +35,11 @@ public interface IUserSettingsService
     /// Invalidates the in-memory cache for a category, forcing a fresh load on next access.
     /// </summary>
     void InvalidateCache(string category);
+
+    Task<AnnouncementMarkerReadResult> GetAnonymousAnnouncementMarkerAsync(
+        Guid tenantId, CancellationToken ct = default);
+
+    Task<bool> SaveAnonymousAnnouncementMarkerAsync(
+        Guid tenantId, ISLAMU.Wire.Contracts.Announcements.AnnouncementDismissalMarkerDto marker,
+        CancellationToken ct = default);
 }

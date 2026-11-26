@@ -1,0 +1,36 @@
+Change-Id: CHG-01M67QRNWYSKN7C63KE6M4DEBF
+Title: "configure tenant learning guidance and orientation"
+Type: feat
+Scope: onboarding
+Summary: "Expose tenant guidance policy editing and current personal orientation in tenant administration using server-advertised actions and observed source stamps."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Detail: >-
+      Policy editing follows the current edit HAL relation and nullable Guid
+      concurrency stamp. Explicit personal acknowledgement remains independent
+      of policy-edit permission and optional invitation visibility. Conflicts
+      and uncertain writes require explicit reload rather than replay.
+  Migration:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      Both tenant settings layouts link to /settings/admin/learning. Administrators
+      can edit closed availability, audiences, orientation and family overrides
+      when permitted, including re-enabling disabled learning. Unsaved drafts
+      remain visible after conflicts. No production readiness gate is added.

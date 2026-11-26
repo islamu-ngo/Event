@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Explore.Blazor.Client.Pages.Admin.Instance.Components;
+using Explore.Blazor.Client.Routing.InstanceAdmin;
 
 namespace Explore.Blazor.Client.Tests.Pages.Admin;
 
@@ -101,7 +102,7 @@ public sealed class InstanceGettingStartedSectionTests
         var component = context.RenderMudComponent<InstanceGettingStartedSection>();
 
         await Assert.That(component.FindAll("a").Select(link => link.GetAttribute("href")).Distinct())
-            .IsEquivalentTo(new[] { "/settings/instance?section=auth-providers", "/settings/instance?section=operator-identity", "/admin/tenants" });
+            .IsEquivalentTo(new[] { "/settings/instance?section=auth-providers", "/settings/instance?section=operator-identity", InstanceAdminRoutes.Tenants });
     }
 
     [Test]

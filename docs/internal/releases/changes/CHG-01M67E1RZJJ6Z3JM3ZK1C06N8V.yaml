@@ -1,0 +1,37 @@
+Change-Id: CHG-01M67E1RZJJ6Z3JM3ZK1C06N8V
+Title: "offer private practice without creating real events"
+Type: feat
+Scope: onboarding
+Summary: "Add an authenticated learning hub and five authored exercises with private interactive fetch, server-confirmed actions and scope-bound cancellation."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Detail: >-
+      Defer private fetch until authenticated interactive rendering. Clear
+      tenant/account/actor state and reject late completions across scope
+      changes or disposal. Uncertain saves require reconciliation; reentrant
+      completion cannot return superseded success. Actions follow received HAL.
+  Migration:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      Use /learning and existing private practice addresses for five fictional
+      exercises without real event effects. Reset and clearing stay private;
+      opening an address never recreates a removed source. Hosted visual and
+      accessibility acceptance remains a programme release gate. No new package,
+      secret, environment variable, schema migration or generated API is added.

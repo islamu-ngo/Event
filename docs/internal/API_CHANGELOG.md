@@ -3,6 +3,113 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-31
+
+- The single announcement bar now uses complete instance/tenant publications,
+  server-issued material editions and source witnesses instead of independent
+  scalar fields and integer revisions. Eight named announcement operations
+  provide private source reads, typed publication and current-user dismissal.
+  HAL links advertise actions; a stale source or marker expectation conflicts
+  without writing. Closing the bar remains an optional preference, not required
+  acknowledgement or learning evidence.
+- Generic settings mutation and reset cannot replace the coordinated publication
+  or erase its private dismissal marker. Configuration imports carry semantic
+  changes, not reusable runtime editions or private evidence. Existing scalar
+  announcements require explicit republishing; no revision-to-edition backfill
+  is performed.
+- Native API/schema generation and per-tag client generation completed. Four
+  selected PostgreSQL cases passed for restricted no-write completion and
+  first-owner installation under existing FORCE RLS with later drift refusal.
+  All 25 targeted HTTP admission/lifecycle cases and 167 affected client cases
+  passed, including generated dismissal serialization with an explicit null
+  expectation. The three factory/store ownership regressions also passed after
+  native ownership issuance was separated from public self-attestation.
+  Remaining native cases, hosted acceptance and the final programme matrix
+  remain open.
+
+## 2026-10-30
+
+- C05 policy source adds private read-only-default GET and Guid-CAS PATCH at
+  `/api/tenant/settings/documents/learning-guidance`. Schema1 and defaults
+  `learning-guidance:1` describe enabled/invitation/manual audiences,
+  optional administrator acknowledgement and at most four family overrides.
+  Only HAL advertises editing, constrained by current native administration and
+  the instance-only edit control. Original absence/value/lock sources and the
+  exact accepted semantic document image remain checked through settlement.
+  Effective-policy Application/HTTP checks and actual PostgreSQL Runtime
+  guidance/isolation checks passed. Hosted UI and full provider assurance remain.
+
+- C05 acknowledgement source adds
+  `POST /api/learning/requirements/{requirementKey}/acknowledge` and private
+  `LearningContextDto.Requirement`. Only current tenant administrators may
+  explicitly acknowledge current `tenant-admin-orientation` material under a
+  required policy. The strict request carries scope/revision/source bindings
+  and a stable intent, never a supplied owner. Pending-only HAL and private
+  evidence do not grant production authority or depend on tour completion.
+  Targeted Application/API admission and SQLite erasure checks passed. Native
+  schema/client regeneration and all seven learning generated-contract checks
+  passed; rendered acknowledgement and full programme assurance remain separate.
+
+- The semantic learning contract below now has fresh native API/client
+  generation, Release client compilation and four passing generated-contract
+  cases. Both dedicated external-authority original-human source cases passed.
+  These are targeted backend receipts, not hosted or full-provider acceptance.
+- The original SQL Server semantic-scaffold quarantine was resolved by a
+  separate metadata-generator correction and regeneration. All four semantic
+  catalogs now have learning-only operation inspection and model-agreement
+  receipts; no database upgrade/reset or full-history acceptance is claimed.
+- Expected native body-check SQL is memoized per original context/enrollment,
+  never as successful authorization or readiness. Live attestation still runs
+  every time; an actual Runtime warmed-read/body-drift rejection case passed.
+  No wire contract or database permission was added by this optimization.
+
+## 2026-10-29
+
+- C04 semantic tour source contract adds private
+  `GET /api/learning/tours/{family}/plan` for exact named `Shell`, `Studio`,
+  `EventManagement` and `NormalAi` families. It returns current applicable
+  semantic steps, plan/policy-source fingerprints, scope, learner revision,
+  captured actor/event context and authorized HAL claim eligibility. Tour material
+  is version 2; authored practice remains version 1.
+- Tour claims now require expected plan/policy stamps and explicit `Replay`.
+  The existing `POST /api/learning/tours/outcome` route accepts closed `Action`
+  values `Progress`, `Complete`, `Skip`, `Interrupt` and `Snooze`, context/event
+  coordinates and accepted source bindings. Only progress accepts key/version;
+  only snooze accepts a registered duration. Ordinal `StepIndex` and `Outcome`
+  inputs are removed, not aliased. Integrators must adopt the semantic contract;
+  historical response `Outcome` remains separate from current applicable
+  `CurrentCoverage`. Authored identity evidence survives applicability omissions;
+  bounds are 32 steps per family, two retained versions and 256 evidence rows.
+- Actual selected-owner sources remain retained through final admission; request
+  fingerprints are not authority. Normal-AI capability is observed outside the
+  transaction, not leased credential validity. Owned cleanup can release claims
+  after source removal without admitting stale progress/completion. No automatic
+  replay, hard production gate or UI delivery is introduced.
+- This entry records source changes, not a release or C04 completion. PostgreSQL,
+  SQLite and MySQL semantic scaffolds were generated offline. The SQL Server
+  scaffold's identical pre-existing moderation FK delta was reproduced on the
+  untouched baseline and is quarantined, not accepted. No database upgrade/reset
+  or final migration/provider acceptance is claimed. Current reported evidence:
+  14 semantic Domain cases; 27 migrated original Domain cases before dead ordinal
+  removal; earlier seven SQLite model cases and one native injected-child
+  rollback. A fresh nine-case actual-role run is pending. Application `CS0105`
+  and client `CA1001` remain quarantined. Historical receipts below are not fresh
+  C04 proof; no hosted assurance or current renderer/UI readiness is established.
+
+## 2026-10-28
+
+- Added the private `/api/learning` context, practice, tour, preference and
+  tenant-source operations. State belongs to the original active tenant member;
+  actor/event contexts require current contextual authority and source lifecycle
+  requires current tenant administration. Closed string-enum requests reject
+  ownership/effect payloads. Stable intent IDs and revisions protect bounded
+  retries; no private response is replayed from generic idempotency storage.
+  Successes and errors are private/no-store. Authored practice changes only
+  learning state, not events, orders, attendees, outboxes or AI conversations.
+  Rendered practice and contextual guidance remain separate required deliveries.
+  Source integration is present; final runtime/provider acceptance is tracked
+  separately and is not implied by this changelog entry.
+
 ## 2026-10-25
 
 - Managed event-program responses copy their sessions, groups, days and agenda

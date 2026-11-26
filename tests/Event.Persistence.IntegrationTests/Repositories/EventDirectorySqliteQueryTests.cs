@@ -14,6 +14,42 @@ public sealed class EventDirectorySqliteQueryTests
     private static readonly DateTimeOffset Now = new(2028, 6, 15, 12, 0, 0, TimeSpan.Zero);
 
     [Test]
+    public async Task ManagedEventsOrderExactInstantsAndExcludeDeletedEvents()
+    {
+        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
+        foreach (var (title, start) in new (string, DateTimeOffset?)[]
+        {
+            ("past", Now.AddDays(-1)),
+            ("zeta", Now.ToOffset(TimeSpan.FromHours(9))),
+            ("future", Now.AddTicks(1).ToOffset(TimeSpan.FromHours(-7))),
+            ("alpha", Now),
+            ("unscheduled", null),
+            ("deleted", Now.AddDays(1))
+        })
+        {
+            var seeded = await fixture.SeedEventAsync();
+            var entity = await fixture.Context.Events.SingleAsync(row => row.Id == seeded.Id);
+            entity.Title = title;
+            entity.PublicCode = title;
+            entity.FirstSessionStartUtc = start;
+            entity.LastSessionStartUtc = start;
+            entity.LastSessionEndUtc = start?.AddHours(1);
+            entity.FirstSessionDate = start.HasValue ? DateOnly.FromDateTime(start.Value.DateTime) : null;
+            entity.SessionCount = start.HasValue ? 1 : 0;
+            entity.IsDeleted = title == "deleted";
+            await fixture.Context.SaveChangesAsync();
+            fixture.Context.ChangeTracker.Clear();
+        }
+
+        var events = await new EventRepository(fixture.Context)
+            .GetEventsByActorWithDetails(fixture.ActorId);
+
+        await Assert.That(string.Join(',', events.Select(entity => entity.Title)))
+            .IsEqualTo("future,alpha,zeta,past,unscheduled");
+        await Assert.That(fixture.Context.ChangeTracker.Entries().Count()).IsEqualTo(0);
+    }
+
+    [Test]
     [Arguments(TemporalView.Upcoming, "future")]
     [Arguments(TemporalView.Ongoing, "current,ends-after,starts-now")]
     [Arguments(TemporalView.Past, "ends-before,ends-now,past")]

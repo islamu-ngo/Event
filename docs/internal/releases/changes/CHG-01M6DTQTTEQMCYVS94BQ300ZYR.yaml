@@ -1,0 +1,29 @@
+Change-Id: CHG-01M6DTQTTEQMCYVS94BQ300ZYR
+Title: "retain creation custody through draft settlement"
+Type: fix
+Scope: events
+Summary: "Acquire discovery custody before draft transactions and preserve committed or unknown outcomes when the original connection fails."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Original human-source and discovery custody remain required through settlement; lost custody never permits replacement or replay.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: Check Studio inventory after an interrupted save before submitting another draft; no configuration or migration changes are required.

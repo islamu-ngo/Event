@@ -1,0 +1,96 @@
+@inject ITranslationService Translation
+@inject NavigationManager Navigation
+
+<details @key="_disclosureGeneration" class="learning-help" data-testid="learning-context-help">
+    <summary class="learning-help__trigger" dir="auto">@T("ui.learning.help.label", "Help")</summary>
+    <div class="learning-help__content">
+        <p class="learning-help__title" dir="auto">@T("ui.learning.help.title", "What would you like to do?")</p>
+        <dl class="learning-help__goals">
+            <dt dir="auto">@T("ui.learning.help.find.title", "Find an event")</dt>
+            <dd dir="auto">
+                @T("ui.learning.help.find.body", "Browse real events and adjust the available search and filters. An empty result is not a sample event or a failed registration.")
+                <a href="@Route("events")" dir="auto">@T("ui.learning.help.browse", "Browse events")</a>
+            </dd>
+            <dt dir="auto">@T("ui.learning.help.participate.title", "Take part")</dt>
+            <dd dir="auto">@T("ui.learning.help.participate.body", "Open an event to see its details and the participation options currently available to you. A saved example never registers you or buys a ticket.")</dd>
+        </dl>
+        <AuthorizeView>
+            <Authorized>
+                @if (_interactiveReady && ReplayGuidanceAvailable && ReplayGuidance.HasDelegate)
+                {
+                    <button type="button" dir="auto" data-testid="learning-help-replay" @onclick="ReplayAsync">
+                        @T("ui.learning.help.replay", "Replay guidance for this workspace")
+                    </button>
+                }
+                <dl class="learning-help__goals">
+                    <dt dir="auto">@T("ui.learning.help.organize.title", "Organize as yourself")</dt>
+                    <dd dir="auto">@T("ui.learning.help.organize.body", "Use the event creation or Studio action when it is available. Studio lists managed work; an event's management pages hold its details, schedule and publication controls.")</dd>
+                    <dt dir="auto">@T("ui.learning.help.collaborate.title", "Work with an organization or group")</dt>
+                    <dd dir="auto">@T("ui.learning.help.collaborate.body", "Check the selected acting organization or group before working. Its events and your personal work are different contexts. Membership, event actions and settings administration are separate permissions.")</dd>
+                    <dt dir="auto">@T("ui.learning.help.scope.title", "Understand your current scope")</dt>
+                    <dd dir="auto">@T("ui.learning.help.scope.body", "Use the scope shown by the page and the actions it actually offers. Changing context does not transfer private practice, change permissions or complete real prerequisites.")</dd>
+                    @foreach (var scope in _interactiveReady ? AuthorizedSettingsScopes ?? [] : [])
+                    {
+                        @if (SettingsRoute(scope) is { } route)
+                        {
+                            <dt dir="auto">@T("ui.learning.help.admin.title", "Administer an available scope"): <bdi dir="auto">@scope.DisplayName</bdi></dt>
+                            <dd dir="auto">
+                                @(scope.Scope == "Instance"
+                                    ? T("ui.learning.help.admin.instance", "Instance administration controls the platform, deployment and inherited directory rules. Use its existing Getting started guidance and live readiness checks; optional lessons cannot make public disclosure or paid commerce ready.")
+                                    : T("ui.learning.help.admin.scoped", "These settings apply only to this authorized scope. Check inherited controls, current blockers and the responsible scope before changing real configuration. Event collaboration does not by itself grant settings administration."))
+                                <a href="@Route(route)" dir="auto">@T("ui.learning.help.admin.open", "Open this scope's existing settings")</a>
+                            </dd>
+                        }
+                    }
+                    <dt dir="auto">@T("ui.learning.help.practice.title", "Practise privately")</dt>
+                    <dd dir="auto">
+                        @T("ui.learning.help.practice.body", "Optional fictional exercises live separately from upcoming and past events. They do not publish, invite, charge or prove competence. Help stays available when guidance is hidden or unavailable.")
+                        <a href="@Route("learning")" dir="auto">@T("ui.learning.help.practice.link", "Open your private learning hub")</a>
+                    </dd>
+                </dl>
+            </Authorized>
+            <NotAuthorized>
+                <p dir="auto">
+                    @T("ui.learning.help.sign_in.body", "You can browse without signing in. Sign in to see your own account and the participation options available to you.")
+                    <a href="@Route("auth/login")" dir="auto" data-enhance-nav="false">@T("ui.learning.help.sign_in", "Sign in")</a>
+                </p>
+            </NotAuthorized>
+        </AuthorizeView>
+        <p dir="auto">@T("ui.learning.help.returning", "You can reopen Help at any time. Close this disclosure with the Help control to return to your work; no walkthrough starts automatically.")</p>
+    </div>
+</details>
+
+@code {
+    [Parameter] public IEnumerable<SettingsScopeDto>? AuthorizedSettingsScopes { get; set; }
+    [Parameter] public bool ReplayGuidanceAvailable { get; set; }
+    [Parameter] public EventCallback ReplayGuidance { get; set; }
+    private bool _interactiveReady;
+    private long _disclosureGeneration;
+
+    private async Task ReplayAsync()
+    {
+        // Hand off to the tour with a fresh, closed native disclosure.
+        ++_disclosureGeneration;
+        await ReplayGuidance.InvokeAsync();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+        _interactiveReady = true;
+        StateHasChanged();
+    }
+
+    private static string? SettingsRoute(SettingsScopeDto scope) => scope.Scope switch
+    {
+        "Instance" => "/settings/instance",
+        "Tenant" when scope.ScopeId is { } id && id != Guid.Empty => "/settings/admin",
+        "Organization" when scope.ScopeId is { } id && id != Guid.Empty => $"/settings/organization/{id:D}",
+        "Group" when scope.ScopeId is { } id && id != Guid.Empty => $"/settings/group/{id:D}",
+        _ => null
+    };
+
+    private string Route(string path) => Navigation.ToAbsoluteUri(path.TrimStart('/')).PathAndQuery;
+    private string T(string key, string fallback) => Translation.T(key, fallback);
+}

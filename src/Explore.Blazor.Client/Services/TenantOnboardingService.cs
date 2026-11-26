@@ -143,7 +143,7 @@ public class TenantOnboardingService : ITenantOnboardingService
             return await _api.CompleteTenantOnboardingAsync(
                 new CompleteTenantOnboardingRequest
                 {
-                    Settings = ToRequest(settings, false),
+                    Settings = ToRequest(settings),
                     DirectoryOperatorIdentity = new TenantDirectoryOperatorIdentityInputDto
                     {
                         PublicName = identity.PublicName,
@@ -243,45 +243,38 @@ public class TenantOnboardingService : ITenantOnboardingService
         AiAssistantProvider = "none"
     };
 
-    private static UpdateTenantPolicyRequest ToRequest(
-        TenantPolicySettingsDto settings,
-        bool forceAnnouncementBarRedisplay) => new()
-        {
-            AllowUserSubmittedEvents = settings.AllowUserSubmittedEvents,
-            AllowOrganizationSubmittedEvents = settings.AllowOrganizationSubmittedEvents,
-            AllowGroupSubmittedEvents = settings.AllowGroupSubmittedEvents,
-            AllowOrganizationSelfRegistration = settings.AllowOrganizationSelfRegistration,
-            AllowGroupSelfRegistration = settings.AllowGroupSelfRegistration,
-            EventCardClickOpensDetailPage = settings.EventCardClickOpensDetailPage,
-            RequireEventApproval = settings.RequireEventApproval,
-            RequireOrganizationVerification = settings.RequireOrganizationVerification,
-            PreferredHomePage = settings.PreferredHomePage,
-            Subdomain = settings.Subdomain,
-            CustomDomain = settings.CustomDomain,
-            AnnouncementBarEnabled = settings.AnnouncementBarEnabled,
-            AnnouncementBarMessage = settings.AnnouncementBarMessage,
-            AnnouncementBarLinkText = settings.AnnouncementBarLinkText,
-            AnnouncementBarLinkUrl = settings.AnnouncementBarLinkUrl,
-            ForceAnnouncementBarRedisplay = forceAnnouncementBarRedisplay,
-            CommunityGuidelinesContent = settings.CommunityGuidelinesContent,
-            RenderPolicyPreset = settings.RenderPolicyPreset,
-            EnableAdvancedRenderPolicyOverrides = settings.EnableAdvancedRenderPolicyOverrides,
-            GlobalRenderMode = settings.GlobalRenderMode,
-            GlobalPrerenderEnabled = settings.GlobalPrerenderEnabled,
-            PublicSeoRenderMode = settings.PublicSeoRenderMode,
-            PublicSeoPrerenderEnabled = settings.PublicSeoPrerenderEnabled,
-            OperationalRenderMode = settings.OperationalRenderMode,
-            OperationalPrerenderEnabled = settings.OperationalPrerenderEnabled,
-            AdminRenderMode = settings.AdminRenderMode,
-            AdminPrerenderEnabled = settings.AdminPrerenderEnabled,
-            AiAssistantEnabled = settings.AiAssistantEnabled,
-            AiAssistantProvider = settings.AiAssistantProvider,
-            AiAssistantEndpointUrl = settings.AiAssistantEndpointUrl,
-            AiAssistantCredentialScope = settings.AiAssistantCredentialScope ?? "none",
-            AiAssistantModelId = settings.AiAssistantModelId,
-            AiAssistantAllowedModelIds = settings.AiAssistantAllowedModelIds,
-            AiAssistantAllowAnonymousAccess = settings.AiAssistantAllowAnonymousAccess,
-            McpEnabled = settings.McpEnabled,
-            McpEnableLegacySse = settings.McpEnableLegacySse
-        };
+    private static UpdateTenantPolicyRequest ToRequest(TenantPolicySettingsDto settings) => new()
+    {
+        AllowUserSubmittedEvents = settings.AllowUserSubmittedEvents,
+        AllowOrganizationSubmittedEvents = settings.AllowOrganizationSubmittedEvents,
+        AllowGroupSubmittedEvents = settings.AllowGroupSubmittedEvents,
+        AllowOrganizationSelfRegistration = settings.AllowOrganizationSelfRegistration,
+        AllowGroupSelfRegistration = settings.AllowGroupSelfRegistration,
+        EventCardClickOpensDetailPage = settings.EventCardClickOpensDetailPage,
+        RequireEventApproval = settings.RequireEventApproval,
+        RequireOrganizationVerification = settings.RequireOrganizationVerification,
+        PreferredHomePage = settings.PreferredHomePage,
+        Subdomain = settings.Subdomain,
+        CustomDomain = settings.CustomDomain,
+        CommunityGuidelinesContent = settings.CommunityGuidelinesContent,
+        RenderPolicyPreset = settings.RenderPolicyPreset,
+        EnableAdvancedRenderPolicyOverrides = settings.EnableAdvancedRenderPolicyOverrides,
+        GlobalRenderMode = settings.GlobalRenderMode,
+        GlobalPrerenderEnabled = settings.GlobalPrerenderEnabled,
+        PublicSeoRenderMode = settings.PublicSeoRenderMode,
+        PublicSeoPrerenderEnabled = settings.PublicSeoPrerenderEnabled,
+        OperationalRenderMode = settings.OperationalRenderMode,
+        OperationalPrerenderEnabled = settings.OperationalPrerenderEnabled,
+        AdminRenderMode = settings.AdminRenderMode,
+        AdminPrerenderEnabled = settings.AdminPrerenderEnabled,
+        AiAssistantEnabled = settings.AiAssistantEnabled,
+        AiAssistantProvider = settings.AiAssistantProvider,
+        AiAssistantEndpointUrl = settings.AiAssistantEndpointUrl,
+        AiAssistantCredentialScope = settings.AiAssistantCredentialScope ?? "none",
+        AiAssistantModelId = settings.AiAssistantModelId,
+        AiAssistantAllowedModelIds = settings.AiAssistantAllowedModelIds,
+        AiAssistantAllowAnonymousAccess = settings.AiAssistantAllowAnonymousAccess,
+        McpEnabled = settings.McpEnabled,
+        McpEnableLegacySse = settings.McpEnableLegacySse
+    };
 }

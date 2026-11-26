@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
@@ -11,6 +12,7 @@ using Explore.Domain.Enums;
 using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -40,22 +42,63 @@ public sealed partial class EventRoleAssignmentMutationBoundary
         string publisherSetting = creation.OrganizationId.HasValue ? GovernanceSettingKeys.Events.OrganizationSubmissionEnabled
             : creation.GroupId.HasValue ? GovernanceSettingKeys.Events.GroupSubmissionEnabled
             : GovernanceSettingKeys.Events.UserSubmissionEnabled;
+        await using var humanOwner = new HumanSecuritySourceGate(context);
+        await using var discoveryOwner = new EventDiscoveryEnrollmentGate(context);
+        IAsyncDisposable? human = null;
+        IAsyncDisposable? discovery = null;
+        Exception? failure = null;
+        bool settled = false;
+        BaseCommandResponse<Guid> creationResult = default!;
         try
         {
-            return await EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => settings.ExecuteOrderedGroupsAsync(
-                [VisitorAccessCapabilityResolver.AuthoritySettingKeys, [publisherSetting, GovernanceSettingKeys.Events.RequireApproval]],
-                token => context.Database.CreateExecutionStrategy().ExecuteAsync<object?, BaseCommandResponse<Guid>>(null,
-                    async (_, _, inner) => await ExecuteAttemptAsync(inner),
-                    async (_, _, inner) => new ExecutionResult<BaseCommandResponse<Guid>>(
-                        await VerifyAsync(inner), attempted is null ? default! : attempted.Result), token),
-                cancellationToken), cancellationToken);
+            if (!HumanSecuritySourceGate.TryRequireCurrent(context))
+            {
+                if (EventDiscoveryEnrollmentGate.TryRequireCurrent(context))
+                    throw new InvalidOperationException("discovery_source_gate_order_invalid");
+                human = await humanOwner.AcquireAsync(cancellationToken);
+            }
+            if (!EventDiscoveryEnrollmentGate.TryRequireCurrent(context))
+                discovery = await discoveryOwner.AcquireAsync(cancellationToken);
+            try
+            {
+                creationResult = await EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => settings.ExecuteOrderedGroupsAsync(
+                    [VisitorAccessCapabilityResolver.AuthoritySettingKeys, [publisherSetting, GovernanceSettingKeys.Events.RequireApproval]],
+                    token => context.Database.CreateExecutionStrategy().ExecuteAsync<object?, BaseCommandResponse<Guid>>(null,
+                        async (_, _, inner) => await ExecuteAttemptAsync(inner),
+                        async (_, _, inner) => new ExecutionResult<BaseCommandResponse<Guid>>(
+                            await VerifyAsync(inner), attempted is null ? default! : attempted.Result), token),
+                    cancellationToken), cancellationToken);
+            }
+            catch (Exception transportFailure) when (attempted is not null && TransportFailure(transportFailure))
+            {
+                try
+                {
+                    HumanSecuritySourceGate.RequireCurrent(context);
+                    EventDiscoveryEnrollmentGate.RequireCurrent(context);
+                    if (!await VerifyAsync(cancellationToken)) throw;
+                    creationResult = attempted!.Result;
+                }
+                catch (Exception reconciliationFailure) when (!ReferenceEquals(reconciliationFailure, transportFailure))
+                {
+                    var evidence = new AggregateException(
+                        "Initial creation transport and reconciliation evidence.", transportFailure, reconciliationFailure);
+                    if (transportFailure is TransactionCommittedCleanupException)
+                        throw new TransactionCommittedCleanupException(evidence);
+                    throw new HumanMutationOutcomeUnknownException(evidence);
+                }
+            }
+            settled = creationResult.IsSuccess;
+            HumanSecuritySourceGate.RequireCurrent(context);
+            EventDiscoveryEnrollmentGate.RequireCurrent(context);
         }
-        catch (Exception failure) when (attempted is not null && TransportFailure(failure))
+        catch (Exception exception)
         {
-            if (await VerifyAsync(cancellationToken)) return attempted!.Result;
-            throw;
+            failure = exception;
         }
         finally { writes?.Dispose(); }
+        failure = await ExploreDbContext.ReleaseOwnedDisclosureGatesAsync(discovery, human, failure, settled);
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+        return creationResult;
 
         async Task<BaseCommandResponse<Guid>> ExecuteAttemptAsync(CancellationToken token)
         {

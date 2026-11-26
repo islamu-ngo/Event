@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -8,6 +9,11 @@ namespace Explore.Persistence.Security;
 
 public static partial class PostgresMixedSettingsContract
 {
+    // Cache expected SQL only, never observed catalog state or readiness. The original
+    // context fixes model/schema; the immutable enrollment fixes declared logins.
+    private static readonly ConditionalWeakTable<ExploreDbContext, Dictionary<PostgresNativeQueueEnrollment, string>>
+        ExpectedBodySql = new();
+
     private static bool CanInsert(Type type) => type != typeof(Explore.Domain.EventLocation)
         && type != typeof(Explore.Domain.TenantPlanAssignment);
 
@@ -49,7 +55,8 @@ public static partial class PostgresMixedSettingsContract
         var sql = new HumanPrincipalSourceSql(context);
         return new(sql.Schema, Roles,
             Routines.Select(routine => new PostgresPrivilegeGuard.Routine(Prefix + routine.Name, routine.Signature,
-                OwnerRole, routine.Name == "email_consume" ? [PostgresEmailDeliveryPolicyContract.OwnerRole]
+                OwnerRole, routine.Name is "learning_retain" or "learning_document" ? [LearningReaderRole]
+                    : routine.Name == "email_consume" ? [PostgresEmailDeliveryPolicyContract.OwnerRole]
                     : routine.Result == "trigger" || routine.Name == CatalogueGuardName ? [OwnerRole] : [GlobalRole])).ToArray(),
             [
                 .. Sources(context).Select(source => new PostgresPrivilegeGuard.Relation(
@@ -65,7 +72,8 @@ public static partial class PostgresMixedSettingsContract
             ],
             [new(OwnerRole, MigratorRole, false, true, false),
                 new(MigratorRole, enrollment.MigratorLogin, false, true, false),
-                new(GlobalRole, enrollment.GlobalLogin, true, false, false)]);
+                new(GlobalRole, enrollment.GlobalLogin, true, false, false),
+                new(LearningReaderRole, enrollment.RuntimeLogin, true, false, false)]);
     }
 
     internal static PostgresPrivilegeGuard.Contract ComposedPrivileges(ExploreDbContext context,
@@ -335,12 +343,18 @@ public static partial class PostgresMixedSettingsContract
             """;
     }
 
-    private static string ExactBodies(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
-        CatalogueGuardWitness(context, enrollment) + "\n"
+    private static string ExactBodies(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        var expected = ExpectedBodySql.GetOrCreateValue(context);
+        if (expected.TryGetValue(enrollment, out string? sql)) return sql;
+        sql = CatalogueGuardWitness(context, enrollment) + "\n"
         + PostgresContractAttestationSql.BuildExactBodiesSql(
             context,
             Functions(context, enrollment),
             function => (function.Name, function.Signature, function.Body),
             FunctionSql,
             "mixed_settings_exact_body_drift");
+        expected.Add(enrollment, sql);
+        return sql;
+    }
 }

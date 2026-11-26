@@ -10,6 +10,7 @@ using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Validation;
 using Explore.Domain;
 using Explore.Domain.Settings;
+using Explore.Domain.Settings.Definitions;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
 
@@ -121,7 +122,18 @@ public static partial class ConfigurationManifestJsonSchemaGenerator
                     "The ConfigurationManifest tenant-section setting catalog is not safe.");
             }
 
-            if (definition.ValueType == SettingValueType.Json && entry.StringArray is null)
+            bool isAnnouncement = ReferenceEquals(
+                definition, PublicExperienceSettingDefinitions.AnnouncementBarPublication);
+            if (entry.AnnouncementOperation is { } announcement
+                && (!isAnnouncement || announcement.Scope != scope || entry.StringArray is not null))
+            {
+                throw new InvalidOperationException(
+                    "Announcement operation descriptors require the exact announcement definition and scope.");
+            }
+
+            if ((isAnnouncement && entry.AnnouncementOperation is null)
+                || (definition.ValueType == SettingValueType.Json
+                    && entry.StringArray is null && entry.AnnouncementOperation is null))
             {
                 throw new InvalidOperationException(
                     "JSON settings require an explicit typed schema descriptor.");
@@ -635,6 +647,8 @@ public static partial class ConfigurationManifestJsonSchemaGenerator
                 new JsonObject { ["type"] = "integer" },
             SettingValueType.Boolean => new JsonObject { ["type"] = "boolean" },
             SettingValueType.Decimal => new JsonObject { ["type"] = "number" },
+            SettingValueType.Json when entry.AnnouncementOperation is { } announcement =>
+                AnnouncementOperationSchema(announcement),
             SettingValueType.Json when entry.StringArray is { } descriptor =>
                 StringArraySchema(descriptor),
             SettingValueType.DateTime => new JsonObject
@@ -655,6 +669,38 @@ public static partial class ConfigurationManifestJsonSchemaGenerator
         }
 
         return schema;
+    }
+
+    private static JsonObject AnnouncementOperationSchema(
+        ConfigurationManifestAnnouncementOperationDescriptor descriptor)
+    {
+        JsonObject Operation(string operation, JsonObject fields)
+        {
+            fields["operation"] = new JsonObject { ["type"] = "string", ["const"] = operation };
+            string[] required = fields.Select(property => property.Key).ToArray();
+            fields["currentLock"] = new JsonObject { ["type"] = "boolean" };
+            return ClosedObject(fields, required);
+        }
+
+        var alternatives = new JsonArray
+        {
+            Operation("publish", new JsonObject
+            {
+                ["enabled"] = new JsonObject { ["type"] = "boolean" },
+                ["message"] = new JsonObject { ["type"] = "string" },
+                ["linkText"] = new JsonObject { ["type"] = "string" },
+                ["linkUrl"] = new JsonObject { ["type"] = "string" },
+                ["redisplay"] = new JsonObject { ["type"] = "boolean" }
+            }),
+            Operation("disable", new JsonObject()),
+            Operation("setLock", new JsonObject
+            {
+                ["isLocked"] = new JsonObject { ["type"] = "boolean" }
+            })
+        };
+        if (descriptor.Scope == ConfigurationManifestScope.Tenant)
+            alternatives.Add(Operation("inherit", new JsonObject()));
+        return new JsonObject { ["oneOf"] = alternatives };
     }
 
     private static JsonObject StringArraySchema(ConfigurationManifestStringArrayDescriptor descriptor)

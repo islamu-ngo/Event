@@ -7,6 +7,7 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.Users.Requests.Queries;
+using Explore.Application.Features.Announcements.Requests.Commands;
 using Explore.Persistence.Security;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.AspNetCore.Http;
@@ -27,9 +28,19 @@ internal sealed class ExploreDbContextExecutionLease
     internal PolicyMutationPurpose? PolicyPurpose { get; private set; }
     internal HumanAdministratorCommitScope? HumanScope { get; private set; }
     internal HumanAuthenticationLifetime? HumanLifetime { get; private set; }
+    internal UpdateManagedTenantAnnouncementCommand? ManagedAnnouncementOriginal { get; private set; }
     private HttpContext? _humanRequest;
     private ClaimsPrincipal? _humanPrincipal;
     private ClaimsIdentity[]? _humanIdentities;
+
+    internal void BindManagedAnnouncement(UpdateManagedTenantAnnouncementCommand original)
+    {
+        if (ManagedAnnouncementOriginal is not null || Context is null
+            || Context.Database.CurrentTransaction is not null || PolicyPurpose != PolicyMutationPurpose.MixedSettings
+            || SelectedTenantId != original.TenantId || HumanScope?.Subject.PrincipalId != original.ActorUserId)
+            throw new UnauthorizedAccessException("Managed announcement selection requires its exact original human target.");
+        ManagedAnnouncementOriginal = original;
+    }
 
     internal void BindOriginalCredential(HttpContext request)
     {
@@ -101,7 +112,7 @@ internal sealed class PolicyMutationExecutionScopeFactory(
     IGlobalExploreDbContextFactory globalFactory, ITenantExploreDbContextFactory tenantFactory,
     ExploreDbContextExecutionLease currentLease) : IPolicyMutationExecutionScopeFactory, IHumanCommitScopePreparation,
         IHumanConfigurationImportOwnerFactory, IMixedSettingsExecutionScopeAccess,
-        IHumanConfigurationImportPublicationFactory, IHumanOriginalCredentialCustody
+        IHumanConfigurationImportPublicationFactory, IHumanConfigurationImportAnnouncementFactory, IHumanOriginalCredentialCustody
 {
     public HumanCommitSubject? Subject => currentLease.HumanScope?.Subject;
     public void RequireOriginalCredential(HumanAuthenticationLifetime lifetime) =>
@@ -114,6 +125,34 @@ internal sealed class PolicyMutationExecutionScopeFactory(
         HumanConfigurationImportPublicationStore.ObserveAsync(
             provider.GetRequiredService<ExploreDbContext>(), currentLease, provider,
             authority, operationId, artifactDigest, effects, occurredAt, cancellationToken);
+
+    public async Task<IHumanConfigurationImportAnnouncementStore> ObserveAnnouncementAsync(
+        HumanConfigurationImportAuthority authority, Guid operationId, string artifactDigest,
+        System.Collections.Immutable.ImmutableArray<AnnouncementImportIntent> intents,
+        DateTime occurredAt, CancellationToken cancellationToken)
+    {
+        var store = await HumanConfigurationImportAnnouncementStore.ObserveAsync(
+            provider.GetRequiredService<ExploreDbContext>(), currentLease, provider,
+            authority, operationId, artifactDigest, intents, occurredAt, cancellationToken);
+        HumanConfigurationImportAnnouncementOwnership.Register(store, this, currentLease,
+            provider.GetRequiredService<IHumanConfigurationImportAdmission>(), authority,
+            (factory, owner, candidate) =>
+            {
+                if (!ReferenceEquals(factory, this) || !ReferenceEquals(owner, currentLease))
+                    throw new UnauthorizedAccessException("Announcement import cannot transfer its native factory or owner.");
+                RequireOriginalCredential(authority.Lifetime);
+                RequireAnnouncementStore(candidate);
+            }, store.RequireCompletedAsync);
+        return store;
+    }
+
+    public void RequireAnnouncementStore(IHumanConfigurationImportAnnouncementStore store)
+    {
+        if (store is not HumanConfigurationImportAnnouncementStore native)
+            throw new UnauthorizedAccessException("A public store implementation cannot attest an announcement import.");
+        native.RequireFactory(currentLease, provider.GetRequiredService<ExploreDbContext>(),
+            provider.GetRequiredService<IHumanConfigurationImportAdmission>());
+    }
 
     public IServiceProvider BorrowMixedSettings(Explore.Application.Features.Settings.MixedSettingsBatchMutation mutation)
     {
@@ -245,7 +284,9 @@ internal sealed class PolicyMutationExecutionScopeFactory(
         {
             currentLease.RequireOriginalOwner(provider.GetRequiredService<ExploreDbContext>());
             if (currentLease.SelectedTenantId != selection.TenantId
-                || (currentLease.PolicyPurpose ?? PolicyMutationPurpose.Standard) != selection.Purpose)
+                || (currentLease.PolicyPurpose ?? PolicyMutationPurpose.Standard) != selection.Purpose
+                || selection.ManagedAnnouncement is not null
+                    && !ReferenceEquals(currentLease.ManagedAnnouncementOriginal, selection.ManagedAnnouncement))
                 throw new InvalidOperationException("A policy operation cannot change its owning database authority.");
             return new BorrowedScope(provider);
         }
@@ -258,6 +299,10 @@ internal sealed class PolicyMutationExecutionScopeFactory(
         Guid? originalAmbientTenant = provider.GetService<ITenantContextAccessor>()?.TenantId;
         var subject = await ResolveSubjectAsync(provider, cancellationToken);
         var lifetime = subject is null ? null : await ResolveLifetimeAsync(provider, cancellationToken);
+        if (selection.ManagedAnnouncement is { } managedAnnouncement
+            && (selection.Purpose != PolicyMutationPurpose.MixedSettings || selection.TenantId != managedAnnouncement.TenantId
+                || managedAnnouncement.ActorUserId == Guid.Empty || subject?.PrincipalId != managedAnnouncement.ActorUserId))
+            throw new UnauthorizedAccessException("Managed announcement selection cannot substitute its original actor or target.");
         if (selection.Purpose == PolicyMutationPurpose.TenantCreation
             && (subject is null || lifetime is null || originalRequest is null
                 || !ReferenceEquals(originalRequest, provider.GetService<IHttpContextAccessor>()?.HttpContext)
@@ -266,6 +311,7 @@ internal sealed class PolicyMutationExecutionScopeFactory(
         if (selection.Purpose == PolicyMutationPurpose.MixedSettings
             && (subject is null || lifetime is null || selection.TenantId == Guid.Empty
                 || selection.TenantId.HasValue && selection.TenantId != originalAmbientTenant
+                    && selection.ManagedAnnouncement is null
                 || !ReferenceEquals(originalRequest, provider.GetService<IHttpContextAccessor>()?.HttpContext)
                 || !ReferenceEquals(originalPrincipal, originalRequest?.User)
                 || originalAmbientTenant != provider.GetService<ITenantContextAccessor>()?.TenantId))
@@ -321,6 +367,8 @@ internal sealed class PolicyMutationExecutionScopeFactory(
                 if (lifetime is not null)
                     lease.BindOriginalCredential(provider.GetRequiredService<IHttpContextAccessor>().HttpContext
                         ?? throw new UnauthorizedAccessException("The original authenticated request is missing."));
+                if (selection.ManagedAnnouncement is { } managed)
+                    lease.BindManagedAnnouncement(managed);
             }
             _ = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             captured = true;

@@ -1,5 +1,5 @@
-using System.Globalization;
 using Explore.Blazor.Client.Clients;
+using Explore.Blazor.Client.Contracts.Services;
 
 namespace Explore.Blazor.Client.Services;
 
@@ -7,15 +7,18 @@ public interface ITenantPublicExperienceAdminService
 {
     Task<TenantPublicExperienceAdminModel> GetSettingsAsync(CancellationToken cancellationToken = default);
     Task ApplySingleTenantPolicySettingsAsync(TenantPolicySettingsDto model, CancellationToken cancellationToken = default);
-    Task ApplyAnnouncementBarSettingsAsync(TenantPolicySettingsDto model, CancellationToken cancellationToken = default);
+    Task<AnnouncementDraft?> GetAnnouncementAsync(CancellationToken cancellationToken = default);
+    bool CanSaveAnnouncement(AnnouncementDraft? model);
+    Task<bool> ReconcileAnnouncementAsync(AnnouncementDraft model, CancellationToken cancellationToken = default);
     Task<PublicExperienceAdminSaveResult> SaveAsync(TenantPublicExperienceAdminModel model, CancellationToken cancellationToken = default);
     Task<PublicExperienceAdminSaveResult> SaveSingleTenantPolicySettingsAsync(TenantPolicySettingsDto model, CancellationToken cancellationToken = default);
-    Task<PublicExperienceAdminSaveResult> SaveAnnouncementBarAsync(TenantPolicySettingsDto model, bool forceRedisplay, CancellationToken cancellationToken = default);
+    Task<PublicExperienceAdminSaveResult> SaveAnnouncementBarAsync(AnnouncementDraft model, bool forceRedisplay, CancellationToken cancellationToken = default);
+    Task<PublicExperienceAdminSaveResult> RemoveAnnouncementOverrideAsync(AnnouncementDraft model, CancellationToken cancellationToken = default);
 }
 
 public sealed class TenantPublicExperienceAdminService(
     ISettingsClient apiClient,
-    IPublicExperienceService publicExperienceService,
+    IAnnouncementClientService announcements,
     ILogger<TenantPublicExperienceAdminService> logger) : ITenantPublicExperienceAdminService
 {
     private const string Category = "PublicExperience";
@@ -28,11 +31,6 @@ public sealed class TenantPublicExperienceAdminService(
     private const string HomeBlocksKey = "public_experience.home_blocks";
     private const string CtasKey = "public_experience.ctas";
     private const string EventSectionPresetsKey = "public_experience.event_section_presets";
-    private const string AnnouncementBarEnabledKey = "public_experience.announcement_bar.enabled";
-    private const string AnnouncementBarMessageKey = "public_experience.announcement_bar.message";
-    private const string AnnouncementBarLinkTextKey = "public_experience.announcement_bar.link_text";
-    private const string AnnouncementBarLinkUrlKey = "public_experience.announcement_bar.link_url";
-    private const string AnnouncementBarRevisionKey = "public_experience.announcement_bar.revision";
 
     private const string EventsCategory = "Events";
     private const string OrganizationsCategory = "Organizations";
@@ -182,54 +180,27 @@ public sealed class TenantPublicExperienceAdminService(
         }
     }
 
-    public async Task ApplyAnnouncementBarSettingsAsync(
-        TenantPolicySettingsDto model,
-        CancellationToken cancellationToken = default)
+    public async Task<AnnouncementDraft?> GetAnnouncementAsync(CancellationToken cancellationToken = default)
     {
-        try
-        {
-            HalResourceOfSettingGroupResponseDto response = await apiClient.GetTenantScopedSettingsAsync(
-                Category,
-                cancellationToken: cancellationToken);
-
-            Dictionary<string, EffectiveSettingDto> settings = response.Settings
-                .Where(setting => !string.IsNullOrWhiteSpace(setting.Key))
-                .ToDictionary(setting => setting.Key, StringComparer.OrdinalIgnoreCase);
-
-            model.AnnouncementBarEnabled = GetBoolean(settings, AnnouncementBarEnabledKey, false);
-            model.AnnouncementBarMessage = GetString(settings, AnnouncementBarMessageKey, string.Empty);
-            model.AnnouncementBarLinkText = GetString(settings, AnnouncementBarLinkTextKey, string.Empty);
-            model.AnnouncementBarLinkUrl = GetString(settings, AnnouncementBarLinkUrlKey, string.Empty);
-            model.AnnouncementBarRevision = GetInteger(settings, AnnouncementBarRevisionKey, 0);
-
-            await ApplyPublicAnnouncementFallbackAsync(model);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to load tenant announcement bar settings.");
-            await ApplyPublicAnnouncementFallbackAsync(model);
-        }
+        var source = await announcements.LoadSourceAsync(cancellationToken: cancellationToken);
+        if (source is null)
+            return null;
+        var draft = new AnnouncementDraft();
+        ApplyAnnouncementSource(draft, source);
+        return draft;
     }
 
-    private async Task ApplyPublicAnnouncementFallbackAsync(TenantPolicySettingsDto model)
+    public bool CanSaveAnnouncement(AnnouncementDraft? model) =>
+        model?.Original is { } source && announcements.CanPublish(source);
+
+    public async Task<bool> ReconcileAnnouncementAsync(
+        AnnouncementDraft model, CancellationToken cancellationToken = default)
     {
-        if (model.AnnouncementBarEnabled == true || !string.IsNullOrWhiteSpace(model.AnnouncementBarMessage))
-        {
-            return;
-        }
-
-        PublicExperienceSettingsDto? settings = await publicExperienceService.GetSettingsAsync();
-        if (settings?.AnnouncementBarEnabled != true
-            || string.IsNullOrWhiteSpace(settings.AnnouncementBarMessage))
-        {
-            return;
-        }
-
-        model.AnnouncementBarEnabled = true;
-        model.AnnouncementBarMessage = settings.AnnouncementBarMessage.Trim();
-        model.AnnouncementBarLinkText = settings.AnnouncementBarLinkText?.Trim() ?? string.Empty;
-        model.AnnouncementBarLinkUrl = settings.AnnouncementBarLinkUrl?.Trim() ?? string.Empty;
-        model.AnnouncementBarRevision = settings.AnnouncementBarRevision ?? 0;
+        var source = await announcements.LoadSourceAsync(cancellationToken: cancellationToken);
+        if (source is null)
+            return false;
+        model.Original = source;
+        return true;
     }
 
     public async Task<PublicExperienceAdminSaveResult> SaveAsync(
@@ -347,39 +318,55 @@ public sealed class TenantPublicExperienceAdminService(
     }
 
     public async Task<PublicExperienceAdminSaveResult> SaveAnnouncementBarAsync(
-        TenantPolicySettingsDto model,
+        AnnouncementDraft model,
         bool forceRedisplay,
         CancellationToken cancellationToken = default)
     {
-        int revision = model.AnnouncementBarRevision ?? 0;
-        if (forceRedisplay)
+        if (!CanSaveAnnouncement(model) || model.Original is not { } source)
+            return PublicExperienceAdminSaveResult.Failed("Reload the original announcement source before saving.");
+        bool enabled = model.Enabled;
+        string message = model.Message.Trim(), linkText = model.LinkText.Trim(), linkUrl = model.LinkUrl.Trim();
+        var result = await announcements.PublishAsync(source, new()
         {
-            revision++;
-        }
-        Dictionary<string, string> values = new(StringComparer.OrdinalIgnoreCase)
-        {
-            [AnnouncementBarEnabledKey] = FormatBoolean(model.AnnouncementBarEnabled == true),
-            [AnnouncementBarMessageKey] = model.AnnouncementBarMessage?.Trim() ?? string.Empty,
-            [AnnouncementBarLinkTextKey] = model.AnnouncementBarLinkText?.Trim() ?? string.Empty,
-            [AnnouncementBarLinkUrlKey] = model.AnnouncementBarLinkUrl?.Trim() ?? string.Empty,
-            [AnnouncementBarRevisionKey] = revision.ToString(CultureInfo.InvariantCulture)
-        };
+            Kind = "publish",
+            Enabled = enabled,
+            Redisplay = forceRedisplay,
+            Material = new() { Message = message, LinkText = linkText, LinkUrl = linkUrl }
+        }, cancellationToken);
+        if (!result.Success || result.Source is not { } fresh)
+            return PublicExperienceAdminSaveResult.Failed(result.Message ?? "Reload announcement state before saving again.");
+        if (model.Enabled == enabled && model.Message.Trim() == message
+            && model.LinkText.Trim() == linkText && model.LinkUrl.Trim() == linkUrl)
+            ApplyAnnouncementSource(model, fresh);
+        else
+            model.Original = fresh;
+        return PublicExperienceAdminSaveResult.Successful();
+    }
 
-        try
-        {
-            PublicExperienceAdminSaveResult result = await SaveBatchAsync(Category, values, cancellationToken);
-            if (result.Success)
-            {
-                model.AnnouncementBarRevision = revision;
-            }
+    public async Task<PublicExperienceAdminSaveResult> RemoveAnnouncementOverrideAsync(
+        AnnouncementDraft model, CancellationToken cancellationToken = default)
+    {
+        if (!CanSaveAnnouncement(model) || model.Original is not { } source)
+            return PublicExperienceAdminSaveResult.Failed("Reload the original announcement source before removing its override.");
+        bool enabled = model.Enabled;
+        string message = model.Message, linkText = model.LinkText, linkUrl = model.LinkUrl;
+        var result = await announcements.PublishAsync(source, new() { Kind = "remove-override" }, cancellationToken);
+        if (!result.Success || result.Source is not { } fresh)
+            return PublicExperienceAdminSaveResult.Failed(result.Message ?? "The announcement override removal was not confirmed.");
+        if (model.Enabled == enabled && model.Message == message && model.LinkText == linkText && model.LinkUrl == linkUrl)
+            ApplyAnnouncementSource(model, fresh);
+        else
+            model.Original = fresh;
+        return PublicExperienceAdminSaveResult.Successful();
+    }
 
-            return result;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to save tenant announcement bar settings.");
-            return PublicExperienceAdminSaveResult.Failed("Failed to save announcement bar settings.");
-        }
+    private static void ApplyAnnouncementSource(AnnouncementDraft model, HalResourceOfAnnouncementSourceResource source)
+    {
+        model.Original = source;
+        model.Enabled = source.Source.Group?.Enabled == true;
+        model.Message = source.Source.Group?.Publication?.Material.Message ?? string.Empty;
+        model.LinkText = source.Source.Group?.Publication?.Material.LinkText ?? string.Empty;
+        model.LinkUrl = source.Source.Group?.Publication?.Material.LinkUrl ?? string.Empty;
     }
 
     private async Task<Dictionary<string, EffectiveSettingDto>> GetTenantSettingsDictionaryAsync(
@@ -604,17 +591,6 @@ public sealed class TenantPublicExperienceAdminService(
     {
         return settings.TryGetValue(key, out EffectiveSettingDto? setting)
             && bool.TryParse(setting.Value?.Trim('"'), out var value)
-                ? value
-                : fallback;
-    }
-
-    private static int GetInteger(
-        IReadOnlyDictionary<string, EffectiveSettingDto> settings,
-        string key,
-        int fallback)
-    {
-        return settings.TryGetValue(key, out EffectiveSettingDto? setting)
-            && int.TryParse(setting.Value?.Trim('"'), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
                 ? value
                 : fallback;
     }

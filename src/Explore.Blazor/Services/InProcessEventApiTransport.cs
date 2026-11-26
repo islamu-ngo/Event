@@ -2,16 +2,23 @@ using System.Collections.Immutable;
 using System.Net;
 using System.Security.Claims;
 using System.IO.Pipelines;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Blazor.Services;
 
-public sealed class InProcessEventApiDispatcher
+public sealed class InProcessEventApiDispatcher : IDisposable
 {
-    public static readonly Uri InternalBaseAddress = new("http://event-api.internal/");
+    public static readonly Uri InternalBaseAddress = new("https://event-api.internal/");
     private static readonly object RequestMarker = new();
+    private readonly ConcurrencyLimiter _dispatchCapacity = new(new ConcurrencyLimiterOptions
+    {
+        PermitLimit = 8,
+        QueueLimit = 32,
+        QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+    });
 
     private RequestDelegate? _pipeline;
     private RequestDelegate? _endpointSelector;
@@ -25,13 +32,23 @@ public sealed class InProcessEventApiDispatcher
         }
     }
 
-    public Task DispatchAsync(HttpContext context)
+    public async Task DispatchAsync(HttpContext context)
     {
         var pipeline = Volatile.Read(ref _pipeline)
             ?? throw new InvalidOperationException("The in-process Event API pipeline is not bound.");
-        return context.RequestServices.GetRequiredService<Explore.ServiceDefaults.EarlyRequestAdmission>()
+        using var capacity = await _dispatchCapacity.AcquireAsync(1, context.RequestAborted).ConfigureAwait(false);
+        if (!capacity.IsAcquired)
+        {
+            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            context.Response.Headers.RetryAfter = "1";
+            context.Response.Headers.CacheControl = "no-store";
+            return;
+        }
+        await context.RequestServices.GetRequiredService<Explore.ServiceDefaults.EarlyRequestAdmission>()
             .InvokeAsync(context, pipeline);
     }
+
+    public void Dispose() => _dispatchCapacity.Dispose();
 
     public void BindEndpointSelector(RequestDelegate endpointSelector)
     {

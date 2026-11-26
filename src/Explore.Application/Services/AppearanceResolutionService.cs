@@ -6,6 +6,7 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Appearance;
 using Explore.Application.DTOs.Appearance.Validators;
 using Explore.Application.Settings;
+using Explore.Application.Settings.Groups;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
@@ -49,37 +50,45 @@ public class AppearanceResolutionService : IAppearanceResolutionService
             return CreateEmergencyFallback();
         }
 
+        var localization = await _settingsResolver.ResolveGroupAsync<AppearanceSettingGroup>(
+            new SettingContext(TenantId: tenantId, UserId: userId.Value), cancellationToken);
+        ResolvedAppearanceDto WithLocalization(ResolvedAppearanceDto appearance) => appearance with
+        {
+            Direction = localization.Direction,
+            Language = localization.Language
+        };
+
         // 1. Try user's active profile for the current tenant context
         var preference = await _preferenceRepository.GetByUserAndTenantAsync(userId.Value, tenantId);
 
         if (preference?.ActiveProfile is { } activeProfile && !activeProfile.IsArchived)
         {
-            return CreateFromProfile(activeProfile, AppearanceResolutionSource.UserTenantProfile);
+            return WithLocalization(CreateFromProfile(activeProfile, AppearanceResolutionSource.UserTenantProfile));
         }
 
         // 2. Try user's global profile (TenantId = null)
         var globalPreference = await _preferenceRepository.GetByUserAndTenantAsync(userId.Value, null);
         if (globalPreference?.ActiveProfile is { } globalProfile && !globalProfile.IsArchived)
         {
-            return CreateFromProfile(globalProfile, AppearanceResolutionSource.UserGlobalProfile);
+            return WithLocalization(CreateFromProfile(globalProfile, AppearanceResolutionSource.UserGlobalProfile));
         }
 
         // 3. Try the configured tenant/instance default preset
         var configuredDefault = await ResolveConfiguredDefaultPresetAsync(tenantId, cancellationToken);
         if (configuredDefault is not null)
         {
-            return CreateFromPreset(configuredDefault.Value.Preset, configuredDefault.Value.Source);
+            return WithLocalization(CreateFromPreset(configuredDefault.Value.Preset, configuredDefault.Value.Source));
         }
 
         // 4. System fallback: enterprise-blue
         var systemPreset = await _presetRepository.GetByThemeKeyAsync(null, "enterprise-blue");
         if (systemPreset is not null)
         {
-            return CreateFromPreset(systemPreset, AppearanceResolutionSource.SystemPresetFallback);
+            return WithLocalization(CreateFromPreset(systemPreset, AppearanceResolutionSource.SystemPresetFallback));
         }
 
         // 5. Emergency hardcoded fallback
-        return CreateEmergencyFallback();
+        return WithLocalization(CreateEmergencyFallback());
     }
 
     private async Task<(UiThemePreset Preset, AppearanceResolutionSource Source)?> ResolveConfiguredDefaultPresetAsync(

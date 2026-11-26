@@ -1,0 +1,522 @@
+using System.Data;
+using System.Text.Json;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
+using Explore.Application.Exceptions;
+using Explore.Application.Features.Learning;
+using Explore.Application.Services;
+using Explore.Domain.Learning;
+using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.DependencyInjection;
+using Wire = ISLAMU.Wire.Contracts.Learning;
+
+namespace Explore.Persistence.Security;
+
+/// <summary>
+/// Settles one prepared learning intent under the original human, retained identity gate
+/// and selected Serializable owner. No result is published before receipt consumption.
+/// </summary>
+internal sealed class HumanLearningMutationStore(
+    ExploreDbContext context,
+    ExploreDbContextExecutionLease lease,
+    IHumanLearningMutationPreparation preparation,
+    IServiceProvider services,
+    TimeProvider clock) : IHumanLearningMutationStore, IDisposable
+{
+    private int _used;
+    private IHumanLearningMutation? _completed;
+    private string? _expectedImage;
+    private string? _expectedAcknowledgements;
+    private string? _expectedAcknowledgementTransition;
+    private Dictionary<Guid, string>? _removedAcknowledgements;
+    private Guid _acknowledgementId;
+    private EntityState _acknowledgementState;
+    private EntityState _acknowledgementRootState;
+    private Dictionary<object, string>? _expectedTracked;
+    private DateTime? _claimDeadline;
+    private RelationalConnectionIdentity? _connection;
+    private IDbContextTransaction? _transaction;
+    private DbContextId _contextId;
+    private int? _backend;
+    private bool _interrupted;
+
+    public async Task<LearningOperationState> ExecuteAsync(
+        IHumanLearningMutation mutation, CancellationToken cancellationToken)
+    {
+        RequireOwner(mutation, transactional: false);
+        if (Interlocked.Exchange(ref _used, 1) != 0)
+            throw new InvalidOperationException("A learning writer permits one original physical attempt.");
+        await mutation.RequireOriginalAsync(cancellationToken);
+        var identity = services.GetRequiredService<PrivacyIdentityFenceOperation>();
+        var authority = services.GetRequiredService<IPrivacyIdentityFenceAuthority>()
+            as IOriginalPrivacyIdentityFenceAuthority
+            ?? throw new InvalidOperationException("Learning requires original retained identity ownership.");
+        bool colocated = authority is EmbeddedPrivacyErasureAuthorityRepository embedded
+            && embedded.UsesOriginalApplicationContext(context);
+        var owner = colocated
+            ? (IOriginalOwnerSettlementBoundary)authority
+            : services.GetRequiredService<IOriginalOwnerSettlementBoundary>();
+        var invocation = new object();
+        bool settled = false;
+        try
+        {
+            return await identity.ExecuteOriginalOwnerIdentityMutationAsync(async (guard, token) =>
+            {
+                async Task<OriginalOwnerDecision<LearningOperationState>> Settle(CancellationToken gateToken)
+                {
+                    var receipt = await owner.ExecuteAsync(invocation, async ownerToken =>
+                    {
+                        BindPhysicalOwner(mutation);
+                        services.GetRequiredService<IHumanActionCommitFinalizer>().Register(async finalToken =>
+                        {
+                            await RequireCompleteAsync(mutation, finalToken);
+                            await mutation.RequireCurrentAsync(finalToken);
+                            LearningAccessPolicy.RequireInteractiveAccess(
+                                mutation.Intent, mutation.CanManageSpace, mutation.Sources);
+                            await identity.EnsureSubjectMayEnrollAsync(mutation.SubjectId, finalToken);
+                            await guard.ValidateAsync(finalToken);
+                            RequirePhysicalOwner(mutation);
+                        }, now =>
+                        {
+                            mutation.RequireCurrentAt(now);
+                            guard.RequireCurrent(now);
+                            if (_claimDeadline is { } deadline && now.UtcDateTime >= deadline)
+                                throw Conflict("The original learning claim expired before settlement.");
+                            RequirePhysicalOwner(mutation);
+                        });
+                        await mutation.RequireCurrentAsync(ownerToken);
+                        RequirePhysicalOwner(mutation);
+                        await identity.EnsureSubjectMayEnrollAsync(mutation.SubjectId, ownerToken);
+                        var result = await ApplyAsync(mutation, ownerToken);
+                        RequirePermittedChanges(mutation, result);
+                        _expectedImage = _expectedAcknowledgementTransition ?? Image(result.Space, result.State);
+                        _expectedTracked = context.ChangeTracker.Entries()
+                            .Where(entry => entry.State != EntityState.Deleted)
+                            .ToDictionary(entry => entry.Entity, entry => ScalarImage(entry.Entity),
+                                ReferenceEqualityComparer.Instance);
+                        await services.GetRequiredService<ILearningRepository>().SaveChangesAsync(ownerToken);
+                        _completed = mutation;
+                        await RequireCompleteAsync(mutation, ownerToken);
+                        return OriginalOwnerDecision<LearningOperationState>.Commit(result);
+                    }, gateToken);
+                    var value = owner.Consume(invocation, receipt, OriginalOwnerDisposition.Committed);
+                    settled = true;
+                    await mutation.RequireOriginalAsync(gateToken);
+                    return OriginalOwnerDecision<LearningOperationState>.Commit(value);
+                }
+
+                return colocated
+                    ? await Settle(token)
+                    : await authority.ExecuteOriginalEnrollmentAsync(Settle,
+                        finalToken => mutation.RequireOriginalAsync(finalToken),
+                        now =>
+                        {
+                            // Source authority linearizes at the primary commit. Its
+                            // transaction locks do not survive the consumed receipt.
+                            if (settled) mutation.RequireOriginalAt(now);
+                            else mutation.RequireCurrentAt(now);
+                        }, token);
+            }, mutation.RequireOriginalAsync, cancellationToken);
+        }
+        catch (Exception exception) when (settled && exception is not HumanMutationOutcomeUnknownException)
+        {
+            throw new HumanMutationOutcomeUnknownException(exception);
+        }
+    }
+
+    private async Task<LearningOperationState> ApplyAsync(
+        IHumanLearningMutation mutation, CancellationToken token)
+    {
+        LearningAccessPolicy.RequireInteractiveAccess(
+            mutation.Intent, mutation.CanManageSpace, mutation.Sources);
+        var repository = services.GetRequiredService<ILearningRepository>();
+        var space = await repository.GetSpaceAsync(mutation.TenantId, tracked: true, token);
+        var baseline = await repository.GetStateAsync(mutation.TenantId, mutation.SubjectId, tracked: false, token);
+        _expectedAcknowledgements = AcknowledgementImage(baseline);
+        var state = await repository.GetStateAsync(mutation.TenantId, mutation.SubjectId, tracked: true, token);
+        if (_expectedAcknowledgements != AcknowledgementImage(state))
+            throw new UnauthorizedAccessException("Tracked requirement evidence differs from its persisted baseline.");
+        LearningPracticeState? practice = null;
+        if (mutation.Intent is LearningRequirementAcknowledgementIntent acknowledgement)
+        {
+            if (mutation.ContextKey != "self" || mutation.EventContextId is not null)
+                throw new UnauthorizedAccessException("Requirement acknowledgement belongs only to the original self context.");
+            LearningAccessPolicy.RequireAcknowledgement(acknowledgement, mutation.CanManageSpace,
+                mutation.Sources, LearningGuidancePolicyCodec.Decode(mutation.Sources.GuidanceDocument));
+            if (Image(space, state) != Image(space, baseline))
+                throw new UnauthorizedAccessException("The tracked learner differs from its persisted baseline.");
+            if (baseline is null && acknowledgement.ExpectedRevision != 0)
+                throw Conflict("The learner revision is stale.");
+
+            LearningRequirementDefinition definition = LearningRequirementDefinition.Current;
+            var originalAcknowledgements = baseline?.RequirementAcknowledgements
+                .ToDictionary(value => value.Id, value => ScalarImage(value)) ?? [];
+            long originalRevision = baseline?.Revision ?? 0;
+            UserLearningState expected = baseline ?? UserLearningState.Create(mutation.CandidateStateId,
+                mutation.TenantId, mutation.SubjectId, mutation.UpdatedAtUtc);
+            Guid acknowledgementId = expected.RequirementAcknowledgements.SingleOrDefault(value =>
+                value.RequirementKey == definition.RequirementKey && value.MaterialVersion == definition.MaterialVersion)?.Id
+                ?? mutation.CandidateChildId;
+            expected.AcknowledgeRequirement(acknowledgementId, definition, mutation.Sources.PolicySourceStamp,
+                acknowledgement.IntentId, acknowledgement.ExpectedRevision, mutation.UpdatedAtUtc);
+            bool changed = expected.Revision != originalRevision;
+            _acknowledgementId = acknowledgementId;
+            _acknowledgementState = !changed ? EntityState.Unchanged
+                : originalAcknowledgements.ContainsKey(acknowledgementId) ? EntityState.Modified : EntityState.Added;
+            _acknowledgementRootState = !changed ? EntityState.Unchanged
+                : state is null ? EntityState.Added : EntityState.Modified;
+            _expectedAcknowledgements = AcknowledgementImage(expected);
+            _expectedAcknowledgementTransition = Image(space, expected);
+            _removedAcknowledgements = originalAcknowledgements.Where(value =>
+                    expected.RequirementAcknowledgements.All(row => row.Id != value.Key))
+                .ToDictionary(value => value.Key, value => value.Value);
+
+            if (state is null)
+            {
+                state = UserLearningState.Create(mutation.CandidateStateId, mutation.TenantId,
+                    mutation.SubjectId, mutation.UpdatedAtUtc);
+                await repository.AddStateAsync(state, token);
+            }
+            state.AcknowledgeRequirement(acknowledgementId, definition, mutation.Sources.PolicySourceStamp,
+                acknowledgement.IntentId, acknowledgement.ExpectedRevision, mutation.UpdatedAtUtc);
+        }
+        else if (mutation.Intent is LearningSpaceIntent spaceIntent)
+        {
+            if (!mutation.CanManageSpace)
+                throw new AuthorizationException("Current tenant administration is required.");
+            if (space is null)
+            {
+                if (spaceIntent.Action != LearningSpaceMutationAction.Remove || spaceIntent.ExpectedRevision != 0)
+                    throw Conflict("There is no removed learning source to recreate.");
+                space = TenantLearningSpace.Create(mutation.CandidateSpaceId, mutation.TenantId, mutation.UpdatedAtUtc);
+                await repository.AddSpaceAsync(space, token);
+            }
+            switch (spaceIntent.Action)
+            {
+                case LearningSpaceMutationAction.Remove:
+                    space.Remove(spaceIntent.ExpectedRevision, mutation.UpdatedAtUtc);
+                    break;
+                case LearningSpaceMutationAction.Recreate:
+                    space.Recreate(spaceIntent.ExpectedRevision, mutation.UpdatedAtUtc);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mutation));
+            }
+        }
+        else
+        {
+            bool ownerCleanup = mutation.Intent is LearningPreferencesIntent
+                or LearningPracticeIntent { Action: LearningPracticeAction.Clear }
+                or LearningTourOutcomeIntent
+            {
+                Action: LearningTourAction.Skip or LearningTourAction.Interrupt
+                    or LearningTourAction.Snooze
+            }
+                || mutation.Intent is LearningTourOutcomeIntent retained && state?.Tours.Any(tour =>
+                    tour.Family == retained.Family && tour.MaterialVersion == retained.MaterialVersion
+                    && tour.LastIntentId == retained.IntentId) == true;
+            if (space?.IsRemoved == true && !ownerCleanup)
+                throw Conflict("The shared learning source has been removed.");
+            if (space is null && !ownerCleanup)
+            {
+                space = TenantLearningSpace.Create(mutation.CandidateSpaceId, mutation.TenantId, mutation.UpdatedAtUtc);
+                await repository.AddSpaceAsync(space, token);
+            }
+            if (state is null)
+            {
+                if (mutation.Intent.ExpectedRevision != 0)
+                    throw Conflict("The learner revision is stale.");
+                state = UserLearningState.Create(mutation.CandidateStateId, mutation.TenantId,
+                    mutation.SubjectId, mutation.UpdatedAtUtc);
+                await repository.AddStateAsync(state, token);
+            }
+            ApplyState(mutation, state, space);
+            if (mutation.Intent is LearningPracticeIntent selected)
+                practice = state.Practices.SingleOrDefault(value =>
+                    value.ContextKey == selected.ContextKey && value.RecipeKey == selected.RecipeKey);
+        }
+        string responseContext = mutation.Intent is LearningPracticeIntent { Action: LearningPracticeAction.Clear }
+            ? "self" : mutation.ContextKey;
+        return new(mutation.TenantId, mutation.SubjectId, responseContext, mutation.EventContextId,
+            space, state, practice, mutation.AvailableActors, mutation.CanManageSpace, mutation.CanManageEvent)
+        {
+            ObservedAtUtc = clock.GetUtcNow().UtcDateTime,
+            Sources = mutation.Sources,
+            StudioAvailable = mutation.StudioAvailable,
+            NormalAiAvailable = mutation.NormalAiAvailable
+        };
+    }
+
+    private void ApplyState(IHumanLearningMutation mutation, UserLearningState state, TenantLearningSpace? space)
+    {
+        try
+        {
+            switch (mutation.Intent)
+            {
+                case LearningPreferencesIntent preference:
+                    state.UpdatePreferences(preference.SuppressAutomaticTours, preference.HideLearning,
+                        preference.PinLearning, preference.ExpectedRevision, mutation.UpdatedAtUtc);
+                    break;
+                case LearningTourClaimIntent claim:
+                    {
+                        RequireTourMaterial(claim.MaterialVersion);
+                        var resolved = ResolveTour(mutation, state, space, claim.Family);
+                        RequirePlan(resolved.Plan, claim.ExpectedPlanFingerprint, claim.ExpectedPolicySourceStamp);
+                        var definition = resolved.Definition
+                            ?? throw Conflict("The current tour is unavailable.");
+                        var progress = state.Tours.SingleOrDefault(value =>
+                            value.Family == claim.Family && value.MaterialVersion == claim.MaterialVersion);
+                        bool duplicate = state.LastIntentId == claim.IntentId || progress?.LastIntentId == claim.IntentId;
+                        if (!duplicate && !claim.Replay && state.IsHidden)
+                            throw Conflict("Hidden guidance requires explicit manual replay.");
+                        Guid claimId = duplicate
+                            && state.ActiveTourId == progress?.Id && state.ActiveClaimId.HasValue
+                            ? state.ActiveClaimId.Value : mutation.CandidateClaimId;
+                        state.ClaimSemanticTour(progress?.Id ?? mutation.CandidateChildId, definition,
+                            claimId, claim.IntentId, claim.ExpectedRevision, mutation.UpdatedAtUtc,
+                            claim.ExpectedPlanFingerprint, claim.ExpectedPolicySourceStamp,
+                            claim.ContextKey, claim.EventContextId, claim.Replay);
+                        _claimDeadline = duplicate ? null : state.ClaimExpiresAtUtc;
+                        break;
+                    }
+                case LearningTourOutcomeIntent outcome:
+                    {
+                        RequireTourMaterial(outcome.MaterialVersion);
+                        var progress = state.Tours.SingleOrDefault(value =>
+                            value.Family == outcome.Family && value.MaterialVersion == outcome.MaterialVersion);
+                        bool duplicate = state.LastIntentId == outcome.IntentId || progress?.LastIntentId == outcome.IntentId;
+                        if (duplicate && progress?.LastIntentId != outcome.IntentId)
+                            throw Conflict("The retained action belongs to another tour family or material version.");
+                        bool release = outcome.ClaimToken.HasValue && outcome.Action is
+                            LearningTourAction.Skip or LearningTourAction.Interrupt or LearningTourAction.Snooze;
+                        LearningTourDefinition definition;
+                        if (duplicate || release)
+                            definition = LearningExperienceCatalog.GetDefinition(outcome.Family);
+                        else
+                        {
+                            var resolved = ResolveTour(mutation, state, space, outcome.Family);
+                            RequirePlan(resolved.Plan, outcome.ExpectedPlanFingerprint, outcome.ExpectedPolicySourceStamp);
+                            definition = resolved.Definition ?? throw Conflict("The current tour is unavailable.");
+                        }
+                        _claimDeadline = duplicate || !outcome.ClaimToken.HasValue ? null : state.ClaimExpiresAtUtc;
+                        state.RecordSemanticTourAction(progress?.Id ?? mutation.CandidateChildId, definition,
+                            outcome.ClaimToken, outcome.IntentId, outcome.Action, outcome.StepKey,
+                            outcome.StepVersion, outcome.SnoozeDuration, outcome.ExpectedPlanFingerprint,
+                            outcome.ExpectedPolicySourceStamp, outcome.ExpectedRevision, mutation.UpdatedAtUtc,
+                            outcome.ContextKey, outcome.EventContextId);
+                        break;
+                    }
+                case LearningPracticeIntent input:
+                    {
+                        RequirePracticeMaterial(input.MaterialVersion);
+                        var current = state.Practices.SingleOrDefault(value =>
+                            value.ContextKey == input.ContextKey && value.RecipeKey == input.RecipeKey);
+                        if (input.PracticeId.HasValue && current?.Id != input.PracticeId
+                            && !(input.Action == LearningPracticeAction.Clear && state.LastIntentId == input.IntentId))
+                            throw new NotFoundException("Learning practice", input.PracticeId);
+                        bool duplicate = state.LastIntentId == input.IntentId || current?.LastIntentId == input.IntentId;
+                        Wire.LearningSimulationStateDto? restored = null;
+                        if (!duplicate && current is not null && !LearningLessonCatalog.TryRestore(current.RecipeKey,
+                                current.RecipeVersion, (Wire.LearningPracticeChoiceSlot)current.Choice,
+                                current.Step, current.Value, current.IsConfirmed, out restored))
+                            throw Conflict("The stored practice is not an authored state.");
+                        if (!LearningLessonCatalog.TryGetLesson(input.RecipeKey, input.MaterialVersion, out var lesson))
+                            throw new ArgumentException("The recipe is not part of the shipped pack.");
+                        var choice = input.ChoiceKey is null ? null
+                            : lesson.Choices.SingleOrDefault(value => value.Key == input.ChoiceKey);
+                        if (input.Action == LearningPracticeAction.Choose && choice is null)
+                            throw new ArgumentException("Choose a shipped recipe option.");
+                        if (input.Action != LearningPracticeAction.Choose && input.ChoiceKey is not null)
+                            throw new ArgumentException("Only Choose accepts an authored option.");
+                        if (!duplicate && !LearningLessonCatalog.TryApply(input.RecipeKey, input.MaterialVersion,
+                                (Wire.LearningPracticeAction)input.Action, input.ChoiceKey, restored, out _))
+                            throw Conflict("The practice action is not valid in the current state.");
+                        state.ApplyPractice(input.PracticeId ?? current?.Id ?? mutation.CandidateChildId,
+                            input.ContextKey, input.RecipeKey, input.MaterialVersion, input.Action,
+                            input.Action == LearningPracticeAction.Choose
+                                ? (LearningPracticeChoice)choice!.Slot : LearningPracticeChoice.None,
+                            input.Action == LearningPracticeAction.Choose ? 1 : 0,
+                            input.Action == LearningPracticeAction.Choose ? choice!.Value : 0,
+                            input.IntentId, input.ExpectedRevision, input.ExpectedPracticeRevision, mutation.UpdatedAtUtc);
+                        break;
+                    }
+                default:
+                    throw new InvalidOperationException("The learning intent is not registered.");
+            }
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new ConcurrencyConflictException("learning_conflict",
+                "Learning changed or the requested transition is stale. Refresh the private context.",
+                innerException: exception);
+        }
+    }
+
+    public async Task RequireCompleteAsync(IHumanLearningMutation mutation, CancellationToken token)
+    {
+        RequirePhysicalOwner(mutation);
+        if (!ReferenceEquals(_completed, mutation) || _expectedImage is null || context.ChangeTracker.HasChanges())
+            throw new UnauthorizedAccessException("The original learning image is incomplete.");
+        var tracked = context.ChangeTracker.Entries().ToArray();
+        if (_expectedTracked is null || tracked.Length != _expectedTracked.Count
+            || tracked.Any(entry => !_expectedTracked.TryGetValue(entry.Entity, out var expected)
+                || expected != ScalarImage(entry.Entity)))
+            throw new UnauthorizedAccessException("The original learning write inventory changed during saving.");
+        var repository = services.GetRequiredService<ILearningRepository>();
+        var space = await repository.GetSpaceAsync(mutation.TenantId, tracked: false, token);
+        var state = await repository.GetStateAsync(mutation.TenantId, mutation.SubjectId, tracked: false, token);
+        if (_expectedImage != Image(space, state))
+            throw new UnauthorizedAccessException("The persisted learning completion image changed.");
+        RequirePhysicalOwner(mutation);
+    }
+
+    private void RequirePermittedChanges(IHumanLearningMutation mutation, LearningOperationState result)
+    {
+        context.ChangeTracker.DetectChanges();
+        bool acknowledgement = mutation.Intent is LearningRequirementAcknowledgementIntent;
+        if (_expectedAcknowledgements != AcknowledgementImage(result.State)
+            || acknowledgement && _expectedAcknowledgementTransition != Image(result.Space, result.State))
+            throw new UnauthorizedAccessException("Learning changed evidence outside its baseline-authorized transition.");
+        var acknowledgements = result.State?.RequirementAcknowledgements.ToArray() ?? [];
+        var trackedAcknowledgements = context.ChangeTracker.Entries<LearningRequirementAcknowledgement>()
+            .Where(entry => entry.State != EntityState.Deleted).ToArray();
+        if (trackedAcknowledgements.Length != acknowledgements.Length
+            || trackedAcknowledgements.Any(entry => !acknowledgements.Any(value => ReferenceEquals(value, entry.Entity))))
+            throw new UnauthorizedAccessException("The tracked acknowledgement inventory contains unowned evidence.");
+        foreach (var entry in context.ChangeTracker.Entries()
+                     .Where(value => value.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
+        {
+            bool permitted = entry.Entity switch
+            {
+                TenantLearningSpace value => !acknowledgement
+                    && ReferenceEquals(value, result.Space) && value.TenantId == mutation.TenantId,
+                UserLearningState value => ReferenceEquals(value, result.State)
+                    && value.TenantId == mutation.TenantId && value.UserId == mutation.SubjectId
+                    && (!acknowledgement || entry.State == _acknowledgementRootState),
+                LearningTourProgress value => !acknowledgement && value.TenantId == mutation.TenantId
+                    && value.UserLearningStateId == result.State?.Id,
+                LearningTourStepProgress value => !acknowledgement && value.TenantId == mutation.TenantId
+                    && context.ChangeTracker.Entries<LearningTourProgress>().Any(tour =>
+                        tour.Entity.Id == value.TourProgressId && tour.Entity.TenantId == mutation.TenantId
+                        && tour.Entity.UserLearningStateId == result.State!.Id),
+                LearningPracticeState value => !acknowledgement && value.TenantId == mutation.TenantId
+                    && value.UserLearningStateId == result.State?.Id,
+                LearningRequirementAcknowledgement value => acknowledgement && value.TenantId == mutation.TenantId
+                    && value.UserLearningStateId == result.State?.Id
+                    && (entry.State == EntityState.Deleted
+                        ? _removedAcknowledgements is not null
+                            && _removedAcknowledgements.TryGetValue(value.Id, out var original)
+                            && original == ScalarImage(value)
+                        : value.Id == _acknowledgementId && entry.State == _acknowledgementState
+                            && acknowledgements.Any(row => ReferenceEquals(row, value))),
+                _ => false
+            };
+            if (!permitted)
+                throw new UnauthorizedAccessException("Learning cannot commit a nonlearning effect.");
+        }
+    }
+
+    private string Image(TenantLearningSpace? space, UserLearningState? state)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            Space = space is null ? null : ScalarImage(space),
+            State = state is null ? null : ScalarImage(state),
+            Tours = state?.Tours.OrderBy(value => value.Id).Select(value => ScalarImage(value)).ToArray(),
+            Steps = state?.Tours.SelectMany(value => value.Steps)
+                .OrderBy(value => value.Id).Select(value => ScalarImage(value)).ToArray(),
+            Practices = state?.Practices.OrderBy(value => value.Id).Select(value => ScalarImage(value)).ToArray(),
+            Acknowledgements = AcknowledgementImage(state)
+        });
+    }
+
+    private string AcknowledgementImage(UserLearningState? state) =>
+        JsonSerializer.Serialize(state?.RequirementAcknowledgements
+            .OrderBy(value => value.Id).Select(value => ScalarImage(value)).ToArray() ?? []);
+
+    private string ScalarImage(object entity) => JsonSerializer.Serialize(context.Entry(entity).Properties
+        .OrderBy(value => value.Metadata.Name, StringComparer.Ordinal)
+        .ToDictionary(value => value.Metadata.Name, value => value.CurrentValue is DateTime timestamp
+            ? DateTime.SpecifyKind(timestamp, DateTimeKind.Utc) : value.CurrentValue, StringComparer.Ordinal));
+
+    private void RequireOwner(IHumanLearningMutation mutation, bool transactional)
+    {
+        context.RequireBoundTenantLease();
+        lease.RequireOriginalOwner(context);
+        if (!ReferenceEquals(preparation.CurrentMutation, mutation)
+            || lease.HumanScope?.Subject.PrincipalId != mutation.SubjectId
+            || lease.HumanScope.Purpose != HumanAdministratorCommitPurpose.RuntimeTenant
+            || lease.SelectedTenantId != mutation.TenantId || mutation.TenantId == Guid.Empty
+            || lease.PolicyPurpose != PolicyMutationPurpose.Standard
+            || transactional && context.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new UnauthorizedAccessException("Learning requires its original prepared selected-tenant human.");
+    }
+
+    private void BindPhysicalOwner(IHumanLearningMutation mutation)
+    {
+        RequireOwner(mutation, transactional: true);
+        if (context.ChangeTracker.HasChanges())
+            throw new UnauthorizedAccessException("Learning requires a clean original owner.");
+        _contextId = context.ContextId;
+        _transaction = context.Database.CurrentTransaction;
+        _connection = RelationalConnectionIdentity.Capture(context);
+        _backend = _connection.BackendProcessId;
+        _connection.StateChange += ConnectionChanged;
+    }
+
+    private void RequirePhysicalOwner(IHumanLearningMutation mutation)
+    {
+        RequireOwner(mutation, transactional: true);
+        if (context.ContextId != _contextId || !ReferenceEquals(context.Database.CurrentTransaction, _transaction)
+            || _connection is null || !_connection.Matches(context) || _connection.State != ConnectionState.Open
+            || _connection.BackendProcessId != _backend
+            || _interrupted)
+            throw new UnauthorizedAccessException("The original learning transaction or connection changed.");
+    }
+
+    private static void RequirePracticeMaterial(int version)
+    {
+        if (version != LearningLessonCatalog.MaterialVersion)
+            throw Conflict("The learning material is stale or unsupported.");
+    }
+
+    private static void RequireTourMaterial(int version)
+    {
+        if (version != LearningExperienceCatalog.MaterialVersion)
+            throw Conflict("The semantic tour material is stale or unsupported.");
+    }
+
+    private (Wire.LearningTourPlanDto Plan, LearningTourDefinition? Definition) ResolveTour(
+        IHumanLearningMutation mutation, UserLearningState state, TenantLearningSpace? space, LearningTourFamily family) =>
+        LearningTourPlanResolver.Resolve(new(mutation.TenantId, mutation.SubjectId, mutation.ContextKey,
+            mutation.EventContextId, space, state, null, mutation.AvailableActors,
+            mutation.CanManageSpace, mutation.CanManageEvent)
+        {
+            Sources = mutation.Sources,
+            StudioAvailable = mutation.StudioAvailable,
+            NormalAiAvailable = mutation.NormalAiAvailable,
+            ObservedAtUtc = clock.GetUtcNow().UtcDateTime
+        }, mutation.Sources, (Wire.LearningTourFamily)family);
+
+    private static void RequirePlan(Wire.LearningTourPlanDto plan, string fingerprint, string policyStamp)
+    {
+        if (!plan.IsAvailable || plan.PlanFingerprint != fingerprint || plan.PolicySourceStamp != policyStamp)
+            throw Conflict("The accepted learning plan or policy sources changed. Refresh the private plan.");
+    }
+
+    private static ConcurrencyConflictException Conflict(string message) => new("learning_conflict", message);
+    private void ConnectionChanged(object? sender, StateChangeEventArgs change)
+    {
+        if (change.CurrentState != ConnectionState.Open) _interrupted = true;
+    }
+
+    public void Dispose()
+    {
+        if (_connection is not null) _connection.StateChange -= ConnectionChanged;
+    }
+}

@@ -17865,6 +17865,391 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.ToTable("ie_languages", (string)null);
                 });
 
+            modelBuilder.Entity("Explore.Domain.Learning.LearningPracticeState", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Choice")
+                        .HasColumnType("int")
+                        .HasColumnName("choice");
+
+                    b.Property<string>("ContextKey")
+                        .IsRequired()
+                        .HasMaxLength(42)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(42)")
+                        .HasColumnName("context_key");
+
+                    b.Property<bool>("IsConfirmed")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("is_confirmed");
+
+                    b.Property<int>("LastAction")
+                        .HasColumnType("int")
+                        .HasColumnName("last_action");
+
+                    b.Property<string>("LastIntentFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("last_intent_fingerprint");
+
+                    b.Property<Guid>("LastIntentId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("last_intent_id");
+
+                    b.Property<string>("RecipeKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(32)")
+                        .HasColumnName("recipe_key");
+
+                    b.Property<int>("RecipeVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("recipe_version");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<int>("Step")
+                        .HasColumnType("int")
+                        .HasColumnName("step");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserLearningStateId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("user_learning_state_id");
+
+                    b.Property<int>("Value")
+                        .HasColumnType("int")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_learning_practice_states");
+
+                    b.HasIndex("TenantId", "UserLearningStateId", "ContextKey", "RecipeKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ie_learning_practice_states_tenant_id_user_learning__1d26c971");
+
+                    b.ToTable("ie_learning_practice_states", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.Learning.LearningRequirementAcknowledgement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("AcknowledgedAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("acknowledged_at_utc");
+
+                    b.Property<string>("LastIntentFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("last_intent_fingerprint");
+
+                    b.Property<Guid>("LastIntentId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("last_intent_id");
+
+                    b.Property<int>("MaterialVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("material_version");
+
+                    b.Property<string>("PolicySourceStamp")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("policy_source_stamp");
+
+                    b.Property<string>("RequirementKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(32)")
+                        .HasColumnName("requirement_key");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserLearningStateId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("user_learning_state_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_learning_requirement_acknowledgements");
+
+                    b.HasIndex("TenantId", "UserLearningStateId", "RequirementKey", "MaterialVersion")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ie_learning_requirement_acknowledgements_tenant_id_u_56d61a79");
+
+                    b.ToTable("ie_learning_requirement_acknowledgements", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.Learning.LearningTourProgress", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Family")
+                        .HasColumnType("int")
+                        .HasColumnName("family");
+
+                    b.Property<string>("LastIntentFingerprint")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("last_intent_fingerprint");
+
+                    b.Property<Guid?>("LastIntentId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("last_intent_id");
+
+                    b.Property<string>("LastStepKey")
+                        .HasMaxLength(96)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(96)")
+                        .HasColumnName("last_step_key");
+
+                    b.Property<int>("MaterialVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("material_version");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("int")
+                        .HasColumnName("outcome");
+
+                    b.Property<DateTime?>("SnoozedUntilUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("snoozed_until_utc");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserLearningStateId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("user_learning_state_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_learning_tour_progress");
+
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ak_learning_tour_progress_tenant_id_id");
+
+                    b.HasIndex("TenantId", "UserLearningStateId", "Family", "MaterialVersion")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ie_learning_tour_progress_tenant_id_user_learning_st_93207e6a");
+
+                    b.ToTable("ie_learning_tour_progress", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.Learning.LearningTourStepProgress", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CompletedAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("completed_at_utc");
+
+                    b.Property<string>("StepKey")
+                        .IsRequired()
+                        .HasMaxLength(96)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(96)")
+                        .HasColumnName("step_key");
+
+                    b.Property<int>("StepVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("step_version");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TourProgressId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tour_progress_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_learning_tour_step_progress");
+
+                    b.HasIndex("TenantId", "TourProgressId", "StepKey", "StepVersion")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ie_learning_tour_step_progress_tenant_id_tour_progre_060d60a2");
+
+                    b.ToTable("ie_learning_tour_step_progress", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.Learning.TenantLearningSpace", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<bool>("IsRemoved")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("is_removed");
+
+                    b.Property<string>("PackKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(32)")
+                        .HasColumnName("pack_key");
+
+                    b.Property<int>("PackVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("pack_version");
+
+                    b.Property<DateTime?>("RemovedAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("removed_at_utc");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_tenant_learning_spaces");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tenant_learning_spaces_tenant_id");
+
+                    b.ToTable("ie_tenant_learning_spaces", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.Learning.UserLearningState", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActiveClaimId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("active_claim_id");
+
+                    b.Property<string>("ActiveContextKey")
+                        .HasMaxLength(42)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(42)")
+                        .HasColumnName("active_context_key");
+
+                    b.Property<Guid?>("ActiveEventContextId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("active_event_context_id");
+
+                    b.Property<string>("ActivePlanFingerprint")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("active_plan_fingerprint");
+
+                    b.Property<string>("ActivePolicySourceStamp")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("active_policy_source_stamp");
+
+                    b.Property<Guid?>("ActiveTourId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("active_tour_id");
+
+                    b.Property<DateTime?>("ClaimExpiresAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("claim_expires_at_utc");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("is_hidden");
+
+                    b.Property<bool>("IsPinned")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("is_pinned");
+
+                    b.Property<string>("LastIntentFingerprint")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("last_intent_fingerprint");
+
+                    b.Property<Guid?>("LastIntentId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("last_intent_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<bool>("SuppressAutomaticTours")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("suppress_automatic_tours");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_user_learning_states");
+
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ak_user_learning_states_tenant_id_id");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_learning_states_tenant_id_user_id");
+
+                    b.ToTable("ie_user_learning_states", (string)null);
+                });
+
             modelBuilder.Entity("Explore.Domain.LegalDocument", b =>
                 {
                     b.Property<Guid>("Id")
@@ -56995,6 +57380,70 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Explore.Domain.Learning.LearningPracticeState", b =>
+                {
+                    b.HasOne("Explore.Domain.Learning.UserLearningState", null)
+                        .WithMany("Practices")
+                        .HasForeignKey("TenantId", "UserLearningStateId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_learning_practice_states_ie_user_learning_states__4c499dd6");
+                });
+
+            modelBuilder.Entity("Explore.Domain.Learning.LearningRequirementAcknowledgement", b =>
+                {
+                    b.HasOne("Explore.Domain.Learning.UserLearningState", null)
+                        .WithMany("RequirementAcknowledgements")
+                        .HasForeignKey("TenantId", "UserLearningStateId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_learning_requirement_acknowledgements_ie_user_lea_43186a25");
+                });
+
+            modelBuilder.Entity("Explore.Domain.Learning.LearningTourProgress", b =>
+                {
+                    b.HasOne("Explore.Domain.Learning.UserLearningState", null)
+                        .WithMany("Tours")
+                        .HasForeignKey("TenantId", "UserLearningStateId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_learning_tour_progress_ie_user_learning_states_te_4a50d991");
+                });
+
+            modelBuilder.Entity("Explore.Domain.Learning.LearningTourStepProgress", b =>
+                {
+                    b.HasOne("Explore.Domain.Learning.LearningTourProgress", null)
+                        .WithMany("Steps")
+                        .HasForeignKey("TenantId", "TourProgressId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_learning_tour_step_progress_ie_learning_tour_prog_a4dfcac4");
+                });
+
+            modelBuilder.Entity("Explore.Domain.Learning.TenantLearningSpace", b =>
+                {
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_learning_spaces_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.Learning.UserLearningState", b =>
+                {
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_learning_states_tenants_tenant_id");
+                });
+
             modelBuilder.Entity("Explore.Domain.LegalDocumentLocalizedSource", b =>
                 {
                     b.HasOne("Explore.Domain.LegalDocumentVersion", "LegalDocumentVersion")
@@ -67995,6 +68444,20 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.Navigation("ProcessingAttempts");
 
                     b.Navigation("RedriveRecords");
+                });
+
+            modelBuilder.Entity("Explore.Domain.Learning.LearningTourProgress", b =>
+                {
+                    b.Navigation("Steps");
+                });
+
+            modelBuilder.Entity("Explore.Domain.Learning.UserLearningState", b =>
+                {
+                    b.Navigation("Practices");
+
+                    b.Navigation("RequirementAcknowledgements");
+
+                    b.Navigation("Tours");
                 });
 
             modelBuilder.Entity("Explore.Domain.LegalDocument", b =>

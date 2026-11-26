@@ -1,0 +1,50 @@
+Change-Id: CHG-01M679CJR3J5415SVKQWYRD306
+Title: "respect tenant guidance choices and administrator acknowledgement"
+Type: feat
+Scope: onboarding
+Summary: "Resolve invitations, manual access and explicit administrator orientation from a typed tenant policy while preserving private evidence and current native authority."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Detail: >-
+      Retain original-human authority and typed policy sources through final
+      admission. Scope Runtime document writes to the selected tenant and
+      guidance key, with exact catalog recognition and no Global bootstrap
+      expansion. Administrator acknowledgement is private evidence, not a grant.
+  Migration:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Detail: >-
+      Apply the selected provider's generated AddLearningGuidancePolicy cohort
+      for bounded tenant-qualified acknowledgement children. SQL Server uses
+      physical NoAction with ordered erasure; other providers use cascades.
+      No shared database reset or automatic deployment is authorized.
+  Configuration:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      Existing settings administration owns the instance-only
+      learning.guidance.allow_tenant_edits control, default true. Tenant policy
+      cannot override it. No environment variable, service or secret is added.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Add private policy GET/PATCH and explicit acknowledgement operations.
+      Regenerate clients for requirement status, invitation observations and
+      the populated guidance HAL response. Existing production authority is
+      independent of learning choices or acknowledgement.
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      Defaults remain optional. Disabled learning preserves private history
+      and clearing; invitation changes do not invalidate unchanged orientation
+      material. Targeted backend checks do not certify rendered learning,
+      hosted accessibility or the complete programme provider matrix.

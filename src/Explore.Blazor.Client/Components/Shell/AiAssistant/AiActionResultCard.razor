@@ -1,35 +1,50 @@
 @using System.Text.Json
+@implements IDisposable
 @inject NavigationManager Navigation
 
-@if (Action is not null && ShouldRenderResult)
+@if (ShouldRenderResult)
 {
     <div class="ai-rail__action-result" data-testid="ai-action-result">
-        @if (Action.ResultResourceId is Guid resultId)
+        @if (Presentation is not null || Action?.ResultResourceId is not null)
         {
-            @if (IsCreateEventDraft)
+            @if (IsCreateEventDraft || Presentation is not null)
             {
                 <div class="ai-rail__result-event-card" data-testid="ai-result-event-card">
                     <div class="ai-rail__result-event-header">
                         <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
                                  Size="Size.Small"
                                  Color="Color.Success" />
-                        <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 600;">
-                            Event Draft Created
+                        <MudText Typo="Typo.caption" Color="Color.Success">
+                            @(Presentation?.Heading ?? "Action result")
                         </MudText>
                     </div>
 
-                    <a href="@($"/events/{resultId}")"
+                    @if (CanOpenResult)
+                    {
+                    <a href="@(Presentation!.Destination)"
                        class="ai-rail__result-event-link"
                        data-testid="ai-result-event-link"
-                       @onclick="() => NavigateToEvent(resultId)"
+                       @onclick="OpenResultAsync"
                        @onclick:preventDefault>
                         <MudText Typo="Typo.subtitle2" Class="ai-rail__result-event-title">
-                            @(PayloadTitle ?? "Untitled Event")
+                            @(Mode == AiPresentationMode.Live
+                                ? (!string.IsNullOrWhiteSpace(PayloadTitle) ? PayloadTitle
+                                    : IsCreateEventDraft ? "Untitled Event" : Presentation!.LinkText)
+                                : Presentation!.LinkText)
                         </MudText>
                         <MudIcon Icon="@Icons.Material.Filled.OpenInNew"
                                  Size="Size.Small"
                                  Class="ai-rail__result-event-arrow" />
                     </a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Presentation?.Description))
+                    {
+                        <p>@Presentation.Description</p>
+                    }
+                    else if (!CanOpenResult)
+                    {
+                        <MudText Typo="Typo.subtitle2">@(PayloadTitle ?? "Action result")</MudText>
+                    }
 
                     @if (HasPayloadDetails)
                     {
@@ -77,11 +92,11 @@
             else
             {
                 <MudText Typo="Typo.caption" Color="Color.Success">
-                    Created result @resultId
+                    Created result @Action?.ResultResourceId
                 </MudText>
             }
         }
-        else if (!string.IsNullOrWhiteSpace(Action.FailureCode) || !string.IsNullOrWhiteSpace(Action.FailureMessage))
+        else if (!string.IsNullOrWhiteSpace(Action?.FailureCode) || !string.IsNullOrWhiteSpace(Action?.FailureMessage))
         {
             <MudText Typo="Typo.caption" Color="Color.Error">
                 @FailureText
@@ -94,7 +109,37 @@
     [Parameter]
     public ProposedActions2? Action { get; set; }
 
-    private bool ShouldRenderResult => Action?.ResultResourceId is not null
+    [Parameter] public AiPresentationMode Mode { get; set; }
+    [Parameter] public AiActionResultPresentation? Presentation { get; set; }
+    [Parameter] public EventCallback<AiActionResultPresentation> OnOpenResult { get; set; }
+
+    private bool _disposed;
+    private bool CanOpenResult => !_disposed
+        && Mode is AiPresentationMode.Live or AiPresentationMode.Simulation
+        && OnOpenResult.HasDelegate && Presentation is { Destination: { } destination, LinkText: { Length: > 0 } }
+        && destination.StartsWith("/", StringComparison.Ordinal)
+        && !destination.StartsWith("//", StringComparison.Ordinal)
+        && !destination.Contains('\\')
+        && (Mode != AiPresentationMode.Simulation || IsPrivateLearningDestination(destination));
+
+    private bool IsPrivateLearningDestination(string destination)
+    {
+        var path = destination.Split('?', '#')[0];
+        var basePath = new Uri(Navigation.BaseUri).AbsolutePath;
+        if (!path.StartsWith(basePath, StringComparison.Ordinal))
+            return false;
+
+        var relativePath = path[basePath.Length..];
+        const string prefix = "learning/demo/";
+        return relativePath == "learning" || relativePath.StartsWith(prefix, StringComparison.Ordinal)
+            && Guid.TryParseExact(relativePath[prefix.Length..], "D", out _);
+    }
+
+    private Task OpenResultAsync() => CanOpenResult
+        ? OnOpenResult.InvokeAsync(Presentation!)
+        : Task.CompletedTask;
+
+    private bool ShouldRenderResult => Presentation is not null || Action?.ResultResourceId is not null
         || !string.IsNullOrWhiteSpace(Action?.FailureCode)
         || !string.IsNullOrWhiteSpace(Action?.FailureMessage);
 
@@ -105,7 +150,11 @@
     private bool IsCreateEventDraft =>
         string.Equals(Action?.Kind, "CreateEventDraft", StringComparison.OrdinalIgnoreCase);
 
-    private void NavigateToEvent(Guid eventId) => Navigation.NavigateTo($"/events/{eventId}");
+    public void Dispose()
+    {
+        _disposed = true;
+        _parsedPayload?.Dispose();
+    }
 
     // ── Payload extraction ──
     private JsonDocument? _parsedPayload;

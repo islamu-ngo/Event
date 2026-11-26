@@ -11,6 +11,10 @@ using Explore.Application.Features.Settings;
 using Explore.Domain;
 using Explore.Domain.Settings;
 using Explore.Domain.Settings.Definitions;
+using Explore.Application.Features.Announcements;
+using Explore.Application.Features.Announcements.Requests.Commands;
+using Explore.Application.DTOs.Appearance.Validators;
+using Explore.Application.Features.Appearance.Requests.Commands;
 
 namespace Explore.Application.Contracts.Persistence;
 
@@ -29,12 +33,58 @@ public sealed class OrdinarySettingsMutation
 
     public object Original { get; }
     public ImmutableArray<HumanSettingsMutation> Effects { get; }
+    public ImmutableArray<string> ReadKeys => Original is DismissAnnouncementCommand
+        ? [GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication,
+            GovernanceSettingKeys.PublicExperiencePreferences.AnnouncementBarDismissedEdition] : [];
     public bool RequiresTenantVerificationCeiling => Original is UpdateSettingCommand or UpdateSettingBatchCommand
         && Effects.Any(effect => effect.Scope == SettingScope.Tenant
             && effect.Key == Explore.Domain.Constants.GovernanceSettingKeys.Organizations.VerificationRequired);
 
     public static OrdinarySettingsMutation? Capture(object original, ImmutableArray<HumanSettingsMutation> effects)
     {
+        if (original is DismissAnnouncementCommand dismissal)
+        {
+            ArgumentNullException.ThrowIfNull(dismissal.Observed);
+            if (dismissal.ActorUserId == Guid.Empty || effects.Length != 1
+                || effects[0] != new HumanSettingsMutation(HumanSettingsOperation.UserSettings, SettingScope.User,
+                    dismissal.Observed.TenantId, dismissal.ActorUserId,
+                    GovernanceSettingKeys.PublicExperiencePreferences.AnnouncementBarDismissedEdition,
+                    HumanSettingsMutationKind.SetValue,
+                    AnnouncementSettingValueCodec.SerializeMarker(new(dismissal.Observed))))
+                throw new UnauthorizedAccessException("Dismissal effects require the exact original subject, tenant and observation.");
+            if (dismissal.ExpectedMarker is { } marker && marker.Observation.TenantId != dismissal.Observed.TenantId)
+                throw new ArgumentException("The expected dismissal marker belongs to another tenant.", nameof(original));
+            return new(original, effects);
+        }
+        if (effects.Any(effect => AnnouncementSettingMutationGuard.Handles(effect.Key)))
+            throw new UnauthorizedAccessException(AnnouncementSettingMutationGuard.FailureCode);
+        if (original is UpdateCurrentUserAppearancePreferencesCommand appearance)
+        {
+            var validator = new UpdateUserAppearancePreferencesDtoValidator();
+            if (!validator.Validate(appearance.Preferences).IsValid)
+                throw new UnauthorizedAccessException("Appearance effects require valid original localization inputs.");
+            var inputs = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (appearance.Preferences.Localization!.Language is { } language)
+                inputs.Add(GovernanceSettingKeys.Appearance.Language, language.Trim().ToLowerInvariant());
+            if (appearance.Preferences.Localization.Direction is { } direction)
+                inputs.Add(GovernanceSettingKeys.Appearance.Direction, direction.Trim().ToLowerInvariant());
+            if (effects.Length != inputs.Count
+                || effects.Select(effect => effect.Key).Distinct(StringComparer.Ordinal).Count() != effects.Length)
+                throw new UnauthorizedAccessException("Appearance effects must match the supplied localization keys.");
+            foreach (var effect in effects)
+            {
+                if (!inputs.TryGetValue(effect.Key, out var input)
+                    || effect.Operation != HumanSettingsOperation.UserSettings || effect.Scope != SettingScope.User
+                    || effect.TenantId.GetValueOrDefault() == Guid.Empty || effect.UserId.GetValueOrDefault() == Guid.Empty
+                    || effect.IsLocked.HasValue
+                    || effect.Kind == HumanSettingsMutationKind.SetValue
+                        && effect.Value != SettingValueSerializer.Serialize(input)
+                    || effect.Kind == HumanSettingsMutationKind.Remove && effect.Value is not null
+                    || effect.Kind is not (HumanSettingsMutationKind.SetValue or HumanSettingsMutationKind.Remove))
+                    throw new UnauthorizedAccessException("Appearance effects differ from the original localization intent.");
+            }
+            return new(original, effects);
+        }
         if (original is UpdateLocalizationGovernanceCommand localization)
         {
             if (!effects.SequenceEqual(CaptureLocalization(localization)))
@@ -139,6 +189,8 @@ public enum OrdinaryUserPreferenceWrite { Create, Update, Remove }
 /// </summary>
 public interface IOrdinarySettingsMutationStore
 {
+    Task<AnnouncementDismissalResult> ApplyAnnouncementDismissalAsync(
+        IOrdinarySettingsSource source, DismissAnnouncementCommand original, CancellationToken cancellationToken);
     Task<IOrdinarySettingsSource> ObserveAsync(OrdinarySettingsMutation mutation, HumanCommitSubject subject,
         CancellationToken cancellationToken);
     Task AcquireAsync(IOrdinarySettingsSource source, CancellationToken cancellationToken);

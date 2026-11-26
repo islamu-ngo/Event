@@ -437,6 +437,48 @@ public static partial class PostgresMixedSettingsContract
             """;
     }
 
+    private static string LearningCaller(PostgresNativeQueueEnrollment enrollment, bool retaining) => $"""
+            {PostgresPrivilegeGuard.RestrictedCallerSql}
+            IF current_user <> '{OwnerRole}' OR session_user <> {Text(enrollment.RuntimeLogin)}
+                OR pg_catalog.current_setting('role') NOT IN ('none',session_user::text)
+                OR pg_catalog.current_setting('session_replication_role') <> 'origin'
+                {(retaining ? "OR pg_catalog.current_setting('transaction_isolation') <> 'serializable'" : "")}
+                OR p_tenant IS NULL OR p_tenant = '00000000-0000-0000-0000-000000000000'::uuid
+                OR NULLIF(pg_catalog.current_setting('app.current_tenant_id',true),'')::uuid IS DISTINCT FROM p_tenant
+            THEN RAISE EXCEPTION 'mixed_settings_learning_original_owner' USING ERRCODE = '42501'; END IF;
+        """;
+
+    private static string LearningRetainBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) => $"""
+        BEGIN
+            {Guard(context, enrollment)}
+            {LearningCaller(enrollment, retaining: true)}
+            PERFORM revision FROM {new HumanPrincipalSourceSql(context).Name(SourceTable)}
+                WHERE id = 1 FOR SHARE NOWAIT;
+            IF NOT FOUND THEN RAISE EXCEPTION 'mixed_settings_source_absent' USING ERRCODE = '55000'; END IF;
+        END;
+        """;
+
+    private static string LearningDocumentBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        var sql = new HumanPrincipalSourceSql(context);
+        var type = typeof(Explore.Domain.Settings.Documents.TenantSettingsDocument);
+        string[] fields = ["Id", "TenantId", "SchemaVersion", "DefaultsVersion", "PayloadJson", "ConcurrencyStamp"];
+        string projection = string.Join(",", fields.Select(field =>
+            $"{Text(field)},r.{sql.Column(type, field)}{(field == "PayloadJson" ? "::text" : "")}"));
+        return $"""
+            DECLARE image jsonb;
+            BEGIN
+                {Guard(context, enrollment)}
+                {LearningCaller(enrollment, retaining: false)}
+                SELECT pg_catalog.jsonb_build_object({projection}) INTO image
+                    FROM {sql.Table(type)} r
+                    WHERE r.{sql.Column(type, "TenantId")} = p_tenant
+                        AND r.{sql.Column(type, "DocumentKey")} = {Text(LearningSourceRetention.GuidanceDocumentKey)};
+                RETURN image;
+            END;
+            """;
+    }
+
     private static IEnumerable<(string Name, string Signature, string Arguments, string Result, string Body)> Functions(
         ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
@@ -448,6 +490,8 @@ public static partial class PostgresMixedSettingsContract
                 {Caller(enrollment, false)}
             END;
             """);
+        yield return ("learning_retain", "uuid", "p_tenant uuid", "void", LearningRetainBody(context, enrollment));
+        yield return ("learning_document", "uuid", "p_tenant uuid", "jsonb", LearningDocumentBody(context, enrollment));
         foreach (var function in TypedFunctions(context, enrollment)) yield return function;
         yield return ("data", "uuid,jsonb", "p_tenant uuid,p_request jsonb", "jsonb", DataBody(context, enrollment));
         yield return ("read", HumanSignature, HumanArguments, "jsonb", ReadBody(context, enrollment));

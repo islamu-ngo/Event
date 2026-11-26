@@ -53,6 +53,9 @@ public interface IHumanConfigurationImportAdmission
 
     Task RequirePublicationAsync(HumanConfigurationImportPublication publication,
         CancellationToken cancellationToken = default);
+
+    Task RequireAnnouncementAsync(HumanConfigurationImportAnnouncement announcement,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>Opaque, callback-limited capability. A public implementation carries no authority.</summary>
@@ -123,7 +126,9 @@ public sealed class HumanConfigurationImportApply
         Func<CancellationToken, Task> validateSources,
         Func<CancellationToken, Task<ImmutableArray<SettingChangedNotification>>> apply,
         ImmutableArray<HumanConfigurationImportPublication> publications,
-        IHumanConfigurationImportPublicationStore? publicationStore)
+        IHumanConfigurationImportPublicationStore? publicationStore,
+        ImmutableArray<HumanConfigurationImportAnnouncement> announcements,
+        IHumanConfigurationImportAnnouncementStore? announcementStore)
     {
         OperationId = operationId;
         Subject = subject;
@@ -134,6 +139,8 @@ public sealed class HumanConfigurationImportApply
         this.apply = apply;
         Publications = publications;
         PublicationStore = publicationStore;
+        Announcements = announcements;
+        AnnouncementStore = announcementStore;
     }
 
     public Guid OperationId { get; }
@@ -143,6 +150,8 @@ public sealed class HumanConfigurationImportApply
     public ImmutableArray<HumanConfigurationImportSettingEffect> Effects { get; }
     public ImmutableArray<HumanConfigurationImportPublication> Publications { get; }
     public IHumanConfigurationImportPublicationStore? PublicationStore { get; }
+    public ImmutableArray<HumanConfigurationImportAnnouncement> Announcements { get; }
+    public IHumanConfigurationImportAnnouncementStore? AnnouncementStore { get; }
     public SettingsMutationOperation Operation => Target.Scope == ConfigurationImportScope.Instance
         ? SettingsMutationOperation.ConfigurationInstanceImport : SettingsMutationOperation.ConfigurationTenantImport;
 
@@ -154,6 +163,8 @@ public sealed class HumanConfigurationImportApply
         await validateSources(cancellationToken);
         if (PublicationStore is { } store)
             await store.RequireCurrentAsync(cancellationToken);
+        if (AnnouncementStore is { } announcements)
+            await announcements.RequireCurrentAsync(cancellationToken);
     }
 
     public override string ToString() => nameof(HumanConfigurationImportApply);

@@ -1,0 +1,27 @@
+Change-Id: CHG-01M6DTP6QQSHX05B5WFS3EEGVM
+Title: "load Studio context on SQLite"
+Type: fix
+Scope: events
+Summary: "Order managed events by their exact first-session instant so SQLite Studio context loads without a server error."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: Studio event lists work on SQLite without configuration or migration changes.

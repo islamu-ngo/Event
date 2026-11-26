@@ -63,7 +63,7 @@ public static partial class PostgresMixedSettingsContract
                 {SourceGuard(context, enrollment)}
                 SELECT count(*) INTO existing FROM pg_catalog.pg_roles WHERE rolname IN ({roles});
                 IF existing <> 0 THEN
-                    IF existing <> 3 THEN RAISE EXCEPTION 'mixed_settings_partial_roles' USING ERRCODE = '55000'; END IF;
+                    IF existing <> {Roles.Length} THEN RAISE EXCEPTION 'mixed_settings_partial_roles' USING ERRCODE = '55000'; END IF;
                     {CatalogueGuard(context, enrollment)}
                     {ExactBodies(context, enrollment)}
                     RETURN;

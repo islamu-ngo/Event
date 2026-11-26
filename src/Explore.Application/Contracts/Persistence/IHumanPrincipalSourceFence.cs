@@ -66,7 +66,10 @@ public sealed record HumanPrincipalTenantGrantFact(
 public sealed record HumanPrincipalTenantFact(Guid Id, int TenantStatusId, bool IsActiveState);
 public sealed record HumanPrincipalOwnerMembershipFact(
     Guid Id, Guid TenantId, Guid PlacementId, Guid OwnerId, int RoleId,
-    bool IsDeleted, bool PlacementIsDeleted, bool OwnerIsDeleted, int ApprovalStatusId);
+    bool IsDeleted, bool PlacementIsDeleted, bool OwnerIsDeleted, int ApprovalStatusId)
+{
+    public bool PlacementIsSuspended { get; init; }
+}
 public sealed record HumanPrincipalPermissionFact(
     int RoleId, int PermissionId, string MasterCode, bool IsActive,
     bool MatchesEventCreateCode, bool MatchesEventFinanceCode)

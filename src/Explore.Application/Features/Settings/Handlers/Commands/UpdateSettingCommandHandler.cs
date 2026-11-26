@@ -88,6 +88,9 @@ public class UpdateSettingCommandHandler
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateSettingCommand request, CancellationToken cancellationToken)
     {
+        if (AnnouncementSettingMutationGuard.Handles(request.Key))
+            return BaseCommandResponse.Validation<Guid>(
+                [AnnouncementSettingMutationGuard.FailureCode], AnnouncementSettingMutationGuard.FailureCode);
         // Validate key exists
         var definition = SettingRegistry.Get(request.Key);
         if (definition is null)

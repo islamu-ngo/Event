@@ -86,7 +86,7 @@ unavailable until explicit directory activation.
 
 | Advantage | Consideration |
 |---|---|
-| **Zero External Infrastructure**: Runs on built-in SQLite persistence; no PostgreSQL server or Redis required. | **Single Replica**: SQLite requires exactly one running container instance (no horizontal multi-container scaling). |
+| **Embedded Application Database**: SQLite needs no PostgreSQL server. Browser sign-in additionally requires the dedicated Redis session authority. | **Single Replica**: SQLite requires exactly one running container instance (no horizontal multi-container scaling). |
 | **Single-Process Footprint**: Runs API, BFF/UI, and SQLite in one container without auxiliary database servers. | **Local-First Storage**: Media and database files live in a mounted Docker volume. |
 | **Instant Onboarding**: In-process migrations apply automatically before the HTTP port opens. | **Multi-Platform Support**: Official multi-arch images built for `linux/amd64` and `linux/arm64`. |
 
@@ -109,6 +109,11 @@ The complete distribution includes its primary database, Data Protection and
 embedded privacy-authority startup migration assemblies. Deploy the
 whole published output or image; do not assemble it by copying migration binaries
 from a separate API or development workspace.
+
+The serving host discovers controllers only from its API assembly. If an older
+build fails during controller discovery with a missing EF design-tool assembly,
+use the corrected complete Standalone output rather than adding design packages
+or manually copying individual dependency binaries into the deployment.
 
 ### Step 1: Create a Persistent Volume
 
@@ -139,6 +144,32 @@ exhaustive reference. Its PostgreSQL host, port and role settings must not be
 carried into SQLite configuration. Use the small Standalone projection below and
 the [environment reference](../configuration-and-operations/environment-variables.md)
 for advanced settings. Restrict the file to its operator (`chmod 600 .env`).
+
+Browser sign-in requires `BFF_SESSION_REDIS_ENDPOINT`, `BFF_SESSION_NAMESPACE`
+and `BFF_SESSION_REDIS_PASSWORD`, even when the application database is SQLite.
+Provision the dedicated session service and matching password before signing in;
+the ordinary availability cache is not a substitute. Its address must be
+reachable from the Standalone process or container. Follow the
+[shared browser session authority contract](../configuration-and-operations/environment-variables.md#shared-browser-session-authority).
+Local password creation also requires the pinned, operator-owned
+`AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH` and
+`AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256` snapshot described in the
+[Local Identity password policy](../configuration-and-operations/authentication-providers.md).
+
+Temporary Local identity-check failures, including API throttling, block protected
+operations without deleting an otherwise valid browser session. Protected HTTP
+requests return `503`; realtime activities remain blocked until a fresh check
+succeeds. Restore service availability and retry rather than disabling admission
+limits. A definitively invalid or revoked identity still requires a new sign-in.
+
+Public manifest scripts and styles load anonymously even when the browser
+sends a session cookie. Identity-check outages therefore do not gate these
+public files; protected operations still require a fresh successful check.
+
+Unavailable public header/footer configuration can remain hidden for the
+existing five-minute public-data cache interval. After correcting operator
+configuration, reload the page or explicitly refresh configuration to obtain
+the current public state; no stale operator identity is displayed meanwhile.
 
 > [!TIP]
 > **Authentication recommendation:** Keep the default embedded Local Identity
@@ -305,6 +336,16 @@ Once the container is healthy:
 The profile's **Support email** is public site identity, not the account's
 credential email or an SMTP From address. Saving it does not configure a sender
 or enable delivery; use the separate SMTP administration when email is wanted.
+
+Studio can list managed events on SQLite, including events without a schedule
+and schedules recorded with different UTC offsets. This correction requires no
+additional configuration or database migration.
+
+After setup, use Studio to create a private, information-only draft before
+publishing an event. If a save is interrupted or returns an error, check your
+Studio inventory before submitting it again: a lost response can leave a
+committed draft. Open the existing draft when it is present to avoid duplicates.
+The draft-save correction requires no additional configuration or database migration.
 
 Create subsequent Local accounts through
 `/settings/instance?section=local-accounts`, using current instance-administrator

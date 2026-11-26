@@ -44,6 +44,8 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
     internal LocalIdentityBinding Binding { get; private set; } = null!;
     internal RecordingSmtp Smtp { get; } = new();
     internal LifecycleClock Clock { get; } = new();
+    internal string FailureMetadata => _requestFailures.Metadata;
+    internal Exception? RequestFailure => _requestFailures.Failure;
     internal static CancellationToken CancellationToken => TestContext.Current!.Execution.CancellationToken;
 
     internal static async Task<LocalIdentityLifecycleHttpFixture> CreateAsync(
@@ -192,12 +194,14 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
     private sealed class RequestFailureMetadata : IExceptionHandler
     {
         private string metadata = "No request exception metadata was observed.";
+        internal Exception? Failure { get; private set; }
 
         internal string Metadata => Volatile.Read(ref metadata);
 
         public ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception,
             CancellationToken cancellationToken)
         {
+            Failure = exception;
             Exception root = exception.GetBaseException();
             string description = Describe(exception);
             if (!ReferenceEquals(root, exception)) description += "; root=" + Describe(root);

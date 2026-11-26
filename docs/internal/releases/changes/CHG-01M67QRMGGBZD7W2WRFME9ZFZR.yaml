@@ -1,0 +1,36 @@
+Change-Id: CHG-01M67QRMGGBZD7W2WRFME9ZFZR
+Title: "keep private learning help available on demand"
+Type: feat
+Scope: onboarding
+Summary: "Offer permanent goal-based Help and private self/member learning controls without exposing progress during public rendering or requiring automatic tours."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: documented
+    Detail: >-
+      Private reads require interactive current-owner admission. Current HAL,
+      source-bound requests and fresh reads govern preferences and explicit
+      notice acknowledgement. Scope replacement and disposal invalidate retained
+      callbacks. Existing server authorization remains authoritative.
+  Migration:
+    Reference: docs/internal/CONTEXTUAL_LEARNING.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/contextual-learning.md
+    Disposition: documented
+    Detail: >-
+      Help remains available when optional guidance is suppressed. Private panels
+      keep preferences and authored practice separate from public actor activity.
+      Notice acknowledgement grants no competence or production permission.
+      Contextual replay and hosted accessibility acceptance remain gated.

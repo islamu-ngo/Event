@@ -1,11 +1,14 @@
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.Federation;
+using Explore.Blazor.Client.Contracts.Services.Learning;
 using Explore.Blazor.Client.Contracts.Services.Notifications;
 using Explore.Blazor.Client.Contracts.Services.Reporting;
 using Explore.Blazor.Client.Contracts.Services.Shell;
 using Explore.Blazor.Client.Services;
 using Explore.Blazor.Client.Services.Docking;
+using Explore.Blazor.Client.Services.Learning;
 using Explore.Blazor.Client.Services.Shell;
+using GuideFlow.Services;
 using MudBlazor;
 using MudBlazor.Interop;
 using MudBlazor.Services;
@@ -77,6 +80,23 @@ public class BlazorTestContext : BunitContext
         Services.AddSingleton<Explore.Blazor.Client.Models.IOnboardingRequestOrigin>(provider =>
             provider.GetRequiredService<Explore.Blazor.Client.Models.OnboardingRequestOrigin>());
         Services.AddSingleton(Substitute.For<IUiShellClient>());
+        Services.AddGuideFlow();
+        Services.AddSingleton(Substitute.For<Explore.Blazor.Client.Clients.ILearningClient>());
+        Services.AddSingleton(Substitute.For<ILearningClientService>());
+        Services.AddSingleton(Substitute.For<Explore.Blazor.Client.Contracts.Services.IAnnouncementClientService>());
+        Services.AddScoped<LearningTargetRegistry>();
+        Services.AddScoped<ILearningTargetRegistry>(provider =>
+            provider.GetRequiredService<LearningTargetRegistry>());
+        Services.AddScoped<GuideFlowLearningTourRenderer>();
+        Services.AddScoped<ILearningTourHost>(provider =>
+            provider.GetRequiredService<GuideFlowLearningTourRenderer>());
+        Services.AddScoped<ILearningTourRenderer>(provider =>
+            provider.GetRequiredService<GuideFlowLearningTourRenderer>());
+        Services.AddScoped<LearningOnboardingCoordinator>();
+        Services.AddScoped<ILearningOnboardingCoordinator>(provider =>
+            provider.GetRequiredService<LearningOnboardingCoordinator>());
+        Services.AddSingleton(Substitute.For<IEventService>());
+        Services.AddScoped<Explore.Blazor.Client.Pages.Studio.StudioEventContextState>();
         Services.AddSingleton(Substitute.For<
             Explore.Blazor.Client.Contracts.Services.ITicketPurchaseGovernanceService>());
         Services.AddSingleton(Substitute.For<IAtprotoFederationSettingsService>());
@@ -233,6 +253,11 @@ public class BlazorTestContext : BunitContext
         userSettingsService.GetSettingsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<SettingGroupResponseDto?>(null));
         Services.AddSingleton(userSettingsService);
+
+        var announcements = Substitute.For<IAnnouncementClientService>();
+        announcements.LoadAsync(Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<AnnouncementDisplayState?>(null));
+        Services.AddSingleton(announcements);
 
         var shellContextService = Substitute.For<IUiShellContextService>();
         shellContextService.GetCachedContextAsync(Arg.Any<CancellationToken>())

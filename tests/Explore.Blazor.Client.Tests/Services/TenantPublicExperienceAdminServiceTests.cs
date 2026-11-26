@@ -1,5 +1,7 @@
 namespace Explore.Blazor.Client.Tests.Services;
 
+using Explore.Blazor.Client.Contracts.Services;
+
 public class TenantPublicExperienceAdminServiceTests
 {
     [Test]
@@ -121,16 +123,16 @@ public class TenantPublicExperienceAdminServiceTests
     private const string Category = "PublicExperience";
 
     private readonly ISettingsClient _apiClient;
-    private readonly IPublicExperienceService _publicExperienceService;
+    private readonly IAnnouncementClientService _announcements;
     private readonly ILogger<TenantPublicExperienceAdminService> _logger;
     private readonly TenantPublicExperienceAdminService _service;
 
     public TenantPublicExperienceAdminServiceTests()
     {
         _apiClient = Substitute.For<ISettingsClient>();
-        _publicExperienceService = Substitute.For<IPublicExperienceService>();
+        _announcements = Substitute.For<IAnnouncementClientService>();
         _logger = Substitute.For<ILogger<TenantPublicExperienceAdminService>>();
-        _service = new TenantPublicExperienceAdminService(_apiClient, _publicExperienceService, _logger);
+        _service = new TenantPublicExperienceAdminService(_apiClient, _announcements, _logger);
     }
 
     [Test]
@@ -729,40 +731,94 @@ public class TenantPublicExperienceAdminServiceTests
     }
 
     [Test]
-    public async Task SaveAnnouncementBarAsync_IncrementsRevision_WhenForceRedisplayRequested()
+    public async Task SaveAnnouncementBarAsyncSendsExplicitRedisplayWithoutComputingAnEdition()
     {
-        // Arrange
-        var model = new TenantPolicySettingsDto
-        {
-            AnnouncementBarEnabled = true,
-            AnnouncementBarMessage = "New update",
-            AnnouncementBarLinkText = "Learn more",
-            AnnouncementBarLinkUrl = "https://example.test/update",
-            AnnouncementBarRevision = 7
-        };
-
-        string? capturedCategory = null;
-        UpdateSettingBatchDto? captured = null;
+        var original = AnnouncementTestData.Source();
+        var fresh = AnnouncementTestData.Source(AnnouncementTestData.OtherEdition,
+            AnnouncementTestData.OtherEpoch, "New update");
+        var publication = fresh.Source.Group?.Publication
+            ?? throw new InvalidOperationException("The fixture requires its publication.");
+        publication.Material.LinkText = "Learn more";
+        publication.Material.LinkUrl = "/events";
+        _announcements.LoadSourceAsync(cancellationToken: Arg.Any<CancellationToken>()).Returns(original);
+        _announcements.CanPublish(original).Returns(true);
+        var model = await _service.GetAnnouncementAsync()
+            ?? throw new InvalidOperationException("The fixture requires its native source.");
+        model.Enabled = true;
+        model.Message = "New update";
+        model.LinkText = "Learn more";
+        model.LinkUrl = "/events";
+        AnnouncementChangeDto? captured = null;
+        _announcements.PublishAsync(original, Arg.Any<AnnouncementChangeDto>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                captured = call.Arg<AnnouncementChangeDto>();
+                return new AnnouncementPublicationClientResult(true, false, null, fresh);
+            });
+        bool genericWrite = false;
         _apiClient.UpdateTenantSettingsBatchAsync(
-                Arg.Do<string>(category => capturedCategory = category),
-                Arg.Do<UpdateSettingBatchDto>(body => captured = body),
-                null,
-                null,
+                Arg.Any<string>(), Arg.Any<UpdateSettingBatchDto>(), Arg.Any<string?>(), Arg.Any<string?>(),
                 Arg.Any<CancellationToken>())
-            .Returns(new BatchUpdateResponseDto { Success = true });
+            .Returns(_ => { genericWrite = true; return new BatchUpdateResponseDto { Success = true }; });
 
-        // Act
         PublicExperienceAdminSaveResult result = await _service.SaveAnnouncementBarAsync(model, forceRedisplay: true);
 
-        // Assert
         await Assert.That(result.Success).IsTrue();
-        await Assert.That(capturedCategory).IsEqualTo(Category);
         await Assert.That(captured).IsNotNull();
-        await Assert.That(captured!.Mode).IsEqualTo(BatchUpdateMode.Strict);
-        await Assert.That(captured.Values["public_experience.announcement_bar.enabled"]).IsEqualTo("true");
-        await Assert.That(captured.Values["public_experience.announcement_bar.message"]).IsEqualTo("New update");
-        await Assert.That(captured.Values["public_experience.announcement_bar.revision"]).IsEqualTo("8");
-        await Assert.That(model.AnnouncementBarRevision).IsEqualTo(8);
+        await Assert.That(captured!.Kind).IsEqualTo("publish");
+        await Assert.That(captured.Enabled).IsEqualTo(true);
+        await Assert.That(captured.Redisplay).IsEqualTo(true);
+        await Assert.That(captured.Material!.Message).IsEqualTo("New update");
+        await Assert.That(captured.Material.LinkText).IsEqualTo("Learn more");
+        await Assert.That(captured.Material.LinkUrl).IsEqualTo("/events");
+        await Assert.That(genericWrite).IsFalse();
+        await Assert.That(original.Source.Group!.Publication!.Edition).IsEqualTo(AnnouncementTestData.Edition);
+        await Assert.That(model.Original).IsSameReferenceAs(fresh);
+    }
+
+    [Test]
+    public async Task ConfirmedRemovalAdvancesOriginalWithoutErasingDraftEditsMadeWhilePending()
+    {
+        var original = AnnouncementTestData.Source();
+        var removed = AnnouncementTestData.Source(epoch: AnnouncementTestData.OtherEpoch);
+        var removedGroup = removed.Source.Group
+            ?? throw new InvalidOperationException("The fixture requires its removal witness.");
+        removedGroup.Enabled = false;
+        removedGroup.Publication = null;
+        _announcements.LoadSourceAsync(cancellationToken: Arg.Any<CancellationToken>()).Returns(original);
+        _announcements.CanPublish(original).Returns(true);
+        var draft = await _service.GetAnnouncementAsync()
+            ?? throw new InvalidOperationException("The fixture requires its native source.");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var settled = new TaskCompletionSource<AnnouncementPublicationClientResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        AnnouncementChangeDto? sent = null;
+        _announcements.PublishAsync(original, Arg.Any<AnnouncementChangeDto>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                sent = call.Arg<AnnouncementChangeDto>();
+                started.TrySetResult();
+                return settled.Task;
+            });
+
+        var pending = _service.RemoveAnnouncementOverrideAsync(draft);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await Assert.That(draft.Message).IsEqualTo("Announcement");
+        await Assert.That(draft.Original).IsSameReferenceAs(original);
+        draft.Enabled = true;
+        draft.Message = "Newer draft";
+        draft.LinkText = "New link";
+        draft.LinkUrl = "/organizations";
+        settled.SetResult(new(true, false, null, removed));
+        var result = await pending.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await Assert.That(result.Success).IsTrue();
+        await Assert.That(sent!.Kind).IsEqualTo("remove-override");
+        await Assert.That(draft.Original).IsSameReferenceAs(removed);
+        await Assert.That(draft.Enabled).IsTrue();
+        await Assert.That(draft.Message).IsEqualTo("Newer draft");
+        await Assert.That(draft.LinkText).IsEqualTo("New link");
+        await Assert.That(draft.LinkUrl).IsEqualTo("/organizations");
     }
 
     private static EffectiveSettingDto Setting(string key, string value, bool? canEdit = true)

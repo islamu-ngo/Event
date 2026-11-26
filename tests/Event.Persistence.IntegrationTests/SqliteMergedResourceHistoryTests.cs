@@ -2,6 +2,7 @@ using Event.Persistence.IntegrationTests.Database;
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Schema;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -10,13 +11,168 @@ using Microsoft.EntityFrameworkCore.Migrations.Operations;
 
 namespace Event.Persistence.IntegrationTests;
 
-// Generation-only regressions: no connection is opened and no migration SQL is executed.
+// Historical-model generation checks and focused native SQLite rebuild regressions.
 public sealed class SqliteMergedResourceHistoryTests
 {
     private const string Imports = "20261013111447_AllowRepeatedFailedConfigurationImports";
     private const string Sources = "20261019145153_AddNativeModerationSourceOwners";
     private const string BeforeImports = "20261009045410_AddModerationMachineSubjectBindings";
     private const string RelativeOrder = "ck_event_resources_relative_availability_order";
+
+    [Test]
+    [Arguments(false, false, false)]
+    [Arguments(true, false, false)]
+    [Arguments(true, true, false)]
+    [Arguments(false, false, true)]
+    public async Task Dependent_rebuild_before_principal_alternate_key_preserves_rows_and_restores_foreign_keys(
+        bool explicitTableDrop, bool precedingRebuildBatch, bool invalidExistingOwnership)
+    {
+        await using var context = CreateContext();
+        await context.Database.OpenConnectionAsync();
+        await context.Database.ExecuteSqlRawAsync("""
+            PRAGMA foreign_keys = ON;
+            CREATE TABLE rebuild_links (
+                id INTEGER NOT NULL PRIMARY KEY,
+                tenant_id INTEGER NOT NULL,
+                report_id INTEGER NOT NULL,
+                payload TEXT NOT NULL);
+            CREATE TABLE rebuild_signals (
+                id INTEGER NOT NULL PRIMARY KEY,
+                tenant_id INTEGER NOT NULL,
+                report_id INTEGER NOT NULL,
+                legacy_link_id INTEGER NOT NULL REFERENCES rebuild_links(id) ON DELETE CASCADE,
+                payload TEXT NOT NULL);
+            CREATE TABLE rebuild_discarded (id INTEGER NOT NULL PRIMARY KEY);
+            CREATE TABLE rebuild_first (id INTEGER NOT NULL PRIMARY KEY, owner_id INTEGER NOT NULL);
+            INSERT INTO rebuild_links VALUES (7, 10, 20, 'retained link');
+            INSERT INTO rebuild_signals VALUES (8, 10, 20, 7, 'retained signal');
+            INSERT INTO rebuild_first VALUES (9, 30);
+            """);
+        if (invalidExistingOwnership)
+            await context.Database.ExecuteSqlRawAsync("UPDATE rebuild_signals SET tenant_id = 11;");
+        var builder = new ModelBuilder();
+        var first = builder.Entity("FirstRebuild");
+        first.ToTable("rebuild_first");
+        first.Property<int>("id").HasColumnType("INTEGER");
+        first.Property<int>("owner_id").HasColumnType("INTEGER");
+        first.HasKey("id");
+        first.HasAlternateKey("owner_id").HasName("ak_rebuild_first_owner");
+        var links = builder.Entity("RebuildLink");
+        links.ToTable("rebuild_links");
+        foreach (string column in new[] { "id", "tenant_id", "report_id" })
+            links.Property<int>(column).HasColumnType("INTEGER");
+        links.Property<string>("payload").IsRequired().HasColumnType("TEXT");
+        links.HasKey("id");
+        links.HasAlternateKey("tenant_id", "report_id", "id").HasName("ak_rebuild_links_owner");
+        var signals = builder.Entity("RebuildSignal");
+        signals.ToTable("rebuild_signals");
+        foreach (string column in new[] { "id", "tenant_id", "report_id", "legacy_link_id" })
+            signals.Property<int>(column).HasColumnType("INTEGER");
+        signals.Property<int?>("provider_link_id").HasColumnType("INTEGER");
+        signals.Property<string>("payload").IsRequired().HasColumnType("TEXT");
+        signals.HasKey("id");
+        signals.HasOne("RebuildLink").WithMany().HasForeignKey("legacy_link_id")
+            .HasPrincipalKey("id").OnDelete(DeleteBehavior.Cascade);
+        signals.HasOne("RebuildLink").WithMany().HasForeignKey("tenant_id", "report_id", "provider_link_id")
+            .HasPrincipalKey("tenant_id", "report_id", "id").OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_rebuild_signals_owner");
+        IModel target = context.GetService<IModelRuntimeInitializer>()
+            .Initialize(builder.FinalizeModel(), designTime: true);
+        var operations = new List<MigrationOperation>
+        {
+            new AddColumnOperation
+            {
+                Table = "rebuild_signals", Name = "provider_link_id",
+                ClrType = typeof(int), ColumnType = "INTEGER", IsNullable = true,
+                DefaultValue = invalidExistingOwnership ? 7 : null
+            },
+            new AddUniqueConstraintOperation
+            {
+                Table = "rebuild_links", Name = "ak_rebuild_links_owner",
+                Columns = ["tenant_id", "report_id", "id"]
+            },
+            new AddForeignKeyOperation
+            {
+                Table = "rebuild_signals", Name = "fk_rebuild_signals_owner",
+                Columns = ["tenant_id", "report_id", "provider_link_id"],
+                PrincipalTable = "rebuild_links", PrincipalColumns = ["tenant_id", "report_id", "id"],
+                OnDelete = ReferentialAction.Restrict
+            }
+        };
+        if (explicitTableDrop)
+            operations.Add(new DropTableOperation { Name = "rebuild_discarded" });
+
+        IReadOnlyList<MigrationCommand> commands;
+        if (precedingRebuildBatch)
+        {
+            // The merged resource history concatenates two provider batches before wrapping.
+            // An inner batch's FK-on command must not expose the next batch's incomplete keys.
+            var dependencies = context.GetService<MigrationsSqlGeneratorDependencies>();
+            var native = new SqliteMigrationsSqlGenerator(
+                dependencies, context.GetService<IRelationalAnnotationProvider>());
+            var preceding = native.Generate(
+                [new AddUniqueConstraintOperation
+                {
+                    Table = "rebuild_first", Name = "ak_rebuild_first_owner", Columns = ["owner_id"]
+                }], target);
+            commands = ConfigurableSchemaMigrationOperations.WrapSqliteTableDrops(
+                preceding.Concat(native.Generate(operations, target)).ToArray(), operations, dependencies);
+        }
+        else
+        {
+            commands = context.GetService<IMigrationsSqlGenerator>().Generate(operations, target);
+        }
+        if (invalidExistingOwnership)
+        {
+            SqliteException? rejection = null;
+            try
+            {
+                foreach (MigrationCommand command in commands)
+                    await context.Database.ExecuteSqlRawAsync(command.CommandText);
+            }
+            catch (SqliteException exception)
+            {
+                rejection = exception;
+            }
+            if (rejection is null)
+                throw new InvalidOperationException("The rebuild must reject an existing cross-tenant reference.");
+            await Assert.That(rejection.SqliteErrorCode).IsEqualTo(19);
+            await Assert.That(rejection.SqliteExtendedErrorCode).IsEqualTo(275);
+            return;
+        }
+
+        foreach (MigrationCommand command in commands)
+            await context.Database.ExecuteSqlRawAsync(command.CommandText);
+
+        await Assert.That(await ReadScalar(context, "PRAGMA foreign_keys;")).IsEqualTo(1L);
+        await Assert.That(await ReadScalar(context,
+            "SELECT COUNT(*) FROM rebuild_first WHERE id = 9 AND owner_id = 30;")).IsEqualTo(1L);
+        await Assert.That(await ReadScalar(context,
+            "SELECT COUNT(*) FROM rebuild_links WHERE id = 7 AND tenant_id = 10 AND report_id = 20 AND payload = 'retained link';"))
+            .IsEqualTo(1L);
+        await Assert.That(await ReadScalar(context,
+            "SELECT COUNT(*) FROM rebuild_signals WHERE id = 8 AND legacy_link_id = 7 AND provider_link_id IS NULL AND payload = 'retained signal';"))
+            .IsEqualTo(1L);
+        await context.Database.ExecuteSqlRawAsync("UPDATE rebuild_signals SET provider_link_id = 7 WHERE id = 8;");
+        await Assert.That(async () => await context.Database.ExecuteSqlRawAsync(
+            "UPDATE rebuild_signals SET report_id = 21 WHERE id = 8;")).Throws<SqliteException>();
+        await Assert.That(async () => await context.Database.ExecuteSqlRawAsync(
+            "DELETE FROM rebuild_links WHERE id = 7;")).Throws<SqliteException>();
+        await Assert.That(async () => await context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO rebuild_signals (id, tenant_id, report_id, legacy_link_id, payload) VALUES (9, 10, 20, 99, 'orphan');"))
+            .Throws<SqliteException>();
+        await using var check = context.Database.GetDbConnection().CreateCommand();
+        check.CommandText = "PRAGMA foreign_key_check;";
+        await using var violations = await check.ExecuteReaderAsync();
+        await Assert.That(await violations.ReadAsync()).IsFalse();
+    }
+
+    private static async Task<long> ReadScalar(ExploreDbContext context, string sql)
+    {
+        await using var command = context.Database.GetDbConnection().CreateCommand();
+        command.CommandText = sql;
+        return Convert.ToInt64(await command.ExecuteScalarAsync(), System.Globalization.CultureInfo.InvariantCulture);
+    }
 
     [Test]
     public async Task Source_owner_upgrade_rebuild_keeps_both_branches_resource_constraints()

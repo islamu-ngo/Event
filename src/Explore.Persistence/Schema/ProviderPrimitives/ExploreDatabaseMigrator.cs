@@ -178,6 +178,8 @@ public static class ExploreDatabaseMigrator
                 executionDatabase, queueEnrollment, cancellationToken);
         }
         await PostgresSubjectPrivacyErasureContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresLearningPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
         await PostgresPdsSettlementContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresPdsQueueAdmissionContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresAtprotoModerationCompensationContract.ApplyAsync(executionDatabase, cancellationToken);
@@ -315,6 +317,7 @@ public static class ExploreDatabaseMigrator
             await PostgresOrdinarySettingsContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresProvisioningPolicyPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresVisitorSettingsStorage.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresConfigurationImportAnnouncementContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresLocalizationSecretStatusReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresTenantPreferencePermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresUserTenantNavigationReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);

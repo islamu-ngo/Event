@@ -122,13 +122,57 @@ public partial class EventList : ComponentBase, IAsyncDisposable
         ? "Events"
         : _publicExperienceShell.EventCatalog.Label.Trim();
 
-    private string EmptyStateTitle => HasActiveFilters()
-        ? T("ui.discovery.empty.filtered_title", "No matching events found")
-        : T("ui.discovery.empty.title", "No events found");
+    private TemporalView EmptyStateView => _traversalFilters?.View ?? TemporalView.UpcomingAndOngoing;
 
-    private string EmptyStateMessage => HasActiveFilters()
-        ? T("ui.discovery.empty.filtered_body", "Try adjusting your filters or search query.")
-        : T("ui.discovery.empty.body", "No events match this search yet. Check back soon.");
+    private bool HasCompletedSearch => _eventsLoaded && !_isLoadingPage &&
+        _recoveryCode is null && _traversal is { Truncated: false };
+
+    private string EmptyStateKind => EmptyStateView switch
+    {
+        TemporalView.Past => "past",
+        _ when HasActiveFilters() => "filtered",
+        TemporalView.All => "all",
+        TemporalView.Ongoing => "ongoing",
+        _ => "upcoming"
+    };
+
+    private string EmptyStateTitle => EmptyStateView switch
+    {
+        TemporalView.Past => HasActiveFilters()
+            ? T("ui.discovery.empty.past_filtered_title", "No matching past events found")
+            : T("ui.discovery.empty.past_title", "No past events found"),
+        TemporalView.Upcoming => HasActiveFilters()
+            ? T("ui.discovery.empty.upcoming_filtered_title", "No matching upcoming events found")
+            : T("ui.discovery.empty.upcoming_title", "No upcoming events found"),
+        TemporalView.Ongoing => HasActiveFilters()
+            ? T("ui.discovery.empty.ongoing_filtered_title", "No matching ongoing events found")
+            : T("ui.discovery.empty.ongoing_title", "No ongoing events found"),
+        TemporalView.UpcomingAndOngoing => HasActiveFilters()
+            ? T("ui.discovery.empty.current_filtered_title", "No matching upcoming or ongoing events found")
+            : T("ui.discovery.empty.current_title", "No upcoming or ongoing events found"),
+        _ => HasActiveFilters()
+            ? T("ui.discovery.empty.filtered_title", "No matching events found")
+            : T("ui.discovery.empty.title", "No events found")
+    };
+
+    private string EmptyStateMessage => EmptyStateView switch
+    {
+        TemporalView.Past => HasActiveFilters()
+            ? T("ui.discovery.empty.past_filtered_body", "No past events match this search. Try adjusting your filters or return to upcoming and ongoing events.")
+            : T("ui.discovery.empty.past_body", "This search found no past events. You can return to upcoming and ongoing events."),
+        TemporalView.Upcoming => HasActiveFilters()
+            ? T("ui.discovery.empty.upcoming_filtered_body", "No upcoming events match this search. Try adjusting your filters or explore past events with these filters.")
+            : T("ui.discovery.empty.upcoming_body", "This search found no upcoming events. Past events may still be available."),
+        TemporalView.Ongoing => HasActiveFilters()
+            ? T("ui.discovery.empty.ongoing_filtered_body", "No ongoing events match this search. Try adjusting your filters or explore past events with these filters.")
+            : T("ui.discovery.empty.ongoing_body", "This search found no ongoing events. Past events may still be available."),
+        TemporalView.UpcomingAndOngoing => HasActiveFilters()
+            ? T("ui.discovery.empty.current_filtered_body", "No upcoming or ongoing events match this search. Try adjusting your filters or explore past events with these filters.")
+            : T("ui.discovery.empty.current_body", "This search found no upcoming or ongoing events. Past events may still be available."),
+        _ => HasActiveFilters()
+            ? T("ui.discovery.empty.filtered_body", "Try adjusting your filters or search query.")
+            : T("ui.discovery.empty.all_body", "This search across all event dates found no events. Check back soon.")
+    };
 
     private string T(string key, string fallback) => Translation.T(key, fallback);
     private bool CanContinue => _recoveryCode is null && _traversal?.HasMore == true &&
@@ -443,6 +487,10 @@ public partial class EventList : ComponentBase, IAsyncDisposable
         {
             _traversalFilters = EventListFilterState.From(
                 _filterBar, SearchQuery, ActorIdQuery, OrganizationIdQuery, GroupIdQuery);
+            _traversalFilters = _traversalFilters with
+            {
+                View = _traversalFilters.View ?? TemporalView.UpcomingAndOngoing
+            };
             _traversal = null;
             _recoveryCode = null;
             _pagedEvents.Clear();
@@ -543,6 +591,13 @@ public partial class EventList : ComponentBase, IAsyncDisposable
     private async Task RefreshList()
     {
         await LoadTraversalAsync();
+    }
+
+    private async Task ChangeTemporalViewAsync(TemporalView view)
+    {
+        if (_filterBar is null) return;
+        _filterBar.SelectedTemporalView = view;
+        await RefreshList();
     }
 
     private Task LoadMoreAsync() => LoadTraversalAsync(append: true);
@@ -951,10 +1006,18 @@ public partial class EventList : ComponentBase, IAsyncDisposable
 
     private bool HasActiveFilters()
     {
-        if (!string.IsNullOrEmpty(SearchQuery)) return true;
-        if (ActorIdQuery.HasValue || OrganizationIdQuery.HasValue || GroupIdQuery.HasValue) return true;
-        if (_filterBar == null) return false;
-        return _filterBar.GetActiveFilterCount() > 0;
+        return _traversalFilters is { } filters &&
+            (!string.IsNullOrWhiteSpace(filters.SearchTerm) ||
+             filters.ActorId.HasValue || filters.OrganizationId.HasValue || filters.GroupId.HasValue ||
+             filters.IncludedCategoryIds is { Count: > 0 } || filters.ExcludedCategoryIds is { Count: > 0 } ||
+             filters.IncludedTagIds is { Count: > 0 } || filters.ExcludedTagIds is { Count: > 0 } ||
+             filters.FormatIds is { Count: > 0 } || filters.MadhabIds is { Count: > 0 } ||
+             filters.RegistrationModeIds is { Count: > 0 } || filters.LanguageIds is { Count: > 0 } ||
+             filters.DateFrom.HasValue || filters.DateTo.HasValue ||
+             filters.EventTypeIds is { Count: > 0 } || filters.AudienceGenderIds is { Count: > 0 } ||
+             filters.AudienceAgeIds is { Count: > 0 } || filters.GenderModeIds is { Count: > 0 } ||
+             filters.ReferencePrayerIds is { Count: > 0 } || filters.SkillLevelId.HasValue ||
+             !string.IsNullOrWhiteSpace(filters.TechStackTag));
     }
 
     private string GetGridCssClass()

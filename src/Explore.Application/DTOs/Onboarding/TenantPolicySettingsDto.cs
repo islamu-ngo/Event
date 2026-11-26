@@ -1,3 +1,5 @@
+using ISLAMU.Wire.Contracts.Announcements;
+
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record TenantPolicySettingsDto
@@ -20,11 +22,8 @@ public sealed record TenantPolicySettingsDto
     public string BrandLogoUrl { get; init; } = string.Empty;
     public string BrandFaviconUrl { get; init; } = string.Empty;
     public string BrandCustomCssUrl { get; init; } = string.Empty;
-    public bool AnnouncementBarEnabled { get; init; }
-    public string AnnouncementBarMessage { get; init; } = string.Empty;
-    public string AnnouncementBarLinkText { get; init; } = string.Empty;
-    public string AnnouncementBarLinkUrl { get; init; } = string.Empty;
-    public int AnnouncementBarRevision { get; init; }
+    public required AnnouncementSourceDto AnnouncementOriginal { get; init; }
+    public required AnnouncementPublicStateDto EffectiveAnnouncement { get; init; }
     public bool CanOverrideHomePagePreference { get; init; } = true;
     public bool CanOverrideSubdomain { get; init; } = true;
     public bool CanOverrideCustomDomain { get; init; } = true;

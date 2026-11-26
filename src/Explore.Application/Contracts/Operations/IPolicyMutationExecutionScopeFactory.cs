@@ -1,3 +1,5 @@
+using Explore.Application.Features.Announcements.Requests.Commands;
+
 namespace Explore.Application.Contracts.Operations;
 
 /// <summary>Closed access to an already acquired mixed owner; never constructs or reselects a scope.</summary>
@@ -34,6 +36,15 @@ public enum PolicyMutationPurpose
 /// <summary>Scope and purpose are sealed together before constructing any mutation dependencies.</summary>
 public sealed record PolicyMutationScope(Guid? TenantId, PolicyMutationPurpose Purpose = PolicyMutationPurpose.Standard)
 {
+    public UpdateManagedTenantAnnouncementCommand? ManagedAnnouncement { get; private init; }
+
+    public static PolicyMutationScope ForManagedAnnouncement(UpdateManagedTenantAnnouncementCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentOutOfRangeException.ThrowIfEqual(command.TenantId, Guid.Empty);
+        return new(command.TenantId, PolicyMutationPurpose.MixedSettings) { ManagedAnnouncement = command };
+    }
+
     public static PolicyMutationScope Instance { get; } = new(TenantId: null);
     public static PolicyMutationScope EmailInstance { get; } = new(null, PolicyMutationPurpose.EmailDelivery);
     public static PolicyMutationScope MixedSettingsInstance { get; } = new(null, PolicyMutationPurpose.MixedSettings);

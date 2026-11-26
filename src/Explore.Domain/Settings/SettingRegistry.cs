@@ -49,6 +49,7 @@ public static class SettingRegistry
         all.AddRange(AiAssistantPreferenceSettingDefinitions.All);
         all.AddRange(UiShellSettingDefinitions.All);
         all.AddRange(TenantDelegationSettingDefinitions.All);
+        all.AddRange(LearningGuidanceSettingDefinitions.All);
         all.AddRange(FooterSettingDefinitions.All);
         all.AddRange(EventListSettingDefinitions.All);
         all.AddRange(NotificationSettingDefinitions.All);

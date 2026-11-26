@@ -2,6 +2,8 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence;
+using Explore.Persistence.Identity;
+using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
@@ -13,21 +15,34 @@ namespace Event.Persistence.IntegrationTests.Identity;
 public sealed class UserIdentityProfilePersistenceTests
 {
     [Test]
-    [Arguments(true)]
-    [Arguments(false)]
-    public async Task TrackedProfilePersistsWithoutRewritingAccountOwnershipOrDeletionFields(bool emailVerified)
+    [Arguments(true, false)]
+    [Arguments(false, false)]
+    [Arguments(true, true)]
+    [Arguments(false, true)]
+    public async Task TrackedProfilePersistsWithoutRewritingAccountOwnershipOrDeletionFields(
+        bool emailVerified, bool preparedMirror)
     {
         await using var store = await Store.CreateAsync();
         IUserRepository repository = new UserRepository(store.Context);
-        User user = (await repository.GetById(store.UserId))!;
-        var original = (user.CreatedAt, user.CreatedBy, user.IsDeleted, user.DeletedAt, user.DeletedBy,
-            user.LastActiveTenantId, user.Pii.FirstName, user.Pii.LastName);
-        Guid stamp = user.ConcurrencyStamp;
+        User before = (await repository.GetById(store.UserId))!;
+        var original = (before.CreatedAt, before.CreatedBy, before.IsDeleted, before.DeletedAt, before.DeletedBy,
+            before.LastActiveTenantId, before.Pii.FirstName, before.Pii.LastName);
+        Guid stamp = before.ConcurrencyStamp;
+        store.Context.ChangeTracker.Clear();
+        User user = (await repository.GetIdentityAccountForSynchronizationAsync(store.UserId, Token))!;
+        await Assert.That(user.Pii).IsNull();
         await using (var transaction = await store.Context.Database.BeginTransactionAsync(Token))
         {
-            user.Email = "synchronized@example.test";
-            user.EmailVerified = emailVerified;
-            await repository.SaveIdentityProfileAsync(user, Token);
+            if (preparedMirror)
+            {
+                var writer = new IdentityEmailMirrorWriter(store.Context, repository);
+                await using var mirror = await writer.PrepareAsync(store.UserId, Token);
+                await mirror.ApplyAsync("synchronized@example.test", emailVerified, Token);
+            }
+            else
+            {
+                await repository.SaveIdentityProfileAsync(user, "synchronized@example.test", emailVerified, Token);
+            }
             await Assert.That(store.Context.Database.CurrentTransaction).IsSameReferenceAs(transaction);
             await transaction.CommitAsync(Token);
         }
@@ -50,7 +65,7 @@ public sealed class UserIdentityProfilePersistenceTests
     {
         await using var store = await Store.CreateAsync();
         var repository = new UserRepository(store.Context);
-        User user = (await repository.GetById(store.UserId))!;
+        User user = (await repository.GetIdentityAccountForSynchronizationAsync(store.UserId, Token))!;
         Guid stamp = user.ConcurrencyStamp;
         store.Context.Entry(user).State = state switch
         {
@@ -61,7 +76,8 @@ public sealed class UserIdentityProfilePersistenceTests
         await using (var transaction = await store.Context.Database.BeginTransactionAsync(Token))
         {
             user.EmailVerified = true;
-            await Assert.ThrowsAsync<InvalidOperationException>(() => repository.SaveIdentityProfileAsync(user, Token));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                repository.SaveIdentityProfileAsync(user, "synchronized@example.test", true, Token));
             await transaction.RollbackAsync(Token);
         }
         store.Context.ChangeTracker.Clear();
@@ -76,14 +92,15 @@ public sealed class UserIdentityProfilePersistenceTests
     {
         await using var store = await Store.CreateAsync();
         var repository = new UserRepository(store.Context);
-        User user = (await repository.GetById(store.UserId))!;
+        User user = (await repository.GetIdentityAccountForSynchronizationAsync(store.UserId, Token))!;
         Guid advanced = Guid.CreateVersion7();
         await store.Context.Users.Where(row => row.Id == store.UserId)
             .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.ConcurrencyStamp, advanced), Token);
         await using (var transaction = await store.Context.Database.BeginTransactionAsync(Token))
         {
             user.EmailVerified = true;
-            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => repository.SaveIdentityProfileAsync(user, Token));
+            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
+                repository.SaveIdentityProfileAsync(user, null, true, Token));
             await transaction.RollbackAsync(Token);
         }
         store.Context.ChangeTracker.Clear();
@@ -97,17 +114,18 @@ public sealed class UserIdentityProfilePersistenceTests
     {
         await using var store = await Store.CreateAsync();
         IUserRepository repository = new UserRepository(store.Context);
-        User user = (await repository.GetById(store.UserId))!;
-        string originalEmail = user.Email;
+        User user = (await repository.GetIdentityAccountForSynchronizationAsync(store.UserId, Token))!;
+        string originalEmail = await store.Context.UserPii.Where(row => row.UserId == store.UserId)
+            .Select(row => row.Email).SingleAsync(Token);
         bool? originalVerification = user.EmailVerified;
         Guid advanced = Guid.CreateVersion7();
         await store.Context.Users.Where(row => row.Id == store.UserId)
             .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.ConcurrencyStamp, advanced), Token);
         await using (var transaction = await store.Context.Database.BeginTransactionAsync(Token))
         {
-            user.Email = "stale-email-only@example.test";
             await Assert.That(user.EmailVerified).IsEqualTo(originalVerification);
-            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => repository.SaveIdentityProfileAsync(user, Token));
+            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
+                repository.SaveIdentityProfileAsync(user, "stale-email-only@example.test", null, Token));
             await transaction.RollbackAsync(Token);
         }
         store.Context.ChangeTracker.Clear();
@@ -117,13 +135,57 @@ public sealed class UserIdentityProfilePersistenceTests
         await Assert.That(persisted.ConcurrencyStamp).IsEqualTo(advanced);
     }
 
+    [Test]
+    public async Task MissingObservationsPreserveTheAccountVersionAndEmailMirror()
+    {
+        await using var store = await Store.CreateAsync();
+        IUserRepository repository = new UserRepository(store.Context);
+        User user = (await repository.GetIdentityAccountForSynchronizationAsync(store.UserId, Token))!;
+        Guid stamp = user.ConcurrencyStamp;
+        await using (var transaction = await store.Context.Database.BeginTransactionAsync(Token))
+        {
+            await repository.SaveIdentityProfileAsync(user, null, null, Token);
+            await Assert.That(store.Context.Database.CurrentTransaction).IsSameReferenceAs(transaction);
+            await transaction.CommitAsync(Token);
+        }
+        store.Context.ChangeTracker.Clear();
+        User persisted = (await repository.GetById(store.UserId))!;
+        await Assert.That(persisted.Email).IsEqualTo("original@example.test");
+        await Assert.That(persisted.EmailVerified).IsEqualTo(false);
+        await Assert.That(persisted.ConcurrencyStamp).IsEqualTo(stamp);
+    }
+
+    [Test]
+    public async Task UnrelatedAccountMutationCannotBeSavedThroughIdentitySynchronization()
+    {
+        await using var store = await Store.CreateAsync();
+        IUserRepository repository = new UserRepository(store.Context);
+        User user = (await repository.GetIdentityAccountForSynchronizationAsync(store.UserId, Token))!;
+        Guid stamp = user.ConcurrencyStamp;
+        await using (var transaction = await store.Context.Database.BeginTransactionAsync(Token))
+        {
+            user.LastActiveTenantId = Guid.CreateVersion7();
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                repository.SaveIdentityProfileAsync(user, "synchronized@example.test", true, Token));
+            await transaction.RollbackAsync(Token);
+        }
+        store.Context.ChangeTracker.Clear();
+        User persisted = (await repository.GetById(store.UserId))!;
+        await Assert.That(persisted.Email).IsEqualTo("original@example.test");
+        await Assert.That(persisted.EmailVerified).IsEqualTo(false);
+        await Assert.That(persisted.LastActiveTenantId).IsNull();
+        await Assert.That(persisted.ConcurrencyStamp).IsEqualTo(stamp);
+    }
+
     private static CancellationToken Token => TestContext.Current!.Execution.CancellationToken;
 
-    private sealed class Store(SqliteConnection connection, ExploreDbContext context,
-        HumanSecuritySourceGate humanGate, IAsyncDisposable human,
-        EventDiscoveryEnrollmentGate discoveryGate, IAsyncDisposable discovery,
-        Guid userId) : IAsyncDisposable
+    private sealed class Store(SqliteConnection connection, ExploreDbContext context, Guid userId) : IAsyncDisposable
     {
+        private HumanSecuritySourceGate? humanGate;
+        private IAsyncDisposable? human;
+        private EventDiscoveryEnrollmentGate? discoveryGate;
+        private IAsyncDisposable? discovery;
+
         internal ExploreDbContext Context => context;
         internal Guid UserId => userId;
 
@@ -134,20 +196,26 @@ public sealed class UserIdentityProfilePersistenceTests
                 DataSource = ":memory:",
                 Pooling = false
             }.ToString());
-            await connection.OpenAsync(Token);
-            await LocalIdentitySqliteTemplate.CopySeededApplicationToAsync(connection, Token);
             var options = TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(connection).UseSnakeCaseNamingConvention().Options;
             var context = new ExploreDbContext(options);
-            context.BindTenantLease();
-            var humanGate = new HumanSecuritySourceGate(context);
-            IAsyncDisposable human = await humanGate.AcquireAsync(Token);
-            var discoveryGate = new EventDiscoveryEnrollmentGate(context);
-            IAsyncDisposable discovery = await discoveryGate.AcquireAsync(Token);
             Guid userId = Guid.CreateVersion7();
-            var store = new Store(connection, context, humanGate, human, discoveryGate, discovery, userId);
+            var store = new Store(connection, context, userId);
             try
             {
+                await connection.OpenAsync(Token);
+                // Profile mirrors have no lookup dependencies. Retain both native schemas
+                // without bootstrapping the unrelated application lookup catalogue.
+                await context.Database.EnsureCreatedAsync(Token);
+                var authorityOptions = TestDbContextOptions.Create<EmbeddedPrivacyErasureAuthorityDbContext>()
+                    .UseSqlite(connection).UseSnakeCaseNamingConvention().Options;
+                await using (var authority = new EmbeddedPrivacyErasureAuthorityDbContext(authorityOptions))
+                    await authority.Database.ExecuteSqlRawAsync(authority.Database.GenerateCreateScript(), Token);
+                context.BindTenantLease();
+                store.humanGate = new HumanSecuritySourceGate(context);
+                store.human = await store.humanGate.AcquireAsync(Token);
+                store.discoveryGate = new EventDiscoveryEnrollmentGate(context);
+                store.discovery = await store.discoveryGate.AcquireAsync(Token);
                 await new UserRepository(context).Create(new User
                 {
                     Id = userId,
@@ -173,10 +241,14 @@ public sealed class UserIdentityProfilePersistenceTests
 
         public async ValueTask DisposeAsync()
         {
-            await discovery.DisposeAsync();
-            await discoveryGate.DisposeAsync();
-            await human.DisposeAsync();
-            await humanGate.DisposeAsync();
+            if (discovery is not null)
+                await discovery.DisposeAsync();
+            if (discoveryGate is not null)
+                await discoveryGate.DisposeAsync();
+            if (human is not null)
+                await human.DisposeAsync();
+            if (humanGate is not null)
+                await humanGate.DisposeAsync();
             await context.DisposeAsync();
             await connection.DisposeAsync();
         }

@@ -5,6 +5,7 @@ using System.Text.Json;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
+using Explore.Application.Features.ConfigurationManifest.Importing;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Compilation;
 using Explore.Application.Features.ConfigurationManifest.Preflight;
@@ -116,7 +117,8 @@ public static class ConfigurationManifestValidator
         }
         else
         {
-            ValidateTenantPackageExport(package.Metadata.Export, errors);
+            ValidateTenantPackageExport(package.Metadata.Export,
+                package.Spec?.Settings?.ContainsKey(PublicExperienceSettingDefinitions.AnnouncementBarPublication.Key) == true, errors);
         }
 
         if (package.Spec is null)
@@ -165,6 +167,7 @@ public static class ConfigurationManifestValidator
 
     private static void ValidateTenantPackageExport(
         ConfigurationManifestExportMetadataV1Alpha2? export,
+        bool preservesAnnouncementOwner,
         List<ConfigurationManifestValidationError> errors)
     {
         if (export is null)
@@ -179,7 +182,7 @@ public static class ConfigurationManifestValidator
             ConfigurationManifestExportMetadataValues.PortableView,
             StringComparison.Ordinal);
         if ((!isOverrides && !isPortable)
-            || export.EffectiveValuesFlattened != isPortable
+            || export.EffectiveValuesFlattened != (isPortable && !preservesAnnouncementOwner)
             || !export.SensitiveValuesOmitted
             || !string.Equals(
                 export.AuthorityScope,
@@ -244,8 +247,12 @@ public static class ConfigurationManifestValidator
             export.View,
             ConfigurationManifestExportMetadataValues.PortableView,
             StringComparison.Ordinal);
+        bool preservesAnnouncementOwner =
+            manifest.Spec?.Instance?.Settings?.ContainsKey(PublicExperienceSettingDefinitions.AnnouncementBarPublication.Key) == true
+            || manifest.Spec?.Tenants?.Any(tenant =>
+                tenant?.Spec?.Settings?.ContainsKey(PublicExperienceSettingDefinitions.AnnouncementBarPublication.Key) == true) == true;
         if ((!isOverrides && !isPortable)
-            || export.EffectiveValuesFlattened != isPortable
+            || export.EffectiveValuesFlattened != (isPortable && !preservesAnnouncementOwner)
             || !export.SensitiveValuesOmitted
             || !string.Equals(
                     export.AuthorityScope,
@@ -700,6 +707,15 @@ public static class ConfigurationManifestValidator
         ConfigurationManifestSettingCatalogEntry entry)
     {
         SettingDefinition definition = entry.Definition;
+        if (definition.Key == PublicExperienceSettingDefinitions.AnnouncementBarPublication.Key)
+        {
+            try
+            {
+                AnnouncementConfigurationProjection.ParseForScope(entry.Scope, value);
+                return true;
+            }
+            catch (ArgumentException) { return false; }
+        }
         bool typeAndConstraintValid = definition.ValueType switch
         {
             SettingValueType.String => IsValidString(value, definition, entry.MaximumStringLength),

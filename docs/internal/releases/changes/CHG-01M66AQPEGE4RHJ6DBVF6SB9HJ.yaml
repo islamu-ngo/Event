@@ -1,0 +1,27 @@
+Change-Id: CHG-01M66AQPEGE4RHJ6DBVF6SB9HJ
+Title: "keep identity synchronization within its database authority"
+Type: fix
+Scope: access
+Summary: "Resolve accounts without private profile reads and synchronize only the email mirror within the original account transaction, retaining optimistic concurrency and rollback without expanding birth-data permissions."
+Group: contextual-tenant-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Detail: Account lookup avoids private birth fields, while email synchronization preserves its tracked account stamp and original transaction. No database-purpose grants, correlation trust or erasure authority are widened.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

@@ -52,19 +52,22 @@ public partial class TenantPolicySettingService : ITenantPolicySettingService
     private readonly ITenantRepository _tenantRepository;
     private readonly ISettingMutationLock _mutationLock;
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
+    private readonly IAnnouncementSettingsReader _announcementSettingsReader;
 
     public TenantPolicySettingService(
         ISystemSettingRepository systemSettingRepository,
         ITenantSettingRepository tenantSettingRepository,
         ITenantRepository tenantRepository,
         ISettingMutationLock mutationLock,
-        IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary)
+        IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
+        IAnnouncementSettingsReader announcementSettingsReader)
     {
         _systemSettingRepository = systemSettingRepository;
         _tenantSettingRepository = tenantSettingRepository;
         _tenantRepository = tenantRepository;
         _mutationLock = mutationLock;
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
+        _announcementSettingsReader = announcementSettingsReader;
     }
 
     private static bool ResolveBoolean(string? tenantOverrideValue, string? systemValue, bool fallback, bool allowTenantOverride)

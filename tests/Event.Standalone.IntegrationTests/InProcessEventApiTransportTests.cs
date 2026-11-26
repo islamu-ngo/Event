@@ -6,6 +6,7 @@ using Explore.Blazor.Extensions;
 using Explore.Blazor.Hosting;
 using Explore.Blazor.Services;
 using Explore.Blazor.Services.Auth;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -18,6 +19,100 @@ namespace Event.Standalone.IntegrationTests;
 
 public sealed class InProcessEventApiTransportTests
 {
+    [Test]
+    [Arguments(9, false, 17)]
+    [Arguments(9, true, 8)]
+    [Arguments(33, false, 40)]
+    public async Task InternalBatchesWaitWithinBoundsAndCancelledWorkDoesNotDispatch(int waiting, bool cancel, int expectedDispatches)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new Explore.ServiceDefaults.EarlyRequestAdmission(TimeProvider.System, enabled: true));
+        await using var provider = services.BuildServiceProvider();
+        using var dispatcher = new InProcessEventApiDispatcher();
+        using var cancellation = new CancellationTokenSource();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int dispatches = 0;
+        dispatcher.Bind(async context =>
+        {
+            if (Interlocked.Increment(ref dispatches) == 8) entered.TrySetResult();
+            await release.Task;
+        });
+        var contexts = Enumerable.Range(0, 8 + waiting).Select(_ =>
+        {
+            var context = new DefaultHttpContext { RequestServices = provider };
+            dispatcher.MarkRequest(context);
+            return context;
+        }).ToArray();
+        var active = contexts.Take(8).Select(dispatcher.DispatchAsync).ToArray();
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var queued = contexts.Skip(8).Select(context =>
+            {
+                context.RequestAborted = cancellation.Token;
+                return dispatcher.DispatchAsync(context);
+            }).ToArray();
+            await Assert.That(queued.Take(32).All(task => !task.IsCompleted)).IsTrue();
+            if (waiting > 32)
+            {
+                await queued[32].WaitAsync(TimeSpan.FromSeconds(5));
+                await Assert.That(contexts[^1].Response.StatusCode).IsEqualTo(StatusCodes.Status429TooManyRequests);
+                await Assert.That(contexts[^1].Response.Headers.RetryAfter.ToString()).IsEqualTo("1");
+                await Assert.That(contexts[^1].Response.Headers.CacheControl.ToString()).IsEqualTo("no-store");
+            }
+            if (cancel)
+            {
+                cancellation.Cancel();
+                await Assert.ThrowsAsync<OperationCanceledException>(() =>
+                    Task.WhenAll(queued).WaitAsync(TimeSpan.FromSeconds(5)));
+                await Assert.That(dispatches).IsEqualTo(expectedDispatches);
+            }
+            else
+            {
+                release.TrySetResult();
+                await Task.WhenAll(active.Concat(queued)).WaitAsync(TimeSpan.FromSeconds(5));
+                await Assert.That(dispatches).IsEqualTo(expectedDispatches);
+                await Assert.That(contexts.Take(expectedDispatches)
+                    .All(context => context.Response.StatusCode == StatusCodes.Status200OK)).IsTrue();
+            }
+        }
+        finally
+        {
+            cancellation.Cancel();
+            release.TrySetResult();
+            await Task.WhenAll(active).WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    [Test]
+    public async Task InProcessRequestsReachApiWhenHttpsRedirectionIsEnabled()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new Explore.ServiceDefaults.EarlyRequestAdmission(TimeProvider.System, enabled: true));
+        services.AddLogging();
+        services.AddHttpContextAccessor();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        services.AddHttpsRedirection(options => options.HttpsPort = 7287);
+        await using var provider = services.BuildServiceProvider();
+        var pipeline = new ApplicationBuilder(provider);
+        pipeline.UseHttpsRedirection();
+        pipeline.Run(context => context.Response.WriteAsync("api-response", context.RequestAborted));
+        using var dispatcher = new InProcessEventApiDispatcher();
+        dispatcher.BindEndpointSelector(_ => Task.CompletedTask);
+        dispatcher.Bind(pipeline.Build());
+        using var handler = new InProcessEventApiHttpMessageHandler(
+            dispatcher,
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            provider.GetRequiredService<IHttpContextAccessor>());
+        using var client = new HttpClient(handler) { BaseAddress = InProcessEventApiDispatcher.InternalBaseAddress };
+
+        using var response = await client.GetAsync("api/probe");
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(await response.Content.ReadAsStringAsync()).IsEqualTo("api-response");
+    }
+
     [Test]
     public async Task HandlerCopiesRequestAndResponseWithoutCookieOrAmbientPrincipal()
     {
@@ -33,7 +128,7 @@ public sealed class InProcessEventApiTransportTests
         };
         ambient.Request.Headers.Cookie = "session=secret";
         accessor.HttpContext = ambient;
-        var dispatcher = new InProcessEventApiDispatcher();
+        using var dispatcher = new InProcessEventApiDispatcher();
         dispatcher.BindEndpointSelector(_ => Task.CompletedTask);
         dispatcher.Bind(async context =>
         {
@@ -77,7 +172,7 @@ public sealed class InProcessEventApiTransportTests
         services.AddLogging();
         services.AddHttpContextAccessor();
         await using var provider = services.BuildServiceProvider();
-        var dispatcher = new InProcessEventApiDispatcher();
+        using var dispatcher = new InProcessEventApiDispatcher();
         dispatcher.BindEndpointSelector(_ => Task.CompletedTask);
         dispatcher.Bind(context => Task.Delay(Timeout.InfiniteTimeSpan, context.RequestAborted));
         using var handler = new InProcessEventApiHttpMessageHandler(
@@ -102,7 +197,8 @@ public sealed class InProcessEventApiTransportTests
         services.AddHttpContextAccessor();
         await using var provider = services.BuildServiceProvider();
         var callbacks = new List<string>();
-        var dispatcher = new InProcessEventApiDispatcher();
+        var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var dispatcher = new InProcessEventApiDispatcher();
         dispatcher.BindEndpointSelector(_ => Task.CompletedTask);
         dispatcher.Bind(async context =>
         {
@@ -121,6 +217,7 @@ public sealed class InProcessEventApiTransportTests
             context.Response.OnCompleted(() =>
             {
                 callbacks.Add("completed-1");
+                completed.TrySetResult();
                 return Task.CompletedTask;
             });
             context.Response.OnCompleted(() =>
@@ -152,6 +249,7 @@ public sealed class InProcessEventApiTransportTests
 
         using var response = await client.GetAsync("api/callbacks");
         _ = await response.Content.ReadAsStringAsync();
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         await Assert.That(response.Headers.GetValues("X-Started").Single()).IsEqualTo("yes");
         await Assert.That(callbacks).IsEquivalentTo([
@@ -168,7 +266,7 @@ public sealed class InProcessEventApiTransportTests
         services.AddHttpContextAccessor();
         await using var provider = services.BuildServiceProvider();
         var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var dispatcher = new InProcessEventApiDispatcher();
+        using var dispatcher = new InProcessEventApiDispatcher();
         dispatcher.BindEndpointSelector(_ => Task.CompletedTask);
         dispatcher.Bind(async context =>
         {
@@ -201,7 +299,7 @@ public sealed class InProcessEventApiTransportTests
         await using var provider = services.BuildServiceProvider();
         var releaseContent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var firstChunkRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var dispatcher = new InProcessEventApiDispatcher();
+        using var dispatcher = new InProcessEventApiDispatcher();
         dispatcher.BindEndpointSelector(_ => Task.CompletedTask);
         dispatcher.Bind(async context =>
         {
@@ -238,7 +336,7 @@ public sealed class InProcessEventApiTransportTests
         services.AddLogging();
         services.AddHttpContextAccessor();
         await using var provider = services.BuildServiceProvider();
-        var dispatcher = new InProcessEventApiDispatcher();
+        using var dispatcher = new InProcessEventApiDispatcher();
         dispatcher.BindEndpointSelector(_ => Task.CompletedTask);
         dispatcher.Bind(async context =>
         {
@@ -267,7 +365,7 @@ public sealed class InProcessEventApiTransportTests
         await using var provider = services.BuildServiceProvider();
         var producerStopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var dispatcher = new InProcessEventApiDispatcher();
+        using var dispatcher = new InProcessEventApiDispatcher();
         dispatcher.BindEndpointSelector(_ => Task.CompletedTask);
         dispatcher.Bind(async context =>
         {

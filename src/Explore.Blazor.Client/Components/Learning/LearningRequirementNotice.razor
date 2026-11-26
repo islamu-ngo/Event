@@ -1,0 +1,84 @@
+@using Explore.Blazor.Client.Contracts.Services.Learning
+@using Explore.Blazor.Client.Services.Learning
+@implements IDisposable
+@inject ILearningClientService Learning
+@inject ITranslationService Translation
+
+@if (IsCurrent(Context, CancellationToken))
+{
+    var context = Context;
+    var token = CancellationToken;
+    <section class="private-learning__notice">
+        @if (HeadingLevel == 2)
+        {
+            <h2>@T("ui.learning.private.orientation.heading", "Your directory administrator orientation")</h2>
+        }
+        else
+        {
+            <h3>@T("ui.learning.private.orientation.heading", "Your directory administrator orientation")</h3>
+        }
+        @if (context.Requirement.Status == LearningRequirementStatus.Pending)
+        {
+            <p>@T("ui.learning.private.orientation.pending", "Your acknowledgement of the current administrator notice is pending. Hiding optional learning or suppressing automatic guidance does not dismiss this notice.")</p>
+            @if (IsSupported(context))
+            {
+                <p>@T("ui.learning.private.orientation.notice", "Administer only the directory and settings you are authorized to manage. Check inherited instance controls and current setup blockers before changing public disclosure or paid commerce. Private practice never clears those blockers, grants authority or lets you inspect another learner's progress. Use the existing directory settings and setup guidance for real remediation.")</p>
+                <p>@T("ui.learning.private.orientation.meaning", "Acknowledgement records only that you read this notice for the current policy and material. It is not a competence claim, a completed course or permission to perform a real action.")</p>
+                @if (Learning.HasContextAction("acknowledge-requirement"))
+                {
+                    <button type="button" data-learning-action="acknowledge-requirement" disabled="@(!Learning.CanSubmit)"
+                            @onclick="@(() => AcknowledgeAsync(context, token))">
+                        @T("ui.learning.private.orientation.acknowledge", "I have read this administrator notice")
+                    </button>
+                }
+            }
+            else
+            {
+                <p>@T("ui.learning.private.orientation.unsupported", "This orientation material is not available in this client. No acknowledgement has been recorded.")</p>
+            }
+        }
+        else if (context.Requirement.Status == LearningRequirementStatus.Satisfied)
+        {
+            <p>@T("ui.learning.private.orientation.satisfied", "The current private context confirms your administrator acknowledgement is satisfied. This does not establish competence, course completion, readiness or permission for a real action.")</p>
+        }
+        else if (context.Requirement.Status == LearningRequirementStatus.NotApplicable)
+        {
+            <p>@T("ui.learning.private.orientation.not_applicable", "Administrator acknowledgement is not applicable to you in the current context. This does not grant authority or establish readiness.")</p>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public HalResourceOfLearningContextDto Context { get; set; } = null!;
+    [Parameter, EditorRequired] public Func<HalResourceOfLearningContextDto, bool> IsCurrentContext { get; set; } = null!;
+    [Parameter] public CancellationToken CancellationToken { get; set; }
+    [Parameter] public int HeadingLevel { get; set; } = 3;
+
+    private bool _disposed;
+
+    private bool IsCurrent(HalResourceOfLearningContextDto source, CancellationToken token) =>
+        !_disposed && !token.IsCancellationRequested && token == CancellationToken
+        && ReferenceEquals(source, Context) && ReferenceEquals(source, Learning.Context)
+        && IsCurrentContext(source)
+        && Learning.Scope is { ContextKey: "self" } scope
+        && source.ContextKey == scope.ContextKey
+        && source.TenantId == scope.TenantId && source.UserId == scope.UserId;
+
+    private static bool IsSupported(HalResourceOfLearningContextDto source) =>
+        source.Requirement.RequirementKey == "tenant-admin-orientation"
+        && source.Requirement.MaterialVersion == 1;
+
+    private async Task AcknowledgeAsync(HalResourceOfLearningContextDto source, CancellationToken token)
+    {
+        if (!IsCurrent(source, token) || !Learning.CanSubmit || !IsSupported(source)
+            || source.Requirement.Status != LearningRequirementStatus.Pending
+            || !Learning.HasContextAction("acknowledge-requirement"))
+            return;
+
+        await Learning.AcknowledgeRequirementAsync(source.Requirement, token);
+    }
+
+    private string T(string key, string fallback) => Translation.T(key, fallback);
+
+    public void Dispose() => _disposed = true;
+}

@@ -1,5 +1,6 @@
 
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Features.Announcements;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
@@ -42,11 +43,35 @@ public static class HierarchicalSettingMerge
 
     public static ResolvedSetting? Resolve(string key, SettingMergeFacts facts)
     {
+        if (AnnouncementSettingMutationGuard.IsRetired(key))
+            return null;
         var systemSetting = facts.System;
         var definition = SettingRegistry.Get(key);
 
         if (systemSetting is null && definition is null)
             return null;
+
+        if (key == GovernanceSettingKeys.PublicExperience.AnnouncementBarPublication)
+        {
+            _ = AnnouncementSettingValueCodec.DeserializeGroup(systemSetting?.Value);
+            var tenant = facts.HasTenantContext ? AnnouncementSettingValueCodec.DeserializeGroup(facts.Tenant?.Value) : null;
+            bool selectedTenant = systemSetting?.IsLocked != true && tenant?.Publication is not null;
+            bool locked = selectedTenant ? facts.Tenant?.IsLocked == true : systemSetting?.IsLocked == true;
+            return new ResolvedSetting
+            {
+                Key = key,
+                Value = selectedTenant
+                    ? facts.Tenant?.Value ?? throw new InvalidOperationException("The selected announcement source is absent.")
+                    : systemSetting?.Value ?? definition?.DefaultValue
+                        ?? throw new InvalidOperationException("The announcement definition is missing."),
+                ValueType = SettingValueType.Json,
+                Source = selectedTenant ? locked ? SettingSource.TenantLocked : SettingSource.TenantOverride
+                    : locked ? SettingSource.SystemLocked : SettingSource.SystemDefault,
+                IsLocked = locked,
+                Description = definition?.Description,
+                Category = definition?.Category
+            };
+        }
 
         var effectiveValue = systemSetting?.Value ?? definition?.DefaultValue ?? "";
         var valueType = systemSetting?.ValueType ?? definition?.ValueType ?? SettingValueType.String;

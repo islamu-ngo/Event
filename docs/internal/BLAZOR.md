@@ -38,6 +38,62 @@ Use the specialized docs for deep detail:
 | Accessibility rules | [ACCESSIBILITY.md](ACCESSIBILITY.md) |
 | Localization stack | [LOCALIZATION.md](LOCALIZATION.md) |
 
+## Private Authored Learning
+
+`LearningHub` and `LearningPractice` register in the existing `Routes` catalog
+as authenticated, noncached `/learning` and `/learning/demo/:practiceId`.
+`RouteConfigurationPathBase` retains prefix ownership; the authentication guard
+uses a base-relative login destination with the original escaped return URL.
+The practice page reads the current identifier from `RouterStateService` during
+parameter updates, following the established routed-page contract rather than
+assuming Blazouter populates a Razor route parameter.
+
+Both pages begin private reads only after interactive rendering. Components
+consume `ILearningClientService`, with one scoped `LearningClientService`
+implementation registered in DI. The facade uses generated `ILearningClient` through the existing
+BFF boundary, snapshots tenant/account/self-or-managed-actor context and
+invalidates pending work on authentication, current-user, actor or tenant changes.
+Cancelled transports are not assumed to stop: generation and scope checks fence
+late reads, writes and post-write refreshes. Disposal clears private state.
+Static rendering contains no practice data or private transfer state.
+
+The hub consumes the six current server-authored recipes. The practice surface
+renders their choices, confirmation, result and reset/clear states without
+mounting Studio or initializing live AI. Received HAL relations alone expose
+actions; capability booleans are not grants. A mutation advances the display
+only after a valid private receipt and fresh context/practice HAL reads.
+An uncertain or unconfirmed save requires explicit reload before resubmission.
+Completion notifications may synchronously replace scope, so success is checked
+again after notification before returning a practice identifier or applied flag.
+
+Mounted component and framework-static-rendering checks cover these boundaries.
+Actual-host keyboard, screen-reader, theme, RTL and viewport assurance remains
+part of programme exit, not a claim supplied by those tests. The backend
+contracts and erasure rules remain in [CONTEXTUAL_LEARNING.md](CONTEXTUAL_LEARNING.md).
+
+### Contextual Tour Presentation
+
+GuideFlow 1.0.1 is a rendering dependency of the client, with its packaged
+stylesheet/module referenced by the server document. One scoped coordinator
+owns server-plan/claim/progress transitions; one mounted host owns presentation.
+The target registry contains actual post-render element references from the
+shell, Studio, event navigation and shared normal-AI rail, not synthetic cards
+or guessed selectors. Context generations and owner disposal remove stale
+targets. Existing dialogs and edited/saving content defer optional guidance.
+
+A current HAL `tour-plan` relation gates both plan reads and renderer mounting.
+Server-derived due-family observations can produce a fresh invitation read;
+they never acquire a claim automatically. Explicit Start claims, accepted
+semantic receipts advance Next, and explicit skip/snooze use the original
+current source. Help replay fetches a fresh plan before starting. Renderer
+local storage is disabled. Uncertain writes are not replayed, and old outcomes
+never use replacement tenant headers.
+
+The authenticated interactive layout resolves its tenant before loading private
+learning. Anonymous/static rendering retains public Help without initializing
+the private renderer. Native component and Studio integration tests do not
+replace the separate actual-host accessibility/audience gate.
+
 ## Guided Instance Administration
 
 `InstanceGettingStartedSection` reads existing onboarding status/journey services;
@@ -136,6 +192,45 @@ An authenticated browser request to `/api/*` in Standalone crosses an explicit i
 This cookie-to-API token conversion fails closed: a valid BFF cookie without a usable server-held access token receives `401` (apart from the documented anonymous onboarding/setup paths), rather than falling through as the cookie identity or an attacker-supplied credential.
 
 `InProcessEventApiHttpMessageHandler` is the separate server-side bridge used by generated `IEventApiClient` services in the Combined profile. It creates an isolated HTTP context and service scope, copies HTTP semantics and permitted headers, but does not copy browser cookies, `Host`, or an ambient principal. It is an in-process transport implementation, not permission to bypass API authentication or Application authorization.
+
+The internal base URI uses the HTTPS scheme so that API HTTPS-redirection
+middleware does not redirect synthetic requests away from their selected
+handlers. Dispatch remains in process; this does not introduce a network hop.
+
+Trusted server-generated batches coordinate at most eight active transport
+requests and 32 FIFO waiters. Waiting observes request cancellation; overflow
+returns non-cacheable `429` with `Retry-After: 1`. Each acquired transport slot
+still enters native `EarlyRequestAdmission`, which remains zero-queue and
+enforces its unchanged process, internal and time-window budgets. Transport
+coordination does not replay work or cache identity decisions.
+
+The public-experience service retains unavailable public settings and shell
+results for its existing five-minute cache interval, returning no stale public
+operator identity. Cached consumers therefore do not repeatedly refetch the
+same fail-closed result during rendering. Explicit reads, `ResetCache`, and
+expiry can obtain fresh public configuration. This cache does not contain
+browser-session validation or private action authority.
+
+`MapSelectedStaticAssets` marks identity-independent manifest assets with
+`PublicStaticAssetMetadata` and explicit anonymous access in both ordinary and
+Assurance selection. For these endpoints only, GET/HEAD requests run with an
+anonymous principal and without Cookie/Authorization headers. The BFF boundary
+restores the incoming request state afterward and runs before Standalone's
+outer authentication as well as Blazor authentication. Host, HTTPS, security
+headers and native admission still execute; pages, unknown paths, mutations
+and API operations retain their existing authentication requirements.
+
+Local identity validation distinguishes rejection from unavailability.
+`BffAdminClaimsTransformation.ValidateLocalSessionAsync` preserves definitive
+identity rejection, but translates throttling, server failures, transport errors,
+non-caller timeouts and open circuits into `BffSessionAuthorityUnavailableException`.
+The HTTP boundary returns a non-cacheable `503` without signing out or revoking
+the native ticket. Standalone installs that boundary before its outer
+authentication and cookie-to-API bridge. An unavailable circuit activity does
+not reach its handler and does not permanently revoke the original circuit;
+the next activity must validate afresh. Caller cancellation and definitive
+revocation retain their existing behavior. No identity-validity cache or
+admission-limit exemption is introduced.
 
 ### Antiforgery boundaries and Standalone limits
 
@@ -370,6 +465,40 @@ Cookie-authenticated BFF mutations use a double-submit-style antiforgery contrac
 7. InteractiveServer storage-upload self-calls use a short-lived Data Protection protected `X-ISLAMU-BFF-SELF-CALL` token bound to the method, path, host, and authenticated user so they can pass the same endpoint filter without exposing browser tokens or setup secrets.
 8. Documented exceptions are setup-secret bootstrap endpoints and `/bff/auth/refresh-session/internal`; these use separate credentials/authorization constraints because initial setup and server-side onboarding calls cannot reliably satisfy browser antiforgery semantics.
 
+## Authenticated Localization Preference Owner
+
+`/bff/language` and `/bff/direction` persist through the existing authenticated
+`PATCH /api/user/appearance` operation before updating culture cookies. The
+native command selects the current tenant's owner before constructing its
+handler. `HumanSettingsMutationPreparation` binds only the supplied language and
+direction effects to the original human subject, credential and physical owner.
+The handler uses that prepared attempt instead of opening a second transaction.
+
+Parent-equivalent values remove the user's override. The ordinary writer
+validates that choice against its retained System/Tenant image using
+`HierarchicalSettingMerge` and `AppearanceSettingGroup`, including canonical
+language/direction normalization and parent locks. Acquiring and completing the
+same source excludes later parent changes; cache invalidation follows successful
+settlement. Theme mode and active profile are outside this intent. This uses the
+existing ordinary-settings provider support and grants no additional database
+rights.
+
+`AppearanceResolutionService` resolves the same current tenant/user setting group
+when reading effective appearance. It overlays only language and direction on the
+selected profile, configured preset or fallback theme. Saving a preference and
+reading it back therefore use the same hierarchy without replacing theme mode or
+the active profile.
+
+Language selection invokes the existing browser BFF mutation bridge, including
+its same-origin antiforgery handling, in every interactive render mode. The BFF's
+language and ASP.NET culture cookies must reach the browser; an InteractiveServer
+HTTP self-call can save the database preference while losing those response
+cookies. `LanguageProvider` seeds its first render from the request UI culture
+before persisting hydration state, so a prerendered English default cannot replace
+the selected request culture during hydration. Once a newer language selection
+owns the live UI culture, an earlier initialization cannot overwrite it when
+that initialization completes.
+
 ## Storage Upload Proxy Boundary
 
 Browser-mediated storage uploads use BFF-owned upload sessions rather than caller-supplied destination URLs:
@@ -494,6 +623,16 @@ Event detail and profile surfaces are HAL-driven management views:
 7. Heavy redaction is destructive and must require explicit user confirmation in UI before calling the API. The API remains authoritative for redaction, deletion, notification, and authorization outcomes.
 
 ### Canonical Studio Event Workspace
+
+Studio context loads actor-owned events through `EventRepository.GetEventsByActorWithDetails`.
+SQLite orders the first-session instant with the existing offset-aware collation;
+tenant/deletion filters, database-side ordering and title/ID tie-breaks remain active.
+
+Initial event creation acquires human-source and discovery enrollment custody
+before the privacy or primary transaction begins. It retains those leases through
+settlement and receipt reconciliation. Lost connector custody never permits a
+replacement lease or replay; transport and reconciliation evidence retain their
+known-committed or unknown-outcome classification through cleanup.
 
 Resource management uses the audience collection's `manage-resources` relation
 for both Overview actions and direct-route mounting. The event's public

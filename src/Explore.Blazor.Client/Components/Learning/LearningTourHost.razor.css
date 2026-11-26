@@ -1,0 +1,64 @@
+.learning-tour {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--app-space-2, 0.5rem);
+}
+
+.learning-tour__action {
+    min-block-size: 2.75rem;
+    padding-inline: 0.75rem;
+    color: var(--mud-palette-primary);
+    background: var(--mud-palette-surface);
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: var(--mud-default-borderradius);
+}
+
+.learning-tour__action:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 2px;
+}
+
+.learning-tour__controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--app-space-2, 0.5rem);
+}
+
+.learning-tour__action--primary {
+    color: var(--mud-palette-primary-text);
+    background: var(--mud-palette-primary);
+}
+
+.learning-tour__action:disabled {
+    color: var(--mud-palette-action-disabled);
+    background: var(--mud-palette-action-disabled-background);
+}
+
+.learning-tour__action:hover:not(:disabled) {
+    border-color: var(--mud-palette-primary);
+}
+
+.learning-tour__progress {
+    margin-block-end: var(--app-space-2, 0.5rem);
+    color: var(--mud-palette-text-secondary);
+}
+
+.learning-tour__renderer ::deep .gf-step {
+    color: var(--mud-palette-text-primary);
+    background: var(--mud-palette-surface);
+}
+
+.learning-tour__renderer ::deep .gf-step__title,
+.learning-tour__renderer ::deep .gf-step__body {
+    color: var(--mud-palette-text-primary);
+}
+
+.learning-tour__renderer ::deep .gf-arrow--bottom {
+    border-block-end-color: var(--mud-palette-surface);
+}
+
+/* One vendor target is mounted at a time; only the semantic plan counts steps. */
+.learning-tour__renderer ::deep .gf-step__progress {
+    display: none;
+}

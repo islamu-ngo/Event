@@ -94,20 +94,20 @@ public sealed partial class TypedSettingsOriginalStore(
         {
             effects = InstanceGovernanceSettingService.CompileGovernanceOriginal(request, system);
         }
-        else if (request.Onboarding is { } onboarding)
+        else if (request.Announcement is not null)
+            effects = CompileAnnouncement(request);
+        else if (request.Onboarding is not null)
         {
             string? slug = expected![nameof(Tenant)]!.AsArray().Single(row =>
                 row![nameof(Tenant.Id)]!.GetValue<string>() == request.TenantId!.Value.ToString("D"))![nameof(Tenant.Slug)]?.GetValue<string>();
-            string? revision = Rows<TenantSetting>().SingleOrDefault(row => row.TenantId == request.TenantId
-                && row.SettingKey == GovernanceSettingKeys.PublicExperience.AnnouncementBarRevision)?.Value;
-            effects = TenantPolicySettingService.CompileOriginal(onboarding.Settings, system, slug, revision);
+            effects = CompileOnboardingOriginal(request, system, slug);
         }
         else if (request.Reporting is { } reporting)
             effects = [new(GovernanceSettingKeys.EventReporting.IntakeEnabled,
                 SettingValueSerializer.Serialize(reporting.Policy.Enabled))];
         else
             throw new UnauthorizedAccessException("Only a closed typed original can compile Settings.");
-        if (effects.IsDefault || effects.IsEmpty && request.PlanAssignment is null
+        if (effects.IsDefault || effects.IsEmpty && request.PlanAssignment is null && request.Announcement is null
             || effects.Select(effect => effect.Key).Distinct(StringComparer.Ordinal).Count() != effects.Length)
             throw new UnauthorizedAccessException("The original typed compiler must produce exact distinct effects.");
         if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
@@ -298,7 +298,8 @@ public sealed partial class TypedSettingsOriginalStore(
                 after["Category"] = definition.Category;
                 after["DisplayOrder"] = 0;
             }
-            if (!original.TenantId.HasValue || original.PlanAssignment is not null && effect.IsLocked.HasValue)
+            if (!original.TenantId.HasValue
+                || (original.PlanAssignment is not null || original.Announcement is not null) && effect.IsLocked.HasValue)
                 after["IsLocked"] = effect.IsLocked;
             if (old is not null && !unchangedPublication)
             {

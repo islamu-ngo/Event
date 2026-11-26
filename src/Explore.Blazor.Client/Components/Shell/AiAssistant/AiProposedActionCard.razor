@@ -1,4 +1,4 @@
-@using Explore.Blazor.Client.Services.Ai
+@implements IDisposable
 
 @if (Action is not null)
 {
@@ -21,35 +21,35 @@
             {
                 <CreateEventDraftActionPreview PayloadJson="@Action.PayloadJson" />
             }
-            <AiActionResultCard Action="Action" />
+            <AiActionResultCard Action="Action" Mode="Mode" Presentation="Presentation?.Result" OnOpenResult="OnOpenResult" />
         </div>
 
         @if (HasActionButtons)
         {
             <div class="ai-rail__action-buttons" aria-label="AI proposed action controls">
-                @if (AiAssistantConversationState.CanReject(Action))
+                @if (Presentation?.CanReject == true)
                 {
                     <MudButton Variant="Variant.Text"
                                Size="Size.Small"
                                Disabled="@(!ActionsEnabled || IsBusy)"
-                               OnClick="() => OnReject.InvokeAsync(Action)"
+                               OnClick="RejectAsync"
                                data-testid="ai-rail-reject-action">
-                        Reject
+                        @Presentation.RejectLabel
                     </MudButton>
                 }
-                @if (AiAssistantConversationState.CanConfirm(Action))
+                @if (Presentation?.CanConfirm == true)
                 {
                     <MudButton Variant="Variant.Filled"
                                Color="Color.Primary"
                                Size="Size.Small"
                                Disabled="@(!ActionsEnabled || IsBusy)"
-                               OnClick="() => OnConfirm.InvokeAsync(Action)"
+                               OnClick="ConfirmAsync"
                                data-testid="ai-rail-confirm-action">
-                        Confirm
+                        @Presentation.ConfirmLabel
                     </MudButton>
                 }
             </div>
-            @if (!ActionsEnabled)
+            @if (!ActionsEnabled && Mode == AiPresentationMode.Live)
             {
                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ai-rail__action-mode-hint">
                     Switch to Build mode to respond to this proposal.
@@ -63,6 +63,10 @@
     [Parameter]
     public ProposedActions2? Action { get; set; }
 
+    [Parameter] public AiPresentationMode Mode { get; set; }
+    [Parameter] public AiActionPresentation? Presentation { get; set; }
+    [Parameter] public EventCallback<AiActionResultPresentation> OnOpenResult { get; set; }
+
     [Parameter]
     public bool IsBusy { get; set; }
 
@@ -75,13 +79,23 @@
     [Parameter]
     public EventCallback<ProposedActions2> OnReject { get; set; }
 
-    private bool HasActionButtons => Action is not null
-        && (AiAssistantConversationState.CanReject(Action) || AiAssistantConversationState.CanConfirm(Action));
+    private bool _disposed;
+    private bool HasActionButtons => !_disposed && Action is not null
+        && Mode is AiPresentationMode.Live or AiPresentationMode.Simulation
+        && (Presentation?.CanReject == true || Presentation?.CanConfirm == true);
+
+    private Task ConfirmAsync() => HasActionButtons && ActionsEnabled && !IsBusy
+        && Presentation?.CanConfirm == true && Action is not null
+            ? OnConfirm.InvokeAsync(Action) : Task.CompletedTask;
+
+    private Task RejectAsync() => HasActionButtons && ActionsEnabled && !IsBusy
+        && Presentation?.CanReject == true && Action is not null
+            ? OnReject.InvokeAsync(Action) : Task.CompletedTask;
 
     private bool IsRejected => string.Equals(Action?.Status, "Rejected", StringComparison.OrdinalIgnoreCase)
         || Action?.RejectedAt is not null;
 
-    private bool IsCompleted => Action?.ResultResourceId is not null;
+    private bool IsCompleted => Presentation?.Result is not null || Action?.ResultResourceId is not null;
 
     private bool IsFailed => !string.IsNullOrWhiteSpace(Action?.FailureCode)
         || !string.IsNullOrWhiteSpace(Action?.FailureMessage);
@@ -111,24 +125,24 @@
                 : Icons.Material.Filled.PendingActions;
 
     private string StatusLabel => IsCompleted
-        ? "Executed"
+        ? Mode == AiPresentationMode.Simulation ? "Simulated" : "Executed"
         : IsRejected
             ? "Rejected"
             : IsFailed
                 ? "Failed"
                 : "Proposed";
 
-    private string ActionTitle => string.Equals(Action?.Kind, "CreateEventDraft", StringComparison.OrdinalIgnoreCase)
+    private string ActionTitle => Presentation?.Title ?? (string.Equals(Action?.Kind, "CreateEventDraft", StringComparison.OrdinalIgnoreCase)
         ? GetCreateEventDraftTitle()
-        : Action?.Kind ?? "AI proposed action";
+        : Action?.Kind ?? "AI proposed action");
 
-    private string ActionDescription => IsCompleted
+    private string ActionDescription => Presentation?.Description ?? (IsCompleted
         ? "The draft was created and is ready to open."
         : IsRejected
             ? "You rejected this proposal. No event draft was created."
             : IsFailed
                 ? "The assistant could not complete this action."
-                : "Review the draft details before confirming or rejecting the action.";
+                : "Review the draft details before confirming or rejecting the action.");
 
     private string ActionAriaLabel => $"AI action {StatusLabel}: {ActionTitle}";
 
@@ -137,4 +151,6 @@
         : IsRejected
             ? "Event draft proposal rejected"
             : "Review event draft proposal";
+
+    public void Dispose() => _disposed = true;
 }

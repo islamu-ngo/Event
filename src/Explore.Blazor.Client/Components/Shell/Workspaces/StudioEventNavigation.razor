@@ -2,19 +2,24 @@
 @using Explore.Blazor.Client.Contracts.Services.Events
 @using Explore.Blazor.Client.Contracts.Services
 @using Explore.Blazor.Client.Components.Event
+@using Explore.Blazor.Client.Services.Learning
+@using Explore.Blazor.Client.Contracts.Services.Learning
 @implements IDisposable
 @inject StudioEventContextState EventContext
 @inject IEventTicketingService Ticketing
 @inject IEventPromotionService Promotions
 @inject IEventResourceService Resources
+@inject ILearningTargetRegistry TourTargets
 
-<nav class="studio-event-navigation" aria-label="Event management navigation" data-testid="studio-event-navigation">
+<nav id="learning-event-sections" @ref="_tourSections" class="studio-event-navigation" aria-label="Event management navigation" data-testid="studio-event-navigation">
     <MudNavMenu Dense="false" Class="studio-event-navigation__menu px-2">
+        <div id="learning-event-return" @ref="_tourReturn">
         <MudNavLink Href="/studio/events"
                     Icon="@Icons.Material.Filled.ArrowBack"
                     Match="NavLinkMatch.All">
             All events
         </MudNavLink>
+        </div>
 
         @if (EventContext.IsLoading && Resource is null)
         {
@@ -22,7 +27,7 @@
         }
         else if (Resource is not null)
         {
-            <div class="studio-event-navigation__header">
+            <div id="learning-event-context" @ref="_tourEventContext" class="studio-event-navigation__header">
                 <MudText Typo="Typo.h6" Class="studio-event-navigation__title">@Resource.Title</MudText>
                 @if (!string.IsNullOrWhiteSpace(Resource.EventStatusFullName))
                 {
@@ -115,6 +120,12 @@
 
 @code {
     [Parameter] public Guid EventId { get; set; }
+    [CascadingParameter(Name = "LearningPresentationContext")]
+    public LearningPresentationContext? TourPresentation { get; set; }
+
+    private ElementReference _tourSections;
+    private ElementReference _tourReturn;
+    private ElementReference _tourEventContext;
 
     private EventDto? Resource => EventContext.EventId == EventId ? EventContext.Event : null;
     private string StudioRoute => $"/studio/events/{EventId}";
@@ -138,6 +149,21 @@
         if (_disposed || EventId != eventId || resource is null) return;
         await LoadPromotionNavigationAsync();
         await LoadResourceNavigationAsync();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!_disposed && Resource is not null && !EventContext.IsLoading
+            && TourPresentation is { Family: LearningTourFamily.EventManagement } presentation
+            && presentation.EventId == EventId
+            && !string.IsNullOrWhiteSpace(_tourSections.Id) && !string.IsNullOrWhiteSpace(_tourReturn.Id)
+            && !string.IsNullOrWhiteSpace(_tourEventContext.Id))
+            TourTargets.Publish(this, presentation, false,
+                new LearningTarget("event-management.event-context", "learning-event-context", _tourEventContext),
+                new LearningTarget("event-management.return-to-studio", "learning-event-return", _tourReturn),
+                new LearningTarget("event-management.sections", "learning-event-sections", _tourSections));
+        else
+            TourTargets.Remove(this);
     }
 
     private async Task LoadResourceNavigationAsync()
@@ -209,6 +235,7 @@
 
     private void OnContextChanged()
     {
+        TourTargets.Remove(this);
         ++_promotionLoadGeneration;
         ++_resourceNavigationGeneration;
         _promotionNavigationAvailable = false;
@@ -227,6 +254,7 @@
     {
         if (_disposed) return;
         _disposed = true;
+        TourTargets.Remove(this);
         EventContext.Changed -= OnContextChanged;
         ++_promotionLoadGeneration;
         ++_resourceNavigationGeneration;

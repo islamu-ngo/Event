@@ -3,6 +3,67 @@
 
 # Operations
 
+## API Controller Assembly Ownership
+
+`AddApiHostServices` owns the MVC controller boundary: it clears inferred
+application parts and adds only the API assembly. Combined hosting must not scan
+persistence, migration or orchestration dependencies as controller libraries.
+Those assemblies can contain design-time types whose tooling dependencies are
+intentionally absent from the serving output. Adding EF design packages to the
+runtime is not the correction. JSON/HAL configuration and explicit test
+application parts registered after API composition retain their normal roles.
+
+## SQLite Startup Rebuild Integrity
+
+Normal Standalone startup applies the historical migrations before accepting
+traffic. `ConfigurableSqliteMigrationsSqlGenerator` keeps deferred temporary-table
+copies and both merged-resource batches in one connection-local foreign-key-off
+window. It recognizes native rebuild pragmas even when the migration contains no
+explicit table drop; nested pragma pairs must not reopen enforcement before a
+principal's alternate key has been rebuilt.
+
+The resource schema preflight remains before that window. After all copies, a
+temporary integer-only CHECK guard rejects any `pragma_foreign_key_check` result
+before the transaction-suppressed foreign-key-on command commits the batch.
+Restoring enforcement alone does not validate existing rows. Failure blocks
+startup; it is not permission to serve with broken relationships, forge migration
+history or replace normal migration with `EnsureCreated`. Generated migration
+files and their constraint definitions remain untouched.
+
+Browser sessions separately require the Redis ticket authority even with a
+SQLite application database. This is not the ordinary availability cache and
+must not fall back to one. See the [Standalone operator guide](../public/documentation/readme/self-hosting/docker-standalone.md)
+and [session authority inputs](../public/documentation/readme/configuration-and-operations/environment-variables.md#shared-browser-session-authority).
+
+## Private Learning Rollout And Recovery
+
+Learning adds four tenant-filtered entity tables through the generated
+`AddTenantLearningState` provider cohorts. Deploy through the normal migration
+owner; MariaDB uses the MySQL cohort but still requires its own engine receipt.
+No secret, configuration flag, background worker, live AI provider or external
+lesson asset is added. Ordinary reads never seed a learner or shared source.
+
+Shared-source removal is an explicitly authorized tenant-administrator operation
+and retains a tombstone. Recreating it requires its current revision; restarting
+the application or viewing context cannot undo removal. Learners retain their
+preferences and can clear their own orphaned practice without preview authority.
+Do not repair state by inserting production events or impersonating its owner.
+
+The learning writer uses one original selected human and physical Serializable
+settlement inside recognition/retained-erasure exclusion. It checks the persisted
+completion image before commit and publishes only after transaction disposal and
+receipt consumption. A stale request returns a conflict requiring a fresh private
+context. An uncertain commit is not a refusal and must not be automatically
+replayed with a new intent. Preserve the original intent when retrying a still
+retained operation; changed payloads are conflicts.
+
+Internal-user erasure purges learning across tenants in the existing protected
+applier, including retained covered replay and native PostgreSQL execution.
+Provider migration/race receipts and failures must be recorded explicitly;
+current-model SQLite tests cannot certify an entire historical migration chain.
+See [private learning](CONTEXTUAL_LEARNING.md) and the
+[operator guide](../public/documentation/readme/getting-started/contextual-learning.md).
+
 ## CodeQL analysis cancellation
 
 For CodeQL cancellation, distinguish the local watch deadline from the actual
@@ -10,6 +71,41 @@ job conclusion. The C# scan budget covers traced build, database finalization
 and query evaluation. Inspect phase timestamps before changing resources or
 rerunning; see [the measured budget](CI_CD_GOVERNANCE.md#required-repository-settings).
 Only the complete analysis for the selected head supplies scanner evidence.
+
+## Announcement Publication And Dismissal Recovery
+
+Announcement publications use coordinated values in the existing settings
+tables; account dismissals remain tenant/user-owned preferences. The approved
+PostgreSQL migrator installs the required native storage contracts and the new
+import owner's fixed RLS policies. First creation under existing FORCE RLS must
+preserve that protection; later policy or function drift is a refusal, not an
+instruction to disable RLS or reinstall over unexplained changes.
+
+Republish legacy scalar announcements through the typed editor. Do not convert
+integer markers into editions, backfill hashes, delete legacy rows or edit
+stored publication JSON to manufacture an edition. A content change or explicit
+redisplay creates a new material edition. Visibility alone preserves it.
+Removing a tenant override resumes inheritance, while disabling it keeps that
+tenant source selected and hides the bar.
+
+After a source/marker conflict, read the current source and private self state
+before another deliberate action. An uncertain save must be reconciled by reads,
+not automatically replayed under new tenant headers. Generic preference reset
+cannot erase the specialized account marker; signing in never imports a browser
+marker. Configuration artifacts contain semantic changes, not reusable runtime
+editions, source epochs or private dismissal evidence.
+
+Targeted verification uses `AnnouncementPublicationTests` in Domain,
+`AnnouncementTransportMappingTests`, `AnnouncementSettingValueCodecTests`,
+`AnnouncementConfigurationProjectionTests` and `AnnouncementOriginalCompilationTests`
+in Application; `AnnouncementEditionAdmissionTests` and the announcement cases
+of `HumanSettingsMutationPreparationTests` exercise real HTTP/original owners.
+`AnnouncementNativeProtocolTests.cs` contains the dedicated PostgreSQL storage
+cases. Seven affected client suites include actual generated-client request
+serialization, retained bar behavior and cache/editor/privacy boundaries.
+Build only the affected project, slice with its native TUnit tree-node filter,
+and record actual counts. These checks do not replace the programme's final
+provider/architecture matrix or separately recorded actual-host accessibility.
 
 ## Complete release-impact metadata
 
@@ -1640,6 +1736,25 @@ env DOTNET_ENVIRONMENT=Development \
 ```
 
 Use `PostgreSql`, `Sqlite`, `SqlServer`, `MySql` or `MariaDb` for the provider.
+The SQL Server catalog owns a provider-scoped `SqlServerSnapshotGenerator`.
+It retains standard owned-type generation and explicitly preserves existing
+`NoAction` ownership metadata in snapshots and migration target models.
+Without that metadata, reconstructing an owned relationship can infer Cascade
+and produce another unrelated FK alteration at the next scaffold. Keep the
+catalog's design-time service reference with that target assembly; placing its
+implementation in the common startup assembly also activates startup discovery
+for other providers.
+
+`PreserveSqlServerOwnedDeletePolicies` is a generated model-metadata checkpoint,
+not a new physical delete policy. Existing committed SQL Server migrations
+already install the moderation evidence FK without database cascade. Its
+`Up` and `Down` are intentionally empty, so applying or reverting this checkpoint
+does not weaken that constraint, alter private birth-receipt cascading, or
+rewrite earlier migration history. Later migrations should contain only their
+own intended model changes. Always compile and stage the current catalog before
+scaffolding with `--no-build`, then inspect the generated operations and verify
+model agreement rather than hand-editing a snapshot or accepting recurring noise.
+
 MySQL/MariaDB must additionally specify the intended server version, for example
 `--Database:ServerVersion=8.4.0` for MySQL. The mode flag is command-line only;
 an environment variable cannot silently select it. The ordinary design-time

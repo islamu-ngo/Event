@@ -200,6 +200,43 @@ recovery/support outcome without identifying another account. The shipped
 recovery path is the original credential provider or operator support, not a
 self-service merge or an unimplemented Link action.
 
+Account resolution uses `GetLocalIdentityBindingAsync` to read the filtered
+account and personal Actor without materializing either private profile. The
+`LocalIdentityWriter` purpose does not receive birth-declaration, collection
+receipt or birth-revision read access merely because a login needs its account.
+The generic full-profile repository read is not the identity lookup contract.
+
+For an existing account, synchronization obtains a tracked account-only entity
+inside the original transaction and compares its concurrency stamp with the
+second resolution. `SaveIdentityProfileAsync` accepts email and verification
+observations separately; absent observations preserve the corresponding stored
+values. The normal account save retains audit preparation and optimistic
+concurrency. An email change then conditionally updates only the email mirror,
+matching its observed old value and requiring exactly one affected row. Both
+writes share the existing transaction, so a mirror failure rolls back the
+account change. No incomplete `UserPii` is attached, and private birth data and
+its revision remain under their existing owner. This changes neither correlation
+trust nor database-purpose permissions.
+
+An already-bound Local sign-in also checks moderation-recognition settlement
+under the retained erasure-authority gate and the selected writer's original
+Serializable transaction. The Local writer's closed storage inventory therefore
+includes SELECT-only columns for `ModerationRecognitionPending` and
+`ModerationRecognitionCaptureItem`. The existing guard validates persisted
+pending state and recomputes the complete material receipt; reading only a
+status or child count would not establish settlement integrity. Receipt hashes,
+capture digests and key-verification tags are within this explicit read
+footprint; recognition key material is not resolved by this guard.
+
+These entries grant no recognition INSERT, UPDATE or DELETE, no table-wide
+SELECT, and no additional birth-data access. Runtime and Global are not promoted,
+and replacement-enrollment matching does not acquire its broader graph through
+this correction. The existing migrator-owned permission installer and exact
+catalog attestation remain authoritative for storage enrollment: a partial or
+obsolete profile fails closed rather than being repaired by a login request.
+An absent or foreign primary transaction, weaker isolation, missing retained
+gate, erased subject or unsettled material still rejects admission.
+
 ## Canonical Identity Email Ownership
 
 `UserIdentityEmailClaim` owns an instance-global normalized address.

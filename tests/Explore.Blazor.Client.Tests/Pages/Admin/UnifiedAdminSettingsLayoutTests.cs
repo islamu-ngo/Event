@@ -901,10 +901,8 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
                 Arg.Any<TenantPolicySettingsDto>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
-        _publicExperienceAdminService.ApplyAnnouncementBarSettingsAsync(
-                Arg.Any<TenantPolicySettingsDto>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
+        _publicExperienceAdminService.GetAnnouncementAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Explore.Blazor.Client.Contracts.Services.AnnouncementDraft?>(null));
         _publicExperienceAdminService.GetSettingsAsync(Arg.Any<CancellationToken>())
             .Returns(new TenantPublicExperienceAdminModel());
         _organizationService.GetOrganizationsPagedAsync(Arg.Any<int>(), Arg.Any<int>())
@@ -927,6 +925,27 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
             RequireContains(cut.Markup, "Instance operator identity");
             RequireContains(cut.Markup, "instance-operator-identity-editor");
         });
+    }
+
+    [Test]
+    public async Task AnnouncementEditorWithoutAPrivateSourceRemainsReadOnly()
+    {
+        var draft = new Explore.Blazor.Client.Contracts.Services.AnnouncementDraft
+        {
+            Enabled = true,
+            Message = "Unsaved draft",
+            LinkText = "Details",
+            LinkUrl = "/events"
+        };
+        var cut = _ctx.RenderMudComponent<Explore.Blazor.Client.Pages.Admin.Tenant.Components.TenantAnnouncementBarSection>(
+            parameters => parameters.Add(component => component.Model, draft));
+
+        await Assert.That(cut.FindComponent<MudSwitch<bool>>().Instance.Disabled).IsTrue();
+        await Assert.That(cut.FindComponents<MudTextField<string>>().Count).IsEqualTo(3);
+        foreach (var field in cut.FindComponents<MudTextField<string>>())
+            await Assert.That(field.Instance.Disabled).IsTrue();
+        await Assert.That(draft.Original).IsNull();
+        await Assert.That(draft.Message).IsEqualTo("Unsaved draft");
     }
 
     private static void RequireContains(string actual, string expected)

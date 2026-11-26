@@ -1,0 +1,156 @@
+@page "/learning/demo/{PracticeId:guid}"
+@using Explore.Blazor.Client.Components.Learning
+@using Explore.Blazor.Client.Contracts.Services.Learning
+@using Explore.Blazor.Client.Services.Learning
+@using Blazouter.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@rendermode InteractiveAuto
+@implements IDisposable
+@inject ILearningClientService Learning
+@inject ITranslationService Translation
+@inject NavigationManager Navigation
+@inject RouterStateService RouterState
+
+<PageTitle>@Title</PageTitle>
+<HeadContent>
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="referrer" content="no-referrer" />
+</HeadContent>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-6">
+    <header class="mb-6">
+        <MudText Typo="Typo.h4" HtmlTag="h1">@Title</MudText>
+        <AppButton Href="@HubRoute" Variant="Variant.Text" Class="mt-2">
+            @T("ui.learning.back_to_hub", "Back to learning hub")
+        </AppButton>
+    </header>
+    @if (!_interactiveReady || Learning.IsBusy && Learning.Practice is null)
+    {
+        <p role="status">@T("ui.learning.practice.loading", "Loading your private example...")</p>
+    }
+    else
+    {
+        @if (Learning.Failure != LearningClientFailure.None)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" role="alert" Class="mb-4">
+                @FailureText
+            </MudAlert>
+        }
+        @if (Learning.IsSaving)
+        {
+            <p role="status">@T("ui.learning.saving", "Waiting for the server to confirm this learning change...")</p>
+        }
+        @if (Learning.Practice is { } practice && practice.Id == ResolvedPracticeId)
+        {
+            <LearningPracticeSurface Practice="@practice" Lesson="@CurrentLesson" />
+        }
+        else if (Learning.LastMutationApplied == true && Learning.Failure == LearningClientFailure.None)
+        {
+            <p role="status" data-learning-state="cleared">
+                @T("ui.learning.practice.cleared_confirmed", "The server confirmed this exercise was cleared. No real work was changed.")
+            </p>
+        }
+        else if (Learning.Failure == LearningClientFailure.None)
+        {
+            <p data-learning-state="empty">@T("ui.learning.practice.absent", "This exercise is not available. Opening its address does not start or recreate it.")</p>
+        }
+        @if (Learning.Failure != LearningClientFailure.None)
+        {
+            <AppButton OnClick="ReloadAsync" Variant="Variant.Outlined" Disabled="@Learning.IsBusy" Class="mt-4">
+                @T("ui.learning.reload", "Reload current context")
+            </AppButton>
+        }
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public Guid PracticeId { get; set; }
+    [CascadingParameter(Name = "TenantContext")] private TenantContext? TenantContext { get; set; }
+    private readonly CancellationTokenSource _lifetime = new();
+    private Guid? _requestedId;
+    private Guid? _resolvedPracticeId;
+    private bool _interactiveReady;
+    private bool _loadRequested = true;
+    private bool _disposed;
+    private LearningLessonDto? CurrentLesson => Learning.Practice is { } practice
+        ? Learning.Lessons.FirstOrDefault(lesson => lesson.RecipeKey == practice.RecipeKey
+            && lesson.MaterialVersion == practice.MaterialVersion)
+        : null;
+    private string Title => _interactiveReady && CurrentLesson is { } lesson
+        ? T(lesson.Title.Key, lesson.Title.Fallback)
+        : T("ui.learning.practice.title", "Private practice");
+    private string HubRoute => Navigation.ToAbsoluteUri("learning").PathAndQuery;
+
+    protected override void OnInitialized()
+    {
+        Learning.Clear();
+        Learning.Changed += OnLearningChanged;
+        Translation.OnLanguageChanged += OnLanguageChanged;
+    }
+
+    protected override void OnParametersSet()
+    {
+        var routeId = RouterState.GetParam("practiceId");
+        _resolvedPracticeId = Guid.TryParse(routeId, out var parsedRouteId) && parsedRouteId != Guid.Empty
+            ? parsedRouteId
+            : PracticeId != Guid.Empty ? PracticeId : null;
+        if (TenantContext is not null)
+            Learning.SetTenantContext(TenantContext.TenantId);
+        var practiceId = _resolvedPracticeId;
+        if (_requestedId == practiceId)
+            return;
+        _requestedId = practiceId;
+        _loadRequested = true;
+        Learning.Clear();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _interactiveReady = true;
+        if (!_disposed && !Learning.IsBusy && (_loadRequested || Learning.RequiresContextRefresh))
+        {
+            _loadRequested = false;
+            await ReloadAsync();
+        }
+    }
+
+    private Guid ResolvedPracticeId => _resolvedPracticeId ?? Guid.Empty;
+    private Task ReloadAsync() => _resolvedPracticeId is { } practiceId
+        ? Learning.LoadPracticeAsync(practiceId, _lifetime.Token)
+        : Task.CompletedTask;
+
+    private void OnLearningChanged()
+    {
+        if (!_disposed)
+            _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLanguageChanged(string language)
+    {
+        if (!_disposed)
+            _ = InvokeAsync(StateHasChanged);
+    }
+
+    private string T(string key, string fallback) => Translation.T(key, fallback);
+    private string FailureText => Learning.Failure switch
+    {
+        LearningClientFailure.SignInRequired => T("ui.learning.failure.sign_in", "Sign in to read your private learning state."),
+        LearningClientFailure.Unavailable => T("ui.learning.failure.unavailable", "This learning context is unavailable. No private practice was opened."),
+        LearningClientFailure.Conflict => T("ui.learning.failure.conflict", "The learning state changed. Reload before choosing another action."),
+        LearningClientFailure.SaveNotApplied => T("ui.learning.failure.not_applied", "The server did not confirm that this change was applied. Your displayed state was not advanced. Reload before trying again."),
+        _ => T("ui.learning.failure.request", "Learning could not be updated or loaded. A change may have reached the server; reload to check its current state before trying again.")
+    };
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+        _disposed = true;
+        Learning.Changed -= OnLearningChanged;
+        Translation.OnLanguageChanged -= OnLanguageChanged;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+        Learning.Clear();
+    }
+}

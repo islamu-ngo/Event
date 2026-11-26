@@ -6,6 +6,25 @@ namespace Explore.API.Hateoas;
 /// </summary>
 public static class RouteNames
 {
+    public const string GetInstanceAnnouncementSource = nameof(GetInstanceAnnouncementSource);
+    public const string GetTenantAnnouncementSource = nameof(GetTenantAnnouncementSource);
+    public const string GetManagedTenantAnnouncementSource = nameof(GetManagedTenantAnnouncementSource);
+    public const string GetMyAnnouncementDismissal = nameof(GetMyAnnouncementDismissal);
+    public const string UpdateInstanceAnnouncement = nameof(UpdateInstanceAnnouncement);
+    public const string UpdateTenantAnnouncement = nameof(UpdateTenantAnnouncement);
+    public const string UpdateManagedTenantAnnouncement = nameof(UpdateManagedTenantAnnouncement);
+    public const string DismissAnnouncement = nameof(DismissAnnouncement);
+    public const string GetLearningContext = nameof(GetLearningContext);
+    public const string GetLearningGuidancePolicy = nameof(GetLearningGuidancePolicy);
+    public const string UpdateLearningGuidancePolicy = nameof(UpdateLearningGuidancePolicy);
+    public const string LearningAcknowledgeRequirement = nameof(LearningAcknowledgeRequirement);
+    public const string GetLearningTourPlan = nameof(GetLearningTourPlan);
+    public const string GetLearningPractice = nameof(GetLearningPractice);
+    public const string ClaimLearningTour = nameof(ClaimLearningTour);
+    public const string RecordLearningTourOutcome = nameof(RecordLearningTourOutcome);
+    public const string UpdateLearningPreferences = nameof(UpdateLearningPreferences);
+    public const string ApplyLearningPracticeAction = nameof(ApplyLearningPracticeAction);
+    public const string ManageTenantLearningSpace = nameof(ManageTenantLearningSpace);
     public const string ResolveVerifiedAccountContinuation = nameof(ResolveVerifiedAccountContinuation);
     public const string JoinVerifiedTenant = nameof(JoinVerifiedTenant);
     public const string GetModerationNoticeCorrection = nameof(GetModerationNoticeCorrection);

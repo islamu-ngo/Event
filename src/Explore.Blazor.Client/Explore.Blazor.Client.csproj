@@ -36,6 +36,7 @@
     <PackageReference Include="Blazouter.WebAssembly" />
     <PackageReference Include="DiffPlex" />
     <PackageReference Include="FluentValidation" />
+    <PackageReference Include="GuideFlow" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" />
     <PackageReference Include="Microsoft.Extensions.Http" />

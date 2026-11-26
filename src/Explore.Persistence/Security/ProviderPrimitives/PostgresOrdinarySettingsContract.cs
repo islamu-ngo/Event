@@ -44,8 +44,10 @@ public static partial class PostgresOrdinarySettingsContract
     private static readonly (string Name, string Signature, string Arguments, string Result)[] Routines =
     [
         ("read", "uuid,uuid,jsonb", "p_tenant uuid,p_user uuid,p_keys jsonb", "jsonb"),
+        ("learning_retain", "uuid", "p_tenant uuid", "void"),
         ("acquire", "uuid,uuid,jsonb,jsonb", "p_tenant uuid,p_user uuid,p_request jsonb,p_before jsonb", "void"),
         ("write", "text,text,integer,jsonb,jsonb", "p_group text,p_key text,p_operation integer,p_before jsonb,p_after jsonb", "jsonb"),
+        ("unchanged", "text,jsonb", "p_key text,p_expected jsonb", "void"),
         ("verify", "jsonb", "p_expected jsonb", "void"),
         ("complete", "jsonb", "p_expected jsonb", "void"),
         ("changed", "", "", "trigger"),
@@ -236,6 +238,24 @@ public static partial class PostgresOrdinarySettingsContract
 
     internal static Task VerifyAsync(IAttempt attempt, OrdinarySettingsDataImage expectedImage, CancellationToken token) =>
         CheckImageAsync(attempt, expectedImage, false, token);
+
+    internal static async Task CompleteUnchangedAsync(IAttempt attempt, string key,
+        OrdinarySettingsDataImage expectedImage, CancellationToken token)
+    {
+        var source = RequireAttempt(attempt);
+        try
+        {
+            await RequireReadyAsync(source.Context, source.Enrollment, token);
+            source.Require(true);
+            await using var command = Command(source.Context);
+            command.CommandText = $"SELECT {FunctionSql(source.Context, "unchanged")}(@key,@expected)";
+            Add(command, "key", NpgsqlDbType.Text, key);
+            Add(command, "expected", NpgsqlDbType.Jsonb, JsonSerializer.Serialize(expectedImage, Json));
+            await command.ExecuteNonQueryAsync(token);
+            source.Require(true);
+        }
+        catch { source.Dispose(); throw; }
+    }
 
     internal static Task RequireCompleteAsync(IAttempt attempt, OrdinarySettingsDataImage expectedImage, CancellationToken token) =>
         CheckImageAsync(attempt, expectedImage, true, token);

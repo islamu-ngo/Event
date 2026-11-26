@@ -1,0 +1,222 @@
+@using System.Globalization
+@using Explore.Blazor.Client.Contracts.Services.Learning
+@using Explore.Blazor.Client.Services.Learning
+@implements IDisposable
+@inject ILearningClientService Learning
+@inject ITranslationService Translation
+
+<section class="learning-practice"
+         data-testid="learning-practice"
+         data-practice-id="@Practice.Id.ToString("D")"
+         data-recipe-key="@Practice.RecipeKey"
+         data-practice-revision="@Practice.Revision.ToString(CultureInfo.InvariantCulture)"
+         data-simulation-step="@Practice.Simulation.Step.ToString(CultureInfo.InvariantCulture)"
+         aria-busy="@(Learning.IsSaving ? "true" : "false")">
+    <div class="learning-practice__simulation">
+        <MudIcon Icon="@Icons.Material.Outlined.Science" aria-hidden="true" />
+        <p>@T("ui.learning.simulation.label", "Simulation only. Nothing here creates, publishes, sells, invites, or changes a real event.")</p>
+    </div>
+
+    <header class="learning-practice__header">
+        <p class="learning-practice__eyebrow">@StateLabel</p>
+        <h2 @ref="_stepHeading" tabindex="-1" class="learning-practice__title">
+            @Display(Practice.Simulation.Presentation.Heading,
+                T("ui.learning.practice.preview", "Example preview"))
+        </h2>
+        <p>@Display(Practice.Simulation.Presentation.Description,
+            T("ui.learning.practice.description", "This private example does not perform a production action."))</p>
+    </header>
+
+    @if (_actionRefused)
+    {
+        <p role="alert">@T("ui.learning.action.refused", "This action is no longer available. The displayed example was not advanced. Reload the current context.")</p>
+    }
+
+    @if (Lesson is { } lesson)
+    {
+        <aside class="learning-practice__guidance" aria-label="@T("ui.learning.practice.guidance", "Exercise guidance")">
+            <p>@Display(lesson.Prerequisite)</p>
+            <p class="learning-practice__muted">@Display(lesson.CapabilityExplanation)</p>
+        </aside>
+
+        @if (Practice.RecipeKey != "ai-example-review" && Learning.HasPracticeAction("simulate-choice"))
+        {
+            <fieldset class="learning-practice__fieldset" disabled="@(!Learning.CanSubmit)">
+                <legend>@T("ui.learning.practice.choose", "Choose an example")</legend>
+                <div class="learning-practice__choices">
+                    @foreach (var choice in lesson.Choices ?? [])
+                    {
+                        <div class="learning-practice__choice" @key="choice.Key">
+                            <AppButton OnClick="@(() => ApplyAsync(LearningPracticeAction.Choose, choice.Key))"
+                                       Variant="Variant.Outlined" FullWidth="true" Disabled="@(!Learning.CanSubmit)"
+                                       data-learning-action="apply-practice-action"
+                                       data-practice-action="choose"
+                                       data-choice-key="@choice.Key">
+                                @Display(choice.Label)
+                            </AppButton>
+                            <p>@Display(choice.Explanation)</p>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        }
+    }
+
+    @if (Practice.RecipeKey == "ai-example-review")
+    {
+        <DemoAiConversation Practice="Practice" Lesson="Lesson" />
+    }
+
+    @if (Practice.RecipeKey != "ai-example-review" && Practice.Simulation.Presentation.Facts is { Count: > 0 } facts)
+    {
+        <dl class="learning-practice__facts" aria-label="@T("ui.learning.practice.facts", "Synthetic example details")">
+            @foreach (var fact in facts)
+            {
+                <div class="learning-practice__fact">
+                    <dt>@T($"learning.facts.{fact.Key}", fact.Key.Replace('-', ' '))</dt>
+                    <dd>@T($"learning.values.{fact.Value}", fact.Value.Replace('-', ' '))</dd>
+                </div>
+            }
+        </dl>
+    }
+
+    @if (Practice.RecipeKey != "ai-example-review" && Practice.Simulation.Receipt is { } receipt)
+    {
+        <div class="learning-practice__result" data-simulation-result="@receipt.ResultKey">
+            <h3>@T("ui.learning.practice.result", "Simulation result")</h3>
+            <p>@T("ui.learning.practice.no_effects", "This result records only your exercise choice. No real event, ticket, invitation, payment, publication, or AI request was created.")</p>
+        </div>
+    }
+
+    <div class="learning-practice__actions">
+        @if (Practice.RecipeKey != "ai-example-review" && Learning.HasPracticeAction("simulate-confirm"))
+        {
+            <AppButton OnClick="@(() => ApplyAsync(LearningPracticeAction.Confirm))"
+                       Disabled="@(!Learning.CanSubmit)"
+                       data-learning-action="apply-practice-action"
+                       data-practice-action="confirm">
+                @T("ui.learning.practice.confirm", "Confirm simulation")
+            </AppButton>
+        }
+        @if (Learning.HasPracticeAction("reset-simulation"))
+        {
+            <AppButton OnClick="@(() => ApplyAsync(LearningPracticeAction.Reset))"
+                       Variant="Variant.Outlined" Disabled="@(!Learning.CanSubmit)"
+                       data-learning-action="apply-practice-action"
+                       data-practice-action="reset">
+                @T("ui.learning.practice.reset", "Reset example")
+            </AppButton>
+        }
+        @if (Learning.HasPracticeAction("clear-practice"))
+        {
+            <AppButton OnClick="@(() => _confirmClear = true)"
+                       Variant="Variant.Text" Disabled="@(!Learning.CanSubmit)"
+                       aria-expanded="@(_confirmClear ? "true" : "false")"
+                       aria-controls="learning-clear-confirmation"
+                       data-learning-action="clear-practice">
+                @T("ui.learning.clear.label", "Clear practice")
+            </AppButton>
+        }
+    </div>
+
+    @if (_confirmClear && Learning.HasPracticeAction("clear-practice"))
+    {
+        <fieldset id="learning-clear-confirmation" class="learning-practice__fieldset" disabled="@(!Learning.CanSubmit)">
+            <legend>@T("ui.learning.clear.label", "Clear practice")</legend>
+            <p>@T("ui.learning.clear.confirmation", "Clear this private exercise? This does not remove the shared source or any real work.")</p>
+            <div class="learning-practice__actions">
+                <AppButton OnClick="ClearAsync" Disabled="@(!Learning.CanSubmit)"
+                           data-learning-action="clear-practice">
+                    @T("ui.learning.clear.confirm", "Confirm clear")
+                </AppButton>
+                <AppButton OnClick="CancelClear" Variant="Variant.Text" Disabled="@Learning.IsBusy">
+                    @T("ui.learning.cancel", "Cancel")
+                </AppButton>
+            </div>
+        </fieldset>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public HalResourceOfLearningPracticeDto Practice { get; set; } = null!;
+    [Parameter] public LearningLessonDto? Lesson { get; set; }
+    private readonly CancellationTokenSource _lifetime = new();
+    private ElementReference _stepHeading;
+    private Guid _observedId;
+    private long _observedRevision;
+    private bool _confirmClear;
+    private bool _focusStep;
+    private bool _actionRefused;
+    private bool _disposed;
+
+    protected override void OnParametersSet()
+    {
+        if (_observedId == Practice.Id && _observedRevision == Practice.Revision)
+            return;
+        _observedId = Practice.Id;
+        _observedRevision = Practice.Revision;
+        _confirmClear = false;
+        _actionRefused = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusStep && !_disposed)
+        {
+            _focusStep = false;
+            await _stepHeading.FocusAsync();
+        }
+    }
+
+    private async Task ApplyAsync(LearningPracticeAction action, string? choiceKey = null)
+    {
+        if (_disposed || !ReferenceEquals(Practice, Learning.Practice))
+            return;
+        var scope = Learning.Scope;
+        var practice = Practice;
+        bool applied = await Learning.ApplyPracticeActionAsync(action, choiceKey, _lifetime.Token);
+        if (_disposed || !ReferenceEquals(scope, Learning.Scope)
+            || !ReferenceEquals(Practice, Learning.Practice) || Practice.Id != practice.Id)
+            return;
+        _actionRefused = !applied && Learning.Failure == LearningClientFailure.None;
+        _focusStep = applied;
+    }
+
+    private async Task ClearAsync()
+    {
+        if (_disposed || !ReferenceEquals(Practice, Learning.Practice))
+            return;
+        var scope = Learning.Scope;
+        var practice = Practice;
+        bool applied = await Learning.ApplyPracticeActionAsync(
+            LearningPracticeAction.Clear, cancellationToken: _lifetime.Token);
+        if (!_disposed && ReferenceEquals(scope, Learning.Scope)
+            && ReferenceEquals(practice, Learning.Practice))
+            _actionRefused = !applied && Learning.Failure == LearningClientFailure.None;
+    }
+
+    private void CancelClear()
+    {
+        _confirmClear = false;
+        _focusStep = true;
+    }
+
+    private string T(string key, string fallback) => Translation.T(key, fallback);
+    private string Display(LearningDisplayTextDto? text, string fallback = "") =>
+        text is null ? fallback : T(text.Key, string.IsNullOrWhiteSpace(text.Fallback) ? fallback : text.Fallback);
+    private string StateLabel => Practice.Simulation.Status switch
+    {
+        LearningSimulationStatus.Choosing => T("ui.learning.practice.choosing", "Choose"),
+        LearningSimulationStatus.AwaitingConfirmation => T("ui.learning.practice.confirming", "Review before confirming"),
+        LearningSimulationStatus.Simulated => T("ui.learning.practice.simulated", "Simulated result"),
+        LearningSimulationStatus.Cleared => T("ui.learning.practice.cleared", "Cleared"),
+        _ => T("ui.learning.practice.preview", "Example preview")
+    };
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+    }
+}

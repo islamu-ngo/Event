@@ -438,12 +438,12 @@ public partial class EventRepository : GenericRepository<Event, Guid>, IEventRep
 
     public async Task<IReadOnlyList<Event>> GetEventsByActorWithDetails(Guid actorId, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Events
+        var query = _dbContext.Events
             .AsNoTrackingWithIdentityResolution()
             .AsSplitQuery()
             .IncludeStandardDetails()
-            .Where(e => e.ActorId == actorId)
-            .OrderByDescending(e => e.FirstSessionStartUtc)
+            .Where(e => e.ActorId == actorId);
+        return await EventDirectoryTemporalQuery.OrderEventsByFirstSessionDescending(_dbContext, query)
             .ThenBy(e => e.Title)
             .ThenBy(e => e.Id)
             .ToListAsync(cancellationToken);

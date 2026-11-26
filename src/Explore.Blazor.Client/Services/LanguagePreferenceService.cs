@@ -1,27 +1,23 @@
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Localization;
+using Explore.Blazor.Client.Services.Interop;
 using Microsoft.Extensions.Logging;
-using Refit;
 
 namespace Explore.Blazor.Client.Services;
-
-public interface ILanguagePreferenceApi
-{
-    [Post("/bff/language")]
-    Task<IApiResponse> SetLanguageAsync([Query] string lang, CancellationToken cancellationToken);
-}
 
 /// <summary>
 /// Default <see cref="ILanguagePreferenceService"/> implementation.
 /// </summary>
 public sealed class LanguagePreferenceService : ILanguagePreferenceService
 {
-    private readonly ILanguagePreferenceApi _api;
+    private readonly ILanguagePreferenceCookieInterop _cookieInterop;
     private readonly ILogger<LanguagePreferenceService> _logger;
 
-    public LanguagePreferenceService(ILanguagePreferenceApi api, ILogger<LanguagePreferenceService> logger)
+    public LanguagePreferenceService(
+        ILanguagePreferenceCookieInterop cookieInterop,
+        ILogger<LanguagePreferenceService> logger)
     {
-        _api = api;
+        _cookieInterop = cookieInterop;
         _logger = logger;
     }
 
@@ -37,17 +33,7 @@ public sealed class LanguagePreferenceService : ILanguagePreferenceService
 
         try
         {
-            var response = await _api.SetLanguageAsync(entry.Code, ct);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning(
-                    "[LOCALIZATION] /bff/language returned {Status} for code {Code}",
-                    (int)response.StatusCode, entry.Code);
-                return false;
-            }
-
-            return true;
+            return await _cookieInterop.PersistLanguagePreferenceAsync(entry.Code, ct);
         }
         catch (Exception ex)
         {

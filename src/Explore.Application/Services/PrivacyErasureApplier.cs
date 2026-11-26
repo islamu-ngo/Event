@@ -28,7 +28,8 @@ public sealed class PrivacyErasureApplier(
     ILogger<PrivacyErasureApplier> logger,
     IOptions<PrivacyErasureOptions> options,
     IModerationRecognitionErasure recognition,
-    ILocalIdentityEligibilityRevocation localEligibility)
+    ILocalIdentityEligibilityRevocation localEligibility,
+    ILearningPrivacyErasureStore learning)
 {
     private readonly PrivacyErasureOptions _options = options.Value;
 
@@ -72,6 +73,8 @@ public sealed class PrivacyErasureApplier(
             nativeCandidates = await native.PrepareAsync(intent, authority, cancellationToken);
         else
             await erasureRepository.FenceSubjectAsync(intent.SubjectId, cancellationToken);
+        await learning.PurgeAsync(intent, cancellationToken);
+        await learning.RequireAbsentAsync(intent, cancellationToken);
         PrivacyErasureReplayCheckpoint? current =
             await checkpointRepository.GetLatestAsync(cancellationToken);
         if (current?.Matches(intent) == true

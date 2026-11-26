@@ -25,6 +25,7 @@
 @using Explore.Blazor.Client.Pages.Contact
 @using Explore.Blazor.Client.Pages.About
 @using Explore.Blazor.Client.Pages.Onboarding
+@using Explore.Blazor.Client.Pages.Learning
 @using Explore.Blazor.Client.Pages.Events.Sessions
 @using Explore.Blazor.Client.Components.EventReporting
 @using Explore.Blazor.Client.Components.Moderation
@@ -105,6 +106,8 @@
             },
 
             // User authenticated routes
+            new RouteConfig { Path = "/learning", Component = typeof(LearningHub), Transition = RouteTransition.None, EnableCache = false, Guards = RequireAuthenticated() },
+            new RouteConfig { Path = "/learning/demo/:practiceId", Component = typeof(LearningPractice), Transition = RouteTransition.None, EnableCache = false, Guards = RequireAuthenticated() },
             new RouteConfig
             {
                 Path = "/moderation/policies",
@@ -195,6 +198,7 @@
             new RouteConfig { Path = "/admin/instance/plans/:Key", Component = typeof(InstanceTenantPlanDetailPage), Transition = RouteTransition.Fade, Guards = RequireMultiTenantAdmin() },
              new RouteConfig { Path = "/settings/instance", Component = typeof(AdminSettingsPage), Transition = RouteTransition.Fade, Guards = RequireAdmin() },
              new RouteConfig { Path = "/settings/admin", Component = typeof(AdminSettingsPage), Transition = RouteTransition.Fade, Guards = RequireTenantAdmin() },
+             new RouteConfig { Path = "/settings/admin/learning", Component = typeof(TenantLearningSettings), Transition = RouteTransition.None, EnableCache = false, Guards = RequireTenantAdmin() },
              new RouteConfig { Path = "/settings/organization/:OrganizationId", Component = typeof(OrganizationAdminSettings), Transition = RouteTransition.Fade, Guards = RequireOrgAdmin() },
              new RouteConfig { Path = "/settings/group/:GroupId", Component = typeof(GroupAdminSettings), Transition = RouteTransition.Fade, Guards = RequireGroupAdmin() },
     };

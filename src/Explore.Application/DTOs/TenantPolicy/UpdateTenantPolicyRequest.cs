@@ -1,8 +1,9 @@
 using System.Text.Json.Serialization;
+using ISLAMU.Wire.Contracts.Announcements;
 
 namespace Explore.Application.DTOs.TenantPolicy;
 
-[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Skip)]
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record UpdateTenantPolicyRequest
 {
     public bool AllowUserSubmittedEvents { get; init; } = true;
@@ -16,11 +17,7 @@ public sealed record UpdateTenantPolicyRequest
     public string PreferredHomePage { get; init; } = "EventList";
     public string Subdomain { get; init; } = string.Empty;
     public string CustomDomain { get; init; } = string.Empty;
-    public bool AnnouncementBarEnabled { get; init; }
-    public string AnnouncementBarMessage { get; init; } = string.Empty;
-    public string AnnouncementBarLinkText { get; init; } = string.Empty;
-    public string AnnouncementBarLinkUrl { get; init; } = string.Empty;
-    public bool ForceAnnouncementBarRedisplay { get; init; }
+    public AnnouncementUpdateDto? Announcement { get; init; }
 
     // Community guidelines
     public string CommunityGuidelinesContent { get; init; } = string.Empty;

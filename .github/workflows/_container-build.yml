@@ -13,9 +13,18 @@ on:
         required: false
         type: string
         default: "."
-      metadata-tags:
-        required: true
+      push-mode:
+        required: false
         type: string
+        default: "tagged"
+      metadata-tags:
+        required: false
+        type: string
+        default: ""
+      environment:
+        required: false
+        type: string
+        default: ""
       build-configuration:
         required: false
         type: string
@@ -33,7 +42,17 @@ on:
         type: string
     secrets:
       ATCR_PASSWORD:
-        required: true
+        required: false
+    outputs:
+      digest:
+        description: "Immutable OCI index digest (sha256:...) built and pushed to both registries."
+        value: ${{ jobs.build.outputs.digest }}
+      atcr-reference:
+        description: "Canonical ATCR registry/repository@sha256:... reference."
+        value: ${{ jobs.build.outputs.atcr-reference }}
+      ghcr-reference:
+        description: "Canonical GHCR registry/repository@sha256:... reference."
+        value: ${{ jobs.build.outputs.ghcr-reference }}
 
 permissions:
   contents: read
@@ -47,11 +66,57 @@ jobs:
     name: Build ${{ inputs.image-name }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    environment: ${{ inputs.environment }}
 
     outputs:
-      digest: ${{ steps.build.outputs.digest }}
+      digest: ${{ steps.refs.outputs.digest }}
+      atcr-reference: ${{ steps.refs.outputs.atcr-reference }}
+      ghcr-reference: ${{ steps.refs.outputs.ghcr-reference }}
 
     steps:
+      - name: Validate container build inputs
+        id: validate
+        shell: bash
+        env:
+          PUSH_MODE: ${{ inputs.push-mode }}
+          METADATA_TAGS: ${{ inputs.metadata-tags }}
+          REGISTRY: ${{ inputs.registry }}
+          REGISTRY_USER: ${{ inputs.registry-user }}
+          IMAGE_NAME: ${{ inputs.image-name }}
+          ATCR_SECRET_PRESENT: ${{ secrets.ATCR_PASSWORD != '' }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+
+          case "${PUSH_MODE}" in
+            tagged)
+              if [[ -z "${METADATA_TAGS//[[:space:]]/}" ]]; then
+                echo "metadata-tags is required when push-mode=tagged." >&2
+                exit 1
+              fi
+              ;;
+            digest-only)
+              if [[ -n "${METADATA_TAGS//[[:space:]]/}" ]]; then
+                echo "metadata-tags must be empty when push-mode=digest-only; release staging assigns no registry tags." >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Unsupported push-mode '${PUSH_MODE}'. Expected 'tagged' or 'digest-only'." >&2
+              exit 1
+              ;;
+          esac
+
+          if [[ "${ATCR_SECRET_PRESENT}" != "true" ]]; then
+            echo "ATCR_PASSWORD secret is required for container builds." >&2
+            exit 1
+          fi
+
+          ghcr_owner="${REPO_OWNER,,}"
+          echo "ghcr-owner=${ghcr_owner}" >> "$GITHUB_OUTPUT"
+          echo "atcr-repository=${REGISTRY}/${REGISTRY_USER}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "ghcr-repository=ghcr.io/${ghcr_owner}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -82,17 +147,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Extract metadata
+      - name: Extract metadata (tagged mode)
+        if: ${{ inputs.push-mode == 'tagged' }}
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: |
-            ${{ inputs.registry }}/${{ inputs.registry-user }}/${{ inputs.image-name }}
-            ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}
+            ${{ steps.validate.outputs.atcr-repository }}
+            ${{ steps.validate.outputs.ghcr-repository }}
           tags: ${{ inputs.metadata-tags }}
 
-      - name: Build and push
-        id: build
+      - name: Build and push (tagged mode)
+        if: ${{ inputs.push-mode == 'tagged' }}
+        id: build-tagged
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ inputs.context }}
@@ -108,16 +175,61 @@ jobs:
           build-args: |
             BUILD_CONFIGURATION=${{ inputs.build-configuration }}
 
-      - name: Record image digest evidence
+      - name: Build and stage by digest only (no registry tags)
+        if: ${{ inputs.push-mode == 'digest-only' }}
+        id: build-digest
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
+          sbom: true
+          provenance: mode=max
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+          outputs: |
+            type=image,name=${{ steps.validate.outputs.atcr-repository }},push=true,push-by-digest=true,name-canonical=true
+            type=image,name=${{ steps.validate.outputs.ghcr-repository }},push=true,push-by-digest=true,name-canonical=true
+          build-args: |
+            BUILD_CONFIGURATION=${{ inputs.build-configuration }}
+
+      - name: Resolve canonical digest references
+        id: refs
+        shell: bash
+        env:
+          TAGGED_DIGEST: ${{ steps.build-tagged.outputs.digest }}
+          DIGEST_ONLY_DIGEST: ${{ steps.build-digest.outputs.digest }}
+          ATCR_REPOSITORY: ${{ steps.validate.outputs.atcr-repository }}
+          GHCR_REPOSITORY: ${{ steps.validate.outputs.ghcr-repository }}
+        run: |
+          set -euo pipefail
+          digest="${TAGGED_DIGEST:-${DIGEST_ONLY_DIGEST}}"
+          if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Container build did not produce a valid sha256 OCI index digest: '${digest}'." >&2
+            exit 1
+          fi
+
+          atcr_ref="${ATCR_REPOSITORY}@${digest}"
+          ghcr_ref="${GHCR_REPOSITORY}@${digest}"
+          {
+            echo "digest=${digest}"
+            echo "atcr-reference=${atcr_ref}"
+            echo "ghcr-reference=${ghcr_ref}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Record image digest evidence (tagged mode)
+        if: ${{ inputs.push-mode == 'tagged' }}
         shell: bash
         env:
           RestorePackagesWithLockFile: "false"
           IMAGE_NAME: ${{ inputs.image-name }}
           DOCKERFILE: ${{ inputs.dockerfile }}
           CONTEXT: ${{ inputs.context }}
-          DIGEST: ${{ steps.build.outputs.digest }}
+          DIGEST: ${{ steps.refs.outputs.digest }}
           TAGS: ${{ steps.meta.outputs.tags }}
-          METADATA: ${{ steps.build.outputs.metadata }}
+          METADATA: ${{ steps.build-tagged.outputs.metadata }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/container
@@ -136,11 +248,72 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Record digest-only staging evidence
+        if: ${{ inputs.push-mode == 'digest-only' }}
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ inputs.image-name }}
+          DOCKERFILE: ${{ inputs.dockerfile }}
+          CONTEXT: ${{ inputs.context }}
+          DIGEST: ${{ steps.refs.outputs.digest }}
+          ATCR_REF: ${{ steps.refs.outputs.atcr-reference }}
+          GHCR_REF: ${{ steps.refs.outputs.ghcr-reference }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/container
+
+          jq -n \
+            --arg imageName "${IMAGE_NAME}" \
+            --arg dockerfile "${DOCKERFILE}" \
+            --arg context "${CONTEXT}" \
+            --arg pushMode "digest-only" \
+            --arg digest "${DIGEST}" \
+            --arg atcrReference "${ATCR_REF}" \
+            --arg ghcrReference "${GHCR_REF}" \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg sha "${GITHUB_SHA}" \
+            --arg ref "${GITHUB_REF}" \
+            --arg runId "${GITHUB_RUN_ID}" \
+            --arg runAttempt "${GITHUB_RUN_ATTEMPT}" \
+            '{
+              imageName: $imageName,
+              dockerfile: $dockerfile,
+              context: $context,
+              pushMode: $pushMode,
+              digest: $digest,
+              tags: [],
+              atcrReference: $atcrReference,
+              ghcrReference: $ghcrReference,
+              github: {
+                repository: $repository,
+                sha: $sha,
+                ref: $ref,
+                runId: $runId,
+                runAttempt: $runAttempt
+              }
+            }' > "artifacts/container/${IMAGE_NAME}-digest.json"
+
+          docker buildx imagetools inspect "${ATCR_REF}" > "artifacts/container/${IMAGE_NAME}-atcr-oci-inspect.txt"
+
+          {
+            echo "## Container image digest-only staging"
+            echo
+            echo "Image: \`${IMAGE_NAME}\`"
+            echo
+            echo "Digest: \`${DIGEST}\`"
+            echo
+            echo "Canonical tagless references:"
+            echo "- \`${ATCR_REF}\`"
+            echo "- \`${GHCR_REF}\`"
+            echo
+            echo "No mutable or version registry tags were assigned."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Export SBOM and provenance registry evidence
         shell: bash
         env:
           IMAGE_NAME: ${{ inputs.image-name }}
-          IMAGE_REF: ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}@${{ steps.build.outputs.digest }}
+          IMAGE_REF: ${{ steps.refs.outputs.ghcr-reference }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/container
@@ -161,14 +334,15 @@ jobs:
             echo "These files preserve the registry manifest/index evidence for the Buildx SBOM and provenance attestations generated during the build."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Record immutable deployment tag promotion evidence
+      - name: Record immutable deployment tag promotion evidence (tagged mode)
+        if: ${{ inputs.push-mode == 'tagged' }}
         shell: bash
         env:
           RestorePackagesWithLockFile: "false"
           IMAGE_NAME: ${{ inputs.image-name }}
           REGISTRY: ${{ inputs.registry }}
           REGISTRY_USER: ${{ inputs.registry-user }}
-          DIGEST: ${{ steps.build.outputs.digest }}
+          DIGEST: ${{ steps.refs.outputs.digest }}
           TAGS: ${{ steps.meta.outputs.tags }}
         run: |
           set -euo pipefail
@@ -208,7 +382,7 @@ jobs:
       - name: Generate Trivy SARIF evidence
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}@${{ steps.build.outputs.digest }}
+          image-ref: ${{ steps.refs.outputs.ghcr-reference }}
           format: sarif
           output: artifacts/container/${{ inputs.image-name }}-trivy.sarif
           exit-code: "0"
@@ -219,7 +393,7 @@ jobs:
       - name: Scan image vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}@${{ steps.build.outputs.digest }}
+          image-ref: ${{ steps.refs.outputs.ghcr-reference }}
           format: table
           output: artifacts/container/${{ inputs.image-name }}-trivy.txt
           exit-code: "1"
@@ -230,8 +404,8 @@ jobs:
       - name: Generate GHCR artifact attestation
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
-          subject-name: ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-name: ${{ steps.validate.outputs.ghcr-repository }}
+          subject-digest: ${{ steps.refs.outputs.digest }}
           push-to-registry: true
 
       - name: Verify GHCR artifact attestation
@@ -239,7 +413,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           IMAGE_NAME: ${{ inputs.image-name }}
-          IMAGE_REF: ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}@${{ steps.build.outputs.digest }}
+          IMAGE_REF: ${{ steps.refs.outputs.ghcr-reference }}
           SIGNER_WORKFLOW: ${{ github.repository }}/.github/workflows/_container-build.yml
         run: |
           set -euo pipefail

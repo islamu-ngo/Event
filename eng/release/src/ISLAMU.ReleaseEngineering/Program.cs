@@ -75,6 +75,11 @@ public static class Program
             return PrepareCommand.Run(args, output, Environment.CurrentDirectory, platform, timeout);
         }
 
+        if (string.Equals(args[0], "seal-artifacts", StringComparison.Ordinal))
+        {
+            return ReleaseArtifactManifest.RunCli(args, output, Environment.CurrentDirectory);
+        }
+
         if (args[0] is "allocate-change-id" or
             "create-change" or
             "preflight-commit" or
@@ -123,7 +128,7 @@ public static class Program
     private static int WriteUsage(TextWriter output)
     {
         output.WriteLine(
-            "usage: release-engine ensure-git-cliff [--output <directory>] | verify-tools | verify-release-tag --tag <tag-name> [--target <oid>] [--event-sha <oid>] [--allowed-signers <path>] [--signer <principal>] [--repository <path>] | diff-contracts <base-oid> <head-oid> <output-path> | prepare <release-directory> [--image-manifest <path>] | sync-public-changelog --publication-base <https-url> [--allowed-signers <path>] [--check] | select-security-changes <paths-file> | select-build-test-changes <paths-file> | verify-security-register <register-json> | allocate-change-id --target <ref> | create-change --type <type> --scope <scope> --title <title> --summary <summary> [--group <group>] [--target <ref>] | preflight-commit <message-file> [--target <ref>] | preflight-staged [--target <ref>] | preflight-range --target <ref> [--head <ref>] | install-change-hooks [--target <ref>]");
+            "usage: release-engine ensure-git-cliff [--output <directory>] | verify-tools | verify-release-tag --tag <tag-name> [--target <oid>] [--event-sha <oid>] [--allowed-signers <path>] [--signer <principal>] [--repository <path>] | diff-contracts <base-oid> <head-oid> <output-path> | prepare <release-directory> [--image-manifest <path>] | seal-artifacts --directory <path> --version <version> --tag <tag-name> --commit <oid> [--output-dir <path>] | sync-public-changelog --publication-base <https-url> [--allowed-signers <path>] [--check] | select-security-changes <paths-file> | select-build-test-changes <paths-file> | verify-security-register <register-json> | allocate-change-id --target <ref> | create-change --type <type> --scope <scope> --title <title> --summary <summary> [--group <group>] [--target <ref>] | preflight-commit <message-file> [--target <ref>] | preflight-staged [--target <ref>] | preflight-range --target <ref> [--head <ref>] | install-change-hooks [--target <ref>]");
         return UsageError;
     }
 }

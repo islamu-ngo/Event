@@ -217,6 +217,7 @@ public sealed class ProgramTests
         await Assert.That(text).Contains("verify-release-tag");
         await Assert.That(text).Contains("diff-contracts");
         await Assert.That(text).Contains("--image-manifest");
+        await Assert.That(text).Contains("seal-artifacts");
         await Assert.That(text).Contains("preflight-range");
         await Assert.That(text).DoesNotContain("run-promoted");
         await Assert.That(text).DoesNotContain("verify-candidate");
@@ -269,6 +270,48 @@ public sealed class ProgramTests
         {
             Directory.Delete(tempRoot, recursive: true);
         }
+    }
+
+    [Test]
+    public async Task SealArtifactsCliSealsDeterministicallyAndRejectsClobberAndBadArguments()
+    {
+        using var fixture = new ReleaseArtifactManifestTests.ArtifactSealFixture();
+        string outputDir = Path.Combine(fixture.Root, "sealed-cli");
+        string commitOid = new('a', 40);
+
+        using var badArgsOut = new StringWriter();
+        int badArgsCode = Program.Run(["seal-artifacts", "--directory", fixture.ArtifactDirectory], badArgsOut);
+        await Assert.That(badArgsCode).IsEqualTo(Program.UsageError);
+
+        using var okOut = new StringWriter();
+        int okCode = Program.Run(
+            [
+                "seal-artifacts",
+                "--directory", fixture.ArtifactDirectory,
+                "--version", "1.1.0",
+                "--tag", "v1.1.0",
+                "--commit", commitOid,
+                "--output-dir", outputDir,
+            ],
+            okOut);
+        await Assert.That(okCode).IsEqualTo(Program.Success).Because(okOut.ToString());
+        await Assert.That(okOut.ToString()).Contains("sealed_artifacts: version=1.1.0 tag=v1.1.0 files=5 images=4 references=8");
+        await Assert.That(File.Exists(Path.Combine(outputDir, ReleaseArtifactManifest.ChecksumsFileName))).IsTrue();
+        await Assert.That(File.Exists(Path.Combine(outputDir, ReleaseArtifactManifest.ManifestFileName))).IsTrue();
+
+        using var clobberOut = new StringWriter();
+        int clobberCode = Program.Run(
+            [
+                "seal-artifacts",
+                "--directory", fixture.ArtifactDirectory,
+                "--version", "1.1.0",
+                "--tag", "v1.1.0",
+                "--commit", commitOid,
+                "--output-dir", outputDir,
+            ],
+            clobberOut);
+        await Assert.That(clobberCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(clobberOut.ToString()).Contains("artifact_manifest_output_exists");
     }
 
     private static string RunProcess(string executable, string workingDirectory, params string[] arguments)

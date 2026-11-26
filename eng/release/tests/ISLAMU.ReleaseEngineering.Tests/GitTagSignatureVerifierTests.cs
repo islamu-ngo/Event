@@ -163,6 +163,134 @@ public sealed class GitTagSignatureVerifierTests
         await Assert.That(afterBaseline.Select(commit => commit.Oid).ToArray()).IsEquivalentTo([secondCommit]);
     }
 
+    [Test]
+    [Arguments("1.0.0")]
+    [Arguments("v01.0.0")]
+    [Arguments("refs/tags/v0.1.0")]
+    [Arguments("v0.1.0;id")]
+    public async Task RejectsMalformedTagNamesAndInvalidExpectedOids(string malformedTag)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new SignedTagFixture();
+        string commit = fixture.Commit("feat(events): publish first release");
+        fixture.CreateSignedTag(FirstReleaseTag, commit, fixture.AuthorizedKeyPath);
+
+        GitTagVerificationResult badTag = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
+            fixture.RepositoryRoot,
+            malformedTag,
+            fixture.AllowedSignersPath));
+        await Assert.That(badTag.IsValid).IsFalse();
+        await Assert.That(badTag.Diagnostic).IsEqualTo("tag_name_malformed");
+
+        GitTagVerificationResult badTarget = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
+            fixture.RepositoryRoot,
+            FirstReleaseTag,
+            fixture.AllowedSignersPath,
+            ExpectedTargetOid: commit[..12]));
+        await Assert.That(badTarget.IsValid).IsFalse();
+        await Assert.That(badTarget.Diagnostic).IsEqualTo("tag_expected_target_invalid");
+
+        GitTagVerificationResult badEventSha = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
+            fixture.RepositoryRoot,
+            FirstReleaseTag,
+            fixture.AllowedSignersPath,
+            ExpectedEventSha: commit.ToUpperInvariant()));
+        await Assert.That(badEventSha.IsValid).IsFalse();
+        await Assert.That(badEventSha.Diagnostic).IsEqualTo("tag_expected_event_sha_invalid");
+
+        GitTagVerificationResult missingTag = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
+            fixture.RepositoryRoot,
+            "v9.9.9",
+            fixture.AllowedSignersPath));
+        await Assert.That(missingTag.IsValid).IsFalse();
+        await Assert.That(missingTag.Diagnostic).IsEqualTo("tag_missing");
+    }
+
+    [Test]
+    public async Task RejectsSymlinkedAllowedSignersSymlinkedRepoAndRevokedSigner()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new SignedTagFixture();
+        string commit = fixture.Commit("feat(events): publish first release");
+        fixture.CreateSignedTag(FirstReleaseTag, commit, fixture.AuthorizedKeyPath);
+
+        string linkedSigners = Path.Combine(fixture.Root, "linked-signers");
+        File.CreateSymbolicLink(linkedSigners, fixture.AllowedSignersPath);
+        GitTagVerificationResult symlinkSigners = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
+            fixture.RepositoryRoot,
+            FirstReleaseTag,
+            linkedSigners,
+            ExpectedTargetOid: commit));
+        await Assert.That(symlinkSigners.IsValid).IsFalse();
+        await Assert.That(symlinkSigners.Diagnostic).IsEqualTo("tag_allowed_signers_missing");
+
+        string linkedRepo = Path.Combine(fixture.Root, "linked-repo");
+        Directory.CreateSymbolicLink(linkedRepo, fixture.RepositoryRoot);
+        GitTagVerificationResult symlinkRepo = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
+            linkedRepo,
+            FirstReleaseTag,
+            fixture.AllowedSignersPath,
+            ExpectedTargetOid: commit));
+        await Assert.That(symlinkRepo.IsValid).IsFalse();
+        await Assert.That(symlinkRepo.Diagnostic).IsEqualTo("tag_repository_invalid");
+
+        // Revoke the authorized key by replacing allowed-signers with only a different key.
+        string replacementPub = string.Join(' ', (await File.ReadAllTextAsync(fixture.UnauthorizedKeyPath + ".pub")).Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2));
+        string rotatedSigners = Path.Combine(fixture.Root, "rotated-signers");
+        await File.WriteAllTextAsync(rotatedSigners, $"release-operator namespaces=\"git\" {replacementPub}\n");
+        GitTagVerificationResult revoked = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
+            fixture.RepositoryRoot,
+            FirstReleaseTag,
+            rotatedSigners,
+            ExpectedTargetOid: commit));
+        await Assert.That(revoked.IsValid).IsFalse();
+        await Assert.That(revoked.Diagnostic).IsEqualTo("tag_signature_invalid");
+    }
+
+    [Test]
+    public async Task RunCliRejectsWrongSignerWrongTargetAndInvalidArguments()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new SignedTagFixture();
+        string firstCommit = fixture.Commit("feat(events): establish baseline");
+        string secondCommit = fixture.Commit("fix(events): harden validation");
+        fixture.CreateSignedTag(FirstReleaseTag, secondCommit, fixture.AuthorizedKeyPath);
+
+        using var missingTagOut = new StringWriter();
+        int missingCode = GitTagSignatureVerifier.RunCli(["verify-release-tag"], missingTagOut, fixture.RepositoryRoot, TimeSpan.FromSeconds(5));
+        await Assert.That(missingCode).IsEqualTo(Program.UsageError);
+
+        using var wrongSignerOut = new StringWriter();
+        int wrongSignerCode = GitTagSignatureVerifier.RunCli(
+            ["verify-release-tag", "--repository", fixture.RepositoryRoot, "--tag", FirstReleaseTag, "--allowed-signers", fixture.AllowedSignersPath, "--signer", "wrong-principal"],
+            wrongSignerOut,
+            fixture.RepositoryRoot,
+            TimeSpan.FromSeconds(5));
+        await Assert.That(wrongSignerCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(wrongSignerOut.ToString()).Contains("tag_signer_unauthorized");
+
+        using var wrongTargetOut = new StringWriter();
+        int wrongTargetCode = GitTagSignatureVerifier.RunCli(
+            ["verify-release-tag", "--repository", fixture.RepositoryRoot, "--tag", FirstReleaseTag, "--allowed-signers", fixture.AllowedSignersPath, "--target", firstCommit],
+            wrongTargetOut,
+            fixture.RepositoryRoot,
+            TimeSpan.FromSeconds(5));
+        await Assert.That(wrongTargetCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(wrongTargetOut.ToString()).Contains("tag_target_mismatch");
+    }
+
     private sealed class SignedTagFixture : IDisposable
     {
         private int commitSequence;
